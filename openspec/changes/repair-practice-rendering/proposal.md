@@ -7,7 +7,7 @@ The operator reports disconnected measure fragments in passage selection and act
 ## What Changes
 
 - Compose selected consecutive measures into one continuous horizontal strip with aligned staff lines, correctly owned musical separators, and no independent crop gaps or horizontal scrollbar.
-- Use the same passage composition rules in the leaf selection preview and active practice, while retaining fixed reading positions, existing slot replacement eligibility, and paused/unmeasured page controls.
+- Use the same passage composition rules in the leaf selection preview and active practice, while retaining fixed reading positions, the protected current-measure policy and consecutive Free view navigation established by the refill follow-up.
 - Project original source-owned ties and slurs into the joined passage using shared curve rules and verified note endpoints. Reusing clipped original-system fragments is insufficient at system joins or fixed-position padding; displayed relations must connect without moving their notes or rewriting stored pages.
 - Fit an ordinary four-bar leaf across the available width efficiently, with substantial consistent outer breathing room so notation does not crowd the preview edge. Center both selector and active passage notation naturally, accounting for unused internal SVG/slot space rather than centering only its frame, while preserving stable active reading references. Keep large joined passages bounded to useful windows rather than compressing a whole work into a tiny preview.
 - Bind all owned duration ink, including hollow stems and their white interiors, to the same visibility and Pause restoration as the associated notes. Handle supported glyph families and scores generically.
@@ -18,6 +18,10 @@ The operator reports disconnected measure fragments in passage selection and act
 - Give existing shared tempo fields separate keyboard browse and edit modes. Up/Down navigates options; Enter edits the number, where Up/Down adjusts and typing replaces it; Enter commits and Escape cancels an unpersisted draft. Mouse chevrons remain available without becoming extra keyboard stops. Retain the established numeric admission and adjustment rules.
 - Preserve joined/component attainment independence, timing and beat-aligned transitions, Done/Enter/pedal completion, queued speeds, shared rotation/input bindings, frozen package identity, and saved data.
 - Require rendered lifecycle observations and visual inspection alongside meaningful geometry/ownership regression tests. Distinguish agreement with the fixed-position idea from acceptance of its implementation.
+
+- Keep Restart preparation as an active action outside Options with clear purpose; compact the shared fingering behavior picker without changing its choices or keyboard/mouse controls. Use Free view consistently for the full-notation browsing mode and its applicable Previous measures/Next measures bindings.
+
+- Let Free view Previous/Next slots inherit live main controls by default, with optional local overrides and explicit local unbinding, with no reset control or extra editor item. Keep runtime/Test/hints consistent and preserve exact older main bindings and shared settings.
 
 ## Capabilities
 

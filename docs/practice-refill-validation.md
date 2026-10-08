@@ -1,150 +1,193 @@
 # Adaptive practice refill source validation
 
-This source change implements `reuse-cleared-practice-space` above reviewed
-rendering prerequisite `c068334ecd3bbbedba17699d7f3533286f9e2e60`, from isolated
-branch base `8bf25709bafd356fe0f4a4717cfacd01f60715b9`. The notation pin remains
-`da93cf9e0359d861987fd76611b59b14b6aedb92`. Calculator, saved practice records,
-package admission, dependencies and source pages are unchanged by this lane.
-This receipt concerns source/browser behavior; the combined source build and
-paired native delivery have their own final receipts.
+This receipt accompanies the scoped adaptive source commit. Its integration base
+is `abf1732967fc067fb7fb66e8643e221f2ce613a4`, after normal merges of reviewed
+rendering prerequisite `c068334ecd3bbbedba17699d7f3533286f9e2e60` and UI/native
+main through `0deff7c7f5c2d4db935bd3b2dc58e4e49b1b6811`. The isolated branch
+began at `8bf25709bafd356fe0f4a4717cfacd01f60715b9`. Notation remains pinned at
+`da93cf9e0359d861987fd76611b59b14b6aedb92`. This lane changes no calculator,
+package admission, source page bytes, dependency or notation files.
+
+The six adaptive application files, hashed in this order as UTF-8 relative name,
+NUL, file bytes, NUL (`practice-refill`, `practice-refill-passage`,
+`practice-relations`, `practice-passage`, `practice-view`, `practice-window`, all
+under `src/` with `.ts`), have aggregate SHA-256
+`d8a0bb37dcd0a09fc0b573837738e8e4af0127d394708226dde7f4384aef37c9`.
+This identifies the reviewed application snapshot separately from test harness
+and documentation changes. Earlier `ed0d4d6` screenshots/certificates described
+superseded cyclic Pause and clipped-tail cue behavior; they are historical,
+not evidence for this final behavior or approval to deliver it.
 
 ## Allocation and admission
 
-Each resident measure retains its original source interval and internal seats.
-The current reading interval is copied exactly; only whole other intervals can
-move. A refill occurs when a required incoming source bar is missing, retaining
-existing resident identities otherwise. The resident set is at most four bars.
-Adjacent source bars share continuous staff and one separator. A cyclic source
-wrap has an explicit staff break and accessible original source identities.
-Nonconsecutive boundaries reserve `max(8, rightAir + leftAir + 1.6)` source units,
-including repeat/final overhangs and stroke air.
+Each resident measure retains its original source width and internal seats.
+Only whole intervals around the exact protected current interval can move, and
+only when a genuinely required incoming bar is missing. Residency is at most
+four bars. All staff lines continue across allocation air, including cyclic
+source wraps. Ordinary separators remain attached, authentic repeat/final ink
+remains, and relation projection stays within each source-consecutive run so
+unrelated source notes never receive a fabricated wrap tie or slur.
 
-Admission tries 49 finite common-frame widths before count-in. Each width
-certifies the deterministic runtime placement policy over at most 8192 states:
-source reading bar, per-hand source reveal mask and resident placements. Edges
-include every conservative source-prefix hand reveal, legal early attack entry,
-rest-clock entry and chord-hand order. At most four cyclic source cuts are
-considered per placement. The full supported rate envelope is 5–500; a rate
-change cannot introduce a new geometry request. The search is conservative and
-does not claim to find every feasible arrangement.
+Admission tries 49 finite common frame widths. Each candidate certifies the
+same deterministic runtime policy over at most 8192 states: source reading bar,
+per-hand reveal mask and resident placements. Every source-prefix hand reveal,
+legal early entry, rest-clock edge and chord-hand order is admitted. At most four
+cyclic source cuts are considered. The preference is source wraps, existing
+resident movement, occupied-span balance, then deterministic source position.
+Balance-first rejected the real Schumann run and was deliberately superseded.
+The supported rate envelope remains 5–500; queued rates do not alter geometry.
+This bounded conservative search does not promise every mathematically feasible
+arrangement will be found.
 
-If enumeration needs a fallback, let M be the largest source width plus the
-largest actual nonconsecutive gap. A frame with usable width 5M admits any
-protected position: removing its width leaves at least 4M split between two
-sides, whose integer M capacities sum to at least three. One cyclic source cut
-places the other at most three intervals within those capacities. This bound is
-only used before count-in and only if the final source glyphs remain at least
-12 CSS px. No live shrink, delayed attack or clipped incoming bar substitutes for
-admission. A failed admission prevents audio unlock/start; an unreadable resize
-pauses for a larger view or shorter passage. A still-readable existing
-certificate is reused directly on resize.
+The fallback uses M = largest original width plus maximum structural/cue air;
+a usable 5M frame has at least three M slots around any protected interval.
+It is available only before count-in and only when the final source font stays
+at least 12 CSS px. Admission failure prevents audio unlock/start. An unreadable
+resize pauses for a larger view or shorter passage; a still-readable existing
+certificate is reused directly. Live shrinking, sliding, clipping and delaying
+an attack are never substitutes for admission.
 
-Full ordinary paint and all possible finger labels are measured before hiding.
-The union of every consecutive resident source run of lengths one through four
-(at most 4N runs) reserves actual source bow, tie, white reservation and stroke
-bounds. Held cue paint is a clipped subset of those authored ties. Disjoint
-wrapped runs have independent clearance registries so offscreen ghost contours
-cannot displace a different visible run.
+Potential source ink and finger labels are measured before hiding. Every
+consecutive source run of length one through four (at most 4N runs) reserves
+complete projected bow, tie, stroke and white reservation bounds. Each protected
+bar also reserves its actual shared-rule reconstructed incoming cues, including
+entry air outside the interval. Full resident bows do not inflate that air.
+Nonconsecutive boundaries reserve `max(8, previous.rightAir + next.leftAir + 1.6)`;
+`next.leftAir` includes verified compact-cue overhang. Disjoint source runs have
+independent ordinary relation clearance registries.
 
-## Reading, sounding and restoration
+Incoming cue clearance is settled in source order against complete source
+obstacles/relations and the actual previously reconstructed ribbon/stroke
+segments. Preflight and runtime use the same source applicability condition
+`tie-from-tick < current-bar-start <= tie-to-tick`. Runtime computes the same
+conservative complete potential cue set before eligibility/expiry filtering;
+changing which owner remains held cannot select a different cue corridor.
+Compact arc span comes from the shared tie minimum depth/depth ratio, not an
+invented duration endpoint. Its destination, source side/profile/owner and stroke
+remain verified; full bounds and entry air are admitted before count-in.
 
-The original matcher and sounding ledger remain authoritative. Accepted source
-attacks establish a monotonic reading bar; clocks can enter written rest bars
-only after the earlier required attacks are accepted. The first chord member
-admits the known reveal requests of that entire source onset, preventing another
-allocation for its later members. Ordinary ink belonging only to retired bars
-disappears as one owner bundle, including hollow/white stem paint, dots, heads,
-flags and annotations. Shared ink stays when a remaining contributor owns it.
+## Reading, sounding and Free view
 
-A held cue is copied only from a verified authored tie and keeps its original
-note owner. Its visual end is the earlier of the current bar finish and original
-sounding end, including continuation onset cases. It never creates an untied or
-pedal tie. Carry-in ordinary source paint retires during the active run; its
-preparation/paused context band stays reserved so hiding it cannot move the
-reading reference. All retirement, incoming placement and cue updates complete
-in one synchronous redraw before the browser paints.
+The original matcher and hold assessment remain authoritative. Accepted source
+attacks establish a monotonic reading bar; the clock enters rests only after
+required earlier attacks. A first chord member admits that onset's known hand
+requests once. Retired ordinary note bundles include heads, ordinary/hollow/white
+stems, rings, dots, flags and annotations; shared ink retains remaining owners.
 
-Pause restores full **resident** source notation at its current placement. It
-does not redraw an evicted old measure over incoming source. A held failure in
-an evicted measure adds a separate original-source context and establishes a
-paused inspection fit with space for that context. Ready/repeat re-primes the
-admitted initial layout without changing matching, hold assessment, musical
-repeat/count-in timing, Done eligibility or saved progress rules.
+Held cues use a complete authored bow when both verified endpoints lie in the
+same displayed consecutive run. Otherwise a shared-rule incoming continuation
+keeps the verified authored destination. Cue lifetime is capped by current bar
+finish and original owner sounding end, including continuation onset cases.
+Untied and pedal-held notes never receive fabricated ties. Retirement, placement
+and cue update form one synchronous redraw before an observable browser frame.
+Carry-in source paint retires while its reserved context band cannot move the
+live reading reference; preparation/Free view restore real original context.
 
-The common fitted scale and score origin are stored for the viewport epoch.
-The active status footprint is reserved, and score placement no longer follows
-the flex area's recentering. Status text, live Fingers display, refills and
-ordinary Pause therefore cannot move or rescale the protected reference.
-Fingers retains normal annotation ownership while the live allocator continues;
-actual paused/error/preparation phases remain frozen. Rotation/resize explicitly
-establishes a new viewport fit while retaining the original session/clock epoch.
+Free view is distinct inspection: complete four consecutive source bars in
+natural order, stepping two (1–4, 3–6, 5–8), with an end-aligned bounded tail.
+Five-bar selections use 1–4 then 2–5; shorter selections show only real bars.
+Entry chooses a nearby containing source window, or the original failed owner
+within the selection. External carry owners retain separate original context.
+The complete source window is naturally centered, not the old cyclic resident
+allocation or a blank certificate frame. Ready/repeat re-primes admitted live
+initial layout. Existing pause/reset and pending-start cancellation semantics,
+assessment, Done, saved progress and musical clocks remain unchanged.
+
+During count-in/trial/live Fingers, fitted common scale and origin are stored
+for the viewport epoch. Symmetric full potential vertical air centers the staff
+instead of asymmetric selected-score annotations. The real live status row stays
+present even empty, plus genuine footer expansion is reserved. Status/refills/F
+cannot move the current reference. The cursor spans actual musical staff lanes.
+Free view may establish a natural inspection fit; resize/rotation may establish a
+new live viewport fit while retaining session/clock epoch.
+
+Previous/Next keep existing IDs, configurable main or local assignments and
+explicit empty slots. Effective callbacks provide truthful footer labels.
+Active hardcoded Left/Right turning was removed; the selector retains its own
+arrow navigation. Shared Options supplies inherited local navigation; this lane
+changes no global preference/resolver pipeline.
 
 ## Observed source cases
 
-`scripts/inspect-practice-refill.mjs` runs Chromium against an explicit
-`PRACTICE_URL` (default `http://127.0.0.1:5208`) with test-owned browser state.
-Archive inputs are imported through the real package pipeline. Input goes through
-the actual `PracticeSession` matcher and `PracticeView` compositor; session times
-are controlled for reproducible source input. This is simulated MIDI timing,
-not physical MIDI, audible metronome, pedal or pianist acceptance.
+`scripts/inspect-practice-refill.mjs` uses real Chromium, package import,
+PracticeSession and PracticeView at explicit `PRACTICE_URL` (default 5208).
+All representative cases use 1440×900 and test-owned browser state. Source attack
+timing is simulated; physical MIDI, audible click, pedal and pianist acceptance
+remain separate. Capture metadata records actual phase, controls, status, bars
+and viewport. The live Ready control is the existing restart/start control;
+blank trial status is genuine, not the old stale untimed preparation label.
 
-| Source / presentation | Selected source | Matched attacks per trace | Refill events per trace | Certificate |
+| Source / presentation | Range | Attacks | Refills | Certificate width; states / edges |
 | --- | --- | ---: | ---: | --- |
-| Schumann No.14 / Jankó | 1–64 | 381 | 20 | 600.106667 units, 191 states / 315 edges |
-| Schumann No.14 / conventional | 1–64 | 381 | 20 | 600.106667 units, 191 states / 315 edges |
-| Private Zelda / Jankó | 1–38 | 204 | 12 | 607.09 units, 105 states / 170 edges |
-| Private Zelda / conventional | 1–38 | 204 | 12 | 607.09 units, 105 states / 170 edges |
-| Pinned engine fixture / traced ties | 1–12 | 13 | 3 | 1150.0225 units, 21 states / 31 edges |
-| Pinned engine fixture / uniform ties | 1–12 | 13 | 3 | 1150.0225 units, 21 states / 31 edges |
+| Schumann / Jankó | 1–64 | 381 | 20 | 600.106667; 191 / 315 |
+| Schumann / conventional | 1–64 | 381 | 20 | 600.106667; 191 / 315 |
+| Zelda / Jankó | 1–38 | 204 | 12 | 614.4; 105 / 170 |
+| Zelda / conventional | 1–38 | 204 | 12 | 614.4; 105 / 170 |
+| Pinned fixture / traced | 1–12 | 13 | 3 | 616.93; 21 / 31 |
+| Pinned fixture / uniform | 1–12 | 13 | 3 | 618.025; 21 / 31 |
 
-Real scores use 1440×900 with offsets −300/0/+300 ms at rate 500. Their source
-interval widths vary; no original note seats or pages change. The original
-production fixture uses 3000×1200 because its engraving retains wide fixed
-two-bar source systems. It contains real rests, shared unison owners, repeat and
-final boundaries, paired ties and a 1200-tick hold across seven authored source
-components. It uses the pinned engine's continuity layout for the long hold and
-tests both traced and uniform source tie profiles at legal −500/0/+500 ms.
+Real scores pass offsets −300/0/+300 ms at rate500. The small production fixture
+engraves four original measures per system and passes legal −500/0/+500 ms;
+its default two-bar source fixture remains available as a wide adverse control.
+It has real rests, shared unisons, repeat/final boundaries, paired ties and an
+original 1200-tick hold with seven authored components. Three distinct cues are
+simultaneous in the traced/uniform traces. No new note paint is synthesized.
 
-Every accepted input verifies required source residency before acceptance,
-current screen CTM/origin/width stability within 1e-6, at most four residents,
-next written-bar lead and unchanged source pages/saved evidence. On-time traces
-also capture actual animation frames around three successive refills; those
-frames contain complete resident identities, unchanged protected CTM and zero
-visible ordinary ink whose entire owner bundle is retired.
+Every accepted input checks prior residency, <=4 bars, next written-bar lead,
+source interval width and exact current screen CTM/origin within 1e-6, unchanged
+source pages/saved evidence and zero old retired owned ink. Three successive
+animation frames per on-time source contain complete allocations and stable
+current CTM. Schumann432 is accepted at420; fixture bar6's attack960 is accepted
+at760 before written rest5 starts768.
 
-Zelda's authored held owner beginning at 2592 retains its genuine cue in bar20
-at the continuation onset 2736 and through the original sounding end 2880.
-Old ordinary/hollow paint is absent; cue expiry, full resident Pause restoration
-and original early-release authority pass in both presentations. Untied Schumann
-produces no fabricated held cue. The generic long-held owner is already evicted
-at bar4: its cue ends at the current bar finish 768 while its sounding obligation
-remains 1200. Early release still fails that original owner and paints its
-separate source context without overlap. The generic 2–5 carry-in selection
-keeps preparation context, removes old owned paint with an authored live cue,
-and restores the context on Pause with zero current CTM drift.
+Zelda's genuine owner2592 has a complete authored cue at continuation2736,
+expired exactly at2880/current20 with original owner end2880 unchanged.
+The generic bar4 cue expires at768/current5, where a new authored bar5 cue ending
+960 is legitimate while the original sounding owner remains1200. Owner-wide cue
+absence is separately observed at1344/current8, not claimed at768. Early release
+still fails the original source owner; full failed-window source and original
+hollow bundle are restored in natural Free view. Generic carry-in2–5 retires old
+heads/stems, retains a genuine cue and restores its original external context.
 
-Separate genuinely height-limited traces keep Fingers active through bar9
-(fixture through bar8), clear count-in status, toggle Fingers off and Pause.
-All protected origin/CTM/scale comparisons pass. Schumann scale is 2.121446
-against width capacity 2.179612; Zelda is 2.107925 against 2.154540. Independent
-review reproduced the original 24px status jump and live-Fingers missing-bar
-failure, then positively re-observed their fixes at 1440×900 and height-limited
-1440×777. Supported 90° rotation uses 1920×1440 for real scores and 3000×3000
-for the wide fixture; session/clock epochs remain unchanged and no horizontal
-scrollbar appears. A full joined run rotated within 1440×900 may fail the 12px
-readability gate and pause understandably. Manual disconnected windows retain
-full source, zero fabricated matches and unchanged evidence/clock state.
+Live status empty/repeat text, footer help hidden/shown (test-owned footprint
+exercise), refills and F-through-incoming-bar transitions have zero CTM drift.
+Normal minimum digits: Schumann12.642 px, Zelda12.010 px, traced12.297 px,
+uniform12.275 px. Separately height-limited fits retain12.320/12.159/12.131 px
+respectively. Normal Zelda is already height limited; its separate comparison
+viewport is slightly taller, not falsely called a smaller screen. Rotation at
+1920×1440 retains session/clock epochs and no scrollbar. Smaller unreadable views
+may refuse before audio. Manual windows preserve clocks/evidence and create no
+matches.
 
-Raw traces and inspected screenshots are outside Git under
-`/tmp/score-viewer-practice-refill`; the private score is supplied only by path.
-Schumann archive SHA-256 values are
-`75ae62bed0db164281a2e02200213d8a83ec542d50d209c6651e72764cfe3d32` (Jankó) and
-`8d57b25c20eca9e5dbfcb345873a1ca1ebc2f3d4b930c968200ea4e83b8e8fc7`
-(conventional). Private Zelda SHA-256 is
+All six cases observe Free view1–4→3–6→5–8 and five-bar1–4→2–5, complete visible
+owned source ink and contained potential bounds. Horizontal center drift is less
+than0.028 CSS px. Inspection fit accounts for the actual footer/status before
+measuring, fixing the previously rejected error-source clipping. Initial live
+surface is centered; later cleared/live remnants stay pinned and are not promised
+continuous recentering.
+
+Raw latest traces/lifecycle PNGs are outside Git in
+`/tmp/score-viewer-practice-refill-reviewed`. Source-derived continuation/cap and
+paired-cue follow-ups supersede corresponding older snapshots there; original
+six-case summary remains bounded evidence, not a substitute for per-case files.
+The actual-main combined binding receipt is
+`/tmp/score-viewer-practice-refill-final/free-view-bindings/binding-results.json`:
+custom runtime navigation, live per-slot inheritance, explicit local null after
+reload blocking inherited/custom/ArrowRight, effective Previous-only footer,
+shared settings and simulated MIDI companion inheritance pass. Package bytes
+and original main mappings remain exact outside intended assignments.
+
+Archive SHA-256 values: Schumann Jankó
+`75ae62bed0db164281a2e02200213d8a83ec542d50d209c6651e72764cfe3d32`,
+Schumann conventional
+`8d57b25c20eca9e5dbfcb345873a1ca1ebc2f3d4b930c968200ea4e83b8e8fc7`,
+private Zelda
 `d503a145624af20e66c79f80248dbea78acc5444c48a11d522e2ec3e1fedd0c2`.
-No private archive contents, operator records or installation changes enter Git.
+No private archive contents, operator data or installation changes enter Git.
 
-Focused allocator, production fixture and existing clock/Done lifecycle checks:
-37 tests passed through `qq-job`, configured TypeScript checking passed. Final
-combined full tests/build and native receipts are pending the reviewed merged
-source, as recorded by the delivery owner.
+52 focused allocator/window/production/clock/Done/Options/inheritance tests,
+TypeScript, source-pin, strict adaptive change and four synced main capabilities
+pass through the required job lane. Final configured full suite/build belongs to
+the reviewed combined source owner. Parent has inspected revised representative
+pixels; independent review must bind final approval to the exact scoped PR head.
+Native artifacts/activation and human musical acceptance have separate receipts.

@@ -15,7 +15,7 @@ Measured connected practice SHALL retire eligible old ink, allocate incoming mus
 - **AND** the current measure retains its exact position and size
 
 ### Requirement: Preserve original measure interiors
-Every resident measure SHALL retain its admitted internal note spacing and geometry at one common scale. Allocation SHALL move whole measure intervals rather than stretch their interiors. Genuine source adjacency SHALL remain coherent; wraps SHALL retain accessible source identities and explicit nonconsecutive staff breaks and SHALL NOT imply false musical adjacency. Practice strips SHALL remain free of visible individual measure numbers, with selected-range context outside the notation.
+Every resident measure SHALL retain its admitted internal note spacing and geometry at one common scale. Allocation SHALL move whole measure intervals rather than stretch their interiors. Genuine source adjacency SHALL remain coherent; spatial wraps SHALL retain continuous aligned staff and accessible source identities without inventing a tie or slur between nonconsecutive source notes. Practice strips SHALL remain free of visible individual measure numbers, with selected-range context outside the notation.
 
 #### Scenario: Incoming wide measure across an original system break
 - **WHEN** a wider source measure enters the display
@@ -45,10 +45,10 @@ An older measure's ordinary note ink SHALL become eligible for retirement after 
 #### Scenario: Early accepted transition and old sounding notes
 - **WHEN** a later measure's first attack is accepted before an older sounding duration ends
 - **THEN** eligible older note ink can retire in the refill transaction
-- **AND** the original sounding obligations and early-release failure rules remain authoritative
+- **AND** the original source obligation definitions and early-release failure rules remain authoritative
 
 ### Requirement: Source-owned held tie cues
-A visually retired tied owner SHALL retain an authored continuation cue while useful in the protected current measure. Its actual paint SHALL reserve space independently of the old measure. The cue SHALL end at that measure's finish or the owner's sounding end, whichever occurs first. Untied or pedal-only holds SHALL NOT receive invented ties.
+A visually retired tied owner SHALL retain a readable authored tie cue while useful in the current measure. If its verified endpoints remain resident within the same displayed consecutive source run, the full original bow SHALL remain. Otherwise a source-owned continuation SHALL use shared curve rules and the verified continuation endpoint. Its actual paint SHALL reserve space independently of the old note bundle. The cue SHALL end at that measure's finish or the owner's sounding end, whichever occurs first. Untied or pedal-only holds SHALL NOT receive invented ties.
 
 #### Scenario: Zelda19 continues sounding through20
 - **WHEN** the note attacked at2592 remains sounding until2880 and its old measure ink retires while20 is being played
@@ -56,12 +56,12 @@ A visually retired tied owner SHALL retain an authored continuation cue while us
 - **AND** the continuation head's2736 onset does not prematurely remove the cue or end the assessed hold
 
 ### Requirement: Resident restoration and original error context
-Pause SHALL restore complete source notation for the current resident measures at their allocated positions. Retired old bundles SHALL NOT overwrite new allocations. An error involving a retired owner SHALL retain access to its original source context and musical obligation.
+Free view SHALL restore complete source notation in centered consecutive windows of up to four selected measures, advancing by two with a bounded final tail. It SHALL stop live playback without discarding saved evidence or original source obligation definitions. Retired bundles SHALL NOT be inserted over live allocations; failures SHALL retain their original source context.
 
 #### Scenario: Pause after held-note retirement and refill
-- **WHEN** the user pauses after newer measures reuse an older held note's space
-- **THEN** all resident measures restore complete owned ink without duplicating the retired old note
-- **AND** a held-note failure can still display its original source context
+- **WHEN** the user enters Free view after newer measures reuse an older held note's space
+- **THEN** a naturally centered consecutive source window restores complete owned ink without displaying the cyclic refill order
+- **AND** a held-note failure retains its original obligation and source context; Right browses the next overlapping window
 
 ### Requirement: Preserve existing modes and musical state
 Refill SHALL preserve unmeasured readability/manual windows, beat-aligned count-in/repeat, queued speeds, independent joined/component attainment and reversible Done. Shared rotation/resize SHALL preserve the session and loop clock. Packages, source fingerprints, calculator planning and saved evidence SHALL remain unchanged.

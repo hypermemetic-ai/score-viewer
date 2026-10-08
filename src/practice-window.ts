@@ -1,10 +1,9 @@
 import type {PracticeChunk,PracticePlan,PracticeSession} from './practice';
 
-/** Paused source windows include useful overlaps and literal leaf junctions. */
+/** Free view uses a selection-relative two-bar step and a bounded final tail. */
 export function passageWindows(plan:PracticePlan,chunk:PracticeChunk):number[][] {
  const first=chunk.firstBar,lastStart=Math.max(first,chunk.lastBar-3),starts=new Set<number>([first,lastStart]);
  for(let bar=first;bar<=lastStart;bar+=2)starts.add(bar);
- for(const leaf of plan.chunks){if(leaf.firstBar<=first||leaf.firstBar>chunk.lastBar)continue;starts.add(Math.max(first,Math.min(lastStart,leaf.firstBar-2)));}
  return [...starts].sort((a,b)=>a-b).map(start=>Array.from({length:Math.min(4,chunk.lastBar-start+1)},(_,i)=>start+i));
 }
 /** Stable slot ownership is independent of the metronome and assessment clocks. */
@@ -13,6 +12,7 @@ export class PracticeSlots {
  constructor(readonly plan:PracticePlan,readonly chunk:PracticeChunk){this.windows=passageWindows(plan,chunk);this.bars=[];this.next=chunk.firstBar;this.prime();}
  prime(){this.window=0;this.nextSlot=0;this.bars=Array.from({length:4},(_,i)=>this.chunk.firstBar+i<=this.chunk.lastBar?this.chunk.firstBar+i:undefined);this.next=this.chunk.firstBar+4;}
  turn(direction:1|-1){const next=Math.max(0,Math.min(this.windows.length-1,this.window+direction));if(next===this.window)return false;this.window=next;this.bars=Array.from({length:4},(_,i)=>this.windows[next][i]);return true;}
+ review(bar:number){const candidates=this.windows.filter(w=>w.includes(bar)).sort((a,b)=>Math.abs(a.indexOf(bar)-(a.length-1)/2)-Math.abs(b.indexOf(bar)-(b.length-1)/2)||a[0]-b[0]),window=candidates[0]??this.windows[0];return this.showRange(window[0],window.at(-1)!);}
  showRange(first:number,last=first){const window=this.windows.findIndex(w=>w.includes(first)&&w.includes(last));if(window<0||this.bars.every((b,i)=>b===this.windows[window][i]))return false;this.window=window;this.bars=Array.from({length:4},(_,i)=>this.windows[window][i]);return true;}
  showBar(bar:number){this.window=Math.max(0,this.windows.findIndex(window=>window.includes(bar)));this.bars=Array.from({length:4},(_,i)=>this.windows[this.window][i]);}
  recycle(session:PracticeSession,connected:boolean,owners:ReadonlyMap<number,ReadonlySet<string>>){

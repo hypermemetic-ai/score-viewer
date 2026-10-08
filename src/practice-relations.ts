@@ -1,13 +1,14 @@
 import type {ScorePackage,Seat} from './package';
 import type {PracticePlan} from './practice';
 import {cropMeasure,type Crop,type PassageTrack} from './practice-passage';
-import {taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments} from '../vendor/iso-notation/src/render/janko/ties';
+import {taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments,tieArcDepth,tieArcInkBox} from '../vendor/iso-notation/src/render/janko/ties';
+import {resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
 import {expressionIntersectsBox,expressionsOverlap,expressionContourOutwardShift,expressionSliceAtX,type ExpressionInk} from '../vendor/iso-notation/src/render/janko/elements/expressions';
 type Contour=NonNullable<ExpressionInk['contour']>;
 export interface InkBox {x0:number;x1:number;y0:number;y1:number}
 interface Fragment {path:SVGPathElement;frame:number;page:number;system:number;contour:Contour}
 interface Relation {id:string;kind:'phrase'|'tie';start:number;end:number;from:Seat;to:Seat;first:Fragment;last:Fragment;groups:string[]}
-export interface ProjectedRelation {id:string;kind:'phrase'|'tie';groups:string[];path:SVGPathElement;contour:Contour;left:number;right:number;knockout:boolean;bounds:InkBox}
+export interface ProjectedRelation {id:string;kind:'phrase'|'tie';groups:string[];path:SVGPathElement;contour:Contour;left:number;right:number;knockout:boolean;bounds:InkBox;strokeSegments?:ExpressionInk['strokeSegments']}
 const cache=new WeakMap<ScorePackage,Relation[]>();
 /** Decode the retained tapered ribbon; all projected tips originate here. */
 function contour(path:SVGPathElement):Contour {
@@ -68,7 +69,7 @@ export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],t
  for(const bar of positions){if(placements&&bar!==undefined){const placement=placements.find(p=>p.bar===bar);if(!placement)throw Error(`Measure ${bar+1}: missing admitted relation placement.`);x=placement.x;}offsets.push(x);const c=crops.find(c=>c.bar===bar);x+=policy==='fixed'?track.width:c?c.right-c.left:0;}
  const runs:Array<{first:number;last:number}>=[];for(let slot=0;slot<positions.length;slot++){if(positions[slot]===undefined)continue;const last=runs.at(-1);if(last&&positions[last.last]!+1===positions[slot])last.last=slot;else runs.push({first:slot,last:slot});}
  const output:ProjectedRelation[]=[];
- // Different source runs have disjoint clips and an explicit staff break.
+ // Different source runs have disjoint relation clips on the continuous staff.
  // Ghost endpoints outside one clip must not displace a bow in another run.
  for(const run of runs){const settled:ExpressionInk[]=[],aBar=positions[run.first]!,bBar=positions[run.last]!,left=offsets[run.first],last=crops.find(c=>c.bar===bBar)!,right=offsets[run.last]+(policy==='fixed'?track.width:last.right-last.left);
   const mapped=(seat:Seat,sourceX:number)=>{
@@ -103,6 +104,32 @@ export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],t
  }
  return output;
 }
+/** A missing authored origin must not turn a clipped enormous bow into a tiny
+ * terminal curl. Reproject its incoming continuation with the shared primitive,
+ * preserving the verified destination tip, source side/profile and stroke. */
+export function readableTieContinuation(p:ScorePackage,q:ProjectedRelation,currentBar:number,crops:Crop[],track:PassageTrack,positions:Array<number|undefined>,placements?:ReadonlyArray<{bar:number;x:number}>,projected:ProjectedRelation[]=[]):ProjectedRelation|undefined {
+ if(q.kind!=='tie')return;
+ const to=p.seats.find(s=>s.id===q.path.getAttribute('data-practice-to-seat'));
+ if(!to||q.contour.xEnd<q.left||q.contour.xEnd>q.right)return;
+ let x=0;const offsets=new Map<number,number>();for(const bar of positions){if(bar===undefined)continue;const c=crops.find(c=>c.bar===bar)!;x=placements?.find(s=>s.bar===bar)?.x??x;offsets.set(bar,x);x+=c.right-c.left;}
+ const origin=offsets.get(currentBar);if(origin===undefined||q.contour.xEnd<=origin+.2)return;
+ // Both verified tips in the same source-adjacent run retain the complete bow.
+ if(q.contour.xStart>=q.left&&q.contour.xEnd<=q.right)return {...q,path:q.path.cloneNode(true) as SVGPathElement};
+ const right=q.contour.xEnd,uniform=q.path.getAttribute('data-tie-profile')==='uniform',profile=uniform?'uniform':'traced',tokens=resolveJankoTokens(p.renderingRecipe?.tokens),c=q.contour,left=Math.min(origin,right-Math.max(tokens.tieMinDepth/tokens.tieDepthRatio,c.thickness*8));
+ const cueTokens={...p.renderingRecipe?.tokens,tieEdgeStroke:Number(q.path.getAttribute('stroke-width'))||tokens.tieEdgeStroke};
+ const arc={x1:left,x2:right,y:c.yEnd,side:c.side,depth:Math.max(c.thickness+.1,Math.min(c.depth,tieArcDepth(left,right,tokens))),profile:profile as 'uniform'|'traced',thickness:c.thickness,fragment:'incoming' as const};
+ const boxes=positions.flatMap(bar=>{if(bar===undefined)return [];const source=crops.find(c=>c.bar===bar)!,offset=offsets.get(bar)!;return (track.boxes.get(bar)??[]).map((b,i)=>({id:bar+':'+i,x0:offset+b.x0-source.left,x1:offset+b.x1-source.left,y0:b.y0-source.frame,y1:b.y1-source.frame}));});
+ let clear=false;
+ for(let attempt=0;attempt<33;attempt++){
+  const segments=tieArcSegments(arc,256),bounds=tieArcInkBox(arc,cueTokens),ink:ExpressionInk={kind:'phrase',id:q.id,x0:left,x1:right,y0:bounds.y0,y1:bounds.y1,startTick:0,endTick:0,continuationStart:true,continuationEnd:false,svg:'',strokeSegments:segments.map(s=>({x0:s.x1,y0:s.y1,x1:s.x2,y1:s.y2,width:uniform?c.thickness:cueTokens.tieEdgeStroke}))};
+  const collision=projected.some(other=>other.id!==q.id&&other.path.getAttribute('data-tie-note')!==q.path.getAttribute('data-tie-note')&&other.bounds.x1>left&&other.bounds.x0<right&&overlaps(ink,{kind:'phrase',id:other.id,startTick:0,endTick:0,continuationStart:false,continuationEnd:false,svg:'',x0:other.bounds.x0,x1:other.bounds.x1,y0:other.bounds.y0,y1:other.bounds.y1,...(other.strokeSegments?{strokeSegments:other.strokeSegments}:{contour:other.contour})}));
+  if(!tieArcEntersBoxes(arc,boxes,cueTokens)&&!collision){clear=true;break;}arc.depth+=.5;
+ }
+ if(!clear)throw Error(`Authored held continuation has no admitted clearance: ${q.id}.`);
+ const path=q.path.cloneNode(true) as SVGPathElement;path.setAttribute('d',tieArcPath(left,arc.y,right,arc.side,arc.depth,profile,arc.thickness,0,'incoming'));path.setAttribute('data-practice-continuation-start','true');path.setAttribute('data-practice-cue-shape','authored-incoming');
+ const bounds=tieArcInkBox(arc,cueTokens);return {...q,path,left:Math.min(q.left,bounds.x0),right:Math.max(right,bounds.x1),contour:{...c,xStart:left,xEnd:right,yStart:arc.y+arc.side*arc.depth,yEnd:arc.y,depth:arc.depth},strokeSegments:tieArcSegments(arc,256).map(s=>({x0:s.x1,y0:s.y1,x1:s.x2,y1:s.y2,width:uniform?c.thickness:cueTokens.tieEdgeStroke})),bounds};
+}
+
 const intervalCache=new WeakMap<ScorePackage,Map<number,{left:number;right:number}>>();
 function interval(p:ScorePackage,plan:PracticePlan,bar:number){
  let saved=intervalCache.get(p);if(!saved){saved=new Map();intervalCache.set(p,saved);}if(saved.has(bar))return saved.get(bar)!;

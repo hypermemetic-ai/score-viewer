@@ -7,11 +7,11 @@ Equal maximum-width slots waste space and make shorter measures look unlike thei
 ## What Changes
 
 - Retain original internal measure geometry and one common scale. Keep the current measure's position and size fixed; arrange other whole measures only when new music is drawn, with no continuous sliding or repeated recentering.
-- Replace canonical equal-width slot allocation in measured connected practice with a bounded allocator for up to four resident measures. Preserve clear source order, accessible identities and explicit nonconsecutive staff breaks through wraps, efficient 3–5-bar leaves, and longer joined passages. The prerequisite repair keeps practice notation free of visible individual measure numbers and shows selected range context outside it.
+- Replace canonical equal-width slot allocation in measured connected practice with a bounded allocator for up to four resident measures. Preserve clear source order, accessible identities and continuous staff through spatial wraps with source-correct relation ownership, efficient 3–5-bar leaves, and longer joined passages. The prerequisite repair keeps practice notation free of visible individual measure numbers and shows selected range context outside it.
 - Retire fully read older note ink at the same redraw that places incoming music. Separate visual retirement from sounding-note assessment: an actual held owner may continue after its old head, duration ink and annotations have disappeared.
-- Retain a small source-owned tie continuation cue for a visually retired tied owner. Reserve its actual paint rather than its old measure's entire width; remove the cue at the protected measure's finish or the owner's sounding end, whichever comes first. Do not invent ties for untied or pedal-only holds.
+- Retain a readable source-owned tie continuation cue for a visually retired tied owner. Reserve its actual paint rather than its old measure's entire width; remove the cue at the protected measure's finish or the owner's sounding end, whichever comes first. Do not invent ties for untied or pedal-only holds.
 - Preflight refill placement and reading lead before count-in. Choose the common scale and origin before playing; never solve a live placement failure by shrinking or moving the current measure, omitting incoming music, or waiting for a batch turn.
-- Restore complete source notation for the current resident measures on ordinary Pause. Recover original source context for errors involving retired owners, without inserting retired old note ink over newly allocated measures.
+- Provide Free view with complete centered consecutive windows of up to four selected measures, moving by two through group and transition views. Recover original source context for errors involving retired owners, without inserting retired old note ink over newly allocated measures.
 - Preserve source packages, calculator/hand planning, assessment and hold durations, musical clocks/repeats, attainment and Done, queued speeds, input bindings, rotation, selector previews, and restored native installation.
 
 ## Capabilities
@@ -22,7 +22,7 @@ Equal maximum-width slots waste space and make shorter measures look unlike thei
 
 ### Modified Capabilities
 
-- `practice-passage-display`: Replace the canonical fixed-slot replacement requirement with a protected current measure and atomic allocation; explicitly distinguish a held-note continuation cue from residual note ink, and restore complete resident windows on Pause. The prerequisite is now merged at `c068334ecd3bbbedba17699d7f3533286f9e2e60` with its capability in the main specs. The delta uses those exact requirement and scenario names and intentionally supersedes only the affected slot/lifecycle contracts.
+- `practice-passage-display`: Replace the canonical fixed-slot replacement requirement with a protected current measure and atomic allocation; explicitly distinguish a held-note continuation cue from residual note ink, and provide centered consecutive Free view windows. The prerequisite is now merged at `c068334ecd3bbbedba17699d7f3533286f9e2e60` with its capability in the main specs. The delta uses those exact requirement and scenario names and intentionally supersedes only the affected slot/lifecycle contracts.
 
 ## Impact
 

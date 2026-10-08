@@ -28,7 +28,7 @@ export function refillResidents(plan:PracticePlan,chunk:PracticeChunk,current:nu
  return [...bars].sort((a,b)=>a-b);
 }
 /** Retain resident source identities until an incoming request actually needs
- * space. This preserves the complete original four-bar leaf on Pause. Only a
+ * space. This avoids unnecessary identity churn between genuine refills. Only a
  * refill evicts old intervals; hidden spare future source can share that event. */
 export function refillAllocationBars(plan:PracticePlan,chunk:PracticeChunk,previous:RefillLayout,current:number,revealed=3):number[] {
  const required=refillResidents(plan,chunk,current,revealed),resident=previous.placements.map(p=>p.bar);
@@ -45,7 +45,7 @@ function validFrame(frame:RefillFrame){if(!Number.isFinite(frame.width)||frame.w
 
 /** Enumerate source-order cuts, not arbitrary note reorderings. Each side is
  * a complete contiguous run. A nonconsecutive boundary reserves an explicit
- * staff break. The protected interval is copied exactly, including its x. */
+ * structural air. The continuous staff remains a reading surface. The protected interval is copied exactly, including its x. */
 export function refillCandidates(previous:RefillLayout,current:number,bars:number[],measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame):RefillLayout[] {
  validFrame(frame);const anchor=previous.placements.find(p=>p.bar===current);
  if(!anchor)throw Error(`Measure ${current+1} was not admitted before its reading entry.`);
@@ -63,11 +63,12 @@ export function refillCandidates(previous:RefillLayout,current:number,bars:numbe
   out.push({current,placements,epoch:previous.epoch+1});
  }
  const old=new Map(previous.placements.map(p=>[p.bar,p.x])),score=(layout:RefillLayout)=>{
+  const first=layout.placements[0],last=layout.placements.at(-1)!,balance=Math.abs((first.x-(first.leftAir??0)+last.x+last.width+(last.rightAir??0))/2-frame.width/2);
   const wraps=layout.placements.slice(1).filter((p,i)=>p.bar<layout.placements[i].bar).length;
   const movement=layout.placements.reduce((sum,p)=>sum+(old.has(p.bar)?Math.abs(p.x-old.get(p.bar)!):0),0);
-  return [wraps,movement,layout.placements[0].x];
+  return [wraps,movement,balance,layout.placements[0].x];
  };
- return out.sort((a,b)=>{const av=score(a),bv=score(b);return av[0]-bv[0]||av[1]-bv[1]||av[2]-bv[2]||a.placements[0].bar-b.placements[0].bar;});
+ return out.sort((a,b)=>{const av=score(a),bv=score(b);return av[0]-bv[0]||av[1]-bv[1]||av[2]-bv[2]||av[3]-bv[3]||a.placements[0].bar-b.placements[0].bar;});
 }
 export function allocateRefill(previous:RefillLayout,current:number,bars:number[],measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame):RefillLayout {
  const same=bars.length===previous.placements.length&&bars.every(bar=>previous.placements.some(p=>p.bar===bar));
