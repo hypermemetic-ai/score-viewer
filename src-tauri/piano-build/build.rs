@@ -94,7 +94,14 @@ pub fn build() {
     }
     verify_vendor(&source.join("vendor/sfizz"));
     let target = env::var("TARGET").unwrap();
-    let destination = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("piano-build");
+    // MSBuild FileTracker still has bounded .tlog paths. Keep its generated
+    // paths short while retaining this Rust target's isolated output tree.
+    let directory = if target.contains("-windows-") {
+        "p"
+    } else {
+        "piano-build"
+    };
+    let destination = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join(directory);
     let cmake = env::var_os("CMAKE").unwrap_or_else(|| "cmake".into());
     let mut configure = Command::new(&cmake);
     configure

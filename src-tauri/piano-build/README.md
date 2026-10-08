@@ -42,6 +42,9 @@ CMake, a matching C/C++ compiler and archive
 tool are build prerequisites. Explicit non-Visual-Studio generators select
 their compiler environment/toolchain rather than receiving a VS-only `-A`.
 The optional toolchain path remains a single literal OS-string argument.
+Windows uses `OUT_DIR/p` and the engine child binary directory `s` to shorten
+MSBuild tracking-log paths. This retains per-target build isolation and normal
+dependency tracking; other platforms retain `piano-build/sfizz-build` names.
 
 `PianoEngine` owns one native pointer. It is movable (`Send`) and exclusively
 accessed (`!Sync`). Construct, configure and load on a control worker; the host
