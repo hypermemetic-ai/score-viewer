@@ -121,7 +121,7 @@ Practice strips SHALL omit visible individual measure numbers while retaining ac
 - **AND** toggling the checkbox or pressing its native keys does not start a passage or persist practice evidence changes
 
 ### Requirement: Bottom return guide
-The selector SHALL place its Score return action and Escape hint in the bottom controls, without a duplicate top-right Score control. Active practice SHALL identify its Escape return as Passages. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
+The selector SHALL place its Score return action and Escape hint in the bottom controls, without a duplicate top-right Score control. Active practice SHALL identify its Escape return as Passages. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations, using the existing main Options arrow-first layout, paired arrows, text sizing and spacing rather than a separate hint style. Both shared footers SHALL use Enter Open as a general activation hint without changing the focused control's actual Enter behavior. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
 
 #### Scenario: Return from practice to the score
 - **WHEN** the user presses Escape in active practice
@@ -184,6 +184,13 @@ Options SHALL have a configurable keyboard binding in the shared Keys and pedals
 - **WHEN** the user presses the configured Options key in passage selection or active practice
 - **THEN** the shared Options dialog opens with a Practice section first and the existing audio/MIDI, Keys and pedals, fingering display and applicable score controls below
 - **AND** active practice follows the existing Pause behavior without changing completion eligibility, progress, or speed policy, and closing Options retains the passage and paused session
+
+#### Scenario: Practice Options describes applicable actions
+- **WHEN** Options is opened from passage selection or active practice
+- **THEN** its shared binding panel omits irrelevant practice actions such as Edit fingers and page turning where no manual passage window can be browsed
+- **AND** an existing page-binding equivalent is labelled Previous measures or Next measures where paused passage-window browsing is supported
+- **AND** applicable finger display, Done and Options controls remain available, with Done shown for an active passage
+- **AND** hidden rows retain their exact saved binding identities and assignments for the full-score reader, with shared capture, conflict and Test ownership unchanged
 
 #### Scenario: Rebinding and guarded input
 - **WHEN** the user changes the Options binding or activates it while a field, modal, or binding capture owns input
