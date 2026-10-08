@@ -1,0 +1,71 @@
+## ADDED Requirements
+
+### Requirement: Optional native piano sound
+The viewer SHALL bundle the reviewed native SFZ engine without the sample bank and SHALL provide an optional piano, initially disabled, through the existing shared native output. Native MIDI SHALL reach the engine before frontend delivery while assessment, bindings, sustain and cues retain their contracts.
+
+#### Scenario: Disabled or unavailable bank
+- **WHEN** Piano is disabled or no admitted bank is ready
+- **THEN** no piano engine sound starts, MIDI and existing viewer behavior remain usable, and the UI explains installation or state clearly
+
+#### Scenario: Enabled connected keyboard
+- **WHEN** an admitted bank is enabled and the player explicitly connects MIDI
+- **THEN** the native host renders the original live bank through the selected shared output without frontend synthesis or a forced device/driver/MIDI change
+
+### Requirement: Original offline bank admission
+The installer SHALL admit only the exact approved V6.2 archive identity into a private native app-data cache. It SHALL stream all copying/hashing/extraction, validate paths, symlinks, bounds, CRCs, per-file hashes and local SFZ/sample closure, retain original content/licenses, and atomically publish only a complete bank.
+
+#### Scenario: Valid original archive
+- **WHEN** Install downloaded piano… selects the unchanged archive matching the approved size/SHA256
+- **THEN** a native worker verifies and installs all original files with the verified live SFZ and local samples, and the bank subsequently works offline
+
+#### Scenario: Failure or cancellation
+- **WHEN** admission, disk space, reading, CRC, closure or publication fails, or cancellation is requested
+- **THEN** partial staging is removed, any existing admitted bank remains available, and clear status permits a later retry
+
+#### Scenario: Unsafe or changed ZIP
+- **WHEN** a ZIP has a different identity, unsafe/duplicate paths, symlinks, unsupported member type or excessive entry/size bounds
+- **THEN** it is rejected before publication and no arbitrary filesystem path is written
+
+### Requirement: Fixed external download affordance
+Options SHALL offer Download piano before installation using a native command that opens only the fixed official author page externally. Install downloaded piano… SHALL use a native ZIP picker without passing bank bytes or arbitrary filesystem paths to the frontend.
+
+#### Scenario: Already acquired original download
+- **WHEN** the operator has an existing local original ZIP
+- **THEN** it enters the same installer path without another Internet download or adopting an unvalidated extracted directory
+
+### Requirement: Clear additive piano settings
+Options SHALL show Piano in its own section below Audio/MIDI and above Keys and pedals with installation/status, an optional toggle, a compact centered percentage volume spinbox and a compact four-choice Latency setting requesting monotonically increasing host tiers. Actual device periods MAY coincide. Browsing arrows SHALL navigate Options without adjusting sound; entered control editing SHALL own adjustments. Volume SHALL reuse the shared centered percentage spinbox with entered typing/arrow editing and stacked mouse chevrons. Latency SHALL offer four discrete choices through one browse stop and entered arrow editing. Preferences SHALL be additive, disabled by default, and preserve existing records and settings. Installation SHALL NOT enable piano or connect MIDI automatically.
+
+#### Scenario: Controls before installation
+- **WHEN** no native bank has been admitted
+- **THEN** only Download/Install and necessary installation status/cancel appear in the piano section, shared Audio/MIDI stay available, and piano controls/help and sampler loading remain absent
+
+#### Scenario: Saving and reopening Options
+- **WHEN** the player changes Piano, volume or latency and reopens Options/restarts the app
+- **THEN** saved valid choices are retained, the effective enabled state depends on bank readiness, and unrelated settings/data remain unchanged
+
+#### Scenario: Delayed-sound help
+- **WHEN** the player opens Sound feels delayed?
+- **THEN** compact help uses short relevant-platform sections to describe wired versus Bluetooth output and higher/lower settings without RAW jargon or default diagnostics, and includes enhancement steps only when internally needed and manufacturer/compatible HD Audio driver guidance with restoration steps, possible microphone/manufacturer-feature consequences and a primary Microsoft link, and makes no physical latency measurement or unobserved 44.1 kHz claim
+
+#### Scenario: Help keyboard ownership
+- **WHEN** help is open and Escape is pressed
+- **THEN** only help closes and focus returns to its opener, leaving Options and installation intact
+
+#### Scenario: Playing while minimized
+- **WHEN** an enabled connected keyboard is played while the viewer loses focus or is minimized
+- **THEN** native piano continues independently of frontend assessment focus gates, while genuine disconnect/reset/overflow safely clears voices
+
+### Requirement: Owned Mac shared buffer adjustment
+The Mac Latency setting SHALL adjust only the selected output’s settable shared HAL buffer within its legal range. The host SHALL stop the stream before changes and restore the previous buffer on disable, output change, reconfiguration and normal exit only if the device still holds the host-owned requested value. Sample rate, output format, default device and drivers SHALL remain unchanged.
+
+#### Scenario: Shared buffer ownership
+- **WHEN** the player chooses a Mac Latency tier and later disables piano or exits normally
+- **THEN** actual queried buffer and any fallback/restoration error are reported, the prior buffer is restored while still owned, and help explains the temporary effect on other apps using that output
+
+### Requirement: Reviewed native delivery and preservation
+The combined source, engine/license closure and paired native build SHALL be independently reviewed before activation. Delivery SHALL preserve existing app identity, scores, progress, corrections and settings and SHALL distinguish installed-bank/stream evidence from physical MIDI/audio acceptance.
+
+#### Scenario: Paired replacement build
+- **WHEN** the integrated piano build is delivered
+- **THEN** Windows and Mac package inputs, engine/bank identity, notices and observed integration are recorded, and physical acceptance is reported only after the operator performs it

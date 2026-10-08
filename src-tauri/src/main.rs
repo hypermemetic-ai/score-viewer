@@ -5,6 +5,9 @@ use tauri::Manager;
 mod midi_input;
 mod midi_events;
 mod practice_audio;
+mod piano_engine;
+mod piano_bank_core;
+mod piano_bank;
 mod managed_files;
 mod score_save;
 struct Store(Mutex<()>);
@@ -30,4 +33,14 @@ async fn save_score(data:String,filename:String)->Result<bool,String>{
 }
 #[tauri::command]
 async fn export_feedback(data:String,filename:Option<String>)->Result<bool,String>{tauri::async_runtime::spawn_blocking(move||{let filename=filename.unwrap_or_else(||"ISO-fingering-corrections.json".into());if filename.len()>100||!filename.ends_with(".json")||!filename.chars().all(|c|c.is_ascii_alphanumeric()||c=='-'||c=='.'){return Err("Invalid export filename".into())};if data.len()>20_000_000{return Err("Feedback too large".into())};match rfd::FileDialog::new().add_filter("JSON feedback",&["json"]).set_file_name(&filename).save_file(){None=>Ok(false),Some(p)=>{fs::write(p,data).map_err(|e|e.to_string())?;Ok(true)}}}).await.map_err(|e|e.to_string())?}
-fn main(){tauri::Builder::default().manage(Store(Mutex::new(()))).manage(midi_input::State::default()).manage(practice_audio::State::default()).invoke_handler(tauri::generate_handler![read_managed,write_managed,pick_score,save_score,export_feedback,midi_input::midi_sources,midi_input::midi_connect,midi_input::midi_disconnect,midi_input::midi_clock,practice_audio::practice_audio_outputs,practice_audio::practice_audio_begin,practice_audio::practice_audio_stop]).run(tauri::generate_context!()).expect("ISO viewer could not start");}
+fn main(){tauri::Builder::default().manage(Store(Mutex::new(()))).manage(midi_input::State::default()).manage(practice_audio::State::default()).manage(piano_bank::State::default()).invoke_handler(tauri::generate_handler![read_managed,write_managed,pick_score,save_score,export_feedback,midi_input::midi_sources,midi_input::midi_connect,midi_input::midi_disconnect,midi_input::midi_clock,practice_audio::practice_audio_outputs,practice_audio::practice_audio_begin,practice_audio::practice_audio_stop,practice_audio::piano_audio_configure,practice_audio::piano_audio_status,piano_bank::piano_bank_status,piano_bank::piano_bank_install,piano_bank::piano_bank_cancel,piano_bank::piano_bank_download,piano_bank::piano_audio_help]).build(tauri::generate_context!()).expect("ISO viewer could not start").run(|app,event|{
+ if matches!(event,tauri::RunEvent::Exit){
+  midi_input::shutdown(&app.state::<midi_input::State>());
+  if let Err(error)=app.state::<practice_audio::State>().shutdown(){
+   eprintln!("Piano audio shutdown: {error}");
+   // Preserve the restoration error without touching preferences or score data.
+   let audit=(||->Result<(),String>{let directory=app.path().app_data_dir().map_err(|e|e.to_string())?;fs::create_dir_all(&directory).map_err(|e|e.to_string())?;let bytes=serde_json::to_vec(&serde_json::json!({"version":1,"error":error,"event":"normal-exit"})).map_err(|e|e.to_string())?;fs::write(directory.join("piano-audio-shutdown.json"),bytes).map_err(|e|e.to_string())})();
+   if let Err(error)=audit{eprintln!("Piano shutdown audit could not be saved: {error}");}
+  }
+ }
+ });}
