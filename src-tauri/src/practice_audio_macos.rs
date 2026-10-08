@@ -1,116 +1,260 @@
-//! App-local CoreAudio HAL output. No input, loopback, default-device or routing writes.
-use super::{Output, Outputs, lifecycle, metronome};
-use cpal::{traits::{DeviceTrait, HostTrait, StreamTrait}, SampleFormat};
-use std::{sync::{Arc, atomic::{AtomicU64, Ordering}, mpsc}, time::Duration};
-use tauri::Emitter;
-
-fn audio_error(error: impl std::fmt::Display) -> String {
-    format!("Could not play the metronome: {error}. Choose an available audio output and test it.")
+//! Persistent CoreAudio HAL at the existing rate, with explicit reversible
+//! selected-device buffer ownership. CPAL Default avoids an untracked property write.
+use super::{buffer_lease, hal, mixer, AudioStatus, Config, Output, Outputs};
+use cpal::{
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+    SampleFormat,
+};
+use std::{
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+fn error(e: impl std::fmt::Display) -> String {
+    format!("CoreAudio could not open/play: {e}. Select an available output.")
 }
-
 pub fn outputs() -> Result<Outputs, String> {
     let host = cpal::default_host();
     let mut outputs = Vec::new();
-    for device in host.output_devices().map_err(audio_error)? {
-        let name = device.name().map_err(audio_error)?;
-        // CPAL 0.16 exposes friendly names, not persistent hardware UIDs.
-        // Opening below demands a unique current match; never reuse numeric indices.
-        outputs.push(Output { id: format!("coreaudio:{name}"), name });
+    for device in host.output_devices().map_err(error)? {
+        let name = device.name().map_err(error)?;
+        outputs.push(Output {
+            id: format!("coreaudio:{name}"),
+            name,
+        });
     }
-    Ok(Outputs { supported: true, outputs })
+    Ok(Outputs {
+        supported: true,
+        outputs,
+    })
 }
-
 fn device(identity: &str) -> Result<cpal::Device, String> {
     let host = cpal::default_host();
     let name = if identity.is_empty() {
-        host.default_output_device().ok_or_else(|| audio_error("no default output"))?
-            .name().map_err(audio_error)?
+        host.default_output_device()
+            .ok_or_else(|| error("no default output"))?
+            .name()
+            .map_err(error)?
     } else {
-        identity.strip_prefix("coreaudio:").ok_or_else(||
-            audio_error("this output belongs to another platform; select a Mac output"))?.into()
+        identity
+            .strip_prefix("coreaudio:")
+            .ok_or_else(|| error("select a Mac output"))?
+            .into()
     };
-    // An enumerated explicit device also receives CoreAudio disconnect monitoring.
-    let mut matches = host.output_devices().map_err(audio_error)?
+    let mut matches = host
+        .output_devices()
+        .map_err(error)?
         .filter(|d| d.name().ok().as_deref() == Some(name.as_str()));
-    let selected = matches.next().ok_or_else(|| audio_error("the selected output is missing"))?;
+    let selected = matches
+        .next()
+        .ok_or_else(|| error("the selected output is missing"))?;
     if matches.next().is_some() {
-        return Err(audio_error("several outputs have this name; choose a uniquely named output"));
+        return Err(error(
+            "several outputs have this name; choose a unique output",
+        ));
     }
     Ok(selected)
 }
-
-pub fn play(app: tauri::AppHandle, session: lifecycle::Session, identity: String, request: lifecycle::Request) {
-    let result = (|| {
-        if session.cancelled() { return Ok(()); }
-        let device = device(&identity)?;
-        let supported = device.default_output_config().map_err(audio_error)?;
-        let mut config = supported.config();
-        // Adopt the existing rate, channel count and buffer size. Never set
-        // a device sample rate/buffer size on behalf of another audio host.
-        config.buffer_size = cpal::BufferSize::Default;
-        if config.channels == 0 || config.channels > 256 || config.sample_rate.0 == 0 {
-            return Err(audio_error("the output has an invalid sample rate or channel count"));
+pub struct Host {
+    stream: Option<cpal::Stream>,
+    mixer: Arc<mixer::SharedMixer>,
+    status: AudioStatus,
+    last: Arc<AtomicU64>,
+    period: Arc<AtomicU64>,
+    frames: Arc<AtomicU64>,
+    peak: Arc<AtomicU64>,
+    failed: Arc<AtomicBool>,
+    bus: Arc<mixer::MidiBus>,
+    lease: Option<buffer_lease::Lease<hal::HalDevice>>,
+    closed: bool,
+}
+impl Host {
+    pub fn open(
+        config: &Config,
+        bus: Arc<mixer::MidiBus>,
+        mailbox: Arc<mixer::CueMailbox>,
+        volume: Arc<AtomicU64>,
+    ) -> Result<Self, String> {
+        let device = device(&config.device)?;
+        let supported = device.default_output_config().map_err(error)?;
+        let mut stream_config = supported.config();
+        stream_config.buffer_size = cpal::BufferSize::Default;
+        let rate = stream_config.sample_rate.0;
+        let channels = stream_config.channels as usize;
+        if channels == 0 || channels > 256 || rate < 8000 || rate > 384000 {
+            return Err(error("invalid rate or channel count"));
         }
-        let channels = config.channels as usize;
-        let rate = config.sample_rate.0;
-        let (origin_tx, origin_rx) = mpsc::sync_channel(1);
-        let (error_tx, error_rx) = mpsc::sync_channel(1);
-        let last_callback = Arc::new(AtomicU64::new(0));
-        let error_callback = move |error| { let _ = error_tx.try_send(audio_error(error)); };
-        macro_rules! stream {
-            ($sample:ty, $convert:expr) => {{
-                let mut source = metronome::Metronome::new_with_grid(rate, request.bpm, request.duration_ms, request.count_step_ms,request.grid.clone());
-                let callback_stop = session.stop_signal();
-                let callback_clock = last_callback.clone();
-                let mut first = true;
-                device.build_output_stream(&config,
-                    move |data: &mut [$sample], info: &cpal::OutputCallbackInfo| {
-                        if callback_stop.load(Ordering::Acquire) {
-                            data.fill(($convert)(0.0)); return;
-                        }
-                        let now = crate::midi_input::midi_clock();
-                        callback_clock.store(now, Ordering::Release);
-                        if first {
-                            first = false;
-                            let stamp = info.timestamp();
-                            let delay = stamp.playback.duration_since(&stamp.callback)
-                                .map(|d|d.as_micros() as u64);
-                            let onset = delay.and_then(|d| if let Some(target)=request.repeat_start_micros {
-                                now.checked_add(d).and_then(|playback|source.repeat_timeline_full_count(playback,0,target,request.full_repeat_count_in))
-                            }else{metronome::onset_micros(now,d)});
-                            let _ = origin_tx.try_send(onset);
-                            if onset.is_none(){data.fill(($convert)(0.0));return;}
-                        }
-                        source.fill(data, channels, $convert);
-                    }, error_callback, None).map_err(audio_error)?
-            }};
-        }
-        let stream = match supported.sample_format() {
-            SampleFormat::F32 => stream!(f32, |v: f32| v),
-            SampleFormat::I16 => stream!(i16, |v: f32| (v * i16::MAX as f32).round() as i16),
-            other => return Err(audio_error(format!("unsupported output sample format {other}"))),
+        let name = device.name().map_err(error)?;
+        let hal = hal::HalDevice::by_name(&name)?;
+        let uid = hal.uid().to_string();
+        let (mut lease, chosen, fallback) = if config.enabled {
+            hal.request(rate, config.tier)?
+        } else {
+            (None, hal.current()?, None)
         };
-        stream.play().map_err(audio_error)?;
-        let onset = origin_rx.recv_timeout(Duration::from_secs(2))
-            .map_err(|_|audio_error("the output did not start"))?
-            .ok_or_else(||audio_error("the output supplied an invalid playback clock"))?;
-        if !session.started(onset) { return Ok(()); }
-        let end = onset.saturating_add((request.duration_ms * 1000.0).ceil() as u64);
-        loop {
-            if let Ok(message) = error_rx.try_recv() { return Err(message); }
-            let now = crate::midi_input::midi_clock();
-            if session.cancelled() || now >= end { break; }
-            if now.saturating_sub(last_callback.load(Ordering::Acquire)) > 500_000 {
-                return Err(audio_error("audio output stopped; reconnect or select another output"));
+        let opened = (|| {
+            let synth: Option<Box<dyn mixer::Synth>> = if config.enabled {
+                Some(Box::new(crate::piano_engine::PianoEngine::new(
+                    config.sfz.as_deref().ok_or("Piano is not installed")?,
+                    rate,
+                    mixer::MAX_BLOCK,
+                )?))
+            } else {
+                None
+            };
+            let mut render = mixer::Mixer::new(synth, bus.clone(), mailbox, volume);
+            #[cfg(test)]
+            if std::env::var_os("VIEWER_AUDIO_DIAGNOSTIC_REPORT_DIR").is_some() {
+                if channels > 8 || rate > 96000 {
+                    return Err(error("Output exceeds bounded diagnostic capture"));
+                }
+                render.enable_capture(rate, channels, 8);
             }
-            std::thread::sleep(Duration::from_millis(5));
+            let shared = Arc::new(mixer::SharedMixer::new(render));
+            let (frames, peak) = shared.counters();
+            let last = Arc::new(AtomicU64::new(crate::midi_input::midi_clock()));
+            let period = Arc::new(AtomicU64::new(0));
+            let failed = Arc::new(AtomicBool::new(false));
+            macro_rules! build {
+                ($sample:ty,$convert:expr) => {{
+                    let mixer = shared.clone();
+                    let last = last.clone();
+                    let period = period.clone();
+                    let callback_failed = failed.clone();
+                    let stream_failed = failed.clone();
+                    device
+                        .build_output_stream(
+                            &stream_config,
+                            move |data: &mut [$sample], info: &cpal::OutputCallbackInfo| {
+                                let now = crate::midi_input::midi_clock();
+                                last.store(now, Ordering::Release);
+                                period.store((data.len() / channels) as u64, Ordering::Relaxed);
+                                let stamp = info.timestamp();
+                                if let Some(delay) = stamp.playback.duration_since(&stamp.callback)
+                                {
+                                    mixer.render(
+                                        data,
+                                        channels,
+                                        now,
+                                        delay.as_micros() as u64,
+                                        $convert,
+                                    );
+                                } else {
+                                    data.fill(($convert)(0.0));
+                                    callback_failed.store(true, Ordering::Release);
+                                }
+                            },
+                            move |_| {
+                                stream_failed.store(true, Ordering::Release);
+                            },
+                            None,
+                        )
+                        .map_err(error)?
+                }};
+            }
+            let stream = match supported.sample_format() {
+                SampleFormat::F32 => build!(f32, |v: f32| v),
+                SampleFormat::I16 => build!(i16, |v: f32| (v * i16::MAX as f32).round() as i16),
+                other => return Err(error(format!("unsupported sample format {other}"))),
+            };
+            stream.play().map_err(error)?;
+            let status = AudioStatus {
+                enabled: config.enabled,
+                ready: config.sfz.is_some(),
+                running: true,
+                device: config.device.clone(),
+                sample_rate: rate,
+                mode: "coreaudio-hal-current".into(),
+                output_uid: uid,
+                period_frames: chosen,
+                buffer_frames: chosen,
+                latency_tier: config.tier,
+                fallback,
+                ..Default::default()
+            };
+            Ok((
+                stream, shared, status, last, period, frames, peak, failed, bus,
+            ))
+        })();
+        match opened {
+            Ok((stream, mixer, status, last, period, frames, peak, failed, bus)) => Ok(Self {
+                stream: Some(stream),
+                mixer,
+                status,
+                last,
+                period,
+                frames,
+                peak,
+                failed,
+                bus,
+                lease,
+                closed: false,
+            }),
+            Err(e) => {
+                if let Some(lease) = lease.as_mut() {
+                    if let Err(restore) = lease.restore() {
+                        return Err(format!(
+                            "{e}; original output buffer restoration failed: {restore}"
+                        ));
+                    }
+                }
+                Err(e)
+            }
         }
-        // Drop releases this app's stream; it never changes the system output.
-        drop(stream);
-        Ok(())
-    })();
-    if let Err(message) = result {
-        session.failed(message, |message| { let _ = app.emit("viewer-audio-error", message); });
     }
-    session.finish();
+    pub fn pump(&mut self) -> Result<(), String> {
+        std::thread::sleep(Duration::from_millis(5));
+        if self.failed.load(Ordering::Acquire) {
+            return Err(error(
+                "the stream failed or supplied an invalid playback clock",
+            ));
+        }
+        if crate::midi_input::midi_clock().saturating_sub(self.last.load(Ordering::Acquire))
+            > 500_000
+        {
+            return Err(error(
+                "audio output stopped; reconnect or select another output",
+            ));
+        }
+        Ok(())
+    }
+    pub fn status(&self) -> AudioStatus {
+        let mut s = self.status.clone();
+        let frames = self.period.load(Ordering::Relaxed) as u32;
+        if frames > 0 {
+            s.period_frames = frames;
+            s.buffer_frames = frames;
+        }
+        s.rendered_frames = self.frames.load(Ordering::Relaxed);
+        s.peak = f64::from_bits(self.peak.load(Ordering::Relaxed));
+        s.queue_overflow = self.bus.overflow.load(Ordering::Relaxed);
+        s
+    }
+    #[cfg(test)]
+    pub fn take_capture(&mut self) -> Result<Option<mixer::Capture>, String> {
+        self.close()?;
+        Ok(self.mixer.take_capture_after_close())
+    }
+    pub fn close(&mut self) -> Result<(), String> {
+        if !self.closed {
+            if let Some(stream) = self.stream.take() {
+                let _ = stream.pause();
+                drop(stream);
+            }
+            self.mixer.close();
+            self.closed = true;
+        }
+        if let Some(lease) = self.lease.as_mut() {
+            lease.restore()?;
+        }
+        self.status.running = false;
+        Ok(())
+    }
+}
+impl Drop for Host {
+    fn drop(&mut self) {
+        let _ = self.close(); /* Last mixer Arc, synth/cue/scratch released here on worker. */
+    }
 }

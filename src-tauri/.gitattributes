@@ -1,0 +1,3 @@
+# Preserve exact upstream engine and notice bytes on every checkout.
+vendor/sfizz/** -text
+piano-notices/** -text
