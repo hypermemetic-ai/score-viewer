@@ -4,6 +4,7 @@ import {cp, mkdir, readFile, rm, writeFile, chmod} from 'node:fs/promises';
 import {resolve, join} from 'node:path';
 import {pathToFileURL, fileURLToPath} from 'node:url';
 import {inventory, sha256, canonical, safePath, validateRecordedChecks, validateCarrierInputs} from './native-release-carrier/inputs.mjs';
+import {validatePianoSources} from './native-release-carrier/score-viewer-piano-release.mjs';
 
 const templates = fileURLToPath(new URL('./native-release-carrier/', import.meta.url));
 function git(source, args, binary = false) {
@@ -43,19 +44,28 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
     inputs.nativeFiles[file.path]={sha256:sha256(bytes),size:bytes.length};
   }
   inputs.nativeFiles=Object.fromEntries(Object.entries(inputs.nativeFiles).sort(([a],[b])=>a.localeCompare(b)));
+  await validatePianoSources(viewerSource, inputs.nativeFiles);
   // Validate all adapters before any carrier mutation. The source commit stays
   // untouched; only the task-owned clean, isolated carrier worktree is written.
   let delivery=await readFile(join(isoCarrier,'scripts','score-viewer-delivery.mjs'),'utf8');
-  delivery=replaceOnce(delivery,"import {brotliDecompressSync} from 'node:zlib';","import {brotliDecompressSync} from 'node:zlib';\nimport {validateSourceIdentity,validatePreparedCarrier,validateRecipientCarrier} from './score-viewer-carrier-inputs.mjs';",'delivery import');
+  delivery=replaceOnce(delivery,"import {brotliDecompressSync} from 'node:zlib';","import {brotliDecompressSync} from 'node:zlib';\nimport {validateSourceIdentity,validatePreparedCarrier,validateRecipientCarrier,validatePianoNativeChecks} from './score-viewer-carrier-inputs.mjs';",'delivery import');
   delivery=replaceOnce(delivery,"export function validateIdentity(identity) {","export function validateIdentity(identity) {\n  if(identity?.sourceInputs)validateSourceIdentity(identity.sourceInputs);",'delivery identity');
   delivery=replaceOnce(delivery,"  validateIdentity(manifest.identity);","  validateIdentity(manifest.identity);\n  if(!manifest.identity.sourceInputs)fail('Reviewed viewer/notation carrier identity missing');\n  await validatePreparedCarrier(root,manifest.identity);",'prepared verification');
   delivery=replaceOnce(delivery,"{sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score}","{sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score,sourceInputs:manifest.identity.sourceInputs}",'embedded identity');
   delivery=replaceOnce(delivery,"  const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';","  await validateRecipientCarrier(files,prepared);\n  const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';",'worker recipient evidence');
   delivery=replaceOnce(delivery,"    const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];","    await validateRecipientCarrier(files,prepared);\n    const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];",'paired recipient evidence');
+  delivery=replaceOnce(delivery,"\n  if(receipt.nativeChecks?.tests!=='passed'","\n  await validatePianoNativeChecks(receipt,prepared);\n  if(receipt.nativeChecks?.tests!=='passed'",'worker engine checks');
+  delivery=replaceOnce(delivery,"\n    if(receipt.nativeChecks?.tests!=='passed'","\n    await validatePianoNativeChecks(receipt,prepared);\n    if(receipt.nativeChecks?.tests!=='passed'",'pair engine checks');
   let worker=await readFile(join(isoCarrier,'scripts','score-viewer-native-worker.mjs'),'utf8');
-  worker=replaceOnce(worker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {validateCarrierInputs} from './score-viewer-carrier-inputs.mjs';",'worker import');
+  worker=replaceOnce(worker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {validateCarrierInputs} from './score-viewer-carrier-inputs.mjs';\nimport {packagePianoNotices,addPianoWorkerChecks} from './score-viewer-piano-release.mjs';",'worker import');
   worker=replaceOnce(worker,"  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});","  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  const verified=await validateCarrierInputs(source);\n  if(JSON.stringify(verified.sourceInputs)!==JSON.stringify(manifest.identity.sourceInputs))throw Error('Worker viewer/notation inputs differ from preparation');",'worker input verification');
   worker=replaceOnce(worker,"  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));","  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n  await cp(join(ctx.prepared,'source-inputs.json'),join(packet,'Source-provenance.json'));\n  await cp(join(ctx.prepared,'source-checks.json'),join(packet,'Source-validation.json'));\n  await cp(join(ctx.prepared,'frontend','release-identity.json'),join(packet,'Release-identity.json'));",'recipient provenance');
+  worker=replaceOnce(worker,"export async function notices(source,viewer,packet,targetTriple) {","export async function notices(source,viewer,packet,targetTriple) {\n  const pianoEngine=await packagePianoNotices(source,viewer,packet);",'piano notice packaging');
+  worker=replaceOnce(worker,"{manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))","{pianoEngine,manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))",'piano dependency identity');
+  worker=replaceOnce(worker,"  const hashes=await inventory(packet);","  ({nativeChecks,details}=await addPianoWorkerChecks(ctx.source,ctx.viewer,packet,nativeChecks,details));\n  const hashes=await inventory(packet);",'piano worker evidence');
+  let macWorker=await readFile(join(isoCarrier,'scripts','build-score-viewer-macos.mjs'),'utf8');
+  macWorker=replaceOnce(macWorker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {verifyBundledPianoNotices} from './score-viewer-piano-release.mjs';",'Mac piano resource import');
+  macWorker=replaceOnce(macWorker,"const bundledNoticeHashes={};","const bundledNoticeHashes=await verifyBundledPianoNotices(stage,viewer,join(app,'Contents','Resources'));",'Mac piano resource verification');
   let attributes='';
   try {attributes=await readFile(join(isoCarrier,'.gitattributes'),'utf8');} catch(error) {if(error.code!=='ENOENT')throw error;}
   if(attributes && !attributes.endsWith('\n'))attributes+='\n';
@@ -78,9 +88,11 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   await writeFile(join(isoCarrier,'delivery-input','checks.json'),checksBytes);
   await writeFile(join(isoCarrier,'delivery-input','inputs.json'),JSON.stringify(inputs,null,2)+'\n');
   await cp(join(templates,'inputs.mjs'),join(isoCarrier,'scripts','score-viewer-carrier-inputs.mjs'));
+  await cp(join(templates,'score-viewer-piano-release.mjs'),join(isoCarrier,'scripts','score-viewer-piano-release.mjs'));
   await cp(join(templates,'prepare-score-viewer.mjs'),join(isoCarrier,'scripts','prepare-score-viewer.mjs'));
   await writeFile(join(isoCarrier,'scripts','score-viewer-delivery.mjs'),delivery);
   await writeFile(join(isoCarrier,'scripts','score-viewer-native-worker.mjs'),worker);
+  await writeFile(join(isoCarrier,'scripts','build-score-viewer-macos.mjs'),macWorker);
   await writeFile(join(isoCarrier,'.gitattributes'),attributes);
   await writeFile(join(isoCarrier,'delivery-input','README.md'),`# Frozen native release inputs\n\nThis isolated delivery carrier builds reviewed viewer ${viewerRevision} with notation ${notationRevision}. Application source ownership remains in hypermemetic-ai/score-viewer. The legacy ISO viewer TypeScript is not built. The shared frontend was checked and built once before freezing; native preparation verifies its inventory and source-check receipt, adds an embedded release identity, and generates every payload probe.\n\nThe unchanged paired workflow selects this carrier commit for checkout. Its packages identify that carrier plus the independently bound viewer and notation revisions. Native Windows tests, Mac tests/virtual MIDI/signatures/deployment/DMG/launch checks, both-slice embedded proof and paired publication remain required. No recipient installation or data changes occur from building this carrier.\n`);
   const verified=await validateCarrierInputs(isoCarrier,{expectedViewerRevision:viewerRevision,expectedNotationRevision:notationRevision});

@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {readFile, readdir, lstat} from 'node:fs/promises';
 import {join} from 'node:path';
+import {validatePianoSources, validatePianoRecipient, requirePianoWorkerChecks} from './score-viewer-piano-release.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const canonical = value => JSON.stringify(value);
@@ -64,6 +65,12 @@ export async function validateRecipientCarrier(files, prepared) {
     const expected = await readFile(join(prepared, original));
     if (!files[recipient] || !Buffer.from(files[recipient]).equals(expected)) fail(`Recipient source evidence differs: ${recipient}`);
   }
+  const inputs = JSON.parse(await readFile(join(prepared, 'source-inputs.json')));
+  validatePianoRecipient(files, inputs.nativeFiles);
+}
+export async function validatePianoNativeChecks(receipt, prepared) {
+  const inputs = JSON.parse(await readFile(join(prepared, 'source-inputs.json')));
+  requirePianoWorkerChecks(receipt, inputs.nativeFiles);
 }
 export async function validateCarrierInputs(source, {expectedViewerRevision, expectedNotationRevision} = {}) {
   const bytes = await readFile(join(source, 'delivery-input', 'inputs.json')), inputs = JSON.parse(bytes);
@@ -83,6 +90,7 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
     if (sha256(file) !== pin.sha256 || file.length !== pin.size) fail(`Native source pin differs: ${path}`);
     if (path.startsWith('licenses/') && !(await readFile(join(source, path))).equals(file)) fail(`Shared/native notice differs: ${path}`);
   }
+  await validatePianoSources(join(source, 'score-viewer'), inputs.nativeFiles);
   const checksBytes = await readFile(join(source, 'delivery-input', 'checks.json'));
   if (!hash(inputs.checks?.sha256) || sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Reviewed check receipt differs');
   const checks = JSON.parse(checksBytes);
