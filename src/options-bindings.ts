@@ -10,7 +10,7 @@ export function optionsBindingRows(practice?:PracticeBindingContext):OptionsBind
  return actions.map(action=>({action,label:practice&&['previous','next'].includes(action)?action==='previous'?'Previous measures':'Next measures':readingActionLabel(action)}));
 }
 export interface OptionsBindingsApi {
- resolver:ControlResolver;bindings():ControlBindings;save(change:ControlChange):Promise<void>;
+ resolver:ControlResolver;bindings():ControlBindings;save(change:ControlChange):Promise<void>;validate?(change:ControlChange):void;
  connection():{source:string;generation:number}|undefined;channel():number|undefined;suspend():void;
  rows?:readonly OptionsBindingRow[];
 }
@@ -55,7 +55,7 @@ export class OptionsBindingsPanel {
  if(this.testing){this.api.resolver.receive(event,connection,true);this.feedback();return true;}
  if(!this.capture)return false;this.api.resolver.receive(event,connection,false);const cap=this.capture;if(cap.connection?.source!==connection.source||cap.connection.generation!==connection.generation){this.connectionChanged();return true;}
  if(cap.candidate?.kind==='key')return true;const learned=cap.learn?.receive(event);this.message(cap.learn?.message??'Connect a MIDI input or press a key.');if(learned){cap.candidate={kind:'midi',...learned};this.finishCapture(cap);}return true;}
- private finishCapture(cap:Capture){if(this.capture!==cap||!cap.candidate)return;try{replaceControl(this.api.bindings(),cap.action,cap.slot,cap.candidate);this.capture=undefined;void this.persist({kind:'assign',action:cap.action,slot:cap.slot,binding:cap.candidate},this.returnFocus!);}catch(error){cap.candidate=undefined;cap.code=undefined;cap.learn=cap.connection?new MidiLearn(cap.connection.source,this.api.channel(),cap.connection.generation):undefined;this.message((error as Error).message);}}
+ private finishCapture(cap:Capture){if(this.capture!==cap||!cap.candidate)return;try{const change:ControlChange={kind:'assign',action:cap.action,slot:cap.slot,binding:cap.candidate};if(this.api.validate)this.api.validate(change);else replaceControl(this.api.bindings(),cap.action,cap.slot,cap.candidate);this.capture=undefined;void this.persist(change,this.returnFocus!);}catch(error){cap.candidate=undefined;cap.code=undefined;cap.learn=cap.connection?new MidiLearn(cap.connection.source,this.api.channel(),cap.connection.generation):undefined;this.message((error as Error).message);}}
  private async persist(change:ControlChange,focus:HTMLElement){if(this.saving)return;const generation=++this.generation;this.saving=true;this.message('Saving…');this.paint();try{await this.api.save(change);if(this.disposed)return;this.saving=false;this.paint();if(generation!==this.generation)return;this.message();if(document.activeElement===focus||document.activeElement===document.body)focus.isConnected&&focus.focus();}catch(error){if(this.disposed)return;this.saving=false;this.paint();if(generation===this.generation)this.message(`Not saved: ${(error as Error).message}`);}}
  focusChanged(target:HTMLElement){if(this.popup&&!this.popup.contains(target)&&target!==this.returnFocus)this.cancel();if(this.capture&&!target.closest(`[data-control-action="${this.capture.action}"]`))this.cancel();}
  dispose(){this.disposed=true;this.cancel();}
