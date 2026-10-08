@@ -13,9 +13,10 @@ use std::{
 #[test]
 #[ignore = "requires explicit verified bank/output/report paths and an authorized native device"]
 fn initialized_windows_stream_and_virtual_midi_pcm() {
-    let sfz = PathBuf::from(
+    let sfz = std::fs::canonicalize(PathBuf::from(
         std::env::var("VIEWER_AUDIO_DIAGNOSTIC_SFZ").expect("explicit admitted SFZ required"),
-    );
+    ))
+    .expect("canonical admitted SFZ, matching installer path form");
     let device = std::env::var("VIEWER_AUDIO_DIAGNOSTIC_OUTPUT_ID")
         .expect("explicit render endpoint required");
     assert!(!device.is_empty());
