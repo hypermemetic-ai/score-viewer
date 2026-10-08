@@ -33,6 +33,11 @@ slices. The viewer-root `.cargo/config.toml` selects Windows-MSVC-only static
 CRT so Rust and every C/C++ archive use `/MT` together, without requiring a
 separate VC-runtime installation. The helper derives the actual target feature
 and uses `/MD` when static CRT is not selected for an external embedding build.
+For Windows-MSVC with Rust `crt-static`, the application build script disables
+Tauri's separate partial `static_vcruntime` helper through its supported
+`WindowsAttributes` API. Rust then owns the complete static CRT, including
+`libucrt`; Tauri still builds the ordinary resources and ACLs. Other targets
+retain the default Tauri build path.
 CMake, a matching C/C++ compiler and archive
 tool are build prerequisites. Explicit non-Visual-Studio generators select
 their compiler environment/toolchain rather than receiving a VS-only `-A`.
