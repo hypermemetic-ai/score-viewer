@@ -28,6 +28,8 @@ export type ControlChange={kind:'assign';action:ReadingAction;slot:0|1;binding:C
 export function changeControls(bindings:ControlBindings,change:ControlChange){return change.kind==='restore-pages'?restoreControlPages(bindings):replaceControl(bindings,change.action,change.slot,change.binding);}
 
 export const actionControlLabel=(bindings:ControlBindings,action:ReadingAction)=>bindings.actions[action].filter((b):b is ControlBinding=>!!b).map(controlLabel).join(' / ');
+/** An explicit saved V assignment owns the key even when its action is unavailable. */
+export const freeViewControlLabel=(bindings:ControlBindings)=>Object.values(bindings.actions).some(slots=>slots.some(b=>b?.kind==='key'&&b.key==='KeyV'))?'':'V';
 export interface ControlMatch {action:ReadingAction;slot:0|1;binding:ControlBinding}
 interface Physical {binding:ControlBinding;down:boolean;blocked:boolean;match?:ControlMatch;code?:string;modifiers?:string[]}
 export interface ControlResult {action?:ReadingAction;match?:ControlMatch;received?:ControlBinding;changed:boolean}
