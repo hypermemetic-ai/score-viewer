@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {strToU8,strFromU8} from 'fflate';
-import {transferStudy,boundaryStudy,sourcePackage,calculatedStudy} from './support/hand-edition-fixture';
+import {transferStudy,boundaryStudy,completeTieBoundaryStudy,sourcePackage,calculatedStudy} from './support/hand-edition-fixture';
 import {archivePackage,hashBytes,importPackage,selectPresentation,type ScorePackage} from '../src/package';
 import {annotationPositions} from '../src/fingering-presentation';import {initialPersonal,fingerDisplayAvailable,corrected,fingerFor} from '../src/state';
 import {calculatedHandInputs} from '../src/calculated-hand-edition';import {createPianoPreparationIdentity} from '../src/piano-preparation-identity';
@@ -116,6 +116,28 @@ test('actual all-five replacement failure retains complete fresh long-value anno
   const carrier=q.p.annotationGeometry!.seats[0];assert.ok(carrier.durationBounds.length);assert.ok(carrier.durationBounds.some(b=>b.y0<carrier.maskBounds.y0));
   assert.ok(carrier.durationBounds.every(b=>position.bounds[3]<b.y0));
   for(const finger of [1,2,3,4,5])assert.equal(fingerFor(q.p,corrected(q.p,initialPersonal(q.p),seat,finger),seat),finger);
+ }
+});
+test('complete three/four-component source ties cold-read across every page on both keyboards without losing remote ownership or annotations',async()=>{
+ for(const count of [3,4] as const)for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const hand:Hand=count===3?'RH':'LH',source=completeTieBoundaryStudy(count,hand),
+   original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:255}),before=await hashBytes(original.bytes),
+   hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?hand:n.hand])),q=await calculatedStudy(original.p,layout,hands),
+   cold=await importPackage(q.bytes,{keyboardLayout:layout}),seats=cold.seats.filter(s=>s.ownerIds.includes('written-hold')),
+   components=source.tieChains![0].components;
+  assert.equal(cold.pages.length,count-1);assert.equal(seats.length,count);assert.equal(new Set(seats.map(s=>s.page)).size,count-1);
+  assert.equal(seats.filter(s=>s.continuation).length,count-1);assert.equal(new Set(seats.map(s=>s.actionId)).size,1);
+  assert.equal(cold.score.notes.find(n=>n.id==='written-hold')!.hand,hand);assert.equal(cold.score.notes.find(n=>n.id==='following-attack')!.hand,hand);
+  assert.notEqual(source.notes.find(n=>n.id==='following-attack')!.hand,hand);
+  for(const [index,l]of q.r.layouts.entries())assert.deepEqual(new Set(l.tieSplitHeadIds),new Set(components.flatMap((c,i)=>
+   c.startTick>=index*144&&c.startTick<(index+1)*144?[]:[i?'written-hold~c'+i:'written-hold'])));
+  assert.deepEqual(cold.files['source-score.json'],original.p.files['source-score.json']);assert.deepEqual(cold.sourceScore,source);
+  assert.equal(annotationPositions(cold).size,cold.seats.length);assert.equal(q.r.lint.violations.length,0);assert.equal(q.r.lint.warnings.length,0);
+  const retained=await ensurePianoReady({packageBytes:q.bytes,layout,intent:'read-retained'});assert.equal(retained.status,'editable');assert.deepEqual(retained.packageBytes,q.bytes);
+  await assert.rejects(importPackage(await repinned(cold,f=>{const r=JSON.parse(strFromU8(f['hand-presentation.json']));
+   const finalSeat=seats.at(-1)!;r.annotationGeometry.seats=r.annotationGeometry.seats.filter((g:any)=>g.seatId!==finalSeat.id);
+   f['hand-presentation.json']=strToU8(JSON.stringify(r));})),/actual paint|coverage|geometry/,'matching metadata cannot excuse missing remote carrier coverage');
+  assert.equal(await hashBytes(original.bytes),before);
  }
 });
 test('unresolved independent statements and unsupported literal transfer fits retain original archives and source rather than relaxing admission',async()=>{

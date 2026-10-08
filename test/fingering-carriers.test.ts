@@ -8,6 +8,7 @@ import {annotationPositions,ANNOTATION_COLOR} from '../src/fingering-presentatio
 import {expertSettings} from '../src/expert-settings';
 import {fingerPreferences} from '../src/input';
 import {DOMParser} from '@xmldom/xmldom';
+import {actualPageObstacles,boxesOverlap,type AnnotationBox} from '../src/svg-annotation-clearance';
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
 const base=p.score.notes[0];
 function note(id:string,pitch:number,tick=0,duration=48,hand:'LH'|'RH'='RH') {return {...base,id,startTick:tick,durationTicks:duration,hand,pitch:{...base.pitch,octave:Math.floor(pitch/12),pitchClass:pitch%12}};}
@@ -48,6 +49,26 @@ test('shared compatible chord stems stack by pitch under either actual direction
  for(const direction of [-1,1] as const){
   const high=seat('high',['high'],80),low=seat('low',['low'],100),notes=[note('high',72,0,48,direction===-1?'RH':'LH'),note('low',60,0,48,direction===-1?'RH':'LH')],q=fixture(notes,[high,low],direction===-1?stem(50,75.8,60):stem(50,104.2,120)),before=JSON.stringify(q),positions=annotationPositions(q),a=positions.get('high')!,b=positions.get('low')!;
   assert.equal(a.carrier.id,b.carrier.id);assert.equal(a.carrier.direction,direction);assert.equal(a.x,b.x);assert.ok(a.bounds[3]<b.bounds[1]);assert.ok(direction===-1?b.bounds[3]<60:a.bounds[1]>120);assert.equal(positions.size,2);assert.equal(JSON.stringify(q),before);
+ }
+});
+test('fresh shared continuation stacks move together within original columns and clear actual grid ink for every 1–5 outline',()=>{
+ for(const direction of [-1,1] as const){const hand:'RH'|'LH'=direction===-1?'RH':'LH',high=seat('high',['high'],80,50,true),low=seat('low',['low'],100,50,true),
+  notes=[note('high',72,0,96,hand),note('low',60,24,72,hand)],q=fixture(notes,[high,low],
+   (direction===-1?stem(50,75.8,60):stem(50,104.2,120))+'<line x1="50" y1="0" x2="50" y2="300" stroke="gray" stroke-width=".1" stroke-dasharray="2,3"/>');
+  q.pages[0]=q.pages[0].replace('<svg xmlns="http://www.w3.org/2000/svg">','<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300">');
+  q.score.performingHandPresentation={version:'performing-hand-presentation-v1',assignmentId:'authored-continuation',owners:notes.map(n=>({id:n.id,
+   pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks,hand:n.hand}))};
+  const geometry={version:'annotation-carrier-geometry-v1' as const,presentationIdentity:'authored-continuation',coverage:'owned-head-and-duration' as const,
+   seats:[high,low].map(s=>({seatId:s.id,page:0,system:0,hand,headBounds:{x0:47,y0:s.baseline-7,x1:53,y1:s.baseline+1},
+    maskBounds:{x0:47,y0:s.baseline-7,x1:53,y1:s.baseline+1},durationBounds:[{x0:49.5,x1:50.5,y0:direction===-1?60:104.2,y1:direction===-1?75.8:120}]}))},
+   candidate={...q,annotationGeometry:geometry},before=JSON.stringify(candidate),positions=annotationPositions(candidate),a=positions.get('high')!,b=positions.get('low')!,
+   obstacles=actualPageObstacles(q.pages[0],new Map(geometry.seats.map(g=>[g.seatId,[g.headBounds.x0,g.headBounds.y0,g.headBounds.x1,g.headBounds.y1] as AnnotationBox])));
+  assert.notEqual(a.x,50);assert.equal(a.x,b.x);assert.equal(a.carrier.id,b.carrier.id);assert.equal(a.carrier.x,50);assert.ok(Math.abs(a.x-50)<=4);
+  assert.ok(a.bounds[3]<b.bounds[1]);assert.ok(direction===-1?b.bounds[3]<60:a.bounds[1]>120);
+  for(const position of positions.values())for(const d of Object.values(digitMetrics)){const em=position.fontSize*4/3,
+   glyph:AnnotationBox=[position.x+(d[0]-280)*em/1000,position.baseline-d[3]*em/1000,position.x+(d[2]-280)*em/1000,position.baseline-d[1]*em/1000];
+   assert.ok(!obstacles.boxes.some(ink=>boxesOverlap(glyph,ink)));assert.ok(glyph[0]>=position.bounds[0]&&glyph[2]<=position.bounds[2]);}
+  assert.deepEqual(annotationPositions({...candidate,seats:[low,high]}),positions);assert.equal(JSON.stringify(candidate),before);
  }
 });
 test('an opposed shared-head alias uses its performing contact branch and retains both engraved branches',()=>{
