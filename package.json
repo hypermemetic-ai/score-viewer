@@ -1,0 +1,27 @@
+{
+  "name": "iso-score-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite --host 0.0.0.0 --port 5205 --strictPort",
+    "tauri": "tauri",
+    "test": "node --import tsx --test --test-concurrency=2 test/*.test.ts",
+    "prebuild": "node scripts/check-source-pin.mjs",
+    "pretest": "node scripts/check-source-pin.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@xmldom/xmldom": "^0.9.8",
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
+    "@tonejs/midi": "2.0.28",
+    "@types/node": "^22.20.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}

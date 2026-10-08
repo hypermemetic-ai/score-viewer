@@ -1,0 +1,69 @@
+import {validatePulseGrid,type PracticePulseGrid} from './score-clock';
+import {host,practiceAudio} from './host';
+import {practiceTiming,pulseAt} from './practice-timing';
+import {ClockOrigin} from './clock-origin';
+import {selectPracticeRepeatStart,repeatStartFromCountOrigin,type PracticeRepeatPlan} from './practice-repeat';
+/** Audio scheduling and MIDI grading share one mapped timeline on each host. */
+export class PracticeClock {
+ private static nativeOwner?:PracticeClock;private static nativeStopPending=Promise.resolve();
+ private unlistenAudio?:()=>void;
+ private audio?:AudioContext;private interval?:number;private nodes:OscillatorNode[]=[];private grid?:PracticePulseGrid;private origin=0;private eighth=0;private countStep=0;private index=0;private end=0;private nativeClock?:ClockOrigin;private midiClock?:ClockOrigin;private stopPending=Promise.resolve();private generation=0;
+ constructor(readonly native=false,readonly output='',private readonly onError:(message:string)=>void=()=>{}){}
+ unlock(){if(this.native)return Promise.resolve();this.audio??=new AudioContext({latencyHint:'interactive'});const resume=this.audio.resume();return Promise.race([resume,new Promise<never>((_,reject)=>setTimeout(()=>reject(Error('Audio did not start. Open practice settings and test the output.')),2500))]).then(()=>{if(this.audio?.state!=='running')throw Error(`Audio is ${this.audio?.state}; test the output before starting.`);});}
+ async beginRepeat(bpm:number,durationMs:number,plan:PracticeRepeatPlan,grid?:PracticePulseGrid){
+  if(plan.nextBpm!==bpm)throw Error('Repeat tempo differs from its musical boundary');
+  if(!Number.isFinite(durationMs)||durationMs<=practiceTiming(bpm).countInMs||durationMs>3_600_000)throw Error('Invalid musical repeat duration');
+  const countStartMs=await this.start(bpm,durationMs,true,plan,grid);
+  return repeatStartFromCountOrigin(plan,countStartMs);
+ }
+ begin(bpm:number,durationMs:number,countIn=false,grid?:PracticePulseGrid){return this.start(bpm,durationMs,countIn,undefined,grid);}
+ private async start(bpm:number,durationMs:number,countIn:boolean,repeat?:PracticeRepeatPlan,grid?:PracticePulseGrid){
+  grid=grid?validatePulseGrid(grid):undefined;const timing=practiceTiming(bpm,grid);
+  if(!Number.isFinite(bpm)||bpm<5||bpm>500||!Number.isFinite(durationMs)||durationMs<1||durationMs>3_600_000)throw Error('Choose a rate from 5–500 per minute and an attempt no longer than one hour.');
+  if(grid&&grid.scoreOffsetPulses!==(countIn?2*grid.pulsesPerBeat:0))throw Error('The score metronome count-in differs from its pulse grid.');
+  const unlock=this.unlock();
+  if(this.native){
+   const previous=PracticeClock.nativeOwner;
+   if(previous&&previous!==this)previous.cancelLocal();
+   PracticeClock.nativeOwner=this;
+  }
+  const stopping=this.stop(),generation=this.generation;
+  if(this.native)PracticeClock.nativeOwner=this;
+  try{
+   await stopping;await unlock;this.checkGeneration(generation);
+   if(this.native){
+    let reported=false;
+    const unlisten=await practiceAudio.onError(message=>{
+     if(generation!==this.generation||PracticeClock.nativeOwner!==this||reported)return;
+     reported=true;this.onError(message);
+    });
+    if(generation!==this.generation||PracticeClock.nativeOwner!==this){unlisten();this.checkGeneration(generation);throw Error('Practice start was cancelled');}
+    this.unlistenAudio=unlisten;
+    const before=performance.now(),native=await host.midiClock(),after=performance.now();this.checkGeneration(generation);
+    const sampled=new ClockOrigin(before,native,after);
+    const start=(await practiceAudio.begin(this.output,bpm,durationMs,countIn?timing.countStepMs:0,repeat?repeat.earliestStartMs*1000:undefined,grid,!!repeat?.fullCountIn))/1000;
+    this.checkGeneration(generation);if(repeat)repeatStartFromCountOrigin(repeat,start);this.nativeClock=sampled;this.midiClock=new ClockOrigin(0,0,0);return start;
+   }
+   const audio=this.audio!,before=audio.currentTime*1000,native=await host.midiClock(),after=audio.currentTime*1000;this.checkGeneration(generation);
+   if(audio.state!=='running')throw Error('Audio stopped. Test the output before starting.');
+   this.midiClock=new ClockOrigin(before,native,after);const ready=audio.currentTime+.15,start=repeat?selectPracticeRepeatStart(repeat,ready*1000).countStartMs/1000:ready;this.origin=start;this.grid=grid;this.eighth=timing.eighthMs;this.countStep=countIn?timing.countStepMs:0;this.end=start+durationMs/1000;this.index=repeat?Math.max(0,Math.ceil((ready-start)*1000/(this.countStep||this.eighth))):0;this.schedule();this.interval=window.setInterval(()=>this.schedule(),20);return start*1000;
+  }catch(error){if(generation===this.generation)void this.stop();throw error;}
+ }
+ now(){return this.native?this.nativeClock?.toNative(performance.now())!:this.audio?.currentTime! *1000;}
+ fromMidi(nativeMicros:number){if(!this.midiClock)throw Error('The practice clock has not started');return this.midiClock.fromMidi(nativeMicros);}
+ private checkGeneration(generation:number){if(generation!==this.generation)throw Error('Practice start was cancelled');}
+ private schedule(){const audio=this.audio!;for(;;){const pulse=pulseAt(this.index,this.eighth,this.countStep,this.grid),next=this.origin+pulse.offsetMs/1000;if(next>=audio.currentTime+.15||next>=this.end)break;const oscillator=audio.createOscillator(),gain=audio.createGain();oscillator.frequency.value=pulse.frequency;gain.gain.setValueAtTime(pulse.amplitude,next);gain.gain.exponentialRampToValueAtTime(.001,next+.04);oscillator.connect(gain).connect(audio.destination);oscillator.start(next);oscillator.stop(next+.045);oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();this.nodes=this.nodes.filter(n=>n!==oscillator);};this.nodes.push(oscillator);this.index++;}}
+ private cancelLocal(){this.generation++;this.unlistenAudio?.();this.unlistenAudio=undefined;clearInterval(this.interval);this.interval=undefined;for(const n of this.nodes){try{n.stop();}catch{}}this.nodes=[];this.midiClock=undefined;this.nativeClock=undefined;}
+ stop(){
+  this.cancelLocal();
+  if(this.native){
+   if(PracticeClock.nativeOwner===this){
+    PracticeClock.nativeOwner=undefined;
+    PracticeClock.nativeStopPending=PracticeClock.nativeStopPending.catch(()=>{}).then(()=>practiceAudio.stop());
+   }
+   this.stopPending=PracticeClock.nativeStopPending;
+  }
+  return this.stopPending;
+ }
+ close(){void this.stop();this.midiClock=undefined;this.nativeClock=undefined;void this.audio?.close();}
+}

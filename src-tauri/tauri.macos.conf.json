@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "icon": ["icons/icon.icns"],
+    "resources": {
+      "../licenses/URW-base35-provenance.md": "notices/URW-base35-provenance.md",
+      "../licenses/URW-base35-LICENSE": "notices/URW-base35-LICENSE",
+      "../licenses/URW-base35-COPYING": "notices/URW-base35-COPYING",
+      "../licenses/OFL-Bravura.txt": "notices/OFL-Bravura.txt"
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.3",
+      "signingIdentity": "-"
+    }
+  }
+}

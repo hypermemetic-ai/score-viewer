@@ -1,0 +1,1428 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/hypermemetic-ai/iso-notation",
+  "sourceRevision": "da93cf9e0359d861987fd76611b59b14b6aedb92",
+  "sourcePath": "score-viewer/",
+  "bootstrapRevision": "73b37de30a90e028705f8a48f726eac76aadb04a",
+  "dependencyPath": "vendor/iso-notation",
+  "boundary": "Temporary source-level full-score/model/calculator dependency. This is not a permanent public API.",
+  "copiedFiles": [
+    {
+      "source": "score-viewer/README.md",
+      "destination": "docs/source-viewer-readme.md",
+      "sha256": "76e702c78458518d142aff76fd2b7c94bc6bf296fafaabc38cea9d0e1352922a"
+    },
+    {
+      "source": "score-viewer/fixtures/schumann-op68-no14.isoscore",
+      "destination": "fixtures/schumann-op68-no14.isoscore",
+      "sha256": "75ae62bed0db164281a2e02200213d8a83ec542d50d209c6651e72764cfe3d32"
+    },
+    {
+      "source": "score-viewer/index.html",
+      "destination": "index.html",
+      "sha256": "67591171a3c4faffff0f468c64821b7261cb80290449f68ab34724dca4116f9a"
+    },
+    {
+      "source": "score-viewer/package-lock.json",
+      "destination": "package-lock.json",
+      "sha256": "526874a2e7c0f82cbb1669b2d1e5770fb0527e03dbf2723613b454933fb658c2"
+    },
+    {
+      "source": "score-viewer/package.json",
+      "destination": "package.json",
+      "sha256": "b4d83d734a343e01ab16ea1d6b8c81dc0e3f986b8210ac0176664886174dcbc7"
+    },
+    {
+      "source": "score-viewer/src-tauri/Cargo.lock",
+      "destination": "src-tauri/Cargo.lock",
+      "sha256": "caf2b8ce92eeb16d422fea775381876e3de55c9132374823c9899974b1404001"
+    },
+    {
+      "source": "score-viewer/src-tauri/Cargo.toml",
+      "destination": "src-tauri/Cargo.toml",
+      "sha256": "9789a06d1742735998b6c55c1fc6d46be31a6711efad68b9e61808d7b6e54bc9"
+    },
+    {
+      "source": "score-viewer/src-tauri/build.rs",
+      "destination": "src-tauri/build.rs",
+      "sha256": "8af41c0062014fc594e4bb9899e60ee9930ab57d4cf0c73041ff557d6ec736e6"
+    },
+    {
+      "source": "score-viewer/src-tauri/capabilities/main.json",
+      "destination": "src-tauri/capabilities/main.json",
+      "sha256": "28b624c5b842bc7ed0be721e0fe14a1300fcfd47188e445a9aef752c70b98396"
+    },
+    {
+      "source": "score-viewer/src-tauri/icons/icon.icns",
+      "destination": "src-tauri/icons/icon.icns",
+      "sha256": "3d5c2657184d4bed5665712fdf51c7e723590d7798875d4d128e7163cc336af4"
+    },
+    {
+      "source": "score-viewer/src-tauri/icons/icon.ico",
+      "destination": "src-tauri/icons/icon.ico",
+      "sha256": "30cc2ee6ecfd055ee37b48e686c5db64ea3e58cf045f820898b58723605a20ea"
+    },
+    {
+      "source": "score-viewer/src-tauri/icons/icon.png",
+      "destination": "src-tauri/icons/icon.png",
+      "sha256": "728b9b508f0e032029ea74b850b1895b4f3f2192c7edd5e8c1fbbcea14023309"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/main.rs",
+      "destination": "src-tauri/src/main.rs",
+      "sha256": "6a5c0a857ebcb8c451c579d8357ff13f6725d3b7a0c5e82d50f0fe11ae5266a8"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/managed_files.rs",
+      "destination": "src-tauri/src/managed_files.rs",
+      "sha256": "7cba5075e2169655ae126f188c8e53ec04ee35204ab3ecbce56e8305b46d0e9c"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/metronome_stream.rs",
+      "destination": "src-tauri/src/metronome_stream.rs",
+      "sha256": "5c66eae884259024e2d32cd1a26ce60337c1954cf3108c3e949cae84f3ede8c1"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/midi_events.rs",
+      "destination": "src-tauri/src/midi_events.rs",
+      "sha256": "ef4a9625a90c43901f1d1faf3ed0e692b46f3a7b94c80526bab94de7d169fdba"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/midi_input.rs",
+      "destination": "src-tauri/src/midi_input.rs",
+      "sha256": "9d2464a38640720a224b194a5e48e8098d0913fb894ad110bfa902ea3aaea257"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/practice_audio.rs",
+      "destination": "src-tauri/src/practice_audio.rs",
+      "sha256": "768c38293f057f07ebeb018d8f71299aa8806d8a5b6dbcad1825a760dc5bc1bf"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/practice_audio_lifecycle.rs",
+      "destination": "src-tauri/src/practice_audio_lifecycle.rs",
+      "sha256": "64d67b72957ad336c4603affa750ff60b41318fe6477f5ca9ab986ba42e0070f"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/practice_audio_macos.rs",
+      "destination": "src-tauri/src/practice_audio_macos.rs",
+      "sha256": "b1c0376c89545ef79f098884fd9539c855ea28cf3e2286d317588c0e921f7587"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/practice_audio_timing.rs",
+      "destination": "src-tauri/src/practice_audio_timing.rs",
+      "sha256": "78395ce336cdbc506bf844a23bc6d07164ce919de06884c3c0267aee4acd592a"
+    },
+    {
+      "source": "score-viewer/src-tauri/src/score_save.rs",
+      "destination": "src-tauri/src/score_save.rs",
+      "sha256": "99f36a83040eb12ed1c16cfa1e16f9a9e46842983c8de8ce1fe08f3c5d8cbdf4"
+    },
+    {
+      "source": "score-viewer/src-tauri/tauri.conf.json",
+      "destination": "src-tauri/tauri.conf.json",
+      "sha256": "7c9594534f0766f8d7561280cb3363d68c20494526efdbbaef1feff99f68b7bb"
+    },
+    {
+      "source": "score-viewer/src-tauri/tauri.macos.conf.json",
+      "destination": "src-tauri/tauri.macos.conf.json",
+      "sha256": "4d5caa1430cdf9fe8873da809157c99a3e92e6ef9d3d8fb1ab2e001c132d65e7"
+    },
+    {
+      "source": "score-viewer/src-tauri/tests/macos_midi.rs",
+      "destination": "src-tauri/tests/macos_midi.rs",
+      "sha256": "d92a923e3cc34c6f63254f08ce6e5f84d33e340b5ffc464a5f541e89c660c550"
+    },
+    {
+      "source": "score-viewer/src/URWGothic-Demi.otf",
+      "destination": "src/URWGothic-Demi.otf",
+      "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae"
+    },
+    {
+      "source": "score-viewer/src/calibration-view.ts",
+      "destination": "src/calibration-view.ts",
+      "sha256": "725a3c61517a90fcb61487f5edde24c83d4f725c5da9074997525d4cfdcee2e2"
+    },
+    {
+      "source": "score-viewer/src/calibration.ts",
+      "destination": "src/calibration.ts",
+      "sha256": "744c64e7a3917c66d5c289f47e80261ff0633e7a89aca3d07448286912e48d3b"
+    },
+    {
+      "source": "score-viewer/src/clock-origin.ts",
+      "destination": "src/clock-origin.ts",
+      "sha256": "f3d9a55d08f3c34a19fd17a3fce816fee006c3d5f1046b2221cc9b0defa5072b"
+    },
+    {
+      "source": "score-viewer/src/control-bindings.ts",
+      "destination": "src/control-bindings.ts",
+      "sha256": "f263229603431b587d6b92ee69f378fcc74c79daab6badaf236f1cc8a9a9a935"
+    },
+    {
+      "source": "score-viewer/src/device-options.ts",
+      "destination": "src/device-options.ts",
+      "sha256": "f530f7ac2a750e9528f1f6f8e0759ba68754bf2efd11b45f8b5e34d426c6bcff"
+    },
+    {
+      "source": "score-viewer/src/edit-sequence.ts",
+      "destination": "src/edit-sequence.ts",
+      "sha256": "b20018730cbdc7ef62cca422e8591e69b4fc464d02044d14d03a177248daa501"
+    },
+    {
+      "source": "score-viewer/src/expert-settings.ts",
+      "destination": "src/expert-settings.ts",
+      "sha256": "a31a73a967198b7da5edf1250f80df03e53d0c9b506afc1b69f418ae6eed2bd4"
+    },
+    {
+      "source": "score-viewer/src/fingering-carriers.ts",
+      "destination": "src/fingering-carriers.ts",
+      "sha256": "e3f4663f0542026dee8ad926b068c9720ad4727b27bdf06d48c6452067eeca8c"
+    },
+    {
+      "source": "score-viewer/src/fingering-presentation.ts",
+      "destination": "src/fingering-presentation.ts",
+      "sha256": "c630f322fe2d52c77b1e6f200bf33045086bc3d4c4d450072d2e36e7e73c315d"
+    },
+    {
+      "source": "score-viewer/src/host.ts",
+      "destination": "src/host.ts",
+      "sha256": "f10f1c18b70c062404bba70d28317fa5b5fe31bfc95e24ad5f51c0fb84a48b76"
+    },
+    {
+      "source": "score-viewer/src/input.ts",
+      "destination": "src/input.ts",
+      "sha256": "831de94cc6e8729822cd64fdd26e0e6fb02203c12e7e70fce430e484ae567de2"
+    },
+    {
+      "source": "score-viewer/src/keyboard-selection.ts",
+      "destination": "src/keyboard-selection.ts",
+      "sha256": "5515f4c05f525385df2542e12f24e67fad928d1e391fc79fa91e638fea898f0b"
+    },
+    {
+      "source": "score-viewer/src/library-menu.ts",
+      "destination": "src/library-menu.ts",
+      "sha256": "599c2554bfb9902ee36e3f007c468f496286257cceccf04f48167129fd465493"
+    },
+    {
+      "source": "score-viewer/src/library-practice-progress.ts",
+      "destination": "src/library-practice-progress.ts",
+      "sha256": "a10323215320170bc804a0dd7d9fd9218f7875573f08eea384fadea540dc738c"
+    },
+    {
+      "source": "score-viewer/src/main.ts",
+      "destination": "src/main.ts",
+      "sha256": "b46c15ad2a4d7c349b850afad836ff553c8821950bbd6756f741758dee35e9d6"
+    },
+    {
+      "source": "score-viewer/src/manual-tempo-control.ts",
+      "destination": "src/manual-tempo-control.ts",
+      "sha256": "c0498c2c8fad43cbfca5c845d60aa1f3b4b8e41e4debcc214bdfdddb39b8ab87"
+    },
+    {
+      "source": "score-viewer/src/metronome-mark.ts",
+      "destination": "src/metronome-mark.ts",
+      "sha256": "6ed02c1757cdd2a9637a2f49abcf3c6e969c6c0e4e269fc525e0fff91555b083"
+    },
+    {
+      "source": "score-viewer/src/midi-sustain.ts",
+      "destination": "src/midi-sustain.ts",
+      "sha256": "21c52f88ad865125109d4de9711e957b084ef81bab5f6271474d7eefb85824f9"
+    },
+    {
+      "source": "score-viewer/src/midi.ts",
+      "destination": "src/midi.ts",
+      "sha256": "c60cfc9ec82f7e93e611232c31b26b090c9d38ca12543843905587c5a620d439"
+    },
+    {
+      "source": "score-viewer/src/operator-finger-authority.ts",
+      "destination": "src/operator-finger-authority.ts",
+      "sha256": "9bb220f8981f7818b28dc38309767df3b47baf011295815ce04b5832b8ccd8db"
+    },
+    {
+      "source": "score-viewer/src/operator-finger-update.ts",
+      "destination": "src/operator-finger-update.ts",
+      "sha256": "07cc5d11f20cb81b4df0569e62aa967ffe9fe180a324cc043e4c6238a007bcaf"
+    },
+    {
+      "source": "score-viewer/src/options-bindings.ts",
+      "destination": "src/options-bindings.ts",
+      "sha256": "11dd1411438afe3f789f2601f57f673864a70110203943f98ae7299f5f4dde0a"
+    },
+    {
+      "source": "score-viewer/src/options-navigation.ts",
+      "destination": "src/options-navigation.ts",
+      "sha256": "5853c62232d8fd75c477405575f5505eac68a9404eaf332968e6420c8ce085da"
+    },
+    {
+      "source": "score-viewer/src/orientation.ts",
+      "destination": "src/orientation.ts",
+      "sha256": "a15689411e6f71dc10d4172032a2af804ba0b8f1fdb1b637a44165a28568943d"
+    },
+    {
+      "source": "score-viewer/src/package-presentation.ts",
+      "destination": "src/package-presentation.ts",
+      "sha256": "98bdfac99b447c790ff0dafd9eea70e19982100c8d1dade5db8495c40d8b025d"
+    },
+    {
+      "source": "score-viewer/src/package.ts",
+      "destination": "src/package.ts",
+      "sha256": "78cbd4806222eb0e3eba17a6459fb570b7fd13ea2cc507975a69160817bddf5d"
+    },
+    {
+      "source": "score-viewer/src/performance.ts",
+      "destination": "src/performance.ts",
+      "sha256": "95eae16165919dae49bd2ba3bb0daf9c9a03b0c708c676551a41fb6ab61d914c"
+    },
+    {
+      "source": "score-viewer/src/piano-context-package.ts",
+      "destination": "src/piano-context-package.ts",
+      "sha256": "d0ac98a9775ab8b89763ce298fca806ed188de9bec2e0a6c36d891e2ed197fd1"
+    },
+    {
+      "source": "score-viewer/src/piano-package-presentation.ts",
+      "destination": "src/piano-package-presentation.ts",
+      "sha256": "1a036c579f296c86655a68337e299a774cb170a00b0356093260a1c63379e2b7"
+    },
+    {
+      "source": "score-viewer/src/piano-readiness-job.ts",
+      "destination": "src/piano-readiness-job.ts",
+      "sha256": "338a4e04c865dc36294a600bdad34a17ceb2203a9c50592fdc723ae0da604ff3"
+    },
+    {
+      "source": "score-viewer/src/piano-readiness-worker-protocol.ts",
+      "destination": "src/piano-readiness-worker-protocol.ts",
+      "sha256": "4a4a112a90d171149f54caf8ed4692d11805485bcca4c1c243e5a072c646cc12"
+    },
+    {
+      "source": "score-viewer/src/piano-readiness.ts",
+      "destination": "src/piano-readiness.ts",
+      "sha256": "ba043719b2189908c561e9cd7269db19857d709b7de4b2b8c81e58f0f0a54237"
+    },
+    {
+      "source": "score-viewer/src/piano-readiness.worker.ts",
+      "destination": "src/piano-readiness.worker.ts",
+      "sha256": "e202085a49e81df1bd5c79766bbbe204207bf25f2e18ff9aeadefdba729b794c"
+    },
+    {
+      "source": "score-viewer/src/planner.worker.ts",
+      "destination": "src/planner.worker.ts",
+      "sha256": "2be70ff9435638bc295e2575928fb485269f33bf74b85e88d3f63de0ed2cdc71"
+    },
+    {
+      "source": "score-viewer/src/practice-attainment.ts",
+      "destination": "src/practice-attainment.ts",
+      "sha256": "be3cada9e5b054169239f5e25593a349e9e5c420946c6a4959a3258abbe33561"
+    },
+    {
+      "source": "score-viewer/src/practice-browser.ts",
+      "destination": "src/practice-browser.ts",
+      "sha256": "8aa93201042ab81a569579b4d175134b0ee6b0040f977489f532cd909464b55a"
+    },
+    {
+      "source": "score-viewer/src/practice-clock.ts",
+      "destination": "src/practice-clock.ts",
+      "sha256": "ca593c04f293568445e6b365c2cbc0fdf9823daaaade991157b7e2defaa32157"
+    },
+    {
+      "source": "score-viewer/src/practice-contact.ts",
+      "destination": "src/practice-contact.ts",
+      "sha256": "8a982703707f43116d2c592654ee75c838f812e00d977e3fa9015931200a0544"
+    },
+    {
+      "source": "score-viewer/src/practice-crop-fit.ts",
+      "destination": "src/practice-crop-fit.ts",
+      "sha256": "9e29315a3045070d7a3a346ad32facfa9dd517376fbf4a7dada206da7b1b6697"
+    },
+    {
+      "source": "score-viewer/src/practice-diagnostics.ts",
+      "destination": "src/practice-diagnostics.ts",
+      "sha256": "4efcc3d9d0e84b80407d53f3dec156eaa1f10aef60d6151f8de0cac11a53125c"
+    },
+    {
+      "source": "score-viewer/src/practice-preview.ts",
+      "destination": "src/practice-preview.ts",
+      "sha256": "84adb8e719a54a6546c188e68466950da5d294af92fee074b4a6cc7f785dda52"
+    },
+    {
+      "source": "score-viewer/src/practice-repeat.ts",
+      "destination": "src/practice-repeat.ts",
+      "sha256": "c862eedb3f5eddb65f66399b2bdde6235dd1dc6d0cfa23562cb3395d568a4131"
+    },
+    {
+      "source": "score-viewer/src/practice-timing.ts",
+      "destination": "src/practice-timing.ts",
+      "sha256": "1bf642211f4dfb6432943205ddf5718452259644634ef796249a30b50f8e766b"
+    },
+    {
+      "source": "score-viewer/src/practice-view.ts",
+      "destination": "src/practice-view.ts",
+      "sha256": "ae438485fa4d790f85a7aa53efc76eb3d3ec54d1ddeb60c4986f080ea2265d14"
+    },
+    {
+      "source": "score-viewer/src/practice-window.ts",
+      "destination": "src/practice-window.ts",
+      "sha256": "e31a828165c677ca8afb921b435926e4d5f3c269fedd9a2b41e1dd1a370e7537"
+    },
+    {
+      "source": "score-viewer/src/practice.ts",
+      "destination": "src/practice.ts",
+      "sha256": "127735e9c71ebfb5ea3fc3ad90cf1ef988b310ccedbf004d357b6808f0872daa"
+    },
+    {
+      "source": "score-viewer/src/presentation-generation.ts",
+      "destination": "src/presentation-generation.ts",
+      "sha256": "f8ad8edbc73a7b34cf6e8c14b721f456120ca823d3b5d72e7cd2bfd18d1cf26f"
+    },
+    {
+      "source": "score-viewer/src/presentation-install.ts",
+      "destination": "src/presentation-install.ts",
+      "sha256": "f1341848d5d1f95312b4c3e4787981a541a8c1b034bf234a158e22556a3a85cc"
+    },
+    {
+      "source": "score-viewer/src/presentation.worker.ts",
+      "destination": "src/presentation.worker.ts",
+      "sha256": "ea92f6bf28b7ba0d6fc25c42b965eb64ed2fc4065f06154ecc87224cf75225c1"
+    },
+    {
+      "source": "score-viewer/src/publication.ts",
+      "destination": "src/publication.ts",
+      "sha256": "76435ad63f8928aff74fc4cba1021035dcaf272141a3f54e3e3abc02afd96ea5"
+    },
+    {
+      "source": "score-viewer/src/reading-bindings.ts",
+      "destination": "src/reading-bindings.ts",
+      "sha256": "c60b9ee0f09a40d0741399d383b5b3ed5f3bd913c40748e125a275b3512753b6"
+    },
+    {
+      "source": "score-viewer/src/reference-midi.ts",
+      "destination": "src/reference-midi.ts",
+      "sha256": "524ff7bce82c9fc15a00095e2ed7ee0c54abe46e2ae8a0208e007e599c7248ec"
+    },
+    {
+      "source": "score-viewer/src/reference-tempo-update.ts",
+      "destination": "src/reference-tempo-update.ts",
+      "sha256": "6820a74c3062d54a8491f3428e2f996efbbba227e5852efe74ba190aad614108"
+    },
+    {
+      "source": "score-viewer/src/score-clock.ts",
+      "destination": "src/score-clock.ts",
+      "sha256": "5f05d3a3538bf87eb6c5b419c27de1c76880f50ea164640e4088fcabdbd58909"
+    },
+    {
+      "source": "score-viewer/src/selection.ts",
+      "destination": "src/selection.ts",
+      "sha256": "f6b004b814b779b0e725aca46aba693e5e6785334284e9e83fe1804ce6a6538f"
+    },
+    {
+      "source": "score-viewer/src/share-score.ts",
+      "destination": "src/share-score.ts",
+      "sha256": "15f9f422800cea936dd5271df987cb7a5f8c924df53138dcea1b5fb0c790da4a"
+    },
+    {
+      "source": "score-viewer/src/state.ts",
+      "destination": "src/state.ts",
+      "sha256": "221282ad22b4ffe5302453be8c50f452683c7a5272d934cca20d2cf918c78e36"
+    },
+    {
+      "source": "score-viewer/src/style.css",
+      "destination": "src/style.css",
+      "sha256": "8ecbc7e02639d2fc321b9a948236769774080400f09bb2a2879c5aacba800156"
+    },
+    {
+      "source": "score-viewer/src/tempo-presentation.ts",
+      "destination": "src/tempo-presentation.ts",
+      "sha256": "19239161d06797097f284132894b81aad5b248cd542b56d1e394b463e4acbc68"
+    },
+    {
+      "source": "score-viewer/src/tempo-repeat.ts",
+      "destination": "src/tempo-repeat.ts",
+      "sha256": "ce8dc2cc2f5112b418d21d19bd5a95fe458b5bccf6a6cc0da648d86d2f17576a"
+    },
+    {
+      "source": "score-viewer/test/audio-lifecycle.test.ts",
+      "destination": "test/audio-lifecycle.test.ts",
+      "sha256": "32475d37b430c3c1f122a194a24580edf56590094a5eb7b1a93cf57f10c0a9f7"
+    },
+    {
+      "source": "score-viewer/test/calibration.test.ts",
+      "destination": "test/calibration.test.ts",
+      "sha256": "084198fa12a9cc03ff756e0be264a7512d4c7cbc43d5c6e2040b568403d40490"
+    },
+    {
+      "source": "score-viewer/test/clock-origin.test.ts",
+      "destination": "test/clock-origin.test.ts",
+      "sha256": "9dd94286f290df6b879d49b69ee471338365a67146632db89192affa48e0aa00"
+    },
+    {
+      "source": "score-viewer/test/control-bindings.test.ts",
+      "destination": "test/control-bindings.test.ts",
+      "sha256": "17b6730cf924dc16fce1dfa99f8541593f4057fbbbcd0ec0eebcacb484f47c2d"
+    },
+    {
+      "source": "score-viewer/test/conventional-export.test.ts",
+      "destination": "test/conventional-export.test.ts",
+      "sha256": "667d25cafb0d557ec2fc9487c966218a043725f6105bd771989257f84f2cf7ca"
+    },
+    {
+      "source": "score-viewer/test/conventional-package.test.ts",
+      "destination": "test/conventional-package.test.ts",
+      "sha256": "cd3f5ee6551b1e62ed16258247e1b06b3d83e319eddc18e4e3f84a98f1084943"
+    },
+    {
+      "source": "score-viewer/test/device-options.test.ts",
+      "destination": "test/device-options.test.ts",
+      "sha256": "5cb73ef2eb8322767d3bd474b4f501c7b2d9f952ba2f5d272b574ef9ba59d634"
+    },
+    {
+      "source": "score-viewer/test/fingering-carriers.test.ts",
+      "destination": "test/fingering-carriers.test.ts",
+      "sha256": "0c749473f9ac10eb18c16a87228d86b21a515829556571847cc4ed8ddc17e441"
+    },
+    {
+      "source": "score-viewer/test/fingering-presentation.test.ts",
+      "destination": "test/fingering-presentation.test.ts",
+      "sha256": "7322560c0c46bb900a6f46aea857c0f8dc10de73b9521c136c2923a313021503"
+    },
+    {
+      "source": "score-viewer/test/fingering-studio.test.ts",
+      "destination": "test/fingering-studio.test.ts",
+      "sha256": "9c5053e6bffed22047a03819b8e29a44f57360323dae939227a51208b38658bf"
+    },
+    {
+      "source": "score-viewer/test/input-extension.test.ts",
+      "destination": "test/input-extension.test.ts",
+      "sha256": "4b626d2604e7e84ea26461ca24a9c5072bfc1c3b00f4c45342fd7060368b038f"
+    },
+    {
+      "source": "score-viewer/test/keyboard-selection.test.ts",
+      "destination": "test/keyboard-selection.test.ts",
+      "sha256": "5cf78c6520725a07696b9f421197f19cabc67e408d74b2e626a7e2d81a92343b"
+    },
+    {
+      "source": "score-viewer/test/library-menu.test.ts",
+      "destination": "test/library-menu.test.ts",
+      "sha256": "afe69a3a4b7cdf57f43b55cfcb1b80c4587810f6a128d86cb0beec6e67b60872"
+    },
+    {
+      "source": "score-viewer/test/library-practice-progress.test.ts",
+      "destination": "test/library-practice-progress.test.ts",
+      "sha256": "940ad0a2fc033d0f3d0ffb1e28ba38ae2c67c6a00d317f5ea2dcebda77ced1b3"
+    },
+    {
+      "source": "score-viewer/test/metronome-mark.test.ts",
+      "destination": "test/metronome-mark.test.ts",
+      "sha256": "416616241983410b927652ed8e818f2adce4de6f01d5dc86149433cf440ed4f6"
+    },
+    {
+      "source": "score-viewer/test/musical-sustain.test.ts",
+      "destination": "test/musical-sustain.test.ts",
+      "sha256": "5f9d48374b242c88ec180fc4f831d63baa80ac0a1963fab769eab275241c49d9"
+    },
+    {
+      "source": "score-viewer/test/operator-finger-update.test.ts",
+      "destination": "test/operator-finger-update.test.ts",
+      "sha256": "44c2b1542e7612240d8d5afecde6424533e6041f7a58cde5878314a1bad5b094"
+    },
+    {
+      "source": "score-viewer/test/orientation.test.ts",
+      "destination": "test/orientation.test.ts",
+      "sha256": "76573e4f1703d75e866f327a06dff120602dea0bcceb00c71182b9f26e3b23ec"
+    },
+    {
+      "source": "score-viewer/test/ottava-xml.test.ts",
+      "destination": "test/ottava-xml.test.ts",
+      "sha256": "021e50892454342bbfd7e160428ec55967f0cd826125463abb443f71df51a072"
+    },
+    {
+      "source": "score-viewer/test/piano-calculation-context.test.ts",
+      "destination": "test/piano-calculation-context.test.ts",
+      "sha256": "1b049845435f459f81b4d53eb1d728542ba11d27e62c7c044bccd82e907f2fd3"
+    },
+    {
+      "source": "score-viewer/test/piano-readiness-no14.test.ts",
+      "destination": "test/piano-readiness-no14.test.ts",
+      "sha256": "57de4a81b6b5667af81ed414b28af8c58ef0b8ddfabeaa81be1877e9689c0fe5"
+    },
+    {
+      "source": "score-viewer/test/piano-readiness-worker.test.ts",
+      "destination": "test/piano-readiness-worker.test.ts",
+      "sha256": "566cbb9e1d418f6b4c666599cfcbd1603574d3a4fa4e827631c05142fd264584"
+    },
+    {
+      "source": "score-viewer/test/piano-readiness.test.ts",
+      "destination": "test/piano-readiness.test.ts",
+      "sha256": "5cf676a0517e98a3a13e51ac9df41e3e7dcbe6e49815e5176bb6ab3adad35f40"
+    },
+    {
+      "source": "score-viewer/test/practice-attainment.test.ts",
+      "destination": "test/practice-attainment.test.ts",
+      "sha256": "6f31aefcc06356f69ceafb208612f6aba2caa4ed3a0e91a3fcdff4ad6fe6e438"
+    },
+    {
+      "source": "score-viewer/test/practice-browser.test.ts",
+      "destination": "test/practice-browser.test.ts",
+      "sha256": "dfd1f74e93b22edff1c613ca669d033a0cfb75905212ba3a11e18fabe89e217a"
+    },
+    {
+      "source": "score-viewer/test/practice-midi-assessment.test.ts",
+      "destination": "test/practice-midi-assessment.test.ts",
+      "sha256": "0dc3d23df7b2023aefe89f161522d796b9d1be2a276e546a8c522817c9d8c210"
+    },
+    {
+      "source": "score-viewer/test/practice-output-routing.test.ts",
+      "destination": "test/practice-output-routing.test.ts",
+      "sha256": "ad616734c487bd08b36463edbfc4c4032a59c1caa8674f7174ea6727705e12ed"
+    },
+    {
+      "source": "score-viewer/test/practice-passages.test.ts",
+      "destination": "test/practice-passages.test.ts",
+      "sha256": "d03d70ac3fb26b8bf21ad0bc19d07528fc77b68102b47e2f7205b8483b58ef6c"
+    },
+    {
+      "source": "score-viewer/test/practice-preview.test.ts",
+      "destination": "test/practice-preview.test.ts",
+      "sha256": "fe0691841964e43975ad64e7122d88bba0606974bf54a107bb53416d0f148327"
+    },
+    {
+      "source": "score-viewer/test/practice-progression-lifecycle.test.ts",
+      "destination": "test/practice-progression-lifecycle.test.ts",
+      "sha256": "cb2ccc7f4c741059d4a6943522b950040516876a855091fe7d15121bdbd8946d"
+    },
+    {
+      "source": "score-viewer/test/practice-repeat.test.ts",
+      "destination": "test/practice-repeat.test.ts",
+      "sha256": "bbbefdf44b4f7d5ff912bcd63adf0b2be706155c86425a39596f841a67261c3d"
+    },
+    {
+      "source": "score-viewer/test/practice-timing.test.ts",
+      "destination": "test/practice-timing.test.ts",
+      "sha256": "26f7eee5c739382ef0761b8aa6fae394db9bfda3be5c4e988aaa13956587661f"
+    },
+    {
+      "source": "score-viewer/test/practice-window.test.ts",
+      "destination": "test/practice-window.test.ts",
+      "sha256": "271db7c18f20f03b60e879f2feee38a27a4561329d8e0319b9c3bc4c8fc4c10d"
+    },
+    {
+      "source": "score-viewer/test/practice.test.ts",
+      "destination": "test/practice.test.ts",
+      "sha256": "4eeaa9c9009cda74bbadcc702365c3838befc336f660c853f157e600cb867795"
+    },
+    {
+      "source": "score-viewer/test/presentation-generation.test.ts",
+      "destination": "test/presentation-generation.test.ts",
+      "sha256": "6e51e4c93a190142812510b41662880d5f4129d5d90971b1dfb7dafcbf130b3f"
+    },
+    {
+      "source": "score-viewer/test/presentation-install.test.ts",
+      "destination": "test/presentation-install.test.ts",
+      "sha256": "d88181e598448c31d2f8bfe7eef72cd0d1e562d781cd48f70395cc4239c58698"
+    },
+    {
+      "source": "score-viewer/test/reader-navigation.test.ts",
+      "destination": "test/reader-navigation.test.ts",
+      "sha256": "36d3c5a778eeb3fc940b4157d0d8cc69bc3291ad5c74aa3dc71eff7ac35f9e3d"
+    },
+    {
+      "source": "score-viewer/test/reading-bindings.test.ts",
+      "destination": "test/reading-bindings.test.ts",
+      "sha256": "5e1e95489c9e8cfade3295ead9ecd8edcc4bf33eff7aa1596921a6a5c47f6beb"
+    },
+    {
+      "source": "score-viewer/test/reference-tempo.test.ts",
+      "destination": "test/reference-tempo.test.ts",
+      "sha256": "face1499abf69b87ac65dd2866241d33a1bcb8405658bb0965da530e575b4a1e"
+    },
+    {
+      "source": "score-viewer/test/score-rendering-recipe.test.ts",
+      "destination": "test/score-rendering-recipe.test.ts",
+      "sha256": "532cad237b09c3f964623cec354368226fc3d13b9af90630f6eeac0704cbcf24"
+    },
+    {
+      "source": "score-viewer/test/support/reference-score.ts",
+      "destination": "test/support/reference-score.ts",
+      "sha256": "abf517d8fdc8302a78a44bcdc982c99594c099f8a36387cbd714c0d21aedee20"
+    },
+    {
+      "source": "score-viewer/test/tempo-presentation.test.ts",
+      "destination": "test/tempo-presentation.test.ts",
+      "sha256": "156cb081389169e3eea4be20e5ecb13674539995ebb5011c3a27421e264c3aa7"
+    },
+    {
+      "source": "score-viewer/test/tempo-repeat.test.ts",
+      "destination": "test/tempo-repeat.test.ts",
+      "sha256": "cb76f220aa68ada9d1b51805d2ece25f463f750267acb3915df64ba7a45bfd3c"
+    },
+    {
+      "source": "score-viewer/test/temporal-finger-package.test.ts",
+      "destination": "test/temporal-finger-package.test.ts",
+      "sha256": "4d6abef7f8847bc537d5640c2d4f10b66fe13c21cb791618e7493ea7fa15993a"
+    },
+    {
+      "source": "score-viewer/test/tuna-publication.test.ts",
+      "destination": "test/tuna-publication.test.ts",
+      "sha256": "26abb5598b738ef92c59142ccf87e3b0837d6fd04444dcba4f26ab76863ab4d0"
+    },
+    {
+      "source": "score-viewer/test/universal-practice.test.ts",
+      "destination": "test/universal-practice.test.ts",
+      "sha256": "a598250a2d099ef81ca439ad742d6ac0b87ca4f67613fbf0eea35e6779b81c86"
+    },
+    {
+      "source": "score-viewer/test/viewer-r8.test.ts",
+      "destination": "test/viewer-r8.test.ts",
+      "sha256": "f3b66e4b0e7a2fb0e4af04818d40263f98ff4a3cbdd91b46d28b29eb5a1ef29f"
+    },
+    {
+      "source": "score-viewer/test/viewer.test.ts",
+      "destination": "test/viewer.test.ts",
+      "sha256": "e15737e265f66af0373d629a845c62b928dcf6e5f11f18dd245b5900c2a9012f"
+    },
+    {
+      "source": "score-viewer/test/worker.test.ts",
+      "destination": "test/worker.test.ts",
+      "sha256": "fc003fd313905c25ff2875554502be05c0f757051c3cb0939bf5b4b9a33851ba"
+    },
+    {
+      "source": "score-viewer/tsconfig.json",
+      "destination": "tsconfig.json",
+      "sha256": "49116e9ca7fd6b50afabbdf4e1133f72fc564a25f23efdc86561343a15e97a04"
+    },
+    {
+      "source": "score-viewer/vite.config.ts",
+      "destination": "vite.config.ts",
+      "sha256": "c49b3e1144ebd9c29387e656b7271462c62a620d27627ed02c4fb3743ec9ff44"
+    }
+  ],
+  "pathRewrites": [
+    {
+      "file": "src/calibration-view.ts",
+      "before": "../../src/model/isomorphic-span-calibration",
+      "after": "../vendor/iso-notation/src/model/isomorphic-span-calibration"
+    },
+    {
+      "file": "src/calibration.ts",
+      "before": "../../src/model/isomorphic-span-calibration",
+      "after": "../vendor/iso-notation/src/model/isomorphic-span-calibration"
+    },
+    {
+      "file": "src/calibration.ts",
+      "before": "../../src/model/isomorphic-fingering-profile",
+      "after": "../vendor/iso-notation/src/model/isomorphic-fingering-profile"
+    },
+    {
+      "file": "src/keyboard-selection.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/library-menu.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/library-practice-progress.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/main.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/main.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/metronome-mark.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/metronome-mark.ts",
+      "before": "../../src/render/janko/elements/urtext-paths",
+      "after": "../vendor/iso-notation/src/render/janko/elements/urtext-paths"
+    },
+    {
+      "file": "src/metronome-mark.ts",
+      "before": "../../src/render/janko/hollow-stem",
+      "after": "../vendor/iso-notation/src/render/janko/hollow-stem"
+    },
+    {
+      "file": "src/operator-finger-update.ts",
+      "before": "../../src/model/hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/hand-planning-input"
+    },
+    {
+      "file": "src/operator-finger-update.ts",
+      "before": "../../src/model/isomorphic-fingering-profile",
+      "after": "../vendor/iso-notation/src/model/isomorphic-fingering-profile"
+    },
+    {
+      "file": "src/operator-finger-update.ts",
+      "before": "../../src/model/isomorphic-rr-personal-pose",
+      "after": "../vendor/iso-notation/src/model/isomorphic-rr-personal-pose"
+    },
+    {
+      "file": "src/operator-finger-update.ts",
+      "before": "../../src/model/isomorphic-finger-planner",
+      "after": "../vendor/iso-notation/src/model/isomorphic-finger-planner"
+    },
+    {
+      "file": "src/operator-finger-update.ts",
+      "before": "../../src/model/isomorphic-finger-actions",
+      "after": "../vendor/iso-notation/src/model/isomorphic-finger-actions"
+    },
+    {
+      "file": "src/package-presentation.ts",
+      "before": "../../src/model/conventional-finger-layer",
+      "after": "../vendor/iso-notation/src/model/conventional-finger-layer"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/physical-source-constraints",
+      "after": "../vendor/iso-notation/src/model/physical-source-constraints"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/hand-planning-input"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/rr-temporal-finger-layer",
+      "after": "../vendor/iso-notation/src/model/rr-temporal-finger-layer"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/conventional-finger-layer",
+      "after": "../vendor/iso-notation/src/model/conventional-finger-layer"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/finger-performance-timing",
+      "after": "../vendor/iso-notation/src/model/finger-performance-timing"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/piano-calculation-context",
+      "after": "../vendor/iso-notation/src/model/piano-calculation-context"
+    },
+    {
+      "file": "src/package.ts",
+      "before": "../../src/model/piano-finger-assignments",
+      "after": "../vendor/iso-notation/src/model/piano-finger-assignments"
+    },
+    {
+      "file": "src/performance.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/piano-context-package.ts",
+      "before": "../../src/model/piano-calculation-context",
+      "after": "../vendor/iso-notation/src/model/piano-calculation-context"
+    },
+    {
+      "file": "src/piano-package-presentation.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/piano-package-presentation.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "src/piano-package-presentation.ts",
+      "before": "../../src/model/rr-temporal-finger-layer",
+      "after": "../vendor/iso-notation/src/model/rr-temporal-finger-layer"
+    },
+    {
+      "file": "src/piano-package-presentation.ts",
+      "before": "../../src/model/piano-finger-assignments",
+      "after": "../vendor/iso-notation/src/model/piano-finger-assignments"
+    },
+    {
+      "file": "src/piano-readiness-worker-protocol.ts",
+      "before": "../../src/model/piano-finger-calculation",
+      "after": "../vendor/iso-notation/src/model/piano-finger-calculation"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/piano-finger-calculation",
+      "after": "../vendor/iso-notation/src/model/piano-finger-calculation"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/conventional-piano-planner",
+      "after": "../vendor/iso-notation/src/model/conventional-piano-planner"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/rr-temporal-finger-layer",
+      "after": "../vendor/iso-notation/src/model/rr-temporal-finger-layer"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/piano-calculation-context",
+      "after": "../vendor/iso-notation/src/model/piano-calculation-context"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/render/janko/score-presentation",
+      "after": "../vendor/iso-notation/src/render/janko/score-presentation"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/render/janko/approved-production",
+      "after": "../vendor/iso-notation/src/render/janko/approved-production"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/piano-finger-assignments",
+      "after": "../vendor/iso-notation/src/model/piano-finger-assignments"
+    },
+    {
+      "file": "src/piano-readiness.ts",
+      "before": "../../src/model/isomorphic-rr-personal-pose",
+      "after": "../vendor/iso-notation/src/model/isomorphic-rr-personal-pose"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/finger-performance-timing",
+      "after": "../vendor/iso-notation/src/model/finger-performance-timing"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/hand-planning-input"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/isomorphic-span-calibration",
+      "after": "../vendor/iso-notation/src/model/isomorphic-span-calibration"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/isomorphic-rr-personal-pose",
+      "after": "../vendor/iso-notation/src/model/isomorphic-rr-personal-pose"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/isomorphic-fingering-profile",
+      "after": "../vendor/iso-notation/src/model/isomorphic-fingering-profile"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/isomorphic-finger-actions",
+      "after": "../vendor/iso-notation/src/model/isomorphic-finger-actions"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/isomorphic-finger-planner",
+      "after": "../vendor/iso-notation/src/model/isomorphic-finger-planner"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/isomorphic-fingering-profile",
+      "after": "../vendor/iso-notation/src/model/isomorphic-fingering-profile"
+    },
+    {
+      "file": "src/planner.worker.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "src/practice-view.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/practice.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "src/practice.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/presentation-generation.ts",
+      "before": "../../src/model/hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/hand-planning-input"
+    },
+    {
+      "file": "src/presentation-generation.ts",
+      "before": "../../src/model/conventional-piano-planner",
+      "after": "../vendor/iso-notation/src/model/conventional-piano-planner"
+    },
+    {
+      "file": "src/presentation-generation.ts",
+      "before": "../../src/model/conventional-finger-layer",
+      "after": "../vendor/iso-notation/src/model/conventional-finger-layer"
+    },
+    {
+      "file": "src/presentation-generation.ts",
+      "before": "../../src/render/janko/score-presentation",
+      "after": "../vendor/iso-notation/src/render/janko/score-presentation"
+    },
+    {
+      "file": "src/presentation-generation.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "src/presentation-generation.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "src/publication.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "src/publication.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "src/reference-tempo-update.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/score-clock.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "src/score-clock.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "src/state.ts",
+      "before": "../../src/model/physical-keyboard",
+      "after": "../vendor/iso-notation/src/model/physical-keyboard"
+    },
+    {
+      "file": "test/calibration.test.ts",
+      "before": "../../src/model/isomorphic-span-calibration",
+      "after": "../vendor/iso-notation/src/model/isomorphic-span-calibration"
+    },
+    {
+      "file": "test/conventional-export.test.ts",
+      "before": "../../",
+      "after": "../vendor/iso-notation/"
+    },
+    {
+      "file": "test/conventional-package.test.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "test/conventional-package.test.ts",
+      "before": "../../src/model/hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/hand-planning-input"
+    },
+    {
+      "file": "test/conventional-package.test.ts",
+      "before": "../../src/model/conventional-finger-layer",
+      "after": "../vendor/iso-notation/src/model/conventional-finger-layer"
+    },
+    {
+      "file": "test/conventional-package.test.ts",
+      "before": "../../src/model/conventional-piano-planner-legacy",
+      "after": "../vendor/iso-notation/src/model/conventional-piano-planner-legacy"
+    },
+    {
+      "file": "test/conventional-package.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/conventional-package.test.ts",
+      "before": "../../test/fixtures/rr-v5-contacts.json",
+      "after": "../vendor/iso-notation/test/fixtures/rr-v5-contacts.json"
+    },
+    {
+      "file": "test/fingering-carriers.test.ts",
+      "before": "../../src/render/janko/hollow-stem",
+      "after": "../vendor/iso-notation/src/render/janko/hollow-stem"
+    },
+    {
+      "file": "test/fingering-studio.test.ts",
+      "before": "../../scripts/lib/fingering-studio-review",
+      "after": "../vendor/iso-notation/scripts/lib/fingering-studio-review"
+    },
+    {
+      "file": "test/fingering-studio.test.ts",
+      "before": "../../src/render/janko/candidates",
+      "after": "../vendor/iso-notation/src/render/janko/candidates"
+    },
+    {
+      "file": "test/fingering-studio.test.ts",
+      "before": "../../src/render/janko/studio",
+      "after": "../vendor/iso-notation/src/render/janko/studio"
+    },
+    {
+      "file": "test/fingering-studio.test.ts",
+      "before": "../../src/render/janko/engine",
+      "after": "../vendor/iso-notation/src/render/janko/engine"
+    },
+    {
+      "file": "test/fingering-studio.test.ts",
+      "before": "../../src/render/janko/linter",
+      "after": "../vendor/iso-notation/src/render/janko/linter"
+    },
+    {
+      "file": "test/fingering-studio.test.ts",
+      "before": "../../src/render/janko/candidates",
+      "after": "../vendor/iso-notation/src/render/janko/candidates"
+    },
+    {
+      "file": "test/keyboard-selection.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/library-practice-progress.test.ts",
+      "before": "../../public/review/schumann-no14-janko-operator-reviewed-20261007.tuna",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna"
+    },
+    {
+      "file": "test/library-practice-progress.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/metronome-mark.test.ts",
+      "before": "../../src/render/janko/hollow-stem",
+      "after": "../vendor/iso-notation/src/render/janko/hollow-stem"
+    },
+    {
+      "file": "test/operator-finger-update.test.ts",
+      "before": "../../scripts/lib/fingering-studio-review",
+      "after": "../vendor/iso-notation/scripts/lib/fingering-studio-review"
+    },
+    {
+      "file": "test/operator-finger-update.test.ts",
+      "before": "../../src/render/janko/candidates",
+      "after": "../vendor/iso-notation/src/render/janko/candidates"
+    },
+    {
+      "file": "test/operator-finger-update.test.ts",
+      "before": "../../src/render/janko/studio",
+      "after": "../vendor/iso-notation/src/render/janko/studio"
+    },
+    {
+      "file": "test/operator-finger-update.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/operator-finger-update.test.ts",
+      "before": "../../data/reviews/schumann-no14-janko-fingers-20261007.json",
+      "after": "../vendor/iso-notation/data/reviews/schumann-no14-janko-fingers-20261007.json"
+    },
+    {
+      "file": "test/ottava-xml.test.ts",
+      "before": "../../src/render/janko/elements/ottava",
+      "after": "../vendor/iso-notation/src/render/janko/elements/ottava"
+    },
+    {
+      "file": "test/ottava-xml.test.ts",
+      "before": "../../src/render/janko/elements/style",
+      "after": "../vendor/iso-notation/src/render/janko/elements/style"
+    },
+    {
+      "file": "test/piano-calculation-context.test.ts",
+      "before": "../../src/render/janko/presentation-seats",
+      "after": "../vendor/iso-notation/src/render/janko/presentation-seats"
+    },
+    {
+      "file": "test/piano-calculation-context.test.ts",
+      "before": "../../src/model/piano-calculation-context",
+      "after": "../vendor/iso-notation/src/model/piano-calculation-context"
+    },
+    {
+      "file": "test/piano-calculation-context.test.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "test/piano-calculation-context.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/piano-readiness-no14.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/piano-readiness-no14.test.ts",
+      "before": "../../data/reviews/schumann-no14-janko-fingers-20261007.json",
+      "after": "../vendor/iso-notation/data/reviews/schumann-no14-janko-fingers-20261007.json"
+    },
+    {
+      "file": "test/piano-readiness-worker.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/piano-readiness-worker.test.ts",
+      "before": "../../data/reviews/schumann-no14-janko-fingers-20261007.json",
+      "after": "../vendor/iso-notation/data/reviews/schumann-no14-janko-fingers-20261007.json"
+    },
+    {
+      "file": "test/piano-readiness.test.ts",
+      "before": "../../src/render/janko/score-presentation",
+      "after": "../vendor/iso-notation/src/render/janko/score-presentation"
+    },
+    {
+      "file": "test/piano-readiness.test.ts",
+      "before": "../../src/render/janko/types",
+      "after": "../vendor/iso-notation/src/render/janko/types"
+    },
+    {
+      "file": "test/piano-readiness.test.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "test/piano-readiness.test.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "test/piano-readiness.test.ts",
+      "before": "../../src/model/physical-source-constraints",
+      "after": "../vendor/iso-notation/src/model/physical-source-constraints"
+    },
+    {
+      "file": "test/piano-readiness.test.ts",
+      "before": "../../public/fonts/URWGothic-Demi.otf",
+      "after": "../vendor/iso-notation/public/fonts/URWGothic-Demi.otf"
+    },
+    {
+      "file": "test/practice-attainment.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice-browser.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice-midi-assessment.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice-output-routing.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice-passages.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice-progression-lifecycle.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice-window.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/practice.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/presentation-generation.test.ts",
+      "before": "../../src/model/hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/hand-planning-input"
+    },
+    {
+      "file": "test/presentation-generation.test.ts",
+      "before": "../../src/model/conventional-finger-layer",
+      "after": "../vendor/iso-notation/src/model/conventional-finger-layer"
+    },
+    {
+      "file": "test/presentation-generation.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-actions-20261007.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore"
+    },
+    {
+      "file": "test/presentation-generation.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/presentation-install.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/reference-tempo.test.ts",
+      "before": "../../src/model/finger-performance-timing",
+      "after": "../vendor/iso-notation/src/model/finger-performance-timing"
+    },
+    {
+      "file": "test/reference-tempo.test.ts",
+      "before": "../../src/model/reference-performance-tempo",
+      "after": "../vendor/iso-notation/src/model/reference-performance-tempo"
+    },
+    {
+      "file": "test/score-rendering-recipe.test.ts",
+      "before": "../../src/render/janko/types",
+      "after": "../vendor/iso-notation/src/render/janko/types"
+    },
+    {
+      "file": "test/score-rendering-recipe.test.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "test/score-rendering-recipe.test.ts",
+      "before": "../../src/render/janko/score-presentation",
+      "after": "../vendor/iso-notation/src/render/janko/score-presentation"
+    },
+    {
+      "file": "test/score-rendering-recipe.test.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "test/score-rendering-recipe.test.ts",
+      "before": "../../src/render/janko/no14-gold-profile.json",
+      "after": "../vendor/iso-notation/src/render/janko/no14-gold-profile.json"
+    },
+    {
+      "file": "test/tempo-presentation.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/temporal-finger-package.test.ts",
+      "before": "../../src/render/janko/presentation-seats",
+      "after": "../vendor/iso-notation/src/render/janko/presentation-seats"
+    },
+    {
+      "file": "test/temporal-finger-package.test.ts",
+      "before": "../../src/model/temporal-hand-planning-input",
+      "after": "../vendor/iso-notation/src/model/temporal-hand-planning-input"
+    },
+    {
+      "file": "test/temporal-finger-package.test.ts",
+      "before": "../../src/model/rr-temporal-finger-layer",
+      "after": "../vendor/iso-notation/src/model/rr-temporal-finger-layer"
+    },
+    {
+      "file": "test/temporal-finger-package.test.ts",
+      "before": "../../src/model/isomorphic-fingering-profile",
+      "after": "../vendor/iso-notation/src/model/isomorphic-fingering-profile"
+    },
+    {
+      "file": "test/temporal-finger-package.test.ts",
+      "before": "../../src/model/isomorphic-rr-personal-pose",
+      "after": "../vendor/iso-notation/src/model/isomorphic-rr-personal-pose"
+    },
+    {
+      "file": "test/temporal-finger-package.test.ts",
+      "before": "../../src/model/types",
+      "after": "../vendor/iso-notation/src/model/types"
+    },
+    {
+      "file": "test/tuna-publication.test.ts",
+      "before": "../../src/render/janko/presentation-seats",
+      "after": "../vendor/iso-notation/src/render/janko/presentation-seats"
+    },
+    {
+      "file": "test/tuna-publication.test.ts",
+      "before": "../../src/render/janko/score-rendering-recipe",
+      "after": "../vendor/iso-notation/src/render/janko/score-rendering-recipe"
+    },
+    {
+      "file": "test/tuna-publication.test.ts",
+      "before": "../../public/review/schumann-no14-conventional-20261006.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore"
+    },
+    {
+      "file": "test/universal-practice.test.ts",
+      "before": "../../public/review/schumann-op68-no14-current-fingers.isoscore",
+      "after": "../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore"
+    },
+    {
+      "file": "test/worker.test.ts",
+      "before": "../../src/model/isomorphic-span-calibration",
+      "after": "../vendor/iso-notation/src/model/isomorphic-span-calibration"
+    }
+  ],
+  "otherAdaptations": [
+    "Root npm build/test source-pin checks; test concurrency 2.",
+    "Mac bundled font notice paths changed from ../../licenses to ../licenses; notice bytes unchanged.",
+    "Extracted README retained as historical docs/source-viewer-readme.md.",
+    "Development dependency @tonejs/midi pinned 2.0.28, matching the prior ISO root lock, for existing score/studio test type/runtime closure."
+  ],
+  "excluded": [
+    "Untracked working-tree changes",
+    "Private uploaded scores/PDF/MIDI",
+    "Personal library/settings/progress",
+    "Provisional fragment implementation",
+    "Cancelled joint study",
+    "Workflow/auth/provider configuration"
+  ],
+  "dependencyRevision": "da93cf9e0359d861987fd76611b59b14b6aedb92"
+}
