@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {expectedFooterCover,validateFooterRuntimeReceipt,semanticHash,footerProbeVersion} from '../scripts/native-release-carrier/footer-ink-receipt.mjs';
-import {boundedCommand,frozenFrontendServer} from '../scripts/native-release-carrier/footer-ink-probe.mjs';
+import {boundedCommand,frozenFrontendServer,requireFooterHelperSuccess} from '../scripts/native-release-carrier/footer-ink-probe.mjs';
 import {actualPageObstacles} from '../src/svg-annotation-clearance.ts';
 import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from '../src/annotation-ink-policy.ts';
 import {FOOTER_METRICS_JSON} from '../src/footer-font-data.ts';
@@ -58,4 +58,29 @@ test('timeout terminates only the detached compiler group including owned descen
  // Linux may retain a terminated orphan as a zombie briefly; no process may
  // continue running. This test never targets another process group.
  try{process.kill(pid,0);const stat=await readFile(`/proc/${pid}/stat`,'utf8');assert.equal(stat.slice(stat.lastIndexOf(')')+2).split(' ')[0],'Z');}catch(e){if(!['ESRCH','ENOENT'].includes(e.code))throw e;}
+});
+test('actual failed helper preserves bounded browser failure detail and never admits a receipt',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'footer-helper-failure-')),output=join(dir,'result.json');
+ try{
+  const script="require('node:fs').writeFileSync(process.argv[1],JSON.stringify({runtime:'WKWebView',result:{status:'failed',message:'Exact footer FontFace did not load\\nunder WebKit'}}));process.exit(5)";
+  const checked=await boundedCommand(process.execPath,['-e',script,output]);assert.equal(checked.exitCode,5);
+  await assert.rejects(requireFooterHelperSuccess(checked,output),error=>{assert.match(error.message,/exit 5.*Exact footer FontFace did not load under WebKit/);assert.doesNotMatch(error.message,/[\u0000-\u001f\u007f-\u009f]/);return true;});
+  await writeFile(output,JSON.stringify({result:{status:'passed',message:'claimed pass'}}));
+  await assert.rejects(requireFooterHelperSuccess(checked,output),/exit 5.*claimed pass/,'claimed success cannot erase failed exit');
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('helper diagnostic parsing bounds message and file sizes and refuses malformed or absent failures',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'footer-helper-diagnostics-')),output=join(dir,'result.json'),failed={exitCode:6,signal:null,timedOut:false,stderr:'navigation stderr'};
+ try{
+  await writeFile(output,JSON.stringify({status:'failed',message:'Navigation failed\u001b[31m',result:{message:'x'.repeat(4000)}}));
+  await assert.rejects(requireFooterHelperSuccess(failed,output),error=>{assert.match(error.message,/Navigation failed.*stderr: navigation stderr/);assert.ok(error.message.length<4300);assert.doesNotMatch(error.message,/\u001b/);return true;});
+  await writeFile(output,'x'.repeat(65537));await assert.rejects(requireFooterHelperSuccess(failed,output),/exceeds diagnostic bound/);
+  await writeFile(output,'malformed');await assert.rejects(requireFooterHelperSuccess(failed,output),/unavailable or malformed/);
+  await rm(output);await assert.rejects(requireFooterHelperSuccess(failed,output),/wrote no failure JSON/);
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('helper exit success still requires later independent receipt admission and timeout always refuses',async()=>{
+ const missing=join(tmpdir(),'no-footer-helper-output-'+process.pid);
+ assert.equal(await requireFooterHelperSuccess({exitCode:0,timedOut:false},missing),undefined,'exit check does not replace the subsequent JSON/nonce/source/paint validator');
+ await assert.rejects(requireFooterHelperSuccess({exitCode:0,timedOut:true,signal:'SIGKILL'},missing),/timeout true/);
 });
