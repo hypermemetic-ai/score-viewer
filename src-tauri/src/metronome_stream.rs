@@ -63,7 +63,7 @@ impl Metronome {
     pub fn fill_silence<T:Copy>(&mut self,samples:&mut[T],channels:usize,convert:impl Fn(f32)->T){
         self.frame+=samples.len().div_ceil(channels) as u64;samples.fill(convert(0.0));
     }
-    fn next(&mut self) -> f32 {
+    pub fn next(&mut self) -> f32 {
         let elapsed=self.frame as f64 / self.rate;
         let t = elapsed-self.lead;
         self.frame += 1;
