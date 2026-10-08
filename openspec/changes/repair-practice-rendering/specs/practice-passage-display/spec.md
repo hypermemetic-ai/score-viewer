@@ -93,6 +93,12 @@ Completed adjacent groups SHALL retain their compact joined range and accessible
 - **AND** further navigation uses the newly visible stretch without scrolling each selection by one row
 - **AND** an equivalent Up transition retains the previous top row at the bottom, with the new selection above it
 
+#### Scenario: Quiet overflowing selector lists
+- **WHEN** either selector list overflows at an ordinary or narrow viewport
+- **THEN** native scrollbars, tracks, arrows and scrollbar divider gutters SHALL remain visually hidden without adding a custom scroll control
+- **AND** wheel/trackpad scrolling, keyboard navigation, contextual page snaps and accessible row focus remain available
+- **AND** column widths, row alignment and component spacing remain stable without a separator between the lists
+
 ### Requirement: Consistent practice range rows
 Both selector lists and completed/unfinished sections SHALL use one roomier row rhythm, with text vertically centered within highlight and focus borders and aligned first-row baselines. Human measure ranges SHALL use consistently spaced dashes in the existing font without changing saved passage identities. Joined ranges SHALL retain accessible component identity without a redundant visible arrow.
 
@@ -102,7 +108,7 @@ Both selector lists and completed/unfinished sections SHALL use one roomier row 
 - **AND** each focused highlight encloses its centered row content, and three-digit ranges remain clear of right-aligned percentages
 
 ### Requirement: Quiet practice range context and progress summary
-Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the Total progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Component and joined-run rates SHALL remain independent. Full-score measure numbering, saved evidence/hierarchy, library aggregates, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
+Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the Total progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Library summaries and progress reported after a practice save SHALL use the same default manual-inclusive weighted-leaf total without a preparation bonus. Component and joined-run rates SHALL remain independent. Full-score measure numbering, saved evidence/hierarchy, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
 
 #### Scenario: Select and practise measures 1–4
 - **WHEN** the user selects and starts a passage covering measures 1–4
@@ -125,6 +131,12 @@ Practice strips SHALL omit visible individual measure numbers while retaining ac
 - **THEN** displayed rates, grouping and sorting use measured results only while retaining the selected passage and checkbox focus
 - **AND** manual marks, measured records and saved joins remain intact, and automatic suggestions, musical advancement and Done eligibility do not change
 - **AND** toggling the checkbox or pressing its native keys does not start a passage or persist practice evidence changes
+
+#### Scenario: Consistent library and saved progress totals
+- **WHEN** the library loads saved practice evidence or a practice save reports its progress
+- **THEN** the total uses the highest measured or manual rate for each original leaf relative to the current target, weighted once without a preparation bonus
+- **AND** clearing Include manual changes the open practice display only; library and save totals remain manual-inclusive
+- **AND** independent whole-run completion, measured/manual provenance, joins, preparation completion and history remain intact
 
 ### Requirement: Bottom return guide
 Reader, shared Options, selector and active-practice return controls SHALL use Back with Esc. Selector and active practice SHALL retain their bottom controls and existing return targets without a duplicate top-right action. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations, using the existing main Options arrow-first layout, paired arrows, text sizing and spacing rather than a separate hint style. Both shared footers SHALL use Enter Open as a general activation hint without changing the focused control's actual Enter behavior. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
@@ -323,3 +335,9 @@ Free view Previous/Next controls SHALL inherit the current main-menu controls pe
 - **WHEN** a local slot is explicitly unbound or a main/local edit would create a conflict in either effective context
 - **THEN** an explicit empty local slot does not fall back to main, and a conflicting edit reports the named conflict without changing saved values or silently discarding an override
 - **AND** runtime, binding Test, capture and visible hints use the same effective admitted controls
+
+## REMOVED Requirements
+
+### Requirement: Preparation restart belongs to practice controls
+**Reason**: The accepted controls refinement removes the explicit Restart preparation action and retains once-only connected preparation.
+**Migration**: Keep earned preparation and prior-attainment guards, initial untimed preparation, and existing Ready/Resume behavior under Once-only preparation and clear active controls; offer no explicit restart action.

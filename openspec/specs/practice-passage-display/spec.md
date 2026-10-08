@@ -93,6 +93,12 @@ Completed adjacent groups SHALL retain their compact joined range and accessible
 - **AND** further navigation uses the newly visible stretch without scrolling each selection by one row
 - **AND** an equivalent Up transition retains the previous top row at the bottom, with the new selection above it
 
+#### Scenario: Quiet overflowing selector lists
+- **WHEN** either selector list overflows at an ordinary or narrow viewport
+- **THEN** native scrollbars, tracks, arrows and scrollbar divider gutters SHALL remain visually hidden without adding a custom scroll control
+- **AND** wheel/trackpad scrolling, keyboard navigation, contextual page snaps and accessible row focus remain available
+- **AND** column widths, row alignment and component spacing remain stable without a separator between the lists
+
 ### Requirement: Consistent practice range rows
 Both selector lists and completed/unfinished sections SHALL use one roomier row rhythm, with text vertically centered within highlight and focus borders and aligned first-row baselines. Human measure ranges SHALL use consistently spaced dashes in the existing font without changing saved passage identities. Joined ranges SHALL retain accessible component identity without a redundant visible arrow.
 
@@ -102,7 +108,7 @@ Both selector lists and completed/unfinished sections SHALL use one roomier row 
 - **AND** each focused highlight encloses its centered row content, and three-digit ranges remain clear of right-aligned percentages
 
 ### Requirement: Quiet practice range context and progress summary
-Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the short Progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Component and joined-run rates SHALL remain independent. Full-score measure numbering, saved evidence/hierarchy, library aggregates, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
+Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the Total progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Library summaries and progress reported after a practice save SHALL use the same default manual-inclusive weighted-leaf total without a preparation bonus. Component and joined-run rates SHALL remain independent. Full-score measure numbering, saved evidence/hierarchy, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
 
 #### Scenario: Select and practise measures 1–4
 - **WHEN** the user selects and starts a passage covering measures 1–4
@@ -112,7 +118,7 @@ Practice strips SHALL omit visible individual measure numbers while retaining ac
 #### Scenario: Different section and joined-run attainment
 - **WHEN** component progress differs from a larger joined or whole-piece run
 - **THEN** each passage row retains its own correct achieved-speed percentage without borrowing component or joined-run evidence
-- **AND** one short Progress summary replaces the confusing paired Sections learned and Whole piece summary without recalculating stored attainment
+- **AND** one Total progress summary replaces the confusing paired Sections learned and Whole piece summary without recalculating stored attainment
 
 #### Scenario: Mixed completion with manual results included
 - **WHEN** some groups are completed and others are still in progress
@@ -126,12 +132,18 @@ Practice strips SHALL omit visible individual measure numbers while retaining ac
 - **AND** manual marks, measured records and saved joins remain intact, and automatic suggestions, musical advancement and Done eligibility do not change
 - **AND** toggling the checkbox or pressing its native keys does not start a passage or persist practice evidence changes
 
+#### Scenario: Consistent library and saved progress totals
+- **WHEN** the library loads saved practice evidence or a practice save reports its progress
+- **THEN** the total uses the highest measured or manual rate for each original leaf relative to the current target, weighted once without a preparation bonus
+- **AND** clearing Include manual changes the open practice display only; library and save totals remain manual-inclusive
+- **AND** independent whole-run completion, measured/manual provenance, joins, preparation completion and history remain intact
+
 ### Requirement: Bottom return guide
-The selector SHALL place its Score return action and Escape hint in the bottom controls, without a duplicate top-right Score control. Active practice SHALL identify its Escape return as Passages. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations, using the existing main Options arrow-first layout, paired arrows, text sizing and spacing rather than a separate hint style. Both shared footers SHALL use Enter Open as a general activation hint without changing the focused control's actual Enter behavior. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
+Reader, shared Options, selector and active-practice return controls SHALL use Back with Esc. Selector and active practice SHALL retain their bottom controls and existing return targets without a duplicate top-right action. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations, using the existing main Options arrow-first layout, paired arrows, text sizing and spacing rather than a separate hint style. Both shared footers SHALL use Enter Open as a general activation hint without changing the focused control's actual Enter behavior. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
 
 #### Scenario: Return from practice to the score
 - **WHEN** the user presses Escape in active practice
-- **THEN** the selector opens and the guide identifies Escape as the return to Score
+- **THEN** the selector opens and the guide labels the return Back with Esc
 - **WHEN** the user presses Escape in that selector
 - **THEN** the full-score reader returns through the existing navigation path
 
@@ -278,17 +290,31 @@ Free view SHALL show complete consecutive notation in centered four-measure grou
 - **THEN** its windows are 1–4 and the bounded final 2–5, without showing an outside measure
 - **AND** a failure owned inside the selection can be inspected in its consecutive source window while an earlier carry-in outside the selection retains separate original context
 
-### Requirement: Preparation restart belongs to practice controls
-Restart preparation SHALL be an active-practice action alongside the playing controls and SHALL be absent from Options and the selector. It SHALL describe its untimed purpose and be available with a connected piano. Restarting SHALL stop active or pending count-in before beginning preparation and preserve tempo, completion and saved evidence.
+### Requirement: Once-only preparation and clear active controls
+Preparation SHALL retain connected first-entry behavior and skip later entries with completed groundwork or prior attainment. No Restart preparation action SHALL appear in any interface. Ready/Resume, disconnected-only Done and the following Working speed SHALL form a centered primary group. Lock current speed SHALL retain existing semantics. Selected passage achievement SHALL remain in the upper-right and whole-piece summaries SHALL read Total progress.
 
-#### Scenario: Restart preparation during a count-in
-- **WHEN** a connected player activates Restart preparation
-- **THEN** scheduled playback and any pending Ready request stop before each hand position and adjacent pair can be played at the player's own pace
-- **AND** saved progress and settings remain unchanged
+#### Scenario: Complete preparation and reopen
+- **WHEN** a connected passage completes its untimed first-entry preparation
+- **THEN** completion remains saved and reopening skips completed preparation
+- **AND** no explicit preparation restart is offered
 
-#### Scenario: Piano disconnected
-- **WHEN** active practice has no connected piano
-- **THEN** the action is unavailable with an accessible connection reason rather than advertising an unexplained no-op
+#### Scenario: Active control group
+- **WHEN** practice is shown with or without MIDI
+- **THEN** Ready/Resume and Working speed remain centered with Done between them only while disconnected
+- **AND** completion admission, first-loop eligibility, undo, queued speeds and evidence remain unchanged
+
+### Requirement: Free view entry respects saved controls
+Plain V SHALL enter Free view; Space SHALL retain Ready/resume. P SHALL open practice only from the reader and SHALL NOT replace an active object. Every effective authoritative plain V assignment SHALL take priority, even if its action is unavailable; its occupied default hint and fallback SHALL be omitted. Modifiers, fields, capture, modal and repeat ownership SHALL remain correct. Saved dictionaries SHALL NOT change for this shortcut.
+
+#### Scenario: Enter Free view and resume
+- **WHEN** unassigned plain V is pressed in active practice
+- **THEN** existing Pause stops active or pending playback and restores Free view
+- **AND** Space resumes through Ready/count-in while repeated V never starts playing
+
+#### Scenario: Saved or guarded V
+- **WHEN** a saved primary or secondary control owns V, or modified/input-captured V is pressed
+- **THEN** the fallback does not steal input or alter saved assignments
+- **AND** a saved plain V owner removes its default hint
 
 ### Requirement: Proportionate shared fingering behavior picker
 Reader and practice Options SHALL use the same compact fingering behavior picker sized to its contents. It SHALL retain both visibility choices, existing keyboard navigation and mouse activation. The control SHALL NOT stretch across unused row space or change unrelated device picker sizing.
