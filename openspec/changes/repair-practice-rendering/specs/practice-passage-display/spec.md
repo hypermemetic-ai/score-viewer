@@ -7,7 +7,7 @@ Present source-faithful practice notation as coherent consecutive passages, with
 ## ADDED Requirements
 
 ### Requirement: Continuous consecutive notation
-Consecutive measures displayed in passage selection or active practice SHALL form one continuous horizontal strip with aligned staff lines and source-correct barlines. Independent crop gaps, duplicated authored boundary ink, and horizontal scrollbars SHALL be absent. Musical notation and separators SHALL retain their source meaning.
+Consecutive measures displayed in passage selection or active practice SHALL form one continuous horizontal strip with aligned staff lines and source-correct barlines. Independent crop gaps, duplicated authored boundary ink, and horizontal scrollbars SHALL be absent. The live reading surface SHALL also keep continuous staff through spatial refills; musical notation and separators SHALL retain their source meaning.
 
 #### Scenario: Four bars across a source system or page boundary
 - **WHEN** the user selects or practises four consecutive source measures whose prepared pages span different systems or pages
@@ -37,22 +37,28 @@ Displayed ties and slurs SHALL be projected for the composed passage through sha
 - **AND** separate source slurs and nonconsecutive slot wraps do not become an invented connection
 
 ### Requirement: Stable active reading references
-Active practice SHALL retain the existing fixed reading positions and completion/hold conditions for replacing measures. Replacing a completed position SHALL leave surviving measures at the same coordinates and scale within an unchanged viewport. Music SHALL NOT slide continuously. Nonconsecutive positions SHALL NOT be presented as consecutive musical boundaries.
+During measured count-in or playing, the current measure SHALL retain its exact screen position and size within an unchanged viewport. Other whole measures SHALL change layout only in an atomic refill that draws incoming music. Original interiors and one common live scale SHALL remain unchanged. The reading surface SHALL remain continuous and naturally framed; music SHALL NOT slide continuously. Source identities and relation ownership SHALL remain truthful through spatial wraps.
 
 #### Scenario: Naturally centered active passage
-- **WHEN** an active four-position track is fitted to the practice surface
-- **THEN** the complete admitted notation is framed naturally with substantial outer breathing room and a clear left inset, accounting for unused SVG/slot space
-- **AND** note removal and slot replacement do not recenter or shift surviving notation
+- **WHEN** an active bounded display is fitted before count-in
+- **THEN** its complete initial notation and continuous staff are naturally centered with substantial outer breathing room and a clear left inset
+- **AND** subsequent hides/refills do not recenter the live surface or change the protected current measure
+
+#### Scenario: Live finger display and status changes retain reading references
+- **WHEN** measured count-in or playing toggles finger display, changes status text or refills without a viewport change
+- **THEN** source residency and reading retirement continue through live finger display while common scale and screen origin remain fixed
+- **AND** Free view, error and preparation phases do not fabricate accepted attacks or advance live residency
 
 #### Scenario: Protected and eligible source positions
-- **WHEN** measured practice completes a measure and all its displayed hold obligations expire
-- **THEN** the next source measure can replace the eligible fixed position without moving surviving notation
-- **AND** an unmatched attack, active hold, error, or unmeasured run cannot trigger that automatic replacement
+- **WHEN** measured practice has accepted every required attack in an older measure and entered a later reading measure
+- **THEN** its ordinary ink can retire as incoming music is atomically allocated around the current measure
+- **AND** continuing sound is assessed independently, with readable authored tie cues where applicable
+- **AND** unread attacks, errors and unmeasured runs cannot manufacture automatic retirement
 
 #### Scenario: A joined run wraps through fixed positions
-- **WHEN** replacement temporarily displays source measures in an order such as 5, 2, 3, 4
-- **THEN** the existing reading order and accessible source identities remain clear, with an explicit staff break at a nonconsecutive boundary
-- **AND** consecutive measures 2, 3, 4 have coherent notation without implying that measure 5 immediately precedes measure 2 in the source
+- **WHEN** replacement displays resident bars across a genuine reading-order wrap
+- **THEN** staff lines remain continuous and aligned, with correctly attached source barlines and accessible source identities
+- **AND** ties and slurs retain verified musical endpoints without inventing a relation between nonconsecutive source notes
 
 ### Requirement: Efficient leaf selection preview
 A selected original leaf SHALL display all its source measures together as one horizontal strip using available preview space efficiently. An ordinary four-bar leaf SHALL show all four bars without a horizontal scrollbar or an automatic two-row fragment layout. Fitting SHALL account for complete visible musical ink and a substantial consistent left inset so the notation does not crowd the preview edge.
@@ -130,24 +136,27 @@ The selector SHALL place its Score return action and Escape hint in the bottom c
 - **THEN** the full-score reader returns through the existing navigation path
 
 ### Requirement: Complete note-ink ownership
-All ink owned by a note SHALL participate in that note's existing visibility lifecycle, including ordinary and hollow duration stems, white reservations, noteheads, flags, dots, and owned relation fragments. Hidden notes SHALL leave no owned residual ink. Shared ink required by another visible owner and unrelated notes or staff SHALL be preserved. This behavior SHALL apply generically to supported scores.
+All ordinary ink owned by a note SHALL retire together, including ordinary/hollow stems, white interiors, heads, flags, dots and annotations. Hidden ordinary notes SHALL leave no residual duration ink. Shared ink required by another visible owner and unrelated notes/staff SHALL remain correct. A separately classified source-owned held tie cue SHALL use its explicit visual lifetime without retaining the old ordinary bundle.
 
 #### Scenario: A long-duration note becomes hidden
-- **WHEN** practice hides the owner group containing a note with a hollow half- or whole-duration stem
-- **THEN** the hollow outline and white interior disappear with the associated note ink
-- **AND** other visible notes and structural staff ink remain intact
+- **WHEN** practice retires an eligible note with a hollow half- or whole-duration stem
+- **THEN** the hollow outline and white interior disappear with its ordinary note ink
+- **AND** other visible notes and structural staff remain intact
+- **AND** any retained tie cue is explicit source-owned continuation paint rather than an orphaned stem or head
 
 #### Scenario: Shared duration and relation ink
-- **WHEN** a displayed beam or relation fragment has multiple source owners and some remain visible
-- **THEN** ink required by those visible owners remains correct without orphaned duration ink from hidden owners
+- **WHEN** a displayed beam or relation has multiple source owners and some remain visible
+- **THEN** paint required by those contributors remains correct without orphaned duration ink from retired ordinary bundles
+- **AND** tie cue removal does not alter sounding obligations
 
 ### Requirement: Full-window Pause restoration
-Pausing a running passage SHALL restore the complete source notation in the displayed passage window, including every note-owned duration mark and white reservation. Restoration SHALL follow the same ownership model as removal and SHALL NOT depend on reconstructing a score-specific exception.
+Entering Free view SHALL stop active or pending playback and restore complete source notation for a consecutive window of up to four selected measures. Full owned ink and source relations SHALL restore through the common ownership model. The window SHALL be naturally centered independently of the live refill canvas. A cyclic resident layout SHALL NOT be used as the Free view window. Original error obligations and source context SHALL remain accessible.
 
 #### Scenario: Pause after ordinary and hollow notes were removed
-- **WHEN** the user pauses active practice after ordinary and hollow-stem note groups have disappeared
-- **THEN** the displayed window restores their complete source notation at its reading positions
-- **AND** repeated start, removal, and Pause cycles retain correct ownership and geometry
+- **WHEN** the user enters Free view after ordinary or hollow note ink disappeared or its space was reused
+- **THEN** a consecutive source window near the current reading location restores complete source notation in natural order and centered framing
+- **AND** repeated playing, refill, Free view and Ready cycles preserve source ownership without duplicating retired ink
+- **AND** Ready returns to the admitted initial live allocation at the existing count-in transition
 
 ### Requirement: Preserve practice modes and musical interaction
 The display repair SHALL preserve the existing measured/unmeasured distinction, beat-aligned count-in/repeat and speed transitions, first-loop eligibility, reversible Done completion, and queued speed changes. Unmeasured practice SHALL retain readable source music without fabricating observed attacks or measured attainment. Existing paused/unmeasured passage-window controls SHALL remain usable.
@@ -255,3 +264,48 @@ Existing shared numeric tempo fields SHALL distinguish keyboard option navigatio
 - **WHEN** a typed draft cannot pass the field's existing admission rules
 - **THEN** the field retains editing with its validation message and does not save an invalid value
 - **AND** valid mouse chevron clicks/holds and release still use the existing adjustment rules
+
+### Requirement: Free view passage navigation
+Free view SHALL show complete consecutive notation in centered four-measure groups and transition windows advancing by two source measures. It SHALL support existing previous/next navigation and retain a final end-aligned window when needed. A shorter selection SHALL show only its real measures. Free view SHALL preserve saved evidence and original source obligation definitions, with the existing pause reset of transient attempt state and no fabricated played attacks.
+
+#### Scenario: Browse four-measure groups and their transitions
+- **WHEN** Free view opens on selected measures 1–12 and the user moves right twice from 1–4
+- **THEN** it shows centered 3–6 and then centered 5–8, with complete coherent staff, barlines, ties and slurs
+- **AND** moving left reverses the same source windows
+
+#### Scenario: Five-measure leaf and held failure context
+- **WHEN** a five-measure leaf is opened in Free view
+- **THEN** its windows are 1–4 and the bounded final 2–5, without showing an outside measure
+- **AND** a failure owned inside the selection can be inspected in its consecutive source window while an earlier carry-in outside the selection retains separate original context
+
+### Requirement: Preparation restart belongs to practice controls
+Restart preparation SHALL be an active-practice action alongside the playing controls and SHALL be absent from Options and the selector. It SHALL describe its untimed purpose and be available with a connected piano. Restarting SHALL stop active or pending count-in before beginning preparation and preserve tempo, completion and saved evidence.
+
+#### Scenario: Restart preparation during a count-in
+- **WHEN** a connected player activates Restart preparation
+- **THEN** scheduled playback and any pending Ready request stop before each hand position and adjacent pair can be played at the player's own pace
+- **AND** saved progress and settings remain unchanged
+
+#### Scenario: Piano disconnected
+- **WHEN** active practice has no connected piano
+- **THEN** the action is unavailable with an accessible connection reason rather than advertising an unexplained no-op
+
+### Requirement: Proportionate shared fingering behavior picker
+Reader and practice Options SHALL use the same compact fingering behavior picker sized to its contents. It SHALL retain both visibility choices, existing keyboard navigation and mouse activation. The control SHALL NOT stretch across unused row space or change unrelated device picker sizing.
+
+#### Scenario: Open shared Options at ordinary and narrow widths
+- **WHEN** the user opens reader or practice Options at an ordinary or narrow viewport
+- **THEN** Show fingerings fits its value and dropdown indicator, and both keyboard and mouse can choose press-to-toggle or show-while-held behavior
+
+### Requirement: Inherited Free view navigation controls
+Free view Previous/Next controls SHALL inherit the current main-menu controls per input slot until locally overridden. An absent override SHALL follow later main changes; an explicit empty override SHALL unbind only that local slot. Editing a local slot SHALL preserve the main value and other inherited slots. The inheritance behavior SHALL add no reset control or extra editor item. Exact shared settings SHALL retain their single source.
+
+#### Scenario: Main control changes after a local keyboard override
+- **WHEN** Free view Previous has a local keyboard override while its MIDI slot is inherited, and the main settings change
+- **THEN** the local keyboard value remains, the MIDI slot follows main, and main assignments remain independently editable
+- **AND** deliberate local edits create overrides without adding an inheritance reset control or extra editor content
+
+#### Scenario: Explicit local unbinding and conflicts
+- **WHEN** a local slot is explicitly unbound or a main/local edit would create a conflict in either effective context
+- **THEN** an explicit empty local slot does not fall back to main, and a conflicting edit reports the named conflict without changing saved values or silently discarding an override
+- **AND** runtime, binding Test, capture and visible hints use the same effective admitted controls

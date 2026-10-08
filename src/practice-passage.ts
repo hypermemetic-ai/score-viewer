@@ -96,7 +96,7 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
 }
 
 export interface Passage {svg:SVGSVGElement;crops:Crop[];relations:Crop['owned'];width:number;height:number}
-export interface PassageTrack {width:number;top:number;bottom:number;leftAir:number;rightAir:number;lanes:number[];boxes:Map<number,InkBox[]>;frame?:{left:number;right:number}}
+export interface PassageTrack {width:number;top:number;bottom:number;leftAir:number;rightAir:number;lanes:number[];boxes:Map<number,InkBox[]>;topAir?:number;frame?:{left:number;right:number}}
 let sequence=0;
 /** SVG geometry must be read while attached to a real rendering document.
  * All admitted ink and every possible annotation contribute before hiding. */
@@ -149,14 +149,15 @@ export function fitPassageFrame(p:ScorePackage,plan:PracticePlan,crops:Crop[],tr
  for(const positions of windows){const passage=composePassage(crops,track,policy,positions,projectRelations(p,plan,crops,track,policy,positions));mount.append(passage.svg);try{const b=passageInkBounds(passage,p);left=Math.min(left,b.x0);right=Math.max(right,b.x1);}finally{passage.svg.remove();}}
  track.frame={left:left-.8,right:right+.8};return track;
 }
-/** One source-to-display translation per position. Compact previews retain
- * literal widths; active positions reserve the same width across every refill.
- * Content, seats, fingers and playhead share the same nested source frame. */
-export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>=crops.map(c=>c.bar),projected?:ProjectedRelation[]):Passage {
+/** One source-to-display translation per position. Compact previews and
+ * explicit refills retain literal source widths; fixed manual windows reserve
+ * equal slots. Content, seats, fingers and playhead share one source frame. */
+export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>=crops.map(c=>c.bar),projected?:ProjectedRelation[],placements?:ReadonlyArray<{bar:number;x:number}>):Passage {
  const svg=document.createElementNS(ns,'svg'),prefix=`practice-${++sequence}-`,defs=document.createElementNS(ns,'defs'),placed:Crop[]=[];
  svg.classList.add('practice-passage');svg.setAttribute('preserveAspectRatio','xMinYMin meet');svg.append(defs);
  let x=0;
  for(const [slot,bar]of positions.entries()){
+  if(placements&&bar!==undefined){const placement=placements.find(p=>p.bar===bar);if(!placement)throw Error(`Measure ${bar+1}: missing admitted placement.`);x=placement.x;}
   const crop=crops.find(c=>c.bar===bar),width=policy==='fixed'?track.width:crop?crop.right-crop.left:0;
   if(!crop){x+=width;continue;}
   crop.owned.forEach(({el},i)=>el.setAttribute('data-practice-owned',String(i)));
@@ -179,18 +180,19 @@ export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|
   // Full-score systems use their break as the final ordinary boundary. Once
   // adjoining real intervals, continue the admitted ordinary rule at that
   // source boundary, using its existing geometry/style (never repeat ink).
-  if(positions[slot+1]===bar!+1&&(!crop.endingType||crop.endingType==='regular')){
+  if(positions[slot+1]!==undefined&&(!crop.endingType||crop.endingType==='regular')){
    const ending=[...group.querySelectorAll<SVGLineElement>('.janko-barlines line,.janko-repeat line')].some(line=>Math.abs(Number(line.getAttribute('x1'))-crop.right)<3);
    if(!ending){const template=[...crop.svg.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(line=>Number(line.getAttribute('stroke-width'))===.6);if(!template)throw Error(`Measure ${bar!+1}: missing admitted ordinary separator.`);const line=template.cloneNode(false) as SVGLineElement;line.removeAttribute('id');line.setAttribute('x1',String(crop.right));line.setAttribute('x2',String(crop.right));line.setAttribute('data-practice-source-boundary',String(bar!+1));source.append(line);}
   }
   if(positions.slice(slot+1).every(bar=>bar===undefined)&&(!crop.endingType||crop.endingType==='regular'))group.querySelectorAll<SVGLineElement>('.janko-barlines line').forEach(line=>{if(Math.abs(Number(line.getAttribute('x1'))-crop.right)<.03)line.remove();});
   const rules=[...group.querySelectorAll<SVGLineElement>('.janko-pitch-lane')].filter(line=>crop.lanes.some(y=>Math.abs(Number(line.getAttribute('y1'))-crop.frame-y)<.03));
-  for(const line of rules){line.setAttribute('x1',String(crop.left+(slot>0&&positions[slot-1]!==bar!-1?3:0)));line.setAttribute('x2',String(crop.right+(slot+1<positions.length&&positions[slot+1]!==bar!+1?-3:0)));}
-  // Structural padding continues only actual source adjacency; a wrap leaves
-  // a visible staff break instead of implying a new musical boundary.
-  if(policy==='fixed'&&positions[slot+1]===bar!+1&&width>sourceWidth){
+  for(const line of rules){line.setAttribute('x1',String(crop.left));line.setAttribute('x2',String(crop.right));}
+  // The staff is one persistent reading surface. Reserve source boundary
+  // air without breaking its lines, including at a spatial source wrap.
+  const next=positions[slot+1],nextX=next!==undefined?(placements?.find(p=>p.bar===next)?.x??x+width):undefined;
+  if(nextX!==undefined&&nextX>x+sourceWidth+.001){
    const padding=document.createElementNS(ns,'g');padding.classList.add('practice-staff-padding');padding.dataset.slot=String(slot);
-   for(const rule of rules){const line=rule.cloneNode(false) as SVGLineElement;line.setAttribute('x1',String(x+sourceWidth));line.setAttribute('x2',String(x+width));line.setAttribute('y1',String(Number(rule.getAttribute('y1'))-crop.frame));line.setAttribute('y2',line.getAttribute('y1')!);padding.append(line);}svg.append(padding);
+   for(const rule of rules){const line=rule.cloneNode(false) as SVGLineElement;line.setAttribute('x1',String(x+sourceWidth));line.setAttribute('x2',String(nextX));line.setAttribute('y1',String(Number(rule.getAttribute('y1'))-crop.frame));line.setAttribute('y2',line.getAttribute('y1')!);padding.append(line);}svg.append(padding);
   }
   svg.append(group);
   placed.push({...crop,svg:source,owned,width:sourceWidth,height:track.bottom-track.top});
@@ -204,6 +206,6 @@ export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|
   if(q.kind==='phrase'&&q.knockout){const knockout=q.path.cloneNode(false) as SVGPathElement;knockout.removeAttribute('data-practice-relation');knockout.setAttribute('data-practice-reservation',q.id);knockout.setAttribute('class','janko-phrase-grid-knockout');knockout.setAttribute('fill','white');knockout.setAttribute('stroke','white');knockout.setAttribute('stroke-width','1.2');knockout.setAttribute('stroke-linejoin','round');g.append(knockout);}
   g.append(q.path);owner.append(g);
  }
- const top=track.top-18,height=track.bottom-top,left=policy==='fixed'?track.leftAir:placed[0]?.leftAir??0,right=policy==='fixed'?track.rightAir:placed.at(-1)?.rightAir??0,frame=track.frame??{left:-left,right:x+right};svg.setAttribute('viewBox',`${frame.left} ${top} ${frame.right-frame.left} ${height}`);
+ const top=track.top-(track.topAir??18),height=track.bottom-top,left=policy==='fixed'?track.leftAir:placed[0]?.leftAir??0,right=policy==='fixed'?track.rightAir:placed.at(-1)?.rightAir??0,frame=track.frame??{left:-left,right:x+right};svg.setAttribute('viewBox',`${frame.left} ${top} ${frame.right-frame.left} ${height}`);
  return {svg,crops:placed,relations,width:frame.right-frame.left,height};
 }
