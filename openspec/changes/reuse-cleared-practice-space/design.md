@@ -8,7 +8,7 @@ Display gestures are already grouped by written bar and hand in `planSource`. Th
 
 Width evidence uses original intervals, not hypothetical minimum engraving widths. In Zelda, retired bars1–2 provide153.67 source units and bar5 requires104.27; bars5+6 require236.14 while the prefix before unchanged bar4 provides230.50. Enough total free space does not guarantee a fit on one side of a pinned current measure.
 
-`practice-passage-display` is an in-flight prerequisite capability rather than an existing main spec. This change includes a prospective full replacement of its exact affected requirement blocks. Establish the prerequisite source/capability before applying or syncing those deltas; do not merge two contradictory slot/lifecycle contracts silently.
+The rendering prerequisite is merged through PR2 at `c068334ecd3bbbedba17699d7f3533286f9e2e60` (independently reviewed head `68d1a6605e93e89f60d66f3dfeb76f5758a67bec`). Its `practice-passage-display` capability is established in the main specs. This change explicitly replaces its affected canonical-slot/lifecycle requirements while preserving their scenarios and the other notation, settings and browsing requirements. The implementation branch carries the original reviewed plan commits above that prerequisite; no saved source or dependency pin is changed.
 
 ## Goals / Non-Goals
 

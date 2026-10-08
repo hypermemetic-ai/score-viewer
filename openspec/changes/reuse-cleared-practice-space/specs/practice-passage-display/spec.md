@@ -1,6 +1,6 @@
 # Spec Delta
 
-This prospective delta targets the exact requirement blocks introduced by prerequisite `repair-practice-rendering`. Establish that capability in the main specs, or explicitly reconcile the prerequisite artifacts, before applying/syncing this change.
+This delta targets the main requirement blocks established by prerequisite `repair-practice-rendering`, merged at `c068334ecd3bbbedba17699d7f3533286f9e2e60`. Its updated bodies explicitly replace the canonical-slot/lifecycle contract while preserving the existing scenario identities.
 
 ## MODIFIED Requirements
 
@@ -18,7 +18,7 @@ Measured active practice SHALL retain the current measure's exact position and s
 - **AND** continuing sound remains assessed independently, with authored tie cues where applicable
 - **AND** unread required attacks, errors or an unmeasured run cannot manufacture automatic retirement
 
-#### Scenario: A joined run wraps through resident positions
+#### Scenario: A joined run wraps through fixed positions
 - **WHEN** replacement displays resident bars across a genuine reading-order wrap
 - **THEN** current-measure references, source order and accessible source identities remain clear, with an explicit staff break at each nonconsecutive boundary
 - **AND** consecutive source measures have coherent notation without falsely connecting a nonconsecutive wrap

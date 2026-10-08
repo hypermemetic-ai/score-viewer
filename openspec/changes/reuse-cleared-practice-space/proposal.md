@@ -22,7 +22,7 @@ Equal maximum-width slots waste space and make shorter measures look unlike thei
 
 ### Modified Capabilities
 
-- `practice-passage-display`: Replace the canonical fixed-slot replacement requirement with a protected current measure and atomic allocation; explicitly distinguish a held-note continuation cue from residual note ink, and restore complete resident windows on Pause. This capability is introduced by prerequisite `repair-practice-rendering` and is not yet a main spec. Its prospective delta is grounded in that change's exact requirement names; apply/sync this change only after the prerequisite capability is available, or reconcile their artifacts explicitly before integration.
+- `practice-passage-display`: Replace the canonical fixed-slot replacement requirement with a protected current measure and atomic allocation; explicitly distinguish a held-note continuation cue from residual note ink, and restore complete resident windows on Pause. The prerequisite is now merged at `c068334ecd3bbbedba17699d7f3533286f9e2e60` with its capability in the main specs. The delta uses those exact requirement and scenario names and intentionally supersedes only the affected slot/lifecycle contracts.
 
 ## Impact
 
