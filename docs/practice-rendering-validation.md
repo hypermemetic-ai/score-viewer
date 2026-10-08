@@ -178,4 +178,17 @@ and emitted servers available:
 
 ## Acceptance boundaries
 
+The docs-only main-spec reconciliation starts from merged controls main
+`e0ccbb2b7657af8810128c0aa6dfd65923b32808`. It syncs the accepted Back, V/Space,
+once-only preparation, centered controls and Total progress contracts, explicitly
+removes the obsolete Restart preparation requirement, and records the already
+reviewed hidden selector scrollbar behavior. The earlier display-stage statement
+that library projection was unchanged is historical: PR11 deliberately changed
+library reads and the practice-save callback to the canonical manual-inclusive
+`displayedPracticeTotal`, matching default Total progress without a preparation
+bonus. Include manual affects the open practice display only; whole-run completion,
+measured/manual provenance, joins, groundwork and history remain independent and
+preserved. This reconciliation changes documentation only and claims no new source,
+frontend, native or musical validation.
+
 Source tests and frontend builds establish source compatibility. Browser geometry and screenshots establish only the observed frontend behavior under simulated input. Native Windows/Mac compilation and launch, physical MIDI/audio/pedal behavior, and pianist musical acceptance remain separate, pending checks. The release seam is documented in `migration.md`. The operator subsequently authorized adaptive refinement and paired native delivery, owned separately by the parent and its children. This prerequisite source receipt does not claim their final source/build/install results.
