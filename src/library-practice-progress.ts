@@ -1,6 +1,7 @@
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {importPackage,selectPresentation,type ScorePackage} from './package';
-import {planPractice,practicePartition,readPractice,totalProgress,wholePracticeProgress} from './practice';
+import {planPractice,practicePartition,readPractice,wholePracticeProgress} from './practice';
+import {displayedPracticeTotal} from './practice-display';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} from './state';
 
 export interface LibraryPracticeReader {
@@ -25,7 +26,7 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  const raw=await reader.readRecord(practiceStorageName(entry.id,p)),legacy=legacyPracticeStorageName(p);
  const saved=raw??(legacy?await reader.readRecord(legacy):undefined);
  const plan=planPractice(p,practicePartition(saved)),state=readPractice(saved,plan);
- return {entryId:entry.id,file:entry.file,keyboard,sections:totalProgress(plan,state),whole:wholePracticeProgress(plan,state)>=1};
+ return {entryId:entry.id,file:entry.file,keyboard,sections:displayedPracticeTotal(plan,state),whole:wholePracticeProgress(plan,state)>=1};
 }
 
 /** Publish a complete snapshot, or a newer bound save, without partially clearing it. */
