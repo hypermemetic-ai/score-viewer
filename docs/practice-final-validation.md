@@ -80,8 +80,34 @@ unchanged-region capture limitation is still distinguished from complete images.
 
 Restart preparation and the proportionate shared fingering picker were reviewed
 in PR6, with actual normal/narrow browser evidence and pending-start cancellation.
-They remain in this combined application. The action is outside Options; the
-selector does not offer it.
+That receipt describes the earlier application. The subsequent controls
+refinement removes Restart preparation entirely while retaining the compact
+shared picker. Initial connected preparation still completes once and is skipped
+when that earned passage is reopened; it does not manufacture measured progress.
+
+## Subsequent controls refinement
+
+The scoped follow-up from `b6d5d360332c620ccdb40a9a19a71fd694c0e5aa` centers
+Ready/Resume, disconnected-only Done and adjacent Working speed. Its secondary
+controls use Lock current speed, Free view/V, Options and Back/Esc. Passage
+achievement remains in the upper-right header and the whole-piece caption is
+Total progress. Plain V enters Free view and Space resumes; P remains reader-only.
+Saved V assignments own the key even if the assigned action is unavailable.
+
+Development and emitted actual-main receipts and complete images are in
+`/tmp/score-viewer-practice-rendering/controls-refinement/`. The controls-only
+runner passes both frontends at 1440, 1100 and 900 pixels, with the primary group's
+content center within one pixel of the available center. It observes both Back
+paths, saved V priority, guarded modifiers, numeric draft/cancel, modal/capture
+ownership and inert P inside practice. The `completion/` receipt observes
+simulated connected/disconnected controls, a real clock loop, Done/undo and
+unchanged combined progress. The `preparation/` receipt observes connected
+first-entry groundwork, simulated matching position steps, persisted completion
+and the skipped return, plus content-sized reader/practice pickers at normal and
+narrow widths. These preparation observations are simulated input, not physical
+MIDI acceptance. The earlier 92 focused tests and final 40 control/lifecycle tests
+pass, as does the configured TypeScript/Vite build. This follow-up supplies source
+and browser evidence for separately owned combined native delivery.
 
 ## Source, package and installation boundaries
 
