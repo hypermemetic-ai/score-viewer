@@ -1,0 +1,17 @@
+{
+  "version": "viewer-annotation-ink-policy-v1",
+  "footer": {
+    "version": "viewer-footer-serif-v1",
+    "family": "Viewer Calculated Footer Serif v1",
+    "fontSha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
+    "metricsSha256": "7e79f4bb94546f2e05f294aa91873d287c5e67e564264c1456f254dc3f83f3a3",
+    "unitsPerEm": 2048,
+    "fontSizePt": 8,
+    "fontStyle": "italic",
+    "fontWeight": 400,
+    "textAnchor": "end",
+    "shaping": "explicit-unchanging-latin-footer-v1",
+    "textRendering": "geometricPrecision",
+    "drawingAllowancePageUnits": 2
+  }
+}

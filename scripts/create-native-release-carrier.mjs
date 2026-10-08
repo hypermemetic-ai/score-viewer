@@ -4,8 +4,12 @@ import {cp, mkdir, readFile, rm, writeFile, chmod} from 'node:fs/promises';
 import {resolve, join} from 'node:path';
 import {pathToFileURL, fileURLToPath} from 'node:url';
 import {inventory, sha256, canonical, safePath, validateRecordedChecks, validateCarrierInputs} from './native-release-carrier/inputs.mjs';
+import {unzipSync,strFromU8} from 'fflate';
+import {semanticHash,footerProbeVersion,footerMetricsSha256} from './native-release-carrier/footer-ink-receipt.mjs';
 import {validatePianoSources} from './native-release-carrier/score-viewer-piano-release.mjs';
 
+const footerNotice='LiberationSerif-Italic-NOTICE.txt';
+const oldFontNotices="['URW-base35-provenance.md','URW-base35-LICENSE','URW-base35-COPYING','OFL-Bravura.txt']";
 const templates = fileURLToPath(new URL('./native-release-carrier/', import.meta.url));
 function git(source, args, binary = false) {
   return execFileSync('git', args, {cwd:source, encoding:binary ? undefined : 'utf8', maxBuffer:32 * 1024 * 1024});
@@ -45,6 +49,32 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   }
   inputs.nativeFiles=Object.fromEntries(Object.entries(inputs.nativeFiles).sort(([a],[b])=>a.localeCompare(b)));
   await validatePianoSources(viewerSource, inputs.nativeFiles);
+  const newFooterNotice=!!inputs.nativeFiles['licenses/'+footerNotice],noticeMirrors=[];
+  // Every prior root notice must already match. Only the one explicitly
+  // reviewed additive notice can be newly mirrored; no old input is replaced.
+  for(const file of selected.filter(f=>f.path.startsWith('licenses/'))){
+    const bytes=git(viewerSource,['show',`${viewerRevision}:${file.path}`],true);
+    try{if(!(await readFile(join(isoCarrier,file.path))).equals(bytes))throw Error('Shared/native notice conflict: '+file.path);}
+    catch(error){if(error.code!=='ENOENT'||file.path!=='licenses/'+footerNotice)throw error;noticeMirrors.push({path:file.path,bytes});}
+  }
+  if(newFooterNotice){
+    const policy=JSON.parse(git(viewerSource,['show',`${viewerRevision}:src/footer-ink-policy.json`])),fixtureBytes=git(viewerSource,['show',`${viewerRevision}:fixtures/authored-calculated-preparation-v2.isoscore`],true),
+      fixtureFiles=unzipSync(fixtureBytes),fm=JSON.parse(strFromU8(fixtureFiles['manifest.json'])),source=fixtureFiles[fm.sourceScore];
+    const fixturePath=Object.keys(frontendFiles).filter(p=>frontendFiles[p].sha256===sha256(fixtureBytes));
+    if(fixturePath.length!==1||!frontendFiles['footer-ink-probe.html']||sha256(fixtureBytes)!=='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1')
+      throw Error('Frontend lacks exact public footer/ordinary-worker probe fixture');
+    const metricDeclaration=git(viewerSource,['show',`${viewerRevision}:src/footer-font-data.ts`]).match(/^export const FOOTER_METRICS_JSON=(.+);$/m);
+    const metricsLiteral=metricDeclaration?JSON.parse(metricDeclaration[1]):undefined;
+    if(typeof metricsLiteral!=='string'||sha256(Buffer.from(metricsLiteral))!==footerMetricsSha256||policy.footer.metricsSha256!==footerMetricsSha256)throw Error('Reviewed exact footer metric literal differs');
+    inputs.runtimeFontProbe={version:footerProbeVersion,policySha256:semanticHash(policy),metricsLiteral,fixture:{path:fixturePath[0],sha256:sha256(fixtureBytes),size:fixtureBytes.length,
+      sourceSha256:sha256(source),ownerCount:JSON.parse(strFromU8(source)).notes.length},files:{}};
+    for(const name of ['footer-ink-probe.swift','footer-ink-probe.mjs','footer-ink-receipt.mjs']){const bytes=git(viewerSource,['show',`${viewerRevision}:scripts/native-release-carrier/${name}`],true);
+      inputs.runtimeFontProbe.files['scripts/'+name]={sha256:sha256(bytes),size:bytes.length};}
+    const notice=inputs.nativeFiles['licenses/'+footerNotice];
+    if(!Object.entries(frontendFiles).some(([path,p])=>path.endsWith('.txt')&&p.sha256===notice.sha256&&p.size===notice.size)||
+      !Object.entries(frontendFiles).some(([path,p])=>path.endsWith('.ttf')&&p.sha256==='eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242'&&p.size===375760))
+      throw Error('Frontend lacks the exact measured footer face and complete accessible notice');
+  }
   // Validate all adapters before any carrier mutation. The source commit stays
   // untouched; only the task-owned clean, isolated carrier worktree is written.
   let delivery=await readFile(join(isoCarrier,'scripts','score-viewer-delivery.mjs'),'utf8');
@@ -63,20 +93,35 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   worker=replaceOnce(worker,"export async function notices(source,viewer,packet,targetTriple) {","export async function notices(source,viewer,packet,targetTriple) {\n  const pianoEngine=await packagePianoNotices(source,viewer,packet);",'piano notice packaging');
   worker=replaceOnce(worker,"{manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))","{pianoEngine,manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))",'piano dependency identity');
   worker=replaceOnce(worker,"  const hashes=await inventory(packet);","  ({nativeChecks,details}=await addPianoWorkerChecks(ctx.source,ctx.viewer,packet,nativeChecks,details,platform,binary));\n  const hashes=await inventory(packet);",'piano worker evidence');
+  if(newFooterNotice){
+    worker=replaceOnce(worker,oldFontNotices,oldFontNotices.slice(0,-1)+",'"+footerNotice+"']",'footer notice copy list');
+    worker=replaceOnce(worker,"await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'}});",
+      "await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'},bundle:{resources:{'../licenses/"+footerNotice+"':'notices/"+footerNotice+"'}}});",'footer generated resource map');
+  }
   let macWorker=await readFile(join(isoCarrier,'scripts','build-score-viewer-macos.mjs'),'utf8');
   macWorker=replaceOnce(macWorker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {verifyBundledPianoNotices,runMacPianoDiagnostic} from './score-viewer-piano-release.mjs';",'Mac piano resource import');
   macWorker=replaceOnce(macWorker,"await ctx.stage('nativeBuildMs'","await runMacPianoDiagnostic(ctx,packet,host,nativeReleaseCargoArgs,env);\nawait ctx.stage('nativeBuildMs'",'Mac initialized audio diagnostic');
   macWorker=replaceOnce(macWorker,"const bundledNoticeHashes={};","const bundledNoticeHashes=await verifyBundledPianoNotices(stage,viewer,join(app,'Contents','Resources'));",'Mac piano resource verification');
+  if(newFooterNotice){
+    macWorker=replaceOnce(macWorker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {runFooterInkProbe} from './footer-ink-probe.mjs';",'Mac actual WebKit font import');
+    macWorker=replaceOnce(macWorker,"const packet = await mkdtemp(join(tmpdir(),'iso-mac-recipient-'));","const packet = await mkdtemp(join(tmpdir(),'iso-mac-recipient-'));\nconst footerInk=await runFooterInkProbe(ctx,packet);",'Mac early bounded WebKit font check');
+    macWorker=replaceOnce(macWorker,"{tests:'passed',virtualMidi:'passed',signatures:'passed',resources:'passed'","{footerInk,tests:'passed',virtualMidi:'passed',signatures:'passed',resources:'passed'",'Mac required font receipt');
+  }
+  if(newFooterNotice)macWorker=replaceOnce(macWorker,oldFontNotices,oldFontNotices.slice(0,-1)+",'"+footerNotice+"']",'Mac footer resource verification list');
   let attributes='';
   try {attributes=await readFile(join(isoCarrier,'.gitattributes'),'utf8');} catch(error) {if(error.code!=='ENOENT')throw error;}
   if(attributes && !attributes.endsWith('\n'))attributes+='\n';
   // Preserve literal Git object bytes across Windows core.autocrlf checkout.
   // The shared font notices must match their copied native counterparts too.
   attributes+='\n# Exact reviewed native and frozen frontend release bytes\ndelivery-input/** -text\n';
+  if(newFooterNotice)for(const name of ['footer-ink-probe.swift','footer-ink-probe.mjs','footer-ink-receipt.mjs'])
+    attributes+=`${JSON.stringify('scripts/'+name)} -text\n`;
   for(const file of selected) {
     attributes+=`${JSON.stringify(`score-viewer/${file.path}`)} -text\n`;
     if(file.path.startsWith('licenses/'))attributes+=`${JSON.stringify(file.path)} -text\n`;
   }
+  for(const mirror of noticeMirrors){await mkdir(resolve(join(isoCarrier,mirror.path),'..'),{recursive:true});
+    await writeFile(join(isoCarrier,mirror.path),mirror.bytes,{flag:'wx'});}
   await rm(join(isoCarrier,'score-viewer','src-tauri'),{recursive:true});
   for(const file of selected) {
     const full=join(isoCarrier,'score-viewer',file.path);
@@ -88,6 +133,9 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   await cp(frontend,join(isoCarrier,'delivery-input','frontend'),{recursive:true,errorOnExist:true,force:false});
   await writeFile(join(isoCarrier,'delivery-input','checks.json'),checksBytes);
   await writeFile(join(isoCarrier,'delivery-input','inputs.json'),JSON.stringify(inputs,null,2)+'\n');
+  await writeFile(join(isoCarrier,'scripts','footer-ink-receipt.mjs'),newFooterNotice?git(viewerSource,['show',`${viewerRevision}:scripts/native-release-carrier/footer-ink-receipt.mjs`],true):await readFile(join(templates,'footer-ink-receipt.mjs')));
+  if(newFooterNotice)for(const name of ['footer-ink-probe.swift','footer-ink-probe.mjs'])
+    await writeFile(join(isoCarrier,'scripts',name),git(viewerSource,['show',`${viewerRevision}:scripts/native-release-carrier/${name}`],true));
   await cp(join(templates,'inputs.mjs'),join(isoCarrier,'scripts','score-viewer-carrier-inputs.mjs'));
   await cp(join(templates,'score-viewer-piano-release.mjs'),join(isoCarrier,'scripts','score-viewer-piano-release.mjs'));
   await cp(join(templates,'prepare-score-viewer.mjs'),join(isoCarrier,'scripts','prepare-score-viewer.mjs'));

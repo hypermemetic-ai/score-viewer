@@ -11,6 +11,8 @@ Viewer preparation currently locks all published hands before calculating finger
 - Prepare complete matching ISO pages and seats for changed hands, independently reimport the package, then install it with one library-pointer transaction. Failed or cancelled preparation retains the prior edition.
 - Keep prior packages, personal journals and practice history attached to their compatible editions. Carry corrections only through explicit owner/contact compatibility checks; never display old-hand layers on new-hand pages.
 - Use newly authored public musical fixtures for both keyboards and independent negative admission controls. Activate alternatives only after the reviewed ISO implementation and complete-page acceptance evidence are available.
+- Complete actual foreign-ink admission with bounded source-column annotation placement and conservative paired-curve fill coverage. A new, separately versioned Viewer footer policy uses an exact licensed face and independently verified glyph metrics; historical drawing and literal ISO page/seat/recipe bytes remain unchanged. Distribute and verify its complete notice in web and native recipients.
+- Require a source-bound isolated native WK font/ordinary-Worker probe before Mac packaging, with independent pinned-metric enclosure and recipient proof. Keep actual WebView2/WK compile/paint acceptance distinct from source and Chromium evidence.
 
 ## Capabilities
 

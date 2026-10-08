@@ -14,6 +14,6 @@ test('an independently frozen v1 edition cold-reads exact bytes while new reques
  assert.notEqual(await preparationRequestIdentity(p,'retain-imported',constraints),p.preparationIdentity!.requestSha256);
  const fresh=await ensurePianoReady({packageBytes:bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});
  assert.equal(fresh.status,'editable','message' in fresh?fresh.message:undefined);if(fresh.status!=='editable')return;
- assert.equal(fresh.package.preparationIdentity!.version,'viewer-piano-preparation-v2');assert.notDeepEqual(fresh.packageBytes,bytes);
+ assert.equal(fresh.package.preparationIdentity!.version,'viewer-piano-preparation-v3');assert.notDeepEqual(fresh.packageBytes,bytes);
  assert.deepEqual(fresh.package.pages,p.pages);assert.deepEqual(fresh.package.files['source-score.json'],p.files['source-score.json']);
 });

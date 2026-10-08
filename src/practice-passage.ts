@@ -1,3 +1,4 @@
+import {applyAnnotationInkPolicy,annotationInkPolicyFor} from './annotation-ink-policy';
 import type {ScorePackage,Seat} from './package';
 import type {PracticePlan} from './practice';
 import {fingeringCarriers} from './fingering-carriers';
@@ -37,7 +38,7 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  }
  if(!Number.isFinite(left)||!Number.isFinite(right)||right!<=left!)throw Error('Vector measure boundaries are unsupported.');
  const beat=system.querySelector<SVGLineElement>('.janko-beat-line')??system.querySelector<SVGLineElement>('.janko-barline')!;const top=Number(beat.getAttribute('y1'))-30,bottom=Number(beat.getAttribute('y2'))+32;
- const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`${left!} ${top} ${right!-left!} ${bottom-top}`);svg.setAttribute('preserveAspectRatio','xMidYMid meet');svg.dataset.practiceBar=String(bar+1);for(const resource of [...doc.documentElement.children].filter(el=>['style','defs'].includes(el.localName)))svg.append(document.importNode(resource,true));svg.append(document.importNode(system,true));const clone=svg.querySelector(`#system-${first.system+1}`)!;clone.removeAttribute('id');clone.querySelectorAll('.janko-measure-num,.janko-system-bracket').forEach(e=>e.remove());
+ const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`${left!} ${top} ${right!-left!} ${bottom-top}`);svg.setAttribute('preserveAspectRatio','xMidYMid meet');svg.dataset.practiceBar=String(bar+1);for(const resource of [...doc.documentElement.children].filter(el=>['style','defs'].includes(el.localName)))svg.append(document.importNode(resource,true));svg.append(document.importNode(system,true));applyAnnotationInkPolicy(svg,annotationInkPolicyFor(p));const clone=svg.querySelector(`#system-${first.system+1}`)!;clone.removeAttribute('id');clone.querySelectorAll('.janko-measure-num,.janko-system-bracket').forEach(e=>e.remove());
  // Give each authored separator one side. Ordinary/double/end rules belong
  // to the ending bar; start-repeat ink belongs to the following bar.
  const boundary=p.score.barlines?.find(rule=>rule.tick===plan.barTicks[bar]),ending=p.score.barlines?.find(rule=>rule.tick===plan.barTicks[bar+1]);

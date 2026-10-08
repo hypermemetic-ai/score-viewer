@@ -2,6 +2,7 @@ import {digitMetrics,type ScorePackage,type Seat} from './package';
 import type {FingerPresentation} from './input';
 import {fingeringCarriers,type FingerCarrier} from './fingering-carriers';
 import {actualPageObstacles,boxesOverlap,type AnnotationBox} from './svg-annotation-clearance';
+import {annotationInkPolicyFor,assertAnnotationInkPolicyReady} from './annotation-ink-policy';
 
 /** Page-coordinate overlay constants, shared by reader and practice. */
 export const ANNOTATION_SIZE_RATIO=.68;
@@ -31,12 +32,13 @@ export function affiliatedAnnotationPosition(input:{x:number;top:number;directio
 }
 /** Reserve all 1–5 outlines beyond the frozen carrier. Shared stems form one
  * pitch-ordered vertical stack; changing a finger changes only its value. */
-export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|'annotationGeometry'>):Map<string,AnnotationPosition>{
+export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|'annotationGeometry'|'calculatedHandReceipt'>):Map<string,AnnotationPosition>{
+ const inkPolicy=annotationInkPolicyFor(p);if(inkPolicy)assertAnnotationInkPolicyReady(inkPolicy);
  const saved=cache.get(p);if(saved)return saved;
  const metric=[Math.min(...Object.values(digitMetrics).map(m=>m[0])),Math.min(...Object.values(digitMetrics).map(m=>m[1])),Math.max(...Object.values(digitMetrics).map(m=>m[2])),Math.max(...Object.values(digitMetrics).map(m=>m[3]))];
  const carriers=fingeringCarriers(p),notes=new Map(p.score.notes.map(n=>[n.id,n])),groups=new Map<string,Seat[]>(),positions=new Map<string,AnnotationPosition>();
  const geometry=p.annotationGeometry,owned=new Map(geometry?.seats.map(s=>[s.seatId,s])),box=(b:{x0:number;y0:number;x1:number;y1:number}):AnnotationBox=>[b.x0,b.y0,b.x1,b.y1],
-  obstacles=geometry?p.pages.map((svg,page)=>actualPageObstacles(svg,new Map(geometry.seats.filter(s=>s.page===page).map(s=>[s.seatId,box(s.headBounds)])))):undefined;
+  obstacles=geometry?p.pages.map((svg,page)=>actualPageObstacles(svg,new Map(geometry.seats.filter(s=>s.page===page).map(s=>[s.seatId,box(s.headBounds)])),annotationInkPolicyFor(p))):undefined;
  if(geometry&&(geometry.version!=='annotation-carrier-geometry-v1'||geometry.coverage!=='owned-head-and-duration'||
   geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length))throw Error('Calculated annotation ownership differs from the admitted presentation.');
  const pitch=(seat:Seat)=>{const n=notes.get(seat.ownerIds[0])!;return n.pitch.octave*12+n.pitch.pitchClass;};
