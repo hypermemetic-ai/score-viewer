@@ -1,0 +1,92 @@
+{
+  "files": {
+    "LICENSE": {
+      "sha256": "21b2105196b4e6a769cebc2534f66852c8efad3e28dbd3bbd1cc3058fba89e7d",
+      "size": 1359
+    },
+    "external/abseil-cpp/LICENSE": {
+      "sha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747",
+      "size": 11361
+    },
+    "external/atomic_queue/LICENSE": {
+      "sha256": "22e4fce4f072000d810546875f26ad1e8b23fcb942fe0a00c85602eb3626c1bb",
+      "size": 1073
+    },
+    "external/cephes/LICENSE.txt": {
+      "sha256": "156ed8eca4810889c1f1e4462a9aa2c7a688a75c0d4f0aa25156a3b9f0349bc2",
+      "size": 5544
+    },
+    "external/filesystem/LICENSE": {
+      "sha256": "1b265537c97cfb422ffb52492c96979943f54fab8746a6dd38d8329953d487cc",
+      "size": 1086
+    },
+    "external/jsl/LICENSE.md": {
+      "sha256": "7e8834a6413a473b201094d5ba144239fcc81bd8ca4ddc3ee0c730c395ded5a4",
+      "size": 1340
+    },
+    "external/simde/COPYING": {
+      "sha256": "75ce0a8c5a7bff42fbd6f8f3b469b518132132c4f4948fb8d02b1ccb5d0df9d8",
+      "size": 1077
+    },
+    "external/st_audiofile/LICENSE.md": {
+      "sha256": "0fb00d84b851152e598191116d6d356bd27b1effec32d911da692cbd554b0a4a",
+      "size": 1331
+    },
+    "external/st_audiofile/thirdparty/dr_libs/LICENSE": {
+      "sha256": "dd1c647e6f767f8ff4b2dfae0fed314726600a01e0cf1ef556afddd5fa96ff15",
+      "size": 2598
+    },
+    "external/st_audiofile/thirdparty/libaiff/LICENSE": {
+      "sha256": "63a62518774fcd5deef1a0ca27bd0d8a4f43d48fb419b4551caa9937ea3d92ff",
+      "size": 1149
+    },
+    "external/st_audiofile/thirdparty/stb_vorbis/LICENSE": {
+      "sha256": "bebfe904b14301657e4e5d655c811d51fd31b97c455b9cc2d8600d6bac6cff63",
+      "size": 2510
+    },
+    "external/st_audiofile/thirdparty/wavpack/COPYING": {
+      "sha256": "275d65ec11a78d552d078b9c26d950e3075892bca895a415ceaaec33bcfabff9",
+      "size": 1557
+    },
+    "external/st_audiofile/thirdparty/wavpack/license.txt": {
+      "sha256": "275d65ec11a78d552d078b9c26d950e3075892bca895a415ceaaec33bcfabff9",
+      "size": 1557
+    },
+    "provenance.json": {
+      "sha256": "13225ac7fc22d32c75403235516b61d795d7dde09065c9c5945826625950627e",
+      "size": 409148
+    },
+    "src/external/cpuid/LICENSE.rst": {
+      "sha256": "5ea2b3becf410c4bdb31e9db37a1b2bc095a41bc9bb142a0b0e345b3410a1914",
+      "size": 1621
+    },
+    "src/external/cpuid/platform/LICENSE.rst": {
+      "sha256": "34e16d722bd20205ce7c8828605497fb19c0237ff4539b402048e2435d65e0ce",
+      "size": 1630
+    },
+    "src/external/hiir/license.txt": {
+      "sha256": "a7dea6b02c25b101ca92d21fb23a0a752e02b62cdc52c965bdb50b223c49e881",
+      "size": 500
+    },
+    "src/external/kiss_fft/COPYING": {
+      "sha256": "ddd1400f963747b305bfa39e21206e58805a1c650451e2ee5ce81ed86bc0b1ab",
+      "size": 1475
+    },
+    "src/external/pugixml/LICENSE.md": {
+      "sha256": "206f671b6d342557adcc973088c2c638df0ec0b1dabbcd24e65aadd2191778d2",
+      "size": 1079
+    },
+    "src/external/spline/LICENSE": {
+      "sha256": "42bcd5d7a5f2ef962a5a32996d245cfb6525704f285bd1c6e94fe55f9433afb4",
+      "size": 1513
+    },
+    "src/external/tunings/LICENSE.md": {
+      "sha256": "ee3bd73591efbb9272e28d066fc430790a1e9eeb75b6658864f4377fe79dc558",
+      "size": 1059
+    }
+  },
+  "name": "Dusk-Fizz/sfizz",
+  "revision": "f3ac7c0ae830104ae3bc8979dc2ed9fff939a926",
+  "schema": 1,
+  "version": "1.2.3"
+}
