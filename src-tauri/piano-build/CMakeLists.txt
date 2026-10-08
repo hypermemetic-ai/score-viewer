@@ -14,6 +14,7 @@ set(WAVPACK_ENABLE_ASM OFF CACHE BOOL "" FORCE)
 # private build copy so compilation never mutates the verified source closure.
 file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/vendor/sfizz")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/sfizz" DESTINATION "${CMAKE_BINARY_DIR}/vendor")
+include("${CMAKE_CURRENT_SOURCE_DIR}/windows-utf8.cmake")
 add_subdirectory("${CMAKE_BINARY_DIR}/vendor/sfizz" sfizz-build EXCLUDE_FROM_ALL)
 
 # sfizz normally selects /MT. Rust's ordinary Windows target uses /MD; keep

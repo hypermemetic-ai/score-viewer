@@ -255,13 +255,18 @@ mod tests {
                     as i16;
                 wav.extend_from_slice(&v.to_le_bytes());
             }
-            fs::write(dir.join("note.wav"), wav).unwrap();
+            fs::write(dir.join("note 音.wav"), wav).unwrap();
             fs::write(
-                dir.join("test.sfz"),
-                "<region> sample=note.wav key=60 ampeg_attack=0 ampeg_release=0.01",
+                dir.join("instrument 音.sfz"),
+                "<region> sample=note 音.wav key=60 ampeg_attack=0 ampeg_release=0.01",
             )
             .unwrap();
             Self(dir)
+        }
+        fn instrument(&self) -> std::path::PathBuf {
+            // The installer hands the host a canonical path. On Windows this
+            // includes the extended native prefix as well as Unicode names.
+            fs::canonicalize(self.0.join("instrument 音.sfz")).unwrap()
         }
     }
     impl Drop for Fixture {
@@ -273,7 +278,7 @@ mod tests {
     fn actual_decoder_offset_render_and_all_off() {
         let _owner = serial_lifecycle();
         let fixture = Fixture::new();
-        let mut engine = PianoEngine::new(&fixture.0.join("test.sfz"), 44100, 128).unwrap();
+        let mut engine = PianoEngine::new(&fixture.instrument(), 44100, 128).unwrap();
         let mut left = [0.0; 128];
         let mut right = [0.0; 128];
         assert!(engine.note_on(64, 60, 100));
@@ -290,7 +295,7 @@ mod tests {
     fn sustain_repedal_zero_velocity_and_teardown_on_worker() {
         let _owner = serial_lifecycle();
         let fixture = Fixture::new();
-        let path = fixture.0.join("test.sfz");
+        let path = fixture.instrument();
         for _ in 0..2 {
             let mut engine = PianoEngine::new(&path, 48000, 128).unwrap();
             std::thread::spawn(move || {
@@ -329,7 +334,7 @@ mod tests {
     fn rejects_bad_capacity_events_and_shapes_without_ffi_render() {
         let _owner = serial_lifecycle();
         let fixture = Fixture::new();
-        let path = fixture.0.join("test.sfz");
+        let path = fixture.instrument();
         assert!(PianoEngine::new(&path, 0, 128).is_err());
         assert!(PianoEngine::new(&path, 44100, 0).is_err());
         assert!(PianoEngine::new(&fixture.0.join("missing.sfz"), 44100, 128).is_err());
@@ -361,8 +366,8 @@ mod tests {
     fn panic_clears_authored_pedal_noise_and_releases_sustain() {
         let _owner = serial_lifecycle();
         let fixture = Fixture::new();
-        fs::write(fixture.0.join("test.sfz"), "<region> sample=note.wav key=60 ampeg_release=0.01\n<region> sample=note.wav on_locc64=0 on_hicc64=0").unwrap();
-        let mut engine = PianoEngine::new(&fixture.0.join("test.sfz"), 48000, 128).unwrap();
+        fs::write(fixture.0.join("instrument 音.sfz"), "<region> sample=note 音.wav key=60 ampeg_release=0.01\n<region> sample=note 音.wav on_locc64=0 on_hicc64=0").unwrap();
+        let mut engine = PianoEngine::new(&fixture.instrument(), 48000, 128).unwrap();
         let mut l = [0.0; 128];
         let mut r = [0.0; 128];
         engine.cc(0, 64, 127);

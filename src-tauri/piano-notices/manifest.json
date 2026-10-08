@@ -1,5 +1,10 @@
 {
   "files": {
+    "BUILD-MODIFICATIONS.md": {
+      "sha256": "3059e299a982830f86fd78e37b6f53e80a90e43fd2841d8ac93bf76e247f44c1",
+      "size": 1972,
+      "sourcePath": "piano-build/WINDOWS-UTF8-COMPATIBILITY.md"
+    },
     "LICENSE": {
       "sha256": "21b2105196b4e6a769cebc2534f66852c8efad3e28dbd3bbd1cc3058fba89e7d",
       "size": 1359

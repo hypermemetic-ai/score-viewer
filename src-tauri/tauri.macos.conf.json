@@ -13,6 +13,7 @@
       "../licenses/URW-base35-COPYING": "notices/URW-base35-COPYING",
       "../licenses/OFL-Bravura.txt": "notices/OFL-Bravura.txt",
       "piano-notices/manifest.json": "notices/piano/manifest.json",
+      "piano-notices/BUILD-MODIFICATIONS.md": "notices/piano/BUILD-MODIFICATIONS.md",
       "piano-notices/LICENSE": "notices/piano/LICENSE",
       "piano-notices/external/abseil-cpp/LICENSE": "notices/piano/external/abseil-cpp/LICENSE",
       "piano-notices/external/atomic_queue/LICENSE": "notices/piano/external/atomic_queue/LICENSE",

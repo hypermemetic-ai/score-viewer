@@ -17,6 +17,11 @@ for relative in sorted(paths):
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
     manifest["files"][relative] = {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+modifications = "BUILD-MODIFICATIONS.md"
+source_path = "piano-build/WINDOWS-UTF8-COMPATIBILITY.md"
+data = (native / source_path).read_bytes()
+(notice / modifications).write_bytes(data)
+manifest["files"][modifications] = {"size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "sourcePath": source_path}
 (notice / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
 (native / ".gitattributes").write_text("# Preserve exact upstream engine and notice bytes on every checkout.\nvendor/sfizz/** -text\npiano-notices/** -text\n")
 config = native / "tauri.macos.conf.json"
@@ -25,7 +30,7 @@ resources = value["bundle"]["resources"]
 for key in list(resources):
     if key.startswith("piano-notices/"):
         del resources[key]
-for relative in ["manifest.json"] + sorted(paths):
+for relative in ["manifest.json"] + sorted(paths + [modifications]):
     resources["piano-notices/" + relative] = "notices/piano/" + relative
 config.write_text(json.dumps(value, indent=2) + "\n")
-print(json.dumps({"notices": len(paths), "bytes": sum(p["size"] for p in manifest["files"].values())}))
+print(json.dumps({"notices": len(manifest["files"]), "bytes": sum(p["size"] for p in manifest["files"].values())}))

@@ -22,6 +22,10 @@ plugins, clients, tests, Faust regeneration or host-specific CPU flags. Optional
 WavPack assembly is disabled; the unchanged instrument uses PCM WAV. Every
 build works on a private copy because upstream generates source-directory
 headers. The final archive contains the built static dependency closure.
+Windows also selects the pinned ghc UTF-8 filesystem backend consistently in
+that copy; all three original header hashes and unique selectors are checked.
+The original vendor closure is unchanged. `WINDOWS-UTF8-COMPATIBILITY.md`
+records the versioned transform and is packaged as `BUILD-MODIFICATIONS.md`.
 
 Each Rust target has its own `OUT_DIR`. Mac targets explicitly select `arm64`
 or `x86_64` and deployment floor 13.3; the paired native build must validate both
