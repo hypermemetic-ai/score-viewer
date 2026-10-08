@@ -96,3 +96,23 @@ conflicting helper; Rust/C++ retain their matching static CRT and ordinary
 Tauri resource/ACL generation still runs through `try_build`. Other targets
 retain `tauri_build::build`. No dependency, workflow or vendor bytes changed.
 The revised combined native link/import/runtime checks remain required.
+
+Paired native run 37823532998 passed its Mac build/runtime checks but Windows
+failed before testing with MSBuild FileTracker FTK1011. Four actual tracking-log
+paths were 261, 262, 264, and 265 characters. The Windows source helper now uses
+`OUT_DIR/p` instead of `OUT_DIR/piano-build`, and CMake uses child binary
+directory `s` instead of `sfizz-build`. Other platform names are unchanged.
+These supported build-tree aliases preserve verified source copying, target
+isolation, CRT selection, two-job concurrency and normal dependency tracking;
+they do not introduce a global temporary root or disable FileTracker.
+
+At that CI root, the four observed paths become 241–245 characters. A path
+model of the admitted 51-archive cross-build closure predicts its longest
+tracking-log path at 253 characters (previously 273); the longest copied vendor
+source path becomes 233 (previously 243). This model is not a Visual Studio
+generated inventory or native qualification. One generated but unbuilt test
+utility target would remain at 262 characters and is outside `piano_bundle`'s
+admitted dependency closure. The native MSBuild retry remains the actual gate.
+Build-tree selection is documented by CMake's
+[command-line `-B` option](https://cmake.org/cmake/help/latest/manual/cmake.1.html)
+and [the `add_subdirectory` binary directory](https://cmake.org/cmake/help/latest/command/add_subdirectory.html).

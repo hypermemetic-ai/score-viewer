@@ -15,7 +15,13 @@ set(WAVPACK_ENABLE_ASM OFF CACHE BOOL "" FORCE)
 file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/vendor/sfizz")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/sfizz" DESTINATION "${CMAKE_BINARY_DIR}/vendor")
 include("${CMAKE_CURRENT_SOURCE_DIR}/windows-utf8.cmake")
-add_subdirectory("${CMAKE_BINARY_DIR}/vendor/sfizz" sfizz-build EXCLUDE_FROM_ALL)
+# Preserve normal tracking with shorter Windows generated project paths.
+if(WIN32)
+  set(engine_binary_dir s)
+else()
+  set(engine_binary_dir sfizz-build)
+endif()
+add_subdirectory("${CMAKE_BINARY_DIR}/vendor/sfizz" "${engine_binary_dir}" EXCLUDE_FROM_ALL)
 
 # sfizz normally selects /MT. Rust's ordinary Windows target uses /MD; keep
 # every C++ archive on that same CRT. A crt-static Rust build explicitly uses /MT.
