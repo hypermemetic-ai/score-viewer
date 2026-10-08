@@ -26,14 +26,18 @@ export function beatUnitSvg(beat:ReferencePerformanceTempo['beat']):string {
   halfWidth:d.base>=192?HOLLOW_STEM_WHOLE_WIDTH:HOLLOW_STEM_HALF_WIDTH,width:HOLLOW_STEM_STROKE,
   value:d.base>=192?'whole':'half'}).replace('fill="#FFFFFF" stroke="#111111"','fill="#111" stroke="currentColor"'):
   `<line class="janko-stem" x1="${x}" y1="${stemStart}" x2="${x}" y2="${stemTop}" stroke-width=".9"/>`];
- const flags=d.base<=24?Math.log2(48/d.base):0;
- if(flags){const g=URTEXT_FLAGS_UP[flags-1],p=(q:readonly [number,number])=>`${(x+q[0]).toFixed(2)} ${(stemTop+q[1]).toFixed(2)}`,path=g.contours.map(c=>`M ${p(c.start)} ${c.segments.map(([a,b,e])=>`C ${p(a)} ${p(b)} ${p(e)}`).join(' ')} Z`).join(' ');parts.push(`<path class="janko-flag" d="${path}" fill-rule="evenodd"/>`);}
+ // Reserve the owning head, source flag bounds and dots, rather than a wide
+ // empty viewport. The vertical frame and all musical ink stay unchanged.
+ const flags=d.base<=24?Math.log2(48/d.base):0;let right=10;
+ if(flags){const g=URTEXT_FLAGS_UP[flags-1],p=(q:readonly [number,number])=>`${(x+q[0]).toFixed(2)} ${(stemTop+q[1]).toFixed(2)}`,path=g.contours.map(c=>`M ${p(c.start)} ${c.segments.map(([a,b,e])=>`C ${p(a)} ${p(b)} ${p(e)}`).join(' ')} Z`).join(' ');parts.push(`<path class="janko-flag" d="${path}" fill-rule="evenodd"/>`);right=Math.max(right,x+g.bbox[2]);}
  for(let i=0;i<d.dots;i++)parts.push(`<circle class="janko-augmentation-dot" cx="${x+4+i*2.7}" cy="${y-2}" r=".75"/>`);
  parts.push(`<text class="janko-digit" x="${x}" y="${baseline.toFixed(2)}" font-weight="700" font-size="5.8pt">n</text>`);
- return `<svg class="metronome-unit" viewBox="0 0 20 27" aria-hidden="true" focusable="false">${parts.join('')}</svg>`;
+ if(d.dots)right=Math.max(right,x+4+(d.dots-1)*2.7+.75);
+ const width=Number((right+2).toFixed(3));
+ return `<svg class="metronome-unit" width="${width}" height="27" viewBox="0 0 ${width} 27" aria-hidden="true" focusable="false">${parts.join('')}</svg>`;
 }
 export function metronomeMark(tempo:ReferencePerformanceTempo,bpm=tempo.bpm):string {
- return `<span class="metronome-mark" aria-label="${tempoRateLabel(tempo.beat,bpm)}" data-beat="${tempo.beat.numerator}/${tempo.beat.denominator}"><span aria-hidden="true">${tempoRateNumber(bpm)}</span>${beatUnitSvg(tempo.beat)}<span aria-hidden="true">per minute</span></span>`;
+ return `<span class="metronome-mark" aria-label="${tempoRateLabel(tempo.beat,bpm)}" data-beat="${tempo.beat.numerator}/${tempo.beat.denominator}"><span aria-hidden="true">${tempoRateNumber(bpm)}</span>${beatUnitSvg(tempo.beat)}<span aria-hidden="true">/min</span></span>`;
 }
 /** Display rounding does not alter the stored rational-unit performance clock. */
 export function tempoRateNumber(bpm:number):string {

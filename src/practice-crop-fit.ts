@@ -12,11 +12,9 @@ export function tightenSourceCrop(svg:SVGSVGElement){
  if(!ys.length)return;const top=Math.min(...ys)-2,bottom=Math.max(...ys)+2;
  svg.setAttribute('viewBox',`${box.x} ${top} ${box.width} ${bottom-top}`);
 }
-/** Keep all original leaf bars visible together; use two rows only below a readable scale. */
+/** One complete passage frame, fitted without independent crop scales/rows. */
 export function fitLeafPreview(root:HTMLElement){
- const svgs=[...root.querySelectorAll<SVGSVGElement>('svg')];if(!svgs.length)return;
- svgs.forEach(tightenSourceCrop);const width=root.clientWidth,sum=svgs.reduce((n,s)=>n+s.viewBox.baseVal.width,0),rows=width/sum<.65&&svgs.length>2?2:1;
- root.dataset.rows=String(rows);root.style.gridTemplateColumns=rows===1?svgs.map(s=>`${s.viewBox.baseVal.width}fr`).join(' '):'repeat(2,minmax(0,1fr))';
- const h=Math.max(...svgs.map(s=>s.viewBox.baseVal.height)),scale=Math.min(2,(width-(rows===1?svgs.length-1:1)*4)/(rows===1?sum:Math.max(...svgs.map(s=>s.viewBox.baseVal.width))*2));
- for(const svg of svgs){(svg.parentElement as HTMLElement).style.height=`${h*scale+18}px`;svg.style.height=`${h*scale}px`;}
+ const svg=root.querySelector<SVGSVGElement>(':scope > svg');if(!svg)return;
+ const logicalTop=(el:HTMLElement)=>{let top=0;for(let node:HTMLElement|null=el;node;node=node.offsetParent as HTMLElement|null)top+=node.offsetTop;return top;};
+ const box=svg.viewBox.baseVal,overview=root.closest<HTMLElement>('.practice-overview'),available=overview?Math.max(80,overview.clientHeight-(logicalTop(root)-logicalTop(overview))-12):Infinity,style=getComputedStyle(root),width=Math.max(1,root.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),scale=Math.min(width/box.width,available/box.height);root.dataset.rows='1';svg.style.width=`${box.width*scale}px`;svg.style.height=`${box.height*scale}px`;
 }
