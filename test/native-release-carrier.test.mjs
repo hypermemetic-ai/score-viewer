@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createCarrier} from '../scripts/create-native-release-carrier.mjs';
-import {canonical, inventory, sha256, sourceIdentity, validateCarrierInputs, validatePreparedCarrier} from '../scripts/native-release-carrier/inputs.mjs';
+import {canonical, inventory, sha256, sourceIdentity, validateCarrierInputs, validatePreparedCarrier, validateRecipientCarrier} from '../scripts/native-release-carrier/inputs.mjs';
 
 function git(root, ...args) {return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();}
 async function file(root, path, bytes) {await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),bytes);}
@@ -14,7 +14,7 @@ async function fixture() {
   const root=await mkdtemp(join(tmpdir(),'score-viewer-carrier-test-')),iso=join(root,'iso'),viewer=join(root,'viewer'),frontend=join(root,'frontend'),checks=join(root,'checks.json');
   for(const path of [iso,viewer,frontend])await mkdir(path);
   git(iso,'init','-q');git(viewer,'init','-q');
-  await file(iso,'scripts/score-viewer-delivery.mjs',"import {brotliDecompressSync} from 'node:zlib';\nexport function validateIdentity(identity) {}\nfunction prepared() {\n  validateIdentity(manifest.identity);\n  return {sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score};\n}\n");
+  await file(iso,'scripts/score-viewer-delivery.mjs',"import {brotliDecompressSync} from 'node:zlib';\nexport function validateIdentity(identity) {}\nfunction prepared() {\n  validateIdentity(manifest.identity);\n  const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';\n    const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];\n  return {sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score};\n}\n");
   await file(iso,'scripts/score-viewer-native-worker.mjs',"import {performance} from 'node:perf_hooks';\nasync function input() {\n  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n}\n");
   await file(iso,'licenses/NOTICE.txt','Shared notice\n');
   await file(iso,'score-viewer/src-tauri/old.rs','old native fixture\n');
@@ -115,4 +115,17 @@ test('prepared payload verification binds original frontend, review receipt and 
   await file(prepared,'source-checks.json',JSON.stringify({...f.receipt,checks:{}}));
   await assert.rejects(validatePreparedCarrier(prepared,{sourceInputs}),/reviewed checks differ/);
   assert.equal(sourceIdentity(inputs,await readFile(join(prepared,'source-inputs.json'))).viewerRevision,f.viewerRevision);
+}));
+
+test('both recipient archives must carry byte-exact source and validation evidence',async()=>withFixture(async f=>{
+  await createCarrier(args(f));
+  const prepared=join(f.root,'prepared');await mkdir(prepared);
+  await cp(join(f.iso,'delivery-input','inputs.json'),join(prepared,'source-inputs.json'));
+  await cp(join(f.iso,'delivery-input','checks.json'),join(prepared,'source-checks.json'));
+  await file(prepared,'frontend/release-identity.json','{"fixture":"embedded identity"}\n');
+  const files={};
+  for(const [recipient,path]of [['Source-provenance.json','source-inputs.json'],['Source-validation.json','source-checks.json'],['Release-identity.json','frontend/release-identity.json']])files[recipient]=await readFile(join(prepared,path));
+  await validateRecipientCarrier(files,prepared);
+  await assert.rejects(validateRecipientCarrier({...files,'Source-validation.json':Buffer.from('false review')},prepared),/Recipient source evidence differs/);
+  await assert.rejects(validateRecipientCarrier({...files,'Release-identity.json':undefined},prepared),/Recipient source evidence differs/);
 }));

@@ -59,6 +59,12 @@ export async function validatePreparedCarrier(prepared, identity) {
   if (sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Prepared reviewed checks differ');
   validateRecordedChecks(JSON.parse(checksBytes), inputs);
 }
+export async function validateRecipientCarrier(files, prepared) {
+  for (const [recipient, original] of [['Source-provenance.json', 'source-inputs.json'], ['Source-validation.json', 'source-checks.json'], ['Release-identity.json', 'frontend/release-identity.json']]) {
+    const expected = await readFile(join(prepared, original));
+    if (!files[recipient] || !Buffer.from(files[recipient]).equals(expected)) fail(`Recipient source evidence differs: ${recipient}`);
+  }
+}
 export async function validateCarrierInputs(source, {expectedViewerRevision, expectedNotationRevision} = {}) {
   const bytes = await readFile(join(source, 'delivery-input', 'inputs.json')), inputs = JSON.parse(bytes);
   if (inputs.schema !== 1 || inputs.viewer?.repository !== 'hypermemetic-ai/score-viewer' || !revision(inputs.viewer.revision) || !revision(inputs.viewer.tree) || !Number.isFinite(Date.parse(inputs.viewer.timestamp)) || inputs.notation?.repository !== 'hypermemetic-ai/iso-notation' || !revision(inputs.notation.revision)) fail('Invalid reviewed carrier inputs');
