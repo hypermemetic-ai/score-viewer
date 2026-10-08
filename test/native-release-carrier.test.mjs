@@ -16,8 +16,8 @@ async function fixture() {
   for(const path of [iso,viewer,frontend])await mkdir(path);
   git(iso,'init','-q');git(viewer,'init','-q');
   await file(iso,'scripts/score-viewer-delivery.mjs',"import {brotliDecompressSync} from 'node:zlib';\nexport function validateIdentity(identity) {}\nfunction prepared() {\n  validateIdentity(manifest.identity);\n  const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';\n    const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];\n  if(receipt.nativeChecks?.tests!=='passed')throw Error('worker');\n    if(receipt.nativeChecks?.tests!=='passed')throw Error('pair');\n  return {sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score};\n}\n");
-  await file(iso,'scripts/score-viewer-native-worker.mjs',"import {performance} from 'node:perf_hooks';\nasync function input() {\n  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n}\nexport async function notices(source,viewer,packet,targetTriple) {\n  await writeJson(join(packet,'native-dependencies.json'),{manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))});\n}\nasync function finishWorker() {\n  const hashes=await inventory(packet);\n}\n");
-  await file(iso,'scripts/build-score-viewer-macos.mjs',"import {performance} from 'node:perf_hooks';\nawait ctx.stage('nativeBuildMs',()=>run());\nconst bundledNoticeHashes={};\n");
+  await file(iso,'scripts/score-viewer-native-worker.mjs',"import {performance} from 'node:perf_hooks';\nasync function input() {\n  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n}\nexport async function notices(source,viewer,packet,targetTriple) {\n  const names=['URW-base35-provenance.md','URW-base35-LICENSE','URW-base35-COPYING','OFL-Bravura.txt'];\n  await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'}});\n  await writeJson(join(packet,'native-dependencies.json'),{manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))});\n}\nasync function finishWorker() {\n  const hashes=await inventory(packet);\n}\n");
+  await file(iso,'scripts/build-score-viewer-macos.mjs',"import {performance} from 'node:perf_hooks';\nconst packet = await mkdtemp(join(tmpdir(),'iso-mac-recipient-'));\nawait ctx.stage('nativeBuildMs',()=>run());\nconst bundledNoticeHashes={};\nconst noticeNames=['URW-base35-provenance.md','URW-base35-LICENSE','URW-base35-COPYING','OFL-Bravura.txt'];\nawait finishWorker(ctx,'macos-universal',packet,binary,\n  {tests:'passed',virtualMidi:'passed',signatures:'passed',resources:'passed'});\n");
   await file(iso,'licenses/NOTICE.txt','Shared notice\n');
   await file(iso,'score-viewer/src-tauri/old.rs','old native fixture\n');
   await file(iso,'.gitignore','score-viewer/dist\n');
@@ -158,6 +158,7 @@ test('both recipient archives must carry byte-exact source and validation eviden
   await file(prepared,'frontend/release-identity.json','{"fixture":"embedded identity"}\n');
   const files={};
   for(const [recipient,path]of [['Source-provenance.json','source-inputs.json'],['Source-validation.json','source-checks.json'],['Release-identity.json','frontend/release-identity.json']])files[recipient]=await readFile(join(prepared,path));
+  files['notices/NOTICE.txt']=await readFile(join(f.iso,'licenses/NOTICE.txt'));
   await validateRecipientCarrier(files,prepared);
   await assert.rejects(validateRecipientCarrier({...files,'Source-validation.json':Buffer.from('false review')},prepared),/Recipient source evidence differs/);
   await assert.rejects(validateRecipientCarrier({...files,'Release-identity.json':undefined},prepared),/Recipient source evidence differs/);
@@ -355,4 +356,46 @@ test('both packages and Mac app resources must carry original curated notices an
   requirePianoWorkerChecks(windows,inputs.nativeFiles,{'iso-score-viewer.exe':binary});
   assert.throws(()=>requirePianoWorkerChecks({...windows,details:{}},inputs.nativeFiles,{'iso-score-viewer.exe':binary}),/import receipt differs/);
   assert.throws(()=>validatePianoRecipient({...files,'iso-score-viewer.exe':peImport('MSVCP140.dll')},inputs.nativeFiles),/VC runtime DLL prerequisite/);
+}));
+
+test('new exact footer notice is additive, emitted, copied to recipients and included in the generated Mac resource map',async()=>withFixture(async f=>{
+ const name='LiberationSerif-Italic-NOTICE.txt',notice=await readFile(new URL('../licenses/'+name,import.meta.url)),font=await readFile(new URL('../src/LiberationSerif-Italic.ttf',import.meta.url));
+ await file(f.viewer,'licenses/'+name,notice);await file(f.frontend,'assets/'+name,notice);await file(f.frontend,'assets/footer.ttf',font);
+ const policy=await readFile(new URL('../src/footer-ink-policy.json',import.meta.url)),fixture=await readFile(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url));
+ await file(f.viewer,'src/footer-font-data.ts',await readFile(new URL('../src/footer-font-data.ts',import.meta.url)));await file(f.viewer,'src/footer-ink-policy.json',policy);await file(f.viewer,'fixtures/authored-calculated-preparation-v2.isoscore',fixture);
+ await file(f.frontend,'footer-ink-probe.html','<script type=module src=assets/probe.js></script>');await file(f.frontend,'assets/public.isoscore',fixture);
+ for(const helper of ['footer-ink-probe.swift','footer-ink-probe.mjs','footer-ink-receipt.mjs'])await file(f.viewer,'scripts/native-release-carrier/'+helper,await readFile(new URL('../scripts/native-release-carrier/'+helper,import.meta.url)));
+ await bindViewer(f);f.receipt.frontendDigest=sha256(canonical(await inventory(f.frontend)));await writeFile(f.checks,JSON.stringify(f.receipt,null,2)+'\n');
+ const nativeBefore=await inventory(join(f.viewer,'src-tauri')),oldNotice=await readFile(join(f.iso,'licenses/NOTICE.txt'));
+ await createCarrier(args(f));const {inputs}=await validateCarrierInputs(f.iso);
+ assert.deepEqual(await inventory(join(f.iso,'score-viewer/src-tauri')),nativeBefore);assert.deepEqual(await readFile(join(f.iso,'licenses/NOTICE.txt')),oldNotice);
+ assert.deepEqual(await readFile(join(f.iso,'licenses/'+name)),notice);assert.deepEqual(await readFile(join(f.iso,'score-viewer/licenses/'+name)),notice);
+ assert.deepEqual(inputs.nativeFiles['licenses/'+name],{sha256:sha256(notice),size:notice.length});
+ await commit(f.iso);const windows=join(f.root,'windows-new-footer-checkout');
+ git(f.root,'clone','-q','--no-hardlinks','--config','core.autocrlf=true',f.iso,windows);
+ const windowsReadback=await validateCarrierInputs(windows);assert.deepEqual(windowsReadback.inputs.runtimeFontProbe,inputs.runtimeFontProbe);
+ for(const path of Object.keys(inputs.runtimeFontProbe.files))assert.deepEqual(await readFile(join(windows,path)),await readFile(join(f.iso,path)),'source-bound helper survives actual Windows-style checkout: '+path);
+ assert.equal(git(windows,'status','--porcelain'),'');
+ const worker=await readFile(join(f.iso,'scripts/score-viewer-native-worker.mjs'),'utf8'),mac=await readFile(join(f.iso,'scripts/build-score-viewer-macos.mjs'),'utf8');
+ assert.ok(mac.indexOf('const footerInk=await runFooterInkProbe')<mac.indexOf("ctx.stage('nativeBuildMs'"),'actual font proof runs before expensive native build');
+ assert.ok(worker.includes("'../licenses/"+name+"':'notices/"+name+"'"));assert.ok(mac.includes(",'"+name+"']"));assert.ok(worker.includes(",'"+name+"']"));
+ const prepared=join(f.root,'prepared');await mkdir(prepared);await cp(join(f.iso,'delivery-input/inputs.json'),join(prepared,'source-inputs.json'));
+ await cp(f.checks,join(prepared,'source-checks.json'));await file(prepared,'frontend/release-identity.json','{}');
+ const files={'Source-provenance.json':await readFile(join(prepared,'source-inputs.json')),'Source-validation.json':await readFile(f.checks),
+  'Release-identity.json':Buffer.from('{}'),'notices/NOTICE.txt':oldNotice,['notices/'+name]:notice};
+ await validateRecipientCarrier(files,prepared);
+ for(const bytes of [undefined,Buffer.from('incomplete OFL')])await assert.rejects(validateRecipientCarrier({...files,['notices/'+name]:bytes},prepared),/font notice differs/);
+ const bundled={...files,'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer':Buffer.from('fixture binary'),
+  'ISO Score Viewer.app/Contents/Resources/notices/NOTICE.txt':oldNotice,['ISO Score Viewer.app/Contents/Resources/notices/'+name]:notice};
+ await assert.rejects(validateRecipientCarrier(bundled,prepared),/runtime receipt missing/);
+ for(const leaf of ['NOTICE.txt',name])for(const bytes of [undefined,Buffer.from('tampered app resource')])
+  await assert.rejects(validateRecipientCarrier({...bundled,['ISO Score Viewer.app/Contents/Resources/notices/'+leaf]:bytes},prepared),/Mac app font notice differs/);
+}));
+test('a pre-existing conflicting root footer notice refuses before carrier writes',async()=>withFixture(async f=>{
+ const name='LiberationSerif-Italic-NOTICE.txt';await file(f.viewer,'licenses/'+name,'Reviewed notice');await bindViewer(f);
+ await file(f.iso,'licenses/'+name,'Other notice');await commit(f.iso);
+ // The ISO notation pin must represent that immutable original root state.
+ f.notationRevision=git(f.iso,'rev-parse','HEAD');git(f.viewer,'update-index','--cacheinfo',`160000,${f.notationRevision},vendor/iso-notation`);
+ await file(f.viewer,'docs/source-provenance.json',JSON.stringify({dependencyRevision:f.notationRevision}));await bindViewer(f);f.receipt.notationRevision=f.notationRevision;await writeFile(f.checks,JSON.stringify(f.receipt));
+ await assert.rejects(createCarrier(args(f)),/notice conflict/);assert.equal(git(f.iso,'status','--porcelain'),'');
 }));

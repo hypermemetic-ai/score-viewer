@@ -87,7 +87,7 @@ export async function packagePianoPresentation(p:ScorePackage,next:PianoPresenta
     if(!next.preparationRequest)throw Error('Calculated edition requires independently identified request policy.');
     const candidate:ScorePackage={...prior,manifest:m,score:JSON.parse(next.score),seats:JSON.parse(next.seats),pages:next.pages,
       keyboardLayout:next.layoutId,profileId:selected.profileId,profileSha256:selected.profileSha256,effectiveHandSha256:selected.effectiveHandSha256,
-      sourceSha256:next.sourceSha256,sourceScore:prior.sourceScore??prior.score,fingerLayer:layer,renderingRecipe:next.recipe,calculationContext:selected.calculationContext??undefined};
+      calculatedHandReceipt:next.calculatedHandReceipt,sourceSha256:next.sourceSha256,sourceScore:prior.sourceScore??prior.score,fingerLayer:layer,renderingRecipe:next.recipe,calculationContext:selected.calculationContext??undefined};
     m.preparationIdentity=selected.preparationIdentity=await createPianoPreparationIdentity(candidate,next.preparationRequest.handPolicy,next.preparationRequest.maxExpansions);
     checked=await importPackage(archivePackage(m,files));
   }else if(next.preparationRequest){

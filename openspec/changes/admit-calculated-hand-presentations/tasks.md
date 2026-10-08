@@ -30,3 +30,12 @@
 - [x] 5.1 Run selected strict OpenSpec validation, complete required Viewer tests/build and Git checks under bounded resources; open a scoped PR with exact Viewer/ISO inputs and honest visual/native acceptance status.
 - [ ] 5.2 Resolve parent review and land the coordinated source change through the normal PR path; verify final branch/remote status and preserve unrelated checkout/services.
 - [ ] 5.3 Coordinate ordinary usable native activation at the actual existing delivery boundary, verify installed input identity and retained personal/practice state, and stop task-owned temporary processes; report any external delivery blocker instead of claiming activation.
+
+## 6. Reviewed actual-ink completion
+
+- [x] 6.1 Add the exact licensed footer face, reproducible finite-alphabet cmap/advance/outline metrics and new Viewer policy/receipt/request identity; prove historical V1/V2 hashes, drawing and journals remain unchanged.
+- [x] 6.2 Integrate independent asset/metric/load readiness and identical footer drawing/clearance rules in worker, cold reader and practice/crop consumers; verify affine/stroke/anchor coverage, unknown-feature refusal and pre-stage failure/cancellation.
+- [ ] 6.3 Emit the full face and accessible complete notice in web output, extend existing carrier notice/root/resource handling minimally, and independently verify actual recipient/resource notice bytes while preserving all prior native/config inputs and piano notices.
+- [x] 6.4 Verify both complete private saved-map and ordinary production-worker proposals through cold source/paint/annotation admission; inspect every actual Viewer page, affected continuations and retained edition/history flow without publishing private payloads.
+- [x] 6.5 Run required full checks and strict selected validation; deliver exact source/pin/asset/notice/browser receipts for parent review before fresh carrier selection and native activation.
+- [x] 6.6 Implement the bounded source-owned public production-Worker/mounted-SVG probe and isolated nonPersistent WK helper, require independently derived metric covers and source-bound native receipt in both worker and extracted pair, and verify adversarial receipt/timeout/closure controls. Record actual target compile/paint and custom-origin limits under the still-open native delivery gate.

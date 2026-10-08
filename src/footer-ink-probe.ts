@@ -1,0 +1,88 @@
+/** Public, isolated runtime acceptance entry. No main/Host/library boot. Uses
+ * the ORDINARY production worker and its independent receiving-realm reader. */
+import {runPianoReadiness} from './piano-readiness-job';
+import {importPackage,hashBytes} from './package';
+import {annotationPositions} from './fingering-presentation';
+import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady,annotationInkPolicyFor,applyAnnotationInkPolicy,assertAnnotationInkPolicyReady,footerStyle} from './annotation-ink-policy';
+import {actualPageObstacles,boxesOverlap} from './svg-annotation-clearance';
+import {identityHash} from './piano-preparation-identity';
+const fixtureUrl=new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url);
+const fixtureSha256='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1';
+const sourceCss='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';
+const primitive=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${sourceCss}</style><text class="janko-page-num" x="575" y="830">Page 2 of 3</text></svg>`;
+const require=(condition:unknown,message:string):void=>{if(!condition)throw Error(message);};
+function mount(literal:string,width=600):SVGSVGElement{
+ const host=document.createElement('div');host.innerHTML=literal;const svg=host.querySelector('svg')!;svg.style.width=width+'px';document.querySelector('#probe')!.append(host);return svg;
+}
+const snapshot=(svg:SVGSVGElement)=>{const el=svg.querySelector('text.janko-page-num') as SVGGraphicsElement,b=el.getBBox(),s=getComputedStyle(el);
+ return{literal:svg.outerHTML,bbox:[b.x,b.y,b.width,b.height],family:s.fontFamily,fontStyle:s.fontStyle,fontWeight:s.fontWeight,fontSize:s.fontSize,textAnchor:s.textAnchor};};
+function isolatedFooter(svg:SVGSVGElement,el:SVGGraphicsElement):SVGSVGElement{
+ const isolated=svg.cloneNode(false) as SVGSVGElement;for(const style of svg.querySelectorAll('style'))isolated.append(style.cloneNode(true));
+ let branch=el.cloneNode(true),parent=el.parentNode;while(parent!==svg){require(parent instanceof SVGElement,'Returned footer is outside its source SVG.');const shallow=parent!.cloneNode(false);shallow.appendChild(branch);branch=shallow;parent=parent!.parentNode;}isolated.append(branch);return isolated;
+}
+function sourceTransform(svg:SVGSVGElement,el:SVGGraphicsElement):number[]{
+ const chain:SVGGraphicsElement[]=[];let parent:Element|null=el;while(parent){chain.unshift(parent as SVGGraphicsElement);if(parent===svg)break;parent=parent.parentElement;}
+ require(chain[0]===svg,'Returned footer has no source SVG ancestry.');let a=[1,0,0,1,0,0];
+ for(const node of chain){const m=node.transform?.baseVal.consolidate()?.matrix;if(m){const b=[m.a,m.b,m.c,m.d,m.e,m.f];a=[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];}}
+ return a;
+}
+const boxCorners=(b:DOMRect,m:number[])=>[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]);
+const drawingRules=(el:Element)=>{const s=getComputedStyle(el);return{family:s.fontFamily,fontKerning:s.fontKerning,fontVariantLigatures:s.fontVariantLigatures,textRendering:s.textRendering,fontSize:s.fontSize,stroke:s.stroke,fontStyle:s.fontStyle,fontWeight:s.fontWeight,textAnchor:s.textAnchor};};
+async function run(){
+ const bytes=new Uint8Array(await(await fetch(fixtureUrl)).arrayBuffer());require(await hashBytes(bytes)===fixtureSha256,'Public fixture differs from frozen original.');
+ const original=await importPackage(bytes),policySha256=await identityHash(ANNOTATION_INK_POLICY),legacy=mount(primitive);
+ await document.fonts.ready;const before=snapshot(legacy);await ensureAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);await document.fonts.ready;
+ applyAnnotationInkPolicy(legacy,undefined);const after=snapshot(legacy);require(JSON.stringify(before)===JSON.stringify(after),'Registering the unique face changed actual historical drawing.');legacy.parentElement!.remove();
+ const workers=[];
+ for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),30_000);
+  let result;try{result=await runPianoReadiness({packageBytes:bytes,layout,maxExpansions:200_000,signal:abort.signal});}finally{clearTimeout(timer);}
+  require(result.status==='editable'||result.status==='ready','Real production worker/receiving cold reader failed: '+('message'in result?result.message:result.status));if(result.status!=='editable'&&result.status!=='ready')throw Error('Missing complete public output');
+  const p=result.package,positions=annotationPositions(p);require(p.preparationIdentity?.version==='viewer-piano-preparation-v3'&&p.calculatedHandReceipt?.version==='viewer-calculated-hand-edition-v2','Production identity/policy dispatch differs.');
+  require(JSON.stringify(annotationInkPolicyFor(p))===JSON.stringify(ANNOTATION_INK_POLICY),'Receiving realm admitted another policy.');
+  require(p.sourceSha256===original.sourceSha256&&p.score.notes.length===original.sourceScore!.notes.length&&positions.size===p.seats.length,'Public source/complete annotation coverage differs.');
+  let footers=0;const footerEnclosures=[];
+  for(const [page,literal]of p.pages.entries()){const svg=mount(literal),els=[...svg.querySelectorAll<SVGGraphicsElement>('text.janko-page-num')];require(els.length===1,'Actual returned page footer is missing or duplicated.');
+   const el=els[0],matrix=sourceTransform(svg,el),x=Number(el.getAttribute('x')),y=Number(el.getAttribute('y')),text=el.textContent!;
+   const isolated=isolatedFooter(svg,el);
+   const cover=actualPageObstacles(isolated.outerHTML,new Map(),ANNOTATION_INK_POLICY).boxes[0];applyAnnotationInkPolicy(svg,annotationInkPolicyFor(p));await document.fonts.ready;
+   const b=el.getBBox(),points=boxCorners(b,matrix),rules=drawingRules(el);require(points.every(([x,y])=>x>=cover[0]&&x<=cover[2]&&y>=cover[1]&&y<=cover[3]),'Actual returned-page footer escapes exact cell cover.');
+   require(rules.family.includes(ANNOTATION_INK_POLICY.footer.family)&&rules.textRendering==='geometricprecision','Actual new page footer did not adopt precise unique face.');
+   footerEnclosures.push({page,text,x,y,matrix,cover,points,rules,literalSha256:await hashBytes(new TextEncoder().encode(literal)),status:'passed'});footers++;svg.parentElement!.remove();}
+  workers.push({layout,status:result.status,sourceSha256:p.sourceSha256,owners:p.score.notes.length,seats:p.seats.length,annotations:positions.size,pages:p.pages.length,footers,footerEnclosures,
+   preparationVersion:p.preparationIdentity!.version,receiptVersion:p.calculatedHandReceipt!.version,policySha256:await identityHash(annotationInkPolicyFor(p)),outputArchiveSha256:await hashBytes(result.packageBytes),independentColdReader:true});
+ }
+ const mounted=[];
+ // Unrelated HTML and sibling SVG styles must never enter source style inventory.
+ const appStyle=document.createElement('style');appStyle.textContent='@font-face{font-family:UnrelatedProbe;src:local(serif)} body{color:black}';document.head.append(appStyle);
+ const sibling=mount('<svg xmlns="http://www.w3.org/2000/svg"><style>.janko-page-num{font-size:90pt}</style></svg>');
+ for(const zoom of [.3,1,2.7])for(const matrix of [[1,0,0,1,0,0],[-1,.2,.3,1,650,0],[1.3,-.2,.4,.8,2,4]]){
+  const svg=mount(primitive,600*zoom),el=svg.querySelector('text') as SVGGraphicsElement;el.setAttribute('transform',`matrix(${matrix.join(' ')})`);
+  const cover=actualPageObstacles(svg.outerHTML,new Map(),ANNOTATION_INK_POLICY).boxes[0];applyAnnotationInkPolicy(svg,ANNOTATION_INK_POLICY);await document.fonts.ready;
+  const b=el.getBBox(),points=boxCorners(b,matrix),s=getComputedStyle(el);
+  require(points.every(([x,y])=>x>=cover[0]&&x<=cover[2]&&y>=cover[1]&&y<=cover[3]),'Mounted exact-face glyph cell escapes independently derived cover.');
+  require(s.fontFamily.includes(ANNOTATION_INK_POLICY.footer.family)&&s.fontKerning==='none'&&s.fontVariantLigatures==='none'&&s.textRendering==='geometricprecision','Mounted actual precise shaping differs.');
+  mounted.push({zoom,matrix,cover,points,rules:drawingRules(el),status:'passed'});svg.parentElement!.remove();
+ }sibling.parentElement!.remove();appStyle.remove();
+ const cover=actualPageObstacles(primitive,new Map(),ANNOTATION_INK_POLICY).boxes[0],clearance={distantOverlap:boxesOverlap([35,808,40,812],cover),actualOverlap:boxesOverlap([530,823,538,829],cover)};
+ require(!clearance.distantOverlap&&clearance.actualOverlap,'Actual overlap or empty-air check differs.');
+ const fake={seats:[],score:{notes:[]},pages:[],calculatedHandReceipt:{version:'viewer-calculated-hand-edition-v2',annotationInkPolicy:ANNOTATION_INK_POLICY}} as any;annotationPositions(fake);
+ const face=new FontFace(ANNOTATION_INK_POLICY.footer.family,'local(serif)',{style:'italic',weight:'400'});document.fonts.add(face);
+ let cacheRefused=false,readinessRefused=false;try{try{annotationPositions(fake);}catch{cacheRefused=true;}try{assertAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);}catch{readinessRefused=true;}}finally{document.fonts.delete(face);}
+ require(cacheRefused&&readinessRefused,'Ambiguous-family cached/readiness admission did not refuse.');
+ const actualFace=[...document.fonts].find(f=>f.family.replace(/[\"']/g,'')===ANNOTATION_INK_POLICY.footer.family)!;require(actualFace,'Verified Window face unavailable before refusal control.');document.fonts.delete(actualFace);
+ let unavailableCacheRefused=false,unavailableReadinessRefused=false,workerStatus:string|undefined,unavailable;const unavailableAbort=new AbortController(),unavailableTimer=setTimeout(()=>unavailableAbort.abort(),30_000);
+ try{try{annotationPositions(fake);}catch{unavailableCacheRefused=true;}try{assertAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);}catch{unavailableReadinessRefused=true;}
+  unavailable=await runPianoReadiness({packageBytes:bytes,layout:'conventional-piano',maxExpansions:200_000,signal:unavailableAbort.signal},()=>{const worker=new Worker(new URL('./piano-readiness.worker.ts',import.meta.url),{type:'module'});worker.addEventListener('message',event=>{if(event.data.type==='complete')workerStatus=event.data.result.status;});return worker;});
+ }finally{clearTimeout(unavailableTimer);document.fonts.add(actualFace);}assertAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);
+ require(unavailableCacheRefused&&unavailableReadinessRefused&&unavailable.status==='unsupported'&&'retainedPackageBytes'in unavailable&&await hashBytes(unavailable.retainedPackageBytes)===fixtureSha256&&['ready','editable'].includes(workerStatus??''),'Unavailable receiving face did not independently refuse ordinary Worker output and retain input.');
+ const availability={cacheRefused:unavailableCacheRefused,readinessRefused:unavailableReadinessRefused,workerStatus,independentReaderStatus:unavailable.status,retainedSha256:fixtureSha256};
+ const controller=new AbortController();controller.abort();const cancelled=await runPianoReadiness({packageBytes:bytes,layout:'conventional-piano',signal:controller.signal});
+ require(cancelled.status==='cancelled'&&'retainedPackageBytes'in cancelled&&await hashBytes(cancelled.retainedPackageBytes)===fixtureSha256,'Cancelled worker did not retain original input.');
+ return{version:'viewer-native-footer-ink-probe-v1',status:'passed',nonce:new URL(location.href).searchParams.get('nonce'),fixtureSha256,policySha256,sourceSha256:original.sourceSha256,workers,mounted,
+  legacy:{before,after,status:'passed'},clearance,availability,ambiguity:{cacheRefused,readinessRefused},cancellation:{status:cancelled.status,retainedSha256:fixtureSha256},
+  platform:{userAgent:navigator.userAgent},limits:{hosting:'temporary loopback HTTP; not Tauri custom-origin/CSP',minimumOsAcceptance:false,physicalAcceptance:false}};
+}
+void run().then(result=>{(window as any).__viewerFooterInkProbe=result;(window as any).webkit?.messageHandlers?.footerInk?.postMessage(result);})
+ .catch(error=>{const result={version:'viewer-native-footer-ink-probe-v1',status:'failed',nonce:new URL(location.href).searchParams.get('nonce'),message:(error as Error).message};
+  (window as any).__viewerFooterInkProbe=result;(window as any).webkit?.messageHandlers?.footerInk?.postMessage(result);});

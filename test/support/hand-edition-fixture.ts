@@ -46,6 +46,24 @@ export function denseStudy():QuantizedGridScore{
   s.sourceSilences.push({voice:'melody',staff:'upper',hand:'RH',kind:'rest',startTick:shift,durationTicks:48,file:'viewer-dense-authored.musicxml',line:1,col:bar+1,bar:bar+1,occurrence:1});
  }return s;
 }
+/** Three/four independently authored written components cross two/three pages.
+ * The following attack transfers; the sounding held owner keeps its own hand. */
+export function completeTieBoundaryStudy(count:3|4,hand:Hand):QuantizedGridScore{
+ const s=transferStudy(),bars=count-1,end=bars*144,lastTick=end-96,other:Hand=hand==='LH'?'RH':'LH';
+ s.id=`viewer-authored-complete-tie-${count}-${hand}`;s.title='Complete written tie boundary study';
+ s.totalTicks=end;s.sourceBarTicks=Array.from({length:bars+1},(_,i)=>i*144);s.sourceSilences=[];
+ const note=(id:string,startTick:number,pitch:number,durationTicks:number,h:Hand,voice:string,group?:string)=>({id,startTick,durationTicks,hand:h,
+  pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},sourceProvenance:{voices:[voice],staves:[voice],hands:[h],unison:false},
+  sourceBeam:group?{group,noBeam:false}:{noBeam:true}});
+ s.notes=[note('written-hold',0,72,lastTick+24,hand,'held-voice'),note('following-attack',lastTick+24,65,24,other,'held-voice','ending'),
+  note('final-attack',lastTick+48,69,24,hand,'held-voice','ending'),
+  ...Array.from({length:bars*6},(_,i)=>note('accompaniment-'+i,i*24,36+i%3*2,24,other,'accompaniment','bass-'+Math.floor(i/6)))];
+ const values=[{startTick:0,durationTicks:144},...(count===4?[{startTick:144,durationTicks:144}]:[]),
+  {startTick:end-144,durationTicks:48},{startTick:lastTick,durationTicks:24}];
+ s.tieChains=[{noteId:'written-hold',voice:'held-voice',soundingTicks:lastTick+24,components:values.map((v,i)=>({...v,voice:'held-voice',
+  tieForward:i<values.length-1,tieWait:false,sourceBeam:i===values.length-1?{group:'ending',noBeam:false}:{noBeam:true}}))}];
+ s.barlines=s.sourceBarTicks.map((tick,i)=>({tick,barNumber:i+1,type:i===bars?'final':'regular'}));return s;
+}
 export async function sourcePackage(source:QuantizedGridScore,options:Parameters<typeof resolveJankoOptions>[0]={},tokens:Parameters<typeof resolveJankoTokens>[0]={}){
  const sourceBytes=strToU8(JSON.stringify(source)),sourceSha256=await hashBytes(sourceBytes),recipe={version:SCORE_RENDERING_RECIPE_VERSION,engineId:SCORE_RENDERING_ENGINE,sourceSha256,
   options:resolveJankoOptions({measuresPerSystem:2,...options}),tokens:resolveJankoTokens({ticksPerMeasure:144,...tokens}),baseline:{pageSha256:['a'.repeat(64)],seatSha256:'b'.repeat(64)}},

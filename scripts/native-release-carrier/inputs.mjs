@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {readFile, readdir, lstat} from 'node:fs/promises';
 import {join} from 'node:path';
+import {footerProbeVersion,footerProbeReceipt,footerMetricsSha256,validateFooterRuntimeReceipt} from './footer-ink-receipt.mjs';
 import {validatePianoSources, validatePianoRecipient, requirePianoWorkerChecks} from './score-viewer-piano-release.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -67,10 +68,26 @@ export async function validateRecipientCarrier(files, prepared) {
   }
   const inputs = JSON.parse(await readFile(join(prepared, 'source-inputs.json')));
   validatePianoRecipient(files, inputs.nativeFiles);
+  const macAppPresent=Object.keys(files).some(path=>path.startsWith('ISO Score Viewer.app/'));
+  for(const [path,pin]of Object.entries(inputs.nativeFiles).filter(([path])=>path.startsWith('licenses/'))){
+    const bytes=files['notices/'+path.slice(9)];
+    if(!bytes||bytes.length!==pin.size||sha256(bytes)!==pin.sha256)fail(`Recipient font notice differs: ${path}`);
+    if(macAppPresent){const bundled=files['ISO Score Viewer.app/Contents/Resources/notices/'+path.slice(9)];
+      if(!bundled||bundled.length!==pin.size||sha256(bundled)!==pin.sha256)fail(`Mac app font notice differs: ${path}`);}
+  }
+  if(macAppPresent&&inputs.nativeFiles['licenses/LiberationSerif-Italic-NOTICE.txt']){
+    const proof=files[footerProbeReceipt];if(!proof)fail('Actual WK font runtime receipt missing');
+    validateFooterRuntimeReceipt(JSON.parse(Buffer.from(proof).toString('utf8')),inputs,sourceIdentity(inputs,await readFile(join(prepared,'source-inputs.json'))));
+  }
 }
 export async function validatePianoNativeChecks(receipt, prepared, files) {
   const inputs = JSON.parse(await readFile(join(prepared, 'source-inputs.json')));
   requirePianoWorkerChecks(receipt, inputs.nativeFiles, files);
+  if(receipt.platform==='macos-universal'&&inputs.nativeFiles['licenses/LiberationSerif-Italic-NOTICE.txt']){
+    const proof=files[footerProbeReceipt],check=receipt.nativeChecks?.footerInk;
+    if(!proof||check?.status!=='passed'||check.version!==footerProbeVersion||check.receipt!==footerProbeReceipt||check.receiptSha256!==sha256(proof))fail('Actual WK font worker check missing or changed');
+    validateFooterRuntimeReceipt(JSON.parse(Buffer.from(proof).toString('utf8')),inputs,sourceIdentity(inputs,await readFile(join(prepared,'source-inputs.json'))));
+  }
 }
 export async function validateCarrierInputs(source, {expectedViewerRevision, expectedNotationRevision} = {}) {
   const bytes = await readFile(join(source, 'delivery-input', 'inputs.json')), inputs = JSON.parse(bytes);
@@ -92,6 +109,13 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
     if (path.startsWith('licenses/') && !(await readFile(join(source, path))).equals(file)) fail(`Shared/native notice differs: ${path}`);
   }
   await validatePianoSources(join(source, 'score-viewer'), inputs.nativeFiles);
+  if(inputs.nativeFiles['licenses/LiberationSerif-Italic-NOTICE.txt']){
+    const p=inputs.runtimeFontProbe;if(typeof p?.metricsLiteral!=='string'||sha256(Buffer.from(p.metricsLiteral))!==footerMetricsSha256||p?.version!==footerProbeVersion||!hash(p.policySha256)||p.fixture?.sha256!=='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1'||
+      !hash(p.fixture.sourceSha256)||!Number.isSafeInteger(p.fixture.ownerCount)||p.fixture.ownerCount<1||canonical(inputs.frontend.files[p.fixture.path])!==canonical({sha256:p.fixture.sha256,size:p.fixture.size})||!inputs.frontend.files['footer-ink-probe.html'])fail('Source-bound public footer runtime inputs missing');
+    const names=['scripts/footer-ink-probe.swift','scripts/footer-ink-probe.mjs','scripts/footer-ink-receipt.mjs'];
+    if(canonical(Object.keys(p.files??{}).sort())!==canonical(names.sort()))fail('Footer runtime helper inventory differs');validatePins(p.files);
+    for(const [path,pin]of Object.entries(p.files)){const b=await readFile(join(source,path));if(b.length!==pin.size||sha256(b)!==pin.sha256)fail('Footer runtime helper differs: '+path);}
+  }
   const checksBytes = await readFile(join(source, 'delivery-input', 'checks.json'));
   if (!hash(inputs.checks?.sha256) || sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Reviewed check receipt differs');
   const checks = JSON.parse(checksBytes);

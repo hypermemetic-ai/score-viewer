@@ -109,3 +109,26 @@ Changed-hand activation SHALL require an exact reviewed ISO dependency and its c
 #### Scenario: Concurrent native delivery
 - **WHEN** another owner is delivering the native app
 - **THEN** this change preserves that delivery and waits for an actual coordinated activation boundary
+
+### Requirement: Versioned portable foreign footer ink
+New measured footer drawing SHALL use an exact licensed face and independently verified cmap/advances/complete glyph bounds under a new Viewer policy, receipt and request identity. Literal ISO pages/seats/recipe evidence, historical identity meanings and footer drawing SHALL remain unchanged. Bounds and actual drawing SHALL share explicit supported shaping, anchor, transform and stroke rules; unsupported text/features SHALL remain conservative. Font/metric/decode/load/family failure SHALL retain prior edition/state before staging. Complete copyright/license/provenance SHALL be accessible in web output and verified as actual bytes in native recipients/resources.
+
+#### Scenario: Distant footer and local finger stack
+- **WHEN** a new derived edition's matched footer uses the verified face and a source-affiliated all1–5 stack occupies distant empty air
+- **THEN** admission measures every actual footer glyph and still refuses true overlap without a page-wide guessed-width exemption
+
+#### Scenario: Old receipt or unavailable face
+- **WHEN** a historical receipt is read or the new exact face/metrics cannot be independently verified and loaded
+- **THEN** historical drawing remains unchanged and an unsupported new candidate retains the original edition rather than using a platform-font guess
+
+#### Scenario: Actual drawing matches admitted bounds
+- **WHEN** reader, worker or practice/crop consumes a new-policy presentation
+- **THEN** it uses the same exact face and supported explicit shaping/spacing/anchor contract, with independent receiving-realm cold admission and no transported platform bounding boxes
+
+#### Scenario: Complete notice reaches recipients
+- **WHEN** the reviewed frontend and native carrier are frozen and packaged
+- **THEN** the new complete notice is independently verified in web output, Windows recipient and Mac app/DMG resources alongside every retained existing notice
+
+#### Scenario: Native font path requires actual runtime proof
+- **WHEN** the new-policy Mac carrier is built and its recipients are independently extracted
+- **THEN** a bounded nonPersistent WK probe executes the production Worker and receiving cold reader on a frozen public fixture, verifies actual mounted footer enclosure against independently derived exact-font covers, records actual helper architecture and WebKit runtime, and must pass source-bound receipt checks before delivery; loopback hosting does not claim Tauri custom-origin/CSP, unexecuted architecture, minimum-OS or physical acceptance
