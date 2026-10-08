@@ -50,9 +50,9 @@ async function bindViewer(f) {
   await writeFile(f.checks,JSON.stringify(f.receipt,null,2)+'\n');
 }
 async function addPiano(f) {
-  const revision='4'.repeat(40), originals={'LICENSE':'Engine fixture license\n','synth.cpp':'int piano_fixture() { return 1; }\n','external/dependency/LICENSE':'Dependency fixture license\n'};
+  const revision='4'.repeat(40), originals={'LICENSE':'Engine fixture license\n','synth.cpp':'int piano_fixture() { return 1; }\n','external/dependency/LICENSE':'Dependency fixture license\n','unlinked/LICENSE':'Unlinked source-only license fixture\n'};
   const source={schema:1,engine:{repository:'https://github.com/dusk-audio/dusk-fizz',revision},components:[{path:'.',revision},{path:'external/dependency',revision:'5'.repeat(40)}],excluded:['tests/unused.cpp'],
-    files:Object.fromEntries(Object.entries(originals).map(([name,bytes])=>[name,{bytes:Buffer.byteLength(bytes),sha256:sha256(bytes)}])),licenses:['LICENSE','external/dependency/LICENSE']};
+    files:Object.fromEntries(Object.entries(originals).map(([name,bytes])=>[name,{bytes:Buffer.byteLength(bytes),sha256:sha256(bytes)}])),licenses:['LICENSE','external/dependency/LICENSE','unlinked/LICENSE']};
   const sourceBytes=JSON.stringify(source,null,2)+'\n';
   for(const [name,bytes]of Object.entries({...originals,'provenance.json':sourceBytes}))await file(f.viewer,`src-tauri/vendor/sfizz/${name}`,bytes);
   const noticeFiles={'LICENSE':originals.LICENSE,'external/dependency/LICENSE':originals['external/dependency/LICENSE'],'provenance.json':sourceBytes};
@@ -194,6 +194,7 @@ test('both packages and Mac app resources must carry original curated notices an
   const pianoEngine=await packagePianoNotices(f.iso,viewer,packet);
   await file(packet,'native-dependencies.json',JSON.stringify({pianoEngine}));
   const files={};for(const name of Object.keys(await inventory(packet)))files[name]=await readFile(join(packet,name));
+  assert.equal(files['notices/piano/unlinked/LICENSE'],undefined);
   assert.equal(validatePianoRecipient(files,inputs.nativeFiles).metadata.revision,'4'.repeat(40));
   assert.throws(()=>validatePianoRecipient({...files,'notices/piano/LICENSE':undefined},inputs.nativeFiles),/changed or missing/);
   assert.throws(()=>validatePianoRecipient({...files,'notices/piano/LICENSE':Buffer.from('wrong')},inputs.nativeFiles),/changed or missing/);
