@@ -36,4 +36,17 @@ Include actual counts, artifact receipts and review references in those check ob
 
 The generator rejects dirty/wrong source checkouts, stale checks/frontend, mismatched gitlink/provenance, symlinks and unsupported script adaptation anchors before changing the carrier. Preparation verifies frozen/native inputs, adds one source-bound embedded release asset and produces the existing exact Tauri/Brotli probes. Native workers revalidate native files and source identities before compiling. The original Windows native tests, universal Mac tests/virtual MIDI, signature/resource/13.3 deployment checks, exact DMG/app parity and available direct/normal OS launch checks remain enabled. Pair assembly independently proves all frozen assets inside Windows and both Mac slices. The existing atomic private publication operation remains the only current-download update.
 
-Once the complete reviewed pair passes validation, publication uses the carrier revision through the existing ISO release command and authorized private download directory. A later Windows activation is a separate operation: reverify the laptop and console identity, preserve the running package/data/shortcut, install additively, verify package identity, switch the usual shortcut and inspect the native viewer. Keep the emergency rollback package and backup. Native/package/startup evidence does not establish physical MIDI/audio/pedal or pianist acceptance.
+Run the existing release command **from the generated carrier checkout** so it imports the adapted source-identity validator. The unchanged validator in an ordinary ISO checkout deliberately rejects the new embedded identity. Keep the workflow definition on its existing `main` ref and supply the reviewed carrier commit as its checkout input:
+
+```sh
+node scripts/release-score-viewer.mjs \
+  --repository hypermemetic-ai/iso-notation --ref main \
+  --revision REVIEWED_CARRIER_SHA \
+  --score-path public/review/schumann-no14-conventional-20261006.isoscore \
+  --score-sha256 2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d \
+  --output /home/qqp/projects/iso-notation-deploy/public/review/score-viewer
+```
+
+The command obtains both native packages, independently verifies the complete pair, and changes the current download pointer atomically. Recheck that the selected carrier is a descendant of the then-current paired revision; an unrelated or older finishing pair is rejected and the current download stays intact. An existing complete artifact can be reused only after identical source/score and package verification. Retain actual preparation/native/assembly timings and cache context in the delivery receipt.
+
+A later Windows activation is a separate operation: reverify the laptop and console identity, preserve the running package/data/shortcut, install additively, verify package identity, switch the usual shortcut and inspect the native viewer. Keep the emergency rollback package and backup. Native/package/startup evidence does not establish physical MIDI/audio/pedal or pianist acceptance.
