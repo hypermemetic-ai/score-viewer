@@ -1,5 +1,5 @@
 import {spawn} from 'node:child_process';import {createServer} from 'node:http';
-import {readFile,writeFile,mkdir,mkdtemp,rm} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';import {randomBytes,createHash} from 'node:crypto';
+import {readFile,writeFile,mkdir,mkdtemp,rm,open} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';import {randomBytes,createHash} from 'node:crypto';
 const sha256=b=>createHash('sha256').update(b).digest('hex'),canonical=v=>JSON.stringify(v);
 import {footerProbeVersion,footerProbeReceipt,validateFooterRuntimeReceipt} from './footer-ink-receipt.mjs';
 export async function boundedCommand(program,args,{cwd,timeoutMs=30000}={}){
@@ -10,6 +10,20 @@ export async function boundedCommand(program,args,{cwd,timeoutMs=30000}={}){
   const timer=setTimeout(()=>{timedOut=true;try{if(group&&child.pid)process.kill(-child.pid,'SIGKILL');else child.kill('SIGKILL');}catch(error){if(error.code!=='ESRCH')reject(error);}},timeoutMs);
   child.once('error',e=>{clearTimeout(timer);reject(e);});child.once('close',(exitCode,signal)=>{clearTimeout(timer);resolve({exitCode,signal,timedOut,stdout,stderr});});
  });
+}
+// Failure text is diagnostic only. It never becomes a passed native receipt.
+// Read a capped owned helper file and emit only its bounded message fields.
+export async function requireFooterHelperSuccess(checked,output){
+ if(checked.exitCode===0&&!checked.timedOut)return;
+ let detail='',file;
+ try{file=await open(output,'r');const stat=await file.stat();if(!stat.isFile()||stat.size>65536)throw Error('oversized');
+  const bytes=Buffer.alloc(65537),{bytesRead}=await file.read(bytes,0,bytes.length,0);if(bytesRead>65536)throw Error('oversized');
+  const raw=JSON.parse(bytes.subarray(0,bytesRead).toString('utf8'));
+  detail=[raw?.message,raw?.result?.message].filter(message=>typeof message==='string').map(message=>message.slice(0,2048)).join('; ');
+ }catch(error){detail=error.code==='ENOENT'?'helper wrote no failure JSON':error.message==='oversized'?'helper failure JSON exceeds diagnostic bound':'helper failure JSON unavailable or malformed';}
+ finally{await file?.close();}
+ const clean=value=>String(value??'').slice(0,4096).replace(/[\u0000-\u001f\u007f-\u009f]/g,' ');
+ throw Error(`Actual WK font readiness/drawing failed (exit ${checked.exitCode}, signal ${checked.signal??'none'}, timeout ${!!checked.timedOut}): ${clean(detail)}${checked.stderr?'; stderr: '+clean(checked.stderr):''}`);
 }
 /** Verified read-only loopback closure; no arbitrary path/source data serving. */
 export async function frozenFrontendServer(frontend,pins){
@@ -32,11 +46,11 @@ export async function runFooterInkProbe(ctx,packet,{execute=boundedCommand}={}){
  const temporary=await mkdtemp(join(tmpdir(),'viewer-footer-ink-')),nonce=randomBytes(16).toString('hex');let server;
  try{
   const helper=join(temporary,'footer-ink-check'),output=join(temporary,'result.json');
-  const compiled=await execute('/usr/bin/xcrun',['swiftc','-framework','AppKit','-framework','WebKit',join(ctx.source,'scripts/footer-ink-probe.swift'),'-o',helper],{timeoutMs:30000});
+  const compiled=await execute('/usr/bin/xcrun',['swiftc','-parse-as-library','-framework','AppKit','-framework','WebKit',join(ctx.source,'scripts/footer-ink-probe.swift'),'-o',helper],{timeoutMs:30000});
   if(compiled.exitCode!==0||compiled.timedOut)throw Error('Cannot compile bounded WK font helper: '+compiled.stderr);
   server=await frozenFrontendServer(join(ctx.prepared,'frontend'),inputs.frontend.files);
   const checked=await execute(helper,[`http://127.0.0.1:${server.port}/footer-ink-probe.html?nonce=${nonce}`,nonce,output],{timeoutMs:85000});
-  if(checked.exitCode!==0||checked.timedOut)throw Error('Actual WK font readiness/drawing failed: '+checked.stderr);
+  await requireFooterHelperSuccess(checked,output);
   const raw=JSON.parse(await readFile(output,'utf8'));if(raw.result?.nonce!==nonce)throw Error('WK runtime nonce differs');
   const receipt={version:footerProbeVersion,status:'passed',sourceInputs,bindings:inputs.runtimeFontProbe,frontendDigest:inputs.frontend.digest,
    host:{runtime:raw.runtime,os:raw.os,architecture:raw.helperArchitecture,nodeArchitecture:process.arch,webkitVersion:raw.webkitVersion},result:raw.result,
