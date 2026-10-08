@@ -52,6 +52,11 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 @media(max-width:900px){.practice-browser,.practice-browser:has(.practice-components){grid-template-columns:var(--practice-list-width,128px) var(--practice-list-width,128px) minmax(0,1fr);gap:12px}.practice-passage-detail{grid-column:auto}}
 @media(max-width:650px){.practice-browser,.practice-browser:has(.practice-components){grid-template-columns:var(--practice-list-width,128px) var(--practice-list-width,128px) minmax(0,1fr);gap:10px}.practice-passage-detail{grid-column:auto}.practice-header{gap:8px}.practice-controls{gap:4px}.practice-chunks button{padding:6px!important}.practice-surface{padding:14px;gap:10px}}
 
+/* Keep native list scrolling without a scrollbar dividing the passage columns. */
+.practice-browser>.practice-chunks{scrollbar-width:none}
+.practice-browser>.practice-components{border-left:0;padding-left:0}
+.practice-browser>.practice-chunks::-webkit-scrollbar{display:none;width:0;height:0}
+
 /* Flat Options: two interchangeable controls and one explicitly owned test. */
 .options-practice{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #303030}.options-redesigned .options-practice h3{margin-bottom:12px}.options-redesigned .manual-tempo button{min-height:0;padding:0;border:0}.options-redesigned .manual-tempo button:focus-visible,.options-redesigned .manual-tempo input:focus-visible{outline:1px solid #b6cfdf;outline-offset:-2px}.options-redesigned .options-practice .practice-speed,.options-redesigned .options-practice .metronome-mark{justify-self:start}
 .practice-leaf-preview{display:flex;justify-content:center;background:#fff;overflow:hidden;padding-inline:24px;box-sizing:border-box}.practice-leaf-preview>.practice-passage{display:block;max-width:100%;flex:none}.practice-score{display:flex;justify-content:center;overflow:hidden;padding-inline:24px;box-sizing:border-box}.practice-score>.practice-passage{display:block;flex:none;max-width:100%;overflow:hidden}.practice-render-error{padding:14px;color:#9e3838;background:#fff}
