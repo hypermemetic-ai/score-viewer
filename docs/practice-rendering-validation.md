@@ -127,6 +127,68 @@ The subsequent operator review rejected the selector's separate hint styling. `n
 
 Contextual binding rows are a display projection of the existing action IDs and assignments. The actual-main receipt `/tmp/score-viewer-practice-rendering/contextual-options/context-results.json` observes six reader rows, Options only in selection, Show fingerings/Done/Options for an active leaf, and those three plus Previous measures/Next measures for a paused longer window. Full-score labels stay Previous page/Next page. Hidden keyboard and MIDI assignments survive an actual save/reload exactly, and a conflict with hidden F11 remains authoritative. Capture/Test/navigation guards, disabled first-loop Done, unchanged leaf PageDown, paused longer PageDown/PageUp ownership changes and frozen package bytes all pass. The contextual child passed 31 focused checks and configured TypeScript; the combined control/input/context subset passed 24 checks. Its four dialog captures use a test-only one-pixel viewport restore after font loading to settle headless capture; owner/state assertions remain separate from those pictures. No product paint, dispatch, binding-schema, resolver or progression change was introduced. The current footer-only observation uses ordinary settling without viewport invalidation. Full combined suite/build/emitted/native validation remains pending as before.
 
+## Subsequent active-control refinement
+
+The scoped follow-up starts from main
+`b6d5d360332c620ccdb40a9a19a71fd694c0e5aa`. It supersedes the earlier visible
+Score/Passages return captions with Back/Esc while retaining their existing
+targets and two-step Escape path. Ready/Resume, disconnected-only Done and Working
+speed form one centered primary group; Working speed is immediately right of Done
+and the Done button itself contains no percentage. The secondary controls use
+Lock current speed and Free view/V. Selected achievement remains in the upper-right
+header; selector and active whole-piece captions read Total progress. Runtime
+progress, manual filtering, Done eligibility/undo and queued speed rules are
+unchanged.
+
+Restart preparation is absent everywhere. Connected first-entry preparation and
+its earned-completion guard remain intact. V enters Free view, Space resumes and
+P opens practice only from the reader. Existing saved primary/secondary V
+assignments keep priority without rewriting preferences; modifiers, repeats,
+numeric editing, Options and binding capture retain their guards.
+
+Actual-main development and emitted observations passed in
+`/tmp/score-viewer-practice-rendering/controls-refinement/settings-results.json`.
+Personally inspected complete images are `development-controls-1440.png`,
+`development-controls-900.png`, `production-controls-1440.png` and
+`production-controls-900.png` in that directory. The primary content group stays
+within one pixel of center at 1440, 1100 and 900 pixels and Done shares the
+Ready/Resume row. `completion/completion-results.json` observes simulated port
+connection, connected Done removal, loop eligibility, undo and combined progress.
+`preparation/preparation-results.json` observes simulated first-entry preparation,
+persisted completion and skipped re-entry, unchanged measured best and frozen
+package bytes, plus compact reader/practice fingering pickers at 1440/360 pixels.
+The preparation result is not physical MIDI acceptance. The focused practice set
+passed 92/92, final control/lifecycle edits passed 40/40, and the configured build
+passed. Native compilation/activation belongs to the separately reviewed combined
+delivery lane.
+
+Reproduce the bounded actual-main controls check with this checkout's development
+and emitted servers available:
+
+```sh
+/home/qqp/.local/bin/qq-job -- env \
+ PRACTICE_CONTROLS_ONLY=1 \
+ PRACTICE_DEVELOPMENT_URL=http://127.0.0.1:5213 \
+ PRACTICE_PRODUCTION_URL=http://127.0.0.1:5214 \
+ PRACTICE_ARTIFACTS=/tmp/score-viewer-practice-rendering/controls-refinement \
+ PRACTICE_PLAYWRIGHT=/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs \
+ PRACTICE_CHROMIUM=/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome \
+ node scripts/inspect-practice-settings.mjs
+```
+
 ## Acceptance boundaries
+
+The docs-only main-spec reconciliation starts from merged controls main
+`e0ccbb2b7657af8810128c0aa6dfd65923b32808`. It syncs the accepted Back, V/Space,
+once-only preparation, centered controls and Total progress contracts, explicitly
+removes the obsolete Restart preparation requirement, and records the already
+reviewed hidden selector scrollbar behavior. The earlier display-stage statement
+that library projection was unchanged is historical: PR11 deliberately changed
+library reads and the practice-save callback to the canonical manual-inclusive
+`displayedPracticeTotal`, matching default Total progress without a preparation
+bonus. Include manual affects the open practice display only; whole-run completion,
+measured/manual provenance, joins, groundwork and history remain independent and
+preserved. This reconciliation changes documentation only and claims no new source,
+frontend, native or musical validation.
 
 Source tests and frontend builds establish source compatibility. Browser geometry and screenshots establish only the observed frontend behavior under simulated input. Native Windows/Mac compilation and launch, physical MIDI/audio/pedal behavior, and pianist musical acceptance remain separate, pending checks. The release seam is documented in `migration.md`. The operator subsequently authorized adaptive refinement and paired native delivery, owned separately by the parent and its children. This prerequisite source receipt does not claim their final source/build/install results.
