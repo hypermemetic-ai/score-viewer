@@ -14,9 +14,11 @@ The application extraction is a separate reviewed source change. It must preserv
 
 ## Requested repair behavior
 
-- Consecutive measures render as a coherent continuous passage in selection previews and practice runs, rather than separately clipped pages.
+- Consecutive measures in both selection previews and active practice runs render as **one continuous strip**, with coherent staff lines and barlines. Remove independent per-measure crop gaps and duplicate edges. These measures are consecutive by construction; they should not look like disconnected page fragments.
 - Existing fixed reading positions and musical transitions remain stable; do not reintroduce horizontal scrolling or continuously moving references.
-- Played-note removal also removes all owned long-duration stem ink, including hollow long-note stems, while preserving other notes and staff ink.
+- Played-note removal also removes all ink belonging to that note owner, including long-duration hollow stem ink, through the same lifecycle as ordinary stems. Pause/full-passage restoration brings that ink back with the associated note. Preserve other notes and staff ink.
 - Verify Schumann No. 14 and the current Zelda score in both affected views and both supported keyboard presentations where applicable. Test the actual lifecycle and visible output, rather than only inspecting stored layout or hashes.
 
-The root migration coordinator owns repository/Paseo setup and source landing. The operator intends to commission the repair separately in this project. No repair implementation has been started by this bootstrap.
+Apply these rules generically across supported scores and presentations, rather than as a Zelda-only adjustment. Preserve existing joined/component mastery, musical timing and beat-aligned count-in, and reversible Done completion behavior; those are not the requested redesign.
+
+The root migration coordinator owns repository/Paseo setup and source landing. The operator intends to commission the repair separately in this project. The application source extraction preserves the reported defects; no repair implementation has been started by the migration.
