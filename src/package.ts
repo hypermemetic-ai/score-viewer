@@ -1,0 +1,284 @@
+import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
+import {DOMParser} from '@xmldom/xmldom';
+import {validateOperatorFingerJournal} from './operator-finger-authority';
+import type {QuantizedGridScore,Hand} from '../vendor/iso-notation/src/model/types';
+import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,referencePerformanceClock} from '../vendor/iso-notation/src/model/reference-performance-tempo';
+import {compilePlanningRequirements} from '../vendor/iso-notation/src/model/physical-source-constraints';
+import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-planning-input';
+import {RR_TEMPORAL_LAYER_PLANNER,validateRRTemporalFingerLayer} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
+import {validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
+import type {PhysicalKeyboardId,PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
+import {validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {validateReferenceMidi} from './reference-midi';
+import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
+import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
+import {PIANO_ASSIGNMENT_VERSION,validatePianoAssignments} from '../vendor/iso-notation/src/model/piano-finger-assignments';
+export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
+export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
+export interface Seat {id:string;page:number;ownerIds:string[];actionId:string;contactId:string;pitchDigit:string;x:number;baseline:number;fontSize:number;system:number;writtenBar:number;continuation?:boolean}
+export interface Metadata {title:string;composer:string;opus?:number;opusLabel?:string;piece?:number;provenance:string[];variant?:string}
+export interface Manifest {format:'iso-score';version:1|2;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext}
+export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string}
+export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext}
+export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
+function fail(s:string):never{throw Error(s);}
+const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
+function passiveSvg(svg:string,seats:Seat[],page:number){
+ const errors:string[]=[];const doc=new DOMParser({onError:(_level,msg)=>errors.push(msg)}).parseFromString(svg,'image/svg+xml');
+ if(errors.length||doc.documentElement?.localName!=='svg'||/<!DOCTYPE|<!ENTITY/i.test(svg))fail(`Page ${page+1}: malformed SVG`);
+ const allowed=new Set(['svg','g','path','text','tspan','rect','line','circle','ellipse','polyline','polygon','defs','style','clipPath','mask','use','symbol','title','desc']);
+ const found=new Map<string,Element>();
+ for(const el of Array.from(doc.getElementsByTagName('*'))){
+  if(!allowed.has(el.localName??''))fail(`Page ${page+1}: active/unsupported SVG ${el.localName}`);
+  for(const attr of Array.from(el.attributes)){
+   if(/^on/i.test(attr.name)||['src','srcset'].includes(attr.localName??''))fail('SVG event or external content');
+   if(attr.localName==='href'&&!attr.value.startsWith('#'))fail('SVG external reference');
+   if(/url\(/i.test(attr.value)&&!/^url\(#[\w-]+\)$/.test(attr.value))fail('SVG external paint reference');
+  }
+  if(el.localName==='style'){
+   const css=el.textContent??'';
+   if(/@import|expression\(|-moz-binding/i.test(css))fail('SVG active CSS');
+   for(const match of css.matchAll(/url\(([^)]+)\)/gi))if(!/^['"]?data:(?:font\/otf|application\/x-font-opentype|application\/font-sfnt);base64,[\w+/=]+['"]?$/.test(match[1]))fail('SVG external font/CSS URL');
+  }
+  const id=el.getAttribute('data-viewer-seat');if(id){if(found.has(id))fail('Duplicate SVG glyph seat');found.set(id,el as unknown as Element);}
+ }
+ const expected=seats.filter(s=>s.page===page);
+ if(found.size!==expected.length)fail(`Page ${page+1}: glyph inventory mismatch`);
+ for(const s of expected){const el=found.get(s.id);if(!el||el.localName!=='text'||el.textContent!==s.pitchDigit||Number(el.getAttribute('x'))!==s.x||Number(el.getAttribute('y'))!==s.baseline||el.getAttribute('font-size')!==`${s.fontSize}pt`)fail(`Page ${page+1}: glyph seat ${s.id} differs`);}
+}
+/** Bounds from the pinned engine outline, not character advance or the current finger. */
+export const digitMetrics:Record<string,[number,number,number,number]>={'1':[153,0,379,739],'2':[34,0,520,752],'3':[15,-13,518,752],'4':[0,0,530,739],'5':[12,-13,520,739]};
+const geometryFont='5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae';
+async function fingerEligibility(m:Manifest,seats:Seat[],pages:string[]):Promise<ScorePackage['fingerEligibility']>{
+ const certificate=m.fingerGeometry;
+ if(certificate?.version!=='frozen-slot-all-five-v1')return {eligible:false,reason:'This package has no supported all-five frozen-seat geometry certificate; pitch reading remains available.'};
+ if(certificate.fontSha256!==geometryFont||m.files[m.font]!==geometryFont)return {eligible:false,reason:'The digit font has no supported outline measurements; pitch reading remains available.'};
+ for(let page=0;page<pages.length;page++){
+  const doc=new DOMParser().parseFromString(pages[page],'image/svg+xml');
+  const styles=Array.from(doc.getElementsByTagName('style'));
+  if(styles.length!==1||await hashBytes(styles[0].textContent??'')!=='2c0f0fa8086d7bd7c46f6469a647d3512800ac82b885dc50b0e1ad2a8cc6dd5a')return {eligible:false,reason:'The vector typography is outside the measured presentation contract; pitch reading remains available.'};
+  for(const seat of seats.filter(s=>s.page===page)){
+   const text=Array.from(doc.getElementsByTagName('text')).find(el=>el.getAttribute('data-viewer-seat')===seat.id)!;
+   const group=text.parentNode as unknown as Element;
+   const masks=Array.from(group.childNodes).filter((n:any)=>n.nodeType===1&&n.localName==='rect'&&n.getAttribute('class')==='janko-knockout') as unknown as Element[];
+   if(group.getAttribute('class')!=='janko-reading-head'||masks.length!==1||text.getAttribute('class')!=='janko-digit'||text.hasAttribute('transform')||text.hasAttribute('style')||text.getAttribute('font-weight')!=='700')return {eligible:false,reason:`Seat ${seat.id} has an unsupported frozen presentation; pitch reading remains available.`};
+   const rect=masks[0],x=Number(rect.getAttribute('x')),y=Number(rect.getAttribute('y')),w=Number(rect.getAttribute('width')),h=Number(rect.getAttribute('height'));
+   if(![x,y,w,h].every(Number.isFinite)||w<=0||h<=0||rect.getAttribute('fill')!=='#FFFFFF'||rect.hasAttribute('transform')||rect.hasAttribute('style'))return {eligible:false,reason:`Seat ${seat.id} has no valid protected slot; pitch reading remains available.`};
+   const em=seat.fontSize*4/3;
+   for(const [finger,b] of Object.entries(digitMetrics)){
+    const ink=[seat.x+(b[0]-280)*em/1000,seat.baseline-b[3]*em/1000,seat.x+(b[2]-280)*em/1000,seat.baseline-b[1]*em/1000];
+    if(ink[0]<x||ink[1]<y||ink[2]>x+w||ink[3]>y+h)return {eligible:false,reason:`Finger ${finger} does not fit frozen seat ${seat.id}; pitch reading remains available.`};
+   }
+  }
+ }
+ return {eligible:true};
+}
+export function validateLayer(layer:FingerLayer,p:Pick<ScorePackage,'score'|'seats'|'manifest'> & {keyboardLayout?:PhysicalKeyboardId}):void{
+ if(layer.plannerVersion===RR_TEMPORAL_LAYER_PLANNER)fail('Temporal four-row layers require complete asynchronous contact replay');
+ if(p.keyboardLayout==='conventional-piano')fail('Use asynchronous conventional layer validation for this presentation');
+ if(layer.version!=='physical-attack-finger-layer-v1'||layer.sourceHash!==(p.manifest.layerSourceHash??p.manifest.semanticSha256)||layer.ticksPerBeat!==p.score.ticksPerBeat||!Array.isArray(layer.attacks)||!isObject(layer.sourceOwnerToAttack))fail('Finger layer source/version mismatch');
+ const rr=layer.physicalRowOrder==='rr-even-far-last-v1';
+ if(layer.physicalRowOrder!==undefined&&!rr)fail('Unknown finger physical-row contract');
+ const rrCore=layer.plannerVersion==='released-owner-actions-v1'&&typeof layer.profileSha256==='string'&&/^[a-f0-9]{64}$/.test(layer.profileSha256)&&typeof layer.inputSha256==='string'&&/^[a-f0-9]{64}$/.test(layer.inputSha256)&&typeof layer.candidateId==='string'&&/^rr-performance-pose:[a-f0-9]{64}$/.test(layer.candidateId);
+ const rrWorker=layer.plannerVersion==='released-owner-actions-v1/viewer-bounded-performance-v2'&&isObject(layer.profileIdentity)&&layer.profileIdentity.id==='rr-player-performance-contact-pose-v5'&&layer.profileIdentity.version==='rr-performance-seconds-contact-pose-route-v5';
+ if(rr&&(layer.profileId!=='rr-player-performance-contact-pose-v5'||layer.baseScoreId!==p.manifest.scoreId||!rrCore&&!rrWorker))fail('Finger layer RR profile/provenance mismatch');
+ if(rr||layer.referencePerformanceTempo!==undefined||layer.performanceClock!==undefined||layer.physicalCostUnits!==undefined||layer.costUnits!==undefined){
+  const reference=requireReferencePerformanceTempo(p.score),provided=validateReferencePerformanceTempo(layer.referencePerformanceTempo),units=rr?(layer.costUnits??layer.physicalCostUnits):layer.physicalCostUnits;
+  const profileValid=rr||isObject(layer.profileIdentity)&&typeof layer.profileIdentity.id==='string'&&typeof layer.profileIdentity.version==='string';
+  if(JSON.stringify(reference)!==JSON.stringify(provided)||JSON.stringify(layer.performanceClock)!==JSON.stringify(referencePerformanceClock(reference,p.score.ticksPerBeat))||layer.revision!==p.manifest.revision||layer.sourceBytesSha256!==p.manifest.semanticSha256||!profileValid||JSON.stringify(units)!==JSON.stringify(FINGER_PHYSICAL_COST_UNITS))fail('Finger layer performance reference/clock/source mismatch');
+ }
+ const notes=new Map(p.score.notes.map(n=>[n.id,n]));const actions=new Set<string>(),owners=new Set<string>();
+ for(const a of layer.attacks){if(actions.has(a.id)||!Number.isInteger(a.finger)||a.finger<1||a.finger>5||!(rr?[2-a.pitch%2,4-a.pitch%2]:[1+a.pitch%2,3+a.pitch%2]).includes(a.row??NaN)||!Array.isArray(a.owners)||!a.owners.length)fail('Invalid finger action');actions.add(a.id);
+ for(const owner of a.owners){const n=notes.get(owner.id);if(!n||owners.has(n.id)||a.pitch!==n.pitch.octave*12+n.pitch.pitchClass||a.hand!==n.hand||a.startTick!==n.startTick||owner.durationTicks!==n.durationTicks||owner.releaseTick!==n.startTick+n.durationTicks||layer.sourceOwnerToAttack[n.id]!==a.id)fail(`Finger owner mismatch: ${owner.id}`);owners.add(n!.id);}}
+ if(owners.size!==notes.size||Object.keys(layer.sourceOwnerToAttack).length!==notes.size)fail('Incomplete finger coverage');
+ if(layer.reviewedFingerAuthority!==undefined){
+  const authority=layer.reviewedFingerAuthority;if(!isObject(authority)||authority.kind!=='explicit-operator-review'||!Array.isArray(authority.constraints))fail('Invalid provided finger authority');
+  const reviewed=new Set<string>();for(const q of (authority as Record<string,any>).constraints){const n=notes.get(q.id),a=layer.attacks.find(a=>a.id===layer.sourceOwnerToAttack[q.id]);if(!n||!a||reviewed.has(q.id)||q.pitch!==a.pitch||q.startTick!==n.startTick||q.durationTicks!==n.durationTicks||q.hand!==a.hand||q.finger!==a.finger||q.row!==undefined&&q.row!==a.row)fail('Provided finger authority/source mismatch');reviewed.add(q.id);}
+  validateOperatorFingerJournal(authority,{revision:p.manifest.revision,sourceHash:layer.sourceHash,profileId:layer.profileId,profileSha256:layer.profileSha256});
+ }
+
+ if(layer.providedAuthorityProjection!==undefined){
+  const q=layer.providedAuthorityProjection as Record<string,any>,authority=layer.reviewedFingerAuthority as Record<string,any>;
+  if(!rrCore||!isObject(q)||q.version!=='retained-provided-owner-authority-v1'||!authority||q.retainedCount!==authority.constraints.length||['candidateId','profileId','profileSha256','sourceHash','sourceBytesSha256','inputSha256'].some(key=>q[key]!==layer[key])||q.targetRevision!==p.manifest.revision||JSON.stringify(q.referencePerformanceTempo)!==JSON.stringify(layer.referencePerformanceTempo)||!isObject(q.retiredReviewAuthority)||!Array.isArray(q.retiredReviewAuthority.retiredOwnerIds)||typeof q.retiredReviewAuthority.reason!=='string'||['originalPackageSha256','originalRevision','originalLayerSha256','originalAuthoritySha256','rawCalculatedLayerSha256','calculatedPlanFileSha256','retainedConstraintsSha256'].some(key=>typeof q[key]!=='string'||!/^[a-f0-9]{64}$/.test(q[key])))fail('Provided authority projection/provenance mismatch');
+  const retired=q.retiredReviewAuthority.retiredOwnerIds as string[];if(new Set(retired).size!==retired.length||retired.some(id=>!notes.has(id)||authority.constraints.some((c:any)=>c.id===id)))fail('Retired provided authority/source mismatch');
+ }
+ for(const s of p.seats)if(s.ownerIds.some(id=>layer.sourceOwnerToAttack[id]!==s.actionId))fail(`Finger seat alias mismatch: ${s.id}`);
+}
+const digest=(value:unknown):value is string=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+const layoutId=(value:unknown):value is PhysicalKeyboardId=>value==='conventional-piano'||value==='janko-four-row';
+function freezeSource(value:unknown):void{if(value&&typeof value==='object'){for(const child of Object.values(value))freezeSource(child);Object.freeze(value);}}
+const linkedViews=new WeakMap<ScorePackage,Map<PhysicalKeyboardId,ScorePackage>>();
+export async function validateLayerAsync(value:unknown,p:ScorePackage,options:{history?:boolean;requireCurrent?:boolean}={}):Promise<FingerLayer>{
+ if(!isObject(value))fail('Invalid finger layer');
+ if(value.version===PIANO_ASSIGNMENT_VERSION){
+  if(!p.keyboardLayout||!p.sourceScore||!p.sourceSha256)fail('Piano assignments have no immutable source/layout binding');
+  const checked=await validatePianoAssignments(value,normalizeHandPlanningInput(pianoPlanningScore(p)),{
+   sourceHash:p.manifest.layerSourceHash??p.sourceSha256,sourceBytesSha256:p.sourceSha256,revision:p.manifest.revision,
+   layout:p.keyboardLayout,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand]))});
+  if(checked.profileId!==p.profileId||checked.profileSha256!==p.profileSha256||checked.effectiveHandSha256!==p.effectiveHandSha256)
+   fail('Piano assignment presentation/profile binding differs');
+  for(const seat of p.seats)if(seat.ownerIds.some(id=>checked.sourceOwnerToAttack[id]!==seat.actionId))fail('Piano assignment finger seat alias mismatch');
+  return checked;
+ }
+ if(value.plannerVersion===RR_TEMPORAL_LAYER_PLANNER){
+  if(p.keyboardLayout!=='janko-four-row'||!p.sourceScore||!p.sourceSha256||typeof value.candidateId!=='string')fail('Temporal four-row layer has no immutable source/layout binding');
+  const checked=await validateRRTemporalFingerLayer(value,normalizeHandPlanningInput(pianoPlanningScore(p)),{
+   sourceHash:p.manifest.layerSourceHash??p.sourceSha256,sourceBytesSha256:p.sourceSha256,revision:p.manifest.revision,
+   candidateId:value.candidateId,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand]))});
+  if(checked.profileId!==p.profileId||checked.profileSha256!==p.profileSha256||checked.effectiveHandSha256!==p.effectiveHandSha256)fail('Temporal four-row presentation/profile binding differs');
+  for(const seat of p.seats)if(seat.ownerIds.some(id=>checked.sourceOwnerToAttack[id]!==seat.actionId))fail('Temporal four-row finger seat alias mismatch');
+  return checked;
+ }
+ if(value.version==='physical-contact-finger-layer-v2'){
+  if(p.keyboardLayout!=='conventional-piano'||!p.sourceScore||!p.sourceSha256)fail('Conventional layer has no immutable source binding');
+  const checked=await validateConventionalFingerLayer(value,normalizeHandPlanningInput(pianoPlanningScore(p)),{
+   sourceHash:p.manifest.layerSourceHash??p.sourceSha256,sourceBytesSha256:p.sourceSha256,
+   // Imports retain known historical contracts. New conventional calculations
+   // can require the corrected common-hand action replay explicitly.
+   effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand])),requireCurrent:options.requireCurrent??false});
+  if(checked.profileId!==p.profileId||checked.profileSha256!==p.profileSha256||checked.effectiveHandSha256!==p.effectiveHandSha256)fail('Conventional presentation/profile binding differs');
+  for(const seat of p.seats)if(seat.ownerIds.some(id=>checked.sourceOwnerToAttack[id]!==seat.actionId))fail('Conventional finger seat alias mismatch');
+  return checked;
+ }
+ if(value.version!=='physical-attack-finger-layer-v1'||p.keyboardLayout==='conventional-piano')fail('Finger layer source/version mismatch');
+ const layer=value as FingerLayer;validateLayer(layer,p);
+ const journal=(layer.reviewedFingerAuthority as Record<string,any>|undefined)?.operatorUpdates;
+ for(const update of journal??[])if(await hashBytes(JSON.stringify(update.baselineReviewedFingerAuthority))!==update.baselineAuthoritySha256)fail('Operator baseline authority digest mismatch');
+ const projection=layer.providedAuthorityProjection as Record<string,any>|undefined;
+ if(projection){const raw={...layer};delete raw.reviewedFingerAuthority;delete raw.providedAuthorityProjection;const authority=layer.reviewedFingerAuthority as Record<string,any>;
+  if(await hashBytes(JSON.stringify(raw,null,2)+'\n')!==projection.rawCalculatedLayerSha256||await hashBytes(JSON.stringify(authority.constraints))!==projection.retainedConstraintsSha256)fail('Provided authority projection digest mismatch');}
+ if(p.manifest.version===2&&!options.history&&(layer.profileId!==p.profileId||layer.profileSha256!==p.profileSha256))fail('Linked Jankó profile differs');
+ return layer;
+}
+/** Only performing-hand editorial fields may differ from the immutable source. */
+function musicalSourceProjection(score:QuantizedGridScore):unknown{
+ const q=structuredClone(score);
+ for(const n of q.notes){delete (n as Partial<typeof n>).hand;delete n.editorialHand;delete n.handInference;}
+ for(const e of q.writtenPresentation?.events.notes??[]){if(e.overrides){delete e.overrides.hand;delete e.overrides.editorialHand;delete e.overrides.handInference;if(!Object.keys(e.overrides).length)delete (e as Partial<typeof e>).overrides;}}
+ return q;
+}
+export function pianoPlanningScore(p:Pick<ScorePackage,'sourceScore'|'score'|'sourceSha256'|'manifest'|'calculationContext'>):QuantizedGridScore {
+ return scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256??p.manifest.semanticSha256);
+}
+export async function handDigest(source:QuantizedGridScore,effective:QuantizedGridScore,checkSource=true):Promise<string>{
+ const byId=new Map(effective.notes.map(n=>[n.id,n.hand]));
+ // Legacy reading must not acquire the planner's terminal-repeat restrictions.
+ if(!checkSource){const groups=new Map<string,typeof source.notes>();
+  for(const n of source.notes){const id=`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`;groups.set(id,[...(groups.get(id)??[]),n]);}
+  const attacks=[...groups.values()].sort((a,b)=>a[0].startTick-b[0].startTick||(a[0].pitch.octave*12+a[0].pitch.pitchClass)-(b[0].pitch.octave*12+b[0].pitch.pitchClass));
+  return hashBytes(JSON.stringify(attacks.flatMap(a=>a.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(o=>[o.id,byId.get(o.id)]))));}
+ const input=normalizeHandPlanningInput(source),requirements=compilePlanningRequirements(input);
+ for(const a of input.gestures.flatMap(g=>g.attacks)){const hands=new Set(a.owners.map(o=>byId.get(o.id)));
+  if(hands.size!==1||requirements.attackHands[a.id]&&!hands.has(requirements.attackHands[a.id]))fail('Linked performing hands contradict a source instruction or physical alias');}
+ return hashBytes(JSON.stringify(input.gestures.flatMap(g=>g.attacks.flatMap(a=>a.owners.map(o=>[o.id,byId.get(o.id)])))));
+}
+export async function selectPresentation(p:ScorePackage,id:PhysicalKeyboardId):Promise<ScorePackage>{
+ if(!layoutId(id))fail('Unsupported keyboard layout');
+ if(p.manifest.version===1){if(id!=='janko-four-row')fail('This package has no conventional-keyboard presentation');return p;}
+ const view=linkedViews.get(p)?.get(id);if(!view)fail('This package has no compatible presentation for the selected keyboard');return view;
+}
+export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId}={}):Promise<ScorePackage>{
+ if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;
+ const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
+ const parse=(name:string)=>{if(!files[name])fail(`Missing ${name}`);try{return JSON.parse(strFromU8(files[name]));}catch{return fail(`Invalid JSON: ${name}`);}};
+ const m=parse('manifest.json') as Manifest;
+ if(m.format!=='iso-score'||![1,2].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
+ if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
+ for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);}
+ let referenceMidi:Uint8Array|undefined;
+ if(m.referenceMidi!==undefined){if(!isObject(m.referenceMidi)||m.referenceMidi.file!=='reference.mid'||Object.keys(m.referenceMidi).length!==1||!m.files['reference.mid'])fail('Invalid/missing reference MIDI descriptor');referenceMidi=files['reference.mid'];validateReferenceMidi(referenceMidi);}
+ if(m.semanticSha256!==m.files['score.json']||m.revision!==m.semanticSha256)fail('Semantic revision mismatch');
+ async function presentation(viewManifest:Manifest,scoreName:string,seatsName:string,fingersName?:string,context:Partial<ScorePackage>={}):Promise<ScorePackage>{
+  const m=viewManifest;
+ const score=parse(scoreName) as QuantizedGridScore,seats=parse(seatsName) as Seat[];
+ if(score.id!==m.scoreId||!Array.isArray(score.notes)||!Number.isInteger(score.ticksPerBeat)||score.ticksPerBeat<=0||!Number.isInteger(score.totalTicks)||!Array.isArray(seats))fail('Invalid semantic score');
+ if(score.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(score.referencePerformanceTempo);else if(!options.allowLegacyTempo&&(m.version===1||!!fingersName&&!!files[fingersName]))requireReferencePerformanceTempo(score);
+ const notes=new Map(score.notes.map(n=>[n.id,n]));if(notes.size!==score.notes.length)fail('Duplicate source owner');
+ for(const n of score.notes){if(!n.id||!['LH','RH'].includes(n.hand)||!Number.isInteger(n.startTick)||!Number.isInteger(n.durationTicks)||n.startTick<0||n.durationTicks<=0||n.startTick+n.durationTicks>score.totalTicks||!Number.isInteger(n.pitch?.octave)||!Number.isInteger(n.pitch?.pitchClass)||n.pitch.pitchClass<0||n.pitch.pitchClass>11)fail('Invalid pitch/timing/hand');}
+ const seen=new Set<string>(),covered=new Set<string>();
+ for(const s of seats){if(seen.has(s.id)||!s.id||!Number.isInteger(s.page)||s.page<0||s.page>=m.pages.length||!Array.isArray(s.ownerIds)||!s.ownerIds.length||s.ownerIds.some(id=>!notes.has(id))||!s.actionId||!s.contactId||s.contactId!==s.actionId||![s.x,s.baseline,s.fontSize].every(Number.isFinite))fail('Invalid source-linked seat');seen.add(s.id);s.ownerIds.forEach(id=>covered.add(id));
+ const n=notes.get(s.ownerIds[0])!;if(!s.continuation&&s.actionId!==`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`)fail('Wrong physical action seat');
+ if(s.ownerIds.some(id=>{const q=notes.get(id)!;return q.hand!==n.hand||q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');}
+ if(covered.size!==notes.size)fail('Incomplete source-owner seating');
+ const pages=m.pages.map((name,i)=>{if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);return svg;});
+ m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
+
+  const p:ScorePackage={manifest:m,score,seats,pages,files,...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages)};
+  if(fingersName&&files[fingersName])p.fingerLayer=await validateLayerAsync(parse(fingersName),p);
+  return p;
+ }
+ if(m.version===1){const p=await presentation(m,'score.json','seats.json','fingers.json');
+  p.keyboardLayout='janko-four-row';p.availablePresentations=['janko-four-row'];p.sourceScore=p.score;p.sourceRevision=m.revision;p.sourceSha256=m.semanticSha256;
+  p.effectiveHandSha256=await handDigest(p.score,p.score,false);
+  if(typeof p.fingerLayer?.profileId==='string')p.profileId=p.fingerLayer.profileId;
+  if(typeof p.fingerLayer?.profileSha256==='string')p.profileSha256=p.fingerLayer.profileSha256;
+  return options.keyboardLayout?selectPresentation(p,options.keyboardLayout):p;
+ }
+ if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
+ const source=parse(m.sourceScore) as QuantizedGridScore;
+ if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
+ const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
+ const planningSource=scoreWithCalculationContext(source,calculationContext,m.sourceSha256!);
+ if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(Object.values(m.presentations).some(d=>d?.fingers))requireReferencePerformanceTempo(planningSource);freezeSource(source);
+ const views=new Map<PhysicalKeyboardId,ScorePackage>();
+ for(const [key,raw]of Object.entries(m.presentations)){
+  if(!layoutId(key)||!isObject(raw)||raw.layoutId!==key||typeof raw.score!=='string'||typeof raw.seats!=='string'||!Array.isArray(raw.pages)||!raw.pages.length||raw.pages.some((x:unknown)=>typeof x!=='string'||!m.files[x])||
+   !digest(raw.revision)||m.files[raw.score]!==raw.revision||!m.files[raw.seats]||typeof raw.profileId!=='string'||!raw.profileId||!digest(raw.profileSha256)||!digest(raw.effectiveHandSha256)||!digest(raw.layerSourceHash)||typeof raw.engineVersion!=='string'||!raw.engineVersion||
+   raw.fingers!==undefined&&(typeof raw.fingers!=='string'||!m.files[raw.fingers])||raw.renderingRecipe!==undefined&&(typeof raw.renderingRecipe!=='string'||!m.files[raw.renderingRecipe]))fail('Unsupported linked presentation descriptor');
+  const d=raw as PresentationDescriptor;
+  const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe};
+  const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(calculationContext?{calculationContext}:{})});
+  // Context is an explicit known field, never a blanket exclusion of source tempo.
+  if(calculationContext&&JSON.stringify(p.score.referencePerformanceTempo)!==JSON.stringify(calculationContext.referencePerformanceTempo))
+   fail('Linked presentation differs from its piano calculation reference');
+  if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
+  if(await handDigest(source,p.score)!==d.effectiveHandSha256)fail('Linked effective-hand identity differs');
+  if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});try{validateScoreRenderingRecipe(p.renderingRecipe,{sourceSha256:m.sourceSha256!});requireReferencePerformanceTempo(planningSource);p.generationAvailable=true;}catch{p.generationAvailable=false;}}
+  views.set(key,p);
+ }
+ const primary=views.get(m.keyboardLayout)!;
+ const d=m.presentations[m.keyboardLayout]!;
+ if(!primary||d.score!=='score.json'||d.seats!=='seats.json'||d.fingers!==('fingers.json' in m.files?'fingers.json':undefined)||
+  ['revision','engineVersion','profileId','profileSha256','effectiveHandSha256','layerSourceHash','renderingRecipe'].some(key=>(d as any)[key]!==((m as any)[key]))||JSON.stringify(d.pages)!==JSON.stringify(m.pages))fail('Linked primary presentation differs from root manifest');
+ for(const p of views.values()){p.availablePresentations=[...views.keys()];linkedViews.set(p,views);}
+ if(options.keyboardLayout)return selectPresentation(primary,options.keyboardLayout);
+ return primary;
+}
+/** Ordinary reading preserves historical v1 pages/fingers without inventing
+ * a performance reference. V2 supplied fingers and tempo-bound layers still
+ * pass their strict source/clock validators; generation and practice are gated. */
+export const importPackageForReading=(bytes:Uint8Array)=>importPackage(bytes,{allowLegacyTempo:true});
+export function archivePackage(manifest:Manifest,files:Record<string,Uint8Array>):Uint8Array{return zipSync({...files,'manifest.json':strToU8(JSON.stringify(manifest,null,2)+'\n')},{level:6});}
+export const libraryOrder=(a:Metadata,b:Metadata)=>a.composer.localeCompare(b.composer)||((a.opus??Infinity)-(b.opus??Infinity)||0)||((a.piece??Infinity)-(b.piece??Infinity)||0)||a.title.localeCompare(b.title);
+
+/** Explicit import may refresh metadata only; source/vector/font/assignments stay byte-identical. */
+export const sameFrozenPayload=(a:Manifest,b:Manifest)=>a.revision===b.revision&&JSON.stringify(Object.entries(a.files).sort())===JSON.stringify(Object.entries(b.files).sort());
+
+/** A narrow, explicit presentation refresh. Never admit general frozen-page changes. */
+export function headerOnlyRefresh(a:ScorePackage,b:ScorePackage):boolean {
+ const stable=(m:Manifest)=>{const {files,createdAt,...rest}=m;return JSON.stringify(rest);};
+ if(stable(a.manifest)!==stable(b.manifest)||JSON.stringify(a.fingerEligibility)!==JSON.stringify(b.fingerEligibility))return false;
+ const pageNames=new Set(a.manifest.pages),names=Object.keys(a.manifest.files);
+ if(names.length!==Object.keys(b.manifest.files).length||names.some(n=>!b.manifest.files[n]||!pageNames.has(n)&&a.manifest.files[n]!==b.manifest.files[n]))return false;
+ const split=(svg:string)=>{
+  const doc=new DOMParser().parseFromString(svg,'image/svg+xml'),headers=Array.from(doc.getElementsByTagName('g')).filter(g=>g.getAttribute('id')==='page-header');
+  if(headers.length!==1||headers[0].parentNode!==doc.documentElement||Array.from(headers[0].childNodes).some(n=>n.nodeType===1&&(n as unknown as Element).localName!=='text'))return;
+  const match=svg.match(/<g id="page-header">[\s\S]*?<\/g>/);if(!match||match.index===undefined)return;
+  const header=match[0],notices=[...header.matchAll(/    <text class="janko-source-notice"[^>]*>[^<]*<\/text>\n/g)].map(m=>m[0]);
+  return {outside:svg.slice(0,match.index)+'HEADER'+svg.slice(match.index+header.length),fixed:header.replace(/    <text class="janko-source-notice"[^>]*>[^<]*<\/text>\n/g,''),notices};
+ };
+ let changed=false;for(let i=0;i<a.pages.length;i++){
+  const x=split(a.pages[i]),y=split(b.pages[i]);if(!x||!y||x.outside!==y.outside||x.fixed!==y.fixed)return false;
+  // Only truncate appended print notices; title, composer, instruction and retained lines stay exact.
+  const prefix=(short:string[],long:string[])=>short.length<=long.length&&short.every((v,i)=>v===long[i]);
+  if(!prefix(x.notices,y.notices)&&!prefix(y.notices,x.notices))return false;
+  changed||=a.pages[i]!==b.pages[i];
+ }
+ return changed;
+}
+
+/** Reference changes are an import conflict, not a source or personal-state migration. */
+export function referenceMidiDiffers(a:ScorePackage,b:ScorePackage):boolean {
+ const x=a.collectionManifest??a.manifest,y=b.collectionManifest??b.manifest;
+ return JSON.stringify(x.referenceMidi)!==JSON.stringify(y.referenceMidi)||x.files['reference.mid']!==y.files['reference.mid'];
+}

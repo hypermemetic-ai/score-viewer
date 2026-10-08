@@ -1,0 +1,70 @@
+import {strToU8} from 'fflate';
+import {archivePackage,hashBytes,importPackage,type FingerLayer,type ScorePackage,type PresentationDescriptor} from './package';
+import {publishPackage} from './publication';
+import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
+import type {PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {RR_TEMPORAL_LAYER_PLANNER} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
+import {PIANO_ASSIGNMENT_VERSION} from '../vendor/iso-notation/src/model/piano-finger-assignments';
+
+export interface PianoPresentationPayload {
+  layoutId:PhysicalKeyboardId;sourceSha256:string;score:string;seats:string;pages:string[];
+  layer:FingerLayer;effectiveHandSha256:string;engineVersion:string;
+  recipe?:PassiveScoreRenderingRecipe;
+}
+
+/** Immutable checked assembly for either layout. Other presentations retain
+ * their exact bytes; publication first verifies the ORIGINAL installed pins. */
+export async function packagePianoPresentation(p:ScorePackage,next:PianoPresentationPayload):Promise<Uint8Array>{
+  const prior=(await publishPackage(p)).package,original=prior.collectionManifest??prior.manifest,
+    sourcePath=original.version===2?original.sourceScore!:'score.json',source=prior.files[sourcePath];
+  if(await hashBytes(source)!==next.sourceSha256||prior.sourceRevision!==next.sourceSha256)
+    throw Error('Calculated presentation has a different immutable source or collection identity.');
+  if(!['conventional-piano','janko-four-row'].includes(next.layoutId)||!next.pages.length||
+    typeof next.layer.profileId!=='string'||typeof next.layer.profileSha256!=='string')throw Error('Incomplete calculated piano presentation.');
+  const m=structuredClone(original),files:Record<string,Uint8Array>={...prior.files};delete files['manifest.json'];
+  const presentations={...(m.presentations??{})};
+  if(m.version===1){
+    if(!prior.fingerLayer||!prior.profileId||!prior.profileSha256||!prior.effectiveHandSha256)
+      throw Error('Legacy generation needs a declared compatible piano presentation; the old archive is retained.');
+    presentations['janko-four-row']={layoutId:'janko-four-row',score:'score.json',seats:'seats.json',fingers:'fingers.json',
+      pages:m.pages.slice(),revision:m.revision,profileId:prior.profileId,profileSha256:prior.profileSha256,
+      effectiveHandSha256:prior.effectiveHandSha256,layerSourceHash:prior.fingerLayer.sourceHash,engineVersion:m.engineVersion};
+  }
+  const replaced=new Set(['score.json','seats.json','fingers.json','rendering-recipe.json',...next.pages.map((_,i)=>`pages/${i+1}.svg`)]);
+  for(const [layout,d]of Object.entries(presentations)){
+    if(!d||layout===next.layoutId)continue;
+    if(![d.score,d.seats,d.fingers,d.renderingRecipe,...d.pages].some(name=>name&&replaced.has(name)))continue;
+    const prefix=`presentations/${layout}/`,relocate=(name:string)=>{
+      const target=prefix+name,bytes=prior.files[name];if(!bytes)throw Error('Retained piano presentation is incomplete.');
+      if(target in files&&bytesDiffer(files[target],bytes))throw Error('Retained presentation paths conflict.');
+      files[target]=bytes;return target;
+    };
+    presentations[layout as PhysicalKeyboardId]={...d,score:relocate(d.score),seats:relocate(d.seats),
+      ...(d.fingers?{fingers:relocate(d.fingers)}:{}),...(d.renderingRecipe?{renderingRecipe:relocate(d.renderingRecipe)}:{}),pages:d.pages.map(relocate)};
+  }
+  files['source-score.json']=source;files['score.json']=strToU8(next.score);files['seats.json']=strToU8(next.seats);
+  if(next.recipe)files['rendering-recipe.json']=strToU8(JSON.stringify(next.recipe));
+  else delete files['rendering-recipe.json'];
+  const revision=await hashBytes(files['score.json']);
+  // This known contract binds presentation revision as metadata. Its complete
+  // source/contact replay is revalidated below against the new actual score.
+  const layer=next.layer.plannerVersion===RR_TEMPORAL_LAYER_PLANNER||next.layer.version===PIANO_ASSIGNMENT_VERSION?{...next.layer,revision}:next.layer;
+  files['fingers.json']=strToU8(JSON.stringify(layer));
+  next.pages.forEach((page,i)=>files[`pages/${i+1}.svg`]=strToU8(page));
+  const selected:PresentationDescriptor={layoutId:next.layoutId,score:'score.json',seats:'seats.json',fingers:'fingers.json',
+    pages:next.pages.map((_,i)=>`pages/${i+1}.svg`),revision,profileId:next.layer.profileId,profileSha256:next.layer.profileSha256,
+    effectiveHandSha256:next.effectiveHandSha256,layerSourceHash:next.layer.sourceHash,engineVersion:next.engineVersion,
+    ...(next.recipe?{renderingRecipe:'rendering-recipe.json'}:{})};
+  presentations[next.layoutId]=selected;
+  Object.assign(m,{version:2,sourceScore:'source-score.json',sourceRevision:next.sourceSha256,sourceSha256:next.sourceSha256,
+    keyboardLayout:next.layoutId,revision,semanticSha256:revision,layerSourceHash:selected.layerSourceHash,
+    profileId:selected.profileId,profileSha256:selected.profileSha256,effectiveHandSha256:selected.effectiveHandSha256,
+    engineVersion:selected.engineVersion,pages:selected.pages,presentations});
+  if(selected.renderingRecipe)m.renderingRecipe=selected.renderingRecipe;else delete m.renderingRecipe;
+  m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
+  // Import validates every retained and new linked view, all source facts and
+  // full known layer replay. The publisher then removes unused old members.
+  const checked=await importPackage(archivePackage(m,files));
+  return(await publishPackage(checked)).bytes;
+}
+const bytesDiffer=(a:Uint8Array,b:Uint8Array)=>a.length!==b.length||a.some((v,i)=>v!==b[i]);
