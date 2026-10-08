@@ -18,6 +18,21 @@ test('successful installation activates staged versions in one final pointer whi
  assert.deepEqual(stored.get(result.entry.personalFiles![key]),personalBytes);assert.deepEqual(result.entry.retainedPackages,[entry.file]);
  assert.equal(prior.personalFiles,undefined);
 });
+test('edition snapshots retain the earlier state pointer even when a later edition uses the same hand storage key',async()=>{
+ const oldFile=`state-version-${'c'.repeat(64)}.json`,prior={...entry,personalFiles:{[key]:oldFile}},stored=new Map<string,Uint8Array>([[oldFile,bytes('old personal journal')]]);
+ const result=await stagePresentationInstall({async write(name,data){stored.set(name,data);}},
+  {entry:prior,entries:[prior],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('new personal journal')});
+ assert.deepEqual(result.entry.editionPersonalFiles?.[entry.file],{[key]:oldFile});
+ assert.notEqual(result.entry.personalFiles![key],oldFile);assert.deepEqual(stored.get(oldFile),bytes('old personal journal'));
+});
+test('stale library edition and superseded stage cannot activate or mutate its predecessor',async()=>{
+ await assert.rejects(stagePresentationInstall({async write(){assert.fail('stale request must not stage');}},
+  {entry,entries:[{...entry,file:`package-${'c'.repeat(64)}.isoscore`}],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('new choices')}),/library edition changed/);
+ const library=bytes('old library'),stored=new Map<string,Uint8Array>([['library.json',library]]);let active=true;
+ await assert.rejects(stagePresentationInstall({async write(name,data){stored.set(name,data);if(name.startsWith('state-version-'))active=false;}},
+  {entry,entries:[entry],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('new choices'),canCommit:()=>active}),/no longer active/);
+ assert.deepEqual(stored.get('library.json'),library);
+});
 test('cancellation after staging leaves active library pointer and sidecar unchanged',async()=>{
  const prior=bytes('old library'),oldState=bytes('old state'),stored=new Map<string,Uint8Array>([['library.json',prior],[key,oldState]]);
  await assert.rejects(stagePresentationInstall({async write(name,data){stored.set(name,data);}},

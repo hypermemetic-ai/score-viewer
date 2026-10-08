@@ -2,6 +2,7 @@ import {importPackage,validateLayerAsync} from './package';
 import {readPersonal} from './state';
 import type {PianoReadinessRequest,PianoReadinessResult} from './piano-readiness';
 import type {PianoReadinessWorkerMessage,PianoReadinessWorkerRequest} from './piano-readiness-worker-protocol';
+import {admitPianoRequestResult} from './piano-request-admission';
 
 export interface ReadinessWorker {
   onmessage:((event:MessageEvent<PianoReadinessWorkerMessage>)=>void)|null;
@@ -17,6 +18,8 @@ export function runPianoReadiness(request:PianoReadinessJobRequest,
   createWorker:()=>ReadinessWorker=()=>new Worker(new URL('./piano-readiness.worker.ts',import.meta.url),{type:'module'})):
   Promise<PianoReadinessResult>{
   const prior=request.packageBytes.slice();
+  const trusted={...request,packageBytes:prior,...(request.personal?{personal:structuredClone(request.personal)}:{}),
+    ...(request.referenceTempo?{referenceTempo:structuredClone(request.referenceTempo)}:{})};
   return new Promise(resolve=>{
     let done=false,worker:ReadinessWorker|undefined;
     const finish=(result:PianoReadinessResult)=>{
@@ -34,14 +37,22 @@ export function runPianoReadiness(request:PianoReadinessJobRequest,
         const result=event.data.result;
         if(!('packageBytes' in result)){finish(result);return;}
         try{
-          const p=await importPackage(result.packageBytes,{keyboardLayout:request.layout}),
-            layer=await validateLayerAsync(result.layer,p,{requireCurrent:true});
+          const p=await importPackage(result.packageBytes,{keyboardLayout:request.layout,allowLegacyTempo:request.intent==='read-retained'});
           const personal=result.personal?readPersonal(result.personal,p):undefined;
+          if(done)return;
+          if(result.status==='reading'){
+            if(request.intent!=='read-retained'||request.forceRecalculate)throw Error('A new calculation requires a complete admitted finger layer.');
+            await admitPianoRequestResult(trusted,p,result.packageBytes,undefined,personal);
+            if(done)return;
+            finish({...result,package:p,...(personal?{personal}:{})});return;
+          }
+          const layer=await validateLayerAsync(result.layer,p,{requireCurrent:request.intent!=='read-retained'});
+          await admitPianoRequestResult(trusted,p,result.packageBytes,layer,personal);
           if(done)return;
           finish({...result,package:p,layer,...(personal?{personal}:{})});
         }catch(error){failed((error as Error).message);}
       };
-      const {signal:_,onProgress:__,...wire}=request;
+      const {signal:_,onProgress:__,...wire}=trusted;
       worker.postMessage(wire);
     }catch(error){failed((error as Error).message);}
   });

@@ -7,24 +7,25 @@ export const defaultView=():ViewState=>({page:0,rotation:0,scale:1,count:1,advan
 /** Holds are presentation input, never durable view state or musical meaning. */
 export function effectiveLabelMode(view:ViewState,behavior:FingerBehavior,held:boolean,available=true,selecting=false,selectionPitchToggle=false):LabelMode{return !available?'pitch':selecting?(behavior==='momentary'?(held?'pitch':'finger'):(selectionPitchToggle?'pitch':'finger')):behavior==='momentary'?(held?'finger':'pitch'):view.labelMode;}
 export interface Correction {contactId:string;actionId:string;ownerIds:string[];original:number;replacement:number;originalPlanner:string;originalLayerSource:string;createdAt:string;writtenBar:number;pitch:number;hand:'LH'|'RH';proposedRow?:number;proposedContact?:PhysicalKeyContact}
-export interface PersonalBinding {sourceRevision:string;keyboardLayout:'conventional-piano'|'janko-four-row';profileId:string;profileSha256:string;effectiveHandSha256:string}
+export interface PersonalBinding {sourceRevision:string;keyboardLayout:'conventional-piano'|'janko-four-row';profileId:string;profileSha256:string;effectiveHandSha256:string;editionRevision?:string}
 export interface PersonalState {version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;overrides:Record<string,Correction>;undo?:Record<string,Correction>;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
 const personalBinding=(p:ScorePackage):PersonalBinding|undefined=>{
  if(p.manifest.version!==2)return;
  if(!p.sourceRevision||!p.keyboardLayout||!p.profileId||!p.profileSha256||!p.effectiveHandSha256)throw Error('Incomplete presentation state identity');
- return {sourceRevision:p.sourceRevision,keyboardLayout:p.keyboardLayout,profileId:p.profileId,profileSha256:p.profileSha256,effectiveHandSha256:p.effectiveHandSha256};
+ return {sourceRevision:p.sourceRevision,keyboardLayout:p.keyboardLayout,profileId:p.profileId,profileSha256:p.profileSha256,effectiveHandSha256:p.effectiveHandSha256,
+  ...(p.preparationIdentity?{editionRevision:p.manifest.revision}:{})};
 };
 export const collectionId=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
 function storageName(kind:string,entryId:string,p:ScorePackage):string{
  const binding=personalBinding(p);
  if(!binding)return `${kind}-${entryId}.json`;
- return `${kind}-${binding.sourceRevision}-${binding.keyboardLayout}-${binding.profileSha256}-${binding.effectiveHandSha256}.json`;
+ return `${kind}-${binding.sourceRevision}-${binding.keyboardLayout}-${binding.profileSha256}-${binding.effectiveHandSha256}${binding.editionRevision?'-'+binding.editionRevision:''}.json`;
 }
 export const personalStorageName=(entryId:string,p:ScorePackage)=>storageName('state',entryId,p);
 export const practiceStorageName=(entryId:string,p:ScorePackage)=>storageName('practice',entryId,p);
 export const performanceStorageName=(entryId:string,p:ScorePackage)=>storageName('performance',entryId,p);
 /** Read-only fallback only for the exact original Jankó revision; never rewrite it. */
-export const legacyPersonalStorageName=(p:ScorePackage)=>p.manifest.version===2&&p.keyboardLayout==='janko-four-row'&&p.sourceRevision===p.manifest.revision?`state-${p.sourceRevision}.json`:undefined;
+export const legacyPersonalStorageName=(p:ScorePackage)=>!p.preparationIdentity&&p.manifest.version===2&&p.keyboardLayout==='janko-four-row'&&p.sourceRevision===p.manifest.revision?`state-${p.sourceRevision}.json`:undefined;
 export const legacyPracticeStorageName=(p:ScorePackage)=>legacyPersonalStorageName(p)?.replace(/^state-/,'practice-');
 export const legacyPerformanceStorageName=(p:ScorePackage)=>legacyPersonalStorageName(p)?.replace(/^state-/,'performance-');
 export const initialPersonal=(p:ScorePackage):PersonalState=>({version:p.manifest.version===2?2:1,...(p.manifest.version===2?{binding:personalBinding(p)}:{}),revision:p.manifest.revision,view:defaultView(),overrides:{},history:[]});
@@ -34,7 +35,10 @@ export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJank
  let s=structuredClone(raw) as PersonalState;const binding=personalBinding(p);
  const legacy=options.allowLegacyJanko&&!!legacyPersonalStorageName(p)&&s.version===1&&s.revision===p.manifest.revision;
  if(legacy)s={...s,version:2,binding};
- if(s.version!==(binding?2:1)||s.revision!==p.manifest.revision||binding&&(!s.binding||Object.entries(binding).some(([key,value])=>(s.binding as unknown as Record<string,unknown>)[key]!==value))||!s.view||!s.overrides||typeof s.overrides!=='object'||Array.isArray(s.overrides)||!Array.isArray(s.history))throw Error('Saved source/layout/profile/hand revision differs; original data retained');
+ const matchesBinding=binding?!!s.binding&&typeof s.binding==='object'&&!Array.isArray(s.binding)&&
+   Object.keys(s.binding).length===Object.keys(binding).length&&Object.entries(binding).every(([key,value])=>
+     Object.prototype.hasOwnProperty.call(s.binding,key)&&(s.binding as unknown as Record<string,unknown>)[key]===value):s.binding===undefined;
+ if(s.version!==(binding?2:1)||s.revision!==p.manifest.revision||!matchesBinding||!s.view||!s.overrides||typeof s.overrides!=='object'||Array.isArray(s.overrides)||!Array.isArray(s.history))throw Error('Saved source/layout/profile/hand revision differs; original data retained');
  const v=s.view;if(![0,90,180,270].includes(v.rotation)||![1,.9,.75,.5].includes(v.scale)||![1,2,3].includes(v.count)||!['slide','group'].includes(v.advance)||!['pitch','finger'].includes(v.labelMode)||!['calculated','yours'].includes(v.fingerSet)||!Number.isInteger(v.page))throw Error('Invalid saved view');
  if(s.calculatedVersion!==undefined&&(!Number.isInteger(s.calculatedVersion)||s.calculatedVersion<0||s.calculatedVersion>=s.history.length))throw Error('Saved calculated version differs; data retained');
  // A stale optional cursor must never discard otherwise valid personal corrections.
@@ -74,4 +78,16 @@ export function viewportFit(w:number,h:number,v:ViewState,total:number,pageWidth
 }
 export function turnPage(v:ViewState,dir:1|-1,total:number,effectiveCount:number):ViewState{return {...v,page:Math.max(0,Math.min(total-1,v.page+dir*(v.advance==='group'?effectiveCount:1)))};}
 export const rotate=(r:Rotation)=>(r+90)%360 as Rotation;
-export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>}
+export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>}
+export function validEntryStorage(e:Entry):boolean {
+ const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v),
+   packageName=(v:unknown)=>typeof v==='string'&&/^package-[a-f0-9]{64}\.isoscore$/.test(v),
+   stateMap=(v:unknown)=>v===undefined||object(v)&&Object.entries(v).every(([key,file])=>
+     /^state-[a-f0-9]{64}(?:-(?:conventional-piano|janko-four-row)-[a-f0-9]{64}-[a-f0-9]{64}(?:-[a-f0-9]{64})?)?\.json$/.test(key)&&
+     key.startsWith(`state-${e.id}`)&&typeof file==='string'&&/^state-version-[a-f0-9]{64}\.json$/.test(file));
+ if(!e||!/^[a-f0-9]{64}$/.test(e.id)||!packageName(e.file)||!stateMap(e.personalFiles)||
+   e.presentations!==undefined&&!Array.isArray(e.presentations)||e.retainedPackages!==undefined&&!Array.isArray(e.retainedPackages))return false;
+ const packages=[e.file,...(e.presentations??[]),...(e.retainedPackages??[])];
+ return packages.every(packageName)&&(e.editionPersonalFiles===undefined||object(e.editionPersonalFiles)&&
+   Object.entries(e.editionPersonalFiles).every(([file,map])=>packageName(file)&&packages.includes(file)&&stateMap(map)));
+}

@@ -1,10 +1,10 @@
-import type {PianoReadinessRequest,PianoReadinessResult} from './piano-readiness';
+import type {PianoReadinessRequest,PianoReadinessResult,PianoReady,PianoReading} from './piano-readiness';
 import type {PianoCalculationOptions} from '../vendor/iso-notation/src/model/piano-finger-calculation';
 
 export type PianoReadinessWorkerRequest=Omit<PianoReadinessRequest,'signal'|'onProgress'>;
 export type PianoReadinessWorkerResult=
-  |Omit<Extract<PianoReadinessResult,{status:'ready'|'editable'}>,'package'>
-  |Omit<Exclude<PianoReadinessResult,{status:'ready'|'editable'}>,'retainedPackage'>;
+  |Omit<PianoReady,'package'>|Omit<PianoReading,'package'>
+  |Omit<Exclude<PianoReadinessResult,{status:'ready'|'editable'|'reading'}>,'retainedPackage'>;
 export type PianoReadinessWorkerMessage=
   |{type:'progress';progress:Parameters<NonNullable<PianoCalculationOptions['onProgress']>>[0]}
   |{type:'complete';result:PianoReadinessWorkerResult};

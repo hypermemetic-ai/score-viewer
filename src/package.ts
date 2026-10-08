@@ -13,13 +13,16 @@ import {validateReferenceMidi} from './reference-midi';
 import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
 import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {PIANO_ASSIGNMENT_VERSION,validatePianoAssignments} from '../vendor/iso-notation/src/model/piano-finger-assignments';
+import {validatePianoPreparationIdentity,type PianoPreparationIdentity} from './piano-preparation-identity';
+import {sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry} from '../vendor/iso-notation/src/score-presentation';
+import {admitCalculatedHandEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
 export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
 export interface Seat {id:string;page:number;ownerIds:string[];actionId:string;contactId:string;pitchDigit:string;x:number;baseline:number;fontSize:number;system:number;writtenBar:number;continuation?:boolean}
 export interface Metadata {title:string;composer:string;opus?:number;opusLabel?:string;piece?:number;provenance:string[];variant?:string}
-export interface Manifest {format:'iso-score';version:1|2;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext}
-export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string}
-export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext}
+export interface Manifest {format:'iso-score';version:1|2;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string}
+export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;calculationContext?:PianoCalculationContext|null}
+export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry}
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
 function fail(s:string):never{throw Error(s);}
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -208,6 +211,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   return p;
  }
  if(m.version===1){const p=await presentation(m,'score.json','seats.json','fingers.json');
+  if(p.score.performingHandPresentation||p.score.notes.some(n=>n.derivedHand)||m.calculatedHandReceipt||m.engineVersion===CALCULATED_HAND_SCORE_RENDERING_ENGINE)fail('Calculated editions require an independently preserved linked original source.');
   p.keyboardLayout='janko-four-row';p.availablePresentations=['janko-four-row'];p.sourceScore=p.score;p.sourceRevision=m.revision;p.sourceSha256=m.semanticSha256;
   p.effectiveHandSha256=await handDigest(p.score,p.score,false);
   if(typeof p.fingerLayer?.profileId==='string')p.profileId=p.fingerLayer.profileId;
@@ -218,28 +222,38 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  const source=parse(m.sourceScore) as QuantizedGridScore;
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
  const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
- const planningSource=scoreWithCalculationContext(source,calculationContext,m.sourceSha256!);
- if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(Object.values(m.presentations).some(d=>d?.fingers))requireReferencePerformanceTempo(planningSource);freezeSource(source);
+ if(source.performingHandPresentation||source.notes.some(n=>n.derivedHand))fail('Immutable original source cannot be substituted by a calculated display projection.');
+ freezeSource(source);
  const views=new Map<PhysicalKeyboardId,ScorePackage>();
  for(const [key,raw]of Object.entries(m.presentations)){
   if(!layoutId(key)||!isObject(raw)||raw.layoutId!==key||typeof raw.score!=='string'||typeof raw.seats!=='string'||!Array.isArray(raw.pages)||!raw.pages.length||raw.pages.some((x:unknown)=>typeof x!=='string'||!m.files[x])||
    !digest(raw.revision)||m.files[raw.score]!==raw.revision||!m.files[raw.seats]||typeof raw.profileId!=='string'||!raw.profileId||!digest(raw.profileSha256)||!digest(raw.effectiveHandSha256)||!digest(raw.layerSourceHash)||typeof raw.engineVersion!=='string'||!raw.engineVersion||
-   raw.fingers!==undefined&&(typeof raw.fingers!=='string'||!m.files[raw.fingers])||raw.renderingRecipe!==undefined&&(typeof raw.renderingRecipe!=='string'||!m.files[raw.renderingRecipe]))fail('Unsupported linked presentation descriptor');
+   raw.fingers!==undefined&&(typeof raw.fingers!=='string'||!m.files[raw.fingers])||raw.renderingRecipe!==undefined&&(typeof raw.renderingRecipe!=='string'||!m.files[raw.renderingRecipe])||raw.calculatedHandReceipt!==undefined&&(typeof raw.calculatedHandReceipt!=='string'||!m.files[raw.calculatedHandReceipt]))fail('Unsupported linked presentation descriptor');
   const d=raw as PresentationDescriptor;
-  const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe};
-  const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(calculationContext?{calculationContext}:{})});
+  const viewContext=d.calculationContext===undefined?calculationContext:d.calculationContext===null?undefined:validatePianoCalculationContext(d.calculationContext,m.sourceSha256!,source),
+    planningSource=scoreWithCalculationContext(source,viewContext,m.sourceSha256!);
+  if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(d.fingers)requireReferencePerformanceTempo(planningSource);
+  const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe,preparationIdentity:d.preparationIdentity,calculatedHandReceipt:d.calculatedHandReceipt};
+  if(viewContext)viewManifest.calculationContext=viewContext;else delete viewManifest.calculationContext;
+  const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(viewContext?{calculationContext:viewContext}:{})});
   // Context is an explicit known field, never a blanket exclusion of source tempo.
-  if(calculationContext&&JSON.stringify(p.score.referencePerformanceTempo)!==JSON.stringify(calculationContext.referencePerformanceTempo))
+  if(viewContext&&JSON.stringify(p.score.referencePerformanceTempo)!==JSON.stringify(viewContext.referencePerformanceTempo))
    fail('Linked presentation differs from its piano calculation reference');
-  if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
+  const derived=!!p.score.performingHandPresentation||p.score.notes.some(n=>n.derivedHand)||d.engineVersion===CALCULATED_HAND_SCORE_RENDERING_ENGINE||d.calculatedHandReceipt!==undefined;
+  if(derived){if(JSON.stringify(sourceFactsProjection(planningSource))!==JSON.stringify(sourceFactsProjection(p.score)))fail('Linked calculated presentation changes immutable musical source facts');}
+  else if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
   if(await handDigest(source,p.score)!==d.effectiveHandSha256)fail('Linked effective-hand identity differs');
   if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});try{validateScoreRenderingRecipe(p.renderingRecipe,{sourceSha256:m.sourceSha256!});requireReferencePerformanceTempo(planningSource);p.generationAvailable=true;}catch{p.generationAvailable=false;}}
+  if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
+  if(derived){if(!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
+   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats]);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
   views.set(key,p);
  }
  const primary=views.get(m.keyboardLayout)!;
  const d=m.presentations[m.keyboardLayout]!;
  if(!primary||d.score!=='score.json'||d.seats!=='seats.json'||d.fingers!==('fingers.json' in m.files?'fingers.json':undefined)||
-  ['revision','engineVersion','profileId','profileSha256','effectiveHandSha256','layerSourceHash','renderingRecipe'].some(key=>(d as any)[key]!==((m as any)[key]))||JSON.stringify(d.pages)!==JSON.stringify(m.pages))fail('Linked primary presentation differs from root manifest');
+  ['revision','engineVersion','profileId','profileSha256','effectiveHandSha256','layerSourceHash','renderingRecipe','calculatedHandReceipt'].some(key=>(d as any)[key]!==((m as any)[key]))||JSON.stringify(d.pages)!==JSON.stringify(m.pages)||JSON.stringify(d.preparationIdentity)!==JSON.stringify(m.preparationIdentity)||
+  d.calculationContext!==undefined&&JSON.stringify(d.calculationContext??undefined)!==JSON.stringify(m.calculationContext))fail('Linked primary presentation differs from root manifest');
  for(const p of views.values()){p.availablePresentations=[...views.keys()];linkedViews.set(p,views);}
  if(options.keyboardLayout)return selectPresentation(primary,options.keyboardLayout);
  return primary;

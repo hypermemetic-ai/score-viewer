@@ -1,7 +1,7 @@
 import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-planning-input';
 import {calculateConventionalPiano,type ConventionalSolverOptions} from '../vendor/iso-notation/src/model/conventional-piano-planner';
 import {conventionalFingerLayer,conventionalIdentityHash,validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
-import {renderScorePresentation,scoreWithPerformingHands} from '../vendor/iso-notation/src/render/janko/score-presentation';
+import {renderScorePresentation,replayRetainedHandPresentation} from '../vendor/iso-notation/src/score-presentation';
 import {validateScoreRenderingRecipe,SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 
@@ -23,7 +23,7 @@ export async function prepareConventionalPresentation(request:{sourceBytes:Uint8
   const input=normalizeHandPlanningInput(source),plan=calculateConventionalPiano(input,options),
     effectiveHandSha256=await conventionalIdentityHash(plan.assignments.map(a=>[a.id,a.hand]));
   if(!plan.replay.valid||!plan.replay.actionCertificate)throw Error('The calculation has no complete current hand-action replay. Existing pages are retained.');
-  const score=scoreWithPerformingHands(source,plan.assignments,plan.version+':'+effectiveHandSha256);
+  const presentation=await replayRetainedHandPresentation({editionId:'schumann-no14-conventional-actions-20261007',sourceBytes:request.sourceBytes,assignments:plan.assignments,recipe}),score=presentation.score;
   const layer=conventionalFingerLayer(input,plan,{sourceHash:sourceSha256,sourceBytesSha256:sourceSha256,
     inputSha256:await conventionalIdentityHash(input),layoutSha256:await conventionalIdentityHash(plan.layout),
     profileSha256:await conventionalIdentityHash(plan.profile),requirementsSha256:await conventionalIdentityHash(plan.requirements),
@@ -32,7 +32,6 @@ export async function prepareConventionalPresentation(request:{sourceBytes:Uint8
   await validateConventionalFingerLayer(layer,input,{sourceHash:sourceSha256,sourceBytesSha256:sourceSha256,
     effectiveHands:Object.fromEntries(score.notes.map(n=>[n.id,n.hand])),requireCurrent:true});
   if(options.signal?.aborted)throw Error('Calculation cancelled');
-  const presentation=renderScorePresentation(score,recipe);
   return{score:JSON.stringify(score),seats:JSON.stringify(presentation.seats),pages:presentation.pages,layer,recipe,
     sourceSha256,semanticSha256:await digest(JSON.stringify(score)),effectiveHandSha256,allFive:presentation.allFive,
     lint:{violations:presentation.lint.violations.length,warnings:presentation.lint.warnings.length},replay:plan.replay};
