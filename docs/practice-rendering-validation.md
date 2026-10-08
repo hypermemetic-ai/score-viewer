@@ -93,6 +93,34 @@ Use a separately installed Playwright/Chromium without changing application depe
 
 The rendering runner's `--baseline` option temporarily reads the reviewed planning/source commit's old practice renderer and styles, checks that the observed mismatch/residual defects are detected, and removes those temporary files in `finally`. `PRACTICE_FIXTURE_ONLY=1` narrows independent fixture investigation. Every browser closes in `finally`. Screenshots and private-score receipts remain outside Git; task-owned foreground servers are stopped before final task completion. The prerequisite source handoff retains ports 5205/5206 under explicit parent ownership for the separately authorized adaptive and final app validation; it is not a process-cleanup claim.
 
+## Post-merge UI spacing correction
+
+The isolated `fix/practice-ui-spacing` checkout starts from merged PR #2, `c068334ecd3bbbedba17699d7f3533286f9e2e60`. Its start Git helper reported a clean checkout. Dependencies were installed with locked `npm ci --ignore-scripts` under `qq-job`; package/lock files and the ISO pin remain unchanged. This correction changes selector typography/spacing and shared metronome presentation only. Saved range IDs, practice evidence, progression, slot placement, note geometry and keyboard semantics are unchanged.
+
+Current development-frontend receipt: `/tmp/score-viewer-practice-rendering/ui-spacing-final/after-results.json`, using this checkout's port 5207 at 1440×900. Completed, unfinished and original-component rows all measure 56 pixels high with equal 10/10/6/6-pixel padding, the existing system font at 16 pixels and text centers within 0.8 pixels of the highlight center. Human ranges use a spaced en dash and tabular numerals, while IDs remain `1-4` etc. No redundant joined arrow is painted; accessible component/evidence descriptions remain. First rows align and percentages remain at each list's right edge. The two list columns measure 138.97 pixels and retain their positions across leaf, parent and component selection. The temporary `125 – 128`/`100%` stress measures 157 pixels wide, with no overflow and 33.27 pixels between range and percentage; original labels are restored before captures.
+
+The personally inspected complete current selector image is `/tmp/score-viewer-practice-rendering/ui-spacing-final/after-schumann-janko-browser-partial.png`. It shows equal roomy rows, centered selected text, the mixed completion divider, retained whole-leaf notation and a single 44-pixel footer with Navigation's four arrows, Practice/Enter, Options/current binding and Score/Esc. The current receipt also verifies exact parent/component/nested-recommendation starts, late-component visibility, independent list scroll, both Include manual criteria and unchanged evidence. The observed Down snap retains its prior 56-pixel row at the top and selects the next 56 pixels below; observed Up clamps at the list start. The larger unclamped Up case remains helper-test evidence. Schumann rendering/removal/Pause, rotations and the production-renderer duration/relation/held-note fixtures passed on the same source. Both real-score and generic fixture pages now honor `PRACTICE_URL`; an earlier hardcoded fixture route had inspected the other checkout's server and is superseded by this complete run.
+
+Shared actual-main functional receipt: `/tmp/score-viewer-practice-rendering/metronome-separated-full/settings-results.json`. Its complete shared Options, numeric-draft, percent conversion, input/binding and persistence observations remain valid; the final SVG-only lowering has separate actual-main geometry/image evidence at `/tmp/score-viewer-practice-rendering/metronome-lowered/spacing.json`. Personally inspected complete pictures are `metronome-lowered/options-mark.png` and `metronome-lowered/performance-mark.png`. The original 20×27 viewport at 26×35 display restores the beat symbol's prior visual mass. Its 2-pixel visual lowering leaves the number on its normal baseline and slash/min fixed as separate elements. Dotted-quarter ink-to-slash air measures 8.73 pixels, slash-to-min air 4 pixels; the rational fallback has 6 pixels between number and fraction. All three numeric boxes remain aligned at x=928 with width 86. Performance remains a percentage above its absolute reference, and Practice target remains absolute. The earlier 4.59-pixel joined-suffix geometry above is superseded by this correction.
+
+Current focused browser/display/metronome checks passed 19/19 (`ui-spacing-final/focused-tests.log`) and configured TypeScript passed. Strict OpenSpec validation passed the change and all three main specifications; source-pin verification and scoped whitespace/ownership checks also passed. Full suite/build and emitted-frontend observations are intentionally pending the final combined adaptive snapshot; this UI lane does not claim a new production bundle or native acceptance. The previous headless unchanged-content capture limitation remains: only personally observed complete pictures are visual evidence, with no application paint workaround. This lane's port-5207 foreground server was stopped and its inspection browser contexts closed. Parent-owned 5205/5206 services remain for combined validation; global task 6.2 remains pending.
+
+Reproduce this bounded lane from its checkout with the foreground port-5207 job open:
+
+```sh
+/home/qqp/.local/bin/qq-job -- npm ci --ignore-scripts
+/home/qqp/.local/bin/qq-job -- npm run dev -- --host 127.0.0.1 --port 5207 --strictPort
+/home/qqp/.local/bin/qq-job -- node --import tsx --test test/practice-browser.test.ts test/practice-display.test.ts test/metronome-mark.test.ts
+/home/qqp/.local/bin/qq-job -- npm exec tsc -- --noEmit
+/home/qqp/.local/bin/qq-job -- env \
+ PRACTICE_URL=http://127.0.0.1:5207 \
+ PRACTICE_PLAYWRIGHT=/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs \
+ PRACTICE_CHROMIUM=/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome \
+ PRACTICE_ARTIFACTS=/tmp/score-viewer-practice-rendering/ui-spacing-final \
+ PRACTICE_SCORE_FILTER=schumann-janko \
+ node scripts/inspect-practice-rendering.mjs
+```
+
 ## Acceptance boundaries
 
 Source tests and frontend builds establish source compatibility. Browser geometry and screenshots establish only the observed frontend behavior under simulated input. Native Windows/Mac compilation and launch, physical MIDI/audio/pedal behavior, and pianist musical acceptance remain separate, pending checks. The release seam is documented in `migration.md`. The operator subsequently authorized adaptive refinement and paired native delivery, owned separately by the parent and its children. This prerequisite source receipt does not claim their final source/build/install results.
