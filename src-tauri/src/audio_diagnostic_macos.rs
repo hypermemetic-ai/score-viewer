@@ -79,6 +79,14 @@ fn initialized_macos_stream_buffer_restore() {
         .expect("selected CoreAudio initialized stream");
     bus.enable(true);
     bus.connect(100);
+    // Prove the sampler independently: no cue exists during this interval.
+    let piano_start = host.status().rendered_frames as usize;
+    bus.send(100, 1, 1, 60, 90);
+    let piano_begin = Instant::now();
+    while piano_begin.elapsed().as_secs_f64() < 0.5 {
+        host.pump().unwrap();
+    }
+    let piano_end = host.status().rendered_frames as usize;
     let stop = Arc::new(AtomicBool::new(false));
     let cue = Box::new(mixer::Cue::new(
         host.status().sample_rate,
@@ -88,7 +96,6 @@ fn initialized_macos_stream_buffer_restore() {
     let onset = cue.onset.clone();
     assert!(mailbox.publish(cue).is_ok());
     let begin = Instant::now();
-    bus.send(100, 1, 1, 60, 90);
     let mut off = false;
     let mut panic = false;
     while begin.elapsed().as_secs_f64() < 2.5 {
@@ -122,6 +129,20 @@ fn initialized_macos_stream_buffer_restore() {
         .iter()
         .any(|v| v.abs() > 0.001));
     let samples = &capture.samples[..capture.len];
+    let piano_start_sample = piano_start * capture.channels;
+    let piano_end_sample = piano_end * capture.channels;
+    assert!(piano_end_sample <= samples.len());
+    assert!(
+        piano_end_sample.saturating_sub(piano_start_sample)
+            >= (status.sample_rate as f64 * capture.channels as f64 * 0.4) as usize
+    );
+    let piano_only = &samples[piano_start_sample..piano_end_sample];
+    let piano_peak = piano_only.iter().fold(0f32, |p, v| p.max(v.abs()));
+    assert!(piano_only.iter().all(|v| v.is_finite()));
+    assert!(
+        piano_peak > 0.001,
+        "Piano-only phase must contain sampler PCM"
+    );
     let tail = &samples[samples
         .len()
         .saturating_sub(status.sample_rate as usize * capture.channels / 2)..];
@@ -165,7 +186,7 @@ fn initialized_macos_stream_buffer_restore() {
         pcm.extend_from_slice(&v.to_le_bytes());
     }
     std::fs::write(directory.join("submitted-pcm.wav"), pcm).unwrap();
-    let report = serde_json::json!({"version":1,"result":"passed","scope":"actual CoreAudio + tiny test-owned sampler/virtual MIDI; submitted float PCM","outputUid":uid,"outputName":name,"originalBufferFrames":original,"originalRate":rate,"samplerMaxBlockFrames":mixer::MAX_BLOCK,"low":status,"high":high_status,"finalBufferFrames":selected.current().unwrap(),"finalRate":selected.rate().unwrap(),"initializationFailureRestored":true,"explicitCloseRestored":true,"reconfigureRestored":true,"dropShutdownRestored":true,"panicTrailingPeak":tail_peak,"sampleCount":samples.len(),"physicalAcceptance":false,"sampleRateDefaultOrDriverChanges":false,"normalAppExitHookAcceptance":"source lifecycle hook; this diagnostic exercises Host drop/explicit close"});
+    let report = serde_json::json!({"version":1,"result":"passed","scope":"actual CoreAudio + tiny test-owned sampler/virtual MIDI; submitted float PCM","outputUid":uid,"outputName":name,"originalBufferFrames":original,"originalRate":rate,"samplerMaxBlockFrames":mixer::MAX_BLOCK,"low":status,"high":high_status,"finalBufferFrames":selected.current().unwrap(),"finalRate":selected.rate().unwrap(),"initializationFailureRestored":true,"explicitCloseRestored":true,"reconfigureRestored":true,"dropShutdownRestored":true,"pianoOnly":{"startFrame":piano_start,"endFrame":piano_end,"startSample":piano_start_sample,"endSample":piano_end_sample,"peak":piano_peak,"scope":"before cue publication"},"panicTrailingPeak":tail_peak,"sampleCount":samples.len(),"physicalAcceptance":false,"sampleRateDefaultOrDriverChanges":false,"normalAppExitHookAcceptance":"source lifecycle hook; this diagnostic exercises Host drop/explicit close"});
     std::fs::write(
         directory.join("macos-stream-diagnostic.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
