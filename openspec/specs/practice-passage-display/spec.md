@@ -87,6 +87,14 @@ Completed adjacent groups SHALL retain their compact joined range and accessible
 - **AND** further navigation uses the newly visible stretch without scrolling each selection by one row
 - **AND** an equivalent Up transition retains the previous top row at the bottom, with the new selection above it
 
+### Requirement: Consistent practice range rows
+Both selector lists and completed/unfinished sections SHALL use one roomier row rhythm, with text vertically centered within highlight and focus borders and aligned first-row baselines. Human measure ranges SHALL use consistently spaced dashes in the existing font without changing saved passage identities. Joined ranges SHALL retain accessible component identity without a redundant visible arrow.
+
+#### Scenario: Mixed completion beside original groups
+- **WHEN** completed joined ranges and unfinished leaf ranges appear beside original groups
+- **THEN** both lists use the same row height, padding and text centering regardless of completion status
+- **AND** each focused highlight encloses its centered row content, and three-digit ranges remain clear of right-aligned percentages
+
 ### Requirement: Quiet practice range context and progress summary
 Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the short Progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Component and joined-run rates SHALL remain independent. Full-score measure numbering, saved evidence/hierarchy, library aggregates, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
 
@@ -113,7 +121,7 @@ Practice strips SHALL omit visible individual measure numbers while retaining ac
 - **AND** toggling the checkbox or pressing its native keys does not start a passage or persist practice evidence changes
 
 ### Requirement: Bottom return guide
-The selector SHALL place its Score return action and Escape hint in the bottom controls, without a duplicate top-right Score control. Active practice SHALL identify its Escape return as Passages. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
+The selector SHALL place its Score return action and Escape hint in the bottom controls, without a duplicate top-right Score control. Active practice SHALL identify its Escape return as Passages. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations, using the existing main Options arrow-first layout, paired arrows, text sizing and spacing rather than a separate hint style. Both shared footers SHALL use Enter Open as a general activation hint without changing the focused control's actual Enter behavior. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
 
 #### Scenario: Return from practice to the score
 - **WHEN** the user presses Escape in active practice
@@ -177,6 +185,13 @@ Options SHALL have a configurable keyboard binding in the shared Keys and pedals
 - **THEN** the shared Options dialog opens with a Practice section first and the existing audio/MIDI, Keys and pedals, fingering display and applicable score controls below
 - **AND** active practice follows the existing Pause behavior without changing completion eligibility, progress, or speed policy, and closing Options retains the passage and paused session
 
+#### Scenario: Practice Options describes applicable actions
+- **WHEN** Options is opened from passage selection or active practice
+- **THEN** its shared binding panel omits irrelevant practice actions such as Edit fingers and page turning where no manual passage window can be browsed
+- **AND** an existing page-binding equivalent is labelled Previous measures or Next measures where paused passage-window browsing is supported
+- **AND** applicable finger display, Done and Options controls remain available, with Done shown for an active passage
+- **AND** hidden rows retain their exact saved binding identities and assignments for the full-score reader, with shared capture, conflict and Test ownership unchanged
+
 #### Scenario: Rebinding and guarded input
 - **WHEN** the user changes the Options binding or activates it while a field, modal, or binding capture owns input
 - **THEN** the binding entry and reader/practice buttons agree on its name and configured control
@@ -206,7 +221,7 @@ Selector rows SHALL retain achieved-speed percentages and genuine completion evi
 #### Scenario: Compact shared tempo units
 - **WHEN** practice targets, absolute score references or shared metronome markings are displayed
 - **THEN** the visible unit reads `/min` and assistive technology receives the equivalent spelled-out per-minute meaning
-- **AND** the number, source beat symbol and `/min` have cohesive spacing without a detached suffix
+- **AND** the inline number retains its normal text baseline, the beat symbol sits slightly lower for balanced visual mass beside the number, and slash and min are separately spaced elements with air on both sides of the slash
 - **AND** the beat duration and exact stored rate retain their existing musical meaning
 
 #### Scenario: Performance tempo relative to score reference

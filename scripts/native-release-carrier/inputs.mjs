@@ -1,0 +1,93 @@
+import {createHash} from 'node:crypto';
+import {readFile, readdir, lstat} from 'node:fs/promises';
+import {join} from 'node:path';
+
+export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+export const canonical = value => JSON.stringify(value);
+const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+const revision = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
+const fail = message => {throw Error(message);};
+export function safePath(path) {
+  if (typeof path !== 'string' || !path || path.includes('\\') || path.startsWith('/') || /^[A-Za-z]:/.test(path) || path.split('/').some(part => !part || part === '.' || part === '..')) fail(`Unsafe carrier path: ${path}`);
+  return path;
+}
+export async function inventory(root) {
+  const rootStat = await lstat(root);
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) fail(`Carrier inventory root must be a real directory: ${root}`);
+  const result = {};
+  async function visit(directory, prefix = '') {
+    for (const name of (await readdir(directory)).sort()) {
+      const path = safePath(prefix ? `${prefix}/${name}` : name), full = join(directory, name), stat = await lstat(full);
+      if (stat.isSymbolicLink()) fail(`Symlink in carrier input: ${path}`);
+      if (stat.isDirectory()) await visit(full, path);
+      else if (stat.isFile()) result[path] = {sha256:sha256(await readFile(full)), size:stat.size};
+      else fail(`Unexpected carrier input: ${path}`);
+    }
+  }
+  await visit(root);
+  return Object.fromEntries(Object.entries(result).sort(([a], [b]) => a.localeCompare(b)));
+}
+export function validatePins(files) {
+  if (!files || !Object.keys(files).length) fail('Empty carrier inventory');
+  for (const [path, pin] of Object.entries(files)) {
+    safePath(path);
+    if (!hash(pin?.sha256) || !Number.isSafeInteger(pin.size) || pin.size < 1) fail(`Invalid carrier pin: ${path}`);
+  }
+}
+export function validateSourceIdentity(identity) {
+  if (!identity || identity.schema !== 1 || identity.viewerRepository !== 'hypermemetic-ai/score-viewer' || identity.notationRepository !== 'hypermemetic-ai/iso-notation' || !revision(identity.viewerRevision) || !revision(identity.viewerTree) || !revision(identity.notationRevision) || !hash(identity.inputsSha256) || !hash(identity.frontendDigest) || !hash(identity.nativeDigest) || !hash(identity.checksSha256)) fail('Invalid viewer/notation carrier identity');
+}
+export function sourceIdentity(inputs, inputsBytes) {
+  const identity = {schema:1, viewerRepository:inputs.viewer.repository, viewerRevision:inputs.viewer.revision, viewerTree:inputs.viewer.tree,
+    notationRepository:inputs.notation.repository, notationRevision:inputs.notation.revision, inputsSha256:sha256(inputsBytes),
+    frontendDigest:inputs.frontend.digest, nativeDigest:sha256(canonical(inputs.nativeFiles)), checksSha256:inputs.checks.sha256};
+  validateSourceIdentity(identity);
+  return identity;
+}
+export function validateRecordedChecks(checks, inputs) {
+  if (checks.schema !== 1 || checks.viewerRevision !== inputs.viewer.revision || checks.notationRevision !== inputs.notation.revision || checks.frontendDigest !== inputs.frontend.digest || ['tests', 'build', 'browserInspection', 'independentReview'].some(name => checks.checks?.[name]?.status !== 'passed')) fail('Reviewed check receipt does not bind final source and frontend');
+}
+export async function validatePreparedCarrier(prepared, identity) {
+  validateSourceIdentity(identity.sourceInputs);
+  const bytes = await readFile(join(prepared, 'source-inputs.json')), inputs = JSON.parse(bytes);
+  if (canonical(sourceIdentity(inputs, bytes)) !== canonical(identity.sourceInputs)) fail('Prepared viewer/notation identity differs');
+  validatePins(inputs.frontend.files);
+  const actual = await inventory(join(prepared, 'frontend'));
+  delete actual['release-identity.json'];
+  if (canonical(actual) !== canonical(inputs.frontend.files) || sha256(canonical(actual)) !== inputs.frontend.digest) fail('Prepared frontend differs from the reviewed viewer build');
+  const checksBytes = await readFile(join(prepared, 'source-checks.json'));
+  if (sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Prepared reviewed checks differ');
+  validateRecordedChecks(JSON.parse(checksBytes), inputs);
+}
+export async function validateRecipientCarrier(files, prepared) {
+  for (const [recipient, original] of [['Source-provenance.json', 'source-inputs.json'], ['Source-validation.json', 'source-checks.json'], ['Release-identity.json', 'frontend/release-identity.json']]) {
+    const expected = await readFile(join(prepared, original));
+    if (!files[recipient] || !Buffer.from(files[recipient]).equals(expected)) fail(`Recipient source evidence differs: ${recipient}`);
+  }
+}
+export async function validateCarrierInputs(source, {expectedViewerRevision, expectedNotationRevision} = {}) {
+  const bytes = await readFile(join(source, 'delivery-input', 'inputs.json')), inputs = JSON.parse(bytes);
+  if (inputs.schema !== 1 || inputs.viewer?.repository !== 'hypermemetic-ai/score-viewer' || !revision(inputs.viewer.revision) || !revision(inputs.viewer.tree) || !Number.isFinite(Date.parse(inputs.viewer.timestamp)) || inputs.notation?.repository !== 'hypermemetic-ai/iso-notation' || !revision(inputs.notation.revision)) fail('Invalid reviewed carrier inputs');
+  if (expectedViewerRevision && inputs.viewer.revision !== expectedViewerRevision) fail('Viewer revision differs');
+  if (expectedNotationRevision && inputs.notation.revision !== expectedNotationRevision) fail('Notation revision differs');
+  validatePins(inputs.nativeFiles);
+  validatePins(inputs.frontend?.files);
+  if (inputs.frontend.digest !== sha256(canonical(inputs.frontend.files))) fail('Frozen frontend digest differs');
+  if (canonical(await inventory(join(source, 'delivery-input', 'frontend'))) !== canonical(inputs.frontend.files)) fail('Frozen frontend inventory differs');
+  const native = await inventory(join(source, 'score-viewer', 'src-tauri'));
+  const expectedNative = Object.fromEntries(Object.entries(inputs.nativeFiles).filter(([path]) => path.startsWith('src-tauri/')).map(([path, pin]) => [path.slice(10), pin]));
+  if (canonical(native) !== canonical(expectedNative)) fail('Native source inventory differs');
+  for (const [path, pin] of Object.entries(inputs.nativeFiles)) {
+    if (!/^(?:src-tauri\/|licenses\/|package(?:-lock)?\.json$)/.test(path)) fail(`Unexpected native source path: ${path}`);
+    const file = await readFile(join(source, 'score-viewer', path));
+    if (sha256(file) !== pin.sha256 || file.length !== pin.size) fail(`Native source pin differs: ${path}`);
+    if (path.startsWith('licenses/') && !(await readFile(join(source, path))).equals(file)) fail(`Shared/native notice differs: ${path}`);
+  }
+  const checksBytes = await readFile(join(source, 'delivery-input', 'checks.json'));
+  if (!hash(inputs.checks?.sha256) || sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Reviewed check receipt differs');
+  const checks = JSON.parse(checksBytes);
+  validateRecordedChecks(checks, inputs);
+  const packageJson = JSON.parse(await readFile(join(source, 'score-viewer', 'package.json'))), config = JSON.parse(await readFile(join(source, 'score-viewer', 'src-tauri', 'tauri.conf.json')));
+  if (packageJson.version !== inputs.version || config.version !== inputs.version || config.identifier !== 'dev.qqp.iso-score-viewer' || config.productName !== 'ISO Score Viewer') fail('Application identity differs');
+  return {inputs, checks, sourceInputs:sourceIdentity(inputs, bytes)};
+}
