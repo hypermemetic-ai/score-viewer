@@ -2,21 +2,21 @@
 
 ## 1. Owner-specific authority
 
-- [ ] 1.1 Extract conservative authority construction, recognize only known guarded automatic retention records, and verify authored tests for stale/unknown authority, selective operator choices and history-only state.
-- [ ] 1.2 Integrate authority admission before saved-layer reuse, remove blanket personal-history hand locks for new requests, and verify both-layout readiness tests preserve genuine source/operator requirements and prior bytes on conflict.
-- [ ] 1.3 Document joint-hand versus explicitly retained-hand requests and authority refusal in the Viewer companion documentation; verify documentation matches the implemented policy and diagnostics.
+- [x] 1.1 Extract conservative authority construction, recognize only known guarded automatic retention records, and verify authored tests for stale/unknown authority, selective operator choices and history-only state.
+- [x] 1.2 Integrate authority admission before saved-layer reuse, remove blanket personal-history hand locks for new requests, and verify both-layout readiness tests preserve genuine source/operator requirements and prior bytes on conflict.
+- [x] 1.3 Document joint-hand versus explicitly retained-hand requests and authority refusal in the Viewer companion documentation; verify documentation matches the implemented policy and diagnostics.
 
 ## 2. Calculation/presentation compatibility
 
-- [ ] 2.1 Add deterministic passive preparation identity bound to source, context, keyboard/profile, policy/constraints, canonical complete assignment and recipe/payload; verify permutation stability and every binding's mutation refusal.
-- [ ] 2.2 Preserve and independently validate identity through assembly/publication/import; gate new-request saved-layer reuse on exact compatible identity and verify policy/context/recipe changes cannot reuse an old layer.
-- [ ] 2.3 Distinguish frozen-edition reading from explicit new calculation in worker/application flows; verify historical pages remain accessible without regeneration and new requests use the admitted policy.
+- [x] 2.1 Add deterministic passive preparation identity bound to source, context, keyboard/profile, policy/constraints, canonical complete assignment and recipe/payload; verify permutation stability and every binding's mutation refusal.
+- [x] 2.2 Preserve and independently validate identity through assembly/publication/import; gate new-request saved-layer reuse on exact compatible identity and verify policy/context/recipe changes cannot reuse an old layer.
+- [x] 2.3 Distinguish frozen-edition reading from explicit new calculation in worker/application flows; verify historical pages remain accessible without regeneration and new requests use the admitted policy.
 
 ## 3. Personal state and retained editions
 
-- [ ] 3.1 Carry only explicitly compatible active corrections into a changed edition, keep old undo/layers/history in their original sidecar, and verify owner/hand/profile/contact/alias conflicts retain prior state.
-- [ ] 3.2 Expose retained editions with matching frozen pages/seats and personal/practice history; verify selection does not trigger recalculation or display an old-hand layer on new-hand pages.
-- [ ] 3.3 Verify atomic installation retains old package/state pointers on package write, state write, cancellation, supersession and library change; document edition rollback and inspect the actual control flow.
+- [x] 3.1 Carry only explicitly compatible active corrections into a changed edition, keep old undo/layers/history in their original sidecar, and verify owner/hand/profile/contact/alias conflicts retain prior state.
+- [x] 3.2 Expose retained editions with matching frozen pages/seats and personal/practice history; verify selection does not trigger recalculation or display an old-hand layer on new-hand pages.
+- [x] 3.3 Verify atomic installation retains old package/state pointers on package write, state write, cancellation, supersession and library change; document edition rollback and inspect the actual control flow.
 
 ## 4. Exact ISO hand-presentation integration
 

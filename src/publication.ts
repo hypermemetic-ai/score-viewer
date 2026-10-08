@@ -52,7 +52,7 @@ export async function publishPackage(p:ScorePackage,referenceMidi?:Uint8Array):P
   const snapshot=Object.fromEntries(entries.map(([n,b])=>[n,new Uint8Array(b)]));
   for(const [name,pin] of Object.entries(original.files))if(!snapshot[name]||await hashBytes(snapshot[name])!==pin)throw Error('Integrity mismatch: '+name);
   const m:Manifest=structuredClone(original);
-  if(m.version===1){delete m.sourceScore;delete m.sourceRevision;delete m.sourceSha256;delete m.renderingRecipe;delete m.presentations;delete m.calculationContext;}
+  if(m.version===1){delete m.sourceScore;delete m.sourceRevision;delete m.sourceSha256;delete m.renderingRecipe;delete m.presentations;delete m.calculationContext;delete m.preparationIdentity;}
   const names=publicationMembers(m),files:Record<string,Uint8Array>={};
   for(const name of names){if(!snapshot[name])throw Error('Missing publication member: '+name);files[name]=snapshot[name];}
   validateNotices(m,files);

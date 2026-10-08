@@ -5,11 +5,14 @@ import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical
 import type {PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import {RR_TEMPORAL_LAYER_PLANNER} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
 import {PIANO_ASSIGNMENT_VERSION} from '../vendor/iso-notation/src/model/piano-finger-assignments';
+import {createPianoPreparationIdentity} from './piano-preparation-identity';
+import type {PerformingHandPolicy} from './piano-request-authority';
 
 export interface PianoPresentationPayload {
   layoutId:PhysicalKeyboardId;sourceSha256:string;score:string;seats:string;pages:string[];
   layer:FingerLayer;effectiveHandSha256:string;engineVersion:string;
   recipe?:PassiveScoreRenderingRecipe;
+  preparationRequest?:{handPolicy:PerformingHandPolicy;maxExpansions?:number};
 }
 
 /** Immutable checked assembly for either layout. Other presentations retain
@@ -61,10 +64,16 @@ export async function packagePianoPresentation(p:ScorePackage,next:PianoPresenta
     profileId:selected.profileId,profileSha256:selected.profileSha256,effectiveHandSha256:selected.effectiveHandSha256,
     engineVersion:selected.engineVersion,pages:selected.pages,presentations});
   if(selected.renderingRecipe)m.renderingRecipe=selected.renderingRecipe;else delete m.renderingRecipe;
+  delete m.preparationIdentity;
   m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
   // Import validates every retained and new linked view, all source facts and
   // full known layer replay. The publisher then removes unused old members.
-  const checked=await importPackage(archivePackage(m,files));
+  let checked=await importPackage(archivePackage(m,files));
+  if(next.preparationRequest){
+    const identity=await createPianoPreparationIdentity(checked,next.preparationRequest.handPolicy,next.preparationRequest.maxExpansions);
+    m.preparationIdentity=selected.preparationIdentity=identity;
+    checked=await importPackage(archivePackage(m,files));
+  }
   return(await publishPackage(checked)).bytes;
 }
 const bytesDiffer=(a:Uint8Array,b:Uint8Array)=>a.length!==b.length||a.some((v,i)=>v!==b[i]);
