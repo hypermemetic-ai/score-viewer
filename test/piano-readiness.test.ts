@@ -3,7 +3,8 @@ import {strToU8} from 'fflate';
 import {ensurePianoReady} from '../src/piano-readiness';
 import {archivePackage,hashBytes,importPackage,selectPresentation} from '../src/package';
 import {publishPreparedNative,publishPackage} from '../src/publication';
-import {corrected,initialPersonal,fingerFor} from '../src/state';
+import {corrected,initialPersonal,fingerFor,personalStorageName,legacyPersonalStorageName} from '../src/state';
+import {loadPersonalJournal,PersonalJournalError} from '../src/personal-journal';
 import {stagePresentationInstall} from '../src/presentation-install';
 import {prepareRetainedEdition} from '../src/retained-editions';
 import type {Entry} from '../src/state';
@@ -266,4 +267,31 @@ test('earlier edition reads exact pages and its own correction journal, without 
  await assert.rejects(prepareRetainedEdition({async read(){assert.fail('Unlisted files must not be read');}},installed.entry,'../unknown','janko-four-row'),/not a declared/);
  const corrupted=new Uint8Array(old.packageBytes);corrupted[20]^=1;
  await assert.rejects(prepareRetainedEdition({async read(){return corrupted;}},installed.entry,file,'janko-four-row'),/saved identity/);
+});
+
+test('an archived package with a missing declared journal cannot restore an empty state or borrow another valid legacy journal',async()=>{
+ const original=await prepared(),calculated=await ensurePianoReady({packageBytes:original.bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});
+ assert.equal(calculated.status,'editable');
+ // Public authored legacy edition with a genuine complete layer, before the
+ // optional Viewer preparation identity/storage suffix was introduced.
+ const manifest=structuredClone(calculated.package.collectionManifest??calculated.package.manifest),files={...calculated.package.files};
+ delete files['manifest.json'];delete manifest.preparationIdentity;delete manifest.presentations!['janko-four-row']!.preparationIdentity;
+ const archive=archivePackage(manifest,files),p=await importPackage(archive),file=`package-${await hashBytes(archive)}.isoscore`,
+  key=personalStorageName(p.sourceRevision!,p),legacy=legacyPersonalStorageName(p)!;
+ assert.ok(legacy);
+ const other=corrected(p,initialPersonal(p),p.seats[0],p.fingerLayer!.attacks[0].finger===1?2:1),
+  missing=`state-version-${'f'.repeat(64)}.json`,entry:Entry={id:p.sourceRevision!,file:`package-${await hashBytes(calculated.packageBytes)}.isoscore`,
+   metadata:p.manifest.metadata,importedAt:'now',retainedPackages:[file],editionPersonalFiles:{[file]:{[key]:missing}}},
+  before=structuredClone(entry),library=strToU8(JSON.stringify({version:1,entries:[entry]})),
+  stored=new Map<string,Uint8Array>([[file,archive],[legacy,strToU8(JSON.stringify(other))],['library.json',library]]),reads:string[]=[];
+ let writes=0;const host={async read(name:string){reads.push(name);return stored.get(name)??null;},async write(){writes++;}};
+ await assert.rejects((async()=>{
+  const retained=await prepareRetainedEdition(host,entry,file,'janko-four-row');
+  await stagePresentationInstall(host,{entry,entries:[entry],packageBytes:retained.packageBytes,
+   personalBytes:strToU8(JSON.stringify(retained.personal)),personalKey:key,personalFiles:retained.personalFiles});
+ })(),error=>error instanceof PersonalJournalError&&error.code==='retained-journal');
+ assert.equal(writes,0);assert.deepEqual(entry,before);assert.deepEqual(stored.get('library.json'),library);assert.deepEqual(reads,[file,missing]);
+ await assert.rejects(loadPersonalJournal(host,{...entry,personalFiles:{[key]:missing}},p),error=>
+  error instanceof PersonalJournalError&&error.code==='personal-journal');
+ assert.equal(reads.includes(legacy),false,'Even an independently valid alternate legacy journal is not a missing declared pointer');
 });

@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {personalForCalculatedEdition,PersonalEditionConflict} from '../src/presentation-install';
-import {initialPersonal,corrected,validEntryStorage,readPersonal,personalStorageName,practiceStorageName,performanceStorageName,type Entry} from '../src/state';
+import {initialPersonal,corrected,validEntryStorage,readPersonal,personalStorageName,legacyPersonalStorageName,practiceStorageName,performanceStorageName,type Entry} from '../src/state';
+import {loadPersonalJournal,PersonalJournalError} from '../src/personal-journal';
 import type {ScorePackage} from '../src/package';
 // These are isolated state-boundary fixtures. They do not assert rendered page
 // admission, which requires the exact reviewed ISO real-engine contract.
@@ -58,4 +59,22 @@ test('library storage accepts only source-scoped declared edition state maps',()
  assert.equal(validEntryStorage({...e,editionPersonalFiles:{'../unknown':{}}}),false);
  assert.equal(validEntryStorage({...e,editionPersonalFiles:{[e.retainedPackages![0]]:{[`state-${'f'.repeat(64)}.json`]:`state-version-${'d'.repeat(64)}.json`}}}),false);
  assert.equal(validEntryStorage({...e,editionPersonalFiles:[] as any}),false);
+});
+test('missing declared journal refuses normal, retained and pending-save loads before any legacy or memory fallback',async()=>{
+ const p=fixture();p.manifest.revision=p.sourceRevision!;
+ const key=personalStorageName('',p),legacy=legacyPersonalStorageName(p)!,memory=corrected(p,initialPersonal(p),p.seats[0],4),
+  entry={id:p.sourceRevision!,personalFiles:{[key]:'state-version-'+ 'f'.repeat(64)+'.json'}} as Entry,
+  reads:string[]=[],host={async read(name:string){reads.push(name);return name===legacy?new TextEncoder().encode(JSON.stringify(memory)):null;}};
+ for(const retained of [false,true]){
+  await assert.rejects(loadPersonalJournal(host,entry,p,{retained,fallbackPersonal:memory}),error=>
+   error instanceof PersonalJournalError&&error.code===(retained?'retained-journal':'personal-journal')&&/declared personal journal is missing/.test(error.message));
+ }
+ assert.deepEqual(reads,[entry.personalFiles![key],entry.personalFiles![key]],'A missing explicit pointer must not read a different bare legacy journal');
+});
+test('unmapped brand-new and original legacy journals remain legitimate without inventing state for unreadable existing files',async()=>{
+ const p=fixture();p.manifest.revision=p.sourceRevision!;
+ const entry={id:p.sourceRevision!} as Entry,initial=initialPersonal(p),legacy=legacyPersonalStorageName(p)!,saved=corrected(p,initial,p.seats[0],4),old={...saved,version:1,binding:undefined};
+ assert.deepEqual(await loadPersonalJournal({async read(){return null;}},entry,p),initial);
+ assert.deepEqual(await loadPersonalJournal({async read(name){return name===legacy?new TextEncoder().encode(JSON.stringify(old)):null;}},entry,p),saved);
+ await assert.rejects(loadPersonalJournal({async read(){return new TextEncoder().encode('null');}},entry,p),/journal cannot be read/);
 });

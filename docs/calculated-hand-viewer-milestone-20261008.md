@@ -30,3 +30,17 @@ Local review artifacts are in `/tmp/viewer-calculated-hand-milestone-20261008/`:
 The authored source hash is `f6047ff499afca83f768512bed13321efcae81aef92b3034a98995fa50f8a767`. The previous archive hash is `5dced1c1347df05e9855fe8c9810eb41f5e3936c389c2cf149a1f618a0d2db60`; the later archive hash is `7e4527dcd0970fb35d6d80598832248c6510d328dbd38a1f85673e62028c8a19`. The old/new complete assignment hashes are respectively `7b4971ead6b9b24b530e8ca6c64a48768be7098a99841ee439f4537106498cf7` and `fbe10f23e03e444c8278043034178b70a23b4669e736c4428e610c4c76a6982c`. The receipt records both complete Viewer identities and the actual retained passive recipe. Their page payload is unchanged in this same-hand control.
 
 These captures establish the edition control and restoration flow on a public authored fixture. They do not establish new mixed-hand beams, independent source rests, tie/grace/occurrence coverage, dense whole-page geometry or player ergonomics. Those require the reviewed ISO strong source/authority and actual paint audits plus complete-page/focused-passage review, followed by the coordinated native delivery boundary. Metadata hashes and ledgers cannot replace that acceptance.
+
+## Persistence review follow-up
+
+Parent review identified that a missing explicitly mapped journal could fall through to another legacy file or a fresh state. The shared `loadPersonalJournal` now refuses a missing declared version pointer before fallback or writes. Earlier-edition restoration reports `retained-journal`; normal opening and pending personal saves report `personal-journal`. When no pointer exists, legitimate first opens and the original guarded legacy fallback still work. An existing unreadable/null journal cannot authorize an empty state.
+
+The real authored archive regression includes an available package, a missing declared journal and another valid corrected legacy journal: restoration refuses before staging, makes zero writes and leaves the library/current pointer intact. Normal and pending-save helper checks also refuse before reading the alternate file. Focused state/readiness/installation checks pass 29/29, the repeated full Viewer suite passes 428/428, and build/typecheck/source-pin/strict selected validation/diff checks pass.
+
+Isolated Chromium observations additionally exercised actual earlier-edition and normal-open refusal. Both showed the specific missing-journal message with zero storage writes, unchanged library bytes and no browser page errors. The earlier-edition control retained its current page; normal opening remained in the library. Captures were inspected, and the temporary preview server was stopped. Additional artifacts in the same local directory:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `missing-journal-retained.png` | `4a91f008f007eceae07161eaadba9a818ee2e92d3fccb8781b753f8e39829da9` |
+| `missing-journal-normal.png` | `13caecf218624569b0a61779cff7e5bf0f5f537443bedd7b38eafaf0db22be82` |
+| `missing-journal-observation.json` | `f0aa6b46256985a3d5769e976d2d48adc484b66813b4e2bbc684272a05a1938d` |
