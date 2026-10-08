@@ -1,0 +1,27 @@
+## 1. Installer and cache
+
+- [x] 1.1 Implement bounded streaming ZIP snapshot, exact identity admission, safe metadata, disk checks and CRC/hash extraction.
+- [x] 1.2 Implement local SFZ closure, retained original notices, per-file admission marker and atomic private cache publication/verification.
+- [ ] 1.3 Implement off-thread native picker/status/cancel commands and bounded fixed-author-page Download command.
+- [x] 1.4 Verify generated fixtures for unsafe paths/symlinks/bounds/CRC/closure/cancel/disk failure and preservation of a prior bank.
+- [x] 1.5 Observe the real original bank through the production installer path without another Internet download.
+
+## 2. Frontend preferences and Options
+
+- [x] 2.1 Implement additive disabled-by-default Piano/volume/latency preferences and readiness-gated configuration, preserving unrelated settings.
+- [x] 2.2 Add Download/Install/status and Piano controls beneath Audio, including four-choice Latency setting and compact owned delayed-sound help with concise platform-relevant guidance.
+- [x] 2.3 Inspect actual frontend installation/ready/error/cancel states, keyboard ownership and saved/reopened preferences.
+
+## 3. Engine and shared native host
+
+- [ ] 3.1 Integrate reviewed native engine FFI/build/dependencies and notices, loading only the verified managed SFZ path off callback.
+- [ ] 3.2 Integrate one shared Windows/macOS host, native MIDI queue before WebView, piano configure/status and cue coexistence.
+- [ ] 3.3 Verify connection/output/reset/disconnect/overflow transitions, sustain/release, native sound independent of focus/minimization and actual output tier/rate/RAW/fallback reporting, plus Mac legal shared-buffer changes and owned restoration on disable/output change/reconfigure/normal exit.
+
+## 4. Combined delivery
+
+- [ ] 4.1 Run meaningful focused checks, final combined full source tests/configured frontend build and native/engine integration checks.
+- [ ] 4.2 Independently review source/carrier/license closure and obtain paired native build/package evidence.
+- [ ] 4.3 Preserve the current installation/data, admit the local original bank via the same installer, activate the reviewed Windows replacement and record stream observations.
+- [ ] 4.4 Stop task-owned processes and finish scoped Git/PR/source-versus-installed receipts for the delivered candidate.
+- [ ] 4.5 Record operator physical MIDI/audio/pedal acceptance separately after delivery; keep this pending until actually observed.
