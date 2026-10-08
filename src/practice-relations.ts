@@ -63,12 +63,14 @@ function overlaps(a:ExpressionInk,b:ExpressionInk){
 /** Relations are projected independently of frozen note seats. Source identities
  * select tips, source contours supply side/body/taper, and the pinned primitive
  * paints one complete ribbon. Runs never bridge a nonconsecutive source wrap. */
-export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>):ProjectedRelation[]{
+export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>,placements?:ReadonlyArray<{bar:number;x:number}>):ProjectedRelation[]{
  const selected=positions.filter((b):b is number=>b!==undefined),min=Math.min(...selected),max=Math.max(...selected),relations=sources(p,plan).filter(q=>q.end>=plan.barTicks[min]&&q.start<plan.barTicks[max+1]),offsets:number[]=[];let x=0;
- for(const bar of positions){offsets.push(x);const c=crops.find(c=>c.bar===bar);x+=policy==='fixed'?track.width:c?c.right-c.left:0;}
+ for(const bar of positions){if(placements&&bar!==undefined){const placement=placements.find(p=>p.bar===bar);if(!placement)throw Error(`Measure ${bar+1}: missing admitted relation placement.`);x=placement.x;}offsets.push(x);const c=crops.find(c=>c.bar===bar);x+=policy==='fixed'?track.width:c?c.right-c.left:0;}
  const runs:Array<{first:number;last:number}>=[];for(let slot=0;slot<positions.length;slot++){if(positions[slot]===undefined)continue;const last=runs.at(-1);if(last&&positions[last.last]!+1===positions[slot])last.last=slot;else runs.push({first:slot,last:slot});}
- const output:ProjectedRelation[]=[],settled:ExpressionInk[]=[];
- for(const run of runs){const aBar=positions[run.first]!,bBar=positions[run.last]!,left=offsets[run.first],last=crops.find(c=>c.bar===bBar)!,right=offsets[run.last]+(policy==='fixed'?track.width:last.right-last.left);
+ const output:ProjectedRelation[]=[];
+ // Different source runs have disjoint clips and an explicit staff break.
+ // Ghost endpoints outside one clip must not displace a bow in another run.
+ for(const run of runs){const settled:ExpressionInk[]=[],aBar=positions[run.first]!,bBar=positions[run.last]!,left=offsets[run.first],last=crops.find(c=>c.bar===bBar)!,right=offsets[run.last]+(policy==='fixed'?track.width:last.right-last.left);
   const mapped=(seat:Seat,sourceX:number)=>{
    const bar=seat.writtenBar-1,c=crops.find(c=>c.bar===bar);
    if(bar>=aBar&&bar<=bBar){if(!c)throw Error('Missing displayed relation source interval.');return offsets[positions.indexOf(bar)]+sourceX-c.left;}

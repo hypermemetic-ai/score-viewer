@@ -149,14 +149,15 @@ export function fitPassageFrame(p:ScorePackage,plan:PracticePlan,crops:Crop[],tr
  for(const positions of windows){const passage=composePassage(crops,track,policy,positions,projectRelations(p,plan,crops,track,policy,positions));mount.append(passage.svg);try{const b=passageInkBounds(passage,p);left=Math.min(left,b.x0);right=Math.max(right,b.x1);}finally{passage.svg.remove();}}
  track.frame={left:left-.8,right:right+.8};return track;
 }
-/** One source-to-display translation per position. Compact previews retain
- * literal widths; active positions reserve the same width across every refill.
- * Content, seats, fingers and playhead share the same nested source frame. */
-export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>=crops.map(c=>c.bar),projected?:ProjectedRelation[]):Passage {
+/** One source-to-display translation per position. Compact previews and
+ * explicit refills retain literal source widths; fixed manual windows reserve
+ * equal slots. Content, seats, fingers and playhead share one source frame. */
+export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>=crops.map(c=>c.bar),projected?:ProjectedRelation[],placements?:ReadonlyArray<{bar:number;x:number}>):Passage {
  const svg=document.createElementNS(ns,'svg'),prefix=`practice-${++sequence}-`,defs=document.createElementNS(ns,'defs'),placed:Crop[]=[];
  svg.classList.add('practice-passage');svg.setAttribute('preserveAspectRatio','xMinYMin meet');svg.append(defs);
  let x=0;
  for(const [slot,bar]of positions.entries()){
+  if(placements&&bar!==undefined){const placement=placements.find(p=>p.bar===bar);if(!placement)throw Error(`Measure ${bar+1}: missing admitted placement.`);x=placement.x;}
   const crop=crops.find(c=>c.bar===bar),width=policy==='fixed'?track.width:crop?crop.right-crop.left:0;
   if(!crop){x+=width;continue;}
   crop.owned.forEach(({el},i)=>el.setAttribute('data-practice-owned',String(i)));

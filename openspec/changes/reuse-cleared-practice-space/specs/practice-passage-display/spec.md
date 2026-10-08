@@ -12,6 +12,11 @@ Measured active practice SHALL retain the current measure's exact position and s
 - **THEN** complete admitted notation is framed naturally with substantial outer breathing room and a clear left inset
 - **AND** subsequent hides/refills do not recenter the surface or change the protected current measure
 
+#### Scenario: Live finger display and status changes retain reading references
+- **WHEN** a measured count-in or trial toggles finger display, clears or changes status text, refills, or pauses without a viewport change
+- **THEN** required source residency and reading retirement continue through live finger display while the admitted common scale and screen origin remain fixed
+- **AND** finger visibility retains its existing owner semantics and paused/error/preparation phases do not fabricate accepted attacks or advance residency
+
 #### Scenario: Protected and eligible source positions
 - **WHEN** measured practice has accepted every required attack in an older measure and entered a later reading measure
 - **THEN** its old ordinary ink can retire as incoming music is atomically allocated around the current measure
