@@ -84,3 +84,15 @@ checks and operator musical acceptance remain separate final integration gates.
 Source paths and private diagnostic logs are under the existing
 `score-viewer-piano-benchmark-20261008` state directory. All engine-lane build/test
 processes exited before its scoped source handoff.
+
+The first combined Windows Tauri graph compiled its source and C++ engine but
+failed to link: tauri-build 2.7.1's default partial `static_vcruntime` helper
+disabled `libucrt` and requested dynamic `ucrt`, while Rust's whole-target
+`crt-static` directives did the reverse. The standalone probe did not exercise
+that Tauri helper. The source build script now uses the supported
+`WindowsAttributes::static_vc_runtime(false)` only for Windows-MSVC targets
+whose actual target features include `crt-static`. This disables only Tauri's
+conflicting helper; Rust/C++ retain their matching static CRT and ordinary
+Tauri resource/ACL generation still runs through `try_build`. Other targets
+retain `tauri_build::build`. No dependency, workflow or vendor bytes changed.
+The revised combined native link/import/runtime checks remain required.
