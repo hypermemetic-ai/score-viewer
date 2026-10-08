@@ -15,7 +15,7 @@ Measured connected practice SHALL retire eligible old ink, allocate incoming mus
 - **AND** the current measure retains its exact position and size
 
 ### Requirement: Preserve original measure interiors
-Every resident measure SHALL retain its admitted internal note spacing and geometry at one common scale. Allocation SHALL move whole measure intervals rather than stretch their interiors. Genuine source adjacency SHALL remain coherent; wraps SHALL retain unambiguous labels and SHALL NOT imply false musical adjacency.
+Every resident measure SHALL retain its admitted internal note spacing and geometry at one common scale. Allocation SHALL move whole measure intervals rather than stretch their interiors. Genuine source adjacency SHALL remain coherent; wraps SHALL retain accessible source identities and explicit nonconsecutive staff breaks and SHALL NOT imply false musical adjacency. Practice strips SHALL remain free of visible individual measure numbers, with selected-range context outside the notation.
 
 #### Scenario: Incoming wide measure across an original system break
 - **WHEN** a wider source measure enters the display

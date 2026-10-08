@@ -20,7 +20,7 @@ Measured active practice SHALL retain the current measure's exact position and s
 
 #### Scenario: A joined run wraps through resident positions
 - **WHEN** replacement displays resident bars across a genuine reading-order wrap
-- **THEN** current-measure references, source order and measure labels remain clear
+- **THEN** current-measure references, source order and accessible source identities remain clear, with an explicit staff break at each nonconsecutive boundary
 - **AND** consecutive source measures have coherent notation without falsely connecting a nonconsecutive wrap
 
 ### Requirement: Complete note-ink ownership
