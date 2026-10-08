@@ -10,6 +10,8 @@ export const pianoSourceManifest = `${pianoVendorPrefix}provenance.json`;
 export const windowsBuildConfig = '.cargo/config.toml';
 export const macPianoDiagnosticPrefix = 'native-validation/piano-coreaudio/';
 export const macPianoDiagnosticTest = 'practice_audio::diagnostic_macos::initialized_macos_stream_buffer_restore';
+const modificationNotice = 'BUILD-MODIFICATIONS.md';
+const modificationSource = 'piano-build/WINDOWS-UTF8-COMPATIBILITY.md';
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const fail = message => {throw Error(`Piano release inputs: ${message}`);};
 const revision = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
@@ -67,13 +69,22 @@ export function inspectPianoInputs(nativeFiles, noticeBytes, sourceBytes) {
   if (!Array.isArray(source.excluded) || source.excluded.some(name => {path(name); return Object.hasOwn(source.files, name);})) fail('invalid excluded source inventory');
   if (!Array.isArray(source.licenses) || !source.licenses.length || source.licenses.some(name => {path(name); return !Object.hasOwn(source.files, name);}) || new Set(source.licenses).size !== source.licenses.length) fail('invalid source license inventory');
 
-  const expectedNotices = {[pianoNoticeManifest]:nativeFiles[pianoNoticeManifest]}, packetFiles = {'notices/piano/manifest.json':nativeFiles[pianoNoticeManifest]};
+  const expectedNotices = {[pianoNoticeManifest]:nativeFiles[pianoNoticeManifest]}, packetFiles = {'notices/piano/manifest.json':nativeFiles[pianoNoticeManifest]}, buildModifications = {};
   for (const [name, record] of Object.entries(notices.files)) {
     path(name);
     if (name === 'manifest.json') fail('recursive notice manifest');
-    const expected = pin(record, name), original = name === 'provenance.json' ? nativeFiles[pianoSourceManifest] : expectedVendor[`${pianoVendorPrefix}${name}`];
+    const expected = pin(record, name);
+    let original;
+    if (Object.hasOwn(record,'sourcePath')) {
+      if (name !== modificationNotice || record.sourcePath !== modificationSource) fail(`unapproved authored notice mapping ${name}`);
+      original = pin(nativeFiles[`src-tauri/${modificationSource}`],modificationSource);
+      buildModifications[name] = {sourcePath:modificationSource,...expected};
+    } else {
+      if (name === modificationNotice) fail('build modification disclosure requires its exact source binding');
+      original = name === 'provenance.json' ? nativeFiles[pianoSourceManifest] : expectedVendor[`${pianoVendorPrefix}${name}`];
+      if (name !== 'provenance.json' && !source.licenses.includes(name)) fail(`notice is not an authored license ${name}`);
+    }
     if (!equalPin(expected, original)) fail(`notice does not match original engine source ${name}`);
-    if (name !== 'provenance.json' && !source.licenses.includes(name)) fail(`notice is not an authored license ${name}`);
     expectedNotices[`${pianoNoticePrefix}${name}`] = expected;
     packetFiles[`notices/piano/${name}`] = expected;
   }
@@ -84,6 +95,7 @@ export function inspectPianoInputs(nativeFiles, noticeBytes, sourceBytes) {
   const metadata = {name:notices.name, version:notices.version, repository:source.engine.repository, revision:notices.revision,
     components:source.components, sourceManifestSha256:sha256(sourceBytes), noticeManifestSha256:sha256(noticeBytes),
     windowsBuildConfigSha256:windowsConfig.sha256,
+    buildModifications,
     sourceFileCount:Object.keys(source.files).length, sourceBytes:Object.values(expectedVendor).reduce((total, record) => total + record.size, 0),
     noticeFiles:Object.fromEntries(Object.entries(packetFiles).sort(([a], [b]) => a.localeCompare(b)))};
   return {metadata, packetFiles};
@@ -101,7 +113,9 @@ export async function validatePianoSources(viewer, nativeFiles) {
   await readPinned(join(viewer, windowsBuildConfig), nativeFiles[windowsBuildConfig], windowsBuildConfig);
   const notices = await readPinned(join(viewer, pianoNoticeManifest), nativeFiles[pianoNoticeManifest], pianoNoticeManifest);
   const source = await readPinned(join(viewer, pianoSourceManifest), nativeFiles[pianoSourceManifest], pianoSourceManifest);
-  return inspectPianoInputs(nativeFiles, notices, source);
+  const piano = inspectPianoInputs(nativeFiles, notices, source);
+  for (const record of Object.values(piano.metadata.buildModifications)) await readPinned(join(viewer,'src-tauri',record.sourcePath),record,record.sourcePath);
+  return piano;
 }
 async function carrierNativeFiles(source) {
   return JSON.parse(await readFile(join(source, 'delivery-input', 'inputs.json'))).nativeFiles;
@@ -226,15 +240,23 @@ export function validateMacPianoDiagnostic(files) {
     const channels = wave.readUInt16LE(22), rate = wave.readUInt32LE(24), count = (wave.length - 44) / 4;
     if (channels < 1 || channels > 32 || rate !== report.originalRate || wave.readUInt32LE(28) !== rate * channels * 4 || wave.readUInt16LE(32) !== channels * 4 ||
         count !== report.sampleCount || count < rate * channels / 2 || count % channels) fail('Mac submitted PCM dimensions differ');
-    let peak = 0, tailPeak = 0;
+    const piano = report.pianoOnly;
+    if (!piano || piano.scope !== 'before cue publication' ||
+        ['startFrame','endFrame','startSample','endSample'].some(name => !Number.isSafeInteger(piano[name]) || piano[name] < 0) ||
+        piano.startSample !== piano.startFrame * channels || piano.endSample !== piano.endFrame * channels ||
+        piano.endSample > count || piano.endSample - piano.startSample < rate * channels * 0.4 ||
+        !Number.isFinite(piano.peak) || piano.peak <= 0.001) fail('missing or invalid Mac piano-only interval');
+    let peak = 0, tailPeak = 0, pianoPeak = 0;
     const tailStart = Math.max(0,count - Math.floor(rate * channels / 2));
     for (let index = 0; index < count; index++) {
       const sample = wave.readFloatLE(44 + index * 4);
       if (!Number.isFinite(sample)) fail('non-finite Mac submitted PCM');
       peak = Math.max(peak,Math.abs(sample));
       if (index >= tailStart) tailPeak = Math.max(tailPeak,Math.abs(sample));
+      if (index >= piano.startSample && index < piano.endSample) pianoPeak = Math.max(pianoPeak,Math.abs(sample));
     }
     if (peak <= 0.001 || tailPeak >= 0.00001 || !Number.isFinite(report.panicTrailingPeak) || Math.abs(tailPeak - report.panicTrailingPeak) > 1e-10) fail('Mac sampler/panic PCM evidence differs');
+    if (pianoPeak <= 0.001 || Math.abs(pianoPeak - piano.peak) > 1e-7) fail('Mac piano-only PCM evidence differs');
     check = {status:'passed'};
   } else fail(`Mac audio diagnostic did not complete: ${report.result}`);
   const actual = Object.keys(files).filter(name => name.startsWith(macPianoDiagnosticPrefix));

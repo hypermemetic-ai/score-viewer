@@ -61,6 +61,15 @@ async function addPiano(f) {
   await file(f.viewer,'src-tauri/piano-notices/manifest.json',JSON.stringify({schema:1,name:'Dusk-Fizz/sfizz',version:'1.2.3',revision,files:Object.fromEntries(Object.entries(noticeFiles).map(([name,bytes])=>[name,{size:Buffer.byteLength(bytes),sha256:sha256(bytes)}]))},null,2)+'\n');
   await bindViewer(f);
 }
+async function addModificationDisclosure(f) {
+  const sourcePath='piano-build/WINDOWS-UTF8-COMPATIBILITY.md',bytes='Authored disclosure of exact private Windows UTF-8 build-copy transformation.\n';
+  await file(f.viewer,`src-tauri/${sourcePath}`,bytes);
+  await file(f.viewer,'src-tauri/piano-notices/BUILD-MODIFICATIONS.md',bytes);
+  const path=join(f.viewer,'src-tauri/piano-notices/manifest.json'),manifest=JSON.parse(await readFile(path));
+  manifest.files['BUILD-MODIFICATIONS.md']={size:Buffer.byteLength(bytes),sha256:sha256(bytes),sourcePath};
+  await writeFile(path,JSON.stringify(manifest,null,2)+'\n');
+  await bindViewer(f);
+}
 
 test('carrier freezes exact final native inputs and frontend with independent source identities',async()=>withFixture(async f=>{
   const result=await createCarrier(args(f));
@@ -202,11 +211,11 @@ function macDiagnostic(result='passed') {
     const status={ready:true,running:true,outputUid:'fixture-output-uid',sampleRate:48000,bufferFrames:128,periodFrames:128,mode:'coreaudio-hal-current',latencyTier:0,error:null};
     report={version:1,result:'passed',outputUid:'fixture-output-uid',outputName:'Fixture',originalBufferFrames:512,finalBufferFrames:512,originalRate:48000,finalRate:48000,
       low:status,high:{...status,latencyTier:2,bufferFrames:480,periodFrames:480},initializationFailureRestored:true,explicitCloseRestored:true,reconfigureRestored:true,dropShutdownRestored:true,
-      panicTrailingPeak:0,sampleCount:48000,physicalAcceptance:false,sampleRateDefaultOrDriverChanges:false,normalAppExitHookAcceptance:'source lifecycle hook; this diagnostic exercises Host drop/explicit close'};
+      panicTrailingPeak:0,sampleCount:96000,pianoOnly:{startFrame:0,endFrame:24000,startSample:0,endSample:24000,peak:0,scope:'before cue publication'},physicalAcceptance:false,sampleRateDefaultOrDriverChanges:false,normalAppExitHookAcceptance:'source lifecycle hook; this diagnostic exercises Host drop/explicit close'};
     const pcm=Buffer.alloc(44+report.sampleCount*4);
     pcm.write('RIFF');pcm.writeUInt32LE(pcm.length-8,4);pcm.write('WAVEfmt ',8);pcm.writeUInt32LE(16,16);pcm.writeUInt16LE(3,20);pcm.writeUInt16LE(1,22);
     pcm.writeUInt32LE(48000,24);pcm.writeUInt32LE(192000,28);pcm.writeUInt16LE(4,32);pcm.writeUInt16LE(32,34);pcm.write('data',36);pcm.writeUInt32LE(pcm.length-44,40);
-    for(let i=0;i<12000;i++)pcm.writeFloatLE(Math.sin(i)*0.15,44+i*4);
+    for(let i=0;i<12000;i++) {pcm.writeFloatLE(Math.sin(i)*0.15,44+i*4);report.pianoOnly.peak=Math.max(report.pianoOnly.peak,Math.abs(pcm.readFloatLE(44+i*4)));}
     files[`${macPianoDiagnosticPrefix}submitted-pcm.wav`]=pcm;
     files[`${macPianoDiagnosticPrefix}fixture.wav`]=Buffer.from('test-owned fixture');
     files[`${macPianoDiagnosticPrefix}fixture.sfz`]=Buffer.from('<region> sample=fixture.wav');
@@ -236,6 +245,10 @@ test('Mac passed diagnostic binds initialized streams, restored HAL state and ac
   assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:nan}),/non-finite/);
   const panic=Buffer.from(files[waveName]);panic.writeFloatLE(0.2,panic.length-4);
   assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:panic}),/sampler\/panic PCM/);
+  const cueOnly=Buffer.from(files[waveName]);cueOnly.fill(0,44);
+  for(let i=24000;i<36000;i++)cueOnly.writeFloatLE(Math.sin(i)*0.15,44+i*4);
+  assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:cueOnly}),/piano-only PCM/);
+  assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,pianoOnly:{...report.pianoOnly,endSample:report.sampleCount+1}})),/piano-only interval/);
 });
 
 test('Mac runner invokes the exact opted-in test and binds recipient evidence',async()=>withFixture(async f=>{
@@ -269,6 +282,34 @@ test('changed engine notices are refused before any carrier mutation',async()=>w
   await file(f.viewer,'src-tauri/piano-notices/LICENSE','A different license\n');await bindViewer(f);
   await assert.rejects(createCarrier(args(f)),/curated notice pin differs/);
   assert.equal(git(f.iso,'status','--porcelain'),'');
+}));
+
+test('only the exact reviewed build-modification disclosure may use an authored source binding',async()=>withFixture(async f=>{
+  await addPiano(f);await addModificationDisclosure(f);await createCarrier(args(f));
+  const {inputs}=await validateCarrierInputs(f.iso),packet=join(f.root,'disclosure-packet');
+  const metadata=await packagePianoNotices(f.iso,join(f.iso,'score-viewer'),packet);
+  const disclosure=metadata.buildModifications['BUILD-MODIFICATIONS.md'];
+  assert.equal(disclosure.sourcePath,'piano-build/WINDOWS-UTF8-COMPATIBILITY.md');
+  assert.equal(sha256(await readFile(join(packet,'notices/piano/BUILD-MODIFICATIONS.md'))),inputs.nativeFiles['src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md'].sha256);
+  const bytes=await readFile(join(f.iso,'score-viewer/src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md'));
+  await file(f.iso,'score-viewer/src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md','Changed reviewed disclosure');
+  await assert.rejects(validateCarrierInputs(f.iso),/Native source inventory differs/);
+  await file(f.iso,'score-viewer/src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md',bytes);
+}));
+
+test('authored notice mappings cannot replace upstream licenses or select other application files',async()=>withFixture(async f=>{
+  await addPiano(f);await addModificationDisclosure(f);
+  const path=join(f.viewer,'src-tauri/piano-notices/manifest.json'),original=JSON.parse(await readFile(path));
+  for(const mutate of [
+    manifest=>{manifest.files['BUILD-MODIFICATIONS.md'].sourcePath='build.rs';},
+    manifest=>{manifest.files.LICENSE.sourcePath='piano-build/WINDOWS-UTF8-COMPATIBILITY.md';},
+    manifest=>{delete manifest.files['BUILD-MODIFICATIONS.md'].sourcePath;},
+    manifest=>{manifest.files['BUILD-MODIFICATIONS.md'].sha256='1'.repeat(64);},
+  ]) {
+    const manifest=structuredClone(original);mutate(manifest);await writeFile(path,JSON.stringify(manifest));await bindViewer(f);
+    await assert.rejects(createCarrier(args(f)),/unapproved authored notice mapping|requires its exact source binding|does not match original/);
+    assert.equal(git(f.iso,'status','--porcelain'),'');
+  }
 }));
 
 test('unrecorded engine source is refused before any carrier mutation',async()=>withFixture(async f=>{
