@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createCarrier} from '../scripts/create-native-release-carrier.mjs';
 import {canonical, inventory, sha256, sourceIdentity, validateCarrierInputs, validatePreparedCarrier, validateRecipientCarrier} from '../scripts/native-release-carrier/inputs.mjs';
+import {packagePianoNotices, validatePianoRecipient, verifyBundledPianoNotices, addPianoWorkerChecks, requirePianoWorkerChecks, verifyWindowsPianoRuntime, validateMacPianoDiagnostic, runMacPianoDiagnostic, macPianoDiagnosticPrefix, macPianoDiagnosticTest} from '../scripts/native-release-carrier/score-viewer-piano-release.mjs';
 
 function git(root, ...args) {return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();}
 async function file(root, path, bytes) {await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),bytes);}
@@ -14,8 +15,9 @@ async function fixture() {
   const root=await mkdtemp(join(tmpdir(),'score-viewer-carrier-test-')),iso=join(root,'iso'),viewer=join(root,'viewer'),frontend=join(root,'frontend'),checks=join(root,'checks.json');
   for(const path of [iso,viewer,frontend])await mkdir(path);
   git(iso,'init','-q');git(viewer,'init','-q');
-  await file(iso,'scripts/score-viewer-delivery.mjs',"import {brotliDecompressSync} from 'node:zlib';\nexport function validateIdentity(identity) {}\nfunction prepared() {\n  validateIdentity(manifest.identity);\n  const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';\n    const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];\n  return {sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score};\n}\n");
-  await file(iso,'scripts/score-viewer-native-worker.mjs',"import {performance} from 'node:perf_hooks';\nasync function input() {\n  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n}\n");
+  await file(iso,'scripts/score-viewer-delivery.mjs',"import {brotliDecompressSync} from 'node:zlib';\nexport function validateIdentity(identity) {}\nfunction prepared() {\n  validateIdentity(manifest.identity);\n  const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';\n    const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];\n  if(receipt.nativeChecks?.tests!=='passed')throw Error('worker');\n    if(receipt.nativeChecks?.tests!=='passed')throw Error('pair');\n  return {sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score};\n}\n");
+  await file(iso,'scripts/score-viewer-native-worker.mjs',"import {performance} from 'node:perf_hooks';\nasync function input() {\n  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n}\nexport async function notices(source,viewer,packet,targetTriple) {\n  await writeJson(join(packet,'native-dependencies.json'),{manifestSha256:sha256(await readFile(join(viewer,'src-tauri','Cargo.toml')))});\n}\nasync function finishWorker() {\n  const hashes=await inventory(packet);\n}\n");
+  await file(iso,'scripts/build-score-viewer-macos.mjs',"import {performance} from 'node:perf_hooks';\nawait ctx.stage('nativeBuildMs',()=>run());\nconst bundledNoticeHashes={};\n");
   await file(iso,'licenses/NOTICE.txt','Shared notice\n');
   await file(iso,'score-viewer/src-tauri/old.rs','old native fixture\n');
   await file(iso,'.gitignore','score-viewer/dist\n');
@@ -24,6 +26,8 @@ async function fixture() {
   await file(viewer,'package-lock.json','{"lockfileVersion":3}\n');
   await file(viewer,'src-tauri/tauri.conf.json',JSON.stringify({version:'0.1.0',identifier:'dev.qqp.iso-score-viewer',productName:'ISO Score Viewer'}));
   await file(viewer,'src-tauri/Cargo.toml','[package]\nname="iso-score-viewer"\nversion="0.1.0"\n');
+  await file(viewer,'src-tauri/build.rs','fn main() { build_native_engine(); tauri_build::build() }\n');
+  await file(viewer,'src-tauri/piano-build/CMakeLists.txt','cmake_minimum_required(VERSION 3.20)\nproject(piano LANGUAGES C CXX)\n');
   await file(viewer,'licenses/NOTICE.txt','Shared notice\n');
   await file(viewer,'docs/source-provenance.json',JSON.stringify({dependencyRevision:notationRevision}));
   await file(viewer,'.gitmodules','[submodule "vendor/iso-notation"]\n path = vendor/iso-notation\n url = https://example.invalid/iso-notation\n');
@@ -40,6 +44,32 @@ async function fixture() {
 }
 async function withFixture(fn) {const f=await fixture();try{await fn(f);}finally{await rm(f.root,{recursive:true,force:true});}}
 const args=f=>({viewerSource:f.viewer,viewerRevision:f.viewerRevision,frontend:f.frontend,checks:f.checks,isoCarrier:f.iso});
+async function bindViewer(f) {
+  f.viewerRevision = await commit(f.viewer);
+  f.receipt.viewerRevision = f.viewerRevision;
+  await writeFile(f.checks,JSON.stringify(f.receipt,null,2)+'\n');
+}
+async function addPiano(f) {
+  await file(f.viewer,'.cargo/config.toml','[target.\'cfg(all(windows, target_env="msvc"))\']\nrustflags = ["-C", "target-feature=+crt-static"]\n');
+  const revision='4'.repeat(40), originals={'LICENSE':'Engine fixture license\n','synth.cpp':'int piano_fixture() { return 1; }\n','external/dependency/LICENSE':'Dependency fixture license\n','unlinked/LICENSE':'Unlinked source-only license fixture\n'};
+  const source={schema:1,engine:{repository:'https://github.com/dusk-audio/dusk-fizz',revision},components:[{path:'.',revision},{path:'external/dependency',revision:'5'.repeat(40)}],excluded:['tests/unused.cpp'],
+    files:Object.fromEntries(Object.entries(originals).map(([name,bytes])=>[name,{bytes:Buffer.byteLength(bytes),sha256:sha256(bytes)}])),licenses:['LICENSE','external/dependency/LICENSE','unlinked/LICENSE']};
+  const sourceBytes=JSON.stringify(source,null,2)+'\n';
+  for(const [name,bytes]of Object.entries({...originals,'provenance.json':sourceBytes}))await file(f.viewer,`src-tauri/vendor/sfizz/${name}`,bytes);
+  const noticeFiles={'LICENSE':originals.LICENSE,'external/dependency/LICENSE':originals['external/dependency/LICENSE'],'provenance.json':sourceBytes};
+  for(const [name,bytes]of Object.entries(noticeFiles))await file(f.viewer,`src-tauri/piano-notices/${name}`,bytes);
+  await file(f.viewer,'src-tauri/piano-notices/manifest.json',JSON.stringify({schema:1,name:'Dusk-Fizz/sfizz',version:'1.2.3',revision,files:Object.fromEntries(Object.entries(noticeFiles).map(([name,bytes])=>[name,{size:Buffer.byteLength(bytes),sha256:sha256(bytes)}]))},null,2)+'\n');
+  await bindViewer(f);
+}
+async function addModificationDisclosure(f) {
+  const sourcePath='piano-build/WINDOWS-UTF8-COMPATIBILITY.md',bytes='Authored disclosure of exact private Windows UTF-8 build-copy transformation.\n';
+  await file(f.viewer,`src-tauri/${sourcePath}`,bytes);
+  await file(f.viewer,'src-tauri/piano-notices/BUILD-MODIFICATIONS.md',bytes);
+  const path=join(f.viewer,'src-tauri/piano-notices/manifest.json'),manifest=JSON.parse(await readFile(path));
+  manifest.files['BUILD-MODIFICATIONS.md']={size:Buffer.byteLength(bytes),sha256:sha256(bytes),sourcePath};
+  await writeFile(path,JSON.stringify(manifest,null,2)+'\n');
+  await bindViewer(f);
+}
 
 test('carrier freezes exact final native inputs and frontend with independent source identities',async()=>withFixture(async f=>{
   const result=await createCarrier(args(f));
@@ -54,6 +84,9 @@ test('carrier freezes exact final native inputs and frontend with independent so
   assert.match(delivery,/sourceInputs:manifest.identity.sourceInputs/);
   assert.equal(git(f.viewer,'status','--porcelain'),'');
   for(const [path,pin]of Object.entries(validated.inputs.nativeFiles))assert.equal(sha256(await readFile(join(f.iso,'score-viewer',path))),pin.sha256);
+  assert.equal(await readFile(join(f.iso,'score-viewer','src-tauri','build.rs'),'utf8'),await readFile(join(f.viewer,'src-tauri','build.rs'),'utf8'));
+  assert.match(worker,/packagePianoNotices/);assert.match(worker,/addPianoWorkerChecks/);
+  assert.match(await readFile(join(f.iso,'scripts','build-score-viewer-macos.mjs'),'utf8'),/verifyBundledPianoNotices/);
 }));
 
 test('stale review/source/frontend is rejected before writing the isolated carrier',async()=>withFixture(async f=>{
@@ -128,4 +161,198 @@ test('both recipient archives must carry byte-exact source and validation eviden
   await validateRecipientCarrier(files,prepared);
   await assert.rejects(validateRecipientCarrier({...files,'Source-validation.json':Buffer.from('false review')},prepared),/Recipient source evidence differs/);
   await assert.rejects(validateRecipientCarrier({...files,'Release-identity.json':undefined},prepared),/Recipient source evidence differs/);
+}));
+
+test('a complete vendored engine preserves its build script and source closure byte-exactly',async()=>withFixture(async f=>{
+  await addPiano(f);await createCarrier(args(f));
+  const {inputs}=await validateCarrierInputs(f.iso);
+  assert.ok(inputs.nativeFiles['src-tauri/vendor/sfizz/synth.cpp']);
+  assert.ok(inputs.nativeFiles['src-tauri/piano-build/CMakeLists.txt']);
+  assert.ok(inputs.nativeFiles['src-tauri/build.rs']);
+  assert.equal(await readFile(join(f.iso,'score-viewer','.cargo','config.toml'),'utf8'),await readFile(join(f.viewer,'.cargo','config.toml'),'utf8'));
+  const checkout=join(f.root,'windows-engine-checkout');await commit(f.iso);
+  git(f.root,'clone','-q','--no-hardlinks','--config','core.autocrlf=true',f.iso,checkout);
+  await validateCarrierInputs(checkout);
+  assert.equal(git(f.viewer,'status','--porcelain'),'');
+}));
+
+test('a competing Cargo config cannot silently alter native build flags',async()=>withFixture(async f=>{
+  await addPiano(f);await createCarrier(args(f));
+  await file(f.iso,'score-viewer/.cargo/config','[build]\nrustflags=[]\n');
+  await assert.rejects(validateCarrierInputs(f.iso),/Cargo configuration inventory differs/);
+}));
+
+function peImport(name, delay=false) {
+  const bytes=Buffer.alloc(2048),pe=0x80,optional=pe+24,section=optional+240;
+  bytes.write('MZ');bytes.writeUInt32LE(pe,60);bytes.write('PE\0\0',pe);bytes.writeUInt16LE(0x8664,pe+4);bytes.writeUInt16LE(1,pe+6);bytes.writeUInt16LE(240,pe+20);
+  bytes.writeUInt16LE(0x20b,optional);bytes.writeUInt32LE(512,optional+60);bytes.writeUInt32LE(16,optional+108);
+  bytes.writeUInt32LE(1024,section+8);bytes.writeUInt32LE(0x1000,section+12);bytes.writeUInt32LE(1024,section+16);bytes.writeUInt32LE(512,section+20);
+  const directory=optional+112+(delay?13:1)*8;
+  bytes.writeUInt32LE(0x1000,directory);bytes.writeUInt32LE(delay?64:40,directory+4);
+  if(delay)bytes.writeUInt32LE(1,512);
+  bytes.writeUInt32LE(0x1100,512+(delay?4:12));bytes.write(name,768);
+  return bytes;
+}
+
+test('Windows piano rejects normal and delay-loaded VC runtime DLL prerequisites',()=>{
+  assert.deepEqual(verifyWindowsPianoRuntime(peImport('KERNEL32.dll')).imports,['kernel32.dll']);
+  assert.deepEqual(verifyWindowsPianoRuntime(peImport('msvcp_win.dll',true)).imports,['msvcp_win.dll']);
+  for(const name of ['MSVCP140.dll','MSVCP140_2.dll','VCRUNTIME140.dll','CONCRT140.dll','VCOMP140.dll'])for(const delay of [false,true])assert.throws(()=>verifyWindowsPianoRuntime(peImport(name,delay)),/VC runtime DLL prerequisite/);
+  const invalid=peImport('KERNEL32.dll');invalid.writeUInt32LE(0xfffffff0,512+12);
+  assert.throws(()=>verifyWindowsPianoRuntime(invalid),/outside file-backed/);
+  assert.throws(()=>verifyWindowsPianoRuntime(Buffer.from('MZ')),/invalid PE bounds/);
+});
+
+function macDiagnostic(result='passed') {
+  const log='running 1 test\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out;\n';
+  const files = {[`${macPianoDiagnosticPrefix}cargo-stdout.txt`]:Buffer.from(log),[`${macPianoDiagnosticPrefix}cargo-stderr.txt`]:Buffer.alloc(0)};
+  let report={version:1,result:'unavailable',reason:'CoreAudio reports no active render outputs on this runner',physicalAcceptance:false,settingsChanged:false};
+  if(result==='passed') {
+    const status={ready:true,running:true,outputUid:'fixture-output-uid',sampleRate:48000,bufferFrames:128,periodFrames:128,mode:'coreaudio-hal-current',latencyTier:0,error:null};
+    report={version:1,result:'passed',outputUid:'fixture-output-uid',outputName:'Fixture',originalBufferFrames:512,finalBufferFrames:512,originalRate:48000,finalRate:48000,
+      low:status,high:{...status,latencyTier:2,bufferFrames:480,periodFrames:480},initializationFailureRestored:true,explicitCloseRestored:true,reconfigureRestored:true,dropShutdownRestored:true,
+      panicTrailingPeak:0,sampleCount:96000,pianoOnly:{startFrame:0,endFrame:24000,startSample:0,endSample:24000,peak:0,scope:'before cue publication'},physicalAcceptance:false,sampleRateDefaultOrDriverChanges:false,normalAppExitHookAcceptance:'source lifecycle hook; this diagnostic exercises Host drop/explicit close'};
+    const pcm=Buffer.alloc(44+report.sampleCount*4);
+    pcm.write('RIFF');pcm.writeUInt32LE(pcm.length-8,4);pcm.write('WAVEfmt ',8);pcm.writeUInt32LE(16,16);pcm.writeUInt16LE(3,20);pcm.writeUInt16LE(1,22);
+    pcm.writeUInt32LE(48000,24);pcm.writeUInt32LE(192000,28);pcm.writeUInt16LE(4,32);pcm.writeUInt16LE(32,34);pcm.write('data',36);pcm.writeUInt32LE(pcm.length-44,40);
+    for(let i=0;i<12000;i++) {pcm.writeFloatLE(Math.sin(i)*0.15,44+i*4);report.pianoOnly.peak=Math.max(report.pianoOnly.peak,Math.abs(pcm.readFloatLE(44+i*4)));}
+    files[`${macPianoDiagnosticPrefix}submitted-pcm.wav`]=pcm;
+    files[`${macPianoDiagnosticPrefix}fixture.wav`]=Buffer.from('test-owned fixture');
+    files[`${macPianoDiagnosticPrefix}fixture.sfz`]=Buffer.from('<region> sample=fixture.wav');
+  }
+  files[`${macPianoDiagnosticPrefix}macos-stream-diagnostic.json`]=Buffer.from(JSON.stringify(report));
+  return {files,report};
+}
+function macReport(files,report) {return {...files,[`${macPianoDiagnosticPrefix}macos-stream-diagnostic.json`]:Buffer.from(JSON.stringify(report))};}
+
+test('Mac diagnostic only admits the explicit no-output limitation',()=>{
+  const {files,report}=macDiagnostic('unavailable');
+  assert.equal(validateMacPianoDiagnostic(files).check.status,'unavailable');
+  for(const reason of ['sampler failed','stream initialization failed','shared buffer cannot be restored'])assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,reason})),/unexpected.*unavailability/);
+  assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,result:'started'})),/did not complete/);
+  assert.throws(()=>validateMacPianoDiagnostic({...files,[`${macPianoDiagnosticPrefix}cargo-stdout.txt`]:Buffer.from('running 0 tests')}),/not executed exactly once/);
+});
+
+test('Mac passed diagnostic binds initialized streams, restored HAL state and actual PCM',()=>{
+  const {files,report}=macDiagnostic();
+  assert.equal(validateMacPianoDiagnostic(files).check.status,'passed');
+  assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,finalBufferFrames:128})),/restoration evidence/);
+  assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,high:{...report.high,ready:false}})),/initialized stream/);
+  assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,sampleCount:report.sampleCount-1})),/dimensions differ/);
+  const waveName=`${macPianoDiagnosticPrefix}submitted-pcm.wav`,silence=Buffer.from(files[waveName]);silence.fill(0,44);
+  assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:silence}),/sampler\/panic PCM/);
+  const nan=Buffer.from(files[waveName]);nan.writeFloatLE(NaN,44);
+  assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:nan}),/non-finite/);
+  const panic=Buffer.from(files[waveName]);panic.writeFloatLE(0.2,panic.length-4);
+  assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:panic}),/sampler\/panic PCM/);
+  const cueOnly=Buffer.from(files[waveName]);cueOnly.fill(0,44);
+  for(let i=24000;i<36000;i++)cueOnly.writeFloatLE(Math.sin(i)*0.15,44+i*4);
+  assert.throws(()=>validateMacPianoDiagnostic({...files,[waveName]:cueOnly}),/piano-only PCM/);
+  assert.throws(()=>validateMacPianoDiagnostic(macReport(files,{...report,pianoOnly:{...report.pianoOnly,endSample:report.sampleCount+1}})),/piano-only interval/);
+});
+
+test('Mac runner invokes the exact opted-in test and binds recipient evidence',async()=>withFixture(async f=>{
+  await addPiano(f);await createCarrier(args(f));
+  const {inputs}=await validateCarrierInputs(f.iso),packet=join(f.root,'mac-packet'),viewer=join(f.iso,'score-viewer');
+  const fixture=macDiagnostic(),calls=[];
+  const ctx={source:f.iso,viewer,stage:async(name,fn)=>{calls.push(name);return fn();}};
+  const diagnostic=await runMacPianoDiagnostic(ctx,packet,'aarch64-apple-darwin',['--config','fixture=true'],{MACOSX_DEPLOYMENT_TARGET:'13.3'},async(args,cwd,env)=>{
+    assert.equal(cwd,viewer);assert.equal(env.VIEWER_AUDIO_DIAGNOSTIC_OUTPUT_ID,'');assert.equal(env.MACOSX_DEPLOYMENT_TARGET,'13.3');
+    assert.deepEqual(args.slice(-6),['--',macPianoDiagnosticTest,'--ignored','--exact','--nocapture','--test-threads=1']);
+    for(const [name,bytes] of Object.entries(fixture.files))if(!name.includes('cargo-'))await file(env.VIEWER_AUDIO_DIAGNOSTIC_REPORT_DIR,name.slice(macPianoDiagnosticPrefix.length),bytes);
+    return {stdout:fixture.files[`${macPianoDiagnosticPrefix}cargo-stdout.txt`].toString(),stderr:''};
+  });
+  assert.deepEqual(calls,['pianoCoreAudioDiagnosticMs']);
+  const receipt={platform:'macos-universal',nativeChecks:{pianoSources:'passed',pianoNotices:'passed',pianoCoreAudio:diagnostic.check},details:{pianoCoreAudio:diagnostic.details}};
+  requirePianoWorkerChecks(receipt,inputs.nativeFiles,fixture.files);
+  assert.throws(()=>requirePianoWorkerChecks({...receipt,details:{}},inputs.nativeFiles,fixture.files),/receipt differs/);
+  assert.throws(()=>requirePianoWorkerChecks(receipt,inputs.nativeFiles,macReport(fixture.files,{...fixture.report,dropShutdownRestored:false})),/restoration evidence/);
+  assert.match(await readFile(join(f.iso,'scripts','build-score-viewer-macos.mjs'),'utf8'),/runMacPianoDiagnostic\(ctx,packet,host,nativeReleaseCargoArgs,env\)/);
+}));
+
+test('missing or failed Mac diagnostic cannot become a passing runner skip',async()=>withFixture(async f=>{
+  await addPiano(f);await createCarrier(args(f));
+  const ctx={source:f.iso,viewer:join(f.iso,'score-viewer'),stage:async(_,fn)=>fn()};
+  await assert.rejects(runMacPianoDiagnostic(ctx,join(f.root,'missing-packet'),'aarch64-apple-darwin',[],{},async()=>({stdout:'running 0 tests',stderr:''})),/invalid JSON/);
+  await assert.rejects(runMacPianoDiagnostic(ctx,join(f.root,'failed-packet'),'aarch64-apple-darwin',[],{},async()=>{throw Error('available stream test failed');}),/available stream test failed/);
+}));
+
+test('changed engine notices are refused before any carrier mutation',async()=>withFixture(async f=>{
+  await addPiano(f);
+  await file(f.viewer,'src-tauri/piano-notices/LICENSE','A different license\n');await bindViewer(f);
+  await assert.rejects(createCarrier(args(f)),/curated notice pin differs/);
+  assert.equal(git(f.iso,'status','--porcelain'),'');
+}));
+
+test('only the exact reviewed build-modification disclosure may use an authored source binding',async()=>withFixture(async f=>{
+  await addPiano(f);await addModificationDisclosure(f);await createCarrier(args(f));
+  const {inputs}=await validateCarrierInputs(f.iso),packet=join(f.root,'disclosure-packet');
+  const metadata=await packagePianoNotices(f.iso,join(f.iso,'score-viewer'),packet);
+  const disclosure=metadata.buildModifications['BUILD-MODIFICATIONS.md'];
+  assert.equal(disclosure.sourcePath,'piano-build/WINDOWS-UTF8-COMPATIBILITY.md');
+  assert.equal(sha256(await readFile(join(packet,'notices/piano/BUILD-MODIFICATIONS.md'))),inputs.nativeFiles['src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md'].sha256);
+  const bytes=await readFile(join(f.iso,'score-viewer/src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md'));
+  await file(f.iso,'score-viewer/src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md','Changed reviewed disclosure');
+  await assert.rejects(validateCarrierInputs(f.iso),/Native source inventory differs/);
+  await file(f.iso,'score-viewer/src-tauri/piano-build/WINDOWS-UTF8-COMPATIBILITY.md',bytes);
+}));
+
+test('authored notice mappings cannot replace upstream licenses or select other application files',async()=>withFixture(async f=>{
+  await addPiano(f);await addModificationDisclosure(f);
+  const path=join(f.viewer,'src-tauri/piano-notices/manifest.json'),original=JSON.parse(await readFile(path));
+  for(const mutate of [
+    manifest=>{manifest.files['BUILD-MODIFICATIONS.md'].sourcePath='build.rs';},
+    manifest=>{manifest.files.LICENSE.sourcePath='piano-build/WINDOWS-UTF8-COMPATIBILITY.md';},
+    manifest=>{delete manifest.files['BUILD-MODIFICATIONS.md'].sourcePath;},
+    manifest=>{manifest.files['BUILD-MODIFICATIONS.md'].sha256='1'.repeat(64);},
+  ]) {
+    const manifest=structuredClone(original);mutate(manifest);await writeFile(path,JSON.stringify(manifest));await bindViewer(f);
+    await assert.rejects(createCarrier(args(f)),/unapproved authored notice mapping|requires its exact source binding|does not match original/);
+    assert.equal(git(f.iso,'status','--porcelain'),'');
+  }
+}));
+
+test('unrecorded engine source is refused before any carrier mutation',async()=>withFixture(async f=>{
+  await addPiano(f);
+  await file(f.viewer,'src-tauri/vendor/sfizz/extra.cpp','unreviewed additional engine source\n');await bindViewer(f);
+  await assert.rejects(createCarrier(args(f)),/engine source inventory differs/);
+  assert.equal(git(f.iso,'status','--porcelain'),'');
+}));
+
+test('unsafe curated paths and missing manifests are rejected before writes',async()=>withFixture(async f=>{
+  await addPiano(f);
+  const manifestPath=join(f.viewer,'src-tauri/piano-notices/manifest.json'),manifest=JSON.parse(await readFile(manifestPath));
+  manifest.files['../outside']=manifest.files.LICENSE;
+  await writeFile(manifestPath,JSON.stringify(manifest));await bindViewer(f);
+  await assert.rejects(createCarrier(args(f)),/unsafe relative path/);
+  assert.equal(git(f.iso,'status','--porcelain'),'');
+  await rm(manifestPath);await bindViewer(f);
+  await assert.rejects(createCarrier(args(f)),/ENOENT/);
+  assert.equal(git(f.iso,'status','--porcelain'),'');
+}));
+
+test('both packages and Mac app resources must carry original curated notices and provenance',async()=>withFixture(async f=>{
+  await addPiano(f);await createCarrier(args(f));
+  const {inputs}=await validateCarrierInputs(f.iso),viewer=join(f.iso,'score-viewer'),packet=join(f.root,'packet'),resources=join(f.root,'app-resources');
+  const pianoEngine=await packagePianoNotices(f.iso,viewer,packet);
+  await file(packet,'native-dependencies.json',JSON.stringify({pianoEngine}));
+  const files={};for(const name of Object.keys(await inventory(packet)))files[name]=await readFile(join(packet,name));
+  assert.equal(files['notices/piano/unlinked/LICENSE'],undefined);
+  assert.equal(validatePianoRecipient(files,inputs.nativeFiles).metadata.revision,'4'.repeat(40));
+  assert.throws(()=>validatePianoRecipient({...files,'notices/piano/LICENSE':undefined},inputs.nativeFiles),/changed or missing/);
+  assert.throws(()=>validatePianoRecipient({...files,'notices/piano/LICENSE':Buffer.from('wrong')},inputs.nativeFiles),/changed or missing/);
+  assert.throws(()=>validatePianoRecipient({...files,'native-dependencies.json':Buffer.from('{}')},inputs.nativeFiles),/dependency record differs/);
+  await cp(join(packet,'notices'),join(resources,'notices'),{recursive:true});
+  assert.equal(Object.keys(await verifyBundledPianoNotices(f.iso,viewer,resources)).length,4);
+  await file(resources,'notices/piano/LICENSE','Changed bundle notice\n');
+  await assert.rejects(verifyBundledPianoNotices(f.iso,viewer,resources),/changed or missing/);
+  assert.throws(()=>requirePianoWorkerChecks({nativeChecks:{tests:'passed'}},inputs.nativeFiles),/checks missing/);
+  const checked=await addPianoWorkerChecks(f.iso,viewer,packet,{tests:'passed',physicalMidiAudioPedal:'not tested'},{});
+  requirePianoWorkerChecks(checked,inputs.nativeFiles);
+  assert.equal(checked.nativeChecks.pianoSources,'passed');assert.equal(checked.nativeChecks.pianoNotices,'passed');
+  assert.equal(checked.nativeChecks.physicalMidiAudioPedal,'not tested');
+  const binary=peImport('KERNEL32.dll'),windows={...checked,platform:'windows-x64',nativeChecks:{...checked.nativeChecks,pianoWindowsRuntime:'passed'},details:{...checked.details,windowsDependencies:verifyWindowsPianoRuntime(binary)}};
+  requirePianoWorkerChecks(windows,inputs.nativeFiles,{'iso-score-viewer.exe':binary});
+  assert.throws(()=>requirePianoWorkerChecks({...windows,details:{}},inputs.nativeFiles,{'iso-score-viewer.exe':binary}),/import receipt differs/);
+  assert.throws(()=>validatePianoRecipient({...files,'iso-score-viewer.exe':peImport('MSVCP140.dll')},inputs.nativeFiles),/VC runtime DLL prerequisite/);
 }));
