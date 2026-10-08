@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, readFile, writeFile, rm, cp} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, writeFile, rm, cp, symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
@@ -65,6 +65,26 @@ test('stale review/source/frontend is rejected before writing the isolated carri
   await file(f.frontend,'assets/reader.js','changed reader\n');
   await assert.rejects(createCarrier(args(f)),/does not bind final source/);
   assert.equal(git(f.iso,'status','--porcelain'),initial);
+}));
+
+test('a linked frontend root is refused before any source or carrier mutation',async()=>withFixture(async f=>{
+  const linked=join(f.root,'linked-frontend');
+  await symlink(f.frontend,linked,'dir');
+  const original=await inventory(f.frontend),carrierStatus=git(f.iso,'status','--porcelain');
+  await assert.rejects(createCarrier({...args(f),frontend:linked}),/root must be a real directory/);
+  assert.deepEqual(await inventory(f.frontend),original);
+  assert.equal(git(f.iso,'status','--porcelain'),carrierStatus);
+  assert.equal(git(f.viewer,'status','--porcelain'),'');
+}));
+
+test('carrier inputs retain exact bytes under a Windows-style autocrlf checkout',async()=>withFixture(async f=>{
+  await createCarrier(args(f));await commit(f.iso);
+  const checkout=join(f.root,'windows-checkout');
+  git(f.root,'clone','-q','--no-hardlinks','--config','core.autocrlf=true',f.iso,checkout);
+  const validated=await validateCarrierInputs(checkout);
+  assert.equal(validated.sourceInputs.frontendDigest,f.frontendDigest);
+  assert.equal(validated.sourceInputs.viewerRevision,f.viewerRevision);
+  assert.equal(git(checkout,'status','--porcelain'),'');
 }));
 
 test('native workers refuse changed native files, unexpected source files and changed notices',async()=>withFixture(async f=>{

@@ -54,6 +54,16 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   worker=replaceOnce(worker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {validateCarrierInputs} from './score-viewer-carrier-inputs.mjs';",'worker import');
   worker=replaceOnce(worker,"  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});","  const manifest=await validatePrepared(prepared,{expectedRevision:git('rev-parse','HEAD')});\n  const verified=await validateCarrierInputs(source);\n  if(JSON.stringify(verified.sourceInputs)!==JSON.stringify(manifest.identity.sourceInputs))throw Error('Worker viewer/notation inputs differ from preparation');",'worker input verification');
   worker=replaceOnce(worker,"  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));","  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));\n  await cp(join(ctx.prepared,'source-inputs.json'),join(packet,'Source-provenance.json'));\n  await cp(join(ctx.prepared,'source-checks.json'),join(packet,'Source-validation.json'));\n  await cp(join(ctx.prepared,'frontend','release-identity.json'),join(packet,'Release-identity.json'));",'recipient provenance');
+  let attributes='';
+  try {attributes=await readFile(join(isoCarrier,'.gitattributes'),'utf8');} catch(error) {if(error.code!=='ENOENT')throw error;}
+  if(attributes && !attributes.endsWith('\n'))attributes+='\n';
+  // Preserve literal Git object bytes across Windows core.autocrlf checkout.
+  // The shared font notices must match their copied native counterparts too.
+  attributes+='\n# Exact reviewed native and frozen frontend release bytes\ndelivery-input/** -text\n';
+  for(const file of selected) {
+    attributes+=`${JSON.stringify(`score-viewer/${file.path}`)} -text\n`;
+    if(file.path.startsWith('licenses/'))attributes+=`${JSON.stringify(file.path)} -text\n`;
+  }
   await rm(join(isoCarrier,'score-viewer','src-tauri'),{recursive:true});
   for(const file of selected) {
     const full=join(isoCarrier,'score-viewer',file.path);
@@ -69,6 +79,7 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   await cp(join(templates,'prepare-score-viewer.mjs'),join(isoCarrier,'scripts','prepare-score-viewer.mjs'));
   await writeFile(join(isoCarrier,'scripts','score-viewer-delivery.mjs'),delivery);
   await writeFile(join(isoCarrier,'scripts','score-viewer-native-worker.mjs'),worker);
+  await writeFile(join(isoCarrier,'.gitattributes'),attributes);
   await writeFile(join(isoCarrier,'delivery-input','README.md'),`# Frozen native release inputs\n\nThis isolated delivery carrier builds reviewed viewer ${viewerRevision} with notation ${notationRevision}. Application source ownership remains in hypermemetic-ai/score-viewer. The legacy ISO viewer TypeScript is not built. The shared frontend was checked and built once before freezing; native preparation verifies its inventory and source-check receipt, adds an embedded release identity, and generates every payload probe.\n\nThe unchanged paired workflow selects this carrier commit for checkout. Its packages identify that carrier plus the independently bound viewer and notation revisions. Native Windows tests, Mac tests/virtual MIDI/signatures/deployment/DMG/launch checks, both-slice embedded proof and paired publication remain required. No recipient installation or data changes occur from building this carrier.\n`);
   const verified=await validateCarrierInputs(isoCarrier,{expectedViewerRevision:viewerRevision,expectedNotationRevision:notationRevision});
   return {viewerRevision,notationRevision,frontendDigest,sourceInputs:verified.sourceInputs,carrierWorktree:isoCarrier};

@@ -12,6 +12,8 @@ export function safePath(path) {
   return path;
 }
 export async function inventory(root) {
+  const rootStat = await lstat(root);
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) fail(`Carrier inventory root must be a real directory: ${root}`);
   const result = {};
   async function visit(directory, prefix = '') {
     for (const name of (await readdir(directory)).sort()) {
