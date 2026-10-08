@@ -58,3 +58,11 @@ The earlier-edition flow selected its exact own compatible archived bytes and de
 ## Remaining boundaries
 
 These are source and browser acceptance observations; they do not establish installed native identity, physical MIDI/audio/pedal behavior, measured anatomy or continuous motion certification. The reviewed companion remains on the ordinary draft PR path for parent review/landing. Native carrier generation/dispatch is parent-owned; no legacy ISO Viewer/workflow or active delivery service was changed. Paid Zelda source is absent from Git and these public artifacts. Its requested split and recalled melody fingers remain hypotheses until private full-score evaluation succeeds; a bounded passage cannot replace a failed full-score result.
+
+## Current-main reconciliation
+
+After the first stable source receipt `1620e236eb9c4516630e70746b42eb4b930250cf`, current main `069fad42f0bdd594aba8b456599ef1d8e0d6103f` (merged PR17–20 audio/bank/engine/Windows build-path work) was ordinarily merged at `4d0e35784b8e461b1f6eff7b86a538debab02b8e`. Three shared `main.ts` conflicts preserve the complete retained-edition/journal controls and add incoming piano options, disposal and boot configuration. All incoming native/audio paths remain byte-exact to main. No new native/audio behavior was authored by this change.
+
+The reconciled full frontend suite passed **446/446**, zero failures/skips, 93.9 seconds, concurrency two. The build/typecheck/source-pin check passed; the existing chunk advisory remains. The scoped diff against current main and selected strict OpenSpec validation pass. All 13 actual browser controls plus the no-write declared-journal refusal were rerun against exact reconciled source `4d0e35784b8e461b1f6eff7b86a538debab02b8e`, with zero browser errors. The owned preview5297 and browser were stopped.
+
+The prior `integration-final` set remains frozen at artifact manifest `3796fe040e16644f364e52e21bde05df9662f6568c4cc0acba3661e56825b8df`. Current-head captures/receipts/logs are separate in `/home/qqp/.local/state/score-viewer-calculated-hands-20261008/integration-reconciled/`, bound through `source-binding.json` and `browser-observations.json`. Their artifact manifest SHA256 is `3044a22050864c17abc73bddd8a9937dbb95780dff11f1c8237f0f1b0b556200`. Later receipt-only commits do not change the captured product source.
