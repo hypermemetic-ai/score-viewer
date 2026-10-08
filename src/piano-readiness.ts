@@ -4,9 +4,9 @@ import {RR_TEMPORAL_LAYER_PLANNER} from '../vendor/iso-notation/src/model/rr-tem
 import {requireReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {validatePianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {scoreWithPerformingHands,renderScorePresentation} from '../vendor/iso-notation/src/render/janko/score-presentation';
+import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {hashBytes,importPackage,pianoPlanningScore,selectPresentation,validateLayerAsync,type ScorePackage,type FingerLayer} from './package';
-import {preparePianoCalculationContext} from './piano-context-package';
+import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {packagePianoPresentation} from './piano-package-presentation';
 import {readPersonal,initialPersonal,type PersonalState} from './state';
 import {calculatePianoAssignments,PIANO_ASSIGNMENT_VERSION,type PianoCalculationDiagnostic} from '../vendor/iso-notation/src/model/piano-finger-assignments';
@@ -16,7 +16,7 @@ import {RR_PERFORMANCE_POSE_PROFILE} from '../vendor/iso-notation/src/model/isom
 import {pianoRequestAuthority,PianoAuthorityConflict,type PerformingHandPolicy} from './piano-request-authority';
 import {preparationRequestIdentity} from './piano-preparation-identity';
 import {personalForCalculatedEdition,PersonalEditionConflict} from './presentation-install';
-import {compatiblePianoRecipe} from './piano-engraving-recipe';
+import {prepareCalculatedEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 
 export interface PianoReadinessRequest extends PianoCalculationOptions {
   packageBytes:Uint8Array;
@@ -70,18 +70,19 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
       return failure('unsupported','performing-hand-policy','Choose a supported performing-hand preparation.');
     if(request.intent!==undefined&&!['calculate','read-retained'].includes(request.intent))
       return failure('unsupported','preparation-intent','Choose a supported score preparation.');
+    const hasPresentation=p.availablePresentations?.includes(request.layout)??p.keyboardLayout===request.layout;
+    if(hasPresentation)p=await selectPresentation(p,request.layout);
+    let nextContext=p.calculationContext;
     if(request.referenceTempo){
       const context=validatePianoCalculationContext({version:'piano-calculation-context-v1',sourceSha256:p.sourceSha256!,
         referencePerformanceTempo:request.referenceTempo},p.sourceSha256!,p.sourceScore??p.score);
       if(JSON.stringify(pianoPlanningScore(p).referencePerformanceTempo)!==JSON.stringify(context.referencePerformanceTempo)){
         if(request.intent==='read-retained'&&!request.forceRecalculate&&p.availablePresentations?.includes(request.layout))
           return failure('conflict','retained-context','A retained edition reads its saved tempo. Request a new calculation to change it.');
-        bytes=await preparePianoCalculationContext(p,context);p=await importPackage(bytes);
+        nextContext=context;
       }
     }
-    const source=pianoPlanningScore(p);
-    const hasPresentation=p.availablePresentations?.includes(request.layout)??p.keyboardLayout===request.layout;
-    if(hasPresentation)p=await selectPresentation(p,request.layout);
+    const source=scoreWithCalculationContext(p.sourceScore??p.score,nextContext,p.sourceSha256!);
     let personal:PersonalState|undefined;
     if(request.personal){
       if(!hasPresentation)return failure('conflict','personal-presentation','Saved finger choices need their original keyboard presentation. Your choices are retained.');
@@ -127,7 +128,7 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
     // Unknown authority must be surfaced before any NEW-request cache reuse.
     const constraints=pianoRequestAuthority(p,source,request.layout,active,personal,request.performingHandPolicy??'calculate');
     const matchingRequest=hasPresentation&&p.preparationIdentity&&active===p.fingerLayer&&
-      p.preparationIdentity.requestSha256===await preparationRequestIdentity(p,request.performingHandPolicy??'calculate',constraints,request.maxExpansions);
+      p.preparationIdentity.requestSha256===await preparationRequestIdentity({...p,calculationContext:nextContext},request.performingHandPolicy??'calculate',constraints,request.maxExpansions);
     if(hasPresentation&&!request.forceRecalculate&&matchingRequest&&(currentLayer(active)||providedRR)){
       // Personal layers are independently replayed, too; they cannot substitute
       // a structural legacy certificate for complete calculated readiness.
@@ -152,27 +153,25 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
         {sourceHash:p.sourceSha256!,sourceBytesSha256:p.sourceSha256!,revision:p.manifest.revision},request);
     }
     interrupted(request);
-    if(calculated.assignments.some(a=>p.score.notes.find(n=>n.id===a.id)?.hand!==a.hand))
-      return failure('unsupported','performing-hand-reassignment','This preparation cannot yet preserve printed voice rests and beams when changing performing hands. The original score and choices are retained.');
-    const sameHands=hasPresentation&&calculated.assignments.every(a=>p.score.notes.find(n=>n.id===a.id)?.hand===a.hand);
-    let score:string,seats:string,pages:string[],engineVersion:string,recipe=p.renderingRecipe;
+    const sameHands=hasPresentation&&!p.score.performingHandPresentation&&calculated.assignments.every(a=>p.score.notes.find(n=>n.id===a.id)?.hand===a.hand);
+    let score:string,seats:string,pages:string[],engineVersion:string,recipe=p.renderingRecipe,receipt:CalculatedHandReceipt|undefined;
     if(sameHands){
       // Attach genuine fingers to fixed ink only when ALL physical hands match
       // its source-linked presentation. Never silently flip existing stems.
       const descriptor=(p.collectionManifest??p.manifest).presentations?.[request.layout];
-      score=strFromU8(p.files[descriptor?.score??'score.json']);seats=JSON.stringify(p.seats);pages=p.pages.slice();engineVersion=p.manifest.engineVersion;
+      score=JSON.stringify(p.calculationContext===nextContext?p.score:{...p.score,referencePerformanceTempo:source.referencePerformanceTempo});seats=JSON.stringify(p.seats);pages=p.pages.slice();engineVersion=p.manifest.engineVersion;
     }else{
       if(!recipe)return failure('unsupported','changed-hand-engraving','Calculated hands need matching score pages. This fixed score has no supported rendering preparation; its current pages are retained.');
       try{
-        const nextRecipe=await compatiblePianoRecipe(source,recipe,p.sourceSha256!);
-        const effective=scoreWithPerformingHands(source,calculated.assignments,'piano-calculation:'+request.layout+':'+calculated.effectiveHandSha256),
-          rendered=renderScorePresentation(effective,nextRecipe);
-        score=JSON.stringify(effective);seats=JSON.stringify(rendered.seats);pages=rendered.pages;engineVersion=nextRecipe.engineId;recipe=nextRecipe;
-      }catch(error){return failure('unsupported','rendering-admission',(error as Error).message);}
+        const prepared=await prepareCalculatedEdition({...p,keyboardLayout:request.layout,calculationContext:nextContext},calculated.layer,
+          request.performingHandPolicy??'calculate',constraints),rendered=prepared.result;
+        score=JSON.stringify(rendered.score);seats=JSON.stringify(rendered.seats);pages=rendered.pages;
+        engineVersion=prepared.recipe.engineId;recipe=prepared.recipe;receipt=prepared.receipt;
+      }catch(error){if(error instanceof HandPresentationError)throw error;return failure('unsupported','rendering-admission',(error as Error).message);}
     }
     const prepared=await packagePianoPresentation(p,{layoutId:request.layout,sourceSha256:p.sourceSha256!,score,seats,pages,
       layer:calculated.layer,effectiveHandSha256:calculated.effectiveHandSha256,engineVersion,recipe,
-      preparationRequest:{handPolicy:request.performingHandPolicy??'calculate',maxExpansions:request.maxExpansions}});
+      preparationRequest:{handPolicy:request.performingHandPolicy??'calculate',maxExpansions:request.maxExpansions},calculatedHandReceipt:receipt,calculationContext:nextContext??null});
     const checked=await importPackage(prepared,{keyboardLayout:request.layout});
     if(personal)personal=personalForCalculatedEdition(personal,p,checked);
     else if(authority)personal=personalForCalculatedEdition(initialPersonal(p),p,checked);
@@ -181,6 +180,8 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
     if(request.signal?.aborted)return failure('cancelled','cancelled','Fingering calculation cancelled. Your score is retained.');
     if(error instanceof PianoAuthorityConflict)return failure('conflict',error.code,error.message);
     if(error instanceof PersonalEditionConflict)return failure('conflict',error.code,error.message);
+    if(error instanceof HandPresentationError)return failure(error.code==='authority'?'conflict':'unsupported','hand-presentation:'+error.code,
+      error.message+(error.ownerIds.length?' Owners: '+error.ownerIds.join(', ')+'.':'')+' The prior edition and saved choices are retained.');
     if(error instanceof PianoCalculationError)return failure(error.status,error.code,error.message);
     return failure('unsupported','readiness-admission',(error as Error).message);
   }

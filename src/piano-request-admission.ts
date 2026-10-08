@@ -5,8 +5,7 @@ import type {PianoReadinessRequest} from './piano-readiness';
 import {pianoRequestAuthority} from './piano-request-authority';
 import {canonicalJson,authorityIdentity,preparationRequestIdentity} from './piano-preparation-identity';
 import {validatePianoCalculationContext,scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
-import {scoreWithPerformingHands,renderScorePresentation} from '../vendor/iso-notation/src/render/janko/score-presentation';
-import {compatiblePianoRecipe} from './piano-engraving-recipe';
+import {prepareCalculatedEdition} from './calculated-hand-edition';
 const equal=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 const exactBytes=(a:Uint8Array,b:Uint8Array)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
 
@@ -21,12 +20,14 @@ export async function admitPianoRequestResult(request:PianoReadinessRequest,p:Sc
     throw Error('Prepared output differs from the requested immutable source or keyboard.');
   const retained=request.intent==='read-retained'&&!request.forceRecalculate;
   if(retained&&has){
+    if(request.referenceTempo){const requested=validatePianoCalculationContext({version:'piano-calculation-context-v1',sourceSha256:original.sourceSha256!,referencePerformanceTempo:request.referenceTempo},original.sourceSha256!,original.sourceScore??original.score);
+      if(!equal(pianoPlanningScore(prior).referencePerformanceTempo,requested.referencePerformanceTempo))throw Error('Retained reading must preserve its requested saved calculation context.');}
     if(!exactBytes(bytes,request.packageBytes)||!equal(personal,saved)||!equal(layer,saved?.layer??prior.fingerLayer))
       throw Error('Retained reading must preserve the requested archive, context and saved choices exactly.');
     return;
   }
-  let context=original.calculationContext;
-  if(request.referenceTempo&&!equal(pianoPlanningScore(original).referencePerformanceTempo,request.referenceTempo))
+  let context=prior.calculationContext;
+  if(request.referenceTempo&&!equal(pianoPlanningScore(prior).referencePerformanceTempo,request.referenceTempo))
     context=validatePianoCalculationContext({version:'piano-calculation-context-v1',sourceSha256:original.sourceSha256!,referencePerformanceTempo:request.referenceTempo},original.sourceSha256!,original.sourceScore??original.score);
   if(!equal(p.calculationContext,context))throw Error('Prepared output has another calculation context.');
   const source=scoreWithCalculationContext(original.sourceScore??original.score,context,original.sourceSha256!),
@@ -40,17 +41,17 @@ export async function admitPianoRequestResult(request:PianoReadinessRequest,p:Sc
   const expectedPersonal=saved?(exactBytes(bytes,request.packageBytes)?saved:personalForCalculatedEdition(saved,prior,p)):
     prior.fingerLayer?.reviewedFingerAuthority?personalForCalculatedEdition(initialPersonal(prior),prior,p):undefined;
   if(!equal(personal,expectedPersonal))throw Error('Prepared output differs from the requested saved correction journal.');
-  const sameHands=has&&p.score.notes.every(n=>prior.score.notes.find(old=>old.id===n.id)?.hand===n.hand);
+  const sameHands=has&&!prior.score.performingHandPresentation&&!p.score.performingHandPresentation&&p.score.notes.every(n=>prior.score.notes.find(old=>old.id===n.id)?.hand===n.hand);
   if(sameHands){
     if(!equal(p.pages,prior.pages)||!equal(p.seats,prior.seats)||p.manifest.engineVersion!==prior.manifest.engineVersion||!equal(p.renderingRecipe,prior.renderingRecipe)||
-      !equal(p.score,scoreWithCalculationContext(prior.score,context,original.sourceSha256!)))
+      !equal(p.score,{...prior.score,referencePerformanceTempo:source.referencePerformanceTempo}))
       throw Error('Same-hand output differs from the requested fixed-page edition or recipe.');
     return;
   }
   if(!prior.renderingRecipe)throw Error('The requested source has no compatible rendering recipe.');
-  const recipe=await compatiblePianoRecipe(source,prior.renderingRecipe,original.sourceSha256!),assignments=layer.attacks.flatMap(a=>a.owners.map(o=>({
-    id:o.id,pitch:a.pitch,startTick:a.startTick,durationTicks:o.durationTicks,hand:a.hand}))),
-    expected=scoreWithPerformingHands(source,assignments,'piano-calculation:'+request.layout+':'+p.effectiveHandSha256),rendered=renderScorePresentation(expected,recipe);
-  if(!equal(p.renderingRecipe,recipe)||p.manifest.engineVersion!==recipe.engineId||!equal(p.score,expected)||!equal(p.pages,rendered.pages)||!equal(p.seats,rendered.seats))
+  const prepared=await prepareCalculatedEdition({...prior,keyboardLayout:request.layout,calculationContext:context},layer,
+    request.performingHandPolicy??'calculate',constraints),rendered=prepared.result;
+  if(!equal(p.renderingRecipe,prepared.recipe)||p.manifest.engineVersion!==prepared.recipe.engineId||!equal(p.score,rendered.score)||
+    !equal(p.pages,rendered.pages)||!equal(p.seats,rendered.seats)||!equal(p.calculatedHandReceipt,prepared.receipt))
     throw Error('Prepared output differs from the requested complete engraving or recipe.');
 }

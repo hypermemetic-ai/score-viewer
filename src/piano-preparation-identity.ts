@@ -2,11 +2,12 @@ import type {ScorePackage,FingerLayer} from './package';
 import {pianoRequestAuthority,type PerformingHandPolicy} from './piano-request-authority';
 import type {PianoAssignmentConstraint} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
-import {APPROVED_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {APPROVED_SCORE_RENDERING_ENGINE,CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 
-export const PIANO_PREPARATION_IDENTITY_VERSION='viewer-piano-preparation-v1' as const;
+export const PIANO_PREPARATION_IDENTITY_VERSION='viewer-piano-preparation-v2' as const;
+const LEGACY_IDENTITY_VERSION='viewer-piano-preparation-v1' as const;
 export interface PianoPreparationIdentity {
-  version:typeof PIANO_PREPARATION_IDENTITY_VERSION;
+  version:typeof PIANO_PREPARATION_IDENTITY_VERSION|typeof LEGACY_IDENTITY_VERSION;
   sourceSha256:string;layoutId:'conventional-piano'|'janko-four-row';profileId:string;profileSha256:string;
   handPolicy:PerformingHandPolicy;maxExpansions:number;
   contextSha256:string;authoritySha256:string;assignmentSha256:string;calculatorSha256:string;
@@ -27,15 +28,22 @@ export function canonicalOwnerAssignments(layer:FingerLayer):unknown[] {
     ...(a.row===undefined?{}:{row:a.row}),...(a.contact===undefined?{}:{contact:a.contact})}))).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
 }
 export async function preparationRequestIdentity(p:ScorePackage,policy:PerformingHandPolicy,constraints:readonly PianoAssignmentConstraint[],maxExpansions=2_000_000):Promise<string>{
+  return requestIdentity(p,policy,constraints,maxExpansions,false);
+}
+async function requestIdentity(p:ScorePackage,policy:PerformingHandPolicy,constraints:readonly PianoAssignmentConstraint[],maxExpansions:number,legacy:boolean):Promise<string>{
   const source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256??p.manifest.semanticSha256);
   return identityHash({sourceSha256:p.sourceSha256,layoutId:p.keyboardLayout,profileId:p.profileId,profileSha256:p.profileSha256,
     contextSha256:await identityHash({referencePerformanceTempo:source.referencePerformanceTempo,calculationContext:p.calculationContext}),
     handPolicy:policy,authoritySha256:await authorityIdentity(constraints),maxExpansions,
-    rendering:{recipe:p.renderingRecipe??null,installedEngine:p.manifest.engineVersion,approvedEngine:APPROVED_SCORE_RENDERING_ENGINE}});
+    rendering:{recipe:p.renderingRecipe??null,installedEngine:p.manifest.engineVersion,approvedEngine:APPROVED_SCORE_RENDERING_ENGINE,
+      ...(legacy?{}:{calculatedEngine:CALCULATED_HAND_SCORE_RENDERING_ENGINE})}});
 }
 /** Compatibility metadata does not establish painted/source coverage. The
  * package and ISO's actual source/geometry validators must admit that first. */
 export async function createPianoPreparationIdentity(p:ScorePackage,policy:PerformingHandPolicy,maxExpansions=2_000_000):Promise<PianoPreparationIdentity>{
+  return createIdentity(p,policy,maxExpansions,PIANO_PREPARATION_IDENTITY_VERSION);
+}
+async function createIdentity(p:ScorePackage,policy:PerformingHandPolicy,maxExpansions:number,version:PianoPreparationIdentity['version']):Promise<PianoPreparationIdentity>{
   if(!p.sourceSha256||!p.keyboardLayout||!p.profileId||!p.profileSha256||!p.fingerLayer)
     throw Error('Preparation identity needs complete source, keyboard, profile and assignments.');
   if(!['calculate','retain-imported'].includes(policy)||!Number.isSafeInteger(maxExpansions)||maxExpansions<1)
@@ -45,7 +53,7 @@ export async function createPianoPreparationIdentity(p:ScorePackage,policy:Perfo
   if(policy==='calculate'&&Array.isArray(p.fingerLayer.operatorConstraints)&&
     p.fingerLayer.operatorConstraints.some((q:any)=>q?.provenance?.kind==='editorial-hand-retention'))
     throw Error('A retained-hand layer cannot claim joint-hand preparation.');
-  const content={version:PIANO_PREPARATION_IDENTITY_VERSION,sourceSha256:p.sourceSha256,layoutId:p.keyboardLayout,
+  const content={version,sourceSha256:p.sourceSha256,layoutId:p.keyboardLayout,
     profileId:p.profileId,profileSha256:p.profileSha256,handPolicy:policy,maxExpansions,
     contextSha256:await identityHash({referencePerformanceTempo:source.referencePerformanceTempo,calculationContext:p.calculationContext}),
     authoritySha256:await authorityIdentity(constraints),assignmentSha256:await identityHash(canonicalOwnerAssignments(p.fingerLayer)),
@@ -53,14 +61,16 @@ export async function createPianoPreparationIdentity(p:ScorePackage,policy:Perfo
       inputSha256:p.fingerLayer.inputSha256,search:p.fingerLayer.search}),
     recipeSha256:p.renderingRecipe?await identityHash(p.renderingRecipe):null,
     payloadSha256:await identityHash({scoreSha256:p.manifest.revision,seats:p.seats,pageSha256:await Promise.all(p.pages.map(bytesHash))}),
-    requestSha256:await preparationRequestIdentity(p,policy,constraints,maxExpansions)};
+    requestSha256:await requestIdentity(p,policy,constraints,maxExpansions,version===LEGACY_IDENTITY_VERSION)};
   return{...content,sha256:await identityHash(content)};
 }
 export async function validatePianoPreparationIdentity(raw:unknown,p:ScorePackage):Promise<PianoPreparationIdentity>{
   if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Invalid piano preparation identity.');
   const q=raw as PianoPreparationIdentity;
-  if(q.version!==PIANO_PREPARATION_IDENTITY_VERSION)throw Error('Unsupported piano preparation identity.');
-  const expected=await createPianoPreparationIdentity(p,q.handPolicy,q.maxExpansions);
+  if(q.version!==PIANO_PREPARATION_IDENTITY_VERSION&&q.version!==LEGACY_IDENTITY_VERSION)throw Error('Unsupported piano preparation identity.');
+  if(q.version===LEGACY_IDENTITY_VERSION&&(p.score.performingHandPresentation||p.renderingRecipe?.engineId===CALCULATED_HAND_SCORE_RENDERING_ENGINE))
+    throw Error('A calculated-hand edition cannot use the legacy preparation identity.');
+  const expected=await createIdentity(p,q.handPolicy,q.maxExpansions,q.version);
   if(canonicalJson(q)!==canonicalJson(expected))throw Error('Piano preparation identity differs from its actual source, assignments or presentation.');
   return structuredClone(expected);
 }

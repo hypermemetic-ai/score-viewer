@@ -2,6 +2,7 @@ import {test} from 'node:test';import assert from 'node:assert/strict';import {r
 import {resolveJankoOptions,resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
 import {SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe,type ScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import {renderScorePresentation,scoreWithPerformingHands} from '../vendor/iso-notation/src/render/janko/score-presentation';
+import {sourceFactsProjection} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 const files=unzipSync(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)));
 const score:QuantizedGridScore=JSON.parse(strFromU8(files['score.json'])),seats=JSON.parse(strFromU8(files['seats.json']));
@@ -30,15 +31,17 @@ test('real-engine recipe reproduces all frozen No14 pages and exact source-owner
   assert.deepEqual(p.pages,[1,2,3].map(n=>strFromU8(files[`pages/${n}.svg`])));
 });
 
-test('hand projection preserves source facts, owner aliases and every performed occurrence',()=>{
+test('hand projection preserves genuine editorial guards; authored unguarded projection retains source facts and occurrences',()=>{
   const original=JSON.stringify(score),assignments=score.notes.map(n=>({id:n.id,pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks,hand:n.hand==='LH'?'RH' as const:'LH' as const}));
-  const effective=scoreWithPerformingHands(score,assignments,'conventional-test');
+  assert.throws(()=>scoreWithPerformingHands(score,assignments,'conventional-test'),/editorial authority/);
   assert.equal(JSON.stringify(score),original);
-  const music=(n:any)=>{const {hand,editorialHand,handInference,...facts}=n;return facts;};
-  assert.deepEqual(effective.notes.map(music),score.notes.map(music));
-  const {notes:_,writtenPresentation:__,...sourceOther}=score,{notes:___,writtenPresentation:____,...effectiveOther}=effective;
-  assert.deepEqual(effectiveOther,sourceOther);
-  for(const event of effective.writtenPresentation!.events.notes!)assert.equal(event.overrides!.hand,effective.notes[event.writtenIndex].hand);
-  assert.throws(()=>scoreWithPerformingHands(score,assignments.slice(1),'test'),/incomplete/);
-  assert.throws(()=>scoreWithPerformingHands(score,assignments.map((a,i)=>i? a:{...a,pitch:a.pitch+1}),'test'),/match source/);
+  const authored:QuantizedGridScore={id:'authored-hand-projection',title:'Projection control',composer:'Fixture',ticksPerBeat:48,totalTicks:96,sourceBarTicks:[0,96],
+    notes:[0,1].map(i=>({id:'authored-'+i,pitch:{octave:4,pitchClass:i*4},startTick:i*48,durationTicks:48,hand:'LH'})),
+    barlines:[],timeSignatures:[],tempos:[],dynamics:[],pedals:[]};
+  const hands=authored.notes.map(n=>({id:n.id,pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks,hand:'RH' as const})),
+    before=JSON.stringify(authored),effective=scoreWithPerformingHands(authored,hands,'authored-test');
+  assert.equal(JSON.stringify(authored),before);assert.deepEqual(sourceFactsProjection(effective),sourceFactsProjection(authored));
+  assert.ok(effective.notes.every(n=>n.derivedHand?.hand==='RH'&&!n.editorialHand));
+  assert.throws(()=>scoreWithPerformingHands(authored,hands.slice(1),'test'),/incomplete/);
+  assert.throws(()=>scoreWithPerformingHands(authored,hands.map((a,i)=>i? a:{...a,pitch:a.pitch+1}),'test'),/match source/);
 });

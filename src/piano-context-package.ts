@@ -19,6 +19,7 @@ export async function preparePianoCalculationContext(p:ScorePackage,context:Pian
     const score=JSON.parse(new TextDecoder().decode(files[d.score]));
     files[d.score]=strToU8(JSON.stringify(scoreWithCalculationContext(score,checked,m.sourceSha256)));
     d.revision=await hashBytes(files[d.score]);
+    d.calculationContext=checked;
   }
   const primary=m.presentations![m.keyboardLayout!]!;
   m.revision=m.semanticSha256=primary.revision;

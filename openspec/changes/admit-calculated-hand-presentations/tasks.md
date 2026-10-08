@@ -20,13 +20,13 @@
 
 ## 4. Exact ISO hand-presentation integration
 
-- [ ] 4.1 Receive and review the exact merged ISO derived-provenance, source-facts projection, compatible recipe and audit contract; deliberately update the submodule and dependencyRevision while retaining sourceRevision, then verify the source-pin check.
-- [ ] 4.2 Integrate complete ISO preparation and independent source/payload admission; remove reassignment refusal only after those gates pass and verify specific rest/beam/tie/grace/fit failures preserve the original edition.
-- [ ] 4.3 Verify real-engine public fixtures on both keyboards, both transfer directions, same-hand independent voices, unequal-release aliases, written continuations, repeats and boundaries; use independent source expectations and adversarial missing/duplicate/misattribution controls.
-- [ ] 4.4 Inspect complete sparse/dense real-engine pages and focused transfer passages; record exact inputs/output hashes, visible source/hand affiliation, dense controls and remaining inspection limits in the acceptance artifact.
+- [x] 4.1 Receive and review the exact merged ISO derived-provenance, source-facts projection, compatible recipe and audit contract; deliberately update the submodule and dependencyRevision while retaining sourceRevision, then verify the source-pin check.
+- [x] 4.2 Integrate complete ISO preparation and independent source/payload admission; remove reassignment refusal only after those gates pass and verify specific rest/beam/tie/grace/fit failures preserve the original edition.
+- [x] 4.3 Verify real-engine public fixtures on both keyboards, both transfer directions, same-hand independent voices, unequal-release aliases, written continuations, repeats and boundaries; use independent source expectations and adversarial missing/duplicate/misattribution controls.
+- [x] 4.4 Inspect complete sparse/dense real-engine pages and focused transfer passages; record exact inputs/output hashes, visible source/hand affiliation, dense controls and remaining inspection limits in the acceptance artifact.
 
 ## 5. Reviewed combined delivery
 
-- [ ] 5.1 Run selected strict OpenSpec validation, complete required Viewer tests/build and Git checks under bounded resources; open a scoped PR with exact Viewer/ISO inputs and honest visual/native acceptance status.
+- [x] 5.1 Run selected strict OpenSpec validation, complete required Viewer tests/build and Git checks under bounded resources; open a scoped PR with exact Viewer/ISO inputs and honest visual/native acceptance status.
 - [ ] 5.2 Resolve parent review and land the coordinated source change through the normal PR path; verify final branch/remote status and preserve unrelated checkout/services.
 - [ ] 5.3 Coordinate ordinary usable native activation at the actual existing delivery boundary, verify installed input identity and retained personal/practice state, and stop task-owned temporary processes; report any external delivery blocker instead of claiming activation.

@@ -13,7 +13,7 @@ import {readinessWorkerResult} from '../src/piano-readiness-worker-protocol';
 import {packagePianoPresentation} from '../src/piano-package-presentation';
 import {renderScorePresentation} from '../vendor/iso-notation/src/render/janko/score-presentation';
 import {resolveJankoOptions,resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
-import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {CALCULATED_HAND_SCORE_RENDERING_ENGINE,SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {SourceHandRequirement} from '../vendor/iso-notation/src/model/physical-source-constraints';
 
@@ -83,7 +83,10 @@ test('missing conventional layout is genuinely generated, replayed and shared wh
   const original=await prepared(),q=await ensurePianoReady({packageBytes:original.bytes,layout:'conventional-piano',performingHandPolicy:'retain-imported'});
   assert.equal(q.status,'editable','message' in q?q.message:undefined);
   assert.equal(q.package.keyboardLayout,'conventional-piano');assert.equal(q.layer.plannerVersion,'finite-static-piano-assignments-v1');
-  assert.equal(q.package.renderingRecipe!.engineId,APPROVED_SCORE_RENDERING_ENGINE);
+  assert.equal(q.package.renderingRecipe!.engineId,CALCULATED_HAND_SCORE_RENDERING_ENGINE);
+  assert.equal(q.package.renderingRecipe!.options.performingHandPolicy,'source-owned-v1');
+  assert.ok(q.package.score.performingHandPresentation?.identity);
+  assert.equal(q.package.annotationGeometry!.seats.length,q.package.seats.length);
   assert.equal(q.package.renderingRecipe!.options.standaloneLongMarker,'hollow-stem');
   assert.equal(q.package.renderingRecipe!.options.authoredRestMode,'source');
   assert.equal(original.p.renderingRecipe!.engineId,SCORE_RENDERING_ENGINE);
