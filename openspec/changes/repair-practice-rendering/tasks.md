@@ -44,5 +44,5 @@
 
 ## 6. Deliver the reviewed source repair
 
-- [ ] 6.1 Review the scoped diff and unchanged package/data/dependency identities, validate the OpenSpec change, and commit/push the repair through the ordinary PR path; verify the PR identifies the final behavior, observed validation, private-score gaps if any, and separate native release seam.
+- [x] 6.1 Review the scoped diff and unchanged package/data/dependency identities, validate the OpenSpec change, and commit/push the repair through the ordinary PR path; verify the PR identifies the final behavior, observed validation, private-score gaps if any, and separate native release seam.
 - [ ] 6.2 Stop task-owned temporary servers/browser processes, run the required Git status helper, and deliver the source receipt for parent review; verify no unattended Git work or task-owned process remains and the restored Windows installation was not replaced.

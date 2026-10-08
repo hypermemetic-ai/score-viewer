@@ -2,7 +2,7 @@
 
 ## Inputs and boundaries
 
-Repair branch started at planning commit `1fba9a0c687260a73a8b8584a16df3bbe91feb63`, on merged source `11c1128a6140b9964aa7f2b4035de761ed7814fa`. The required Git status helper reported a clean synchronized branch on 2026-10-08. The tracked ISO gitlink and provenance dependency revision remain `da93cf9e0359d861987fd76611b59b14b6aedb92`.
+Repair branch started at planning commit `1fba9a0c687260a73a8b8584a16df3bbe91feb63`, on merged source `11c1128a6140b9964aa7f2b4035de761ed7814fa`. The required Git status helper reported a clean synchronized branch on 2026-10-08. Published prerequisite implementation: `fbcc10586f9ba180c85e9156464b22c494dd710f`, PR #2. A following receipt commit updates delivery tracking only. The tracked ISO gitlink and provenance dependency revision remain `da93cf9e0359d861987fd76611b59b14b6aedb92`.
 
 The independently restored Windows installation `4e64dfedaed12892d73c6164b2965b0a1a594577` is outside this task. No native build, release dispatch, installed-package replacement, Windows GUI input, or user data/settings write is performed. Browser state uses ephemeral isolated Chromium contexts. The rendering runner uses `isolated-regression`; the full-app runner uses its own isolated host bridge with admitted package entry identities.
 
