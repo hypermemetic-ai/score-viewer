@@ -5,6 +5,8 @@ import {importPackage,selectPresentation} from '../src/package';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} from '../src/state';
 import {planPractice,initialPractice,totalProgress,practicePercent,reconcilePassages} from '../src/practice';
 import {LibraryPracticeSummaries,readLibraryPracticeSummary,type LibraryPracticeReader} from '../src/library-practice-progress';
+import {displayedPracticeTotal} from '../src/practice-display';
+import {toggleDone} from '../src/practice-attainment';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url));
 const p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row'),cp=await selectPresentation(p,'conventional-piano');
@@ -13,14 +15,14 @@ const plan=planPractice(rr,'fixed-four-v1'),earned=initialPractice(plan);
 // Two earned source patterns cover five leaves; one groundwork pattern covers two.
 for(const i of [0,1])earned.best[plan.chunks[i].pattern]=earned.target;
 earned.groundwork=Object.fromEntries([2].map(i=>[plan.chunks[i].pattern,true]));
-const fraction=0.2583333333333333;
+const fraction=0.25;
 const rrFile=practiceStorageName(entry.id,rr),cpFile=practiceStorageName(entry.id,cp);
 const records=new Map([[rrFile,JSON.stringify(earned)]]);
 const reader:LibraryPracticeReader={readPackage:async()=>bytes,readRecord:async name=>records.has(name)?JSON.parse(records.get(name)!):null};
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
 
 test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every persisted record',async()=>{
- assert.equal(totalProgress(plan,earned),fraction);
+ assert.equal(totalProgress(plan,earned),0.2583333333333333);assert.equal(displayedPracticeTotal(plan,earned),fraction);
  const before=[...records],cache=new LibraryPracticeSummaries();
  for(const keyboard of ['conventional-piano','janko-four-row','conventional-piano','janko-four-row'] as const){
   assert.equal(await cache.refresh([entry],keyboard,reader,()=>true),true);
@@ -31,6 +33,12 @@ test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every pe
   assert.equal(cache.get(entry,keyboard==='janko-four-row'?'conventional-piano':'janko-four-row'),undefined);
  }
  assert.deepEqual([...records],before);
+});
+
+test('library shows the same combined manual/measured total without preparation bonus or record changes',async()=>{
+ const state=initialPractice(plan);for(const c of plan.chunks){state.best[c.pattern]=.4*state.target;state.groundwork??={};state.groundwork[c.pattern]=true;}
+ const first=plan.chunks[0];toggleDone(state,{passage:first.id,pattern:first.pattern,rate:.7*state.target});const before=JSON.stringify(state),summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async()=>JSON.parse(before)});
+ assert.ok(Math.abs(summary!.sections-.4125)<1e-12);assert.equal(summary!.sections,displayedPracticeTotal(plan,state));assert.ok(Math.abs(displayedPracticeTotal(plan,state,false)-.4)<1e-12);assert.ok(totalProgress(plan,state)>summary!.sections);assert.equal(JSON.stringify(state),before);
 });
 
 test('an unavailable selected companion never reads another keyboard’s records',async()=>{
