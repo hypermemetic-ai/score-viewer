@@ -1,12 +1,40 @@
 {
   "bundle": {
-    "targets": ["app", "dmg"],
-    "icon": ["icons/icon.icns"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "icon": [
+      "icons/icon.icns"
+    ],
     "resources": {
       "../licenses/URW-base35-provenance.md": "notices/URW-base35-provenance.md",
       "../licenses/URW-base35-LICENSE": "notices/URW-base35-LICENSE",
       "../licenses/URW-base35-COPYING": "notices/URW-base35-COPYING",
-      "../licenses/OFL-Bravura.txt": "notices/OFL-Bravura.txt"
+      "../licenses/OFL-Bravura.txt": "notices/OFL-Bravura.txt",
+      "piano-notices/manifest.json": "notices/piano/manifest.json",
+      "piano-notices/BUILD-MODIFICATIONS.md": "notices/piano/BUILD-MODIFICATIONS.md",
+      "piano-notices/LICENSE": "notices/piano/LICENSE",
+      "piano-notices/external/abseil-cpp/LICENSE": "notices/piano/external/abseil-cpp/LICENSE",
+      "piano-notices/external/atomic_queue/LICENSE": "notices/piano/external/atomic_queue/LICENSE",
+      "piano-notices/external/cephes/LICENSE.txt": "notices/piano/external/cephes/LICENSE.txt",
+      "piano-notices/external/filesystem/LICENSE": "notices/piano/external/filesystem/LICENSE",
+      "piano-notices/external/jsl/LICENSE.md": "notices/piano/external/jsl/LICENSE.md",
+      "piano-notices/external/simde/COPYING": "notices/piano/external/simde/COPYING",
+      "piano-notices/external/st_audiofile/LICENSE.md": "notices/piano/external/st_audiofile/LICENSE.md",
+      "piano-notices/external/st_audiofile/thirdparty/dr_libs/LICENSE": "notices/piano/external/st_audiofile/thirdparty/dr_libs/LICENSE",
+      "piano-notices/external/st_audiofile/thirdparty/libaiff/LICENSE": "notices/piano/external/st_audiofile/thirdparty/libaiff/LICENSE",
+      "piano-notices/external/st_audiofile/thirdparty/stb_vorbis/LICENSE": "notices/piano/external/st_audiofile/thirdparty/stb_vorbis/LICENSE",
+      "piano-notices/external/st_audiofile/thirdparty/wavpack/COPYING": "notices/piano/external/st_audiofile/thirdparty/wavpack/COPYING",
+      "piano-notices/external/st_audiofile/thirdparty/wavpack/license.txt": "notices/piano/external/st_audiofile/thirdparty/wavpack/license.txt",
+      "piano-notices/provenance.json": "notices/piano/provenance.json",
+      "piano-notices/src/external/cpuid/LICENSE.rst": "notices/piano/src/external/cpuid/LICENSE.rst",
+      "piano-notices/src/external/cpuid/platform/LICENSE.rst": "notices/piano/src/external/cpuid/platform/LICENSE.rst",
+      "piano-notices/src/external/hiir/license.txt": "notices/piano/src/external/hiir/license.txt",
+      "piano-notices/src/external/kiss_fft/COPYING": "notices/piano/src/external/kiss_fft/COPYING",
+      "piano-notices/src/external/pugixml/LICENSE.md": "notices/piano/src/external/pugixml/LICENSE.md",
+      "piano-notices/src/external/spline/LICENSE": "notices/piano/src/external/spline/LICENSE",
+      "piano-notices/src/external/tunings/LICENSE.md": "notices/piano/src/external/tunings/LICENSE.md"
     },
     "macOS": {
       "minimumSystemVersion": "13.3",

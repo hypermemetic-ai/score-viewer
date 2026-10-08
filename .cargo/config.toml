@@ -1,0 +1,4 @@
+# Keep Windows packages self-contained. The piano build helper reads this target
+# feature and selects the same /MT runtime for every vendored C/C++ archive.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
