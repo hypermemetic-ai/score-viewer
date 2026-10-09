@@ -1,4 +1,4 @@
-import {validateInstrumentReadingScore,isPitchedEvent} from '../vendor/iso-notation/src/score-presentation';
+import {validateInstrumentReadingScore,validateSourceWrittenComponents,isPitchedEvent} from '../vendor/iso-notation/src/score-presentation';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import type {ScorePackage} from './package';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
@@ -10,7 +10,8 @@ import type {PracticeChunk,PracticePartition,PracticePassagePlan} from './practi
 export interface ManualWrittenComponent {
  id:string;ownerId?:string;silenceId?:string;kind:'pitched'|'unpitched'|'rest'|'skip';
  partId:string;staffId:string;voiceId:string;bar:number;tick:number;durationTicks:number;
- provenance:{kind:'retained-reading-head-v1';headId:string}|{kind:'retained-source-silence-v1';sourceSilenceId?:string};
+ provenance:{kind:'retained-reading-head-v1';headId:string}|{kind:'retained-source-silence-v1';sourceSilenceId?:string}|
+  {kind:'retained-source-written-component-v1';sourceEventId:string};
 }
 export interface ManualMusicalOwner {
  id:string;kind:'pitched'|'unpitched';partId:string;staffId:string;voiceId:string;
@@ -62,6 +63,14 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
  if(byOwner.size!==p.score.notes.length||p.reading.owners.length!==p.score.notes.length)
   throw Error('Manual practice has incomplete musical ownership.');
  const owners:ManualMusicalOwner[]=[],components:ManualWrittenComponent[]=[];
+ const dual=p.reading.dual,scene=dual?.views[dual.notation]?.scene;
+ if(dual){
+  validateSourceWrittenComponents(p.score);
+  if(!scene||dual.sourcePartId!==partId||scene.sourcePartId!==partId||scene.sourceStaffId!==dual.sourceStaffId||
+    scene.view!==dual.notation||scene.components.length!==p.score.sourceWrittenComponents!.components.length||
+    new Set(scene.components.map(c=>c.sourceEventId)).size!==scene.components.length||
+    JSON.stringify(p.pages)!==JSON.stringify(dual.views[dual.notation].pages))throw Error('Manual dual presentation differs from its source.');
+ }
  const chains=new Map((p.score.tieChains??[]).map(chain=>[chain.noteId,chain]));
  for(const event of p.score.notes){
   const owner=byOwner.get(event.id),coordinate=isPitchedEvent(event)?event.pitch:event.referencePitch,
@@ -76,26 +85,39 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
    .map(component=>canonicalJson([event.id,component.startTick,component.durationTicks]))),distinct=new Set<string>();
   for(const head of owner.heads){
    if(!head.id||!Number.isSafeInteger(head.page)||head.page<0||head.page>=p.pages.length||
-     !Number.isSafeInteger(head.system)||head.system<0||head.system>=p.reading.layoutMetadata.length||
+     !Number.isSafeInteger(head.system)||head.system<0||!dual&&head.system>=p.reading.layoutMetadata.length||
      !Number.isFinite(head.x)||!Number.isFinite(head.y)||!Number.isSafeInteger(head.tick)||
      !Number.isSafeInteger(head.durationTicks)||head.durationTicks<=0||head.tick<event.startTick||
      head.tick+head.durationTicks>event.startTick+event.durationTicks)
     throw Error('Manual practice has invalid written appearances.');
-   const layout=p.reading.layoutMetadata[head.system];
-   if(layout.system!==head.system||layout.page!==head.page||!layout.notes.some(note=>note.id===head.id&&note.x===head.x&&note.y===head.y))
+   const layout=p.reading.layoutMetadata[head.system],appearance=scene?.components.find(c=>c.ownerIds.includes(event.id)&&
+    c.tick===head.tick&&c.durationTicks===head.durationTicks&&c.page===head.page&&c.system===head.system&&c.anchor.x===head.x&&c.anchor.y===head.y);
+   if(dual?!appearance:layout.system!==head.system||layout.page!==head.page||!layout.notes.some(note=>note.id===head.id&&note.x===head.x&&note.y===head.y))
     throw Error('Manual practice written appearance differs from its admitted scene.');
    const key=canonicalJson([event.id,head.tick,head.durationTicks]);
    if(!expected.has(key))throw Error('Manual practice written clock differs from its source component.');
    if(distinct.has(key))continue;distinct.add(key);
    if(components.length>=100000)throw Error('Manual practice exceeds its written-component bound.');
-   components.push({id:`retained-written-value:${key}`,ownerId:event.id,kind:event.eventKind,partId,
+   if(!dual)components.push({id:`retained-written-value:${key}`,ownerId:event.id,kind:event.eventKind,partId,
     staffId:event.staffId!,voiceId:event.voiceId!,bar:barAt(bars,head.tick),tick:head.tick,durationTicks:head.durationTicks,
     provenance:{kind:'retained-reading-head-v1',headId:head.id}});
   }
   if(distinct.size!==expected.size)throw Error('Manual practice has incomplete written source components.');
  }
  const silenceIds=new Set<string>();
- for(const rest of p.score.sourceSilences??[]){
+ if(dual)for(const component of p.score.sourceWrittenComponents!.components){
+  const a=scene!.components.find(c=>c.sourceEventId===component.sourceEventId),bar=scene!.bars.find(b=>b.writtenBar===component.writtenBar);
+  if(!a||!bar||a.eventKind!==component.eventKind||a.writtenBar!==component.writtenBar||a.tick!==component.tick||
+    a.durationTicks!==component.durationTicks||a.page!==bar.page||a.system!==bar.system||bar.startTick!==bars[component.writtenBar]||
+    bar.endTick!==bars[component.writtenBar+1]||JSON.stringify(a.ownerIds)!==JSON.stringify(component.ownerId?[component.ownerId]:[])||
+    a.silenceId!==component.silenceId||!a.inkIds.length||a.inkIds.some(id=>typeof id!=='string'||!id)||
+    ![a.bounds.x0,a.bounds.y0,a.bounds.x1,a.bounds.y1].every(Number.isFinite)||a.bounds.x1<=a.bounds.x0||a.bounds.y1<=a.bounds.y0)
+   throw Error('Manual source-written component differs from its admitted scene.');
+  components.push({id:component.sourceEventId,ownerId:component.ownerId,silenceId:component.silenceId,kind:component.eventKind,
+   partId:component.partId,staffId:component.staffId,voiceId:component.voiceId,bar:component.writtenBar,tick:component.tick,durationTicks:component.durationTicks,
+   provenance:{kind:'retained-source-written-component-v1',sourceEventId:component.sourceEventId}});
+ }
+ else for(const rest of p.score.sourceSilences??[]){
   if(rest.partId!==partId||!rest.voice||!rest.staff)throw Error('Manual practice rest needs genuine source part, staff and voice ownership.');
   const bar=barAt(bars,rest.startTick),staffId=rest.staff.startsWith(partId+':')?rest.staff.slice(partId.length+1):rest.staff,
    silenceId=rest.id??`retained-silence:${canonicalJson(rest)}`;

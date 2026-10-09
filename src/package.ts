@@ -1,4 +1,5 @@
 import {admitReadingContent,type ReadingDescriptor,type ReadingContent} from './reading-package';
+import {selectReadingNotation} from './dual-reading-package';
 import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady} from './annotation-ink-policy';
 import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {requirePianoEvent} from './piano-event';
@@ -258,7 +259,8 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(m.version===3){
   if(options.keyboardLayout)fail('This score has no piano keyboard presentation.');
   const {score,pages,reading}=admitReadingContent(m,files);
-  pages.forEach((svg,page)=>passiveSvg(svg,[],page));
+  if(reading.dual){for(const view of Object.values(reading.dual.views))view.pages.forEach((svg,page)=>passiveSvg(svg,[],page));}
+  else pages.forEach((svg,page)=>passiveSvg(svg,[],page));
   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
   freezeSource(score);
   return {manifest:m,score,seats:[],pages,files,reading,archiveSha256:await hashBytes(bytes),sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
@@ -374,6 +376,15 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
   // In Node this also rereads and hashes the actual font file on every use.
   for(const p of packages){const policy=annotationInkPolicyFor(p);if(policy)await ensureAnnotationInkPolicyReady(policy);}
   const clone=structuredClone(graph);
+  // Dual scenes retain this realm's immutable actual preparation. A plain
+  // clone cannot carry their source-owned projector registration. Only this
+  // private cold-admission graph supplies that shared frozen source/context;
+  // package wrappers and all member buffers remain independent copies.
+  for(let i=0;i<packages.length;i++)if(packages[i].reading?.dual){
+   const admitted=selectReadingNotation(packages[i],packages[i].reading!.dual!.notation);
+   Object.assign(clone.packages[i],{manifest:admitted.manifest,score:admitted.score,sourceScore:admitted.score,
+    reading:admitted.reading,pages:[...admitted.pages]});
+  }
   for(const [p,views]of clone.groups)linkedViews.set(p,new Map(views));
   for(let i=0;i<packages.length;i++)if(packages[i].sourceScore&&Object.isFrozen(packages[i].sourceScore))freezeSource(clone.packages[i].sourceScore);
   for(let i=0;i<packages.length;i++){const p=packages[i],evidence=writtenHeadEvidence.get(p),binding=evidence?captureHeadBinding(clone.packages[i]):undefined;

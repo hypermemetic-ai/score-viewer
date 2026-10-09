@@ -91,7 +91,8 @@ test('historical curved register archives replay explicitly without silent outwa
   source.readingPolicy={version:'instrument-reading-v1',partId:'original-part',centerPitch:24,guidePitches:[12,24,36],
     pitchFolding:'literal',stemPolicy:'register'};
   const historicalBytes=await authoredReadingPackage(source),historical=await importPackage(historicalBytes),raw=unzipSync(historicalBytes);
-  assert.equal(historical.manifest.reading!.engineId,'janko-real-engine-instrument-reading-v2-curved-techniques');
+  assert.equal(historical.manifest.reading!.version,'instrument-reading-package-v1');
+  assert.equal(historical.manifest.reading!.version==='instrument-reading-package-v1'&&historical.manifest.reading!.engineId,'janko-real-engine-instrument-reading-v2-curved-techniques');
   assert.deepEqual(historical.score,source);assert.deepEqual(historical.files['score.json'],raw['score.json']);
   assert.equal(historical.manifest.revision,await hashBytes(raw['score.json']));
   for(const [archive,engine]of [[bytes,'janko-real-engine-instrument-reading-v2-curved-techniques'],

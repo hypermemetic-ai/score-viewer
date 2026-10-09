@@ -3,8 +3,9 @@ import {prepareInstrumentReading,validateInstrumentReadingScore,instrumentReadin
   type ReadingOwner,type JankoLayoutOptions,type JankoTokens} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,type Manifest,type Metadata} from './package';
+import {admitDualReadingContent,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
 
-export interface ReadingDescriptor {
+export interface LegacyReadingDescriptor {
   version:'instrument-reading-package-v1';
   engineId:ReturnType<typeof prepareInstrumentReading>['engineId'];
   policy:InstrumentReadingPolicy;
@@ -13,10 +14,12 @@ export interface ReadingDescriptor {
   options:Partial<JankoLayoutOptions>;
   tokens:Partial<JankoTokens>;
 }
+export type ReadingDescriptor=LegacyReadingDescriptor|DualReadingDescriptor;
 export interface ReadingContent {
   owners:ReadingOwner[];
   layoutMetadata:ReturnType<typeof prepareInstrumentReading>['layoutMetadata'];
   geometryEvidence:ReturnType<typeof prepareInstrumentReading>['geometryEvidence'];
+  dual?:DualReadingContent;
 }
 
 const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
@@ -50,6 +53,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
   score:QuantizedGridScore;pages:string[];reading:ReadingContent
 } {
   const d=m.reading;
+  if(d?.version==='instrument-reading-package-v2')return admitDualReadingContent(m,files);
   if(!d||!object(d)||Object.keys(d).some(k=>!['version','engineId','policy','owners','layout','options','tokens'].includes(k))||
     d.version!=='instrument-reading-package-v1'||typeof d.engineId!=='string'||m.engineVersion!==d.engineId||
     d.owners!=='reading-owners.json'||d.layout!=='reading-layout.json'||!object(d.options)||!object(d.tokens)||
