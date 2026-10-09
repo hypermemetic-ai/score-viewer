@@ -17,7 +17,7 @@ export async function admitPianoRequestResult(request:PianoReadinessRequest,p:Sc
     prior=has?await selectPresentation(original,request.layout):original,
     saved=request.personal?readPersonal(request.personal,prior):undefined;
   const steps=request.transposeSteps??getScoreTransposition(prior),pitchChanged=steps!==getScoreTransposition(prior);
-  if(!Number.isSafeInteger(steps)||Math.abs(steps)>87||pitchChanged&&(steps===0||request.intent==='read-retained'))throw Error('Prepared output has an invalid requested transposition intent.');
+  if(!Number.isSafeInteger(steps)||pitchChanged&&(steps===0||request.intent==='read-retained'))throw Error('Prepared output has an invalid requested transposition intent.');
   if(steps!==0&&(pitchChanged||request.forceRecalculate||request.intent!=='read-retained')){
     const transformed=await createScoreTransposition(prior,request.packageBytes,steps,request.layout);
     if(!equal(p.transposition,transformed.envelope)||p.sourceSha256!==transformed.envelope.effectiveSourceSha256||p.keyboardLayout!==request.layout||
@@ -28,7 +28,8 @@ export async function admitPianoRequestResult(request:PianoReadinessRequest,p:Sc
     if(request.referenceTempo)context=validatePianoCalculationContext({version:'piano-calculation-context-v1',sourceSha256:p.sourceSha256!,referencePerformanceTempo:request.referenceTempo},p.sourceSha256!,transformed.source);
     if(!equal(p.calculationContext,context))throw Error('Transposed output has another requested calculation context.');
     const source=scoreWithCalculationContext(transformed.source,context,p.sourceSha256!),
-      constraints=pianoRequestAuthority(prior,source,request.layout,pitchChanged?undefined:saved?.layer??prior.fingerLayer,pitchChanged?undefined:saved,'retain-imported'),
+      rawConstraints=pianoRequestAuthority(prior,source,request.layout,pitchChanged?undefined:saved?.layer??prior.fingerLayer,pitchChanged?undefined:saved,'retain-imported'),
+      constraints=[...new Map(rawConstraints.map(c=>[canonicalJson(c),c])).values()],
       identity=p.preparationIdentity;
     if(!identity||!layer||identity.handPolicy!=='retain-imported'||identity.authoritySha256!==await authorityIdentity(constraints)||
       identity.requestSha256!==await preparationRequestIdentity(p,'retain-imported',constraints,request.maxExpansions)||!equal(layer,p.fingerLayer))throw Error('Transposed output belongs to another selected hand map or layer request.');

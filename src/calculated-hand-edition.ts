@@ -13,6 +13,8 @@ import {annotationPositions} from './fingering-presentation';
 
 import {ANNOTATION_INK_POLICY,validateAnnotationInkPolicy,ensureAnnotationInkPolicyReady,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
 
+import {admitTranspositionBaselineRecipe} from './score-transposition';
+
 interface CalculatedHandEvidence {
  outputIdentity:{pageSha256:string[];seatSha256:string};
  sourceInventory:SourceStatementInventory;sourceCoverage:PresentationSourceCoverage;
@@ -46,7 +48,9 @@ const receiptFor=(r:Awaited<ReturnType<typeof prepareCalculatedHandPresentation>
  * replayed before adopting new rules; a derived baseline was cold-replayed on import. */
 export async function calculatedRecipeForRequest(p:ScorePackage):Promise<ScoreRenderingRecipe>{
  if(!p.renderingRecipe)throw Error('Calculated hands require a matching native rendering preparation.');
- if(p.transposition)return createCalculatedHandRenderingRecipe(p.sourceSha256!,p.renderingRecipe.options,p.renderingRecipe.tokens);
+ if(p.transposition){if(!p.transpositionOriginal)throw Error('Transpose has no independently admitted original baseline.');
+  await admitTranspositionBaselineRecipe(p.transpositionOriginal);
+  return createCalculatedHandRenderingRecipe(p.sourceSha256!,p.renderingRecipe.options,p.renderingRecipe.tokens);}
  const source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256!),
   prior=p.renderingRecipe.engineId===CALCULATED_HAND_SCORE_RENDERING_ENGINE?p.renderingRecipe:
    await replayRetainedRecipeBaseline(source,p.renderingRecipe,p.sourceSha256!);
