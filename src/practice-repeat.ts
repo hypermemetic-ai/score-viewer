@@ -1,5 +1,5 @@
 import {practiceTiming} from './practice-timing';
-import {validatePulseGrid,type PracticePulseGrid} from './score-clock';
+import {validatePulseGrid,repeatPulseGrid,type PracticePulseGrid} from './score-clock';
 
 /** BPM denotes the score's admitted goal beat (No.14: dotted quarter, 3/8). */
 export interface PracticeRepeatPlan {
@@ -13,6 +13,7 @@ export interface PracticeRepeatPlan {
  readonly countInMs:number;
  readonly repeatBarMs:number;
  readonly fullCountIn:true;
+ readonly grid?:PracticePulseGrid;
 }
 export interface PracticeRepeatStart {
  readonly countStartMs:number;
@@ -23,17 +24,17 @@ export interface PracticeRepeatStart {
 const validBpm=(bpm:number)=>Number.isFinite(bpm)&&bpm>=5&&bpm<=500;
 const validTime=(ms:number)=>Number.isFinite(ms)&&ms>=0&&ms*1000<=Number.MAX_SAFE_INTEGER;
 /** Capture source/audio deadlines before recording success mutates working tempo. */
-export function planPracticeRepeat(input:{previousStartMs:number;phraseEndMs:number;previousBpm:number;nextBpm:number;fullCountIn?:true;grid?:PracticePulseGrid;sourceBoundary?:true}):PracticeRepeatPlan {
+export function planPracticeRepeat(input:{previousStartMs:number;phraseEndMs:number;previousBpm:number;nextBpm:number;fullCountIn?:true;grid?:PracticePulseGrid;previousGrid?:PracticePulseGrid;sourceBoundary?:true}):PracticeRepeatPlan {
  const {previousStartMs,phraseEndMs,previousBpm,nextBpm}=input;
  if(!validTime(previousStartMs)||!validTime(phraseEndMs)||phraseEndMs<previousStartMs||!validBpm(previousBpm)||!validBpm(nextBpm))throw Error('Invalid musical repeat boundary');
- const grid=input.grid?validatePulseGrid(input.grid):undefined,previousBeatMs=grid?.version===2?practiceTiming(previousBpm,grid).countBarMs:practiceTiming(previousBpm).goalBeatMs;
+ const admitted=input.grid?validatePulseGrid(input.grid):undefined,grid=admitted?.version===2&&input.sourceBoundary?repeatPulseGrid(admitted,input.previousGrid):admitted,previousBeatMs=grid?.version===2?practiceTiming(previousBpm,grid).countBarMs:practiceTiming(previousBpm).goalBeatMs;
  // Remove only arithmetic noise at an exact score beat, never wall-clock delay.
  const beats=Math.ceil((phraseEndMs-previousStartMs)/previousBeatMs-1e-9);
  const boundaryMs=input.sourceBoundary?phraseEndMs:previousStartMs+beats*previousBeatMs;
  const {goalBeatMs,countInMs,countBarMs}=practiceTiming(nextBpm,grid),repeatBarMs=grid?.version===2?countBarMs:goalBeatMs;
  const earliestStartMs=boundaryMs+countInMs;
  if(!validTime(earliestStartMs))throw Error('Musical repeat clock overflow');
- return Object.freeze({previousStartMs,phraseEndMs,boundaryMs,nextBpm,goalBeatMs,earliestStartMs,countInMs,repeatBarMs,gapBeats:countInMs/goalBeatMs,fullCountIn:true as const});
+ return Object.freeze({previousStartMs,phraseEndMs,boundaryMs,nextBpm,goalBeatMs,earliestStartMs,countInMs,repeatBarMs,gapBeats:countInMs/goalBeatMs,fullCountIn:true as const,...(grid?{grid}:{})});
 }
 /** Readiness selects a grid point; it never becomes a new musical origin. */
 export function selectPracticeRepeatStart(plan:PracticeRepeatPlan,readyMs:number):PracticeRepeatStart {

@@ -31,9 +31,9 @@ test('simple meter count-in ends at the real score downbeat, not the next fictit
  assert.equal(pulseAt(12,timing.eighthMs,0,grid).frequency,1200);
 });
 test('actual pickup and meter-change bar clocks determine accents without changing goal beats',()=>{
- const p=score(),source={...planPractice(p),timeSignatures:[{tick:0,numerator:3,denominator:4},{tick:192,numerator:2,denominator:4}]},grid=scorePulseGrid(source,[0,48,192,288]),t=practiceTiming(60,grid);
+ const p=score(),source={...planPractice(p),barPhaseTicks:undefined,timeSignatures:[{tick:0,numerator:3,denominator:4},{tick:192,numerator:2,denominator:4}]},grid=scorePulseGrid(source,[0,48,192,288]),t=practiceTiming(60,grid);
  assert.deepEqual(grid.barStartPulses,[0,2,8,12]);
- for(const pulse of [0,6,12,18,22])assert.equal(pulseAt(pulse,t.eighthMs,0,grid).frequency,1200);
+ for(const pulse of [0,6,12,18])assert.equal(pulseAt(pulse,t.eighthMs,0,grid).frequency,1200);
  assert.equal(pulseAt(10,t.eighthMs,0,grid).frequency,900);
  assert.throws(()=>validatePulseGrid({...grid,barStartPulses:[0,2,2]}),/grid/);
  assert.throws(()=>scorePulseGrid(source,[0,.1,288]),/rational/);

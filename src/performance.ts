@@ -25,7 +25,8 @@ export function planPerformance(p:ScorePackage):PerformancePlan {
   if(attack.owners.includes(written.id))throw Error('Performance occurrence duplicates a written source owner.');attack.end=Math.max(attack.end,end);attack.owners.push(written.id);attack.performedOwners!.push(note.id);const group=source.ownerGroup.get(written.id)!;if(!attack.groups.includes(group))attack.groups.push(group);
  }
  const events=[...physical.values()];
- return {revision:source.revision,events:events.sort((a,b)=>a.tick-b.tick||a.midi-b.midi),totalTicks:p.score.writtenPresentation!.performedTotalTicks,ticksPerBeat:source.ticksPerBeat,referencePerformanceTempo:source.referencePerformanceTempo,grid:scorePulseGrid(source,[...occurrences.map(o=>o.performedTick),p.score.writtenPresentation!.performedTotalTicks])};}
+ const performedMeters=occurrences.map(o=>({...source.timeSignatures.findLast(m=>m.tick<=o.writtenTick)!,tick:o.performedTick})),performedPhases=occurrences.map(o=>source.barPhaseTicks![o.writtenBar-1]);
+ return {revision:source.revision,events:events.sort((a,b)=>a.tick-b.tick||a.midi-b.midi),totalTicks:p.score.writtenPresentation!.performedTotalTicks,ticksPerBeat:source.ticksPerBeat,referencePerformanceTempo:source.referencePerformanceTempo,grid:scorePulseGrid({...source,timeSignatures:performedMeters,barPhaseTicks:performedPhases},[...occurrences.map(o=>o.performedTick),p.score.writtenPresentation!.performedTotalTicks])};}
 export interface PerformanceResult {bpm:number;accuracy:number;correct:number;expected:number;missed:number;extra:number;earlyReleases:number;at:string}
 export interface PerformanceRecords {referenceBeat?:ReferencePerformanceTempo['beat'];version:1;revision:string;best:Record<string,PerformanceResult>}
 export function accuracyLabel(accuracy:number){return accuracy===1?'100%':`${Math.min(99.9,Math.round(accuracy*1000)/10).toFixed(1)}%`;}

@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {scorePulseGrid,validatePulseGrid} from '../src/score-clock';
+import {scorePulseGrid,validatePulseGrid,repeatPulseGrid} from '../src/score-clock';
 import {practiceTiming,pulseAt,countBeatAt} from '../src/practice-timing';
 import {planPracticeRepeat,selectPracticeRepeatStart} from '../src/practice-repeat';
 const source=(numerator:number,denominator:number,beat={numerator:1,denominator:4})=>({ticksPerBeat:48,timeSignatures:[{tick:0,numerator,denominator}],referencePerformanceTempo:{version:'reference-performance-tempo-v1' as const,bpm:80,beat,provenance:{kind:'editorial' as const,reference:'Public musical clock fixture'}}});
@@ -26,5 +26,27 @@ test('fractional reference beats and meter changes retain exact source end and w
 test('legacy pulse contracts remain literal and mixed/malformed v2 metadata refuses',()=>{
  const legacy={pulsesPerBeat:3,scoreOffsetPulses:6,barStartPulses:[0,6,12]};assert.deepEqual(validatePulseGrid(legacy),legacy);
  const grid=scorePulseGrid(source(3,4),[0,144,288]);
- for(const bad of [{...grid,version:3},{...grid,countBeatPulses:4},{...grid,scoreOffsetPulses:4},{...grid,scoreStartPhasePulses:6},{...grid,beatStartPulses:[0,2,2]},{...legacy,countBarPulses:6}])assert.throws(()=>validatePulseGrid(bad as any),/grid/);
+ for(const bad of [{...grid,version:3},{...grid,countBeatPulses:4},{...grid,scoreOffsetPulses:4},{...grid,scoreStartPhasePulses:6},{...grid,beatStartPulses:[0,2,2]},{...legacy,countBarPulses:6},{...grid,unknown:true},{...grid,barPhasePulses:[0]},{...grid,barStartPulses:[0,1e9],barMeterPulses:[6],barBeatPulses:[2],barPhasePulses:[0]}])assert.throws(()=>validatePulseGrid(bad as any),/grid/);
+});
+test('short endings stay on their downbeat; only established written pickups carry nonzero phase',()=>{
+ const s=source(4,4),bars=[0,48,240,384],grid=scorePulseGrid(s,bars),t=practiceTiming(60,grid);
+ assert.deepEqual(grid.barPhasePulses,[6,0,0]);assert.equal(pulseAt(grid.scoreOffsetPulses+grid.barStartPulses[2],t.eighthMs,0,grid).frequency,1200);
+ const ending=scorePulseGrid(s,bars,240,384);assert.equal(ending.scoreStartPhasePulses,0);assert.equal(ending.scoreOffsetPulses,8);
+ const unidentified=scorePulseGrid(s,[0,192,240,432],192,240);assert.equal(unidentified.scoreStartPhasePulses,0);
+ const repeated=scorePulseGrid({...s,writtenPresentation:{repeats:[{startBar:4}]}},[0,48,240,384,432,624]);assert.deepEqual(repeated.barPhasePulses,[6,0,0,6,0]);assert.equal(pulseAt(repeated.scoreOffsetPulses+repeated.barStartPulses[3],practiceTiming(60,repeated).eighthMs,0,repeated).frequency,900);
+});
+test('pickup plus complementary ending repeats one whole bar at the preserved overarching phase',()=>{
+ const initial=scorePulseGrid(source(4,4),[0,48,240,384]);assert.equal(initial.scoreOffsetPulses,14);
+ let prior=initial,sourceEnd=11000;
+ for(let loop=0;loop<2;loop++){
+  const repeated=repeatPulseGrid(initial,prior),plan=planPracticeRepeat({previousStartMs:sourceEnd-8000,phraseEndMs:sourceEnd,previousBpm:60,nextBpm:60,grid:initial,previousGrid:prior,sourceBoundary:true}),t=practiceTiming(60,repeated);
+  assert.equal(repeated.countStartPhasePulses,6);assert.equal(repeated.scoreOffsetPulses,8);assert.deepEqual(plan.grid,repeated);assert.equal(plan.countInMs,4000);
+  assert.deepEqual([0,2,4,6].map(p=>countBeatAt(p*t.eighthMs+.001,60,repeated)),['4','1','2','3']);assert.deepEqual([0,2,4,6,8].map(p=>pulseAt(p,t.eighthMs,0,repeated).frequency),[900,1200,900,900,900]);
+  assert.equal(selectPracticeRepeatStart(plan,sourceEnd).startMs,sourceEnd+4000);sourceEnd+=12000;prior=repeated;
+ }
+});
+test('a written repeated pickup retains its phase and real meter changes select an explicit entry grid',()=>{
+ const sourceGrid=scorePulseGrid(source(3,4),[0,48,192,288]),performed=scorePulseGrid({...source(3,4),barPhaseTicks:[96,0,0,96,0,0]},[0,48,192,288,336,480,576]);assert.deepEqual(performed.barPhasePulses,[4,0,0,4,0,0]);
+ const next=repeatPulseGrid(sourceGrid);assert.equal(next.countStartPhasePulses,4);
+ const mixed=scorePulseGrid({...source(3,4),timeSignatures:[{tick:0,numerator:3,denominator:4},{tick:144,numerator:2,denominator:4}]},[0,144,240]);assert.equal(repeatPulseGrid(mixed).countStartPhasePulses,0);
 });
