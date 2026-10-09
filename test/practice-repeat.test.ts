@@ -6,14 +6,15 @@ import {PracticeClock} from '../src/practice-clock';
 import {host,practiceAudio} from '../src/host';
 
 const plan=(previousBpm=60,nextBpm=60)=>planPracticeRepeat({previousStartMs:10000,phraseEndMs:18000,previousBpm,nextBpm});
-test('two dotted-quarter goal beats retain phrase phase despite save readiness jitter',()=>{
+test('every repeat preserves both count beats after save readiness jitter',()=>{
  const p=plan();
  assert.equal(practiceTiming(60).goalBeatMs,1000);
  assert.equal(p.boundaryMs,18000);assert.equal(p.earliestStartMs,20000);
- for(const ready of [18001,18437,19299,20000]){
-  assert.deepEqual(selectPracticeRepeatStart(p,ready),{countStartMs:18000,startMs:20000,extraBeats:0,totalGapBeats:2});
+ assert.deepEqual(selectPracticeRepeatStart(p,18000),{countStartMs:18000,startMs:20000,extraBeats:0,totalGapBeats:2});
+ for(const [ready,count]of [[18001,19000],[18437,19000],[19299,20000],[20000,20000]]){
+  assert.deepEqual(selectPracticeRepeatStart(p,ready),{countStartMs:count,startMs:count+2000,extraBeats:(count-18000)/1000,totalGapBeats:2+(count-18000)/1000});
  }
- for(const [ready,start,extra]of [[20000.1,21000,1],[20839,21000,1],[21111,22000,2],[27501,28000,8]]){
+ for(const [ready,start,extra]of [[20000.1,23000,3],[20839,23000,3],[21111,24000,4],[27501,30000,10]]){
   const actual=selectPracticeRepeatStart(p,ready);
   assert.equal(actual.startMs,start);assert.equal(actual.extraBeats,extra);assert.equal(actual.totalGapBeats,2+extra);
  }
@@ -21,7 +22,7 @@ test('two dotted-quarter goal beats retain phrase phase despite save readiness j
 test('acceleration takes effect at the old beat boundary, with new goal-beat gaps',()=>{
  const p=planPracticeRepeat({previousStartMs:10000,phraseEndMs:18125,previousBpm:60,nextBpm:120});
  assert.equal(p.boundaryMs,19000);assert.equal(p.goalBeatMs,500);assert.equal(p.earliestStartMs,20000);
- assert.equal(selectPracticeRepeatStart(p,20001).startMs,20500);
+ assert.equal(selectPracticeRepeatStart(p,20001).startMs,21500);
  const exact=planPracticeRepeat({previousStartMs:123.456,phraseEndMs:123.456+12*60000/185.123456789,previousBpm:185.123456789,nextBpm:190.05});
  assert.ok(Math.abs(exact.boundaryMs-exact.phraseEndMs)<1e-8);
  assert.ok(Math.abs(exact.earliestStartMs-exact.boundaryMs-2*60000/190.05)<1e-8);
@@ -50,7 +51,7 @@ test('native repeat carries an absolute MIDI-domain target and accepts only alig
   assert.throws(()=>clock.fromMidi(20000000),/not started/);
  }finally{await clock.stop();}
 });
-test('WebAudio joins a partly elapsed count without replaying past clicks or moving the attack',async t=>{
+test('WebAudio preserves every count click after late output readiness',async t=>{
  const previous={audio:Object.getOwnPropertyDescriptor(globalThis,'AudioContext'),window:Object.getOwnPropertyDescriptor(globalThis,'window'),sample:host.midiClock};
  let time=18.5;const starts:number[]=[];let scheduled:()=>void=()=>{};
  class FakeAudio{
@@ -65,10 +66,10 @@ test('WebAudio joins a partly elapsed count without replaying past clicks or mov
  const clock=new PracticeClock(false);
  try{
   const actual=await clock.beginRepeat(60,7000,plan());
-  assert.equal(actual.startMs,20000);assert.equal(actual.countStartMs,18000);
-  time=18.6;scheduled();assert.equal(starts.length,1);assert.ok(Math.abs(starts[0]-(18+2/3))<1e-8);assert.ok(starts.every(at=>at>=18.65));
+  assert.equal(actual.startMs,21000);assert.equal(actual.countStartMs,19000);
+  time=18.86;scheduled();assert.equal(starts.length,1);assert.ok(Math.abs(starts[0]-19)<1e-8);assert.ok(starts.every(at=>at>=19));
   time=19.95;const delayed=await clock.beginRepeat(60,7000,plan());
-  assert.equal(delayed.startMs,21000);assert.equal(delayed.extraBeats,1);assert.equal(clock.fromMidi(21000000),21000);
+  assert.equal(delayed.startMs,23000);assert.equal(delayed.extraBeats,3);assert.equal(clock.fromMidi(23000000),23000);
  }finally{clock.close();}
 });
 test('cancelled native repeat cannot replace a newer clock origin or stop its owner',async t=>{
@@ -88,5 +89,5 @@ test('cancelled native repeat cannot replace a newer clock origin or stop its ow
  }finally{await clock.stop();}
 });
 
-test('Done count-in restart retains musical grid but guarantees both fresh count beats after readiness',()=>{const p=planPracticeRepeat({previousStartMs:1000,phraseEndMs:18000,previousBpm:60,nextBpm:60,fullCountIn:true});for(const ready of [18000,18400,19900,20850]){const start=selectPracticeRepeatStart(p,ready);assert.ok(start.countStartMs>=ready);assert.equal((start.countStartMs-p.boundaryMs)%p.goalBeatMs,0);assert.equal(start.startMs-start.countStartMs,2000);}assert.equal(selectPracticeRepeatStart({...p,fullCountIn:undefined},18400).countStartMs,18000);});
+test('Done count-in restart retains musical grid but guarantees both fresh count beats after readiness',()=>{const p=planPracticeRepeat({previousStartMs:1000,phraseEndMs:18000,previousBpm:60,nextBpm:60,fullCountIn:true});for(const ready of [18000,18400,19900,20850]){const start=selectPracticeRepeatStart(p,ready);assert.ok(start.countStartMs>=ready);assert.equal((start.countStartMs-p.boundaryMs)%p.goalBeatMs,0);assert.equal(start.startMs-start.countStartMs,2000);}assert.equal(selectPracticeRepeatStart(p,18400).countStartMs,19000);});
 test('actual Tauri audio request serializes the optional full-count flag as a Boolean and retains absent behavior',async t=>{const prior=Object.getOwnPropertyDescriptor(globalThis,'window'),calls:any[]=[];Object.defineProperty(globalThis,'window',{configurable:true,value:{__TAURI_INTERNALS__:{invoke:async(command:string,args:unknown)=>{calls.push({command,args:JSON.parse(JSON.stringify(args))});return 19000000;}}}});t.after(()=>{if(prior)Object.defineProperty(globalThis,'window',prior);else delete(globalThis as any).window;});await practiceAudio.begin('chosen',60,7000,1000/3,20000000);await practiceAudio.begin('chosen',60,7000,1000/3,20000000,undefined,true);assert.equal(calls[0].command,'practice_audio_begin');assert.equal(calls[0].args.fullRepeatCountIn,false);assert.equal(calls[1].args.fullRepeatCountIn,true);assert.equal(typeof calls[1].args.fullRepeatCountIn,'boolean');const {fullRepeatCountIn,...base}=calls[1].args;assert.deepEqual(base,(({fullRepeatCountIn,...rest})=>rest)(calls[0].args));assert.equal(base.repeatStartMicros,20000000);});
