@@ -14,5 +14,5 @@
 
 ## 3. Integration and review
 
-- [ ] 3.1 Run the focused and complete source tests, configured build, strict OpenSpec and diff checks after integrating the parent's reviewed baseline.
-- [ ] 3.2 Produce a scoped source PR and private browser evidence for parent review; stop temporary processes and report native/physical acceptance limits without autoarchiving.
+- [x] 3.1 Run the focused and complete source tests, configured build, strict OpenSpec and diff checks after integrating the parent's reviewed baseline.
+- [x] 3.2 Produce a scoped source PR and private browser evidence for parent review; stop temporary processes and report native/physical acceptance limits without autoarchiving.

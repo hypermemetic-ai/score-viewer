@@ -1,4 +1,4 @@
-import {applyAnnotationInkPolicy,annotationInkPolicyFor,footerFontNoticeUrl} from './annotation-ink-policy';
+import {footerFontNoticeUrl} from './annotation-ink-policy';
 import {ViewerOrientation,fitSurface,fitDialog} from './orientation';
 import{ObservedMidiSustain,isMusicalSustain,musicalControllerTime}from'./midi-sustain';
 import {scoreTickMs} from './score-clock';
