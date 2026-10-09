@@ -1,4 +1,4 @@
-import type {ScorePackage,Seat} from './package';
+import {admittedWrittenHeads,type ScorePackage,type Seat} from './package';
 import type {PracticePlan} from './practice';
 import {cropMeasure,type Crop,type PassageTrack} from './practice-passage';
 import {deriveTieDisplayPlan,taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments,tieArcDepth,tieArcInkBox} from '../vendor/iso-notation/src/render/janko/ties';
@@ -21,6 +21,7 @@ const headCache=new WeakMap<ScorePackage,Map<string,string[]>>();
  * admitted recipe's real head ledger and bind its literal glyph to the frozen
  * seat; neither nearest-head guesses nor continuation suffixes establish it. */
 function replayedHeads(p:ScorePackage):Map<string,string[]> {
+ const admitted=admittedWrittenHeads(p);if(admitted)return new Map([...admitted].map(([seat,ids])=>[seat,[...ids]]));
  const saved=headCache.get(p);if(saved)return saved;
  const recipe=validateScoreRenderingRecipe(p.renderingRecipe),options=scoreRenderingRecipeOptions(recipe),heads=new Map<string,string[]>(),display=deriveTieDisplayPlan(p.score,options.chordGrouping==='compatible-stems'),owners=new Set(p.score.notes.map(n=>n.id));
  for(const layout of layoutJankoScore(p.score,options,recipe.tokens))for(const [id,pieces]of buildInkScene(layout,options,recipe.tokens,p.score).heads){

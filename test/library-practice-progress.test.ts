@@ -7,6 +7,7 @@ import {planPractice,initialPractice,totalProgress,practicePercent,reconcilePass
 import {LibraryPracticeSummaries,readLibraryPracticeSummary,type LibraryPracticeReader} from '../src/library-practice-progress';
 import {displayedPracticeTotal} from '../src/practice-display';
 import {toggleDone} from '../src/practice-attainment';
+import {PackageAdmissionSession} from '../src/package-admission-session';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url));
 const p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row'),cp=await selectPresentation(p,'conventional-piano');
@@ -20,6 +21,31 @@ const rrFile=practiceStorageName(entry.id,rr),cpFile=practiceStorageName(entry.i
 const records=new Map([[rrFile,JSON.stringify(earned)]]);
 const reader:LibraryPracticeReader={readPackage:async()=>bytes,readRecord:async name=>records.has(name)?JSON.parse(records.get(name)!):null};
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
+
+test('warm summary reuse rereads progress and changed archive bytes never borrow a prior admission',async()=>{
+ const cache=new LibraryPracticeSummaries();let currentBytes=new Uint8Array(bytes),saved=structuredClone(earned),packageReads=0,recordReads=0;
+ const fresh={readPackage:async()=>{packageReads++;return currentBytes;},readRecord:async()=>{recordReads++;return structuredClone(saved);}};
+ await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);
+ saved=initialPractice(plan);for(const c of plan.chunks)saved.best[c.pattern]=saved.target;
+ await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,1);
+ assert.equal(packageReads,2);assert.equal(recordReads,2);
+ currentBytes=new Uint8Array(bytes.length);await cache.refresh([entry],'janko-four-row',fresh,()=>true);
+ assert.equal(cache.get(entry,'janko-four-row'),undefined);assert.equal(recordReads,2);
+ currentBytes=new Uint8Array(bytes);await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,1);
+ cache.clear();assert.equal(cache.get(entry,'janko-four-row'),undefined);
+});
+
+test('newest refresh waits for a distinct old producer without omitting progress or replaying stale generations',async()=>{
+ const cache=new LibraryPracticeSummaries(),slot=(cache as unknown as {admission:PackageAdmissionSession}).admission,
+  other=readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),producer=slot.import(other,{allowLegacyTempo:true});
+ assert.equal(slot.retained.pending,1);
+ const old=cache.refresh([entry],'conventional-piano',reader,()=>true),
+  superseded=cache.refresh([entry],'conventional-piano',reader,()=>true),
+  newest=cache.refresh([entry],'janko-four-row',reader,()=>true);
+ assert.deepEqual(await Promise.all([old,superseded,newest]),[false,false,true]);await producer;
+ assert.equal(slot.retained.pending,0);assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);
+ assert.equal(cache.get(entry,'conventional-piano'),undefined);
+});
 
 test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every persisted record',async()=>{
  assert.equal(totalProgress(plan,earned),0.2583333333333333);assert.equal(displayedPracticeTotal(plan,earned),fraction);

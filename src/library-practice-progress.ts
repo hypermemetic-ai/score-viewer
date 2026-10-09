@@ -5,6 +5,7 @@ import {displayedPracticeTotal} from './practice-display';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} from './state';
 import {assertSelectedTransposition} from './score-transposition-selection';
 import {getScoreTransposition} from './score-transposition';
+import {PackageAdmissionSession} from './package-admission-session';
 
 export interface LibraryPracticeReader {
  readPackage(file:string):Promise<Uint8Array|null>;
@@ -19,10 +20,14 @@ export interface LibraryPracticeSummary {
 }
 
 /** Read existing evidence only; unavailable companions never borrow the base layout. */
-export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKeyboardId,reader:LibraryPracticeReader):Promise<LibraryPracticeSummary|undefined> {
+export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKeyboardId,reader:LibraryPracticeReader,admission?:PackageAdmissionSession,isCurrent:()=>boolean=()=>true):Promise<LibraryPracticeSummary|undefined> {
  const bytes=await reader.readPackage(entry.file);
  if(!bytes)return;
- const imported=await importPackage(bytes,{allowLegacyTempo:true});
+ // Only the newest background refresh may resume after an old cold producer.
+ // No additional replay/queue is launched while that producer owns the slot.
+ if(admission)await admission.waitForIdle();
+ if(!isCurrent())return;
+ const imported=await (admission?admission.import(bytes,{allowLegacyTempo:true}):importPackage(bytes,{allowLegacyTempo:true}));
  if(collectionId(imported)!==entry.id||!imported.availablePresentations?.includes(keyboard))return;
  assertSelectedTransposition(entry,imported);
  const p=await selectPresentation(imported,keyboard);
@@ -36,6 +41,8 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
 export class LibraryPracticeSummaries {
  private generation=0;
  private summaries=new Map<string,LibraryPracticeSummary>();
+ private admission=new PackageAdmissionSession();
+ clear():void {++this.generation;this.summaries.clear();this.admission.clear();}
 
  get(entry:Entry,keyboard:PhysicalKeyboardId):LibraryPracticeSummary|undefined {
   const summary=this.summaries.get(entry.id);
@@ -45,7 +52,7 @@ export class LibraryPracticeSummaries {
  async refresh(entries:Entry[],keyboard:PhysicalKeyboardId,reader:LibraryPracticeReader,isCurrent:()=>boolean):Promise<boolean> {
   const generation=++this.generation,snapshot=entries.map(entry=>({...entry})),next=new Map<string,LibraryPracticeSummary>();
   for(const entry of snapshot){
-   try{const summary=await readLibraryPracticeSummary(entry,keyboard,reader);if(summary)next.set(entry.id,summary);}
+   try{const summary=await readLibraryPracticeSummary(entry,keyboard,reader,this.admission,()=>generation===this.generation&&isCurrent());if(summary)next.set(entry.id,summary);}
    catch{/* Unsupported or corrupt practice evidence remains untouched. */}
    if(generation!==this.generation||!isCurrent())return false;
   }

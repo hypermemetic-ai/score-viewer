@@ -49,3 +49,27 @@ test('actual worker entry executes strict service and sends only inert admission
  assert.equal(complete.result.status,'ready');assert.equal('package' in complete.result,false);
  assert.ok('layer' in complete.result);assert.deepEqual(complete.result.layer,prepared.after.fingerLayer);
 });
+
+test('exact retained reading uses strict service and request binding without constructing a worker',async()=>{
+ const before=prepared.publication.bytes.slice(),request={packageBytes:before.slice(),layout:'janko-four-row' as const,intent:'read-retained' as const};
+ const pending=runPianoReadiness(request);request.packageBytes.fill(0);
+ const q=await pending;assert.equal(q.status,'ready','message'in q?q.message:undefined);
+ assert.ok('package'in q);assert.equal(q.package.keyboardLayout,'janko-four-row');assert.deepEqual(q.packageBytes,before);
+ assert.deepEqual(q.layer,prepared.after.fingerLayer);assert.equal((await selectPresentation(q.package,'conventional-piano')).keyboardLayout,'conventional-piano');
+ const tempo=structuredClone(q.package.score.referencePerformanceTempo!);tempo.bpm++;
+ const old=Object.getOwnPropertyDescriptor(globalThis,'Worker');let created=0;
+ (globalThis as any).Worker=class implements ReadinessWorker {
+  onmessage:ReadinessWorker['onmessage']=null;onerror:ReadinessWorker['onerror']=null;
+  constructor(){created++;}terminate(){}
+  async postMessage(request:Parameters<ReadinessWorker['postMessage']>[0]){emit(this,{type:'complete',result:readinessWorkerResult(await ensurePianoReady(request))});}
+ };
+ try{const mismatch=await runPianoReadiness({packageBytes:before,layout:'janko-four-row',intent:'read-retained',referenceTempo:tempo});
+  assert.equal(created,1,'changed tempo retains Worker service rather than the direct-read path');
+  assert.equal(mismatch.status,(await ensurePianoReady({packageBytes:before,layout:'janko-four-row',intent:'read-retained',referenceTempo:tempo})).status);assert.equal('package'in mismatch,false);
+ }finally{if(old)Object.defineProperty(globalThis,'Worker',old);else delete (globalThis as any).Worker;}
+});
+
+test('direct retained cancellation retains bytes and never publishes its late cold admission',async()=>{
+ const controller=new AbortController(),before=prepared.publication.bytes.slice(),pending=runPianoReadiness({packageBytes:before,layout:'janko-four-row',intent:'read-retained',signal:controller.signal});
+ controller.abort();const q=await pending;assert.equal(q.status,'cancelled');assert.deepEqual(q.retainedPackageBytes,before);
+});
