@@ -1,3 +1,4 @@
+import {requirePitchedEvent} from '../../vendor/iso-notation/src/model/musical-event';
 import {readFileSync} from 'node:fs';import {strToU8} from 'fflate';
 import {publishPreparedNative} from '../../src/publication';import {archivePackage,hashBytes,importPackage,pianoPlanningScore,type ScorePackage} from '../../src/package';
 import {prepareCalculatedEdition} from '../../src/calculated-hand-edition';import {packagePianoPresentation} from '../../src/piano-package-presentation';
@@ -12,9 +13,9 @@ import type {PhysicalKeyboardId} from '../../vendor/iso-notation/src/model/physi
 export function transferStudy(hand:Hand='LH'):QuantizedGridScore{
  const other=hand==='LH'?'RH':'LH';return{id:'viewer-authored-'+hand,title:'Viewer hand-transfer study '+hand,composer:'Viewer regression',
   ticksPerBeat:48,totalTicks:288,sourceBarTicks:[0,144,288],productionLayout:true,
-  notes:[48,52,55].map((pitch,i)=>({id:'gesture-'+i,startTick:i*12,durationTicks:12,hand,pitch:{octave:4,pitchClass:pitch-48},
+  notes:[48,52,55].map((pitch,i)=>({id:'gesture-'+i,startTick:i*12,durationTicks:12,hand,eventKind:'pitched' as const,pitch:{octave:4,pitchClass:pitch-48},
    sourceBeam:{group:'public-authored-gesture',noBeam:false},sourceProvenance:{voices:['accompaniment'],staves:['lower'],hands:[hand],unison:false}}))
-   .concat([{id:'melody-entrance',startTick:144,durationTicks:144,hand:other,pitch:{octave:5,pitchClass:9},sourceBeam:{group:'melody',noBeam:true},
+   .concat([{id:'melody-entrance',startTick:144,durationTicks:144,hand:other,eventKind:'pitched' as const,pitch:{octave:5,pitchClass:9},sourceBeam:{group:'melody',noBeam:true},
     sourceProvenance:{voices:['melody'],staves:['upper'],hands:[other],unison:false}}]),
   sourceSilences:[{voice:'melody',staff:'upper',hand:other,kind:'rest',startTick:0,durationTicks:144,file:'viewer-authored.musicxml',line:1,col:7,bar:1,occurrence:1}],
   barlines:[{tick:0,barNumber:1,type:'regular'},{tick:144,barNumber:2,type:'regular'},{tick:288,barNumber:3,type:'final'}],
@@ -24,7 +25,7 @@ export function transferStudy(hand:Hand='LH'):QuantizedGridScore{
 export function boundaryStudy():QuantizedGridScore{
  const s=transferStudy();s.id='viewer-authored-boundary';s.title='Repeated boundary and release study';s.sourceSilences=[];
  const note=(id:string,tick:number,pitch:number,duration:number,hand:Hand,voice:string,beam?:string)=>({id,startTick:tick,durationTicks:duration,hand,
-  pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},sourceProvenance:{voices:[voice],staves:[voice],hands:[hand],unison:false},...(beam?{sourceBeam:{group:beam}}:{})});
+  eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},sourceProvenance:{voices:[voice],staves:[voice],hands:[hand],unison:false},...(beam?{sourceBeam:{group:beam}}:{})});
  s.notes=[note('held',0,60,168,'RH','melody'),...['edge-a','edge-b','edge-c','edge-d'].map((id,i)=>note(id,120+i*12,48+i*4,12,'LH','crossing','across-bars')),
   note('short-release',192,61,72,'RH','upper'),note('long-release',192,61,96,'RH','lower')];
  s.tieChains=[{noteId:'held',voice:'melody',soundingTicks:168,components:[{startTick:0,durationTicks:144,tieForward:true,tieWait:false,voice:'melody'},
@@ -40,9 +41,9 @@ export function denseStudy():QuantizedGridScore{
  const s=transferStudy();s.id='viewer-authored-dense';s.title='Eight-bar independent voice study';s.totalTicks=1152;s.sourceBarTicks=Array.from({length:9},(_,i)=>i*144);
  s.notes=[];s.sourceSilences=[];s.barlines=s.sourceBarTicks.map((tick,i)=>({tick,barNumber:i+1,type:i===8?'final':'regular'}));
  for(let bar=0;bar<8;bar++){const shift=bar*144;
-  for(let i=0;i<3;i++)s.notes.push({id:`dense-${bar}-${i}`,startTick:shift+i*12,durationTicks:12,hand:'LH',pitch:{octave:4,pitchClass:[0,4,7][i]},
+  for(let i=0;i<3;i++)s.notes.push({id:`dense-${bar}-${i}`,startTick:shift+i*12,durationTicks:12,hand:'LH',eventKind:'pitched' as const,pitch:{octave:4,pitchClass:[0,4,7][i]},
    sourceBeam:{group:'dense-figure-'+bar},sourceProvenance:{voices:['accompaniment'],staves:['lower'],hands:['LH'],unison:false}});
-  s.notes.push({id:'melody-'+bar,startTick:shift+48,durationTicks:96,hand:'RH',pitch:{octave:5,pitchClass:bar%3},sourceProvenance:{voices:['melody'],staves:['upper'],hands:['RH'],unison:false}});
+  s.notes.push({id:'melody-'+bar,startTick:shift+48,durationTicks:96,hand:'RH',eventKind:'pitched' as const,pitch:{octave:5,pitchClass:bar%3},sourceProvenance:{voices:['melody'],staves:['upper'],hands:['RH'],unison:false}});
   s.sourceSilences.push({voice:'melody',staff:'upper',hand:'RH',kind:'rest',startTick:shift,durationTicks:48,file:'viewer-dense-authored.musicxml',line:1,col:bar+1,bar:bar+1,occurrence:1});
  }return s;
 }
@@ -53,7 +54,7 @@ export function completeTieBoundaryStudy(count:3|4,hand:Hand):QuantizedGridScore
  s.id=`viewer-authored-complete-tie-${count}-${hand}`;s.title='Complete written tie boundary study';
  s.totalTicks=end;s.sourceBarTicks=Array.from({length:bars+1},(_,i)=>i*144);s.sourceSilences=[];
  const note=(id:string,startTick:number,pitch:number,durationTicks:number,h:Hand,voice:string,group?:string)=>({id,startTick,durationTicks,hand:h,
-  pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},sourceProvenance:{voices:[voice],staves:[voice],hands:[h],unison:false},
+  eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},sourceProvenance:{voices:[voice],staves:[voice],hands:[h],unison:false},
   sourceBeam:group?{group,noBeam:false}:{noBeam:true}});
  s.notes=[note('written-hold',0,72,lastTick+24,hand,'held-voice'),note('following-attack',lastTick+24,65,24,other,'held-voice','ending'),
   note('final-attack',lastTick+48,69,24,hand,'held-voice','ending'),
@@ -78,7 +79,7 @@ export async function sourcePackage(source:QuantizedGridScore,options:Parameters
 }
 export async function calculatedStudy(prior:ScorePackage,layout:PhysicalKeyboardId,hands:Record<string,Hand>,extra:readonly PianoAssignmentConstraint[]=[]){
  const constraints:PianoAssignmentConstraint[]=Object.entries(hands).map(([ownerId,hand])=>{const n=prior.sourceScore!.notes.find(n=>n.id===ownerId)!;return{ownerId,hand,
-  guard:{pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},provenance:{kind:'operator-choice',reference:'Explicit public comparison hypothesis'}};});
+  guard:{pitch:12*requirePitchedEvent(n).pitch.octave+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},provenance:{kind:'operator-choice',reference:'Explicit public comparison hypothesis'}};});
  constraints.push(...extra);
  const chosen=await calculatePianoAssignments(pianoPlanningScore(prior),layout,{sourceHash:prior.sourceSha256!,sourceBytesSha256:prior.sourceSha256!,revision:prior.manifest.revision},{constraints,maxExpansions:200_000}),
   prepared=await prepareCalculatedEdition({...prior,keyboardLayout:layout},chosen.layer,'calculate',constraints),r=prepared.result,

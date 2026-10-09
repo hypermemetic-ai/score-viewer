@@ -1,12 +1,16 @@
 import {chord,inputCode,readingActions,readingActionLabel,type ReadingAction} from './input';
 import {MidiLearn,type MidiCC} from './midi';
 import {ControlResolver,controlLabel,controlAccessibleLabel,controlDetail,replaceControl,type ControlBinding,type ControlBindings,type ControlChange,type KeyInput} from './control-bindings';
+import type {ScoreCapabilities} from './score-capabilities';
 const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export interface PracticeBindingContext {active:boolean;measureNavigation:boolean}
 export interface OptionsBindingRow {action:ReadingAction;label:string}
 /** A display projection only: hidden actions retain their shared stored controls. */
-export function optionsBindingRows(practice?:PracticeBindingContext,reader=true):OptionsBindingRow[] {
- const actions=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:reader?readingActions:['practiceSettings'] as ReadingAction[];
+export function optionsBindingRows(practice?:PracticeBindingContext,capabilities?:ScoreCapabilities,reader=true):OptionsBindingRow[] {
+ const candidates=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:reader?readingActions:['practiceSettings'] as ReadingAction[];
+ const actions=candidates.filter(action=>!capabilities||
+  !['toggle','edit'].includes(action)&&action!=='done'||
+  ['toggle','edit'].includes(action)&&capabilities.pianoPreparation||action==='done'&&capabilities.pianoPractice);
  return actions.map(action=>({action,label:practice&&['previous','next'].includes(action)?action==='previous'?'Previous measures':'Next measures':readingActionLabel(action)}));
 }
 export interface OptionsBindingsApi {

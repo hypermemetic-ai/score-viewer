@@ -1,3 +1,6 @@
+import {serializeCompatibleScore} from './score-serialization';
+import {requirePianoEvent} from './piano-event';
+import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
 import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-planning-input';
 import {calculateConventionalPiano,type ConventionalSolverOptions} from '../vendor/iso-notation/src/model/conventional-piano-planner';
 import {conventionalFingerLayer,conventionalIdentityHash,validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
@@ -12,7 +15,7 @@ const digest=async(bytes:Uint8Array|string)=>Array.from(new Uint8Array(await cry
  * renderer and solver are trusted application modules, never imported code. */
 export async function prepareConventionalPresentation(request:{sourceBytes:Uint8Array;recipe:unknown},options:ConventionalSolverOptions={}) {
   const sourceSha256=await digest(request.sourceBytes),recipe=validateScoreRenderingRecipe(request.recipe,{sourceSha256,engineId:GENERATION_ENGINE});
-  const source=JSON.parse(new TextDecoder().decode(request.sourceBytes)) as QuantizedGridScore;
+  const source=normalizeLegacyScoreEvents(JSON.parse(new TextDecoder().decode(request.sourceBytes)) as QuantizedGridScore);
   if(source.printIdentity?.piece!=='No. 14 · Kleine Studie'||source.notes?.length!==383||source.graceGroups?.length)
     throw Error('Matching generation currently supports the supplied No. 14 preparation. The existing score remains available.');
   if(options.signal?.aborted)throw Error('Calculation cancelled');
@@ -30,10 +33,11 @@ export async function prepareConventionalPresentation(request:{sourceBytes:Uint8
     effectiveHandSha256,searchSha256:await conventionalIdentityHash({...plan.search,elapsedMs:undefined,postureCacheEntries:undefined}),
     clockSha256:await conventionalIdentityHash(plan.performanceClock),actionsSha256:await conventionalIdentityHash(plan.replay.actionCertificate),candidateId:'conventional-piano-no14-actions-v2'});
   await validateConventionalFingerLayer(layer,input,{sourceHash:sourceSha256,sourceBytesSha256:sourceSha256,
-    effectiveHands:Object.fromEntries(score.notes.map(n=>[n.id,n.hand])),requireCurrent:true});
+    effectiveHands:Object.fromEntries(score.notes.map(n=>[n.id,requirePianoEvent(n).hand])),requireCurrent:true});
   if(options.signal?.aborted)throw Error('Calculation cancelled');
-  return{score:JSON.stringify(score),seats:JSON.stringify(presentation.seats),pages:presentation.pages,layer,recipe,
-    sourceSha256,semanticSha256:await digest(JSON.stringify(score)),effectiveHandSha256,allFive:presentation.allFive,
+  const serialized=serializeCompatibleScore(score,request.sourceBytes);
+  return{score:serialized,seats:JSON.stringify(presentation.seats),pages:presentation.pages,layer,recipe,
+    sourceSha256,semanticSha256:await digest(serialized),effectiveHandSha256,allFive:presentation.allFive,
     lint:{violations:presentation.lint.violations.length,warnings:presentation.lint.warnings.length},replay:plan.replay};
 }
 export type PreparedConventionalPresentation=Awaited<ReturnType<typeof prepareConventionalPresentation>>;

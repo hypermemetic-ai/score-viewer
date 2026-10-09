@@ -1,3 +1,4 @@
+import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
 import {strToU8} from 'fflate';
 import {archivePackage,hashBytes,importPackage,type FingerLayer,type ScorePackage,type PresentationDescriptor} from './package';
 import {publishPackage} from './publication';
@@ -89,7 +90,7 @@ export async function packagePianoPresentation(p:ScorePackage,next:PianoPresenta
   let checked:ScorePackage;
   if(next.calculatedHandReceipt){
     if(!next.preparationRequest)throw Error('Calculated edition requires independently identified request policy.');
-    const candidate:ScorePackage={...prior,manifest:m,score:JSON.parse(next.score),seats:JSON.parse(next.seats),pages:next.pages,
+    const candidate:ScorePackage={...prior,manifest:m,score:normalizeLegacyScoreEvents(JSON.parse(next.score) as ScorePackage['score']),seats:JSON.parse(next.seats),pages:next.pages,
       keyboardLayout:next.layoutId,profileId:selected.profileId,profileSha256:selected.profileSha256,effectiveHandSha256:selected.effectiveHandSha256,
       calculatedHandReceipt:next.calculatedHandReceipt,sourceSha256:next.sourceSha256,sourceScore:next.transpositionPreparation?.source??prior.sourceScore??prior.score,
       ...(next.transpositionPreparation?{transposition:next.transpositionPreparation.envelope,transpositionOriginal:prior.transpositionOriginal??prior}:{}),fingerLayer:layer,renderingRecipe:next.recipe,calculationContext:selected.calculationContext??undefined};
