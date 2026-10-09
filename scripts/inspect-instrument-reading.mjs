@@ -44,7 +44,7 @@ try {
     assert.ok(await page.locator('.page svg').evaluateAll((svgs,id)=>svgs.some(svg=>
       Array.from(svg.querySelectorAll('[data-note-id]')).some(head=>head.getAttribute('data-note-id')===id&&head.querySelector('.janko-unpitched-head'))),dead.heads[0].id));
     await page.screenshot({path:output+'/reading-percussive-page.png'});}
-  let techniqueLabelsObserved=0;
+  let techniqueLabelsObserved=0,curvedTechniqueConnectorsObserved=0;
   for(const technique of score.techniques??[]){const owner=owners.find(owner=>owner.id===technique.fromNoteId);
     assert.ok(owner?.heads.length);await goTo(owner.heads[0].page);
     assert.ok(await page.locator('.page .janko-technique-label').evaluateAll((labels,technique)=>labels.some(label=>
@@ -52,8 +52,9 @@ try {
       label.querySelector('.janko-technique-glyph')&&
       label.getAttribute('data-owner-ids')===JSON.stringify([technique.fromNoteId,technique.toNoteId])),technique));
     assert.ok(await page.locator('.page .janko-technique-connector').evaluateAll((paths,id)=>paths.some(path=>
-      path.getAttribute('data-technique-id')===id&&/L/.test(path.getAttribute('d')??'')&&!/[QCAqca]/.test(path.getAttribute('d')??'')),technique.id));
+      path.getAttribute('data-technique-id')===id&&/[QCqc]/.test(path.getAttribute('d')??'')),technique.id));
     techniqueLabelsObserved++;
+    curvedTechniqueConnectorsObserved++;
   }
   if(techniqueLabelsObserved)await page.screenshot({path:output+'/reading-technique-page.png'});
   const modifiedComponents=score.notes.flatMap(event=>{
@@ -117,9 +118,9 @@ try {
   assert.equal(await page.locator('#app').getAttribute('data-page'),savedPage);
   assert.equal(await page.evaluate(file=>localStorage.getItem('iso-viewer-dev/'+file),file),Buffer.from(bytes).toString('base64'));
   assert.deepEqual(errors,[]);
-  const result={url,pages:manifest.pages.length,events:owners.length,unpitched:owners.filter(o=>o.eventKind==='unpitched').length,
+  const result={url,engineId:manifest.reading.engineId,pages:manifest.pages.length,events:owners.length,unpitched:owners.filter(o=>o.eventKind==='unpitched').length,
     ordinaryReader:true,noFabricatedKeyboardSeats:true,physicalActionsGated:true,sourceBytesUnchanged:true,
-    reopensSavedView:true,percussiveHeadObserved:!!dead,techniqueLabelsObserved,
+    reopensSavedView:true,percussiveHeadObserved:!!dead,techniqueLabelsObserved,curvedTechniqueConnectorsObserved,
     modifiedComponentsObserved:modifiedComponents.length,modifiedRestComponentsObserved:modifiedRests.length,
     ...(captureInspection?{capturePageVisible:true,captureFontsLoaded:true,capturePageOwnsCenterLayer:true}:{}),
     ratioFragmentsObserved:ratioFragments.size,pageErrors:errors};

@@ -60,6 +60,20 @@ test('canonical admission refuses false unpitched pitches, unknown kinds and inv
   await assert.rejects(importPackage(bytes,{keyboardLayout:'conventional-piano'}),/no piano keyboard presentation/);
 });
 
+test('H/P reading retains curved connections and refuses the historical bracket engine',async()=>{
+  assert.ok(p.score.techniques?.length,'Original H/P study needs source technical relations');
+  for(const technique of p.score.techniques??[]){
+    const paths=p.pages.flatMap(page=>page.match(/<path\b[^>]*class="[^"]*\bjanko-technique-connector\b[^"]*"[^>]*>/g)??[]),
+      owned=paths.filter(path=>path.includes(`data-technique-id="${technique.id}"`));
+    assert.ok(owned.length,'Every source H/P relation needs its prepared connector');
+    assert.ok(owned.every(path=>/[QCqc]/.test(path.match(/\bd="([^"]*)"/)?.[1]??'')));
+  }
+  await assert.rejects(importPackage(await changed((_files,m)=>{
+    m.engineVersion='janko-real-engine-instrument-reading-v1';
+    (m.reading! as {engineId:string}).engineId=m.engineVersion;
+  })),/musical reading package/);
+});
+
 test('rehashed reading archives cannot replace performing-hand meaning with visual stem directions',async()=>{
   for(const authority of [{hand:'RH'},
     {editorialHand:{hand:'LH',kind:'confirm',authorityId:'authored-hand-confirmation'}}]){
@@ -71,6 +85,16 @@ test('rehashed reading archives cannot replace performing-hand meaning with visu
   }
   assert.deepEqual(p.score,authoredReadingScore());
   assert.equal(await hashBytes(p.files['score.json']),p.manifest.revision);
+});
+
+test('rehashed reading archives refuse malformed display stem directions before geometry',async()=>{
+  for(const direction of [0,2,null,false,'up']){
+    await assert.rejects(importPackage(await changed(files=>{
+      const source=JSON.parse(strFromU8(files['score.json']));
+      source.notes.find((event:{id:string})=>event.id==='center').displayStemDirection=direction;
+      files['score.json']=strToU8(JSON.stringify(source));
+    })),/Display stem direction must be -1 or 1/);
+  }
 });
 
 test('source techniques, part ownership and geometry cannot invent unsupported musical reading',async()=>{
