@@ -2,7 +2,7 @@ import {strFromU8,strToU8,zipSync} from 'fflate';
 import {prepareInstrumentReading,validateInstrumentReadingScore,INSTRUMENT_READING_ENGINE,
   type ReadingOwner,type JankoLayoutOptions,type JankoTokens} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
-import {hashBytes,type Manifest,type Metadata} from './package';
+import {hashBytes,importPackageForReading,type Manifest,type Metadata} from './package';
 
 export interface ReadingDescriptor {
   version:'instrument-reading-package-v1';
@@ -16,6 +16,7 @@ export interface ReadingDescriptor {
 export interface ReadingContent {
   owners:ReadingOwner[];
   layoutMetadata:ReturnType<typeof prepareInstrumentReading>['layoutMetadata'];
+  geometryEvidence:ReturnType<typeof prepareInstrumentReading>['geometryEvidence'];
 }
 
 const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
@@ -24,6 +25,17 @@ function boundedScore(score:QuantizedGridScore):void {
     !Array.isArray(score.notes)||score.notes.length>10_000||!Array.isArray(score.sourceBarTicks)||
     score.sourceBarTicks.length>2_001)throw Error('Reading preparation needs a complete score of at most 10,000 events and 2,000 measures.');
   validateInstrumentReadingScore(score);
+}
+function checkedPreparation(score:QuantizedGridScore,options:Partial<JankoLayoutOptions>,tokens:Partial<JankoTokens>){
+  const result=prepareInstrumentReading(score,options,tokens);
+  if(!result.geometryEvidence.ok)throw Error('Reading page geometry needs correction: '+result.geometryEvidence.violations.slice(0,3).map(v=>v.message).join('; '));
+  const ids=new Set(result.owners.map(owner=>owner.id));
+  if(ids.size!==score.notes.length||result.owners.length!==score.notes.length||score.notes.some(event=>!ids.has(event.id))||
+    result.owners.some(owner=>!owner.heads.length||owner.heads.some(head=>!Number.isSafeInteger(head.page)||head.page<0||head.page>=result.pages.length||
+      !Number.isSafeInteger(head.system)||head.system<0||head.system>=result.layoutMetadata.length||!Number.isFinite(head.x)||!Number.isFinite(head.y)||
+      head.x<0||head.y<0||head.x>result.options.pageWidth||head.y>result.options.pageHeight)))
+    throw Error('Reading preparation has incomplete or invalid musical event appearances.');
+  return result;
 }
 function parse(files:Record<string,Uint8Array>,name:string):unknown {
   if(!files[name])throw Error('Missing reading member: '+name);
@@ -51,7 +63,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
   if(score.id!==m.scoreId||score.title!==m.metadata.title||score.composer!==m.metadata.composer||
     JSON.stringify(score.readingPolicy)!==JSON.stringify(d.policy)||strFromU8(files['seats.json']??strToU8('null'))!=='[]')
     throw Error('Reading source identity or policy differs.');
-  const result=prepareInstrumentReading(score,d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
+  const result=checkedPreparation(score,d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
   if(result.pages.length!==m.pages.length||JSON.stringify(result.owners)!==JSON.stringify(owners)||
     JSON.stringify(result.layoutMetadata)!==JSON.stringify(layout))throw Error('Reading event ownership or geometry differs from its musical source.');
   const pages=m.pages.map((name,index)=>{
@@ -60,7 +72,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
     if(page!==result.pages[index])throw Error('Reading page differs from its shared source preparation: '+name);
     return page;
   });
-  return {score,pages,reading:{owners:result.owners,layoutMetadata:result.layoutMetadata}};
+  return {score,pages,reading:{owners:result.owners,layoutMetadata:result.layoutMetadata,geometryEvidence:result.geometryEvidence}};
 }
 
 /** Local archive assembly from shared musical meaning and shared ink. No
@@ -71,7 +83,7 @@ export async function prepareReadingPackage(input:{score:QuantizedGridScore;meta
   boundedScore(input.score);
   if(!input.createdAt||input.metadata.title!==input.score.title||input.metadata.composer!==input.score.composer||
     !input.font.name||!input.font.bytes.length||!Object.keys(input.notices).length)throw Error('Incomplete musical reading preparation.');
-  const prepared=prepareInstrumentReading(input.score,input.options,input.tokens);
+  const prepared=checkedPreparation(input.score,input.options??{},input.tokens??{});
   if(!prepared.pages.length||prepared.pages.length>500)throw Error('Reading preparation exceeds 500 pages.');
   const files:Record<string,Uint8Array>={'score.json':strToU8(JSON.stringify(input.score)),'seats.json':strToU8('[]'),
     'reading-owners.json':strToU8(JSON.stringify(prepared.owners)),
@@ -92,7 +104,6 @@ export async function prepareReadingPackage(input:{score:QuantizedGridScore;meta
   m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
   files['manifest.json']=strToU8(JSON.stringify(m));
   const bytes=zipSync(files,{level:6});
-  const {importPackageForReading}=await import('./package');
   await importPackageForReading(bytes);
   return bytes;
 }

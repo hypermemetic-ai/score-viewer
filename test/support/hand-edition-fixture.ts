@@ -1,3 +1,4 @@
+import {requirePitchedEvent} from '../../vendor/iso-notation/src/model/musical-event';
 import {readFileSync} from 'node:fs';import {strToU8} from 'fflate';
 import {publishPreparedNative} from '../../src/publication';import {archivePackage,hashBytes,importPackage,pianoPlanningScore,type ScorePackage} from '../../src/package';
 import {prepareCalculatedEdition} from '../../src/calculated-hand-edition';import {packagePianoPresentation} from '../../src/piano-package-presentation';
@@ -78,7 +79,7 @@ export async function sourcePackage(source:QuantizedGridScore,options:Parameters
 }
 export async function calculatedStudy(prior:ScorePackage,layout:PhysicalKeyboardId,hands:Record<string,Hand>,extra:readonly PianoAssignmentConstraint[]=[]){
  const constraints:PianoAssignmentConstraint[]=Object.entries(hands).map(([ownerId,hand])=>{const n=prior.sourceScore!.notes.find(n=>n.id===ownerId)!;return{ownerId,hand,
-  guard:{pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},provenance:{kind:'operator-choice',reference:'Explicit public comparison hypothesis'}};});
+  guard:{pitch:12*requirePitchedEvent(n).pitch.octave+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},provenance:{kind:'operator-choice',reference:'Explicit public comparison hypothesis'}};});
  constraints.push(...extra);
  const chosen=await calculatePianoAssignments(pianoPlanningScore(prior),layout,{sourceHash:prior.sourceSha256!,sourceBytesSha256:prior.sourceSha256!,revision:prior.manifest.revision},{constraints,maxExpansions:200_000}),
   prepared=await prepareCalculatedEdition({...prior,keyboardLayout:layout},chosen.layer,'calculate',constraints),r=prepared.result,

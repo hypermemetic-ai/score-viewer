@@ -1,3 +1,4 @@
+import {requirePianoEvent} from '../src/piano-event';
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {unzipSync,strFromU8} from 'fflate';import {hashBytes,importPackage,selectPresentation,validateLayerAsync} from '../src/package';
 import {prepareConventionalPresentation} from '../src/presentation-generation';
@@ -8,7 +9,7 @@ const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-
 test('trusted real-engine worker reproduces the corrected CLI action route and every matching package page/seat',async()=>{
  const result=await prepareConventionalPresentation({sourceBytes:files['source-score.json'],recipe});
  assert.equal(result.sourceSha256,await hashBytes(files['source-score.json']));assert.equal(result.effectiveHandSha256,layer.effectiveHandSha256);
- const expected=structuredClone(layer),actual=structuredClone(result.layer);delete expected.search.elapsedMs;delete (actual.search as Partial<typeof actual.search>).elapsedMs;assert.deepEqual(actual,expected);assert.equal(result.score,strFromU8(files['score.json']));assert.equal(result.seats,strFromU8(files['seats.json']));
+ const expected=structuredClone(layer),actual=structuredClone(result.layer);delete expected.search.elapsedMs;delete (actual.search as Partial<typeof actual.search>).elapsedMs;assert.deepEqual(actual,expected);assert.equal(result.score===strFromU8(files['score.json']),true,'Worker score bytes differ from frozen presentation');assert.equal(result.seats===strFromU8(files['seats.json']),true,'Worker seat bytes differ from frozen presentation');
  assert.deepEqual(result.pages,manifest.pages.map((name:string)=>strFromU8(files[name])));assert.equal(result.replay.valid,true);assert.equal(result.replay.performedAttacks,570);assert.equal(result.allFive,true);assert.deepEqual(result.lint,{violations:0,warnings:0});
  assert.equal(result.layer.plannerVersion,'conventional-joint-contact-route-v2');assert.equal(result.layer.profileId,'conventional-unmeasured-actions-v2');
  assert.ok(result.layer.actionCertificate);assert.equal(result.layer.actionCertificate.version,'conventional-hand-actions-v2');assert.ok(result.layer.actionCertificate.positions.length);assert.ok(result.layer.actionCertificate.actions.length);
@@ -16,7 +17,7 @@ test('trusted real-engine worker reproduces the corrected CLI action route and e
 });
 test('corrected package binds required hand actions and retains the original Jankó companion without certifying v1',async()=>{
  const p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row');
- const checked=await validateConventionalFingerLayer(p.fingerLayer,normalizeHandPlanningInput(p.sourceScore!),{sourceHash:p.sourceSha256!,sourceBytesSha256:p.sourceSha256!,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand])),requireCurrent:true});
+ const checked=await validateConventionalFingerLayer(p.fingerLayer,normalizeHandPlanningInput(p.sourceScore!),{sourceHash:p.sourceSha256!,sourceBytesSha256:p.sourceSha256!,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,requirePianoEvent(n).hand])),requireCurrent:true});
  assert.equal(checked.plannerVersion,'conventional-joint-contact-route-v2');
  const assembled={score:strFromU8(files['score.json']),seats:strFromU8(files['seats.json']),pages:p.pages,layer:checked,recipe,
   sourceSha256:p.sourceSha256!,semanticSha256:p.manifest.revision,effectiveHandSha256:p.effectiveHandSha256!,allFive:true,lint:{violations:0,warnings:0}};

@@ -189,8 +189,8 @@ export async function selectPresentation(p:ScorePackage,id:PhysicalKeyboardId):P
  const view=linkedViews.get(p)?.get(id);if(!view)fail('This package has no compatible presentation for the selected keyboard');return view;
 }
 export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId}={}):Promise<ScorePackage>{
- if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;
- const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
+ if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;const members=new Set<string>();
+ const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(members.has(f.name)||members.size>=10000)fail('Duplicate or excessive archive members');members.add(f.name);if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
  const parse=(name:string)=>{if(!files[name])fail(`Missing ${name}`);try{return JSON.parse(strFromU8(files[name]));}catch{return fail(`Invalid JSON: ${name}`);}};
  const m=parse('manifest.json') as Manifest;
  if(m.format!=='iso-score'||![1,2,3].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||!Array.isArray(m.metadata.provenance)||m.metadata.provenance.some(v=>typeof v!=='string')||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
@@ -200,6 +200,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(m.referenceMidi!==undefined){if(!isObject(m.referenceMidi)||m.referenceMidi.file!=='reference.mid'||Object.keys(m.referenceMidi).length!==1||!m.files['reference.mid'])fail('Invalid/missing reference MIDI descriptor');referenceMidi=files['reference.mid'];validateReferenceMidi(referenceMidi);}
  if(m.semanticSha256!==m.files['score.json']||m.revision!==m.semanticSha256)fail('Semantic revision mismatch');
  if(m.version===3){
+  if(options.keyboardLayout)fail('This score has no piano keyboard presentation.');
   const {score,pages,reading}=admitReadingContent(m,files);
   pages.forEach((svg,page)=>passiveSvg(svg,[],page));
   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
@@ -207,6 +208,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   return {manifest:m,score,seats:[],pages,files,reading,archiveSha256:await hashBytes(bytes),sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    generationAvailable:false,fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
  }
+ if(m.reading!==undefined)fail('Legacy piano packages cannot carry a musical reading descriptor.');
  async function presentation(viewManifest:Manifest,scoreName:string,seatsName:string,fingersName?:string,context:Partial<ScorePackage>={}):Promise<ScorePackage>{
   const m=viewManifest;
  const score=normalizeLegacyScoreEvents(parse(scoreName) as QuantizedGridScore),seats=parse(seatsName) as Seat[];

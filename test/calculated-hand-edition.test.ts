@@ -1,3 +1,5 @@
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
+import {requirePianoEvent} from '../src/piano-event';
 import test from 'node:test';import assert from 'node:assert/strict';import {strToU8,strFromU8} from 'fflate';
 import {transferStudy,boundaryStudy,completeTieBoundaryStudy,sourcePackage,calculatedStudy} from './support/hand-edition-fixture';
 import {archivePackage,hashBytes,importPackage,selectPresentation,type ScorePackage} from '../src/package';
@@ -24,9 +26,9 @@ test('both keyboards and transfer directions cold-replay complete authored beams
   const original=await sourcePackage(transferStudy(hand)),other:Hand=hand==='LH'?'RH':'LH',hands={'gesture-0':hand,'gesture-1':other,'gesture-2':hand,'melody-entrance':other},
    q=await calculatedStudy(original.p,layout,hands),cold=await importPackage(q.bytes,{keyboardLayout:layout});
   assert.deepEqual(cold.files['source-score.json'],original.p.files['source-score.json']);assert.ok(cold.score.notes.every(n=>!n.editorialHand&&n.derivedHand));
-  assert.deepEqual(cold.score.notes.map(n=>n.hand),Object.values(hands));
+  assert.deepEqual(cold.score.notes.map(n=>requirePianoEvent(n).hand),Object.values(hands));
   const source=cold.calculatedHandReceipt!.sourceInventory,coverage=cold.calculatedHandReceipt!.sourceCoverage;
-  assert.deepEqual(source.owners.map(o=>[o.id,o.pitch,o.startTick,o.durationTicks]),original.source.notes.map(n=>[n.id,n.pitch.octave*12+n.pitch.pitchClass,n.startTick,n.durationTicks]).sort((a,b)=>String(a[0])<String(b[0])?-1:1));
+  assert.deepEqual(source.owners.map(o=>{assert.ok('pitch' in o);return[o.id,o.pitch,o.startTick,o.durationTicks];}),original.source.notes.map(n=>[n.id,requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,n.startTick,n.durationTicks]).sort((a,b)=>String(a[0])<String(b[0])?-1:1));
   assert.equal(source.silences.length,1);assert.equal(source.silences[0].source.voice,'melody');
   assert.equal(coverage.silences[0].disposition,'visible');assert.ok(coverage.silences[0].paint[0].ids.length);
   assert.deepEqual(q.r.layouts[0].beams[0].notes.map(n=>n.id),['gesture-0','gesture-1','gesture-2']);
@@ -53,14 +55,14 @@ test('finger-only constraints stay separate from operator hand requirements and 
   q=await calculatedStudy(original.p,'conventional-piano',hands),a=q.p.fingerLayer!.attacks[0],owner=a.owners[0],finger=a.finger===3?4:3,
   extra={ownerId:owner.id,guard:{pitch:a.pitch,startTick:a.startTick,durationTicks:owner.durationTicks},finger,provenance:{kind:'operator-choice' as const,reference:'Explicit finger-only comparison'}},
   next=await calculatedStudy(q.p,'conventional-piano',hands,[extra]),inputs=await calculatedHandInputs(next.p,next.p.fingerLayer!,'calculate',next.p.renderingRecipe! as ScoreRenderingRecipe,[extra]);
- assert.deepEqual(inputs.operatorRequirements,[]);assert.deepEqual(q.p.score.notes.map(n=>n.hand),next.p.score.notes.map(n=>n.hand));
+ assert.deepEqual(inputs.operatorRequirements,[]);assert.deepEqual(q.p.score.notes.map(n=>requirePianoEvent(n).hand),next.p.score.notes.map(n=>requirePianoEvent(n).hand));
  assert.notEqual(q.p.score.performingHandPresentation!.assignmentId,next.p.score.performingHandPresentation!.assignmentId);
  assert.equal(next.p.fingerLayer!.attacks[0].finger,finger);
  await assert.rejects(importPackage(await repinned(q.p,f=>{f['fingers.json']=next.p.files['fingers.json'];})),/identity|finger|request|Derived/);
  const seat=q.p.seats.find(s=>s.ownerIds.includes(owner.id))!,personal=corrected(q.p,initialPersonal(q.p),seat,finger),
   request={packageBytes:q.bytes,layout:'conventional-piano' as const,personal,forceRecalculate:true,maxExpansions:200_000},fresh=await ensurePianoReady(request);
  assert.equal(fresh.status,'editable','message' in fresh?fresh.message:undefined);if(fresh.status!=='editable')return;
- assert.deepEqual(fresh.package.score.notes.map(n=>n.hand),q.p.score.notes.map(n=>n.hand));
+ assert.deepEqual(fresh.package.score.notes.map(n=>requirePianoEvent(n).hand),q.p.score.notes.map(n=>requirePianoEvent(n).hand));
  assert.notEqual(fresh.package.score.performingHandPresentation!.assignmentId,q.p.score.performingHandPresentation!.assignmentId);
  assert.equal(fingerFor(fresh.package,fresh.personal!,fresh.package.seats.find(s=>s.ownerIds.includes(owner.id))!),finger);
  await admitPianoRequestResult(request,fresh.package,fresh.packageBytes,fresh.layer,fresh.personal);
@@ -71,7 +73,7 @@ test('new contexts prepare detached complete derived editions while each keyboar
    hands={'gesture-0':'LH','gesture-1':'RH','gesture-2':'LH','melody-entrance':'RH'} as const,a=await calculatedStudy(withClock,first,hands),b=await calculatedStudy(a.p,second,hands),
    referenceTempo={...initialTempo,bpm:91},request={packageBytes:b.bytes,layout:second,referenceTempo,maxExpansions:200_000},fresh=await ensurePianoReady(request);
   assert.equal(fresh.status,'editable','message' in fresh?fresh.message:undefined);if(fresh.status!=='editable')continue;
-  assert.deepEqual(fresh.package.score.notes.map(n=>n.hand),b.p.score.notes.map(n=>n.hand));
+  assert.deepEqual(fresh.package.score.notes.map(n=>requirePianoEvent(n).hand),b.p.score.notes.map(n=>requirePianoEvent(n).hand));
   assert.notEqual(fresh.package.score.performingHandPresentation!.assignmentId,b.p.score.performingHandPresentation!.assignmentId);
   assert.equal(fresh.package.score.referencePerformanceTempo!.bpm,91);assert.equal(fresh.package.calculationContext!.referencePerformanceTempo.bpm,91);
   const companion=await selectPresentation(fresh.package,first);
@@ -93,7 +95,7 @@ test('new contexts prepare detached complete derived editions while each keyboar
 });
 test('repeat visits, unequal-release aliases and written holds keep original obligations and matching page-boundary seats on both keyboards',async()=>{
  for(const layout of ['conventional-piano','janko-four-row'] as const){const source=boundaryStudy(),original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:240}),
-  hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='edge-a'?'RH':n.hand])),q=await calculatedStudy(original.p,layout,hands),inventory=q.p.calculatedHandReceipt!.sourceInventory,
+  hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='edge-a'?'RH':requirePianoEvent(n).hand])),q=await calculatedStudy(original.p,layout,hands),inventory=q.p.calculatedHandReceipt!.sourceInventory,
   short=inventory.owners.find(o=>o.id==='short-release')!,long=inventory.owners.find(o=>o.id==='long-release')!;
   assert.equal(q.p.pages.length,2);assert.equal(inventory.occurrences.length,4);assert.equal(inventory.owners.reduce((n,o)=>n+o.performedVisits!.length,0),14);
   assert.deepEqual(short.performedVisits!.map(v=>[v.startTick,v.releaseTick]),[[192,264],[480,552]]);
@@ -122,13 +124,13 @@ test('complete three/four-component source ties cold-read across every page on b
  for(const count of [3,4] as const)for(const layout of ['conventional-piano','janko-four-row'] as const){
   const hand:Hand=count===3?'RH':'LH',source=completeTieBoundaryStudy(count,hand),
    original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:255}),before=await hashBytes(original.bytes),
-   hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?hand:n.hand])),q=await calculatedStudy(original.p,layout,hands),
+   hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?hand:requirePianoEvent(n).hand])),q=await calculatedStudy(original.p,layout,hands),
    cold=await importPackage(q.bytes,{keyboardLayout:layout}),seats=cold.seats.filter(s=>s.ownerIds.includes('written-hold')),
    components=source.tieChains![0].components;
   assert.equal(cold.pages.length,count-1);assert.equal(seats.length,count);assert.equal(new Set(seats.map(s=>s.page)).size,count-1);
   assert.equal(seats.filter(s=>s.continuation).length,count-1);assert.equal(new Set(seats.map(s=>s.actionId)).size,1);
-  assert.equal(cold.score.notes.find(n=>n.id==='written-hold')!.hand,hand);assert.equal(cold.score.notes.find(n=>n.id==='following-attack')!.hand,hand);
-  assert.notEqual(source.notes.find(n=>n.id==='following-attack')!.hand,hand);
+  assert.equal(requirePianoEvent(cold.score.notes.find(n=>n.id==='written-hold')!).hand,hand);assert.equal(requirePianoEvent(cold.score.notes.find(n=>n.id==='following-attack')!).hand,hand);
+  assert.notEqual(requirePianoEvent(source.notes.find(n=>n.id==='following-attack')!).hand,hand);
   for(const [index,l]of q.r.layouts.entries())assert.deepEqual(new Set(l.tieSplitHeadIds),new Set(components.flatMap((c,i)=>
    c.startTick>=index*144&&c.startTick<(index+1)*144?[]:[i?'written-hold~c'+i:'written-hold'])));
   assert.deepEqual(cold.files['source-score.json'],original.p.files['source-score.json']);assert.deepEqual(cold.sourceScore,source);
@@ -145,7 +147,7 @@ test('unresolved independent statements and unsupported literal transfer fits re
  const prior=await sourcePackage(independent),refused=await ensurePianoReady({packageBytes:prior.bytes,layout:'conventional-piano',maxExpansions:200_000});
  assert.equal(refused.status,'unsupported');assert.equal('code' in refused?refused.code:undefined,'hand-presentation:source-coverage');assert.deepEqual(refused.retainedPackageBytes,prior.bytes);
  const source=boundaryStudy(),original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:320}),before=await hashBytes(original.bytes),
-  hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='edge-c'?'RH':n.hand]));
+  hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='edge-c'?'RH':requirePianoEvent(n).hand]));
  await assert.rejects(calculatedStudy(original.p,'conventional-piano',hands),e=>e instanceof HandPresentationError&&e.code==='unsupported-fit'&&e.ownerIds.includes('edge-c'));
  assert.equal(await hashBytes(original.bytes),before);assert.deepEqual(original.p.sourceScore,source);
 });

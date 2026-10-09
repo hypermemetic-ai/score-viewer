@@ -1,3 +1,4 @@
+import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
 import {strFromU8,strToU8,zipSync} from 'fflate';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
@@ -83,12 +84,12 @@ export interface PreparedNativePublication {
  * calculates hands/fingers; the source and every visible owner stay native. */
 export async function publishPreparedNative(input:PreparedNativePublication,referenceMidi?:Uint8Array):Promise<Publication> {
   if(!input.engineVersion||!input.createdAt||!input.presentations.length||input.presentations.length>2||new Set(input.presentations.map(p=>p.layoutId)).size!==input.presentations.length)throw Error('Incomplete native preparation.');
-  const source=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(input.source)) as QuantizedGridScore,sourceHash=await hashBytes(input.source);
+  const source=normalizeLegacyScoreEvents(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(input.source)) as QuantizedGridScore),sourceHash=await hashBytes(input.source);
   const files:Record<string,Uint8Array>={'source-score.json':input.source,[input.font.name]:input.font.bytes,...input.notices},presentations:Manifest['presentations']={};
   const put=(name:string,b:Uint8Array)=>{if(name in files)throw Error('Conflicting prepared member: '+name);files[name]=b;};
   for(const [index,p] of input.presentations.entries()){
     if(!['janko-four-row','conventional-piano'].includes(p.layoutId)||!p.pages.length)throw Error('Unsupported or empty prepared presentation.');
-    const prefix=index?`presentations/${p.layoutId}/`:'',scoreBytes=p.score??input.source,score=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(scoreBytes)) as QuantizedGridScore;
+    const prefix=index?`presentations/${p.layoutId}/`:'',scoreBytes=p.score??input.source,score=normalizeLegacyScoreEvents(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(scoreBytes)) as QuantizedGridScore);
     const revision=await hashBytes(scoreBytes),profileId='publisher-fixed-pages-v1',profileSha256=await hashBytes(JSON.stringify({kind:profileId,layoutId:p.layoutId}));
     const d:PresentationDescriptor={layoutId:p.layoutId,score:prefix+'score.json',seats:prefix+'seats.json',pages:p.pages.map((_,i)=>prefix+`pages/${i+1}.svg`),revision,profileId,profileSha256,effectiveHandSha256:await handDigest(source,score),layerSourceHash:sourceHash,engineVersion:input.engineVersion};
     put(d.score,scoreBytes);put(d.seats,strToU8(JSON.stringify(p.seats)));d.pages.forEach((n,i)=>put(n,strToU8(p.pages[i])));presentations[p.layoutId]=d;

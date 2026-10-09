@@ -6,7 +6,7 @@ import {prepareReadingPackage} from '../../src/reading-package';
 export function authoredReadingScore():QuantizedGridScore {
   const owner={partId:'original-part',staffId:'1',voiceId:'1'};
   return {id:'original-instrument-reading',title:'Original instrument reading study',composer:'Viewer regression',
-    ticksPerBeat:48,totalTicks:384,sourceBarTicks:[0,192,384],timeSignatures:[{tick:0,numerator:4,denominator:4}],
+    ticksPerBeat:48,totalTicks:384,productionLayout:true,sourceBarTicks:[0,192,384],barlines:[{tick:0,barNumber:1,type:'regular'},{tick:192,barNumber:2,type:'regular'},{tick:384,barNumber:3,type:'final'}],tempos:[],dynamics:[],pedals:[],timeSignatures:[{tick:0,numerator:4,denominator:4}],
     referencePerformanceTempo:{version:'reference-performance-tempo-v1',bpm:100,beat:{numerator:1,denominator:4},
       provenance:{kind:'composer',reference:'Original study tempo'}},
     parts:[{id:'original-part',name:'Original bass part',instruments:[{id:'original-bass',name:'Bass',midiProgram:34}]}],
@@ -23,14 +23,14 @@ export function authoredReadingScore():QuantizedGridScore {
       {...owner,id:'literal-outside-guide',eventKind:'pitched',pitch:{octave:4,pitchClass:0},startTick:192,durationTicks:192,sourceWrittenValue:{type:'whole',dots:0}}
     ],
     techniques:[
-      {id:'original-hammer',kind:'hammer-on',label:'H',fromNoteId:'center',toNoteId:'higher',fromTick:0,toTick:24,partId:'original-part',voiceId:'1'},
-      {id:'original-pull',kind:'pull-off',label:'P',fromNoteId:'higher',toNoteId:'lower',fromTick:24,toTick:48,partId:'original-part',voiceId:'1'}
+      {id:'original-hammer',kind:'hammer-on',label:'H',fromNoteId:'center',toNoteId:'higher',fromTick:0,toTick:24,partId:'original-part',staffId:'1',voiceId:'1'},
+      {id:'original-pull',kind:'pull-off',label:'P',fromNoteId:'higher',toNoteId:'lower',fromTick:24,toTick:48,partId:'original-part',staffId:'1',voiceId:'1'}
     ]};
 }
 
 export function authoredReadingPackage(score=authoredReadingScore()):Promise<Uint8Array> {
   return prepareReadingPackage({score,metadata:{title:score.title,composer:score.composer,provenance:['Original authored regression study.']},
-    createdAt:'2026-10-08T00:00:00Z',font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../../src/URWGothic-Demi.otf',import.meta.url))},
+    createdAt:'2026-10-08T00:00:00Z',options:{measuresPerSystem:1,systemsPerPage:1},font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../../src/URWGothic-Demi.otf',import.meta.url))},
     notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>
       ['licenses/'+name,readFileSync(new URL('../../licenses/'+name,import.meta.url))]))});
 }

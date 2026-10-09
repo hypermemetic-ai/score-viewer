@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
 import {importPackage,hashBytes,type Manifest} from '../src/package';
+import {scoreOptionsMarkup} from '../src/score-options';
+import {scoreTranspositionRange} from '../src/score-transposition';
 import {scoreCapabilities} from '../src/score-capabilities';
 import {soundingPitch,isPitchedEvent,requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {initialPersonal,readPersonal,personalStorageName,collectionId} from '../src/state';
@@ -43,6 +45,10 @@ test('reading pages and owner geometry must reproduce the shared musical source'
     const owners=JSON.parse(strFromU8(files['reading-owners.json']));owners[1].id=owners[0].id;files['reading-owners.json']=strToU8(JSON.stringify(owners));
   })),/ownership or geometry/);
   await assert.rejects(importPackage(await changed((_files,m)=>{m.reading!.policy.centerPitch=36;})),/policy differs/);
+  await assert.rejects(importPackage(await changed(files=>{
+    const owners=JSON.parse(strFromU8(files['reading-owners.json']));owners[0].heads[0].x+=2;
+    files['reading-owners.json']=strToU8(JSON.stringify(owners));
+  })),/ownership or geometry/);
 });
 
 test('canonical admission refuses false unpitched pitches, unknown kinds and invented piano descriptors',async()=>{
@@ -51,14 +57,39 @@ test('canonical admission refuses false unpitched pitches, unknown kinds and inv
     await assert.rejects(importPackage(await changed(files=>{const q=JSON.parse(strFromU8(files['score.json']));change(q);files['score.json']=strToU8(JSON.stringify(q));})),/sounding pitch|event kind/);
   }
   await assert.rejects(importPackage(await changed((_files,m)=>{m.keyboardLayout='janko-four-row';})),/musical reading package/);
+  await assert.rejects(importPackage(bytes,{keyboardLayout:'conventional-piano'}),/no piano keyboard presentation/);
+});
+
+test('source techniques, part ownership and geometry cannot invent unsupported musical reading',async()=>{
+  for(const mutate of [(q:any)=>{q.techniques[0].toNoteId='dead';},
+    (q:any)=>{q.techniques[0].voiceId='2';},(q:any)=>{q.techniques[0].label='P';},
+    (q:any)=>{q.techniques[0].fromTick=12;},(q:any)=>{q.notes[0].partId='unknown-part';}]){
+    await assert.rejects(importPackage(await changed(files=>{const q=JSON.parse(strFromU8(files['score.json']));mutate(q);
+      files['score.json']=strToU8(JSON.stringify(q));})),/technique|event owner/);
+  }
+  for(const mutate of [(m:Manifest)=>{m.reading!.options.pageWidth=1e9;},
+    (m:Manifest)=>{m.reading!.options.systemsPerPage=1e9;},
+    (m:Manifest)=>{m.reading!.tokens.semitoneScale=-1;},
+    (m:Manifest)=>{(m.reading!.tokens as Record<string,unknown>).stemLength=null;}])
+    await assert.rejects(importPackage(await changed((_files,m)=>mutate(m))),/geometry|token|option/);
 });
 
 test('physical piano operations reject reading packages before making actions or changing source',async()=>{
   assert.deepEqual(scoreCapabilities(p),{reading:true,pianoPreparation:false,pianoPractice:false,pianoPerformance:false,fingerEditing:false});
   assert.throws(()=>planSource(p),/available for reading/);assert.throws(()=>planPerformance(p),/available for reading/);
+  assert.throws(()=>scoreTranspositionRange(p),/available for reading/);
+  const markup=scoreOptionsMarkup({id:collectionId(p),file:'package-'+p.archiveSha256+'.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-08'},p,initialPersonal(p),{steps:0,min:0,max:0});
+  assert.match(markup,/Read the score/);assert.match(markup,/Share score/);assert.doesNotMatch(markup,/data-score-transpose|Generate fingerings|personal corrections/);
   const ready=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano'});
   assert.equal(ready.status,'unsupported');if('code' in ready)assert.equal(ready.code,'instrument-reading');
   assert.deepEqual(p.score,authoredReadingScore());
+});
+
+test('physical capability checks reject explicitly nonpiano parts even with source RH/LH labels',()=>{
+ const source=authoredReadingScore();source.notes=source.notes.filter(isPitchedEvent).map(note=>({...note,hand:'RH'}));
+ const claimedLegacy={...p,manifest:{...p.manifest,version:2 as const},score:source};
+ assert.equal(scoreCapabilities(claimedLegacy).pianoPractice,false);
+ assert.throws(()=>planSource(claimedLegacy),/available for reading/);
 });
 
 test('reading uses ordinary saved view identity and sharing excludes personal state',async()=>{

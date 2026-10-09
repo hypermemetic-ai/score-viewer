@@ -1,3 +1,5 @@
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
+import {requirePianoEvent} from '../src/piano-event';
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {strToU8} from 'fflate';
 import {ensurePianoReady} from '../src/piano-readiness';
@@ -25,8 +27,8 @@ async function prepared({reference=true,recipe=true,dual=false,leap=false}={}){
     timeSignatures:[{tick:0,numerator:4,denominator:4}],tempos:[],dynamics:[],pedals:[],sourceHandRequirements:[]};
   if(leap)source.notes=[54,66,32,75].map((pitch,i)=>({id:'owner-'+i,eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},
     startTick:i<2?24:72,durationTicks:48,hand:pitch<60?'LH':'RH'}));
-  source.sourceHandRequirements=source.notes.map(n=>({version:'source-hand-requirement-v1',ownerId:n.id,hand:n.hand,
-    guard:{pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},
+  source.sourceHandRequirements=source.notes.map(n=>({version:'source-hand-requirement-v1',ownerId:n.id,hand:requirePianoEvent(n).hand,
+    guard:{pitch:12*requirePitchedEvent(n).pitch.octave+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},
     provenance:{kind:'source-instruction',reference:'Authored fixture explicit right-hand instruction'}}));
   if(reference)source.referencePerformanceTempo={version:'reference-performance-tempo-v1',bpm:100,beat:{numerator:1,denominator:4},
     provenance:{kind:'editorial',reference:'Explicit authored fixture clock'}};
@@ -52,7 +54,7 @@ test('genuine fixed-page Jankó calculation becomes complete editable ready with
   const original=await prepared({recipe:false}),before=await hashBytes(original.bytes),q=await ensurePianoReady({packageBytes:original.bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});
   assert.equal(q.status,'editable','message' in q?q.message:undefined);
   assert.deepEqual(q.availableFingerPresentations,['annotations']);assert.equal(q.layer.attacks.length,6);
-  assert.deepEqual(q.layer.attacks.map(a=>a.hand),original.source.notes.map(n=>n.hand));
+  assert.deepEqual(q.layer.attacks.map(a=>a.hand),original.source.notes.map(n=>requirePianoEvent(n).hand));
   assert.ok((q.layer.operatorConstraints as Array<{provenance:{kind:string}}>).every(c=>c.provenance.kind==='editorial-hand-retention'));
   assert.equal(q.layer.actionCertificate,undefined);
   assert.deepEqual(q.package.sourceScore,original.source);assert.deepEqual(q.package.pages,original.p.pages);assert.deepEqual(q.package.seats,original.p.seats);
@@ -170,7 +172,7 @@ test('new requests supersede automatic retention for both keyboards, preserve so
   assert.ok('package' in q,'message' in q?q.message:'Expected complete preparation');
   assert.ok('layer' in q,'A new calculation must have a complete layer');
   assert.equal(q.package.preparationIdentity!.handPolicy,'calculate');
-  assert.deepEqual(q.layer.attacks.map(a=>a.hand),original.source.notes.map(n=>n.hand));
+  assert.deepEqual(q.layer.attacks.map(a=>a.hand),original.source.notes.map(n=>requirePianoEvent(n).hand));
   assert.ok(!Array.isArray(q.layer.operatorConstraints)||q.layer.operatorConstraints.every((c:any)=>c.provenance.kind!=='editorial-hand-retention'));
   assert.deepEqual(q.package.files['source-score.json'],original.p.files['source-score.json']);
   let progress=0;const cached=await ensurePianoReady({packageBytes:q.packageBytes,layout,onProgress:()=>progress++});

@@ -1,3 +1,4 @@
+import {serializeCompatibleScore} from './score-serialization';
 import {requirePianoEvent} from './piano-event';
 import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
 import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-planning-input';
@@ -34,8 +35,9 @@ export async function prepareConventionalPresentation(request:{sourceBytes:Uint8
   await validateConventionalFingerLayer(layer,input,{sourceHash:sourceSha256,sourceBytesSha256:sourceSha256,
     effectiveHands:Object.fromEntries(score.notes.map(n=>[n.id,requirePianoEvent(n).hand])),requireCurrent:true});
   if(options.signal?.aborted)throw Error('Calculation cancelled');
-  return{score:JSON.stringify(score),seats:JSON.stringify(presentation.seats),pages:presentation.pages,layer,recipe,
-    sourceSha256,semanticSha256:await digest(JSON.stringify(score)),effectiveHandSha256,allFive:presentation.allFive,
+  const serialized=serializeCompatibleScore(score,request.sourceBytes);
+  return{score:serialized,seats:JSON.stringify(presentation.seats),pages:presentation.pages,layer,recipe,
+    sourceSha256,semanticSha256:await digest(serialized),effectiveHandSha256,allFive:presentation.allFive,
     lint:{violations:presentation.lint.violations.length,warnings:presentation.lint.warnings.length},replay:plan.replay};
 }
 export type PreparedConventionalPresentation=Awaited<ReturnType<typeof prepareConventionalPresentation>>;
