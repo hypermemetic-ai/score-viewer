@@ -14,7 +14,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
     "@xmldom/xmldom": "^0.9.8",
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.2",
+    "score-converter-proof": "file:vendor/score-converter/score-converter-proof-0.0.0.tgz"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",

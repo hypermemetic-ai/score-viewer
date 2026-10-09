@@ -1,5 +1,6 @@
 import {admitReadingContent,type ReadingDescriptor,type ReadingContent} from './reading-package';
 import {selectReadingNotation} from './dual-reading-package';
+import {conservativeMaterialBytes} from './package-material';
 import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady} from './annotation-ink-policy';
 import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {requirePianoEvent} from './piano-event';
@@ -373,17 +374,11 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
   if(p.transpositionOriginal)visit(p.transpositionOriginal);
  };
  visit(original);
- const graph={original,packages,groups},counted=new Set<object>();
+ const graph={original,packages,groups};
  // Count each shared object/buffer once, without serializing duplicate paths
  // through the companion graph. This is a conservative material budget, not
  // a claim about the VM's object headers or string interning.
- const size=(value:unknown):number=>{
-  if(typeof value==='string')return value.length*2;
-  if(!value||typeof value!=='object')return 16;
-  if(counted.has(value))return 0;counted.add(value);
-  if(value instanceof Uint8Array)return value.byteLength+64;
-  return 64+Object.entries(value).reduce((n,[key,item])=>n+32+key.length*2+size(item),0);
- },retainedBytes=size(graph)+packages.reduce((n,p)=>{const record=writtenHeadEvidence.get(p);return n+(record?record.signature.length*2+JSON.stringify([...record.heads]).length*2+record.pages.length*16+record.count*32:0);},0);
+ const retainedBytes=conservativeMaterialBytes(graph)+packages.reduce((n,p)=>{const record=writtenHeadEvidence.get(p);return n+(record?record.signature.length*2+JSON.stringify([...record.heads]).length*2+record.pages.length*16+record.count*32:0);},0);
  return {retainedBytes,async copy(keyboardLayout){
   // A cached package cannot grant a stale or ambiguous font family authority.
   // In Node this also rereads and hashes the actual font file on every use.

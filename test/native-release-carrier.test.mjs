@@ -399,3 +399,17 @@ test('a pre-existing conflicting root footer notice refuses before carrier write
  await file(f.viewer,'docs/source-provenance.json',JSON.stringify({dependencyRevision:f.notationRevision}));await bindViewer(f);f.receipt.notationRevision=f.notationRevision;await writeFile(f.checks,JSON.stringify(f.receipt));
  await assert.rejects(createCarrier(args(f)),/notice conflict/);assert.equal(git(f.iso,'status','--porcelain'),'');
 }));
+
+test('converter source delivery preserves existing resource maps and binds helper, packet and actual Mac resources',async()=>withFixture(async f=>{
+ const names=['source-package.tgz','source-package-identity.json','SOURCE-NOTICE.txt','NOTICE.txt','guitar-pro.worker.js.LEGAL.txt'];
+ await file(f.viewer,'scripts/native-release-carrier/score-viewer-converter-release.mjs',await readFile(new URL('../scripts/native-release-carrier/score-viewer-converter-release.mjs',import.meta.url)));
+ await file(f.viewer,'package.json',JSON.stringify({name:'iso-score-viewer',version:'0.1.0',dependencies:{'score-converter-proof':'file:vendor/score-converter/score-converter-proof-0.0.0.tgz'}}));
+ for(const name of names)await file(f.frontend,'converter/gp/'+name,'exact fixture '+name+'\n');
+ f.frontendDigest=sha256(canonical(await inventory(f.frontend)));f.receipt.frontendDigest=f.frontendDigest;await bindViewer(f);
+ await createCarrier(args(f));
+ const {inputs}=await validateCarrierInputs(f.iso),worker=await readFile(join(f.iso,'scripts/score-viewer-native-worker.mjs'),'utf8'),mac=await readFile(join(f.iso,'scripts/build-score-viewer-macos.mjs'),'utf8');
+ assert.equal(inputs.converterNoticeHelper.path,'scripts/score-viewer-converter-release.mjs');
+ assert.match(worker,/packageConverterNotices\(source,packet\)/);assert.match(mac,/verifyBundledConverterNotices/);
+ for(const name of names)assert.equal(worker.includes(`"../dist/converter/gp/${name}":"notices/score-converter/${name}"`),true);
+ const helper=join(f.iso,inputs.converterNoticeHelper.path);await writeFile(helper,'changed helper');await assert.rejects(validateCarrierInputs(f.iso),/Converter notice helper differs/);
+}));

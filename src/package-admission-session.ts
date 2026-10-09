@@ -1,4 +1,5 @@
 import {ownPackageAdmission,type ScorePackage} from './package';
+import {PACKAGE_MATERIAL_BUDGET_BYTES} from './package-material';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 
 interface Options {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId}
@@ -24,7 +25,7 @@ export class PackageAdmissionSession {
 
  constructor(limits:{maxEntries?:number;maxRetainedBytes?:number}={}){
   this.#maxEntries=bounded(limits.maxEntries,2);
-  this.#maxRetainedBytes=bounded(limits.maxRetainedBytes,64*1024*1024);
+  this.#maxRetainedBytes=bounded(limits.maxRetainedBytes,PACKAGE_MATERIAL_BUDGET_BYTES);
  }
  get retained(){return {entries:this.#entries.length,bytes:this.#entries.reduce((n,e)=>n+e.retainedBytes,0),pending:this.#pending.size};}
  // An active producer keeps its slot through clear. Clearing must not permit
