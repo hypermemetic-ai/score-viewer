@@ -79,17 +79,16 @@ function checkReading(op:ReadingOperation){
  if(readingOperation!==op||op.generation!==readingGeneration||op.controller.signal.aborted||job!==op.running||current!==op.previous||preferences.keyboardLayout!==op.keyboard)throw cancelledReading();
 }
 /** Let paint and input run between completed phases. Cold admission itself is synchronous. */
-async function readingCheckpoint(op:ReadingOperation){
- checkReading(op);
+async function paintCheckpoint(signal?:AbortSignal){
  await new Promise<void>(resolve=>{
   let finished=false,frame=0,task=0;
-  const done=()=>{if(finished)return;finished=true;cancelAnimationFrame(frame);clearTimeout(task);clearTimeout(fallback);op.controller.signal.removeEventListener('abort',done);resolve();},
+  const done=()=>{if(finished)return;finished=true;cancelAnimationFrame(frame);clearTimeout(task);clearTimeout(fallback);signal?.removeEventListener('abort',done);resolve();},
    fallback=window.setTimeout(done,60);
-  op.controller.signal.addEventListener('abort',done,{once:true});
+  signal?.addEventListener('abort',done,{once:true});
   frame=requestAnimationFrame(()=>{task=window.setTimeout(done,0);});
  });
- checkReading(op);
 }
+async function readingCheckpoint(op:ReadingOperation){checkReading(op);await paintCheckpoint(op.controller.signal);checkReading(op);}
 function readingDialog(op:ReadingOperation){
  checkReading(op);
  const d=showDialog(`<h2>Opening score</h2><p class="job" role="status">${esc(op.running.progress)}</p><div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'score-reading');
@@ -112,6 +111,7 @@ function finishReading(op:ReadingOperation,success:boolean){
  if(readingOperation!==op)return;
  op.running.state=success?'complete':'failed';if(dialog===op.dialog)closeDialog(false);readingOperation=undefined;
  if(!success&&op.options&&current===op.previous){options(op.options);if(op.optionsFocus)dialog?.querySelector<HTMLElement>(`[data-options-key="${CSS.escape(op.optionsFocus)}"]`)?.focus();}
+ if(!current)void refreshLibrarySummaries();
 }
 const readerPages=new ReaderPageCache();let dialogBack:(()=>void)|undefined;let optionsSection:string|undefined;let practiceNavigation:OptionsNavigation|undefined;let toolbarNavigation:OptionsNavigation|undefined;let dialogNavigation:OptionsNavigation|undefined;
 let orientation=new ViewerOrientation(preferences);
@@ -490,10 +490,17 @@ async function performanceDialog(){if(!current)return;requirePianoCapability(cur
 
 function paintLibrarySummaries(){if(current||practice)return;if(dialog){librarySummaryPaintPending=true;return;}renderLibrary();}
 const libraryProgressContext=()=>JSON.stringify([preferences.keyboardLayout,entries.map(entry=>[entry.id,entry.file])]);
-async function loadPracticeTotals(){const context=libraryProgressContext(),keyboard=preferences.keyboardLayout;
- return practiceSummaries.refresh(entries,keyboard,{readPackage:file=>host.read(file),readRecord:file=>readJson(file)},()=>context===libraryProgressContext());
+const summariesBlocked=()=>!!current||!!practice||!!readingOperation||job?.state==='working'||job?.state==='installing';
+async function loadPracticeTotals(){
+ if(summariesBlocked())return false;
+ const context=libraryProgressContext(),keyboard=preferences.keyboardLayout,epoch=readingGeneration,
+  isCurrent=()=>epoch===readingGeneration&&context===libraryProgressContext()&&!summariesBlocked();
+ return practiceSummaries.refresh(entries,keyboard,{
+  readPackage:async file=>{await paintCheckpoint();return isCurrent()?host.read(file):null;},
+  readRecord:async file=>{await paintCheckpoint();if(!isCurrent())throw Error('Library summary was superseded.');return readJson(file);}
+ },isCurrent);
 }
 async function refreshLibrarySummaries(){if(await loadPracticeTotals())paintLibrarySummaries();}
 
-async function boot(){calibration=await loadCalibration(host);try{const lib=await readJson<{version:number;entries:Entry[]}>('library.json');if(lib){if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');entries=lib.entries;}const saved=await readJson<typeof preferences>('preferences.json');if(saved){if(saved.version!==1||![0,90,180,270].includes(saved.libraryRotation))throw Error('Preferences version differs; data retained');preferences={...saved,keyboardLayout:keyboardPreference(saved.keyboardLayout,entries.some(e=>e.id==='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27')),bindings:readBindings(saved.bindings),...fingerPreferences(saved),midi:readMidiMapping(saved.midi),midiBindings:saved.midiBindings===undefined?undefined:readMidiBindings(saved.midiBindings,saved.midi)};}if(preferences.lastWorkedEntryId!==undefined&&(typeof preferences.lastWorkedEntryId!=='string'||!/^[a-f0-9]{64}$/.test(preferences.lastWorkedEntryId)))throw Error('Saved score selection differs; data retained');if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);mainControls=readControlBindings(preferences.controlBindings,preferences);preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);await host.onFocusChange(focused=>{if(!focused)loseFocus();else readerFocused=true;});await host.onMidi(onMidi,status=>{if(status.generation===midiConnection?.generation){bindingOptions?.connectionChanged();musicalSustain.clear();midiConnection=undefined;bindingOptions?.paint();stopPerformance();readerPreview?.clear();readerContacts.clear();paintReaderContacts();practice?.pause();resetInput();practice?.pause();notify(status.message);midiOptions?.lost(status.message);}},onMidiNote);await loadPracticeTotals();render();await host.fullscreen(true);void enqueue(()=>configurePiano()).catch(error=>{pianoWarning=`Piano sound is off: ${error.message}`;});}catch(error){app.innerHTML='<p class="error">The library could not open. Your saved files have been retained.</p>';notify((error as Error).message);}}
+async function boot(){calibration=await loadCalibration(host);try{const lib=await readJson<{version:number;entries:Entry[]}>('library.json');if(lib){if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');entries=lib.entries;}const saved=await readJson<typeof preferences>('preferences.json');if(saved){if(saved.version!==1||![0,90,180,270].includes(saved.libraryRotation))throw Error('Preferences version differs; data retained');preferences={...saved,keyboardLayout:keyboardPreference(saved.keyboardLayout,entries.some(e=>e.id==='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27')),bindings:readBindings(saved.bindings),...fingerPreferences(saved),midi:readMidiMapping(saved.midi),midiBindings:saved.midiBindings===undefined?undefined:readMidiBindings(saved.midiBindings,saved.midi)};}if(preferences.lastWorkedEntryId!==undefined&&(typeof preferences.lastWorkedEntryId!=='string'||!/^[a-f0-9]{64}$/.test(preferences.lastWorkedEntryId)))throw Error('Saved score selection differs; data retained');if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);mainControls=readControlBindings(preferences.controlBindings,preferences);preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);await host.onFocusChange(focused=>{if(!focused)loseFocus();else readerFocused=true;});await host.onMidi(onMidi,status=>{if(status.generation===midiConnection?.generation){bindingOptions?.connectionChanged();musicalSustain.clear();midiConnection=undefined;bindingOptions?.paint();stopPerformance();readerPreview?.clear();readerContacts.clear();paintReaderContacts();practice?.pause();resetInput();practice?.pause();notify(status.message);midiOptions?.lost(status.message);}},onMidiNote);render();await host.fullscreen(true);void refreshLibrarySummaries();void enqueue(()=>configurePiano()).catch(error=>{pianoWarning=`Piano sound is off: ${error.message}`;});}catch(error){app.innerHTML='<p class="error">The library could not open. Your saved files have been retained.</p>';notify((error as Error).message);}}
 void boot();
