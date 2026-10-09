@@ -14,7 +14,7 @@ import {strFromU8} from 'fflate';
 import {replayProvidedRRLayer} from './operator-finger-update';
 import {RR_PERFORMANCE_POSE_PROFILE} from '../vendor/iso-notation/src/model/isomorphic-rr-personal-pose';
 import {pianoRequestAuthority,PianoAuthorityConflict,type PerformingHandPolicy} from './piano-request-authority';
-import {preparationRequestIdentity} from './piano-preparation-identity';
+import {preparationRequestIdentity,canonicalJson} from './piano-preparation-identity';
 import {personalForCalculatedEdition,PersonalEditionConflict} from './presentation-install';
 import {prepareCalculatedEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 
@@ -37,7 +37,7 @@ export interface PianoReady {
   status:'ready'|'editable';packageBytes:Uint8Array;package:ScorePackage;layer:FingerLayer;
   calculationDiagnostics:PianoCalculationDiagnostic[];
   availableFingerPresentations:Array<'annotations'|'replacement'>;
-  personal?:PersonalState;
+  personal?:PersonalState;requestedEditionSha256?:string;
 }
 export interface PianoNotReady {
   status:'needs-data'|'unsupported'|'search-exhausted'|'cancelled'|'conflict';
@@ -76,12 +76,13 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
       return failure('unsupported','preparation-intent','Choose a supported score preparation.');
     const hasPresentation=p.availablePresentations?.includes(request.layout)??p.keyboardLayout===request.layout;
     if(hasPresentation)p=await selectPresentation(p,request.layout);
+    if(p.transposition&&!hasPresentation&&request.intent==='read-retained'&&!request.forceRecalculate)return failure('unsupported','retained-presentation','This retained edition has no saved view for that keyboard. Prepare its matching presentation to continue.');
     const requestedSteps=request.transposeSteps??getScoreTransposition(p),pitchChanged=requestedSteps!==getScoreTransposition(p);
-    if(request.transposeSteps!==undefined&&(!Number.isSafeInteger(request.transposeSteps)||Math.abs(request.transposeSteps)>87))return failure('unsupported','transposition-steps','Transpose needs a whole number of steps within the piano range.');
+    if(request.transposeSteps!==undefined&&(!Number.isSafeInteger(request.transposeSteps)))return failure('unsupported','transposition-steps','Transpose needs a whole number of steps within the piano range.');
     if(pitchChanged&&requestedSteps===0)return failure('unsupported','transposition-original','Select the retained original edition to restore 0 steps.');
     if(pitchChanged&&request.intent==='read-retained')return failure('conflict','retained-transposition','A retained edition reads its saved pitch. Request a new preparation to change it.');
     const transposePreparation=requestedSteps!==0&&(pitchChanged||request.forceRecalculate||request.intent!=='read-retained')?await createScoreTransposition(p,original,requestedSteps,request.layout):undefined,
-      calculationBase=transposePreparation?{...p,sourceScore:transposePreparation.source,sourceSha256:transposePreparation.envelope.effectiveSourceSha256,transposition:transposePreparation.envelope}:p,
+      calculationBase=transposePreparation?{...p,sourceScore:transposePreparation.source,sourceSha256:transposePreparation.envelope.effectiveSourceSha256,transposition:transposePreparation.envelope,transpositionOriginal:p.transpositionOriginal??p}:p,
       handPolicy=transposePreparation?'retain-imported':request.performingHandPolicy??'calculate';
     let nextContext=p.calculationContext;
     if(transposePreparation&&nextContext)nextContext=validatePianoCalculationContext({...nextContext,sourceSha256:calculationBase.sourceSha256!},calculationBase.sourceSha256!,calculationBase.sourceScore??calculationBase.score);
@@ -128,7 +129,7 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
         message:'Your finger changes are saved. Their continuous movement has not been certified.'});
       return{status:assignments||edited?'editable':'ready',packageBytes:readyBytes,package:checked,layer,calculationDiagnostics,
         availableFingerPresentations:checked.fingerEligibility.eligible?['annotations','replacement']:['annotations'],
-        ...(personal?{personal}:{})};
+        ...(personal?{personal}:{}),...(transposePreparation?{requestedEditionSha256:await hashBytes(original)}:{})};
     };
     if(hasPresentation&&!pitchChanged&&!request.forceRecalculate&&request.intent==='read-retained'){
       if(active)return await ready(bytes,p,active);
@@ -139,7 +140,8 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
       return failure('needs-data','reference-tempo','Choose a duration unit and rate per minute for this score before calculating fingers.');
     requireReferencePerformanceTempo(source);interrupted(request);
     // Unknown authority must be surfaced before any NEW-request cache reuse.
-    const constraints=pianoRequestAuthority(p,source,request.layout,pitchChanged?undefined:active,personal,handPolicy);
+    const rawConstraints=pianoRequestAuthority(p,source,request.layout,pitchChanged?undefined:active,personal,handPolicy),
+      constraints=transposePreparation?[...new Map(rawConstraints.map(c=>[canonicalJson(c),c])).values()]:rawConstraints;
     const matchingRequest=!transposePreparation&&hasPresentation&&p.preparationIdentity&&active===p.fingerLayer&&
       p.preparationIdentity.requestSha256===await preparationRequestIdentity({...p,calculationContext:nextContext},handPolicy,constraints,request.maxExpansions);
     if(hasPresentation&&!request.forceRecalculate&&matchingRequest&&(currentLayer(active)||providedRR)){

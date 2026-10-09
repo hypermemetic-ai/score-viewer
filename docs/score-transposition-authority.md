@@ -3,7 +3,10 @@
 Viewer transposition is an additive derivation, not a mutation of the imported
 score. `viewer-score-transposition-v1` retains one exact, independently admitted
 untransposed archive at `transposition/original.isoscore`. A retained baseline
-with a transposition envelope is refused before nested admission. This member
+with a transposition envelope is refused before nested admission. Its historical
+raw rendering recipe must independently reproduce the literal baseline before
+its options/tokens can be adopted; an already cold-replayed calculated baseline
+retains its existing source-owned factory authority. This member
 is the portable exact 0 restoration archive; the collection installer preserves
 its original sidecar and achievement journals separately.
 
@@ -11,8 +14,12 @@ The ordinary source-score member is the deterministic effective source. Its
 source SHA, layer source identity and rendering recipe bind the effective
 pitches through existing strict checks. The envelope separately binds the root
 source SHA, baseline archive SHA/layout, integer offset, effective source SHA
-and selected-request archive SHA. The current request snapshot, rather than a
-returned worker claim, supplies the expected envelope during reader admission.
+and originating selected-request archive SHA. Unchanged same-offset/map
+generation retains this admitted authority so the physical exercise identity
+stays stable. A separate transient worker result binds the current requested
+archive SHA; the receiver checks its independently retained request snapshot
+before admitting a completion. That snapshot also supplies the expected guarded
+map/context and complete replay rather than trusting a returned worker claim.
 No field is added to ISO's strictly tempo-only calculation context.
 
 The complete sorted owner hand map is explicit **Viewer selection authority**,

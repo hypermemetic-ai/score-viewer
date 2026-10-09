@@ -1,7 +1,9 @@
 import {strFromU8,strToU8,unzipSync} from 'fflate';
 import type {QuantizedGridScore,PitchCoordinate,Hand} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {hashBytes,importPackage,type ScorePackage} from './package';
+import {hashBytes,importPackage,pianoPlanningScore,type ScorePackage} from './package';
+import {replayRetainedRecipeBaseline} from './piano-engraving-recipe';
+import {CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/score-presentation';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
 
 export const SCORE_TRANSPOSITION_VERSION='viewer-score-transposition-v1' as const;
@@ -36,16 +38,17 @@ export function scoreTranspositionCompatible(candidate:ScorePackage,selected:Sco
 }
 /** Every known absolute pitch location is handled explicitly. Unknown pitch or
  * candidate display projections refuse rather than retaining stale ink. */
-export function transposeScore(source:QuantizedGridScore,steps:number):QuantizedGridScore {
- if(!Number.isSafeInteger(steps)||Math.abs(steps)>87)throw Error('Transpose needs a whole number of steps within the piano range.');
+export function transposeScore(source:QuantizedGridScore,steps:number):QuantizedGridScore {return transformScore(source,steps,true);}
+function transformScore(source:QuantizedGridScore,steps:number,enforceRange:boolean):QuantizedGridScore {
+ if(!Number.isSafeInteger(steps))throw Error('Transpose needs a whole number of steps within the piano range.');
  if(source.relativePresentation||source.readingPresentation||source.performingHandPresentation||source.notes.some(n=>n.readingDisplay||n.derivedHand))
   throw Error('Transpose does not support this relative or derived source projection.');
  const q=structuredClone(source),seen=new WeakSet<object>();
  const pitch=(value:any,path:string)=>{
-  if(!object(value)||Object.keys(value).some(k=>!['pitchClass','octave'].includes(k))||!Number.isInteger(value.pitchClass)||value.pitchClass<0||value.pitchClass>11||!Number.isInteger(value.octave))
+  if(!object(value)||Object.keys(value).some(k=>!['pitchClass','octave'].includes(k))||!Number.isInteger(value.pitchClass)||value.pitchClass<0||value.pitchClass>11||!Number.isSafeInteger(value.octave)||!Number.isSafeInteger(linear(value as PitchCoordinate)))
    throw Error('Transpose encountered an unsupported pitch at '+path+'.');
   if(seen.has(value))return;
-  const next=linear(value as PitchCoordinate)+steps;if(next<9||next>96)throw Error('Transpose would move a pitch outside the piano range.');
+  const next=linear(value as PitchCoordinate)+steps;if(enforceRange&&(next<9||next>96))throw Error('Transpose would move a pitch outside the piano range.');
   value.pitchClass=next%12;value.octave=Math.floor(next/12);seen.add(value);
  };
  q.notes.forEach((n,i)=>pitch(n.pitch,`notes/${i}`));
@@ -57,10 +60,10 @@ export function transposeScore(source:QuantizedGridScore,steps:number):Quantized
  }
  const requirements=(q as any).sourceHandRequirements;
  if(requirements!==undefined){if(!Array.isArray(requirements))throw Error('Transpose encountered unsupported source hand guards.');
-  for(const r of requirements){const n=source.notes.find(n=>n.id===r.ownerId);
-   if(!n||r.version!=='source-hand-requirement-v1'||!object(r.guard)||Object.keys(r.guard).length!==3||r.guard.pitch!==linear(n.pitch)||r.guard.startTick!==n.startTick||r.guard.durationTicks!==n.durationTicks)
+  for(const [i,r] of requirements.entries()){const n=source.notes.find(n=>n.id===r.ownerId),guard=(source as any).sourceHandRequirements[i].guard;
+   if(!n||r.version!=='source-hand-requirement-v1'||!object(guard)||Object.keys(guard).length!==3||guard.pitch!==linear(n.pitch)||guard.startTick!==n.startTick||guard.durationTicks!==n.durationTicks)
     throw Error('Transpose encountered a stale source hand guard.');
-   r.guard.pitch+=steps;seen.add(r.guard);
+   if(!seen.has(r.guard))r.guard.pitch+=steps;seen.add(r.guard);
   }
  }
  const audit=(v:any,path:string)=>{if(!v||typeof v!=='object')return;if(seen.has(v))return;
@@ -71,22 +74,31 @@ export function transposeScore(source:QuantizedGridScore,steps:number):Quantized
  audit(q,'source');return q;
 }
 export function scoreTranspositionRange(p:ScorePackage):{min:number;max:number}{
- const source=originalSource(p);transposeScore(source,0);
+ const source=originalSource(p);transformScore(source,0,false);
  const values:number[]=[];const walk=(v:any)=>{if(!v||typeof v!=='object')return;
   if(Number.isInteger(v.pitchClass)&&Number.isInteger(v.octave)){values.push(linear(v));return;}
   Object.values(v).forEach(walk);};walk(source);
  if(!values.length)throw Error('This score has no pitches to transpose.');
- return{min:9-Math.min(...values),max:96-Math.max(...values)};
+ const min=9-Math.min(...values),max=96-Math.max(...values);
+ if(min>max)throw Error('This score cannot fit the piano range at a single offset.');return{min,max};
+}
+export async function admitTranspositionBaselineRecipe(p:ScorePackage):Promise<void>{
+ if(!p.renderingRecipe)throw Error('Transpose needs a matching rendering preparation for the original edition.');
+ // The calculated baseline has already passed full cold source/paint replay.
+ // Raw historical recipes still need their literal factory-adoption gate.
+ if(p.renderingRecipe.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE)await replayRetainedRecipeBaseline(pianoPlanningScore(p),p.renderingRecipe,p.sourceSha256!);
 }
 export async function createScoreTransposition(p:ScorePackage,archive:Uint8Array,steps:number,keyboard:PhysicalKeyboardId){
  const original=p.transpositionOriginal??p;
+ await admitTranspositionBaselineRecipe(original);
  if(steps===0)throw Error('Select the retained original edition to restore 0 steps.');
  const originalBytes=getOriginalScorePackageBytes(p)??new Uint8Array(archive),source=original.sourceScore??original.score,
   effective=transposeScore(source,steps),sourceBytes=strToU8(JSON.stringify(effective)),
   map=transpositionOwnerMap(p),content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:'transposition/original.isoscore',
    originalArchiveSha256:await hashBytes(originalBytes),baselineLayout:original.keyboardLayout!,originalSourceSha256:original.sourceSha256!,selectedEditionSha256:await hashBytes(archive),steps,
    effectiveSourceSha256:await hashBytes(sourceBytes),handMaps:{[keyboard]:map}};
- return{envelope:{...content,sha256:await identityHash(content)} as ScoreTransposition,originalBytes,source:effective,sourceBytes};
+ const retained=p.transposition?.steps===steps&&canonicalJson(p.transposition.handMaps[keyboard])===canonicalJson(map)?p.transposition:undefined;
+ return{envelope:retained?structuredClone(retained):{...content,sha256:await identityHash(content)} as ScoreTransposition,originalBytes,source:effective,sourceBytes};
 }
 export async function admitScoreTransposition(raw:unknown,files:Record<string,Uint8Array>,effectiveBytes:Uint8Array):Promise<{envelope:ScoreTransposition;original:ScorePackage}>{
  if(!object(raw)||raw.version!==SCORE_TRANSPOSITION_VERSION||Object.keys(raw).sort().join()!==
@@ -103,6 +115,7 @@ export async function admitScoreTransposition(raw:unknown,files:Record<string,Ui
  const originalFiles=unzipSync(bytes,{filter:f=>{if(f.originalSize>20_000_000)throw Error('Oversized transpose baseline.');return f.name==='manifest.json';}}),manifest=JSON.parse(strFromU8(originalFiles['manifest.json']));
  if(manifest.transposition!==undefined)throw Error('A transpose baseline must be an untransposed original archive.');
  const original=await importPackage(bytes,{allowLegacyTempo:true,keyboardLayout:envelope.baselineLayout});
+ await admitTranspositionBaselineRecipe(original);
  const reference=files['reference.mid'],priorReference=original.referenceMidi;
  if(!!reference!==!!priorReference||reference&&priorReference&&(reference.length!==priorReference.length||reference.some((b,i)=>b!==priorReference[i])))throw Error('Transpose reference bytes differ from its original archive.');
  if(original.sourceSha256!==envelope.originalSourceSha256)throw Error('Transpose baseline source identity differs.');
