@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {importPackage,selectPresentation} from '../src/package';
+import {importPackage,selectPresentation,hashBytes} from '../src/package';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} from '../src/state';
 import {planPractice,initialPractice,totalProgress,practicePercent,reconcilePassages} from '../src/practice';
 import {LibraryPracticeSummaries,readLibraryPracticeSummary,type LibraryPracticeReader} from '../src/library-practice-progress';
@@ -10,7 +10,7 @@ import {toggleDone} from '../src/practice-attainment';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url));
 const p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row'),cp=await selectPresentation(p,'conventional-piano');
-const entry:Entry={id:collectionId(p),file:'package-test.isoscore',importedAt:'2026-10-07T00:00:00Z',metadata:p.manifest.metadata};
+const entry:Entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.isoscore`,importedAt:'2026-10-07T00:00:00Z',metadata:p.manifest.metadata};
 const plan=planPractice(rr,'fixed-four-v1'),earned=initialPractice(plan);
 // Two earned source patterns cover five leaves; one groundwork pattern covers two.
 for(const i of [0,1])earned.best[plan.chunks[i].pattern]=earned.target;

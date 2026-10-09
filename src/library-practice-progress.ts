@@ -3,6 +3,8 @@ import {importPackage,selectPresentation,type ScorePackage} from './package';
 import {planPractice,practicePartition,readPractice,wholePracticeProgress} from './practice';
 import {displayedPracticeTotal} from './practice-display';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} from './state';
+import {assertSelectedTransposition} from './score-transposition-selection';
+import {getScoreTransposition} from './score-transposition';
 
 export interface LibraryPracticeReader {
  readPackage(file:string):Promise<Uint8Array|null>;
@@ -22,6 +24,7 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  if(!bytes)return;
  const imported=await importPackage(bytes,{allowLegacyTempo:true});
  if(collectionId(imported)!==entry.id||!imported.availablePresentations?.includes(keyboard))return;
+ assertSelectedTransposition(entry,imported);
  const p=await selectPresentation(imported,keyboard);
  const raw=await reader.readRecord(practiceStorageName(entry.id,p)),legacy=legacyPracticeStorageName(p);
  const saved=raw??(legacy?await reader.readRecord(legacy):undefined);
@@ -52,7 +55,7 @@ export class LibraryPracticeSummaries {
  }
 
  record(liveEntry:Entry|undefined,targetEntry:Entry,p:ScorePackage,keyboard:PhysicalKeyboardId,sections:number,whole:boolean):boolean {
-  if(!liveEntry||liveEntry.id!==targetEntry.id||liveEntry.file!==targetEntry.file||collectionId(p)!==liveEntry.id||p.keyboardLayout!==keyboard)return false;
+  if(!liveEntry||liveEntry.id!==targetEntry.id||liveEntry.file!==targetEntry.file||collectionId(p)!==liveEntry.id||getScoreTransposition(p)!==(liveEntry.transposition?.steps??0)||p.keyboardLayout!==keyboard)return false;
   if(!Number.isFinite(sections)||sections<0||sections>1||typeof whole!=='boolean')return false;
   ++this.generation;
   this.summaries.set(liveEntry.id,{entryId:liveEntry.id,file:liveEntry.file,keyboard,sections,whole});

@@ -1,5 +1,7 @@
 import {hashBytes,type ScorePackage} from './package';
-import {personalStorageName,readPersonal,initialPersonal,installLayer,type Entry,type PersonalState} from './state';
+import {personalStorageName,readPersonal,initialPersonal,installLayer,validEntryStorage,type Entry,type PersonalState} from './state';
+import {nextTranspositionSelection} from './score-transposition-selection';
+import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 export class PersonalEditionConflict extends Error {
   readonly code='personal-edition';
   constructor(message:string){super(message+' The prior edition and complete personal journal are retained.');}
@@ -45,24 +47,34 @@ export function rebindPersonalPresentation(s:PersonalState,from:ScorePackage,to:
 }
 /** Stage new package/state versions; only the final library pointer activates
  * them. A failed stage leaves every currently referenced sidecar untouched. */
-export async function stagePresentationInstall(host:{write(name:string,data:Uint8Array):Promise<void>},request:{
+export async function stagePresentationInstall(host:{write(name:string,data:Uint8Array):Promise<void>;read?(name:string):Promise<Uint8Array|null>},request:{
   packageBytes:Uint8Array;personalBytes:Uint8Array;personalKey:string;entry:Entry;entries:Entry[];canCommit?:()=>boolean;newEntry?:boolean;
+  /** The pointer write is atomic but asynchronous; lock dismissal before it. */
+  onCommitStarted?:()=>void;
   /** Explicit retained-edition seed; ordinary installation uses current maps. */
   personalFiles?:Record<string,string>;
+  /** Offset comes from an independently admitted package, never a field draft. */
+  transposition?:{steps:number;layout:PhysicalKeyboardId;originalPackageBytes?:Uint8Array;originalLayouts?:readonly PhysicalKeyboardId[];originalPersonalFiles?:Record<string,string>};
 }):Promise<{entry:Entry;entries:Entry[]}> {
   const file=`package-${await hashBytes(request.packageBytes)}.isoscore`,personalFile=`state-version-${await hashBytes(new TextEncoder().encode(crypto.randomUUID()+await hashBytes(request.personalBytes)))}.json`;
   const existing=request.entries.find(prior=>prior.id===request.entry.id),found=!!existing;
   if(request.newEntry&&found)throw Error('The imported score already exists; its managed state is retained.');
   if(existing&&existing.file!==request.entry.file)throw Error('The library edition changed; existing files retained.');
   if(request.canCommit&&!request.canCommit())throw Error('Calculation is no longer active; existing score retained.');
-  const entry={...request.entry,file,personalFiles:{...(request.personalFiles??request.entry.personalFiles),[request.personalKey]:personalFile},
-    editionPersonalFiles:{...request.entry.editionPersonalFiles,...(found?{[request.entry.file]:{...request.entry.personalFiles}}:{})},
-    retainedPackages:[...new Set([...(request.entry.retainedPackages??[]),...(found?[request.entry.file]:[])])]};
+  const originalFile=request.transposition?.originalPackageBytes?`package-${await hashBytes(request.transposition.originalPackageBytes)}.isoscore`:undefined,
+    transposition=nextTranspositionSelection(request.entry,file,request.transposition?{steps:request.transposition.steps,layout:request.transposition.layout,originalFile,originalLayouts:request.transposition.originalLayouts}:undefined);
+  if(request.newEntry&&request.transposition?.steps&&!originalFile)throw Error('A transposed import requires its exact original edition; previous library retained.');
+  const entry={...request.entry,file,...(transposition?{transposition}:{}),personalFiles:{...(request.personalFiles??request.entry.personalFiles),[request.personalKey]:personalFile},
+    editionPersonalFiles:{...request.entry.editionPersonalFiles,...(found?{[request.entry.file]:{...request.entry.personalFiles}}:{}),...(originalFile&&originalFile!==request.entry.file&&request.transposition?.originalPersonalFiles?{[originalFile]:{...request.transposition.originalPersonalFiles}}:{})},
+    retainedPackages:[...new Set([...(request.entry.retainedPackages??[]),...(found?[request.entry.file]:[]),...(originalFile?[originalFile]:[])])]};
   const entries=found?request.entries.map(prior=>prior.id===entry.id?entry:prior):[...request.entries,entry];
   if(!found&&!request.newEntry)throw Error('The score is no longer in the library; existing files retained.');
+  if(!validEntryStorage(entry))throw Error('The new edition selection is invalid; the active library and journals are retained.');
+  if(originalFile){const retained=await host.read?.(originalFile);if(retained&&await hashBytes(retained)!==await hashBytes(request.transposition!.originalPackageBytes!))throw Error('The retained original archive differs; its bytes and active selection are preserved.');if(!retained)await host.write(originalFile,request.transposition!.originalPackageBytes!);}
   await host.write(file,request.packageBytes);
   await host.write(personalFile,request.personalBytes);
   if(request.canCommit&&!request.canCommit())throw Error('Calculation is no longer active; existing score retained.');
+  request.onCommitStarted?.();
   await host.write('library.json',new TextEncoder().encode(JSON.stringify({version:1,entries})));
   return {entry,entries};
 }

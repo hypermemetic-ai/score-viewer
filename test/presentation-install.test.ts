@@ -2,6 +2,12 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {stagePresentationInstall} from '../src/presentation-install';
 import {hashBytes} from '../src/package';import type {Entry} from '../src/state';
 const bytes=(s:string)=>new TextEncoder().encode(s),entry:Entry={id:'a'.repeat(64),file:`package-${'b'.repeat(64)}.isoscore`,metadata:{title:'No.14',composer:'Schumann',provenance:[]},importedAt:'now'},key=`state-${entry.id}.json`;
+test('final pointer phase starts after cancellation guard and before the asynchronous write',async()=>{
+ const events:string[]=[];let committing=false;
+ await stagePresentationInstall({async write(name){if(name==='library.json'){assert.equal(committing,true);events.push('pointer');}}},{entry,entries:[entry],personalKey:key,packageBytes:bytes('new'),personalBytes:bytes('state'),canCommit:()=>{events.push('guard');return true;},onCommitStarted:()=>{committing=true;events.push('commit');}});
+ assert.deepEqual(events.slice(-3),['guard','commit','pointer']);
+ let callback=false;await assert.rejects(stagePresentationInstall({async write(){}},{entry,entries:[entry],personalKey:key,packageBytes:bytes('new'),personalBytes:bytes('state'),canCommit:()=>false,onCommitStarted:()=>{callback=true;}}));assert.equal(callback,false);
+});
 for(const failure of [1,2,3])test(`installation failure at write ${failure} preserves all active package/state/library bytes`,async()=>{
  const original=new Map([['library.json',bytes(JSON.stringify({version:1,entries:[entry]}))],[key,bytes('reviewed choices')],[entry.file,bytes('old archive')]]),stored=new Map<string,Uint8Array>(original);let count=0;
  await assert.rejects(stagePresentationInstall({async write(name,data){if(++count===failure)throw Error('disk unavailable');stored.set(name,data);}},
