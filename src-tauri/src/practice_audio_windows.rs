@@ -306,9 +306,11 @@ pub struct PumpObservation {
     pub padding_after: u32,
     pub service_micros: u64,
     pub released_micros: u64,
+    pub release_before_micros: u64,
     pub clock_position: u64,
     pub clock_frequency: u64,
     pub clock_observed_micros: u64,
+    pub clock_qpc_100ns: u64,
 }
 impl Host {
     pub fn open(
@@ -316,6 +318,15 @@ impl Host {
         bus: Arc<mixer::MidiBus>,
         mailbox: Arc<mixer::CueMailbox>,
         volume: Arc<AtomicU64>,
+    ) -> Result<Self, String> {
+        Self::open_with_start(config, bus, mailbox, volume, true)
+    }
+    fn open_with_start(
+        config: &Config,
+        bus: Arc<mixer::MidiBus>,
+        mailbox: Arc<mixer::CueMailbox>,
+        volume: Arc<AtomicU64>,
+        start: bool,
     ) -> Result<Self, String> {
         unsafe {
             let com = Com::enter()?;
@@ -417,9 +428,20 @@ impl Host {
             let ptr = host.render.GetBuffer(prime).map_err(error)?;
             std::ptr::write_bytes(ptr, 0, prime as usize * f.nBlockAlign as usize);
             host.render.ReleaseBuffer(prime, 0).map_err(error)?;
-            host.client.Start().map_err(error)?;
+            if start {
+                host.client.Start().map_err(error)?;
+            }
             Ok(host)
         }
+    }
+    #[cfg(test)]
+    fn open_prepared(
+        config: &Config,
+        bus: Arc<mixer::MidiBus>,
+        mailbox: Arc<mixer::CueMailbox>,
+        volume: Arc<AtomicU64>,
+    ) -> Result<Self, String> {
+        Self::open_with_start(config, bus, mailbox, volume, false)
     }
     pub fn pump(&mut self) -> Result<(), String> {
         unsafe {
@@ -505,6 +527,8 @@ impl Host {
                     capture.over_capacity = true;
                 }
             }
+            #[cfg(test)]
+            let release_before_micros = crate::midi_input::midi_clock();
             self.render.ReleaseBuffer(available, 0).map_err(error)?;
             #[cfg(test)]
             let released_micros = crate::midi_input::midi_clock();
@@ -521,7 +545,10 @@ impl Host {
                     let clock: IAudioClock = self.client.GetService().map_err(error)?;
                     let frequency = clock.GetFrequency().map_err(error)?;
                     let mut position = 0;
-                    clock.GetPosition(&mut position, None).map_err(error)?;
+                    let mut qpc = 0;
+                    clock
+                        .GetPosition(&mut position, Some(&mut qpc))
+                        .map_err(error)?;
                     capture.pumps.push(PumpObservation {
                         callback_micros: now,
                         padding_before: padding,
@@ -529,9 +556,11 @@ impl Host {
                         padding_after: self.client.GetCurrentPadding().map_err(error)?,
                         service_micros: render_began.elapsed().as_micros() as u64,
                         released_micros,
+                        release_before_micros,
                         clock_position: position,
                         clock_frequency: frequency,
                         clock_observed_micros: crate::midi_input::midi_clock(),
+                        clock_qpc_100ns: qpc,
                     });
                 } else {
                     capture.over_capacity = true;
@@ -587,6 +616,11 @@ impl Host {
         unsafe { self.client.GetStreamLatency().map_err(error) }
     }
 }
+
+// Experimental diagnostics only: never compiled into an application release.
+#[cfg(test)]
+#[path = "audio_modes_diagnostic.rs"]
+mod modes_diagnostic;
 impl Drop for Host {
     fn drop(&mut self) {
         unsafe {
