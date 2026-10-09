@@ -77,6 +77,18 @@ test('dual publication retains every declared view and round-trips without a sep
  assert.deepEqual(pub.excluded,[]);assert.deepEqual([...publicationMembers(original.manifest)].sort(),Object.keys(original.files).filter(n=>n!=='manifest.json').sort());
  assert.deepEqual(pub.package.reading!.dual,original.reading!.dual);assert.equal(pub.package.manifest.revision,original.manifest.revision);
 });
+
+test('retained intake files bind exact owned bytes without granting family or replacing source members',async()=>{
+ const input=authoredFrettedInput(),retainedFiles={'guitar-pro/original.gp':new Uint8Array([71,80,56]),'guitar-pro/report.json':strToU8('{"fixture":true}')},
+  pending=prepareDualReadingPackage({...input,retainedFiles});
+ retainedFiles['guitar-pro/original.gp'].fill(0);retainedFiles['guitar-pro/report.json'].fill(0);
+ const admitted=await importPackage(await pending);
+ assert.deepEqual(admitted.files['guitar-pro/original.gp'],new Uint8Array([71,80,56]));
+ assert.equal(admitted.manifest.files['guitar-pro/original.gp'],await hashBytes(new Uint8Array([71,80,56])));
+ assert.equal(admitted.reading!.dual!.instrumentFamily,'unknown');assert.deepEqual(admitted.score,input.score);
+ await assert.rejects(prepareDualReadingPackage({...input,retainedFiles:{'score.json':new Uint8Array([1])}}),/Conflicting or unsafe/);
+ await assert.rejects(prepareDualReadingPackage({...input,retainedFiles:{'../original.gp':new Uint8Array([1])}}),/Conflicting or unsafe/);
+});
 test('forged geometry, true-component, owner, source tuning and active page mutations refuse even after rehashing',async()=>{
  for(const name of ['reading/tab/owners.json','reading/tab/scene.json','reading/iso/scene.json','reading/tab/geometry.json']){
   await assert.rejects(importPackage(await changed((files)=>{const value=JSON.parse(strFromU8(files[name]));
