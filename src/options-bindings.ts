@@ -5,8 +5,8 @@ const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;
 export interface PracticeBindingContext {active:boolean;measureNavigation:boolean}
 export interface OptionsBindingRow {action:ReadingAction;label:string}
 /** A display projection only: hidden actions retain their shared stored controls. */
-export function optionsBindingRows(practice?:PracticeBindingContext):OptionsBindingRow[] {
- const actions=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:readingActions;
+export function optionsBindingRows(practice?:PracticeBindingContext,reader=true):OptionsBindingRow[] {
+ const actions=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:reader?readingActions:['practiceSettings'] as ReadingAction[];
  return actions.map(action=>({action,label:practice&&['previous','next'].includes(action)?action==='previous'?'Previous measures':'Next measures':readingActionLabel(action)}));
 }
 export interface OptionsBindingsApi {
