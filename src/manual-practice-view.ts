@@ -100,6 +100,7 @@ export class ManualPracticeView {
   if(action.startsWith('passage:')){const chunk=reconcilePassages(this.plan,this.state).all.get(action.slice(8));if(chunk){this.selectPassage(chunk);this.paint();this.app.querySelector<HTMLElement>('.practice-stage')!.focus();}return;}
   if(action==='ready'){if(!this.session||this.saveError||this.renderError)return;this.manual.cancelEdit();if(!this.transport)this.replaceTransport();if(['countin','trial','complete'].includes(this.session.phase))this.transport!.pause();await this.transport!.start();return;}
   if(action==='pause'){this.pause();return;}if(action==='overview'){this.pause();this.overview=true;this.paint();return;}
+  if(action==='free-view'){const chunk=this.browser.current(this.state);if(this.overview&&chunk)this.selectPassage(chunk);this.pause();this.paint();this.app.querySelector<HTMLElement>('.practice-stage')?.focus();return;}
   if(action==='back'){await this.flush();this.close();this.options.back();return;}
   if(action==='settings'){this.pause();this.options.settings();return;}
   if(action==='next'||action==='previous'){if(this.canTurnPage&&this.options.context.turn(action==='next'?1:-1)){this.paint();void this.save();}return;}

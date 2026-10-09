@@ -63,3 +63,8 @@ test('changing the request cannot replace its captured operation cancellation gu
  const request={parts:[first],entries:[],canCommit:()=>live},pending=stageReadingPartsInstall(host,request);live=false;request.canCommit=()=>true;
  await assert.rejects(pending,/cancelled/);assert.deepEqual(host.writes,[]);assert.deepEqual(host.files.get('library.json'),initial());
 });
+test('staged owned archive copies count toward the finite selection budget before any managed write',async()=>{
+ const host=memoryHost(),oversized=new Uint8Array(40*1024*1024);
+ await assert.rejects(stageReadingPartsInstall(host,{parts:[{bytes:oversized,package:first.package}],entries:[]}),/too large to prepare together/);
+ assert.deepEqual(host.writes,[]);assert.equal(host.files.size,0);
+});

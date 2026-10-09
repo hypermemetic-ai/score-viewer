@@ -36,7 +36,12 @@ import {manualPassageScene} from './manual-passage-scene';
 import {ReadingPresentationController} from './reading-presentation';
 import {manualReaderView,retainManualReaderView} from './manual-reader-presentation';
 import {readingNotationControl} from './reading-notation-control';
-import {selectReadingNotation,type ReadingNotation} from './dual-reading-package';
+import {selectReadingNotation,prepareDualReadingPacket,type ReadingNotation} from './dual-reading-package';
+import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
+import {ReadingPartCatalog} from './reading-part-catalog';
+import {guitarProTracksMarkup} from './guitar-pro-tracks';
+import {scoreImportKind} from './score-import-kind';
+import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
 import {planSource,practicePercent} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
 import {loadCalibration,saveCalibration,exportCalibration,type CalibrationLoad,type ViewerCalibration} from './calibration';
@@ -69,7 +74,7 @@ const app=document.querySelector<HTMLElement>('#app')!;
 let entries:Entry[]=[],preferences:{version:1;libraryRotation:Rotation;displayRotation?:Rotation;bindings:Bindings;fingerBehavior:FingerBehavior;fingerPresentation:FingerPresentation;keyboardLayout:PhysicalKeyboardId;midi?:MidiMapping;midiBindings?:MidiBindings;controlBindings?:ControlBindings;freeViewControls?:FreeViewControlOverrides;lastWorkedEntryId?:string;audioOutput?:string;piano?:PianoPreferences}={version:1,libraryRotation:0,bindings:defaultBindings(),...fingerPreferences(),keyboardLayout:'conventional-piano'},input=new InputController();
 let pianoSettings=defaultPianoPreferences(),pianoWarning='',pianoOptions:PianoOptionsPanel|undefined;
 let current:{entry:Entry;package:ScorePackage;personal:PersonalState}|undefined;let toolbarVisible=false,timer:number|undefined,dialog:HTMLDialogElement|undefined,focusReturn:HTMLElement|undefined;
-let readingPresentation:ReadingPresentationController|undefined,readingViewError:string|undefined;
+let readingPresentation:ReadingPresentationController|undefined,readingViewError:string|undefined;const readingParts=new ReadingPartCatalog();
 let job:{cancel:()=>void;entryId:string;state:'working'|'installing'|'complete'|'failed';progress:string}|undefined;
 let selection:Seat|undefined,selectionPitchToggle=false;const editSequence=new EditSequence();let typingUntil=0,readerPreview:PracticePreview|undefined,readerGroups=new Set<string>(),readerBar=-1;const readerContacts=new PracticeContacts();let mainControls=readControlBindings(undefined,preferences);const controls=new ControlResolver(mainControls);const musicalSustain=new ObservedMidiSustain();let midiConnection:{source:string;generation:number}|undefined,readerFocused=true;let bindingOptions:OptionsBindingsPanel|undefined;let optionsNavigation:OptionsNavigation|undefined;let midiOptions:MidiOptionsPanel|undefined,audioOptions:AudioOptionsPanel|undefined;let midiTransition=0;let practiceOptionsCleanup:(()=>void)|undefined;let practiceFocusReturn:string|undefined;
 let calibration:CalibrationLoad;
@@ -113,9 +118,12 @@ function beginReading(entryId:string){
  readingOperation=op;job=running;practice?.pause();readingDialog(op);return op;
 }
 async function admitReading(bytes:Uint8Array,op:ReadingOperation){
- await readerAdmission.waitForIdle();checkReading(op);
- const p=await readerAdmission.import(bytes,{allowLegacyTempo:true});await readingCheckpoint(op);return p;
+ await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
+ const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:{signal:op.controller.signal}});await readingCheckpoint(op);
+ if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
+ return p;
 }
+function readingProgress(op:ReadingOperation,text:string){checkReading(op);op.running.progress=text;const status=op.dialog?.querySelector('.job');if(status)status.textContent=text;}
 function suspendReadingDialog(op:ReadingOperation){checkReading(op);op.dialog=undefined;closeDialog(false);}
 function finishReading(op:ReadingOperation,success:boolean){
  if(readingOperation!==op)return;
@@ -170,7 +178,7 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
  readerPages.clear();toolbarNavigation?.dispose();toolbarNavigation=undefined;librarySummaryPaintPending=false;
  app.innerHTML=`<section class="surface"><div class="library"><header><h1>Scores</h1><nav aria-label="Library actions">${instrumentPickerMarkup(preferences.keyboardLayout)}${button('Import','import','M')}${button('Rotate','rotate','R')}${button('Options','options',actionControlLabel(mainControls,'practiceSettings'))}${button('Exit','exit')}</nav></header><div class="scores" aria-label="Composers and scores"></div>${entries.length?'':'<p class="empty">Add a score to begin.<br><small>Import a .tuna score or a legacy .isoscore file.</small></p>'}<p class="job">${job?.state==='working'?esc(job.progress):''}</p></div></section>`;
  transformSurface(app.querySelector('.surface')!,preferences.libraryRotation);
- libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>{const summary=practiceSummaries.get(entry,preferences.keyboardLayout);return `${esc(entry.metadata.opusLabel??'')}${entry.metadata.piece?` · No. ${entry.metadata.piece}`:''}${entry.metadata.variant?` · ${esc(entry.metadata.variant)}`:''}${summary?` · Sections ${practicePercent(summary.sections)}%${summary.whole?' · Whole piece at goal':''}`:''}`;},preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
+ libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>{const summary=practiceSummaries.get(entry,preferences.keyboardLayout);return `${readingParts.summary(entry)?esc(readingParts.summary(entry))+' · ':''}${esc(entry.metadata.opusLabel??'')}${entry.metadata.piece?` · No. ${entry.metadata.piece}`:''}${entry.metadata.variant?` · ${esc(entry.metadata.variant)}`:''}${summary?` · Sections ${practicePercent(summary.sections)}%${summary.whole?' · Whole piece at goal':''}`:''}`;},preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
  const restore=libraryFocusElement(app,focusKey);if(restore&&!restore.hidden)restore.focus();else if(entries.length)libraryMenu.focus();else app.querySelector<HTMLElement>('[data-action=import]')?.focus();
 }
 function render(){practiceNavigation?.dispose();practiceNavigation=undefined;if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;renderPages();renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();}
@@ -195,7 +203,7 @@ function renderToolbar(){if(practice)return;if(!current)return;const {personal:s
 function reveal(focus=false){const changed=!toolbarVisible;toolbarVisible=true;if(current&&changed)renderToolbar();clearTimeout(timer);timer=window.setTimeout(()=>{if(!dialog&&!app.querySelector('.toolbar')?.contains(document.activeElement)){toolbarVisible=false;if(current)renderToolbar();}},3500);if(focus)app.querySelector<HTMLElement>('.toolbar button')?.focus();}
 async function loadPersonal(entry:Entry,p:ScorePackage){return loadPersonalJournal(host,entry,p);}
 function prepareReader(){readerBar=-1;readerContacts.clear();readerPreview=undefined;if(!current||!scoreCapabilities(current.package).pianoPractice)return;try{const plan=planSource(current.package);readerPreview=new PracticePreview(plan);readerGroups=new Set(plan.gestures.map(g=>g.id));}catch{readerPreview=undefined;}}
-function keyboardControl(p?:ScorePackage){if(p&&!scoreCapabilities(p).pianoPreparation)return '<span class="reading-instrument" aria-label="Instrument">Unknown instrument</span>';return `<select class="keyboard-select" data-keyboard aria-label="Instrument">${(['conventional-piano','janko-four-row'] as const).map(id=>`<option value="${id}" ${(p?(p.keyboardLayout??'janko-four-row'):preferences.keyboardLayout)===id?'selected':''}>${keyboardLabel(id)}</option>`).join('')}</select>`;}
+function keyboardControl(p?:ScorePackage){if(p&&!scoreCapabilities(p).pianoPreparation)return current?readingParts.control(entries,current.entry):'<span class="reading-instrument" aria-label="Instrument">Unknown instrument</span>';return `<select class="keyboard-select" data-keyboard aria-label="Instrument">${(['conventional-piano','janko-four-row'] as const).map(id=>`<option value="${id}" ${(p?(p.keyboardLayout??'janko-four-row'):preferences.keyboardLayout)===id?'selected':''}>${keyboardLabel(id)}</option>`).join('')}</select>`;}
 let keyboardChanging=false;
 function currentFingerPresentation(p=current?.package){return preferences.fingerPresentation==='replacement'&&p&&!p.fingerEligibility.eligible?'annotations':preferences.fingerPresentation;}
 async function chooseReference(actionLabel:'Calculate fingers'|'Practice'|'Use tempo'='Calculate fingers'):Promise<ReferencePerformanceTempo|undefined>{
@@ -211,7 +219,7 @@ async function preparePiano(bytes:Uint8Array,layout:PhysicalKeyboardId,entryId:s
  if(op)checkReading(op);else job?.cancel();const controller=op?.controller??new AbortController(),running=op?.running??{cancel:()=>controller.abort(),entryId,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Preparing finger choices…'};job=running;
  const d=op?.dialog??showDialog(`<h2>${transposeSteps===undefined?'Preparing fingers':'Transposing score'}</h2><p class="job" role="status">${running.progress}</p><div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');
  if(!op)d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
- if(op){await readerAdmission.waitForIdle();checkReading(op);}
+ if(op){await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);}
  const q=await runPianoReadiness({packageBytes:bytes,layout,personal,forceRecalculate,referenceTempo,transposeSteps,performingHandPolicy,intent:forceRecalculate?'calculate':'read-retained',signal:controller.signal,
   onProgress:progress=>{if(job!==running||running.state!=='working')return;running.progress=`Calculating finger choices ${progress.completed} / ${progress.total}…`;const label=d.querySelector('.job');if(label)label.textContent=running.progress;}},undefined,readerAdmission);
  if(job!==running||controller.signal.aborted){running.state='failed';if(dialog===d)closeDialog();throw Error('Calculation cancelled. Your score and choices are retained.');}
@@ -277,7 +285,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(activation!==scoreActivation)return;
  pitchInput.block();stopPerformance();practice?.close();practice=undefined;selection=undefined;selectionPitchToggle=false;
  readingPresentation=nextPresentation;readingViewError=nextViewError;if(nextViewError)notify(nextViewError);
- current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();prepareReader();resetInput();
+ readingParts.remember(next.entry,next.package);current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();prepareReader();resetInput();
  try{const clock=await host.midiClock();if(activation!==scoreActivation||current!==next)return;pitchInput.reset(clock);}catch(error){if(activation!==scoreActivation||current!==next)return;notify((error as Error).message);}
  if(context)await startPractice(context,admitted);else render();
  void refreshLibrarySummaries();
@@ -343,8 +351,8 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}
 }
 
-async function open(entry:Entry){const op=beginReading(entry.id);try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
- const prior=await admitReading(data,op);assertSelectedTransposition(entry,prior);const selected=prior.availablePresentations?.includes(op.keyboard)?await selectPresentation(prior,op.keyboard):undefined,
+async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id);try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
+ const prior=await admitReading(data,op);if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);const selected=prior.availablePresentations?.includes(op.keyboard)?await selectPresentation(prior,op.keyboard):undefined,
   personal=selected?await loadPersonal(entry,selected):prior.manifest.version===3?await loadPersonal(entry,prior):undefined,{q,running}=await prepareScore(data,op.keyboard,entry.id,personal,prior,op);
  const loadedPersonal=q.personal??await loadPersonal(entry,q.package),installed=q.package.reading?.dual?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal);await readingCheckpoint(op);
   toolbarVisible=false;await host.fullscreen(true);libraryMenu.selection.update(entries,preferences.lastWorkedEntryId);libraryMenu.selection.select(`score:${entry.id}`);preferences.lastWorkedEntryId=entry.id;
@@ -352,8 +360,55 @@ async function open(entry:Entry){const op=beginReading(entry.id);try{await readi
   finishReading(op,true);
  }catch(error){finishReading(op,false);throw error;}
 }
+
+async function chooseGuitarProTracks(inspection:GuitarProInspection,op:ReadingOperation):Promise<string[]|undefined>{
+ suspendReadingDialog(op);
+ return new Promise(resolve=>{const d=showDialog(guitarProTracksMarkup(inspection),'guitar-pro-tracks');let settled=false;
+  const done=(ids?:string[])=>{if(settled)return;settled=true;op.controller.signal.removeEventListener('abort',aborted);resolve(ids);if(dialog===d)closeDialog(false);},aborted=()=>done();
+  op.controller.signal.addEventListener('abort',aborted,{once:true});if(op.controller.signal.aborted){done();return;}
+  d.querySelector('[data-gp-cancel]')!.addEventListener('click',()=>done());d.addEventListener('close',()=>done(),{once:true});
+  d.querySelector('[data-gp-import]')!.addEventListener('click',()=>{const ids=[...d.querySelectorAll<HTMLInputElement>('[data-gp-track]:checked:not(:disabled)')].map(field=>field.dataset.gpTrack!);if(!ids.length||ids.length>8){d.querySelector('[data-gp-error]')!.textContent='Choose one to eight source parts.';return;}done(ids);});
+ });
+}
+async function importGuitarProScore(bytes:Uint8Array){
+ const op=beginReading('import-guitar-pro');try{
+  await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);readingProgress(op,'Finding source parts…');
+  const inspection=await inspectGuitarProSource(bytes,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)}),ids=await chooseGuitarProTracks(inspection,op);checkReading(op);
+  if(!ids){finishReading(op,false);return;}readingDialog(op);readingProgress(op,'Reading selected parts…');
+  const {frettedPreparationAssets}=await import('./fretted-preparation-assets');checkReading(op);
+  const assets=await frettedPreparationAssets(op.controller.signal);await readingCheckpoint(op);
+  const staged=await stageGuitarProParts(inspection,ids,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op),prepareAndAdmit:async(input,signal)=>{
+   checkReading(op);readingProgress(op,'Preparing ISO and TAB…');const packet=await prepareDualReadingPacket({score:input.score,metadata:input.metadata,retainedFiles:input.retainedFiles,createdAt:new Date().toISOString(),...assets},{signal});checkReading(op);return packet;
+  }});await readingCheckpoint(op);
+  const installed=await enqueue(async()=>{checkReading(op);return stageReadingPartsInstall(host,{parts:staged.parts,entries,
+   canCommit:()=>{try{checkReading(op);return true;}catch{return false;}},onCommitStarted:()=>{checkReading(op);op.running.state='installing';op.dialog?.querySelector<HTMLButtonElement>('[data-action=cancel-job]')?.setAttribute('disabled','');}
+  });});entries=installed.entries;const entry=installed.selected[0],part=staged.parts.find(part=>collectionId(part.package)===entry.id)!;
+  for(const selected of installed.selected){const prepared=staged.parts.find(part=>collectionId(part.package)===selected.id)!;readingParts.remember(selected,prepared.package);}
+  checkReading(op);toolbarVisible=false;libraryMenu.selection.update(entries,entry.id);libraryMenu.selection.select(`score:${entry.id}`);preferences.lastWorkedEntryId=entry.id;
+  await activateScore({entry,package:part.package,personal:await loadPersonal(entry,part.package)});await savePreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));finishReading(op,true);
+ }catch(error){
+  if(error instanceof ReadingPartsCommitUnconfirmed){
+   // The pointer may already have committed. Reconcile an actual readable
+   // library; never remove staged files or infer a rollback from a lost ack.
+   const saved=await readJson<{version:number;entries:Entry[]}>('library.json').catch(()=>undefined);
+   if(saved?.version===1&&Array.isArray(saved.entries)&&saved.entries.every(validEntryStorage))entries=saved.entries;
+  }
+  finishReading(op,false);throw error;
+ }
+}
+let partChanging=false;
+async function switchReadingPart(id:string){
+ const target=current,context=target&&guitarProContext(target.package);if(!target||!context)throw Error('This score has no admitted Guitar Pro source parts.');
+ const entry=readingParts.siblings(entries,target.entry).find(entry=>entry.id===id);if(!entry)throw Error('This source part is unavailable.');if(entry.id===target.entry.id)return;
+ if(partChanging||job?.state==='working'||job?.state==='installing')throw Error('A source part change is already running.');
+ const wasManual=practice instanceof ManualPracticeView,wasOptions=dialog?.dataset.kind==='options',openerKey=(document.activeElement as HTMLElement)?.dataset.optionsKey;partChanging=true;
+ try{await open(entry,context.groupId);if(current?.entry.id!==entry.id)return;if(wasManual){await startManualPractice();if(practice instanceof ManualPracticeView)await practice.action('free-view');}if(wasOptions)options('score');
+  if(openerKey==='readingPart'){if(!dialog&&!practice)reveal();(dialog??app).querySelector<HTMLElement>('[data-options-key=readingPart]')?.focus();}
+ }
+ finally{partChanging=false;}
+}
 async function importScore(){
- const bytes=await host.pickScore();if(!bytes)return;const op=beginReading('import');try{await readingCheckpoint(op);const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
+ const bytes=await host.pickScore();if(!bytes)return;if(scoreImportKind(bytes)==='guitar-pro'){await importGuitarProScore(bytes);return;}const op=beginReading('import');try{await readingCheckpoint(op);const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false;
  if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op);
@@ -425,7 +480,7 @@ function options(section?:string){
 
  let transpose={steps:p?getScoreTransposition(p):0,min:0,max:0,error:undefined as string|undefined};
  if(p&&scoreCapabilities(p).pianoPreparation)try{transpose={...transpose,...scoreTranspositionRange(p)};}catch(error){transpose.error=(error as Error).message;}
- const scoreOptions=current&&p&&s?scoreOptionsMarkup(current.entry,p,s,transpose,job):'';
+ const scoreOptions=current&&p&&s?scoreOptionsMarkup(current.entry,p,s,transpose,job,readingParts.control(entries,current.entry)):'';
  const sections:OptionsSection[]=[
   ...(activePractice?[{id:'practice',label:'Practice',content:activePractice.optionsMarkup()}]:[]),
   ...(scoreOptions?[{id:'score',label:'Score',content:scoreOptions}]:[]),
@@ -506,7 +561,7 @@ app.addEventListener('pointerdown',e=>{const control=(e.target as HTMLElement).c
 window.addEventListener('pointerup',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 window.addEventListener('pointercancel',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 app.addEventListener('change',e=>{const el=e.target as HTMLSelectElement;if(!current||!el.dataset.option)return;const v=current.personal.view,key=el.dataset.option as keyof typeof v;(v as any)[key]=['count','scale'].includes(key)?Number(el.value):el.value;renderPages();renderToolbar();void savePersonal();});
-document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();void savePersonal();}void savePreferences();return;}if(!current||!field.matches('dialog [data-history]'))return;const value=Number(field.value);void commitPersonal(current,latest=>{latest.calculatedVersion=value<0?undefined:value;latest.view.fingerSet='calculated';return latest;}).then(()=>{renderPages();renderToolbar();});});
+document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{notify(error.message);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();void savePersonal();}void savePreferences();return;}if(!current||!field.matches('dialog [data-history]'))return;const value=Number(field.value);void commitPersonal(current,latest=>{latest.calculatedVersion=value<0?undefined:value;latest.view.fingerSet='calculated';return latest;}).then(()=>{renderPages();renderToolbar();});});
 window.addEventListener('mousemove',e=>{if(current&&(e.clientY>innerHeight-36||e.clientX<20||e.clientX>innerWidth-20))reveal();});
 window.addEventListener('resize',()=>{if(dialog)fitDialog(dialog,orientation.rotation);if(practice)return;if(current)renderPages();else transformSurface(app.querySelector('.surface')!,orientation.rotation);});
 window.addEventListener('pagehide',()=>{if(job?.state==='working')job.cancel();readerAdmission.clear();});

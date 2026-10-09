@@ -83,7 +83,10 @@ export function viewportFit(w:number,h:number,v:ViewState,total:number,pageWidth
 }
 export function turnPage(v:ViewState,dir:1|-1,total:number,effectiveCount:number):ViewState{return {...v,page:Math.max(0,Math.min(total-1,v.page+dir*(v.advance==='group'?effectiveCount:1)))};}
 export const rotate=(r:Rotation)=>(r+90)%360 as Rotation;
-export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>;transposition?:ScoreTranspositionSelection}
+/** Descriptive discovery only. Actual provider replay is required before this
+ * hint can supply an Instrument choice or family. */
+export interface GuitarProEntryHint {version:'guitar-pro-entry-hint-v1';groupId:string;inputSha256:string;sourceTrackId:string;sourceName?:string}
+export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>;transposition?:ScoreTranspositionSelection;guitarPro?:GuitarProEntryHint}
 export function validEntryStorage(e:Entry):boolean {
  const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v),
    packageName=(v:unknown)=>typeof v==='string'&&/^package-[a-f0-9]{64}\.isoscore$/.test(v),
@@ -92,6 +95,9 @@ export function validEntryStorage(e:Entry):boolean {
      key.startsWith(`state-${e.id}`)&&typeof file==='string'&&/^state-version-[a-f0-9]{64}\.json$/.test(file));
  if(!e||!/^[a-f0-9]{64}$/.test(e.id)||!packageName(e.file)||!stateMap(e.personalFiles)||
    e.presentations!==undefined&&!Array.isArray(e.presentations)||e.retainedPackages!==undefined&&!Array.isArray(e.retainedPackages))return false;
+ if(e.guitarPro!==undefined&&(!object(e.guitarPro)||e.guitarPro.version!=='guitar-pro-entry-hint-v1'||!/^[a-f0-9]{64}$/.test(e.guitarPro.groupId)||
+  !/^[a-f0-9]{64}$/.test(e.guitarPro.inputSha256)||!/^\d{1,6}$/.test(e.guitarPro.sourceTrackId)||
+  e.guitarPro.sourceName!==undefined&&(typeof e.guitarPro.sourceName!=='string'||e.guitarPro.sourceName.length>1024)))return false;
  const packages=[e.file,...(e.presentations??[]),...(e.retainedPackages??[])];
  return packages.every(packageName)&&(e.transposition===undefined||validTranspositionSelection(e.transposition,e.file,packages))&&(e.editionPersonalFiles===undefined||object(e.editionPersonalFiles)&&
    Object.entries(e.editionPersonalFiles).every(([file,map])=>packageName(file)&&packages.includes(file)&&stateMap(map)));

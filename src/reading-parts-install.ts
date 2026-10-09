@@ -1,5 +1,7 @@
 import {admittedDualArchiveSha256,hashBytes,type ScorePackage} from './package';
 import {selectReadingNotation} from './dual-reading-package';
+import {guitarProContext} from './guitar-pro-provider';
+import {conservativeMaterialBytes,PACKAGE_MATERIAL_BUDGET_BYTES} from './package-material';
 import {collectionId,initialPersonal,personalStorageName,validEntryStorage,type Entry} from './state';
 
 interface ManagedHost {read(name:string):Promise<Uint8Array|null>;write(name:string,bytes:Uint8Array):Promise<void>}
@@ -18,12 +20,16 @@ export async function stageReadingPartsInstall(host:ManagedHost,request:{
  if(!Array.isArray(request.parts)||request.parts.length<1||request.parts.length>8)throw Error('Choose one to eight source parts.');
  // All mutable bytes/library pointers are owned before the first await. The
  // source/view graph is the privately admitted immutable context, not a clone.
- const canCommit=request.canCommit,onCommitStarted=request.onCommitStarted,requestedPrior=structuredClone(request.entries),parts=request.parts.map(part=>{
+ const material=()=>{if(conservativeMaterialBytes({selection:request.parts,parts,prior:requestedPrior},PACKAGE_MATERIAL_BUDGET_BYTES)>PACKAGE_MATERIAL_BUDGET_BYTES)
+  throw Error('This selection is too large to prepare together. Import fewer tracks.');};
+ const canCommit=request.canCommit,onCommitStarted=request.onCommitStarted,requestedPrior=structuredClone(request.entries),parts:Array<{p:ScorePackage;sha256:string;bytes:Uint8Array;id:string;source:ReturnType<typeof guitarProContext>}>=[];
+ material();for(const part of request.parts){
   if(!(part.bytes instanceof Uint8Array)||part.bytes.byteLength>50_000_000)throw Error('Source archive exceeds the supported package bound.');
   const p=selectReadingNotation(part.package,'iso'),sha256=admittedDualArchiveSha256(p);
   if(!sha256)throw Error('The source part has no complete admitted archive identity.');
-  return {p,sha256,bytes:new Uint8Array(part.bytes),id:collectionId(p)};
- }),check=()=>{if(canCommit&&!canCommit())throw Error('Import cancelled. Your library and choices are retained.');};
+  parts.push({p,sha256,bytes:new Uint8Array(part.bytes),id:collectionId(p),source:guitarProContext(p)});material();
+ }
+ const check=()=>{if(canCommit&&!canCommit())throw Error('Import cancelled. Your library and choices are retained.');};
  if(new Set(parts.map(p=>p.id)).size!==parts.length||requestedPrior.some(e=>!validEntryStorage(e)))
   throw Error('Invalid or duplicate source parts; the library is retained.');
  const staged:Array<{entry:Entry;bytes:Uint8Array;personalFile?:string;personalBytes?:Uint8Array}>=[];
@@ -44,7 +50,8 @@ export async function stageReadingPartsInstall(host:ManagedHost,request:{
   }
   const personalBytes=encoder.encode(JSON.stringify(initialPersonal(part.p))),personalKey=personalStorageName(part.id,part.p),
    personalFile=`state-version-${await hashBytes(encoder.encode(crypto.randomUUID()+await hashBytes(personalBytes)))}.json`;
-  check();const entry:Entry={id:part.id,file,metadata:part.p.manifest.metadata,importedAt:new Date().toISOString(),personalFiles:{[personalKey]:personalFile}};
+  check();const source=part.source,entry:Entry={id:part.id,file,metadata:part.p.manifest.metadata,importedAt:new Date().toISOString(),personalFiles:{[personalKey]:personalFile},
+   ...(source?{guitarPro:{version:'guitar-pro-entry-hint-v1' as const,groupId:source.groupId,inputSha256:source.inputSha256,sourceTrackId:source.sourceTrackId,...(source.sourceName?{sourceName:source.sourceName}:{})}}:{})};
   if(!validEntryStorage(entry))throw Error('The source part has an invalid storage identity.');
   staged.push({entry,bytes:part.bytes,personalFile,personalBytes});
  }
