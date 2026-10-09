@@ -32,6 +32,14 @@ export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:strin
 export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;transposition?:ScoreTransposition;transpositionOriginal?:ScorePackage;archiveSha256?:string;reading?:ReadingContent}
 
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
+// Only a completed ordinary cold import can bind an archive to these frozen
+// dual source identities. Wrapper fields and saved hashes grant no authority.
+const admittedDualArchives=new WeakMap<Manifest,{score:QuantizedGridScore;sha256:string}>();
+export function admittedDualArchiveSha256(p:ScorePackage):string|undefined {
+ const record=admittedDualArchives.get(p.manifest);
+ if(!record||record.score!==p.score||!Object.isFrozen(p.manifest)||!Object.isFrozen(p.score))return;
+ try{selectReadingNotation(p,p.reading?.dual?.notation??'iso');return record.sha256;}catch{return;}
+}
 function fail(s:string):never{throw Error(s);}
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
 function passiveSvg(svg:string,seats:Seat[],page:number){
@@ -251,6 +259,9 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  const parse=(name:string)=>{if(!files[name])fail(`Missing ${name}`);try{return JSON.parse(strFromU8(files[name]));}catch{return fail(`Invalid JSON: ${name}`);}};
  const m=parse('manifest.json') as Manifest;
  if(m.format!=='iso-score'||![1,2,3].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||!Array.isArray(m.metadata.provenance)||m.metadata.provenance.some(v=>typeof v!=='string')||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
+ // Unzip and this owned digest capture happen before the first member await.
+ // A later caller mutation cannot bind different bytes to admitted dual ink.
+ const dualArchiveHash=m.version===3&&m.reading?.version==='instrument-reading-package-v2'?hashBytes(new Uint8Array(bytes)):undefined;
  if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
  for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);}
  let referenceMidi:Uint8Array|undefined;
@@ -263,7 +274,9 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   else pages.forEach((svg,page)=>passiveSvg(svg,[],page));
   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
   freezeSource(score);
-  return {manifest:m,score,seats:[],pages,files,reading,archiveSha256:await hashBytes(bytes),sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
+  const archiveSha256=await(dualArchiveHash??hashBytes(bytes));
+  if(reading.dual)admittedDualArchives.set(m,{score,sha256:archiveSha256});
+  return {manifest:m,score,seats:[],pages,files,reading,archiveSha256,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    generationAvailable:false,fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
  }
  if(m.reading!==undefined)fail('Legacy piano packages cannot carry a musical reading descriptor.');
