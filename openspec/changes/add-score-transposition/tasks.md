@@ -20,7 +20,7 @@
 ## 4. Combined source review
 
 - [x] 4.1 Run the full viewer suite, configured TS/Vite build and strict OpenSpec validation; inspect complete original and transposed pages plus selection/active/Free view strips on both keyboards, record actual browser/worker/cold evidence and original-data round-trip preservation without claiming native or physical acceptance.
-- [ ] 4.2 Commit/push the scoped combined source and planning branch, obtain independent review through the ordinary PR path, fix findings and merge; prove the exact merged tree matches the reviewed source and leave task checkboxes reflecting only established evidence.
+- [x] 4.2 Commit/push the scoped combined source and planning branch, obtain independent review through the ordinary PR path, fix findings and merge; prove the exact merged tree matches the reviewed source and leave task checkboxes reflecting only established evidence.
 
 ## 5. Reviewed paired delivery and recipient activation
 
@@ -28,3 +28,5 @@
 - [ ] 5.2 Build, independently validate and atomically publish the complete Windows x64/universal Mac pair through the existing lane; verify extracted recipient assets and all existing native/font/startup/signature gates, retaining precise host/origin/hardware limits and the previous complete pair on failure.
 - [ ] 5.3 Preserve the current Windows app, full data/bank and shortcut by streaming inventory, install additively and activate the reviewed recipient through the usual shortcut; inspect actual original/transposed score and practice behavior, verify 0 restoration and preserved original journals/preferences, and record the Mac download and exact installed pin.
 - [ ] 5.4 Merge tracking-only documentation closeout with final delivery/preservation receipts and verification limits, stop all task-owned temporary processes and run final git-status checks for worked checkouts; preserve exact runtime/carrier references separately from documentation main without autoarchiving.
+
+Tracking draft: PR25 merged at `fa6593feff0a6c103db0fbd5bd12b286c92fe2a6`, tree `05e78e699d3a9fb2a55eb1d11c3707aa8a25af01`, identical to reviewed `bd245b5c9a00682ffb3d46ee4a450b980cc6e02e`. Parent selected reviewed carrier `ca6e4a44eeff9ea5fd3d2144acacd3d5c9d61c55` on `release/viewer-score-transposition-20261008` (review-only ISO PR340), with ISO `d79292fb0c80aa6e880d61acc641fcb8e8c602e4`. Carrier preparation is proven; 5.1–5.4 remain unchecked here until the parent records its unified native evidence. Platform, publication and Windows activation receipts are pending, and source/browser checks do not establish physical acceptance.
