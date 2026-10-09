@@ -8,7 +8,7 @@ The application is copied from `score-viewer/` at ISO revision `da93cf9e0359d861
 
 ## Transitional shared dependency
 
-`vendor/iso-notation` is a private Git submodule pinned to the same full revision as the extracted application. Existing source-level imports are rerouted there. It supplies the musical model, fingering calculators, full-score engraving, source fixtures and historical studio integrations. No engine or calculator is duplicated as viewer-owned code. The fragment renderer being developed for the learning application is not a substitute for these full-score responsibilities.
+`vendor/iso-notation` is a private Git submodule pinned to the reviewed full revision recorded as `dependencyRevision` in the provenance file. The original application `sourceRevision` remains its extraction identity. Existing source-level imports are rerouted there. It supplies the musical model, fingering calculators, full-score engraving, source fixtures and historical studio integrations. No engine or calculator is duplicated as viewer-owned code. The fragment renderer being developed for the learning application is not a substitute for these full-score responsibilities.
 
 `npm run build` and `npm test` verify the declared pin, the tracked gitlink and the dependency's tracked cleanliness before execution. Install dependencies with `npm ci --ignore-scripts`; build explicitly afterward. The test command limits Node file concurrency to two. `@tonejs/midi@2.0.28` is an explicit development dependency for the existing score/studio test closure; it previously resolved from the ISO root. Existing application dependencies retain their locked versions.
 

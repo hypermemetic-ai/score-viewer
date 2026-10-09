@@ -1,3 +1,4 @@
+import {requirePianoEvent} from './piano-event';
 import {DOMParser} from '@xmldom/xmldom';
 import type {ScorePackage,Seat} from './package';
 
@@ -88,7 +89,7 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>):
     let previous=element.previousSibling;while(previous&&previous.nodeType!==1)previous=previous.previousSibling;
     const rect=has(group,'janko-reading-head')?descendants(group).find(el=>has(el,'janko-knockout')):previous?.nodeType===1&&has(previous as Element,'janko-knockout')?previous as Element:undefined;
     const em=seat.fontSize*4/3,box:Box=rect?[number(rect,'x'),number(rect,'y'),number(rect,'x')+number(rect,'width'),number(rect,'y')+number(rect,'height')]:[seat.x-em*.4,seat.baseline-em*.8,seat.x+em*.4,seat.baseline+em*.15];
-    const note=notes.get(seat.ownerIds[0])!;
+    const note=requirePianoEvent(notes.get(seat.ownerIds[0])!);
     return {seat,element:group,column:group.hasAttribute('data-note-x')?number(group,'data-note-x'):seat.x,box,tick:note.startTick,release:note.startTick+note.durationTicks,hand:note.hand,pitch:note.pitch.octave*12+note.pitch.pitchClass,voices:JSON.stringify(note.sourceProvenance?.voices??[note.voice??null])};
    });
    const stems:Stem[]=elements.filter(el=>has(el,'janko-stem')||has(el,'janko-hollow-stem')).flatMap((element,index)=>{

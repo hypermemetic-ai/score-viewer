@@ -1,3 +1,5 @@
+import {requirePianoEvent} from './piano-event';
+import {requirePianoCapability} from './score-capabilities';
 import {attainedRate,readManualAttainment,claimIdentity,type ManualAttainment} from './practice-attainment';
 import{MidiSoundingNotes,type MidiStream,type PracticeMidiSetup}from'./midi-sustain';
 import type{MidiCC}from'./midi';
@@ -38,10 +40,11 @@ export function planPractice(p:ScorePackage,partition:PracticePartition='connect
  const plan=planSource(p,partition);scorePulseGrid(plan,plan.barTicks);return plan;
 }
 export function planSource(p:ScorePackage,partition:PracticePartition='connection-boundary-v1'):PracticePlan {
+ requirePianoCapability(p,'pianoPractice');
  const bars=p.score.sourceBarTicks;if(!bars||bars.length<2||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||bars.some((b,i)=>!Number.isFinite(b)||(i>0&&b<=bars[i-1])))throw Error('This score has no complete written-measure map.');
  const barFor=(tick:number)=>Math.max(0,bars.findIndex((b,i)=>i<bars.length-1&&tick>=b&&tick<bars[i+1]));
  const ownerGroup=new Map<string,string>(),groups=new Map<string,Gesture>(),attacks=new Map<string,PracticeAttack>();
- for(const n of p.score.notes){const bar=barFor(n.startTick),group=`${bar}:${n.hand}`,pitch=n.pitch.octave*12+n.pitch.pitchClass,id=`${n.startTick}:${pitch}`;ownerGroup.set(n.id,group);let g=groups.get(group);if(!g){g={id:group,bar,hand:n.hand,start:n.startTick,end:n.startTick+n.durationTicks,owners:[],attackIds:[]};groups.set(group,g);}g.start=Math.min(g.start,n.startTick);g.end=Math.max(g.end,n.startTick+n.durationTicks);g.owners.push(n.id);if(!g.attackIds.includes(id))g.attackIds.push(id);
+ for(const event of p.score.notes){const n=requirePianoEvent(event),bar=barFor(n.startTick),group=`${bar}:${n.hand}`,pitch=n.pitch.octave*12+n.pitch.pitchClass,id=`${n.startTick}:${pitch}`;ownerGroup.set(n.id,group);let g=groups.get(group);if(!g){g={id:group,bar,hand:n.hand,start:n.startTick,end:n.startTick+n.durationTicks,owners:[],attackIds:[]};groups.set(group,g);}g.start=Math.min(g.start,n.startTick);g.end=Math.max(g.end,n.startTick+n.durationTicks);g.owners.push(n.id);if(!g.attackIds.includes(id))g.attackIds.push(id);
  let a=attacks.get(id);if(!a){a={id,tick:n.startTick,end:n.startTick+n.durationTicks,midi:pitch+12,bar,owners:[],groups:[]};attacks.set(id,a);}a.end=Math.max(a.end,n.startTick+n.durationTicks);a.owners.push(n.id);if(!a.groups.includes(group))a.groups.push(group);
  }
  const ordered=[...attacks.values()].sort((a,b)=>a.tick-b.tick||a.midi-b.midi),gestures=[...groups.values()].sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));

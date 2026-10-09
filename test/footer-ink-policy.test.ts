@@ -3,7 +3,8 @@ import {DOMParser} from '@xmldom/xmldom';
 import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady,verifyFooterAssets,annotationInkPolicyFor,footerGlyphPoints,applyAnnotationInkPolicy} from '../src/annotation-ink-policy';
 import {svgClassStyles,resolvedSvgStyle} from '../src/svg-style';
 import {actualPageObstacles,boxesOverlap} from '../src/svg-annotation-clearance';
-import {hashBytes,importPackage} from '../src/package';import {ensurePianoReady} from '../src/piano-readiness';
+import {unzipSync,strFromU8,strToU8} from 'fflate';
+import {hashBytes,importPackage,archivePackage} from '../src/package';import {ensurePianoReady} from '../src/piano-readiness';
 import {preparationRequestIdentity} from '../src/piano-preparation-identity';import {pianoRequestAuthority} from '../src/piano-request-authority';
 const css='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';
 const page=(attrs='',text='Page 2 of 3')=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${css}</style><text class="janko-page-num" x="575" y="830" ${attrs}>${text}</text></svg>`;
@@ -54,4 +55,17 @@ test('independently frozen V2/receiptV1 edition retains exact historical hash an
  assert.equal(fresh.status,'editable','message' in fresh?fresh.message:undefined);if(fresh.status!=='editable')return;
  assert.equal(fresh.package.preparationIdentity!.version,'viewer-piano-preparation-v3');assert.equal(fresh.package.calculatedHandReceipt!.version,'viewer-calculated-hand-edition-v2');
  assert.deepEqual(annotationInkPolicyFor(fresh.package),ANNOTATION_INK_POLICY);assert.deepEqual(fresh.package.files['source-score.json'],p.files['source-score.json']);
+});
+
+
+test('legacy calculated inventory normalization refuses changed pitch or unknown discriminator after repinning archive hashes',async()=>{
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url)));
+ for(const mutate of [(owner:Record<string,unknown>)=>{owner.eventKind='other';},
+   (owner:Record<string,unknown>)=>{owner.eventKind='unpitched';owner.soundingPitch=null;owner.referencePitch=owner.pitch;},
+   (owner:Record<string,unknown>)=>{owner.pitch=Number(owner.pitch)+1;}]){
+  const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])),receipt=JSON.parse(strFromU8(files[m.calculatedHandReceipt]));
+  mutate(receipt.sourceInventory.owners[0]);files[m.calculatedHandReceipt]=strToU8(JSON.stringify(receipt));
+  m.files[m.calculatedHandReceipt]=await hashBytes(files[m.calculatedHandReceipt]);
+  await assert.rejects(importPackage(archivePackage(m,files)),/inventory|receipt differs/);
+ }
 });

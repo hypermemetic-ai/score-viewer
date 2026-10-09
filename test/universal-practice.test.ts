@@ -1,3 +1,5 @@
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
+import {requirePianoEvent} from '../src/piano-event';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
@@ -50,7 +52,7 @@ test('unavoidable long hold retains bounded groups and the same source action, n
  assert.ok(plan.chunks[1].pattern.includes('carry'));
 });
 test('carry setup keeps the original owner and onset, is not a matched attack, and its release is assessed',()=>{
- const p=score();p.score.notes[0].durationTicks=p.score.totalTicks;p.score.notes[0].pitch={...p.score.notes[0].pitch,octave:5};p.score.notes[0].hand='RH';const plan=planPractice(p),state=initialPractice(plan);state.working=104;
+ const p=score();p.score.notes[0].durationTicks=p.score.totalTicks;requirePitchedEvent(p.score.notes[0]).pitch={...requirePitchedEvent(p.score.notes[0]).pitch,octave:5};requirePianoEvent(p.score.notes[0]).hand='RH';const plan=planPractice(p),state=initialPractice(plan);state.working=104;
  const session=new PracticeSession(plan,plan.chunks[1],state,true),held=plan.attacks[0];
  assert.deepEqual(session.carryIn.map(a=>a.id),[held.id]);assert.equal(session.events.length,4);
  assert.throws(()=>session.ready(0),/earlier held/);assert.equal(session.phase,'ready');
@@ -60,7 +62,7 @@ test('carry setup keeps the original owner and onset, is not a matched attack, a
  const manual=new PracticeSession(plan,plan.chunks[1],state,false);assert.throws(()=>manual.ready(0),/earlier held/);manual.ready(0,new Set(),true);manual.update(manual.startMs+(manual.chunk.end-manual.startTick)*manual.tickMs);assert.equal(manual.phase,'complete');assert.equal(manual.matched.size,0);
 });
 test('carry release obligation ends at its actual source end inside the selected passage',()=>{
- const p=score();p.score.notes[0].durationTicks=1008;p.score.notes[0].pitch={...p.score.notes[0].pitch,octave:5};const plan=planPractice(p),state=initialPractice(plan),run=new PracticeSession(plan,plan.chunks[1],state,true),held=run.carryIn[0];state.working=104;
+ const p=score();p.score.notes[0].durationTicks=1008;requirePitchedEvent(p.score.notes[0]).pitch={...requirePitchedEvent(p.score.notes[0]).pitch,octave:5};const plan=planPractice(p),state=initialPractice(plan),run=new PracticeSession(plan,plan.chunks[1],state,true),held=run.carryIn[0];state.working=104;
  run.ready(0,new Set([held.midi]));run.update(run.startMs);run.release(held.midi,run.startMs+(held.end-run.startTick)*run.tickMs);assert.notEqual(run.phase,'error');assert.equal(held.end,1008);
 });
 test('a held final-bar tie keeps the final five-bar passage together; legacy fixed-four evidence stays pinned',()=>{

@@ -15,4 +15,6 @@ New clones should use `git clone --recurse-submodules`. The pinned private ISO s
 
 The viewer owns `src/`, `src-tauri/`, its tests and application assets. Notation, the score format, editorial tools and engraving remain ISO-owned; `vendor/iso-notation` is an explicitly temporary, full-revision source dependency for those modules and the calculator. It is not a new permanent public API. Format conversion belongs to [score-converter](https://github.com/hypermemetic-ai/score-converter); the interval-learning application belongs to [learning-app](https://github.com/hypermemetic-ai/learning-app). The fingering calculator's separate repository extraction is pending.
 
+Common instrument reading and local MusicXML preparation are described in [instrument reading](docs/instrument-reading.md).
+
 See [migration and native delivery boundaries](docs/migration.md), [source provenance](docs/source-provenance.json) and [the immediate practice repair handoff](docs/practice-repair-handoff.md). The extracted [historical application README](docs/source-viewer-readme.md) describes the original accepted source and its delivery history; paths and installation claims there refer to the earlier monorepo.

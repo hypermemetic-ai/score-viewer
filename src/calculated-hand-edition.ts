@@ -64,10 +64,31 @@ export async function prepareCalculatedEdition(p:ScorePackage,layer:FingerLayer,
  return{result,recipe:finalizeCalculatedHandRenderingRecipe(recipe,result.recipeBaseline),receipt:receiptFor(result,ANNOTATION_INK_POLICY,p.transposition?.sha256)};
 }
 
+/** Frozen receipt bytes stay intact. Historical pitched inventory records
+ * gain their discriminator only at this passive evidence boundary. */
+function normalizeCalculatedReceipt(raw:unknown):CalculatedHandReceipt {
+ const r=structuredClone(raw) as CalculatedHandReceipt;
+ if(!r?.sourceInventory||!Array.isArray(r.sourceInventory.owners)||!Array.isArray(r.sourceInventory.members))
+  throw Error('Calculated receipt has an incomplete source inventory.');
+ for(const record of [...r.sourceInventory.owners,...r.sourceInventory.members]){
+  const o=record as unknown as Record<string,unknown>;
+  if(o.eventKind===undefined){
+   if(typeof o.pitch!=='number'||!Number.isFinite(o.pitch)||'referencePitch' in o||'soundingPitch' in o)
+    throw Error('Legacy calculated inventory has contradictory pitch facts.');
+   o.eventKind='pitched';
+  }else if(o.eventKind==='pitched'){
+   if(typeof o.pitch!=='number'||!Number.isFinite(o.pitch)||'referencePitch' in o||'soundingPitch' in o)
+    throw Error('Calculated pitched inventory has contradictory pitch facts.');
+  }else if(o.eventKind!=='unpitched'||'pitch' in o||o.soundingPitch!==null||typeof o.referencePitch!=='number'||!Number.isFinite(o.referencePitch))
+   throw Error('Calculated inventory has an unknown or contradictory event kind.');
+ }
+ return r;
+}
+
 /** Cold admission is an actual source-owned engine replay with no optimizer.
  * The saved ledger or its hashes cannot substitute for source/paint audit. */
 export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seatBytes:Uint8Array):Promise<CalculatedHandReceipt>{
- const r=raw as CalculatedHandReceipt,inkPolicy=(r?.version==='viewer-calculated-hand-edition-v2'||r?.version==='viewer-calculated-hand-edition-v3')?validateAnnotationInkPolicy(r.annotationInkPolicy):undefined;
+ const r=normalizeCalculatedReceipt(raw),inkPolicy=(r?.version==='viewer-calculated-hand-edition-v2'||r?.version==='viewer-calculated-hand-edition-v3')?validateAnnotationInkPolicy(r.annotationInkPolicy):undefined;
  if(r?.version!=='viewer-calculated-hand-edition-v1'&&!inkPolicy)throw Error('Unsupported calculated edition receipt.');
  if(!!p.transposition!==(r?.version==='viewer-calculated-hand-edition-v3')||p.transposition&&r.version==='viewer-calculated-hand-edition-v3'&&r.transpositionSha256!==p.transposition.sha256)throw Error('Calculated receipt has another transposition authority.');
  if(inkPolicy)await ensureAnnotationInkPolicyReady(inkPolicy);
@@ -79,7 +100,7 @@ export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seat
   identity=await createHandPresentationIdentity(inputs,owners);
  await validateHandPresentationAgainstSource(source,p.score,identity,operatorRequirements);
  const replay=await prepareCalculatedHandPresentation(source,owners,recipe,inputs,operatorRequirements),expected=receiptFor(replay,inkPolicy,p.transposition?.sha256);
- if(!same(raw,expected))throw Error('Calculated edition receipt differs from original-source actual paint, coverage or annotation geometry.');
+ if(!same(r,expected))throw Error('Calculated edition receipt differs from original-source actual paint, coverage or annotation geometry.');
  if(!same(p.score,replay.score)||p.pages.length!==replay.pages.length||p.pages.some((page,i)=>page!==replay.pages[i])||
   new TextDecoder('utf-8',{fatal:true}).decode(seatBytes)!==JSON.stringify(replay.seats)||!same(p.seats,replay.seats))
   throw Error('Calculated edition pages or seats differ from its saved complete hand-map replay.');
