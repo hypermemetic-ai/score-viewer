@@ -68,7 +68,7 @@ The final replacement carrier is `e6cdb2e58b83311b206109959e8e0a52953191f0`, tre
 | Application/data/bank/preferences/journals/progress preservation | **PASSED** full final 812-file streaming audit and 76 actual small readbacks. Every original nonlibrary file, full 718-file bank and prior application remain exact; only two No.14 library pointers change to identical-content personal versions. |
 | Usable final universal Mac download | **PASSED** immutable URL below and independently verified actual served ZIP. |
 | Owned-process cleanup | **PASSED** no task-owned temporary processes; the requested viewer and protected existing publication service remain live. |
-| Ordinary final tracking PR | **PENDING** independent review/merge of this docs-only closeout; no runtime identity changes or autoarchive. |
+| Documentation closeout | Records the accepted result; its reviewed merge changes no runtime identity and does not archive an OpenSpec change. |
 
 | Final served packet | Verified bytes | SHA256 |
 | --- | --- | --- |
