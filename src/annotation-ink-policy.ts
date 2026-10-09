@@ -68,11 +68,11 @@ export function assertAnnotationInkPolicyReady(policy:ViewerAnnotationInkPolicy)
   if(!loaded||loaded.status!=='loaded'||matches.length!==1||matches[0]!==loaded)throw Error('The measured footer font family is unavailable or ambiguous.');
  }
 }
-/** Only policyV2 receipt dispatch; old drawing/hashes remain untouched. */
+/** Explicit measured-policy receipt dispatch; old drawing/hashes remain untouched. */
 export function annotationInkPolicyFor(p:{calculatedHandReceipt?:unknown;files?:Record<string,Uint8Array>;manifest?:{calculatedHandReceipt?:string}}):ViewerAnnotationInkPolicy|undefined{
  let r=p.calculatedHandReceipt as any;
  if(!r&&p.manifest?.calculatedHandReceipt){const b=p.files?.[p.manifest.calculatedHandReceipt];if(b)r=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(b));}
- if(r?.version==='viewer-calculated-hand-edition-v2')return validateAnnotationInkPolicy(r.annotationInkPolicy);
+ if(r?.version==='viewer-calculated-hand-edition-v2'||r?.version==='viewer-calculated-hand-edition-v3')return validateAnnotationInkPolicy(r.annotationInkPolicy);
  return;
 }
 export const footerStyle={

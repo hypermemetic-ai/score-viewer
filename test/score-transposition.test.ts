@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {strToU8} from 'fflate';
+import {DOMParser} from '@xmldom/xmldom';
 import {ensurePianoReady} from '../src/piano-readiness';
 import {archivePackage,hashBytes,importPackage} from '../src/package';
 import {publishPreparedNative,publishPackage} from '../src/publication';
@@ -14,6 +15,9 @@ import {resolveJankoOptions,resolveJankoTokens} from '../vendor/iso-notation/src
 import {SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {SourceHandRequirement} from '../vendor/iso-notation/src/model/physical-source-constraints';
+import {transferStudy,boundaryStudy,sourcePackage,calculatedStudy} from './support/hand-edition-fixture';
+import {annotationInkPolicyFor,ANNOTATION_INK_POLICY} from '../src/annotation-ink-policy';
+import {actualPageObstacles,boxesOverlap} from '../src/svg-annotation-clearance';
 async function prepared({reference=true,recipe=true,dual=false,leap=false}={}){
   const source:QuantizedGridScore&{sourceHandRequirements:SourceHandRequirement[]}={id:'authored-readiness-piano',title:'Piano study',composer:'Fixture',
     ticksPerBeat:48,totalTicks:192,sourceBarTicks:[0,192],productionLayout:true,notes:[48,50,52,53,55,57].map((pitch,i)=>({id:`owner-${i}`,
@@ -46,7 +50,7 @@ async function prepared({reference=true,recipe=true,dual=false,leap=false}={}){
 }
 
 test('complete absolute pitch transformation preserves timing, source owners and relation facts; unsupported projections refuse',async()=>{
- const {source}=await prepared(),s=structuredClone(source);
+ const {source,p:base}=await prepared(),s=structuredClone(source);
  s.repeatTies=[{id:'repeat-tie',fromNoteId:'owner-0',toNoteId:'owner-0',fromEventId:'from',toEventId:'to',fromTick:24,toTick:192,
   pitch:{octave:4,pitchClass:0},voice:'rh',fromBar:1,toBar:2,sourceFile:'authored.ly'}];
  s.writtenPresentation={sourceScoreId:s.id,sourceHash:'a'.repeat(64),performedTotalTicks:384,writtenBars:1,performedBars:2,repeats:[],occurrences:[],
@@ -67,6 +71,9 @@ test('complete absolute pitch transformation preserves timing, source owners and
  assert.deepEqual(s,before);
  const aliased=structuredClone(source);delete (aliased as any).sourceHandRequirements;aliased.notes[1].pitch=aliased.notes[0].pitch;
  const shiftedAlias=transposeScore(aliased,1);assert.deepEqual(shiftedAlias.notes[0].pitch,{octave:4,pitchClass:1});assert.deepEqual(shiftedAlias.notes[1].pitch,shiftedAlias.notes[0].pitch);assert.throws(()=>transposeScore(s,88),/range/);assert.throws(()=>transposeScore(s,1.5),/whole number/);
+ const outside=structuredClone(source);delete (outside as any).sourceHandRequirements;outside.notes=[{...outside.notes[0],pitch:{octave:8,pitchClass:3}}];
+ const reading={...base,score:outside,sourceScore:outside};assert.deepEqual(scoreTranspositionRange(reading),{min:-90,max:-3});
+ assert.deepEqual(transposeScore(outside,-3).notes[0].pitch,{octave:8,pitchClass:0});
  assert.throws(()=>transposeScore({...s,relativePresentation:{} as any},1),/relative/);
  assert.throws(()=>transposeScore({...s,unknownPitch:48} as any,1),/unsupported pitch-bearing/);
  const stale=structuredClone(s);(stale as any).sourceHandRequirements[0].guard.pitch++;assert.throws(()=>transposeScore(stale,1),/stale source hand guard/);
@@ -81,7 +88,7 @@ for(const keyboard of ['janko-four-row','conventional-piano'] as const)test(`${k
  assert.deepEqual(q.layer.attacks.map(a=>a.hand),original.source.notes.map(n=>n.hand));
  assert.deepEqual(q.layer.attacks.map(a=>a.pitch),original.source.notes.map(n=>n.pitch.octave*12+n.pitch.pitchClass+1));
  assert.notDeepEqual(q.package.pages,original.p.pages);assert.notDeepEqual(q.package.seats,original.p.seats);
- assert.deepEqual(getOriginalScorePackageBytes(q.package),original.bytes);assert.deepEqual(q.package.referenceMidi,original.p.referenceMidi);
+  assert.deepEqual(getOriginalScorePackageBytes(q.package),original.bytes);assert.deepEqual(q.package.referenceMidi,original.p.referenceMidi);
  assert.deepEqual(q.package.transpositionOriginal!.sourceScore,original.source);assert.equal(q.personal,undefined);
  assert.deepEqual(scoreTranspositionRange(q.package),{min:-39,max:39});
  assert.equal(scoreTranspositionCompatible(q.package,original.p,keyboard),true);
@@ -92,6 +99,11 @@ for(const keyboard of ['janko-four-row','conventional-piano'] as const)test(`${k
  assert.equal(received.status,q.status,'message' in received?received.message:undefined);
  const published=await publishPackage(q.package),cold=await importPackage(published.bytes);
  assert.deepEqual(cold.pages,q.package.pages);assert.deepEqual(cold.transposition,q.package.transposition);assert.deepEqual(getOriginalScorePackageBytes(cold),original.bytes);
+ const samePitch=await ensurePianoReady({packageBytes:q.packageBytes,layout:keyboard,forceRecalculate:true,personal:initialPersonal(q.package)});
+ assert.equal(samePitch.status,'editable','message' in samePitch?samePitch.message:undefined);if(!('package' in samePitch))return;
+ assert.deepEqual(samePitch.package.transposition,q.package.transposition);
+ assert.equal(samePitch.package.manifest.revision,q.package.manifest.revision,'same physical exercise must retain its edition revision');
+ assert.equal(samePitch.package.preparationIdentity!.sha256,q.package.preparationIdentity!.sha256);
  const again=await ensurePianoReady({packageBytes:q.packageBytes,layout:keyboard,transposeSteps:-1,personal:initialPersonal(q.package)});
  assert.equal(again.status,'editable','message' in again?again.message:undefined);if(!('package' in again)||!('layer' in again))return;
  assert.equal(again.package.transposition?.steps,-1);assert.equal(again.personal,undefined);assert.deepEqual(getOriginalScorePackageBytes(again.package),original.bytes);
@@ -105,10 +117,11 @@ test('cold admission refuses repinned transformation/map/source/paint/seat/layer
  const original=await prepared(),q=await ensurePianoReady({packageBytes:original.bytes,layout:'janko-four-row',transposeSteps:2});
  assert.equal(q.status,'editable','message' in q?q.message:undefined);if(!('package' in q))return;
  const repin=async(edit:(m:any,f:Record<string,Uint8Array>)=>void)=>{const m=structuredClone(q.package.collectionManifest??q.package.manifest),f={...q.package.files};delete f['manifest.json'];edit(m,f);
+  const {sha256,...content}=m.transposition!;m.transposition!.sha256=await identityHash(content);
   m.files=Object.fromEntries(await Promise.all(Object.entries(f).map(async([n,b])=>[n,await hashBytes(b)])));return archivePackage(m,f);};
+ await assert.rejects(()=>repin(m=>{m.transposition.steps=3;}).then(importPackage),/independent reconstruction/);
+ await assert.rejects(()=>repin(m=>{m.transposition.handMaps['janko-four-row'][0].pitch++;}).then(importPackage),/stale source guards/);
  for(const edit of [
-  (m:any)=>{m.transposition.steps=3;},
-  (m:any)=>{m.transposition.handMaps['janko-four-row'][0].pitch++;},
   (m:any,f:Record<string,Uint8Array>)=>{f[m.sourceScore]=strToU8(JSON.stringify({...q.package.sourceScore,title:'different'}));m.sourceRevision=m.sourceSha256='a'.repeat(64);},
   (m:any,f:Record<string,Uint8Array>)=>{f[m.pages[0]]=strToU8(new TextDecoder().decode(f[m.pages[0]]).replace('<svg ','<svg data-tampered="1" '));},
   (_m:any,f:Record<string,Uint8Array>)=>{const seats=JSON.parse(new TextDecoder().decode(f['seats.json']));seats[0].x++;f['seats.json']=strToU8(JSON.stringify(seats));},
@@ -137,4 +150,60 @@ test('current reference context is rebound to effective pitches and stale select
  const controller=new AbortController(),worker:ReadinessWorker={onmessage:null,onerror:null,terminate(){},postMessage(){controller.abort();
   worker.onmessage?.({data:{type:'complete',result:readinessWorkerResult(shifted)}} as MessageEvent<any>);}},result=await runPianoReadiness({...request,signal:controller.signal},()=>worker);
  assert.equal(result.status,'cancelled');assert.deepEqual('retainedPackageBytes' in result?result.retainedPackageBytes:undefined,changed.packageBytes);
+ const wrongReceipt:ReadinessWorker={onmessage:null,onerror:null,terminate(){},postMessage(){wrongReceipt.onmessage?.({data:{type:'complete',result:{...readinessWorkerResult(shifted),requestedEditionSha256:'a'.repeat(64)}}} as MessageEvent<any>);}};
+ const rejected=await runPianoReadiness(request,()=>wrongReceipt);assert.equal(rejected.status,'unsupported');assert.match('message' in rejected?rejected.message:'',/another selected request edition/);
+});
+
+test('selected calculated hands stay distinct from source hands and repeated tie owners preserve complete effective obligations',async()=>{
+ for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const original=await sourcePackage(transferStudy()),hands={'gesture-0':'LH','gesture-1':'RH','gesture-2':'LH','melody-entrance':'RH'} as const,
+   selected=await calculatedStudy(original.p,layout,hands),request={packageBytes:selected.bytes,layout,transposeSteps:1},result=await ensurePianoReady(request);
+  assert.equal(result.status,'editable','message' in result?result.message:undefined);if(!('package' in result)||!('layer' in result))continue;
+  assert.notDeepEqual(result.package.score.notes.map(n=>n.hand),result.package.sourceScore!.notes.map(n=>n.hand));
+  assert.deepEqual(result.package.score.notes.map(n=>n.hand),selected.p.score.notes.map(n=>n.hand));
+  assert.deepEqual(result.package.transposition!.handMaps[layout],selected.p.score.notes.map(n=>({id:n.id,pitch:n.pitch.octave*12+n.pitch.pitchClass,
+   startTick:n.startTick,durationTicks:n.durationTicks,hand:n.hand})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0));
+  assert.deepEqual(getOriginalScorePackageBytes(result.package),selected.bytes);
+  await admitPianoRequestResult(request,result.package,result.packageBytes,result.layer,undefined);
+  const boundary=await sourcePackage(boundaryStudy(),{measuresPerSystem:1,systemsPerPage:1,pageWidth:240}),
+   baseline=await calculatedStudy(boundary.p,layout,Object.fromEntries(boundary.source.notes.map(n=>[n.id,n.id==='edge-a'?'RH':n.hand]))),
+   shifted=await ensurePianoReady({packageBytes:baseline.bytes,layout,transposeSteps:1});
+  assert.equal(shifted.status,'editable','message' in shifted?shifted.message:undefined);if(!('package' in shifted))continue;
+  assert.equal(shifted.package.pages.length,2);
+  const inventory=shifted.package.calculatedHandReceipt!.sourceInventory;
+  assert.equal(inventory.occurrences.length,4);assert.equal(inventory.owners.reduce((n,o)=>n+o.performedVisits!.length,0),14);
+  assert.equal(shifted.package.seats.filter(s=>s.ownerIds.includes('held')).length,2);
+  assert.equal(shifted.package.seats.find(s=>s.ownerIds.includes('short-release'))!.actionId,'192:62');
+  assert.deepEqual((await importPackage(shifted.packageBytes)).pages,shifted.package.pages);
+ }
+});
+
+test('transposition retains the historical literal recipe baseline adoption gate',async()=>{
+ const original=await prepared(),m=structuredClone(original.p.collectionManifest??original.p.manifest),files={...original.p.files};delete files['manifest.json'];
+ const recipe=structuredClone(original.r);recipe.baseline={pageSha256:['f'.repeat(64)],seatSha256:'e'.repeat(64)};
+ files['rendering-recipe.json']=strToU8(JSON.stringify(recipe));m.files['rendering-recipe.json']=await hashBytes(files['rendering-recipe.json']);
+ const bytes=archivePackage(m,files),admitted=await importPackage(bytes);assert.equal(admitted.generationAvailable,true);
+ const result=await ensurePianoReady({packageBytes:bytes,layout:'janko-four-row',transposeSteps:2});
+ assert.equal(result.status,'unsupported');assert.match('message' in result?result.message:'',/does not reproduce its source pages/);
+ assert.deepEqual('retainedPackageBytes' in result?result.retainedPackageBytes:undefined,bytes);
+});
+
+test('actual three-page transposition receipt dispatch keeps measured footer ink through cold admission',async()=>{
+ const single=await prepared(),source=structuredClone(single.source);source.totalTicks=576;source.sourceBarTicks=[0,192,384,576];
+ source.notes=Array.from({length:3},(_,bar)=>single.source.notes.map(n=>({...n,id:n.id+':bar-'+bar,startTick:n.startTick+bar*192}))).flat();
+ source.barlines=source.sourceBarTicks.map((tick,i)=>({tick,barNumber:i+1,type:i===3?'final' as const:'regular' as const}));
+ source.sourceHandRequirements=source.notes.map(n=>({version:'source-hand-requirement-v1',ownerId:n.id,hand:n.hand,
+  guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},provenance:{kind:'source-instruction',reference:'Authored three-page RH study'}}));
+ const original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:240,pageHeight:300},{ticksPerMeasure:192}),
+  result=await ensurePianoReady({packageBytes:original.bytes,layout:'janko-four-row',transposeSteps:1});
+ assert.equal(result.status,'editable','message' in result?result.message:undefined);if(!('package' in result))return;
+ const cold=await importPackage(result.packageBytes),policy=annotationInkPolicyFor(cold);assert.deepEqual(policy,ANNOTATION_INK_POLICY);
+ assert.equal(cold.pages.length,3);assert.equal(cold.calculatedHandReceipt!.version,'viewer-calculated-hand-edition-v3');
+ const page=cold.pages[1],heads=new Map(cold.annotationGeometry!.seats.filter(s=>s.page===1).map(s=>[s.seatId,[s.headBounds.x0,s.headBounds.y0,s.headBounds.x1,s.headBounds.y1] as [number,number,number,number]])),
+  known=actualPageObstacles(page,heads,policy).boxes,legacy=actualPageObstacles(page,heads).boxes,
+  footer=Array.from(new DOMParser().parseFromString(page,'image/svg+xml').getElementsByTagName('text')).find(el=>el.getAttribute('class')==='janko-page-num')!,footerY=Number(footer.getAttribute('y')),
+  air:[number,number,number,number]=[35,footerY-22,40,footerY-18];
+ assert.equal(known.some(b=>boxesOverlap(air,b)),false,'distant left-hand air remains unreserved by actual footer');
+ assert.equal(legacy.some(b=>boxesOverlap(air,b)),true,'legacy unknown-font footer would reserve a whole-page band');
+ assert.throws(()=>annotationInkPolicyFor({calculatedHandReceipt:{...cold.calculatedHandReceipt,annotationInkPolicy:{...ANNOTATION_INK_POLICY,footer:{...ANNOTATION_INK_POLICY.footer,fontSha256:'0'.repeat(64)}}}}),/altered/);
 });

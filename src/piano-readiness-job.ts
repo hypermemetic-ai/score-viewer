@@ -1,4 +1,4 @@
-import {importPackage,validateLayerAsync} from './package';
+import {importPackage,validateLayerAsync,hashBytes} from './package';
 import {readPersonal} from './state';
 import type {PianoReadinessRequest,PianoReadinessResult} from './piano-readiness';
 import type {PianoReadinessWorkerMessage,PianoReadinessWorkerRequest} from './piano-readiness-worker-protocol';
@@ -37,8 +37,10 @@ export function runPianoReadiness(request:PianoReadinessJobRequest,
         const result=event.data.result;
         if(!('packageBytes' in result)){finish(result);return;}
         try{
+          if(result.status!=='reading'&&result.requestedEditionSha256!==undefined&&result.requestedEditionSha256!==await hashBytes(trusted.packageBytes))throw Error('Prepared transposition belongs to another selected request edition.');
           const p=await importPackage(result.packageBytes,{keyboardLayout:request.layout,allowLegacyTempo:request.intent==='read-retained'});
           const personal=result.personal?readPersonal(result.personal,p):undefined;
+          if(p.transposition&&(request.intent!=='read-retained'||request.forceRecalculate)&&result.status!=='reading'&&result.requestedEditionSha256!==await hashBytes(trusted.packageBytes))throw Error('Prepared transposition lacks its selected request edition identity.');
           if(done)return;
           if(result.status==='reading'){
             if(request.intent!=='read-retained'||request.forceRecalculate)throw Error('A new calculation requires a complete admitted finger layer.');
