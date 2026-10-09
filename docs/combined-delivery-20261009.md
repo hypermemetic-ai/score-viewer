@@ -21,6 +21,8 @@ Reviewed application source is frozen at `0c6c60efd03f5d3a0a4bb4252bd8b48fb02055
 
 The final two-file pin checkpoint `cb699df2b130a954e501f311523af786635df577` has the same complete tree as frozen main. Its configured 544/544 tests, TypeScript/Vite build, source-pin check and strict OpenSpec 12/12 passed. Fresh independent cold reads preserve every actual raw member/page/receipt outcome across four original/+1 Zelda presentations and the 1,013-owner/ten-page bass archive; all 48 original JSON files remain hash-identical. The receipt is `~/.local/state/score-viewer-performance-admission-20261009/final-scene-viewer-pin-cb699df-ready.json`, SHA256 `3f860a4d99ee3ac2789b14ee0ef61b8fd6a3a199dc3baf0c73c09cbaf1b5f3b9`.
 
+The actual frozen delivery `source-checks.json`, SHA256 `917ec041dc58316c6e6b897536445f79bcfaf648b846b05aad40e5d92ff423f1`, independently binds 544 configured Viewer tests, 29 carrier/footer-runtime tests, 55 exact-source native PCM/ownership tests, strict 12/12, clean install and configured build at frozen main. Those 55 tests do not open an output or exercise installed IPC. This is the named source closure, not a claim that every historical ISO test suite passes. The eleven-file frozen frontend digest is `2c50894296c2850ab8925ccf3b7727437d93ed1c6413f76f2c1c74d261a96fd5`.
+
 ## Measured frontend behavior
 
 [Admission evidence](performance-admission-audit-20261009.md) distinguishes strict first admission from exact session reuse, independent Worker receiving admission and the private head accessor. The sessions remain separate and bounded; altered inputs, current-font ambiguity, unknown objects and genuine calculations keep their original authority/refusal paths.
@@ -48,18 +50,31 @@ ISO PR344's separate matched source-render medians improve 8.4–11.0% across fo
 
 [PR29 notation evidence](practice-rendering-validation.md#october-9-selected-range-and-opposite-side-tie-repair) supersedes the old current-Zelda tie refusal: 36 leaf previews, 16 Free view windows and eight active loops pass across four editions, with complete cue/restoration and zero protected-measure drift. Joined 25–33 passes at 2560 pixels; larger 25–33/full 1–38 still refuse at 1920 under actual cue/fit constraints. One/two-measure source separator-template cases remain outside that repair. No.14's retained derived-only source still cannot be transposed under the absolute-source policy. Connector B remains a selected separate proposal, unimplemented.
 
-## Combined native delivery — pending
+## Combined native delivery
 
-The paired delivery owner is separately building the frozen source above. Every factual row below requires its actual receipt and independent parent acceptance before completion; earlier deliveries remain historical evidence.
+The accepted carrier is `005778fe67b18e7c9fea600703e2089cbf48daf5`, tree `d933b611c195dd617f5ed5e0a13854c89bf61f51`, descending from the retained published carrier `95cccdbc0cf1560062c6cf032b46bb56edbf1378`. Review-only ISO PR345 is not merged over ISO main. Both jobs in [paired run 37901613144](https://github.com/hypermemetic-ai/iso-notation/actions/runs/37901613144) succeeded and the complete pair was atomically published. Source identity remains the frozen Viewer/notation pair above. Windows installation and recipient acceptance are still pending; earlier deliveries remain historical evidence.
 
 | Gate | Current status |
 | --- | --- |
-| Exact carrier, prepared frontend/native closure and source/check identities | **PENDING** final accepted carrier/preparation receipts. |
-| Windows x64 and universal Mac packages, both slices, native/embedded/font/notice/signature/launch checks | **PENDING** actual worker/package receipts and their precise host limits. |
-| Complete pair validation, atomic private publication and served ZIP hashes | **PENDING** complete immutable pair and actual HTTP-byte verification. |
+| Exact carrier, prepared frontend/native closure and source/check identities | **PASSED** parent byte/inventory review: eleven frontend files, 1,893 native source files, twelve decoded Rust assets, 28 notices and 27 preserved/one additive resources. Private payload absent; established workflows/release adapters unchanged. |
+| Windows x64 and universal Mac packages, both slices, native/embedded/font/notice/signature/launch checks | **PASSED** actual worker/packet checks and complete embedded proofs. Windows GUI/physical observations remain pending; Mac host limits are recorded below. |
+| Complete pair validation, atomic private publication and served ZIP hashes | **PASSED** root independently admitted the complete local pair and every served byte: 33 files/38,596,861 bytes, stable exact atomic pointer. |
 | Windows additive recipient, native GUI review and usual-shortcut activation | **PENDING** installed executable/path/hash and observed native captures. |
 | Original application/data/bank/preferences/journals/progress preservation and classified differences | **PENDING** final before/after inventory and recovery receipt. |
-| Usable universal Mac download | **PENDING** verified served URL, packet hash and independent acceptance. |
+| Usable universal Mac download | **PASSED** independently verified served immutable ZIP and packet, linked below. |
 | Owned-process cleanup and ordinary final tracking PR | **PENDING** delivery-owner cleanup and reviewed documentation closeout. |
+
+| Published packet | Verified bytes | SHA256 |
+| --- | --- | --- |
+| [Windows x64 ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-005778fe67b18e7c9fea600703e2089cbf48daf5/packages/Windows.zip) | 7,013,983 | `b3e7722372a6769bada429d73a95a525a15ad2e264d720b4fadb1200a8d8358a` |
+| [Universal Mac ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-005778fe67b18e7c9fea600703e2089cbf48daf5/packages/Mac.zip) | 23,640,713 | `48bcf6b4dfcf3ba3c885498a974259901953f2f2a14895b8d00dbefa6c1ce65b` |
+
+The published Windows executable hash is `cd5a8a232ad671e6667382e68662a77b4658189cf7562057e49f406dfb7c9d95`; this identifies the packet, not yet the activated executable. Release-manifest SHA256 is `4fe1bb960fb71a0e77c2250e2631c960e03706178601a5f563c2e77c15ec82aa`, and actual stable current-pointer SHA256 is `bfcca4a86cc40d4cc30f9e81a82048e7f9a02a4c244ff77fba32ba452ae620e7`.
+
+Mac's actual WK receipt `aa555f74229735ea6295e99122a651b2643641d835339c489d8db0cbeaf2e6de` passed on arm64 macOS 15.7.9 (24G830), WebKit 20621.3.11.11.3. It exercises the actual production Worker/independent cold reader and enclosure policy through temporary loopback HTTP; it does not establish Tauri custom-origin/CSP or full practice repeat loops. Both universal slices, notices/resources, signatures, declared minimum-OS checks, DMG parity, direct packaged startup and same-user `NSWorkspace.openApplication` launch passed. Minimum-OS metadata/link gates are not execution on macOS 13.3, and the arm64 host does not establish a second host architecture.
+
+The opt-in Mac tiny-fixture CoreAudio/virtual-MIDI test passed on Apple Virtual Sound Device at 48 kHz, requesting 15/512-frame buffers and restoring the original 512 frames. Submitted piano-only PCM and panic silence passed. Its explicit-close/Drop restoration evidence is not actual normal-Tauri-exit acceptance or physical playing. Normal native repeat/audio listening on the recipient remains unobserved.
+
+Private root receipts live under `~/.local/state/score-viewer-combined-delivery-20261009`: `parent-carrier-review.json` (`5f4b8815da2805dd6f84351ece9774af55df7c559078d9950dcd535dbd61c44f`), `parent-mac-worker-review.json` (`4a7dc6f50dcf6c13cc7fa143349d116ddc7255d5c11c0b6a5adf93b328bcc1de`) and `parent-served-pair-review.json` (`e136058c4fa245d29a226cbd55d2cfcd82fb07dc98ac4673edc66307b0b1086a`). Root independently accepted the carrier and complete actual served pair. Final Windows GUI/shortcut/preservation and delivery cleanup receipts remain required before final tracking push.
 
 Source evidence does not establish physical MIDI/pedal, sound-to-ear latency, audible musical acceptance or minimum-OS runtime. Optional-piano tasks 3.3/4.5 remain pending for their physical/platform observations. No OpenSpec change is autoarchived by this tracking work.
