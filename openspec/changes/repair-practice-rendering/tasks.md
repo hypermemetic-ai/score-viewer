@@ -53,3 +53,11 @@
 
 - [x] 6.1 Review the scoped diff and unchanged package/data/dependency identities, validate the OpenSpec change, and commit/push the repair through the ordinary PR path; verify the PR identifies the final behavior, observed validation, private-score gaps if any, and separate native release seam.
 - [x] 6.2 Stop task-owned temporary servers/browser processes, run the required Git status helper, and deliver the source receipt for parent review; verify no unattended Git work or task-owned process remains and the restored Windows installation was not replaced.
+
+## 7. Repair the confirmed remaining source relation regressions
+
+- [x] 7.1 Scope source relation geometry admission to the union of displayed consecutive runs before contour/endpoint validation, preserving carry-in/out; add public source-linked cache-order, nonconsecutive-gap and malformed-in-range controls.
+- [x] 7.2 Reconcile verified opposite-sided cross-system tie fragments using exact component heads/ticks and collision-admitted shared contours. Retain original offsets, derive common-side tips from each fixed owned head enclosure and its own authored air, evaluate both authored sides with a half-font-size further-translation bound and least total endpoint displacement; preserve same-side projection, complete ownership/held cues and relevant refusal controls.
+- [x] 7.3 Observe actual Zelda original/+1 in both keyboards at 1–4 and affected 19/27–28 in selector, Free view and representative active/repeat/refill lifecycle; run ordinary Worker/cold admission, verify source/archive/state/reading geometry unchanged and keep private inputs outside Git.
+- [x] 7.4 Pass focused/full Viewer tests, configured build, strict OpenSpec and relevant carrier/runtime checks; record source-only visual evidence and limits, commit/push the reviewed PR and stop task-owned processes without native/desktop/dependency changes.
+- [x] 7.5 Test the permitted upper refill width through the unchanged exhaustive checker when the conservative compact estimate exceeds it; prove actual nonuniform footprints with cue reservations can admit while infeasible limits still refuse, without changing placement, fit or protected-measure rules.

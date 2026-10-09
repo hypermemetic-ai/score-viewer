@@ -36,6 +36,29 @@ Displayed ties and slurs SHALL be projected for the composed passage through sha
 - **THEN** each continuing relation follows its fixed displayed note endpoints across the padding
 - **AND** separate source slurs and nonconsecutive slot wraps do not become an invented connection
 
+#### Scenario: An unrelated later relation is unsupported
+- **WHEN** the selected consecutive source runs do not intersect a later malformed relation, including a gap between nonconsecutive resident runs
+- **THEN** that relation does not block the displayed passage or enter its projected geometry
+- **AND** selecting the affected range still reports its unresolved geometry even after an earlier range was cached
+
+#### Scenario: A written tie changes side at an original system break
+- **WHEN** one verified source tie component leaves one original system below its note and enters another above its continuation, or the reverse
+- **THEN** its consecutive passage projection connects both verified endpoints as one source-owned, collision-admitted shared contour
+- **AND** both authored sides are evaluated using each fixed head's actual owned enclosure and its own authored tip air, retaining original offsets separately and choosing the admitted candidate with least total endpoint displacement
+- **AND** any further clearance translation is at most half the smaller endpoint font size; valid same-side projection remains unchanged
+- **AND** all written hold components, visible cue ownership and Free view restoration remain complete without moving notes or rewriting the source pages
+- **AND** contradictory same-system fragments and malformed relevant endpoint geometry still refuse
+
+#### Scenario: A selected known tie has stale component timing
+- **WHEN** a relevant retained tie's literal timing differs from its authoritative written component
+- **THEN** admission refuses instead of projecting the geometry under one clock and retiring its cue under another
+- **AND** an unrelated displayed range remains independently admitted
+
+#### Scenario: An opposite-side continuation declares the wrong component heads
+- **WHEN** the new cross-system opposite-side route names a head pair differing from its authoritative written component pair
+- **THEN** admission refuses even when both fragments agree on the wrong head identifiers
+- **AND** historical same-side head anchoring remains unchanged
+
 ### Requirement: Stable active reading references
 During measured count-in or playing, the current measure SHALL retain its exact screen position and size within an unchanged viewport. Other whole measures SHALL change layout only in an atomic refill that draws incoming music. Original interiors and one common live scale SHALL remain unchanged. The reading surface SHALL remain continuous and naturally framed; music SHALL NOT slide continuously. Source identities and relation ownership SHALL remain truthful through spatial wraps.
 
@@ -59,6 +82,11 @@ During measured count-in or playing, the current measure SHALL retain its exact 
 - **WHEN** replacement displays resident bars across a genuine reading-order wrap
 - **THEN** staff lines remain continuous and aligned, with correctly attached source barlines and accessible source identities
 - **AND** ties and slurs retain verified musical endpoints without inventing a relation between nonconsecutive source notes
+
+#### Scenario: A conservative compact estimate exceeds the readable limit
+- **WHEN** a selected passage's conservative compact estimate exceeds the permitted upper width
+- **THEN** admission still tests that upper width with every existing placement, cue, edge, gap and protected-measure constraint through the complete state/transition checker
+- **AND** only a successful unchanged certificate admits it; an infeasible limit still refuses without squeezing note interiors or reducing readability
 
 ### Requirement: Efficient leaf selection preview
 A selected original leaf SHALL display all its source measures together as one horizontal strip using available preview space efficiently. An ordinary four-bar leaf SHALL show all four bars without a horizontal scrollbar or an automatic two-row fragment layout. Fitting SHALL account for complete visible musical ink and a substantial consistent left inset so the notation does not crowd the preview edge.
