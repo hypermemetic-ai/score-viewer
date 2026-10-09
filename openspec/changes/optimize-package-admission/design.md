@@ -26,7 +26,13 @@ Actual source replay may return tiny head IDs for exact seat/page/system/x/basel
 
 ### Remaining cold stalls
 
-Cold engraving contains long synchronous layout/scene work. An arbitrary `await` before it merely delays the same stall. A bounded cooperative strategy needs explicit pure-layout/scene yield boundaries or off-main computation with independent receiving verification; it requires a concrete reviewed proposal before source changes. This task records remaining first-cold stall rather than treating cache hits as solving it.
+Reviewed main hooks paint loading and permit input only between completed import/readiness/preflight phases, then recheck operation generation, signal, job, current score and preference context. Library first paint precedes independently admitted summary work, which waits while a reader/practice/operation is active. These approved checkpoints stay outside ordinary key handlers and musical clocks.
+
+Cold engraving still contains long synchronous layout/scene work. An arbitrary `await` before it merely delays the same stall. Splitting that replay needs explicit pure-layout/scene boundaries or off-main computation with independent receiving verification and a separate reviewed proposal. Actual first/warm/frame-gap evidence is recorded in the source notes; warm cache hits do not solve the remaining first-cold stall.
+
+### Invocation-owned final scenes
+
+Separately reviewed ISO PR344 starts reuse only after layout refinement completes. Explicit-score and scoreless contexts remain distinct; original constructor/refusal sites are retained. Lazy scenes are owned by synchronous read-only lint/emission/seat phases, with actual input binding rechecked at phase boundaries. Modified/unknown layouts, mutation and expired scopes take the original fresh path. Nothing is returned as an authority certificate or saved across calls. Matched source render improves 8.4–11.0% across four actual editions with exact output parity; complete-main timings are labelled separately.
 
 ## Risks / Trade-offs
 
@@ -38,4 +44,4 @@ Unit controls cover mutation, same-size byte collisions, options, companions, co
 
 ## Open Questions
 
-The remaining cooperative-yield mechanism is investigation only until a concrete proposal is accepted. It does not waive strict cold admission or block independently useful duplicate-work fixes.
+Further cooperative yielding inside strict cold replay remains investigation only until a concrete proposal is accepted. Completed operation-phase checkpoints do not waive that admission or turn another realm's certificate into authority.

@@ -13,4 +13,6 @@
 ## 3. Integrated source evidence
 
 - [x] 3.1 Observe real browser Schumann and private Zelda cue/audio event timelines across repeated fixed/accelerating attempts, truthful phase displays and source-state preservation; keep private payloads outside Git.
-- [ ] 3.2 Run configured tests/build, native bounded probes, strict OpenSpec and independent source review; record exact source/process closure without claiming native/physical acceptance.
+- [x] 3.2 Run configured tests/build, native bounded probes, strict OpenSpec and independent source review; record exact source/process closure without claiming native/physical acceptance.
+
+Source tracking: merged PR32/33 and PR35 Performance integration have [browser/source-meter evidence](../../../docs/practice-countin-validation.md), 55 exact-source native PCM/lifecycle/ownership tests and the actual complete Windows/Tauri compile/link checkpoint. The final combined source passes 544/544 configured tests, build/source-pin and strict 12/12. The checkpoint executable was not executed on Windows; actual paired packages/activation and human musical acceptance remain separate [pending delivery gates](../../../docs/combined-delivery-20261009.md#combined-native-delivery--pending). No autoarchive.
