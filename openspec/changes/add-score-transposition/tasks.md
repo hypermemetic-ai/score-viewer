@@ -2,24 +2,24 @@
 
 ## 1. Versioned pitch transformation and preparation
 
-- [ ] 1.1 Implement a deterministic Viewer transposition envelope and complete supported pitch transformation with legal offsets; verify positive/negative/octave changes, notes/repeats/ties/grace/guards, unchanged timing/owners and explicit unsupported/range refusals in focused tests.
-- [ ] 1.2 Integrate the new policy with preparation identity and ordinary worker requests, preserving selected owner hands while freshly engraving and replanning both keyboards; verify same-hand pitch changes cannot reuse old pages/contacts and stale request cancellation refuses.
-- [ ] 1.3 Independently replay transposition during receiving-realm and archive cold admission, retaining the exact nonnested untransposed baseline, original source/reference bytes, complete original-guarded selected hand-map authority and historical policy dispatch; verify valid shared round trips, requested-map equality and tampered steps/source/map/receipt/pages/seats/layers all refuse, and document the new archive authority.
+- [x] 1.1 Implement a deterministic Viewer transposition envelope and complete supported pitch transformation with legal offsets; verify positive/negative/octave changes, notes/repeats/ties/grace/guards, unchanged timing/owners and explicit unsupported/range refusals in focused tests.
+- [x] 1.2 Integrate the new policy with preparation identity and ordinary worker requests, preserving selected owner hands while freshly engraving and replanning both keyboards; verify same-hand pitch changes cannot reuse old pages/contacts and stale request cancellation refuses.
+- [x] 1.3 Independently replay transposition during receiving-realm and archive cold admission, retaining the exact nonnested untransposed baseline, original source/reference bytes, complete original-guarded selected hand-map authority and historical policy dispatch; verify valid shared round trips, requested-map equality and tampered steps/source/map/receipt/pages/seats/layers all refuse, and document the new archive authority.
 
 ## 2. Reversible edition selection and musical state
 
-- [ ] 2.1 Add strictly admitted collection-level selected steps and retained original/derived edition selection with additive transactional installation and baseline/map/hand-policy-compatible offset reuse; verify 0 restores exact original archive/state including shared-import restoration, reopen/layout changes retain the offset, and failed/superseded writes leave the current pointer/value intact.
-- [ ] 2.2 Keep corrections and practice/performance evidence bound to the actual pitch edition without weakening existing pitch/contact guards; verify original edited/progress state is unchanged, new pitch evidence starts independently and retained editions recover their own journals.
-- [ ] 2.3 Rebuild paused practice and performance input against the admitted effective score while retaining the selected passage where applicable; verify expected MIDI pitches change, old pending events cannot affect the new context, and physical piano passthrough remains unchanged. Document the user-facing restoration and evidence behavior.
+- [x] 2.1 Add strictly admitted collection-level selected steps and retained original/derived edition selection with additive transactional installation and baseline/map/hand-policy-compatible offset reuse; verify 0 restores exact original archive/state including shared-import restoration, reopen/layout changes retain the offset, and failed/superseded writes leave the current pointer/value intact.
+- [x] 2.2 Keep corrections and practice/performance evidence bound to the actual pitch edition without weakening existing pitch/contact guards; verify original edited/progress state is unchanged, new pitch evidence starts independently and retained editions recover their own journals.
+- [x] 2.3 Rebuild paused practice and performance input against the admitted effective score while retaining the selected passage where applicable; verify expected MIDI pitches change, old pending events cannot affect the new context, and physical piano passthrough remains unchanged. Document the user-facing restoration and evidence behavior.
 
 ## 3. Visible shared Score controls
 
-- [ ] 3.1 Implement the approved expanded Score section and current piece subtitle, first in reader Options and immediately after Practice; align settings, expose Generate fingerings/Share score, retain applicable history/correction/cancel actions and keep Source & review secondary. Verify ordinary/narrow/rotated production views and library Options without an empty Score section.
-- [ ] 3.2 Wire Transpose using the shared centered numeric box, external steps label and non-tabbable stacked chevrons; verify Enter/typing/edit arrows/commit/Escape, browse navigation, valid range/refusal and busy/cancel behavior in the real dialog with the production worker.
+- [x] 3.1 Implement the approved expanded Score section and current piece subtitle, first in reader Options and immediately after Practice; align settings, expose Generate fingerings/Share score, retain applicable history/correction/cancel actions and keep Source & review secondary. Verify ordinary/narrow/rotated production views and library Options without an empty Score section.
+- [x] 3.2 Wire Transpose using the shared centered numeric box, external steps label and non-tabbable stacked chevrons; verify Enter/typing/edit arrows/commit/Escape, browse navigation, valid range/refusal and busy/cancel behavior in the real dialog with the production worker.
 
 ## 4. Combined source review
 
-- [ ] 4.1 Run the full viewer suite, configured TS/Vite build and strict OpenSpec validation; inspect complete original and transposed pages plus selection/active/Free view strips on both keyboards, record actual browser/worker/cold evidence and original-data round-trip preservation without claiming native or physical acceptance.
+- [x] 4.1 Run the full viewer suite, configured TS/Vite build and strict OpenSpec validation; inspect complete original and transposed pages plus selection/active/Free view strips on both keyboards, record actual browser/worker/cold evidence and original-data round-trip preservation without claiming native or physical acceptance.
 - [ ] 4.2 Commit/push the scoped combined source and planning branch, obtain independent review through the ordinary PR path, fix findings and merge; prove the exact merged tree matches the reviewed source and leave task checkboxes reflecting only established evidence.
 
 ## 5. Reviewed paired delivery and recipient activation
