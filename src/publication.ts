@@ -30,7 +30,10 @@ export function publicationMembers(m:Manifest):Set<string> {
     }
   }
 
-  if(m.version===3&&m.reading){names.add(m.reading.owners);names.add(m.reading.layout);}
+  if(m.version===3&&m.reading){
+    if(m.reading.version==='instrument-reading-package-v1'){names.add(m.reading.owners);names.add(m.reading.layout);}
+    else for(const view of Object.values(m.reading.views))for(const name of [view.owners,view.scene,view.geometry,...view.pages])names.add(name);
+  }
 
   if(m.transposition)names.add(m.transposition.originalArchive);
 

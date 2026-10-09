@@ -258,7 +258,8 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(m.version===3){
   if(options.keyboardLayout)fail('This score has no piano keyboard presentation.');
   const {score,pages,reading}=admitReadingContent(m,files);
-  pages.forEach((svg,page)=>passiveSvg(svg,[],page));
+  if(reading.dual){for(const view of Object.values(reading.dual.views))view.pages.forEach((svg,page)=>passiveSvg(svg,[],page));}
+  else pages.forEach((svg,page)=>passiveSvg(svg,[],page));
   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
   freezeSource(score);
   return {manifest:m,score,seats:[],pages,files,reading,archiveSha256:await hashBytes(bytes),sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
