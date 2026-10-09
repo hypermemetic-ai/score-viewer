@@ -23,4 +23,4 @@
 ## 5. Measured acceptance and review
 
 - [ ] 5.1 Measure actual first import, second open, keyboard responsiveness, summaries, worker reception and memory before/after; record remaining cold stall and submit bounded-yielding proposal before any scheduling change.
-- [ ] 5.2 Run configured suite/build/source-pin and strict OpenSpec checks, independently preserve all archive/user-data hashes, submit scoped PR and stop owned browser/storage/server processes.
+- [x] 5.2 Run configured suite/build/source-pin and strict OpenSpec checks, independently preserve all archive/user-data hashes, submit scoped PR and stop owned browser/storage/server processes.
