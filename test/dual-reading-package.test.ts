@@ -38,6 +38,20 @@ test('notation selection retains source/archive identity and the exact manual pl
  assert.deepEqual(iso.pages,original.pages);assert.equal(JSON.stringify(original),before);
  assert.throws(()=>selectReadingNotation(original,'bad' as never),/Unsupported/);
 });
+test('admitted source and view data are immutable and caller hooks cannot mint selectable ink',async()=>{
+ const p=await importPackage(bytes),retained=p.reading;let called=0;
+ assert.throws(()=>{p.reading!.dual!.views.tab.pages[0]='<svg xmlns="http://www.w3.org/2000/svg" data-unreplayed="true"></svg>';},TypeError);
+ assert.throws(()=>Object.defineProperty(p.reading!,'toJSON',{value:()=>{called++;return retained;}}),TypeError);
+ assert.throws(()=>Object.defineProperty(p.reading!.dual!.views.tab,'pages',{get:()=>{called++;return [];}}),TypeError);
+ assert.equal(called,0);assert.deepEqual(selectReadingNotation(p,'tab').pages,retained!.dual!.views.tab.pages);
+ const forged=structuredClone(p);forged.reading!.dual!.views.tab.pages[0]='<svg data-unreplayed="true"/>';
+ Object.defineProperty(forged.reading!,'toJSON',{value:()=>retained});
+ assert.throws(()=>selectReadingNotation(forged,'tab'),/actual receiving-realm/);
+ const sourceProxy={...p,score:new Proxy(p.score,{})};assert.throws(()=>selectReadingNotation(sourceProxy,'tab'),/actual receiving-realm/);
+ const readingProxy={...p,reading:new Proxy(p.reading!,{})};assert.throws(()=>selectReadingNotation(readingProxy,'tab'),/actual receiving-realm/);
+ const tab=selectReadingNotation(p,'tab');assert.equal(Object.isFrozen(tab.reading!.dual!.views.tab.scene.components),true);
+ assert.throws(()=>{tab.reading!.dual!.instrumentFamily='guitar' as never;},TypeError);
+});
 test('dual publication retains every declared view and round-trips without a separate performance edition',async()=>{
  const pub=await publishPackage(selectReadingNotation(original,'tab'));
  assert.deepEqual(pub.excluded,[]);assert.deepEqual([...publicationMembers(original.manifest)].sort(),Object.keys(original.files).filter(n=>n!=='manifest.json').sort());

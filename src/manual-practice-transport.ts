@@ -14,6 +14,7 @@ export class ManualPracticeTransport {
  constructor(readonly session:ManualPracticeSession,readonly clock:ManualClock,private changed:()=>void,private failed:(message:string)=>void){}
  get futureCount(){return this.finishing&&this.armed?this.armed.plan:undefined;}
  async start(){
+  if(this.disposed)return;
   const generation=++this.generation;this.clearDeadline();this.armed=undefined;this.finishing=false;
   try{
    this.session.applyNextRate();const rate=this.session.state.working,grid=this.session.sourcePulseGrid,
@@ -70,6 +71,6 @@ export class ManualPracticeTransport {
  }
  private clearDeadline(){if(this.deadline!==undefined)clearTimeout(this.deadline);this.deadline=undefined;this.cancelWait?.();this.cancelWait=undefined;}
  private fail(message:string){this.pause();this.failed(message);}
- pause(){this.generation++;this.clearDeadline();this.armed=undefined;this.finishing=false;this.session.pause();void this.clock.stop();this.changed();}
+ pause(){if(this.disposed)return;this.generation++;this.clearDeadline();this.armed=undefined;this.finishing=false;this.session.pause();void this.clock.stop();this.changed();}
  close(){if(this.disposed)return;this.pause();this.disposed=true;this.clock.close();}
 }

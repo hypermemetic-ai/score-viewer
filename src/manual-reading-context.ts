@@ -12,7 +12,6 @@ export interface ManualReadingViewState {
  cursors:Record<ReadingNotation,{scale:number;pageCount:number;advance:number}>;
 }
 const defaults=()=>({scale:1,pageCount:1,advance:1});
-function freezeGraph(value:unknown){if(value&&typeof value==='object'&&!Object.isFrozen(value)){for(const child of Object.values(value))freezeGraph(child);Object.freeze(value);}}
 /** The controller owns one immutable admitted source graph. Per-view geometry
  * is navigation state; the manual journal and loop plan remain common. */
 export class ManualReadingContext {
@@ -26,11 +25,10 @@ export class ManualReadingContext {
   // Check actual realm admission and capture BOTH choices before any await.
   // A caller mutation while plan hashing settles cannot alter this context.
   const iso=selectReadingNotation(input,'iso'),tab=selectReadingNotation(input,'tab'),
-   source=structuredClone({manifest:iso.manifest,score:iso.score,reading:iso.reading}),
-   owned=(p:ScorePackage):ScorePackage=>({...p,...source,pages:[...p.pages],seats:[],reading:{...source.reading!,owners:structuredClone(p.reading!.owners),
-    geometryEvidence:structuredClone(p.reading!.geometryEvidence),dual:{...source.reading!.dual!,notation:p.reading!.dual!.notation}}}),
-   packages={iso:owned(iso),tab:owned(tab)},snapshot={saved:structuredClone(saved),view:structuredClone(view)};
-  for(const p of Object.values(packages)){freezeGraph(p.score);freezeGraph(p.manifest);freezeGraph(p.reading);freezeGraph(p.pages);}
+   // Source and both complete views are already recursively frozen by the
+   // receiving realm. Retain the actual prepared scenes for source-owned
+   // projection, while owning wrappers and all mutable personal/view input.
+   packages={iso:{...iso,seats:[]},tab:{...tab,seats:[]}},snapshot={saved:structuredClone(saved),view:structuredClone(view)};
   const plan=await planManualPractice(packages.iso,partition);
   return new ManualReadingContext(plan,packages,snapshot.saved,snapshot.view);
  }

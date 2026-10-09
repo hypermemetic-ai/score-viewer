@@ -33,7 +33,12 @@ const exactKeys=(v:unknown,keys:readonly string[])=>object(v)&&Object.keys(v).le
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 // Realm-local successful replay, never serialized or supplied by a caller.
 // Mutable forged/cloned content cannot become a selectable presentation.
-const admittedViews=new WeakMap<ReadingContent,{source:string;descriptor:string;content:string}>();
+interface AdmittedViews {score:QuantizedGridScore;manifest:Manifest;reading:ReadingContent}
+const admittedViews=new WeakMap<ReadingContent,AdmittedViews>();
+function freezeGraph(value:unknown,seen=new WeakSet<object>()){
+ if(!value||typeof value!=='object'||Object.isFrozen(value)||seen.has(value))return;
+ seen.add(value);for(const child of Object.values(value))freezeGraph(child,seen);Object.freeze(value);
+}
 const forbidden=['keyboardLayout','presentations','fingerGeometry','renderingRecipe','calculationContext','preparationIdentity','calculatedHandReceipt',
  'transposition','effectiveHandSha256','profileId','profileSha256','layerSourceHash','referenceMidi','sourceScore','sourceRevision','sourceSha256'];
 function scoreBounds(score:QuantizedGridScore){
@@ -91,7 +96,8 @@ export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Arra
   descriptor.pages.forEach((name,i)=>{if(strFromU8(files[name])!==view.pages[i])throw Error('Dual reading page differs from shared preparation: '+name);});
  }
  const reading=content(prepared);
- admittedViews.set(reading,{source:JSON.stringify(score),descriptor:JSON.stringify(d),content:JSON.stringify(reading)});
+ freezeGraph(score);freezeGraph(m);freezeGraph(reading);
+ admittedViews.set(reading,{score,manifest:m,reading});
  return {score,pages:prepared.iso.pages,reading};
 }
 
@@ -128,11 +134,14 @@ export async function prepareDualReadingPackage(input:{score:QuantizedGridScore;
  * recipe or musical progress identity. The caller saves only its view cursor. */
 export function selectReadingNotation(p:ScorePackage,notation:ReadingNotation):ScorePackage {
  if(notation!=='iso'&&notation!=='tab')throw Error('Unsupported reading notation.');
- const dual=p.reading?.dual;if(!dual)throw Error('This score has no admitted dual notation.');
- const admission=admittedViews.get(p.reading!);
- if(!admission||admission.source!==JSON.stringify(p.score)||admission.descriptor!==JSON.stringify(p.manifest.reading)||
-  admission.content!==JSON.stringify(p.reading))throw Error('Dual notation must retain its actual receiving-realm admission.');
- const view=dual.views[notation];
- const reading={...p.reading!,owners:view.owners,geometryEvidence:view.geometryEvidence as ReadingContent['geometryEvidence'],dual:{...dual,notation}};
- admittedViews.set(reading,{...admission,content:JSON.stringify(reading)});return {...p,pages:view.pages,reading};
+ const inputReading=p.reading,admission=inputReading&&admittedViews.get(inputReading);
+ if(!admission||p.score!==admission.score||p.manifest!==admission.manifest)
+  throw Error('Dual notation must retain its actual receiving-realm admission.');
+ // Only private immutable replay output supplies the selected geometry.
+ // Caller packages, serializers, accessors and Proxy views supply no new ink.
+ const dual=admission.reading.dual!,view=dual.views[notation],
+  reading:ReadingContent={...admission.reading,owners:view.owners,
+   geometryEvidence:view.geometryEvidence as ReadingContent['geometryEvidence'],dual:{...dual,notation}};
+ freezeGraph(reading);admittedViews.set(reading,admission);
+ return {...p,score:admission.score,manifest:admission.manifest,pages:view.pages,reading};
 }

@@ -34,7 +34,8 @@ test('dual context does not accept forged realm certificates and owns snapshots 
  await assert.rejects(ManualReadingContext.open(structuredClone(original)),/receiving-realm/);
  const p=await importPackage(await authoredFrettedPackage()),plan=await planManualPractice(p,'fixed-four-v1'),saved=manualPracticeRecord(plan,initialPractice(plan)),
   pending=ManualReadingContext.open(p,saved,undefined,'fixed-four-v1');
- p.manifest.scoreId='changed-after-open';p.reading!.dual!.views.iso.scene.components[0].tick++;saved.state.working=55;
+ p.manifest={...p.manifest,scoreId:'changed-after-open'};p.reading=structuredClone(p.reading!);
+ p.reading!.dual!.views.iso.scene.components[0].tick++;saved.state.working=55;
  const c=await pending;assert.equal(c.package.manifest.scoreId,'authored-fretted-dual');assert.deepEqual(c.plan,plan);assert.equal(c.state.working,10);
  assert.equal(Object.isFrozen(c.package.score),true);assert.equal(Object.isFrozen(c.package.reading!.dual!.views.tab.scene),true);
 });

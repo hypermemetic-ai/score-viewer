@@ -19,8 +19,8 @@ function fixture(){
   adoptRepeat:r=>{calls.push('adopt');clock.time=r.countStartMs;return {countStartMs:r.countStartMs,startMs:r.startMs,extraBeats:0,totalGapBeats:4};},
   beginRepeat:async(_b,_d,p)=>{calls.push('beginRepeat');clock.time=p.boundaryMs+p.repeatBarMs;return {countStartMs:clock.time,startMs:clock.time+p.countInMs,extraBeats:4,totalGapBeats:8};},
   cancelRepeat:async()=>undefined,stop:async()=>{calls.push('stop');},close:()=>{calls.push('close');}};
- const errors:string[]=[],transport=new ManualPracticeTransport(s,api,()=>{},m=>errors.push(m));
- return {s,clock,calls,transport,errors,setMode:(m:typeof armMode)=>{armMode=m;},resolve:()=>resolveArm?.(undefined)};
+ const errors:string[]=[],changes:string[]=[],transport=new ManualPracticeTransport(s,api,()=>changes.push(s.phase),m=>errors.push(m));
+ return {s,clock,calls,transport,errors,changes,setMode:(m:typeof armMode)=>{armMode=m;},resolve:()=>resolveArm?.(undefined)};
 }
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 test('manual repeat adopts the full source-bar cue without a second audio restart or measured evidence',async()=>{
@@ -30,6 +30,22 @@ test('manual repeat adopts the full source-bar cue without a second audio restar
  assert.equal(f.s.startMs,end+practiceTiming(100,f.s.pulseGrid).countInMs);assert.deepEqual(f.s.state.best,{});
  f.transport.update();assert.equal(f.s.windows.index,0);assert.equal(countBeatAt(0,100,f.s.pulseGrid),'1');
  assert.deepEqual(f.errors,[]);f.transport.close();assert.equal(f.calls.at(-1),'close');
+});
+test('a stale start after close has no audio, rate, phase or notification side effects',async()=>{
+ const f=fixture();f.transport.close();const calls=[...f.calls],changes=[...f.changes],state=structuredClone(f.s.state);
+ await f.transport.start();f.transport.prepare();f.transport.update();f.transport.pause();
+ assert.deepEqual(f.calls,calls);assert.deepEqual(f.changes,changes);assert.deepEqual(f.s.state,state);
+ assert.equal(f.s.phase,'paused');assert.deepEqual(f.errors,[]);
+});
+test('closing while initial begin or repeat preparation is pending fences every continuation',async()=>{
+ const f=fixture();let resolveBegin!:(origin:number)=>void;
+ f.transport.clock.begin=()=>{f.calls.push('begin');return new Promise(resolve=>{resolveBegin=resolve;});};
+ const pending=f.transport.start();f.transport.close();const calls=[...f.calls],changes=[...f.changes],state=structuredClone(f.s.state);
+ resolveBegin(1000);await pending;assert.deepEqual(f.calls,calls);assert.deepEqual(f.changes,changes);assert.deepEqual(f.s.state,state);
+ assert.equal(f.s.phase,'paused');assert.equal(f.calls.includes('arm'),false);
+ const g=fixture();g.setMode('pending');await g.transport.start();g.transport.close();const after=[...g.calls],notifications=[...g.changes];
+ g.resolve();await settle();assert.deepEqual(g.calls,after);assert.deepEqual(g.changes,notifications);assert.equal(g.s.phase,'paused');
+ assert.equal(g.calls.includes('adopt'),false);assert.equal(g.calls.includes('beginRepeat'),false);
 });
 test('a refused pre-arm uses the existing repeat clock whole-bar fallback and retains a complete cue',async()=>{
  const f=fixture();f.setMode('refused');await f.transport.start();await settle();const end=f.s.startMs+f.s.durationMs;
