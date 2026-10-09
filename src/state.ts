@@ -1,6 +1,8 @@
 import type {ScorePackage,FingerLayer,Seat,Attack,Metadata} from './package';
 import {CONVENTIONAL_PIANO,physicalContact,type PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {FingerBehavior,FingerPresentation} from './input';
+import {getOriginalScoreIdentity} from './score-transposition';
+import {validTranspositionSelection,type ScoreTranspositionSelection} from './score-transposition-selection';
 export type Rotation=0|90|180|270;export type LabelMode='pitch'|'finger';export type FingerSet='calculated'|'yours';
 export interface ViewState {page:number;rotation:Rotation;scale:1|.9|.75|.5;count:1|2|3;advance:'slide'|'group';labelMode:LabelMode;fingerSet:FingerSet}
 export const defaultView=():ViewState=>({page:0,rotation:0,scale:1,count:1,advance:'slide',labelMode:'pitch',fingerSet:'yours'});
@@ -15,11 +17,11 @@ const personalBinding=(p:ScorePackage):PersonalBinding|undefined=>{
  return {sourceRevision:p.sourceRevision,keyboardLayout:p.keyboardLayout,profileId:p.profileId,profileSha256:p.profileSha256,effectiveHandSha256:p.effectiveHandSha256,
   ...(p.preparationIdentity?{editionRevision:p.manifest.revision}:{})};
 };
-export const collectionId=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
+export const collectionId=(p:ScorePackage)=>getOriginalScoreIdentity(p);
 function storageName(kind:string,entryId:string,p:ScorePackage):string{
  const binding=personalBinding(p);
  if(!binding)return `${kind}-${entryId}.json`;
- return `${kind}-${binding.sourceRevision}-${binding.keyboardLayout}-${binding.profileSha256}-${binding.effectiveHandSha256}${binding.editionRevision?'-'+binding.editionRevision:''}.json`;
+ return `${kind}-${collectionId(p)}-${binding.keyboardLayout}-${binding.profileSha256}-${binding.effectiveHandSha256}${binding.editionRevision?'-'+binding.editionRevision:''}.json`;
 }
 export const personalStorageName=(entryId:string,p:ScorePackage)=>storageName('state',entryId,p);
 export const practiceStorageName=(entryId:string,p:ScorePackage)=>storageName('practice',entryId,p);
@@ -78,7 +80,7 @@ export function viewportFit(w:number,h:number,v:ViewState,total:number,pageWidth
 }
 export function turnPage(v:ViewState,dir:1|-1,total:number,effectiveCount:number):ViewState{return {...v,page:Math.max(0,Math.min(total-1,v.page+dir*(v.advance==='group'?effectiveCount:1)))};}
 export const rotate=(r:Rotation)=>(r+90)%360 as Rotation;
-export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>}
+export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>;transposition?:ScoreTranspositionSelection}
 export function validEntryStorage(e:Entry):boolean {
  const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v),
    packageName=(v:unknown)=>typeof v==='string'&&/^package-[a-f0-9]{64}\.isoscore$/.test(v),
@@ -88,6 +90,6 @@ export function validEntryStorage(e:Entry):boolean {
  if(!e||!/^[a-f0-9]{64}$/.test(e.id)||!packageName(e.file)||!stateMap(e.personalFiles)||
    e.presentations!==undefined&&!Array.isArray(e.presentations)||e.retainedPackages!==undefined&&!Array.isArray(e.retainedPackages))return false;
  const packages=[e.file,...(e.presentations??[]),...(e.retainedPackages??[])];
- return packages.every(packageName)&&(e.editionPersonalFiles===undefined||object(e.editionPersonalFiles)&&
+ return packages.every(packageName)&&(e.transposition===undefined||validTranspositionSelection(e.transposition,e.file,packages))&&(e.editionPersonalFiles===undefined||object(e.editionPersonalFiles)&&
    Object.entries(e.editionPersonalFiles).every(([file,map])=>packageName(file)&&packages.includes(file)&&stateMap(map)));
 }
