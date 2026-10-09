@@ -78,6 +78,12 @@ The selected offset SHALL persist for the original score and apply consistently 
 - **THEN** the exact admitted retained baseline permits 0 restoration on the receiving computer
 - **AND** cached offset editions are reused only when baseline, selected per-layout hand map and hand-policy context match the current request
 
+#### Scenario: First add another keyboard while transposed
+- **WHEN** the original archive lacks the newly selected keyboard presentation
+- **THEN** ordinary keyboard preparation retains an admitted untransposed companion for that new layout before activating its transposed view
+- **AND** the original existing keyboard archives, pages and journals remain exact, and neither the intermediate companion nor a different keyboard activates as a side effect
+- **AND** later selecting 0 uses the retained untransposed edition for the requested keyboard without regenerating an existing original view
+
 #### Scenario: Failure or newer request during generation
 - **WHEN** generation fails, is cancelled, or is superseded by another score/offset request
 - **THEN** it cannot activate stale output, overwrite original journals, or leave the visible value disagreeing with the selected score
