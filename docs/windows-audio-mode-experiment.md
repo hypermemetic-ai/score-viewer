@@ -1,0 +1,43 @@
+# Isolated Windows audio route comparison
+
+This draft experiment is separate from the incremental shared-queue repair in PR40. It adds no application mode control, driver, dependency or release input. Its source is based on merged Viewer `d7dc1e324a532df50e5264680ee704c67a10d77b`, with the existing notation dependency unchanged. The renderer and capture entries compile only under `cfg(test)` and are ignored by ordinary tests. Do not merge this experiment into the current runtime freeze.
+
+The user approved a comparison of shared, exclusive and ASIO routes. The earlier perceived delay was from an older build and was later estimated roughly 30 ms; it is not a reproduced 100 ms symptom in the current installed application. This experiment measures controlled virtual native notes and a digital return. It does not measure hardware MIDI ingress, the DAC, the loudspeaker or human perception.
+
+## Fixed comparison
+
+All modes use the production Mixer and pinned sfizz PianoEngine, the already admitted installed Live SFZ, volume 0.04, 256-frame sampler quantum, and the existing voices/preload/quality/controller setup. Initial tools match Rust opt-level 0 and C++ Release. This is an explicitly instrumented test profile, not an installed release performance certificate.
+
+The asynchronous producer plays C4, E4 and G4 at 400, 747 and 1109 ms, velocity 100. Each note releases 100 ms later; CC120 follows 250 ms after attack, producing a quiet interval before the next attack. The renderer runs for three seconds. This is a sparse three-attack test with service observations, not sustained polyphony or a heavy-load stability certificate. A later common workload requires an explicit bounded schedule.
+
+MOTU comparisons transiently open explicit Out 1–2 at its unchanged 44.1 kHz rate. Realtek comparisons open the explicit built-in endpoint at its unchanged 48 kHz rate. Results from different endpoints/rates are not pooled. The saved application preference for MOTU Out 3–4 remains unchanged. The sole Windows coordinator preserves/stops/restores the ordinary application as needed for exclusive ownership. This source never changes defaults, rates, enhancements, endpoint volume, driver or registry.
+
+Shared uses the actual production event host at tier 0 and its bounded queue target. A test-only prepared-open wrapper defers Start until the common gate; the ordinary application's open path always starts as before. Exclusive requires exact `S_OK` integer-PCM format support at the current mix rate, first trying 24 valid bits left-aligned in a 32-bit container, then PCM16. `S_FALSE` is not admission. It requests the advertised exclusive minimum with equal nonzero event duration/period. An alignment refusal obtains the aligned capacity, releases that client and initializes a fresh client. Prime and every event write exactly the full exclusive packet. No shared padding/refill policy is used for exclusive.
+
+Exclusive records initialized duration, actual packet size, stream-latency metadata, integer representation and alignment retry. These values are not an ear-latency measurement, and ping-pong allocation does not by itself imply a one-period or two-period physical bound. Service timing and audio-clock position/QPC accompany every committed packet. Shared and exclusive ReleaseBuffer brackets, and ASIO OutputReady or callback-return proxy, retain their different meanings.
+
+## Common pure digital return
+
+The [official MOTU M-Series manual, page 23](https://cdn-data.motu.com/manuals/usb-c-audio/M_Series_User_Guide.pdf) documents that pure Loopback returns Out 1–2; Loopback Mix adds live physical inputs. The collector opens only the reviewed pure capture endpoint `{0.0.1.00000000}.{ab6d0c57-ec15-4272-8aa6-a0e28e38f9e3}` and requires its exact Loopback name, MOTU family and reviewed driver identity. It never opens Loopback Mix, physical inputs, a microphone or monitoring. It uses ordinary capture, not the shared-only render-endpoint WASAPI loopback flag.
+
+The collector requires unchanged stereo 44.1 kHz float32 capture. Unsupported format or simultaneous render/capture operation is an explicit refusal; no route or rate substitution occurs. Before Start it reserves PCM and packet storage. It records an eight-second leading-silence stream, every packet's first-frame QPC100ns, device position, flags and sample index. File writes occur after Stop, except the bounded readiness marker. Sample/packet collection is preallocated; there is no file I/O in the packet-acquire/release interval.
+
+The source WAV represents actual packed submitted PCM normalized to float32. Integer quantization is retained for signature matching. The prepacking synth trace is a separate observation, relative to the concatenated submitted sequence excluding priming silence; it is not a device playback position.
+
+`scripts/validate-audio-mode-capture.py` joins source and capture by an execution nonce and absolute Windows QPC100ns. It requires a fixed three-note signature with correlation at least 0.98, a 50 ms quiet baseline no greater than 1e-8, and a fixed ±2-frame alignment search. It validates the union of the actual quiet/signature sample interval and its QPC interval, including adjacent predecessors. Discontinuity, timestamp-error, noncontiguous device/sample position, equal/backward QPC or incomplete coverage refuses evidence. The unchanged 100 µs fine timestamp gate is reported separately; failure is not converted into a precise pass. Coarse onset brackets use the actual QPC timestamps of the packets bracketing the matched onset, without nominal-rate interpolation. They bound digital return only.
+
+## Bounded execution handshake
+
+Source/PE/guard review and root admission precede any Windows run. One coordinator owns the desktop and audio lane. Use fresh per-renderer and per-collector report directories and a common random 32-hex nonce. No experiment may overlap native installation or another endpoint test.
+
+1. Launch the chosen renderer ignored-test entry with explicit reviewed mode/endpoint/SFZ/report directory/nonce. It prepares the client, loads the engine, allocates telemetry, and writes `renderer-ready.json` before Start. Missing start permission times out after 60 seconds.
+2. After renderer readiness, launch the pure collector ignored-test entry with its own fresh directory and the same nonce. Wait for `collector-ready.json`, which records Start and its absolute QPC100ns.
+3. Write the renderer's `renderer-start.json` with `qpc100ns` from a current QueryPerformanceCounter conversion and the matching nonce. A stale or unrelated nonce/clock is refused. Renderer then starts and the producer has a fixed 400 ms quiet lead. This order keeps cold bank loading outside the capture interval.
+4. Wait for both bounded entries to exit. Retain raw logs, readiness/start markers, `render.json`, `source.wav`, `capture.json` and `pure-capture.wav`; run the validator under the resource launcher. Reject missing, mixed or failed evidence.
+5. Verify every temporary process stopped and the original application, shortcut, settings, bank, endpoint/defaults and routing were restored. Preservation is the executor's independently checked receipt, not a self-certification by this tool.
+
+Renderer environment: `VIEWER_MODE=shared|exclusive`, `VIEWER_MODE_ENDPOINT` (reviewed explicit Out 1–2 or Realtek ID), `VIEWER_MODE_SFZ`, `VIEWER_MODE_REPORT_DIR`, `VIEWER_MODE_NONCE`. Collector requires only report directory and nonce. Exact test filters are `practice_audio::platform::modes_diagnostic::compare_route` and `practice_audio::platform::modes_diagnostic::pure_motu_collector`, with `--exact --ignored --nocapture --test-threads=1`. Onboard output-only runs omit collector; their commit/driver metadata cannot establish a captured key-to-output ladder.
+
+## Source references and limits
+
+The implementation follows Microsoft's [exclusive-mode streams](https://learn.microsoft.com/en-us/windows/win32/coreaudio/exclusive-mode-streams), [IAudioClient::Initialize](https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudioclient-initialize) and [IAudioRenderClient::GetBuffer](https://learn.microsoft.com/en-us/windows/win32/api/audioclient/nf-audioclient-iaudiorenderclient-getbuffer) contracts. [WASAPI loopback](https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording) is shared-only and is not used as exclusive-mode evidence. Exact exclusive format/period, capture coexistence and real service behavior remain actual-device questions until execution. No completed route ranking or audible acceptance is claimed by source compilation.
