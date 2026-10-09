@@ -6,8 +6,8 @@ const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;
 export interface PracticeBindingContext {active:boolean;measureNavigation:boolean}
 export interface OptionsBindingRow {action:ReadingAction;label:string}
 /** A display projection only: hidden actions retain their shared stored controls. */
-export function optionsBindingRows(practice?:PracticeBindingContext,capabilities?:ScoreCapabilities):OptionsBindingRow[] {
- const candidates=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:readingActions;
+export function optionsBindingRows(practice?:PracticeBindingContext,capabilities?:ScoreCapabilities,reader?:boolean):OptionsBindingRow[] {
+ const candidates=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:reader===false?['practiceSettings'] as ReadingAction[]:readingActions.filter(action=>reader!==true||action!=='done');
  const actions=candidates.filter(action=>!capabilities||
   !['toggle','edit'].includes(action)&&action!=='done'||
   ['toggle','edit'].includes(action)&&capabilities.pianoPreparation||action==='done'&&capabilities.pianoPractice);

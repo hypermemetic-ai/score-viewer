@@ -13,6 +13,13 @@ test('Options projects supported practice rows without changing shared binding i
  assert.equal(JSON.stringify(bindings),before);assert.deepEqual(bindings.actions.edit,[{kind:'key',key:'KeyE'},{kind:'key',key:'F11'}]);assert.deepEqual(bindings.actions.previous,[{kind:'key',key:'PageUp'},null]);
 });
 
+test('library Options exposes only its usable shared action and keeps every saved reader control',()=>{
+ const bindings=replaceControl(readControlBindings(undefined,{bindings:defaultBindings()}),'practiceSettings',0,{kind:'key',key:'KeyQ'}),before=JSON.stringify(bindings);
+ assert.deepEqual(optionsBindingRows(undefined,undefined,false),[{action:'practiceSettings',label:'Options'}]);
+ assert.equal(JSON.stringify(bindings),before);assert.equal(bindings.actions.practiceSettings[0]?.kind,'key');
+ assert.deepEqual(optionsBindingRows(undefined,undefined,true).map(row=>row.action),readingActions.filter(action=>action!=='done'));
+});
+
 test('musical reading exposes page and option bindings without replacing stored piano bindings',()=>{
  const bindings=readControlBindings(undefined,{bindings:defaultBindings()}),before=JSON.stringify(bindings),
   capabilities=scoreCapabilities({manifest:{version:3}});
