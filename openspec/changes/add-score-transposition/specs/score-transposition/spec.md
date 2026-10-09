@@ -15,13 +15,13 @@ An opened score SHALL expose Transpose in the visible Score section of Options. 
 - **AND** Enter starts editing, typing or edit-mode Up/Down changes the draft by whole steps, Enter commits, and Escape cancels the draft
 - **AND** browse-mode arrows navigate options without changing pitch or selecting the mouse chevrons
 
-#### Scenario: Explain the pitch offset
+#### Scenario: Concise transposition row
 - **WHEN** Transpose is shown
-- **THEN** a short explanation makes the direction and 0 restoration understandable without using semitones as the visible unit
-- **AND** one step raises or lowers the sounding pitch by one adjacent chromatic pitch
+- **THEN** the row contains its label, numeric value, steps unit and mouse chevrons without explanatory commentary
+- **AND** a concise validation error appears only when needed
 
 ### Requirement: Complete musical pitch transformation
-An admitted transposition SHALL shift all sounding pitch references by the same integer offset while preserving musical timing, source owner/bar identities, hand assignments, repeats, grace timing and relation meaning. Legal offsets SHALL respect the supported instrument range. Unsupported pitch-bearing structures SHALL refuse explicitly; pitches SHALL NOT wrap, clip or fold octaves.
+An admitted transposition SHALL shift all sounding pitch references by the same integer offset, with each step moving one adjacent chromatic pitch, while preserving musical timing, source owner/bar identities, hand assignments, repeats, grace timing and relation meaning. Legal offsets SHALL respect the supported instrument range. Unsupported pitch-bearing structures SHALL refuse explicitly; pitches SHALL NOT wrap, clip or fold octaves.
 
 #### Scenario: Notes, repeat overrides, ties and pitched grace notes
 - **WHEN** a supported source is transposed upward or downward

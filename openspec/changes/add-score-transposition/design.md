@@ -50,7 +50,7 @@ Alternatives rejected: a global preference wrongly affects unrelated pieces; sto
 
 ### Shared Score section and numeric interaction
 
-Replace the outer Score disclosure with a normal section heading and current piece subtitle. Reader ordering is Score, then existing general sections; practice ordering is Practice, Score, then those sections. Keep established Options binding/footer/navigation and shared styling. Use the numeric control's existing draft and chevron semantics for Transpose, with centered integer value and an external steps label. Short helper text explains upward/downward offsets and 0 restoration.
+Replace the outer Score disclosure with a normal section heading and current piece subtitle. Reader ordering is Score, then existing general sections; practice ordering is Practice, Score, then those sections. Keep established Options binding/footer/navigation and shared styling. Use the numeric control's existing draft and chevron semantics for Transpose, with centered integer value and an external steps label. The row has no explanatory commentary; show only a concise validation error when needed.
 
 Place Generate fingerings and Share score in a prominent compact action group immediately below settings. Keep the current calculation/history, retained-edition/header and cancel behaviors where applicable. Display correction count with applicable export/restore and undo actions without irrelevant disabled buttons. Put provenance and font-license access in Source & review after the useful controls. Do not add a new global shortcut, reset button or alternative options dialog.
 
