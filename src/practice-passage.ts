@@ -13,15 +13,23 @@ import {projectRelations,type InkBox,type ProjectedRelation} from './practice-re
 const ns='http://www.w3.org/2000/svg';
 const projectedRelationPaint='.janko-phrase,.janko-phrase-grid-knockout,path[data-tie-note]';
 const carrierCache=new WeakMap<ScorePackage,ReturnType<typeof fingeringCarriers>>();
+const pageCache=new WeakMap<ScorePackage,Map<number,{source:string;doc:Document}>>();
+/** Keep at most eight private read-only source pages per live package. Each
+ * crop imports its own mutable ink; exact page bytes invalidate old parses. */
+function sourcePage(p:ScorePackage,page:number):Document {
+ let pages=pageCache.get(p);if(!pages){pages=new Map();pageCache.set(p,pages);}
+ const source=p.pages[page],saved=pages.get(page);if(saved?.source===source){pages.delete(page);pages.set(page,saved);return saved.doc;}
+ const doc=new DOMParser().parseFromString(source,'image/svg+xml');pages.delete(page);pages.set(page,{source,doc});if(pages.size>8)pages.delete(pages.keys().next().value!);return doc;
+}
 export interface Crop {bar:number;svg:SVGSVGElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
 /** Copy real-engine ink; attach source group ownership to existing vector elements, never invent notes. */
 export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  const seats=p.seats.filter(s=>s.writtenBar===bar+1);let first=seats[0],doc:Document,system:Element;
- if(first){doc=new DOMParser().parseFromString(p.pages[first.page],'image/svg+xml');system=doc.querySelector(`#system-${first.system+1}`)!;}
+ if(first){doc=sourcePage(p,first.page);system=doc.querySelector(`#system-${first.system+1}`)!;}
  else {
   // A rest-only bar has no pitch seat. Use the real engine's printed system
   // label and bar rules, never fabricate a blank score or musical head.
-  const systems=p.pages.flatMap((svg,page)=>{const d=new DOMParser().parseFromString(svg,'image/svg+xml');return [...d.querySelectorAll('[id^="system-"]')].map(el=>({doc:d,system:el,page,index:Number(el.id.slice(7))-1,start:Number(el.querySelector('.janko-measure-num')?.textContent)}));}).sort((a,b)=>a.start-b.start);
+  const systems=p.pages.flatMap((_svg,page)=>{const d=sourcePage(p,page);return [...d.querySelectorAll('[id^="system-"]')].map(el=>({doc:d,system:el,page,index:Number(el.id.slice(7))-1,start:Number(el.querySelector('.janko-measure-num')?.textContent)}));}).sort((a,b)=>a.start-b.start);
   const i=systems.findIndex((s,i)=>Number.isSafeInteger(s.start)&&s.start<=bar+1&&(systems[i+1]?.start??plan.barTicks.length)>bar+1),entry=systems[i];
   if(!entry)throw Error(`The vector score has no measure boundary map for measure ${bar+1}.`);
   doc=entry.doc;system=entry.system;first={page:entry.page,system:entry.index} as Seat;
