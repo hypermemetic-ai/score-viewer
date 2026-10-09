@@ -1,7 +1,7 @@
-import type {PracticeChunk,PracticePlan,PracticeSession} from './practice';
+import type {PracticeChunk,PracticePassagePlan,PracticePlan,PracticeSession} from './practice';
 
 /** Free view uses a selection-relative two-bar step and a bounded final tail. */
-export function passageWindows(plan:PracticePlan,chunk:PracticeChunk):number[][] {
+export function passageWindows(plan:PracticePassagePlan,chunk:PracticeChunk):number[][] {
  const first=chunk.firstBar,lastStart=Math.max(first,chunk.lastBar-3),starts=new Set<number>([first,lastStart]);
  for(let bar=first;bar<=lastStart;bar+=2)starts.add(bar);
  return [...starts].sort((a,b)=>a-b).map(start=>Array.from({length:Math.min(4,chunk.lastBar-start+1)},(_,i)=>start+i));

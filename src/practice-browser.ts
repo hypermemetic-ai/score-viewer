@@ -1,5 +1,5 @@
 import {fitLeafPreview} from './practice-crop-fit';
-import {practicePercent,reconcilePassages,type PracticeChunk,type PracticePlan,type PracticeState} from './practice';
+import {practicePercent,reconcilePassages,type PracticeChunk,type PracticePassagePlan,type PracticeState} from './practice';
 import {displayedComponentsAttained,displayedPracticeProgress,displayedPracticeTotal} from './practice-display';
 import {attainmentLabel} from './tempo-presentation';
 
@@ -16,7 +16,7 @@ export function practiceListScrollTop(scrollTop:number,height:number,max:number,
 /** Navigation state is separate from assessment; browsing never records a played run. */
 export class PracticeBrowser {
  selected:string;parent?:string;component?:string;includeManual=true;private recommended?:string;private retainedSelection?:string;
- constructor(readonly plan:PracticePlan){this.selected=plan.chunks[0]?.id??'';}
+ constructor(readonly plan:PracticePassagePlan){this.selected=plan.chunks[0]?.id??'';}
  private tree(state:PracticeState){return reconcilePassages(this.plan,structuredClone(state));}
  progress(chunk:PracticeChunk,state:PracticeState){return displayedPracticeProgress(chunk,state,this.includeManual);}
  setIncludeManual(include:boolean){this.includeManual=include;this.retainedSelection=this.selected;}

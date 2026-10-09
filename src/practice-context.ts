@@ -1,4 +1,4 @@
-import {initialPractice,readPractice,passageHierarchy,planPractice,practicePartition,type PracticePartition,type PracticePlan,type PracticeState} from './practice';
+import {initialPractice,readPractice,passageHierarchy,planPractice,practicePartition,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
 import type {ScorePackage} from './package';
 
 export type PracticePreferences=Pick<PracticeState,'start'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'>;
@@ -7,7 +7,7 @@ export function practicePreferences(state:PracticeState):PracticePreferences {
  return structuredClone({start,step,target,personalGoal,tolerance,offset,keepTempo,audioOutput});
 }
 /** Retained evidence owns its settings; a fresh pitch only inherits preferences. */
-export function practiceStateForContext(plan:PracticePlan,saved:unknown,context?:PracticeViewContext):PracticeState {
+export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,context?:PracticeViewContext):PracticeState {
  const fresh=initialPractice(plan),state=readPractice(saved??(context?.preferences?{...fresh,...context.preferences,working:context.preferences.start}:undefined),plan);
  return context?restorePracticeGrouping(plan,state,context):state;
 }
@@ -24,7 +24,7 @@ export interface PracticeViewContext {
  passage?:string;window?:[number,number];
  preferences?:PracticePreferences;
 }
-export function restorePracticeGrouping(plan:PracticePlan,state:PracticeState,context:PracticeViewContext):PracticeState {
+export function restorePracticeGrouping(plan:PracticePassagePlan,state:PracticeState,context:PracticeViewContext):PracticeState {
  if(plan.partition!==context.partition)return state;
  // Both trees must be independently sound. A retained tree has priority when
  // the old navigation joins would cross it; played evidence is never removed.
