@@ -7,13 +7,14 @@ import {canonicalJson,authorityIdentity,preparationRequestIdentity} from './pian
 import {validatePianoCalculationContext,scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {prepareCalculatedEdition} from './calculated-hand-edition';
 import {createScoreTransposition,getScoreTransposition} from './score-transposition';
+import type {PackageAdmissionSession} from './package-admission-session';
 const equal=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 const exactBytes=(a:Uint8Array,b:Uint8Array)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
 
 /** Reader-realm admission is bound to the independently admitted ORIGINAL
  * request, not the returned package's internally consistent claims. */
-export async function admitPianoRequestResult(request:PianoReadinessRequest,p:ScorePackage,bytes:Uint8Array,layer:FingerLayer|undefined,personal:PersonalState|undefined):Promise<void>{
-  const original=await importPackage(request.packageBytes,{allowLegacyTempo:true}),has=original.availablePresentations?.includes(request.layout)??original.keyboardLayout===request.layout,
+export async function admitPianoRequestResult(request:PianoReadinessRequest,p:ScorePackage,bytes:Uint8Array,layer:FingerLayer|undefined,personal:PersonalState|undefined,admission?:PackageAdmissionSession):Promise<void>{
+  const original=await (admission?admission.import(request.packageBytes,{allowLegacyTempo:true}):importPackage(request.packageBytes,{allowLegacyTempo:true})),has=original.availablePresentations?.includes(request.layout)??original.keyboardLayout===request.layout,
     prior=has?await selectPresentation(original,request.layout):original,
     saved=request.personal?readPersonal(request.personal,prior):undefined;
   const steps=request.transposeSteps??getScoreTransposition(prior),pitchChanged=steps!==getScoreTransposition(prior);

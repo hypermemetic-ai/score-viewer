@@ -1,0 +1,34 @@
+# Package admission performance audit
+
+This change removes repeated validation of identical bytes within one operation without granting a saved package or worker certificate new authority. Default `importPackage` remains cold. Application open/import/keyboard hooks are a separate coordinated follow-up; module timings below are not complete-open or native-installation claims.
+
+## Measured causes and scope
+
+Original retained Zelda has 204 source owners, 207 physical seats and three pages in each saved keyboard layout. Original/+1 conventional/+1 Jankó cold import replays complete source engraving, receipts and annotation geometry. Profiling attributes most cost to that actual replay; unzip and literal member hashes do not account for the multi-second delay.
+
+An ordinary Chromium readiness Worker took 11.9–12.7 seconds for the original saved edition: 4.1–4.5 seconds in worker computation/initialization and 7.8–8.2 seconds in receiving validation. Actual full-main open separately measured 22–34 seconds. Those app observations include library/main preparation and are distinct from isolated imports. The retained reading path previously repeated actual source replay despite requesting unchanged saved pages.
+
+Two source changes have independent ISO review:
+
+- PR342, merged `e5ca92f1928aee4bbd58975b4db9caa4787bb106`, reads each final system's rest paint once per preparation instead of rebuilding its complete scene per source silence. Original Zelda's coverage scene evaluations fall from 126 to 21; whole import improves modestly, approximately 4–8% in the matched local observations.
+- PR343, merged `abe03c02ac000e5dd1ee5964e0356bd77aeddab2`, returns ephemeral written-head IDs during existing seat construction. It creates no extra layout or scene and changes no serialized page, seat, receipt or fingerprint. Exact four-edition head lookup replaces a 1.6–1.9-second independent replay with a bounded signature/ID lookup. This is a lookup improvement, not a claim that complete practice or opening is that much faster.
+
+## Authority and ownership
+
+`PackageAdmissionSession` copies bytes and effective admission options before awaiting, then owns strict cold admission of the full companion/transposition graph. Private canonical values never escape. Every result is an independent deep clone with this realm's private companion registrations. Keyboard selection chooses only an actually admitted companion; strict/legacy tempo permissions are separate admission keys. Production compiled module identity scopes the authority to its realm; no state or evidence crosses a worker boundary or is persisted.
+
+Retention is at most two entries and 64 MiB of represented archive/member/unique-graph/binding material. Accounting is an explicit logical budget, not exact JavaScript heap or RSS. There is one distinct cold producer: identical requests coalesce, distinct concurrent misses refuse busy, and clear invalidates retention without releasing an active producer's slot. The latest library refresh waits for that producer, then checks its generation and live context; stale refreshes cannot publish. Library progress records are reread on every refresh.
+
+Every session copy checks applicable actual annotation font authority. Browser controls introduce an additional loaded face with the same measured family: reuse and written-head access refuse, the entry is evicted, and restoration permits only a fresh actual cold import. Node session copies reread and hash the font asset. The synchronous head accessor checks the already admitted font policy and current live browser face; it does not claim to synchronously monitor arbitrary Node filesystem changes.
+
+Written-head records live only in a private WeakMap populated after all actual replay/geometry/coverage/receipt comparisons and all outer/companion checks succeed. The getter checks semantic/source/seat/recipe/authority state, literal page data and private membership of the actual graph objects, then returns copied IDs. Caller-installed claims, changed semantics/pages, accessors, substituted Proxies and unknown objects cannot attach evidence. Only the private clone factory can transfer exact evidence and recapture object membership in its own new graph. Unknown/changed packages retain the existing exact source replay fallback.
+
+Every returned Worker archive still gets first cold admission in a fresh receiving session. Independent request binding may reuse only exact bytes admitted there, and independently checks source, tempo, transposition, hands, policy, personal state and layer. No request result is cached. Direct saved reading uses a fresh operation session's cold admission and the existing readiness/binding checks only for saved matching layout/tempo/pitch without force. Changed inputs, missing views and new calculations retain Worker execution and its original refusal rules. Cancellation terminates the owned worker and invalidates late retention.
+
+## Evidence and remaining work
+
+Private measurements and fixture hashes live under `~/.local/state/score-viewer-performance-admission-20261009`. `immutable-gates.mjs` independently cold-admits all four retained Zelda views and the 1,013-owner/10-page outward bass archive. After both deliberate dependency advances, every raw member, page, receipt, policy and original journal outcome equals the PR26 baseline; all 48 original JSON files remain hash-identical. Existing historical curved policy dispatch and crossclaim/tamper controls remain required.
+
+Session controls cover caller/options/result/companion mutation, exact-byte collision refusal, distinct producer bounds, clear while active, eviction/material budgets, actual font ambiguity and private head transfer. The real browser new-calculation control still uses an actual module Worker, emits progress and cold-admits its returned archive independently. A fast retained result cannot bypass that path.
+
+Cold imports still block the main thread for seconds. Warm cache hits and removing redundant validation do not establish responsive first-open behavior. Complete main-operation hooks and matched keyboard/heartbeat measurements remain pending. Further pure per-call final-scene reuse or cooperative yielding requires a separate concrete proposal and source review; this change introduces neither a global scene cache nor weakened admission. Native deployment and human musical acceptance are separate gates.

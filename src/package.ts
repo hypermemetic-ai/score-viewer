@@ -1,4 +1,5 @@
 import {admitReadingContent,type ReadingDescriptor,type ReadingContent} from './reading-package';
+import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady} from './annotation-ink-policy';
 import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {requirePianoEvent} from './piano-event';
 import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
@@ -17,7 +18,7 @@ import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finge
 import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {PIANO_ASSIGNMENT_VERSION,validatePianoAssignments} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {validatePianoPreparationIdentity,type PianoPreparationIdentity} from './piano-preparation-identity';
-import {sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry} from '../vendor/iso-notation/src/score-presentation';
+import {sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry,type PresentationWrittenHead} from '../vendor/iso-notation/src/score-presentation';
 import {admitCalculatedHandEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 import {admitScoreTransposition,type ScoreTransposition} from './score-transposition';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
@@ -117,6 +118,61 @@ const digest=(value:unknown):value is string=>typeof value==='string'&&/^[a-f0-9
 const layoutId=(value:unknown):value is PhysicalKeyboardId=>value==='conventional-piano'||value==='janko-four-row';
 function freezeSource(value:unknown):void{if(value&&typeof value==='object'){for(const child of Object.values(value))freezeSource(child);Object.freeze(value);}}
 const linkedViews=new WeakMap<ScorePackage,Map<PhysicalKeyboardId,ScorePackage>>();
+interface HeadObjects {objects:WeakSet<object>;count:number}
+interface WrittenHeadEvidence extends HeadObjects {signature:string;pages:string[];heads:Map<string,string[]>}
+const writtenHeadEvidence=new WeakMap<ScorePackage,WrittenHeadEvidence>();
+function headSignature(p:ScorePackage,allowed?:WeakSet<object>,capture?:HeadObjects):string {
+ const seen=new Set<object>(),literal=(value:unknown):unknown=>{
+  if(value===null||value===undefined)return [String(value)];
+  if(['string','boolean','number'].includes(typeof value)){if(typeof value==='number'&&!Number.isFinite(value))fail('Invalid head binding value');return [typeof value,value];}
+  if(typeof value!=='object'||seen.has(value))fail('Nonliteral head binding');seen.add(value);
+  // Actual imports/clones alone capture membership. A replacement Proxy may
+  // imitate descriptors while presenting different values through get traps.
+  if(allowed&&!allowed.has(value))fail('Replaced head binding object');
+  if(capture&&!capture.objects.has(value)){capture.objects.add(value);capture.count++;}
+  const array=Array.isArray(value),prototype=Object.getPrototypeOf(value);
+  if(prototype!==(array?Array.prototype:Object.prototype)&&prototype!==null)fail('Nonliteral head binding prototype');
+  if(Object.getOwnPropertySymbols(value).length)fail('Nonliteral head binding symbol');
+  const entries=Object.entries(Object.getOwnPropertyDescriptors(value)).sort(([a],[b])=>a.localeCompare(b));
+  const result=[array?'array':'object',entries.map(([key,descriptor])=>{if(!('value'in descriptor))fail('Nonliteral head binding accessor');return[key,literal(descriptor.value)];})];
+  seen.delete(value);return result;
+ };
+ return JSON.stringify(['score','sourceScore','sourceSha256','sourceRevision','seats','renderingRecipe','calculationContext',
+  'preparationIdentity','keyboardLayout','availablePresentations','calculatedHandReceipt','manifest','collectionManifest',
+  'fingerLayer','transposition','annotationGeometry','profileId','profileSha256','effectiveHandSha256'].map(key=>{
+   const descriptor=Object.getOwnPropertyDescriptor(p,key);if(descriptor&&!('value'in descriptor))fail('Nonliteral head binding accessor');
+   return[key,literal(descriptor?.value)];
+ }));
+}
+function captureHeadBinding(p:ScorePackage):HeadObjects&{signature:string}{
+ const capture:HeadObjects={objects:new WeakSet([p.pages]),count:1};
+ return {...capture,signature:headSignature(p,undefined,capture),count:capture.count};
+}
+function recordWrittenHeads(p:ScorePackage,actual:readonly PresentationWrittenHead[]):void {
+ const heads=new Map<string,string[]>();
+ if(actual.length!==p.seats.length)fail('Incomplete actual written-head ledger');
+ for(const h of actual){const s=p.seats.find(s=>s.id===h.seatId);
+  if(!s||heads.has(s.id)||s.page!==h.page||s.system!==h.system||s.x!==h.x||s.baseline!==h.baseline||s.fontSize!==h.fontSize||s.pitchDigit!==h.digit||
+   JSON.stringify([...s.ownerIds].sort())!==JSON.stringify(h.ownerIds)||!h.headIds.length||h.headIds.some(id=>typeof id!=='string'||!id))fail('Actual written-head tuple differs');
+  heads.set(s.id,[...h.headIds]);
+ }
+ writtenHeadEvidence.set(p,{...captureHeadBinding(p),pages:[...p.pages],heads});
+}
+/** Only fully admitted actual replay can register evidence. Unknown, mutated
+ * or stale-font packages retain the exact replay fallback. No caller can attach
+ * an archive claim; copied IDs never expose the private record. */
+export function admittedWrittenHeads(p:ScorePackage):ReadonlyMap<string,readonly string[]>|undefined {
+ const evidence=writtenHeadEvidence.get(p);if(!evidence)return;
+ try{
+  if(evidence.signature!==headSignature(p,evidence.objects))return;
+  const descriptor=Object.getOwnPropertyDescriptor(p,'pages');if(!descriptor||!('value'in descriptor))return;
+  const pages=descriptor.value;
+  if(!evidence.objects.has(pages)||!Array.isArray(pages)||Object.getPrototypeOf(pages)!==Array.prototype||pages.length!==evidence.pages.length||Reflect.ownKeys(pages).length!==pages.length+1)return;
+  for(let i=0;i<evidence.pages.length;i++){const descriptor=Object.getOwnPropertyDescriptor(pages,String(i));if(!descriptor||!('value'in descriptor)||descriptor.value!==evidence.pages[i])return;}
+  const policy=annotationInkPolicyFor(p);if(policy)assertAnnotationInkPolicyReady(policy);
+  return new Map([...evidence.heads].map(([seat,ids])=>[seat,[...ids]]));
+ }catch{return;}
+}
 export async function validateLayerAsync(value:unknown,p:ScorePackage,options:{history?:boolean;requireCurrent?:boolean}={}):Promise<FingerLayer>{
  if(p.manifest.version===3)fail('Piano finger choices cannot be attached to this reading score');
  if(!isObject(value))fail('Invalid finger layer');
@@ -244,7 +300,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
  if(source.performingHandPresentation||source.notes.some(n=>n.derivedHand))fail('Immutable original source cannot be substituted by a calculated display projection.');
  freezeSource(source);
- const views=new Map<PhysicalKeyboardId,ScorePackage>();
+ const views=new Map<PhysicalKeyboardId,ScorePackage>(),actualHeads=new Map<ScorePackage,readonly PresentationWrittenHead[]>();
  for(const [key,raw]of Object.entries(m.presentations)){
   if(!layoutId(key)||!isObject(raw)||raw.layoutId!==key||typeof raw.score!=='string'||typeof raw.seats!=='string'||!Array.isArray(raw.pages)||!raw.pages.length||raw.pages.some((x:unknown)=>typeof x!=='string'||!m.files[x])||
    !digest(raw.revision)||m.files[raw.score]!==raw.revision||!m.files[raw.seats]||typeof raw.profileId!=='string'||!raw.profileId||!digest(raw.profileSha256)||!digest(raw.effectiveHandSha256)||!digest(raw.layerSourceHash)||typeof raw.engineVersion!=='string'||!raw.engineVersion||
@@ -267,7 +323,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});try{validateScoreRenderingRecipe(p.renderingRecipe,{sourceSha256:m.sourceSha256!});requireReferencePerformanceTempo(planningSource);p.generationAvailable=true;}catch{p.generationAvailable=false;}}
   if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
   if(derived){if(!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
-   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats]);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
+   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats],heads=>actualHeads.set(p,heads));p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
   views.set(key,p);
  }
  if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');
@@ -277,6 +333,9 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   ['revision','engineVersion','profileId','profileSha256','effectiveHandSha256','layerSourceHash','renderingRecipe','calculatedHandReceipt'].some(key=>(d as any)[key]!==((m as any)[key]))||JSON.stringify(d.pages)!==JSON.stringify(m.pages)||JSON.stringify(d.preparationIdentity)!==JSON.stringify(m.preparationIdentity)||
   d.calculationContext!==undefined&&JSON.stringify(d.calculationContext??undefined)!==JSON.stringify(m.calculationContext))fail('Linked primary presentation differs from root manifest');
  for(const p of views.values()){p.availablePresentations=[...views.keys()];linkedViews.set(p,views);}
+ // Defer registration until every companion and outer root-manifest check
+ // succeeds. A rejected import never publishes usable partial evidence.
+ for(const [p,heads]of actualHeads)recordWrittenHeads(p,heads);
  if(options.keyboardLayout)return selectPresentation(primary,options.keyboardLayout);
  return primary;
 }
@@ -284,6 +343,49 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  * a performance reference. V2 supplied fingers and tempo-bound layers still
  * pass their strict source/clock validators; generation and practice are gated. */
 export const importPackageForReading=(bytes:Uint8Array)=>importPackage(bytes,{allowLegacyTempo:true});
+
+/** A runtime-owned admission never exposes its canonical package or bytes.
+ * Every copy preserves this realm's companion registry; another realm must
+ * independently import its own archive. This is not a serialized certificate. */
+export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyTempo?:boolean}={}):Promise<{
+ retainedBytes:number;copy(keyboardLayout?:PhysicalKeyboardId):Promise<ScorePackage>
+}> {
+ const original=await importPackage(new Uint8Array(bytes),{allowLegacyTempo:!!options.allowLegacyTempo});
+ const packages:ScorePackage[]=[],groups:Array<[ScorePackage,Array<[PhysicalKeyboardId,ScorePackage]>]>=[],seen=new Set<ScorePackage>();
+ const visit=(p:ScorePackage)=>{
+  if(seen.has(p))return;seen.add(p);packages.push(p);
+  const views=linkedViews.get(p);if(views){groups.push([p,[...views]]);for(const view of views.values())visit(view);}
+  if(p.transpositionOriginal)visit(p.transpositionOriginal);
+ };
+ visit(original);
+ const graph={original,packages,groups},counted=new Set<object>();
+ // Count each shared object/buffer once, without serializing duplicate paths
+ // through the companion graph. This is a conservative material budget, not
+ // a claim about the VM's object headers or string interning.
+ const size=(value:unknown):number=>{
+  if(typeof value==='string')return value.length*2;
+  if(!value||typeof value!=='object')return 16;
+  if(counted.has(value))return 0;counted.add(value);
+  if(value instanceof Uint8Array)return value.byteLength+64;
+  return 64+Object.entries(value).reduce((n,[key,item])=>n+32+key.length*2+size(item),0);
+ },retainedBytes=size(graph)+packages.reduce((n,p)=>{const record=writtenHeadEvidence.get(p);return n+(record?record.signature.length*2+JSON.stringify([...record.heads]).length*2+record.pages.length*16+record.count*32:0);},0);
+ return {retainedBytes,async copy(keyboardLayout){
+  // A cached package cannot grant a stale or ambiguous font family authority.
+  // In Node this also rereads and hashes the actual font file on every use.
+  for(const p of packages){const policy=annotationInkPolicyFor(p);if(policy)await ensureAnnotationInkPolicyReady(policy);}
+  const clone=structuredClone(graph);
+  for(const [p,views]of clone.groups)linkedViews.set(p,new Map(views));
+  for(let i=0;i<packages.length;i++)if(packages[i].sourceScore&&Object.isFrozen(packages[i].sourceScore))freezeSource(clone.packages[i].sourceScore);
+  for(let i=0;i<packages.length;i++){const p=packages[i],evidence=writtenHeadEvidence.get(p),binding=evidence?captureHeadBinding(clone.packages[i]):undefined;
+   if(evidence&&binding?.signature===evidence.signature&&clone.packages[i].pages.every((page,j)=>page===evidence.pages[j]))
+    writtenHeadEvidence.set(clone.packages[i],{...binding,pages:[...evidence.pages],heads:new Map([...evidence.heads].map(([seat,ids])=>[seat,[...ids]]))});
+  }
+  if(keyboardLayout){
+   return selectPresentation(clone.original,keyboardLayout);
+  }
+  return clone.original;
+ }};
+}
 export function archivePackage(manifest:Manifest,files:Record<string,Uint8Array>):Uint8Array{return zipSync({...files,'manifest.json':strToU8(JSON.stringify(manifest,null,2)+'\n')},{level:6});}
 export const libraryOrder=(a:Metadata,b:Metadata)=>a.composer.localeCompare(b.composer)||((a.opus??Infinity)-(b.opus??Infinity)||0)||((a.piece??Infinity)-(b.piece??Infinity)||0)||a.title.localeCompare(b.title);
 
