@@ -47,7 +47,7 @@ Each genuinely new transposed presentation SHALL use the existing shared engravi
 - **AND** conventional contact/cache choices are not shifted mechanically from another pitch or presentation
 
 ### Requirement: Independently admitted transformation authority
-A transposed archive SHALL retain its immutable original source and explicitly bind the original identity, offset, versioned transformation policy and effective musical identity to its prepared presentation. Worker output, receiving-realm checks and cold import SHALL independently reconstruct and admit the effective source. Historical archives SHALL retain their literal source and recipe meaning.
+A transposed archive SHALL retain its exact admitted untransposed baseline and bind original identity, offset, versioned transformation policy, guarded complete selected hand map and effective musical identity. Worker output, receiving-realm checks and cold import SHALL independently reconstruct and admit the effective source. Historical archives SHALL retain their literal source and recipe meaning.
 
 #### Scenario: Cold open or share a transposed score
 - **WHEN** a saved or shared transposed archive is opened without the generating worker's memory
@@ -59,6 +59,12 @@ A transposed archive SHALL retain its immutable original source and explicitly b
 - **THEN** output refuses independently of any worker claim or prior host certificate
 - **AND** historical policy dispatch and existing font/geometry checks remain intact
 
+#### Scenario: Selected hand map differs from immutable source
+- **WHEN** transposition retains a currently admitted calculated hand map
+- **THEN** receiving admission verifies it equals the selected requested edition and its complete guards normalize to original owner identities/pitches/timing
+- **AND** cold admission treats it as explicit Viewer selection authority while enforcing authored/editorial hand requirements
+- **AND** the retained baseline is exactly one untransposed archive, without nested transformation envelopes
+
 ### Requirement: Atomic reversible score selection
 The selected offset SHALL persist for the original score and apply consistently in reading, practice and keyboard presentation selection. Activation SHALL occur only after complete admission and durable additive installation. Failure, cancellation or supersession SHALL preserve the currently selected edition and offset. Selecting 0 SHALL restore the retained untransposed edition rather than regenerate it.
 
@@ -66,6 +72,11 @@ The selected offset SHALL persist for the original score and apply consistently 
 - **WHEN** the user selects 0 after practising a transposed edition
 - **THEN** the exact retained untransposed archive, applicable original corrections and original achievement history become active again
 - **AND** the transposed edition and its data remain retained
+
+#### Scenario: Share restoration and retained offset compatibility
+- **WHEN** a shared derived archive is imported or an existing offset is selected again
+- **THEN** the exact admitted retained baseline permits 0 restoration on the receiving computer
+- **AND** cached offset editions are reused only when baseline, selected per-layout hand map and hand-policy context match the current request
 
 #### Scenario: Failure or newer request during generation
 - **WHEN** generation fails, is cancelled, or is superseded by another score/offset request
