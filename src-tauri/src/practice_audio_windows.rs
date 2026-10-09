@@ -1,5 +1,5 @@
 //! Event-driven shared WASAPI. All COM objects remain on their owning MTA worker.
-use super::{mixer, period, AudioStatus, Config, Output, Outputs};
+use super::{mixer, period, render_queue, AudioStatus, Config, Output, Outputs};
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -280,7 +280,7 @@ pub struct Host {
     format: Format,
     encoding: Encoding,
     int24: Vec<i32>,
-    size: u32,
+    queue: render_queue::RenderQueue,
     status: AudioStatus,
     last: Instant,
     _mmcss: Option<Mmcss>,
@@ -294,6 +294,21 @@ pub struct Capture {
     pub maximum_samples: usize,
     pub over_capacity: bool,
     pub render_ms: Vec<f64>,
+    pub pumps: Vec<PumpObservation>,
+}
+#[cfg(test)]
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PumpObservation {
+    pub callback_micros: u64,
+    pub padding_before: u32,
+    pub submitted_frames: u32,
+    pub padding_after: u32,
+    pub service_micros: u64,
+    pub released_micros: u64,
+    pub clock_position: u64,
+    pub clock_frequency: u64,
+    pub clock_observed_micros: u64,
 }
 impl Host {
     pub fn open(
@@ -331,6 +346,18 @@ impl Host {
             if size == 0 || size > 65536 {
                 return Err("Output buffer exceeds supported capacity".into());
             }
+            let queue = render_queue::RenderQueue::new(size, opened.period, config.tier)
+                .ok_or("Invalid output period or queue capacity")?;
+            // Only an explicitly invoked ignored diagnostic can reconstruct the
+            // delivered full-capacity policy for a same-binary comparison.
+            #[cfg(test)]
+            let queue = if std::env::var("VIEWER_AUDIO_DIAGNOSTIC_QUEUE_MODE").as_deref()
+                == Ok("capacity-baseline")
+            {
+                render_queue::RenderQueue::new(size, size, 0).unwrap()
+            } else {
+                queue
+            };
             let synth: Option<Box<dyn mixer::Synth>> = if config.enabled {
                 let path = config.sfz.as_deref().ok_or("Piano is not installed")?;
                 Some(Box::new(crate::piano_engine::PianoEngine::new(
@@ -357,6 +384,7 @@ impl Host {
                 sample_rate: f.nSamplesPerSec,
                 period_frames: opened.period,
                 buffer_frames: size,
+                queue_target_frames: queue.target,
                 raw: opened.raw,
                 mode: opened.mode,
                 fallback: opened.fallback,
@@ -376,7 +404,7 @@ impl Host {
                 format: opened.format,
                 encoding: enc,
                 int24,
-                size,
+                queue,
                 status,
                 last: Instant::now(),
                 _mmcss: mmcss,
@@ -385,9 +413,10 @@ impl Host {
                 capture: None,
             };
             // Prime silence; no pending cue or MIDI is consumed before the actual stream.
-            let ptr = host.render.GetBuffer(size).map_err(error)?;
-            std::ptr::write_bytes(ptr, 0, size as usize * f.nBlockAlign as usize);
-            host.render.ReleaseBuffer(size, 0).map_err(error)?;
+            let prime = host.queue.target;
+            let ptr = host.render.GetBuffer(prime).map_err(error)?;
+            std::ptr::write_bytes(ptr, 0, prime as usize * f.nBlockAlign as usize);
+            host.render.ReleaseBuffer(prime, 0).map_err(error)?;
             host.client.Start().map_err(error)?;
             Ok(host)
         }
@@ -408,7 +437,7 @@ impl Host {
             }
             self.last = Instant::now();
             let padding = self.client.GetCurrentPadding().map_err(error)?;
-            let available = self.size.saturating_sub(padding);
+            let available = self.queue.refill(padding).ok_or("Invalid output padding")?;
             if available == 0 {
                 return Ok(());
             }
@@ -478,11 +507,32 @@ impl Host {
             }
             self.render.ReleaseBuffer(available, 0).map_err(error)?;
             #[cfg(test)]
+            let released_micros = crate::midi_input::midi_clock();
+            #[cfg(test)]
             if let Some(capture) = self.capture.as_mut() {
                 if capture.render_ms.len() < capture.render_ms.capacity() {
                     capture
                         .render_ms
                         .push(render_began.elapsed().as_secs_f64() * 1000.0);
+                } else {
+                    capture.over_capacity = true;
+                }
+                if capture.pumps.len() < capture.pumps.capacity() {
+                    let clock: IAudioClock = self.client.GetService().map_err(error)?;
+                    let frequency = clock.GetFrequency().map_err(error)?;
+                    let mut position = 0;
+                    clock.GetPosition(&mut position, None).map_err(error)?;
+                    capture.pumps.push(PumpObservation {
+                        callback_micros: now,
+                        padding_before: padding,
+                        submitted_frames: available,
+                        padding_after: self.client.GetCurrentPadding().map_err(error)?,
+                        service_micros: render_began.elapsed().as_micros() as u64,
+                        released_micros,
+                        clock_position: position,
+                        clock_frequency: frequency,
+                        clock_observed_micros: crate::midi_input::midi_clock(),
+                    });
                 } else {
                     capture.over_capacity = true;
                 }
@@ -516,6 +566,7 @@ impl Host {
             maximum_samples: count,
             over_capacity: false,
             render_ms: Vec::with_capacity(20000),
+            pumps: Vec::with_capacity(20000),
         });
         Ok(())
     }
@@ -526,6 +577,14 @@ impl Host {
     #[cfg(test)]
     pub fn channels(&self) -> u16 {
         unsafe { (*self.format.0).nChannels }
+    }
+    #[cfg(test)]
+    pub fn frame_counter(&self) -> Arc<AtomicU64> {
+        self.mixer.frames.clone()
+    }
+    #[cfg(test)]
+    pub fn stream_latency_100ns(&self) -> Result<i64, String> {
+        unsafe { self.client.GetStreamLatency().map_err(error) }
     }
 }
 impl Drop for Host {

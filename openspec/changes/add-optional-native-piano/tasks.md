@@ -25,3 +25,9 @@
 - [x] 4.3 Preserve the current installation/data, admit the local original bank via the same installer, activate the reviewed Windows replacement and record stream observations.
 - [x] 4.4 Stop task-owned processes and finish scoped Git/PR/source-versus-installed receipts for the delivered candidate.
 - [ ] 4.5 Record operator physical MIDI/audio/pedal acceptance separately after delivery; keep this pending until actually observed.
+
+## 5. Live-response repair
+
+- [x] 5.1 Implement and prove bounded Windows queue targets, shared packet bounds, per-sampler-quantum MIDI/panic intake and retained actual prepared-cue horizons without Mac/vendor/config changes.
+- [x] 5.2 Observe root-controlled same-endpoint admitted-bank baseline/repaired submission, independently admitted coarse loopback intervals, actual stream latency and exact three-attack service headroom; preserve fine-timing refusals, sustained-heavy-load limits and separate physical acceptance.
+- [ ] 5.3 Independently review, merge and include the source repair in the ordinary paired native delivery with exact source and preservation receipts.

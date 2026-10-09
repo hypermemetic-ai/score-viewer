@@ -421,6 +421,57 @@ mod tests {
         .is_err());
     }
     #[test]
+    fn reduced_nominal_queue_does_not_relax_observed_or_in_flight_repeat_horizon() {
+        let old = request(3, 180., 6, 3);
+        let next = request(3, 181., 6, 3);
+        let origin = 1_000_000;
+        let boundary = (origin as f64 + old.grid_v2.as_ref().unwrap().source_end_micros(old.bpm))
+            .ceil() as u64;
+        let now = boundary - 20_000;
+        let nominal = admit(
+            &next,
+            1,
+            boundary,
+            now,
+            128,
+            48000,
+            now + 2667,
+            2667,
+            origin,
+            &old,
+        )
+        .unwrap();
+        assert!(nominal.armed);
+        let observed = admit(
+            &next,
+            1,
+            boundary,
+            now,
+            128,
+            48000,
+            boundary + 1,
+            2667,
+            origin,
+            &old,
+        )
+        .unwrap();
+        assert!(!observed.armed);
+        let in_flight = admit(
+            &next,
+            1,
+            boundary,
+            now,
+            128,
+            48000,
+            now + 10000,
+            20000,
+            origin,
+            &old,
+        )
+        .unwrap();
+        assert!(!in_flight.armed);
+    }
+    #[test]
     fn concurrent_cancel_has_a_single_queued_or_activated_outcome() {
         for id in 1..=64 {
             let a = Arc::new(ArmControl::new(

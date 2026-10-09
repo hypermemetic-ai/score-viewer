@@ -10,6 +10,7 @@ The viewer can assess MIDI and play practice cues but cannot yet make the player
 - Admit only the unchanged official Accurate-Salamander V6.2 48 kHz/24-bit family archive into an atomic private managed cache. Retain licenses and original bytes, validate member paths, CRCs, hashes and SFZ/sample closure, and preserve a prior bank on failures.
 - Persist piano preferences through the existing preferences file while preserving all existing scores, progress, fingering and input settings.
 - Verify the combined frontend/native source, license closure and paired native package before Windows activation and physical MIDI/audio acceptance.
+- Reduce avoidable Windows live-key delay by making the selected latency tier control queued PCM instead of filling all allocated storage. Verify actual submission/loopback evidence while keeping physical acceptance separate.
 
 ## Capabilities
 

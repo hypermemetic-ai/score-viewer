@@ -450,29 +450,33 @@ impl Mixer {
                 (*self.cue).prepare(now.saturating_add(delay));
             }
         }
-        let panic = self.bus.panic.load(Ordering::Acquire);
-        if panic != self.panic {
-            self.panic = panic;
-            self.contacts = Contacts::default();
-            if let Some(s) = self.synth.as_mut() {
-                s.all_off();
-            }
-        }
-        // Bound work even with a constantly producing source; overflow signals
-        // panic independently of queue capacity and invalidates already queued ink.
-        for _ in 0..1024 {
-            let Some(e) = self.bus.queue.pop() else { break };
-            if e.panic == self.panic && e.connection == self.bus.connection.load(Ordering::Acquire)
-            {
-                if let Some(s) = self.synth.as_mut() {
-                    self.contacts.apply(e, s.as_mut());
-                }
-            }
-        }
+        // Recheck ingress at each sampler quantum, so messages arriving while a
+        // larger device packet is rendered can reach its next unsynthesized
+        // chunk. Keep one bounded budget for the WHOLE device transfer.
+        let mut ingress_budget = 1024;
         let gain = f64::from_bits(self.volume.load(Ordering::Relaxed)) as f32;
         let mut peak = 0.0f32;
         let mut frame_offset = 0u64;
         for chunk in out.chunks_mut(MAX_BLOCK * channels) {
+            let panic = self.bus.panic.load(Ordering::Acquire);
+            if panic != self.panic {
+                self.panic = panic;
+                self.contacts = Contacts::default();
+                if let Some(s) = self.synth.as_mut() {
+                    s.all_off();
+                }
+            }
+            while ingress_budget > 0 {
+                let Some(e) = self.bus.queue.pop() else { break };
+                ingress_budget -= 1;
+                if e.panic == self.panic
+                    && e.connection == self.bus.connection.load(Ordering::Acquire)
+                {
+                    if let Some(s) = self.synth.as_mut() {
+                        self.contacts.apply(e, s.as_mut());
+                    }
+                }
+            }
             let frames = chunk.len() / channels;
             self.left[..frames].fill(0.0);
             self.right[..frames].fill(0.0);
@@ -681,6 +685,68 @@ mod tests {
             value,
             ..Default::default()
         }
+    }
+    #[test]
+    fn piano_has_no_cue_lead_and_mid_transfer_events_reach_next_sampler_quantum() {
+        struct ContactTone {
+            active: bool,
+            first: bool,
+            bus: Arc<MidiBus>,
+        }
+        impl Synth for ContactTone {
+            fn note_on(&mut self, offset: u32, _: u8, _: u8) {
+                assert_eq!(offset, 0);
+                self.active = true;
+            }
+            fn note_off(&mut self, _: u32, _: u8, _: u8) {
+                self.active = false;
+            }
+            fn cc(&mut self, _: u32, _: u8, _: u8) {}
+            fn all_off(&mut self) {
+                self.active = false;
+            }
+            fn render(&mut self, left: &mut [f32], right: &mut [f32]) -> bool {
+                left.fill(if self.active { 0.2 } else { 0. });
+                right.copy_from_slice(left);
+                if self.first {
+                    self.first = false;
+                    self.bus.send(77, 1, 1, 60, 100);
+                }
+                true
+            }
+        }
+        let bus = Arc::new(MidiBus::default());
+        bus.enable(true);
+        bus.connect(77);
+        let mut mixer = Mixer::new(
+            Some(Box::new(ContactTone {
+                active: false,
+                first: true,
+                bus: bus.clone(),
+            })),
+            bus.clone(),
+            Arc::new(CueMailbox::default()),
+            Arc::new(AtomicU64::new(1f64.to_bits())),
+        );
+        let mut out = [0f32; MAX_BLOCK * 3];
+        WATCH.with(|w| w.set(Some((0, 0))));
+        mixer.fill(&mut out, 1, 1_000_000, 0, |v| v);
+        let allocations = WATCH.with(|w| {
+            let x = w.get().unwrap();
+            w.set(None);
+            x
+        });
+        assert_eq!(allocations, (0, 0));
+        assert!(out[..MAX_BLOCK].iter().all(|v| *v == 0.));
+        assert!(out[MAX_BLOCK..].iter().all(|v| *v == 0.2));
+        bus.clear();
+        bus.send(77, 1, 1, 64, 100);
+        let mut instant = [0f32; 128];
+        mixer.fill(&mut instant, 1, 1_001_000, 0, |v| v);
+        assert_eq!(
+            instant[0], 0.2,
+            "live piano does not wait the150ms cue lead"
+        );
     }
     fn metered_request(bpm: f64) -> lifecycle::Request {
         let grid = lifecycle::PulseGridV2 {

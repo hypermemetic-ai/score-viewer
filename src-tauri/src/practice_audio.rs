@@ -28,6 +28,8 @@ mod platform;
 #[cfg(target_os = "macos")]
 #[path = "practice_audio_macos.rs"]
 mod platform;
+#[path = "audio_render_queue.rs"]
+mod render_queue;
 #[path = "practice_audio_repeat.rs"]
 mod repeat;
 
@@ -51,6 +53,7 @@ pub struct AudioStatus {
     pub sample_rate: u32,
     pub period_frames: u32,
     pub buffer_frames: u32,
+    pub queue_target_frames: u32,
     pub raw: bool,
     pub mode: String,
     pub output_uid: String,
@@ -60,6 +63,17 @@ pub struct AudioStatus {
     pub rendered_frames: u64,
     pub peak: f64,
     pub queue_overflow: u64,
+}
+impl AudioStatus {
+    fn queue_horizon_frames(&self) -> u32 {
+        // CoreAudio retains its existing callback/lease behavior. Its unchanged
+        // host does not publish the Windows write-target field.
+        if self.queue_target_frames == 0 {
+            self.buffer_frames
+        } else {
+            self.queue_target_frames
+        }
+    }
 }
 #[derive(Clone, Default)]
 pub struct Config {
@@ -457,7 +471,7 @@ fn run(
                             id,
                             origin,
                             crate::midi_input::midi_clock(),
-                            s.buffer_frames,
+                            s.queue_horizon_frames(),
                             s.sample_rate,
                             mailbox.submitted_end_micros.load(Ordering::Acquire),
                             mailbox.block_micros.load(Ordering::Acquire),
@@ -504,7 +518,7 @@ fn run(
                             id,
                             origin,
                             crate::midi_input::midi_clock(),
-                            s.buffer_frames,
+                            s.queue_horizon_frames(),
                             s.sample_rate,
                             mailbox.submitted_end_micros.load(Ordering::Acquire),
                             mailbox.block_micros.load(Ordering::Acquire),
@@ -915,6 +929,12 @@ pub async fn practice_audio_cancel_repeat(
     .map_err(|e| e.to_string())?
 }
 
+#[cfg(test)]
+#[path = "audio_capture_validation.rs"]
+mod capture_validation;
+#[cfg(all(test, windows))]
+#[path = "audio_latency_diagnostic.rs"]
+mod latency_diagnostic;
 #[cfg(all(test, windows))]
 #[path = "audio_diagnostic.rs"]
 mod stream_diagnostic;
