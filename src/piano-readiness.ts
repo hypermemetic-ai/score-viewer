@@ -20,6 +20,7 @@ import {personalForCalculatedEdition,PersonalEditionConflict} from './presentati
 import {prepareCalculatedEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 
 import {createScoreTransposition,getScoreTransposition} from './score-transposition';
+import type {PackageAdmissionSession} from './package-admission-session';
 
 export interface PianoReadinessRequest extends PianoCalculationOptions {
   packageBytes:Uint8Array;
@@ -58,13 +59,13 @@ const interrupted=(request:PianoReadinessRequest)=>{
 /** Pure preparation: no library writes, preferences, device state or imported
  * executable code. A caller may stage only a complete ready/editable result.
  * Editable assignments never assert a successful continuous movement route. */
-export async function ensurePianoReady(request:PianoReadinessRequest):Promise<PianoReadinessResult>{
+export async function ensurePianoReady(request:PianoReadinessRequest,admission?:PackageAdmissionSession):Promise<PianoReadinessResult>{
   const original=new Uint8Array(request.packageBytes);let prior:ScorePackage|undefined;
   const failure=(status:PianoNotReady['status'],code:string,message:string):PianoNotReady=>
     ({status,code,message,retainedPackageBytes:original,...(prior?{retainedPackage:prior}:{})});
   try{
     interrupted(request);
-    try{prior=await importPackage(original,{allowLegacyTempo:true});}catch(error){
+    try{prior=await (admission?admission.import(original,{allowLegacyTempo:true}):importPackage(original,{allowLegacyTempo:true}));}catch(error){
       const message=(error as Error).message;
       return /authority|operator|source guard|source instruction/i.test(message)?failure('conflict','operator-authority',message):
         failure('unsupported','package-admission',message);

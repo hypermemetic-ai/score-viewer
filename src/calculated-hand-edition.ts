@@ -2,7 +2,7 @@ import {prepareCalculatedHandPresentation,validateHandPresentationAgainstSource,
  createCalculatedHandRenderingRecipe,finalizeCalculatedHandRenderingRecipe,presentationSha256,
  CALCULATED_HAND_SCORE_RENDERING_ENGINE,type ScoreRenderingRecipe,type HandPresentationIdentityInputs,
  type GuardedOperatorHandRequirement,type PresentationAnnotationGeometry,type PresentationSourceCoverage,
- type SourceStatementInventory,type OwnerHand} from '../vendor/iso-notation/src/score-presentation';
+ type SourceStatementInventory,type OwnerHand,type PresentationWrittenHead} from '../vendor/iso-notation/src/score-presentation';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import type {PianoAssignmentConstraint} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import type {ScorePackage,FingerLayer} from './package';
@@ -87,7 +87,7 @@ function normalizeCalculatedReceipt(raw:unknown):CalculatedHandReceipt {
 
 /** Cold admission is an actual source-owned engine replay with no optimizer.
  * The saved ledger or its hashes cannot substitute for source/paint audit. */
-export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seatBytes:Uint8Array):Promise<CalculatedHandReceipt>{
+export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seatBytes:Uint8Array,onActualReplay?:(heads:readonly PresentationWrittenHead[])=>void):Promise<CalculatedHandReceipt>{
  const r=normalizeCalculatedReceipt(raw),inkPolicy=(r?.version==='viewer-calculated-hand-edition-v2'||r?.version==='viewer-calculated-hand-edition-v3')?validateAnnotationInkPolicy(r.annotationInkPolicy):undefined;
  if(r?.version!=='viewer-calculated-hand-edition-v1'&&!inkPolicy)throw Error('Unsupported calculated edition receipt.');
  if(!!p.transposition!==(r?.version==='viewer-calculated-hand-edition-v3')||p.transposition&&r.version==='viewer-calculated-hand-edition-v3'&&r.transpositionSha256!==p.transposition.sha256)throw Error('Calculated receipt has another transposition authority.');
@@ -108,5 +108,6 @@ export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seat
  // Carrier geometry is only the owned slice. Admission separately inventories
  // every actual SVG primitive and reserves all 1–5 annotation outlines.
  annotationPositions({...p,calculatedHandReceipt:expected,annotationGeometry:expected.annotationGeometry});
+ onActualReplay?.(replay.writtenHeads.map(h=>({...h,ownerIds:[...h.ownerIds],headIds:[...h.headIds]})));
  return structuredClone(expected);
 }
