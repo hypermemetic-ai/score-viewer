@@ -144,7 +144,8 @@ export async function stageGuitarProParts(inspection:GuitarProInspection,trackId
   const publicApi=await guitarProRuntime(),parts:StagedGuitarProImport['parts'][number][]=[];
   const budget=(pending:unknown)=>assertGuitarProStagedMaterial({retainedInput,inspection,parts},pending);
   budget(undefined);
-  for(const id of ids){
+  for(let index=0;index<ids.length;index++){
+   const id=ids[index];
    await checkpoint({signal,checkpoint:paint});
    const prepared=await preparedPart(await convertedInput(publicApi,retainedInput.bytes,id,inspection.inputSha256,signal,budget),prepare,signal,budget,paint);
    // Grant only after a SECOND actual public converter replay against admitted retained bytes.
