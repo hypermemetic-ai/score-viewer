@@ -9,7 +9,7 @@ export class PracticePreviewCache {
   if(pages.length!==this.pages.length||pages.some((page,i)=>page!==this.pages[i])){this.clear();this.pages=[...pages];}
   const overview=mount.closest<HTMLElement>('.practice-overview'),fonts=mount.ownerDocument.fonts;
   const context=[mount.clientWidth,overview?.clientHeight,innerWidth,innerHeight,devicePixelRatio,
-   ...Array.from(fonts,face=>{let id=this.faces.get(face);if(id===undefined){id=++this.nextFace;this.faces.set(face,id);}return [id,face.status,face.family,face.style,face.weight,face.stretch,face.featureSettings,face.variationSettings,face.unicodeRange];})];
+   ...Array.from(fonts,face=>{let id=this.faces.get(face);if(id===undefined){id=++this.nextFace;this.faces.set(face,id);}return [id,face.status,face.family,face.style,face.weight,face.stretch,face.featureSettings,face.variationSettings,face.unicodeRange,(face as FontFace&{sizeAdjust?:string}).sizeAdjust,face.ascentOverride,face.descentOverride,face.lineGapOverride];})];
   const key=JSON.stringify([bars,context]),saved=fonts.status==='loaded'?this.frames.get(key):undefined;
   if(saved){this.frames.delete(key);this.frames.set(key,saved);return saved;}
   const svg=build();

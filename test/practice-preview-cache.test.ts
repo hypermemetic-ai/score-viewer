@@ -5,7 +5,7 @@ import {PracticePreviewCache} from '../src/practice-preview-cache';
  * source rendering, cold/warm geometry and lifecycle are inspected separately. */
 function fixture(){
  Object.assign(globalThis,{innerWidth:1920,innerHeight:1080,devicePixelRatio:1});
- const face={status:'loaded',family:'Score face',style:'normal',weight:'700',stretch:'normal'} as FontFace,
+ const face={status:'loaded',family:'Score face',style:'normal',weight:'700',stretch:'normal'} as FontFace&{sizeAdjust?:string},
   fonts=Object.assign([face],{status:'loaded'}),overview={clientHeight:800},
   mount={clientWidth:1200,ownerDocument:{fonts},closest:()=>overview} as unknown as HTMLElement,
   cache=new PracticePreviewCache();let builds=0;
@@ -20,6 +20,14 @@ test('preview reuse is bounded to the same exact source and mounted font/viewpor
  f.overview.clientHeight=750;assert.notEqual(f.cache.get([0,1,2,3],f.mount,pages,f.build),first);
  f.face.weight='400';assert.notEqual(f.cache.get([0,1,2,3],f.mount,pages,f.build),first);
  const changed=f.cache.get([0,1,2,3],f.mount,['altered source page'],f.build);assert.notEqual(changed,first);
+ assert.equal(f.builds(),5);
+});
+test('loaded face metric overrides invalidate otherwise identical preview contexts',()=>{
+ const f=fixture(),pages=['source'];let previous=f.cache.get([0],f.mount,pages,f.build);
+ for(const field of ['sizeAdjust','ascentOverride','descentOverride','lineGapOverride'] as const){
+  f.face[field]='110%';const next=f.cache.get([0],f.mount,pages,f.build);assert.notEqual(next,previous);previous=next;
+  assert.equal(f.cache.get([0],f.mount,pages,f.build),next);
+ }
  assert.equal(f.builds(),5);
 });
 test('pending fonts and failed admission never supply a successful cached preview',()=>{
