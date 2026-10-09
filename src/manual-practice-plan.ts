@@ -31,7 +31,7 @@ export function manualMusicalFacts(p:Pick<ScorePackage,'score'>):Record<string,u
  return source;
 }
 
-function sourceBars(p:ScorePackage):number[] {
+function sourceBars(p:Pick<ScorePackage,'score'>):number[] {
  const bars=p.score.sourceBarTicks;
  if(!bars||bars.length<2||bars.length>2001||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||
    bars.some((b,i)=>!Number.isSafeInteger(b)||b<0||i>0&&b<=bars[i-1]))
@@ -47,7 +47,11 @@ function barAt(bars:readonly number[],tick:number):number {
 /** Consumes the actual strict reading result. It never substitutes seats or
  * guesses omitted source physical positions. New dual-view source contracts
  * will supply exact source-written component IDs through their own adapter. */
-export async function planManualPractice(p:ScorePackage,partition:PracticePartition='connection-boundary-v1'):Promise<ManualPracticePlan> {
+export async function planManualPractice(input:ScorePackage,partition:PracticePartition='connection-boundary-v1'):Promise<ManualPracticePlan> {
+ // Caller-owned packages may change while WebCrypto settles. Capture every
+ // consumed source/admission/appearance field together, before any await, so
+ // returned clocks and components have the same meaning as their digest.
+ const p=structuredClone({manifest:input.manifest,score:input.score,reading:input.reading,seats:input.seats,pages:input.pages});
  if(p.manifest.version!==3||!p.reading||!p.reading.geometryEvidence.ok||p.seats.length||!p.pages.length)
   throw Error('Manual instrument practice needs admitted musical reading notation.');
  validateInstrumentReadingScore(p.score);

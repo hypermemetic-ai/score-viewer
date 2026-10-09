@@ -5,6 +5,7 @@ import {planManualPractice} from '../src/manual-practice-plan';
 import {initialPractice,readPractice,passageHierarchy} from '../src/practice';
 import {authoredReadingScore,authoredReadingPackage} from './support/instrument-reading-fixture';
 import {authoredManualScore} from './support/manual-practice-fixture';
+import {ManualPracticeSession} from '../src/manual-practice-session';
 
 const original=await importPackage(await authoredReadingPackage());
 
@@ -93,4 +94,31 @@ test('retained written repeat facts weight source passages without duplicating m
  assert.deepEqual(plan.barTicks,score.sourceBarTicks);
  const unrepeated=await importPackage(await authoredReadingPackage(authoredManualScore(8)));
  assert.notEqual(plan.revision,(await planManualPractice(unrepeated,'fixed-four-v1')).revision);
+});
+
+test('the public planner binds one owned snapshot across asynchronous hashing',async()=>{
+ const p=await importPackage(await authoredReadingPackage(authoredManualScore(8))),before=JSON.stringify(p),
+  original=await planManualPractice(p,'fixed-four-v1'),meterOnly=structuredClone(p),meterPending=planManualPractice(meterOnly,'fixed-four-v1');
+ meterOnly.score.id='changed-after-promise';meterOnly.score.timeSignatures[0].numerator=3;
+ const meterResult=await meterPending;
+ assert.deepEqual(meterResult,original);
+ const a=new ManualPracticeSession(original,original.chunks[0],initialPractice(original)),
+  b=new ManualPracticeSession(meterResult,meterResult.chunks[0],initialPractice(meterResult));
+ assert.deepEqual(b.pulseGrid,a.pulseGrid);assert.equal(b.pulseGrid.countBarPulses,8);
+ const changed=structuredClone(p),pending=planManualPractice(changed,'fixed-four-v1');
+ changed.score.id='changed-after-promise';changed.score.timeSignatures[0].numerator=3;
+ changed.score.sourceBarTicks![1]++;changed.score.ticksPerBeat=99;changed.score.readingPolicy!.partId='borrowed-part';
+ changed.score.techniques=[{id:'late-hammer',kind:'hammer-on',label:'H',partId:'original-part',staffId:'1',voiceId:'1',
+  fromNoteId:changed.score.notes[15].id,toNoteId:changed.score.notes[16].id,fromTick:15*48,toTick:16*48}];
+ changed.score.writtenPresentation={sourceScoreId:'borrowed',sourceHash:'1'.repeat(64),performedTotalTicks:999,
+  writtenBars:8,performedBars:2,repeats:[],events:{},occurrences:[{performedBar:1,writtenBar:1,pass:1,performedTick:0,writtenTick:0},
+   {performedBar:2,writtenBar:1,pass:2,performedTick:192,writtenTick:0}]};
+ changed.score.notes[0].startTick++;changed.reading!.owners[0].heads[0].x++;
+ changed.reading!.layoutMetadata[0].notes[0].y++;changed.reading!.geometryEvidence.ok=false;
+ changed.manifest.version=1;changed.manifest.reading!.policy.partId='other-descriptor-part';changed.pages.length=0;
+ const result=await pending;
+ assert.deepEqual(result,original);
+ changed.score.timeSignatures[0].denominator=8;changed.reading!.owners.length=0;
+ assert.deepEqual(result,original);assert.equal(JSON.stringify(p),before);
+ assert.equal(Object.isFrozen(changed.score),false,'planning does not freeze caller state');
 });
