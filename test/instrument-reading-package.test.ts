@@ -60,6 +60,19 @@ test('canonical admission refuses false unpitched pitches, unknown kinds and inv
   await assert.rejects(importPackage(bytes,{keyboardLayout:'conventional-piano'}),/no piano keyboard presentation/);
 });
 
+test('rehashed reading archives cannot replace performing-hand meaning with visual stem directions',async()=>{
+  for(const authority of [{hand:'RH'},
+    {editorialHand:{hand:'LH',kind:'confirm',authorityId:'authored-hand-confirmation'}}]){
+    await assert.rejects(importPackage(await changed(files=>{
+      const source=JSON.parse(strFromU8(files['score.json']));
+      Object.assign(source.notes.find((event:{id:string})=>event.id==='center'),authority);
+      files['score.json']=strToU8(JSON.stringify(source));
+    })),/performing.hand authority/i);
+  }
+  assert.deepEqual(p.score,authoredReadingScore());
+  assert.equal(await hashBytes(p.files['score.json']),p.manifest.revision);
+});
+
 test('source techniques, part ownership and geometry cannot invent unsupported musical reading',async()=>{
   for(const mutate of [(q:any)=>{q.techniques[0].toNoteId='dead';},
     (q:any)=>{q.techniques[0].voiceId='2';},(q:any)=>{q.techniques[0].label='P';},
