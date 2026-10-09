@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc, Mutex, OnceLock,
     },
     time::Duration,
@@ -28,6 +28,8 @@ mod platform;
 #[cfg(target_os = "macos")]
 #[path = "practice_audio_macos.rs"]
 mod platform;
+#[path = "practice_audio_repeat.rs"]
+mod repeat;
 
 #[derive(Serialize)]
 pub struct Output {
@@ -74,6 +76,22 @@ enum Command {
         lifecycle::Request,
         lifecycle::Session,
     ),
+    Arm {
+        device: String,
+        request: lifecycle::Request,
+        origin: u64,
+        previous: u64,
+        id: u64,
+        owner: lifecycle::Session,
+        abandoned: Arc<AtomicBool>,
+        reply: mpsc::Sender<Result<repeat::ArmReceipt, String>>,
+    },
+    Cancel {
+        id: u64,
+        previous: u64,
+        owner: lifecycle::Session,
+        reply: mpsc::Sender<Result<repeat::CancelReceipt, String>>,
+    },
     Shutdown(mpsc::Sender<Result<(), String>>),
 }
 struct Worker {
@@ -164,16 +182,66 @@ fn run(
         finished: Arc<std::sync::atomic::AtomicBool>,
         invalid: Arc<std::sync::atomic::AtomicBool>,
         announced: bool,
+        request: lifecycle::Request,
+        arm: Option<Arc<repeat::ArmControl>>,
     }
     let mut config = initial;
     let mailbox = Arc::new(mixer::CueMailbox::default());
     let mut backend: Option<platform::Host> = None;
     let mut active: Option<Active> = None;
+    let mut pending: Option<Active> = None;
     let mut shutdown_reply = None;
     fn close(backend: &mut Option<platform::Host>) -> Result<(), String> {
         let result = backend.as_mut().map(|h| h.close()).unwrap_or(Ok(()));
         drop(backend.take());
         result
+    }
+    fn drain_cancelled(
+        backend: &mut Option<platform::Host>,
+        mailbox: &mixer::CueMailbox,
+    ) -> Result<(), String> {
+        let start = std::time::Instant::now();
+        while mailbox.has_pending() {
+            mailbox.reclaim();
+            backend
+                .as_mut()
+                .ok_or("Audio output is unavailable")?
+                .pump()?;
+            if start.elapsed() > Duration::from_millis(500) {
+                return Err("Cancelled cue retirement timed out".into());
+            }
+        }
+        mailbox.reclaim();
+        Ok(())
+    }
+    fn reconcile(active: &mut Option<Active>, pending: &mut Option<Active>) {
+        if repeat::promote_activated(active, pending, |p| {
+            p.arm.as_ref().is_some_and(|a| a.activated())
+        }) {
+            return;
+        }
+        // A cancelled CLAIMED cue is still being committed by the callback.
+        // Keep its worker metadata until onset/pointer publication completes.
+        if pending
+            .as_ref()
+            .is_some_and(|p| p.arm.as_ref().is_some_and(|a| a.claimed()))
+        {
+            return;
+        }
+        if pending.as_ref().is_some_and(|p| {
+            p.session.cancelled()
+                || p.invalid.load(Ordering::Acquire)
+                || p.arm.as_ref().is_some_and(|a| a.cancelled())
+        }) {
+            if let Some(p) = pending.take() {
+                if p.invalid.load(Ordering::Acquire) {
+                    p.session
+                        .failed("Prepared repeat missed its playback boundary".into(), |m| {
+                            let _ = p.app.emit("viewer-audio-error", m);
+                        });
+                }
+            }
+        }
     }
     let publish = |value: AudioStatus| {
         if let Ok(mut s) = status.lock() {
@@ -182,6 +250,9 @@ fn run(
     };
     loop {
         mailbox.reclaim();
+        // A callback may already have switched owners since the last pump.
+        // Resolve that committed handoff before inspecting Arm/Cancel inputs.
+        reconcile(&mut active, &mut pending);
         let command = if backend.is_some() {
             rx.try_recv().ok()
         } else {
@@ -204,6 +275,11 @@ fn run(
                         || next.tier != config.tier;
                     config = next;
                     if reopen {
+                        if let Some(p) = pending.take() {
+                            if let Some(arm) = p.arm {
+                                arm.cancel();
+                            }
+                        }
                         if let Some(a) = active.take() {
                             a.session.cancel();
                             a.session.finish();
@@ -265,6 +341,11 @@ fn run(
                         a.session.cancel();
                         a.session.finish();
                     }
+                    if let Some(p) = pending.take() {
+                        if let Some(arm) = p.arm {
+                            arm.cancel();
+                        }
+                    }
                     if backend.is_none() || device != config.device {
                         let restored = close(&mut backend);
                         mailbox.reset();
@@ -307,6 +388,13 @@ fn run(
                         }
                     }
                     let rate = backend.as_ref().unwrap().status().sample_rate;
+                    if let Err(error) = drain_cancelled(&mut backend, &mailbox) {
+                        session.failed(error, |m| {
+                            let _ = app.emit("viewer-audio-error", m);
+                        });
+                        continue;
+                    }
+                    let owned_request = request.clone();
                     let cue = Box::new(mixer::Cue::new(rate, request, session.stop_signal()));
                     let next = Active {
                         app,
@@ -315,6 +403,8 @@ fn run(
                         finished: cue.finished.clone(),
                         invalid: cue.invalid.clone(),
                         announced: false,
+                        request: owned_request,
+                        arm: None,
                     };
                     if mailbox.publish(cue).is_err() {
                         next.session
@@ -325,10 +415,154 @@ fn run(
                         active = Some(next);
                     }
                 }
+                Command::Arm {
+                    device,
+                    request,
+                    origin,
+                    previous,
+                    id,
+                    owner,
+                    abandoned,
+                    reply,
+                } => {
+                    let mut published: Option<Arc<repeat::ArmControl>> = None;
+                    let result = (|| -> Result<repeat::ArmReceipt, String> {
+                        if abandoned.load(Ordering::Acquire) {
+                            return Err("Repeat arm cancelled before admission".into());
+                        }
+                        let a = active
+                            .as_ref()
+                            .ok_or("No current audio cue owns this repeat")?;
+                        if !owner.is_current()
+                            || !a.session.same_generation(&owner)
+                            || !a.session.is_current()
+                            || a.onset.load(Ordering::Acquire) != previous
+                            || device != config.device
+                        {
+                            return Err("Repeat cue output or onset owner changed".into());
+                        }
+                        if pending.is_some() {
+                            return Err("A repeat cue is already pending".into());
+                        }
+                        a.session.admit_arm_id(id)?;
+                        // Only a previously cancelled pointer can remain here;
+                        // the callback drains it without disturbing the old cue.
+                        drain_cancelled(&mut backend, &mailbox)?;
+                        let s = backend
+                            .as_ref()
+                            .ok_or("Current audio output is unavailable")?
+                            .status();
+                        let receipt = repeat::admit(
+                            &request,
+                            id,
+                            origin,
+                            crate::midi_input::midi_clock(),
+                            s.buffer_frames,
+                            s.sample_rate,
+                            mailbox.submitted_end_micros.load(Ordering::Acquire),
+                            mailbox.block_micros.load(Ordering::Acquire),
+                            previous,
+                            &a.request,
+                        )?;
+                        if !receipt.armed {
+                            return Ok(receipt);
+                        }
+                        let arm = Arc::new(repeat::ArmControl::new(
+                            id,
+                            previous,
+                            origin,
+                            abandoned.clone(),
+                        ));
+                        let cue = Box::new(mixer::Cue::future(
+                            s.sample_rate,
+                            request.clone(),
+                            a.session.stop_signal(),
+                            arm.clone(),
+                        ));
+                        let next = Active {
+                            app: a.app.clone(),
+                            session: a.session.clone(),
+                            onset: cue.onset.clone(),
+                            finished: cue.finished.clone(),
+                            invalid: cue.invalid.clone(),
+                            announced: true,
+                            request,
+                            arm: Some(arm.clone()),
+                        };
+                        if abandoned.load(Ordering::Acquire) || !owner.is_current() {
+                            return Err("Repeat arm cancelled during preparation".into());
+                        }
+                        // Vector copies and all cue allocation happened above.
+                        // Re-admit at publication, rather than acknowledging a
+                        // deadline that was only true before preparation.
+                        let s = backend
+                            .as_ref()
+                            .ok_or("Current audio output is unavailable")?
+                            .status();
+                        let receipt = repeat::admit(
+                            &next.request,
+                            id,
+                            origin,
+                            crate::midi_input::midi_clock(),
+                            s.buffer_frames,
+                            s.sample_rate,
+                            mailbox.submitted_end_micros.load(Ordering::Acquire),
+                            mailbox.block_micros.load(Ordering::Acquire),
+                            previous,
+                            &a.request,
+                        )?;
+                        if !receipt.armed {
+                            return Ok(receipt);
+                        }
+                        if mailbox.publish_prepared(cue).is_err() {
+                            return Err("Repeat cue queue is busy".into());
+                        }
+                        a.session.arm_published(id);
+                        published = Some(arm);
+                        pending = Some(next);
+                        Ok(receipt)
+                    })();
+                    if reply.send(result).is_err() {
+                        if let Some(arm) = published {
+                            arm.cancel();
+                        }
+                    }
+                }
+                Command::Cancel {
+                    id,
+                    previous,
+                    owner,
+                    reply,
+                } => {
+                    let found = pending
+                        .as_ref()
+                        .into_iter()
+                        .chain(active.as_ref())
+                        .find(|a| {
+                            owner.is_current()
+                                && a.session.same_generation(&owner)
+                                && a.session.is_current()
+                                && a.arm.as_ref().is_some_and(|arm| arm.matches(id, previous))
+                        });
+                    let state = found
+                        .map(|a| a.arm.as_ref().unwrap().cancel())
+                        .unwrap_or(repeat::CancelState::Missing);
+                    let _ = reply.send(Ok(repeat::CancelReceipt {
+                        version: 2,
+                        arm_id: id,
+                        previous_count_start_micros: previous,
+                        state,
+                    }));
+                }
             }
         }
         let failure = backend.as_mut().and_then(|host| host.pump().err());
         if let Some(error) = failure {
+            if let Some(p) = pending.take() {
+                if let Some(arm) = p.arm {
+                    arm.cancel();
+                }
+            }
             if let Some(a) = active.take() {
                 a.session.failed(error.clone(), |m| {
                     let _ = a.app.emit("viewer-audio-error", m);
@@ -353,6 +587,7 @@ fn run(
         } else if let Some(host) = backend.as_ref() {
             publish(host.status());
         }
+        reconcile(&mut active, &mut pending);
         if let Some(a) = active.as_mut() {
             let onset = a.onset.load(Ordering::Acquire);
             if !a.announced && onset != 0 {
@@ -366,7 +601,7 @@ fn run(
                     });
             }
             if a.session.cancelled()
-                || a.finished.load(Ordering::Acquire)
+                || (a.finished.load(Ordering::Acquire) && pending.is_none())
                 || a.invalid.load(Ordering::Acquire)
             {
                 a.session.finish();
@@ -388,6 +623,11 @@ fn run(
     if let Some(a) = active {
         a.session.cancel();
         a.session.finish();
+    }
+    if let Some(p) = pending {
+        if let Some(arm) = p.arm {
+            arm.cancel();
+        }
     }
     let result = close(&mut backend);
     bus.enable(false);
@@ -421,6 +661,22 @@ fn run(
             }
             Command::Begin(_, _, _, s) => {
                 s.cancel();
+            }
+            Command::Arm { reply, .. } => {
+                let _ = reply.send(Err("Native audio is available on Windows and macOS".into()));
+            }
+            Command::Cancel {
+                id,
+                previous,
+                reply,
+                ..
+            } => {
+                let _ = reply.send(Ok(repeat::CancelReceipt {
+                    version: 2,
+                    arm_id: id,
+                    previous_count_start_micros: previous,
+                    state: repeat::CancelState::Missing,
+                }));
             }
         }
     }
@@ -524,8 +780,9 @@ pub async fn practice_audio_begin(
     pulses_per_beat: Option<u32>,
     score_offset_pulses: Option<u32>,
     bar_start_pulses: Option<Vec<u64>>,
+    pulse_grid_v2: Option<lifecycle::PulseGridV2>,
 ) -> Result<u64, String> {
-    let request = lifecycle::Request::new_with_grid(
+    let request = lifecycle::Request::new_with_clock(
         &device,
         bpm,
         duration_ms,
@@ -533,6 +790,7 @@ pub async fn practice_audio_begin(
         pulses_per_beat,
         score_offset_pulses,
         bar_start_pulses,
+        pulse_grid_v2,
     )?
     .with_repeat_start(repeat_start_micros)?
     .with_full_repeat_count_in(full_repeat_count_in.unwrap_or(false))?;
@@ -555,6 +813,106 @@ pub async fn practice_audio_begin(
         let _ = (app, state, device, request);
         Err("Native audio is available on Windows and macOS".into())
     }
+}
+
+#[tauri::command]
+pub async fn practice_audio_arm_repeat(
+    state: tauri::State<'_, State>,
+    device: String,
+    bpm: f64,
+    duration_ms: f64,
+    count_in_step_ms: f64,
+    count_start_micros: f64,
+    pulse_grid_v2: lifecycle::PulseGridV2,
+    previous_count_start_micros: f64,
+    arm_id: f64,
+) -> Result<repeat::ArmReceipt, String> {
+    // Admission precedes any worker publication or lifecycle replacement.
+    let request = lifecycle::Request::new_with_clock(
+        &device,
+        bpm,
+        duration_ms,
+        count_in_step_ms,
+        None,
+        None,
+        None,
+        Some(pulse_grid_v2),
+    )?;
+    let origin = repeat::target(count_start_micros)?;
+    let previous = repeat::safe_id(previous_count_start_micros)?;
+    let id = repeat::safe_id(arm_id)?;
+    let owner = state
+        .playback
+        .current_session()?
+        .ok_or("No current cue owns a future repeat")?;
+    let abandoned = Arc::new(AtomicBool::new(false));
+    let cancellation = abandoned.clone();
+    let (tx, rx) = mpsc::channel();
+    state
+        .worker()
+        .send
+        .try_send(Command::Arm {
+            device,
+            request,
+            origin,
+            previous,
+            id,
+            owner,
+            abandoned,
+            reply: tx,
+        })
+        .map_err(|_| "Audio worker is busy or stopped")?;
+    tauri::async_runtime::spawn_blocking(move || match rx.recv_timeout(lifecycle::START_WAIT) {
+        Ok(result) => result,
+        Err(_) => {
+            cancellation.store(true, Ordering::Release);
+            Err("Repeat arm timed out and was cancelled".into())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn practice_audio_cancel_repeat(
+    state: tauri::State<'_, State>,
+    arm_id: f64,
+    previous_count_start_micros: f64,
+) -> Result<repeat::CancelReceipt, String> {
+    let id = repeat::safe_id(arm_id)?;
+    let previous = repeat::safe_id(previous_count_start_micros)?;
+    let Some(owner) = state.playback.current_session()? else {
+        return Ok(repeat::CancelReceipt {
+            version: 2,
+            arm_id: id,
+            previous_count_start_micros: previous,
+            state: repeat::CancelState::Missing,
+        });
+    };
+    let Some(worker) = state.worker.get() else {
+        return Ok(repeat::CancelReceipt {
+            version: 2,
+            arm_id: id,
+            previous_count_start_micros: previous,
+            state: repeat::CancelState::Missing,
+        });
+    };
+    let (tx, rx) = mpsc::channel();
+    worker
+        .send
+        .try_send(Command::Cancel {
+            id,
+            previous,
+            owner,
+            reply: tx,
+        })
+        .map_err(|_| "Audio worker is busy or stopped")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        rx.recv_timeout(lifecycle::START_WAIT)
+            .map_err(|_| "Repeat cancellation acknowledgment timed out".to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(all(test, windows))]
