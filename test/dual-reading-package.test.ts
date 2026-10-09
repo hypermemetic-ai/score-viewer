@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
 import {hashBytes,importPackage,type Manifest} from '../src/package';
-import {prepareDualReadingPackage,selectReadingNotation} from '../src/dual-reading-package';
+import {admitDualReadingContent,prepareDualReadingPackage,selectReadingNotation} from '../src/dual-reading-package';
 import {planManualPractice} from '../src/manual-practice-plan';
 import {initialPractice} from '../src/practice';
 import {manualPracticeRecord,readManualPractice} from '../src/manual-practice-state';
@@ -51,6 +51,14 @@ test('admitted source and view data are immutable and caller hooks cannot mint s
  const readingProxy={...p,reading:new Proxy(p.reading!,{})};assert.throws(()=>selectReadingNotation(readingProxy,'tab'),/actual receiving-realm/);
  const tab=selectReadingNotation(p,'tab');assert.equal(Object.isFrozen(tab.reading!.dual!.views.tab.scene.components),true);
  assert.throws(()=>{tab.reading!.dual!.instrumentFamily='guitar' as never;},TypeError);
+});
+test('a pre-frozen callable or accessor manifest cannot acquire a local selectable record',()=>{
+ const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;let called=0;
+ Object.defineProperty(m,'toJSON',{value:()=>{called++;return original.manifest;}});Object.freeze(m);
+ assert.throws(()=>admitDualReadingContent(m,files),/literal data/);assert.equal(called,0);
+ const accessor=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;
+ Object.defineProperty(accessor,'createdAt',{get:()=>{called++;return '2026-10-09';}});Object.freeze(accessor);
+ assert.throws(()=>admitDualReadingContent(accessor,files),/accessor authority/);assert.equal(called,0);
 });
 test('dual publication retains every declared view and round-trips without a separate performance edition',async()=>{
  const pub=await publishPackage(selectReadingNotation(original,'tab'));

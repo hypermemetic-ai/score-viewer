@@ -35,9 +35,18 @@ const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 // Mutable forged/cloned content cannot become a selectable presentation.
 interface AdmittedViews {score:QuantizedGridScore;manifest:Manifest;reading:ReadingContent}
 const admittedViews=new WeakMap<ReadingContent,AdmittedViews>();
+const frozenData=new WeakSet<object>();
 function freezeGraph(value:unknown,seen=new WeakSet<object>()){
- if(!value||typeof value!=='object'||Object.isFrozen(value)||seen.has(value))return;
- seen.add(value);for(const child of Object.values(value))freezeGraph(child,seen);Object.freeze(value);
+ if(typeof value==='function'||typeof value==='symbol'||typeof value==='bigint')throw Error('Dual reading requires literal data.');
+ if(!value||typeof value!=='object'||frozenData.has(value))return;
+ if(seen.has(value))throw Error('Dual reading requires acyclic literal data.');
+ seen.add(value);
+ for(const key of Reflect.ownKeys(value)){
+  const descriptor=Object.getOwnPropertyDescriptor(value,key);
+  if(typeof key!=='string'||!descriptor||!('value' in descriptor))throw Error('Dual reading cannot admit callable or accessor authority.');
+  freezeGraph(descriptor.value,seen);
+ }
+ seen.delete(value);Object.freeze(value);frozenData.add(value);
 }
 const forbidden=['keyboardLayout','presentations','fingerGeometry','renderingRecipe','calculationContext','preparationIdentity','calculatedHandReceipt',
  'transposition','effectiveHandSha256','profileId','profileSha256','layerSourceHash','referenceMidi','sourceScore','sourceRevision','sourceSha256'];
