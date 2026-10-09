@@ -71,7 +71,7 @@ test('source techniques, part ownership and geometry cannot invent unsupported m
     (m:Manifest)=>{m.reading!.options.systemsPerPage=1e9;},
     (m:Manifest)=>{m.reading!.tokens.semitoneScale=-1;},
     (m:Manifest)=>{(m.reading!.tokens as Record<string,unknown>).stemLength=null;}])
-    await assert.rejects(importPackage(await changed((_files,m)=>mutate(m))),/geometry|token|option/);
+    await assert.rejects(importPackage(await changed((_files,m)=>mutate(m))),/geometry|dimension|token|option/);
 });
 
 test('physical piano operations reject reading packages before making actions or changing source',async()=>{
