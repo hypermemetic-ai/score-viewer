@@ -9,6 +9,8 @@ import {manualPracticeRecord,readManualPractice} from '../src/manual-practice-st
 import {scoreCapabilities} from '../src/score-capabilities';
 import {publishPackage,publicationMembers} from '../src/publication';
 import {authoredFrettedInput,authoredFrettedPackage} from './support/fretted-dual-fixture';
+import {PackageAdmissionSession} from '../src/package-admission-session';
+import {ManualReadingContext} from '../src/manual-reading-context';
 
 const bytes=await authoredFrettedPackage(),original=await importPackage(bytes);
 async function changed(mutate:(files:Record<string,Uint8Array>,m:Manifest)=>void){
@@ -59,6 +61,16 @@ test('a pre-frozen callable or accessor manifest cannot acquire a local selectab
  const accessor=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;
  Object.defineProperty(accessor,'createdAt',{get:()=>{called++;return '2026-10-09';}});Object.freeze(accessor);
  assert.throws(()=>admitDualReadingContent(accessor,files),/accessor authority/);assert.equal(called,0);
+});
+test('cold and warm application admission copies retain real immutable dual context with independent archive buffers',async()=>{
+ const session=new PackageAdmissionSession(),cold=await session.import(bytes),warm=await session.import(bytes);
+ assert.notEqual(cold,warm);assert.notEqual(cold.files['score.json'],warm.files['score.json']);
+ assert.equal(Object.isFrozen(cold.score.sourceWrittenComponents!.components),true);
+ cold.files['score.json'].fill(0);cold.pages[0]='changed caller page';
+ const tab=selectReadingNotation(cold,'tab');assert.deepEqual(tab.pages,original.reading!.dual!.views.tab.pages);
+ const context=await ManualReadingContext.open(warm);context.switchNotation('tab');assert.deepEqual(context.package.pages,tab.pages);
+ const third=await session.import(bytes);assert.deepEqual(third.files['score.json'],original.files['score.json']);assert.deepEqual(third.pages,original.pages);
+ assert.throws(()=>selectReadingNotation(structuredClone(warm),'tab'),/actual receiving-realm/);
 });
 test('dual publication retains every declared view and round-trips without a separate performance edition',async()=>{
  const pub=await publishPackage(selectReadingNotation(original,'tab'));

@@ -10,7 +10,9 @@ const bounded=(value:number|undefined,maximum:number)=>value===undefined?maximum
 
 /** Bounded reuse of actual admission within this compiled realm. Exact bytes
  * resolve even same-size index collisions. Canonical graphs stay behind private
- * fields and copy closures; callers always receive independent mutable copies.
+ * fields and copy closures; callers receive independent wrappers/member bytes.
+ * Dual musical source/presentation graphs remain immutable and keep their
+ * actual receiving-realm context; ordinary piano graphs are mutable copies.
  * The material budget counts copied archive/member bytes and UTF-16 serialized
  * graph content conservatively; it is not a claim about exact JS heap usage. */
 export class PackageAdmissionSession {
