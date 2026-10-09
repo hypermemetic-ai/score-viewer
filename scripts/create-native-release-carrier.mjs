@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {converterResourceMap} from './native-release-carrier/score-viewer-converter-release.mjs';
 import {execFileSync} from 'node:child_process';
 import {cp, mkdir, readFile, rm, writeFile, chmod} from 'node:fs/promises';
 import {resolve, join} from 'node:path';
@@ -75,6 +76,12 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
       !Object.entries(frontendFiles).some(([path,p])=>path.endsWith('.ttf')&&p.sha256==='eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242'&&p.size===375760))
       throw Error('Frontend lacks the exact measured footer face and complete accessible notice');
   }
+  const converterResources=converterResourceMap(frontendFiles);
+  let converterHelper;
+  if(Object.keys(converterResources).length){
+    converterHelper=git(viewerSource,['show',`${viewerRevision}:scripts/native-release-carrier/score-viewer-converter-release.mjs`],true);
+    inputs.converterNoticeHelper={path:'scripts/score-viewer-converter-release.mjs',sha256:sha256(converterHelper),size:converterHelper.length};
+  }
   // Validate all adapters before any carrier mutation. The source commit stays
   // untouched; only the task-owned clean, isolated carrier worktree is written.
   let delivery=await readFile(join(isoCarrier,'scripts','score-viewer-delivery.mjs'),'utf8');
@@ -98,6 +105,13 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
     worker=replaceOnce(worker,"await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'}});",
       "await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'},bundle:{resources:{'../licenses/"+footerNotice+"':'notices/"+footerNotice+"'}}});",'footer generated resource map');
   }
+  if(Object.keys(converterResources).length){
+    worker=replaceOnce(worker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {packageConverterNotices} from './score-viewer-converter-release.mjs';",'converter notice packaging import');
+    worker=replaceOnce(worker,"export async function notices(source,viewer,packet,targetTriple) {","export async function notices(source,viewer,packet,targetTriple) {\n  await packageConverterNotices(source,packet);",'converter packet source packaging');
+    const resources={...converterResources,...(newFooterNotice?{['../licenses/'+footerNotice]:'notices/'+footerNotice}:{})};
+    const oldConfig=newFooterNotice?"await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'},bundle:{resources:{'../licenses/"+footerNotice+"':'notices/"+footerNotice+"'}}});":"await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'}});";
+    worker=replaceOnce(worker,oldConfig,"await writeJson(preparedConfig,{build:{beforeBuildCommand:'',frontendDist:'../dist'},bundle:{resources:"+JSON.stringify(resources)+"}});",'converter additive Mac resource map');
+  }
   let macWorker=await readFile(join(isoCarrier,'scripts','build-score-viewer-macos.mjs'),'utf8');
   macWorker=replaceOnce(macWorker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {verifyBundledPianoNotices,runMacPianoDiagnostic} from './score-viewer-piano-release.mjs';",'Mac piano resource import');
   macWorker=replaceOnce(macWorker,"await ctx.stage('nativeBuildMs'","await runMacPianoDiagnostic(ctx,packet,host,nativeReleaseCargoArgs,env);\nawait ctx.stage('nativeBuildMs'",'Mac initialized audio diagnostic');
@@ -107,13 +121,17 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
     macWorker=replaceOnce(macWorker,"const packet = await mkdtemp(join(tmpdir(),'iso-mac-recipient-'));","const packet = await mkdtemp(join(tmpdir(),'iso-mac-recipient-'));\nconst footerInk=await runFooterInkProbe(ctx,packet);",'Mac early bounded WebKit font check');
     macWorker=replaceOnce(macWorker,"{tests:'passed',virtualMidi:'passed',signatures:'passed',resources:'passed'","{footerInk,tests:'passed',virtualMidi:'passed',signatures:'passed',resources:'passed'",'Mac required font receipt');
   }
+  if(Object.keys(converterResources).length){
+    macWorker=replaceOnce(macWorker,"import {performance} from 'node:perf_hooks';","import {performance} from 'node:perf_hooks';\nimport {verifyBundledConverterNotices} from './score-viewer-converter-release.mjs';",'Mac converter notice import');
+    macWorker=replaceOnce(macWorker,"const bundledNoticeHashes=await verifyBundledPianoNotices(stage,viewer,join(app,'Contents','Resources'));","const bundledNoticeHashes={...await verifyBundledPianoNotices(stage,viewer,join(app,'Contents','Resources')),...await verifyBundledConverterNotices(stage,join(app,'Contents','Resources'))};",'Mac converter actual resource verification');
+  }
   if(newFooterNotice)macWorker=replaceOnce(macWorker,oldFontNotices,oldFontNotices.slice(0,-1)+",'"+footerNotice+"']",'Mac footer resource verification list');
   let attributes='';
   try {attributes=await readFile(join(isoCarrier,'.gitattributes'),'utf8');} catch(error) {if(error.code!=='ENOENT')throw error;}
   if(attributes && !attributes.endsWith('\n'))attributes+='\n';
   // Preserve literal Git object bytes across Windows core.autocrlf checkout.
   // The shared font notices must match their copied native counterparts too.
-  attributes+='\n# Exact reviewed native and frozen frontend release bytes\ndelivery-input/** -text\n';
+  attributes+='\n# Exact reviewed native and frozen frontend release bytes\ndelivery-input/** -text\n"scripts/score-viewer-converter-release.mjs" -text\n';
   if(newFooterNotice)for(const name of ['footer-ink-probe.swift','footer-ink-probe.mjs','footer-ink-receipt.mjs'])
     attributes+=`${JSON.stringify('scripts/'+name)} -text\n`;
   for(const file of selected) {
@@ -136,6 +154,7 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
   await writeFile(join(isoCarrier,'scripts','footer-ink-receipt.mjs'),newFooterNotice?git(viewerSource,['show',`${viewerRevision}:scripts/native-release-carrier/footer-ink-receipt.mjs`],true):await readFile(join(templates,'footer-ink-receipt.mjs')));
   if(newFooterNotice)for(const name of ['footer-ink-probe.swift','footer-ink-probe.mjs'])
     await writeFile(join(isoCarrier,'scripts',name),git(viewerSource,['show',`${viewerRevision}:scripts/native-release-carrier/${name}`],true));
+  await writeFile(join(isoCarrier,'scripts','score-viewer-converter-release.mjs'),converterHelper??await readFile(join(templates,'score-viewer-converter-release.mjs')));
   await cp(join(templates,'inputs.mjs'),join(isoCarrier,'scripts','score-viewer-carrier-inputs.mjs'));
   await cp(join(templates,'score-viewer-piano-release.mjs'),join(isoCarrier,'scripts','score-viewer-piano-release.mjs'));
   await cp(join(templates,'prepare-score-viewer.mjs'),join(isoCarrier,'scripts','prepare-score-viewer.mjs'));

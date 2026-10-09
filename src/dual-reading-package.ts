@@ -112,8 +112,12 @@ export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Arra
 
 /** One owned graph before asynchronous hashing. This path remains generic
  * MusicXML/source intake and does not manufacture a Guitar Pro family claim. */
-export async function prepareDualReadingPackage(input:{score:QuantizedGridScore;metadata:Metadata;createdAt:string;
- font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;retainedFiles?:Record<string,Uint8Array>;options?:Partial<JankoLayoutOptions>;tokens?:Partial<JankoTokens>}):Promise<Uint8Array>{
+export interface DualReadingPreparationInput {score:QuantizedGridScore;metadata:Metadata;createdAt:string;
+ font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;retainedFiles?:Record<string,Uint8Array>;options?:Partial<JankoLayoutOptions>;tokens?:Partial<JankoTokens>}
+export interface DualReadingPacket {bytes:Uint8Array;package:ScorePackage}
+/** Includes the existing independent final cold receiving result; a caller
+ * does not need to replay a third time just to retain its actual scene context. */
+export async function prepareDualReadingPacket(input:DualReadingPreparationInput):Promise<DualReadingPacket>{
  const owned=structuredClone(input),score=owned.score;
  if(!owned.createdAt||owned.metadata.title!==score.title||owned.metadata.composer!==score.composer||!owned.font.name||
   !owned.font.bytes.length||!Object.keys(owned.notices).length)throw Error('Incomplete dual reading preparation.');
@@ -137,7 +141,12 @@ export async function prepareDualReadingPackage(input:{score:QuantizedGridScore;
   reading:{version:'instrument-reading-package-v2',sourcePartId:prepared.sourcePartId,sourceStaffId:prepared.sourceStaffId,
    policy:score.readingPolicy!,options:prepared.iso.options,tokens:prepared.iso.tokens,views}};
  m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
- files['manifest.json']=strToU8(JSON.stringify(m));const bytes=zipSync(files,{level:6});await importPackageForReading(bytes);return bytes;
+ files['manifest.json']=strToU8(JSON.stringify(m));const bytes=zipSync(files,{level:6}),packageValue=await importPackageForReading(bytes);return {bytes,package:packageValue};
+}
+
+/** Legacy byte-only entry retains exactly the same builder and cold replay. */
+export async function prepareDualReadingPackage(input:DualReadingPreparationInput):Promise<Uint8Array>{
+ return (await prepareDualReadingPacket(input)).bytes;
 }
 
 /** Presentation choice never rewrites the canonical manifest, source bytes,

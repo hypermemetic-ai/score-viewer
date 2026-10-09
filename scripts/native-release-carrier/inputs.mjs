@@ -1,3 +1,4 @@
+import {validateConverterRecipient,converterResourceMap} from './score-viewer-converter-release.mjs';
 import {createHash} from 'node:crypto';
 import {readFile, readdir, lstat} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -68,6 +69,7 @@ export async function validateRecipientCarrier(files, prepared) {
   }
   const inputs = JSON.parse(await readFile(join(prepared, 'source-inputs.json')));
   validatePianoRecipient(files, inputs.nativeFiles);
+  validateConverterRecipient(files,inputs.frontend.files);
   const macAppPresent=Object.keys(files).some(path=>path.startsWith('ISO Score Viewer.app/'));
   for(const [path,pin]of Object.entries(inputs.nativeFiles).filter(([path])=>path.startsWith('licenses/'))){
     const bytes=files['notices/'+path.slice(9)];
@@ -116,11 +118,17 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
     if(canonical(Object.keys(p.files??{}).sort())!==canonical(names.sort()))fail('Footer runtime helper inventory differs');validatePins(p.files);
     for(const [path,pin]of Object.entries(p.files)){const b=await readFile(join(source,path));if(b.length!==pin.size||sha256(b)!==pin.sha256)fail('Footer runtime helper differs: '+path);}
   }
+  if(Object.keys(converterResourceMap(inputs.frontend.files)).length){
+    const p=inputs.converterNoticeHelper;
+    if(p?.path!=='scripts/score-viewer-converter-release.mjs'||!hash(p.sha256)||!Number.isSafeInteger(p.size)||p.size<1)fail('Source-bound converter notice helper missing');
+    const b=await readFile(join(source,p.path));if(b.length!==p.size||sha256(b)!==p.sha256)fail('Converter notice helper differs');
+  }
   const checksBytes = await readFile(join(source, 'delivery-input', 'checks.json'));
   if (!hash(inputs.checks?.sha256) || sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Reviewed check receipt differs');
   const checks = JSON.parse(checksBytes);
   validateRecordedChecks(checks, inputs);
   const packageJson = JSON.parse(await readFile(join(source, 'score-viewer', 'package.json'))), config = JSON.parse(await readFile(join(source, 'score-viewer', 'src-tauri', 'tauri.conf.json')));
+  if(packageJson.dependencies?.['score-converter-proof']&&!inputs.frontend.files['converter/gp/source-package-identity.json'])fail('Selected converter lacks emitted source/notice closure');
   if (packageJson.version !== inputs.version || config.version !== inputs.version || config.identifier !== 'dev.qqp.iso-score-viewer' || config.productName !== 'ISO Score Viewer') fail('Application identity differs');
   return {inputs, checks, sourceInputs:sourceIdentity(inputs, bytes)};
 }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
 import {hashBytes,importPackage,type Manifest} from '../src/package';
-import {admitDualReadingContent,prepareDualReadingPackage,selectReadingNotation} from '../src/dual-reading-package';
+import {admitDualReadingContent,prepareDualReadingPackage,prepareDualReadingPacket,selectReadingNotation} from '../src/dual-reading-package';
 import {planManualPractice} from '../src/manual-practice-plan';
 import {initialPractice} from '../src/practice';
 import {manualPracticeRecord,readManualPractice} from '../src/manual-practice-state';
@@ -13,8 +13,8 @@ import {PackageAdmissionSession} from '../src/package-admission-session';
 import {ManualReadingContext} from '../src/manual-reading-context';
 
 const bytes=await authoredFrettedPackage(),original=await importPackage(bytes);
-async function changed(mutate:(files:Record<string,Uint8Array>,m:Manifest)=>void){
- const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;mutate(files,m);
+async function changed(mutate:(files:Record<string,Uint8Array>,m:Manifest)=>void,source=bytes){
+ const files=unzipSync(source),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;mutate(files,m);
  m.files=Object.fromEntries(await Promise.all(Object.entries(files).filter(([n])=>n!=='manifest.json').map(async([n,b])=>[n,await hashBytes(b)])));
  m.semanticSha256=m.revision=m.files['score.json'];files['manifest.json']=strToU8(JSON.stringify(m));return zipSync(files);
 }
@@ -107,4 +107,16 @@ test('dual preparation and manual planning own a whole snapshot before asynchron
  mutable.score.id='later';mutable.score.timeSignatures[0].numerator=3;mutable.reading!.dual!.views.iso.scene.components[0].tick++;
  assert.deepEqual(await later,plan);assert.equal(p.score.id,'authored-fretted-dual');
  const bad=structuredClone(p);bad.reading!.dual!.views.iso.scene.components[0].tick++;await assert.rejects(planManualPractice(bad),/appearance|component/);
+});
+
+test('packet builder preserves legacy bytes and returns the actual independent receiving scenes',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.UTC(2026,9,9)});
+ const input=authoredFrettedInput(),packet=await prepareDualReadingPacket(input),legacy=await prepareDualReadingPackage(input),cold=await importPackage(packet.bytes);
+ assert.equal(await hashBytes(packet.bytes),await hashBytes(legacy),'Legacy and packet builders emit identical complete bytes with the same authored input and archive clock');
+ assert.equal(packet.package.archiveSha256,await hashBytes(packet.bytes));
+ for(const notation of ['iso','tab'] as const){const actual=selectReadingNotation(packet.package,notation),reopened=selectReadingNotation(cold,notation);assert.deepEqual(actual.pages,reopened.pages);assert.deepEqual(actual.reading,reopened.reading);}
+ assert.throws(()=>selectReadingNotation(structuredClone(packet.package),'tab'),/actual receiving-realm/);
+ const forged=await changed((files,m)=>{const descriptor=m.reading;assert.equal(descriptor?.version,'instrument-reading-package-v2');if(descriptor?.version!=='instrument-reading-package-v2')throw Error('Expected dual descriptor');files[descriptor.views.tab.pages[0]]=strToU8('<svg xmlns="http://www.w3.org/2000/svg" data-forged="true"></svg>');},packet.bytes);
+ await assert.rejects(importPackage(forged),/page differs/);
+ assert.equal(selectReadingNotation(packet.package,'tab').pages.some(page=>page.includes('data-forged')),false);
 });
