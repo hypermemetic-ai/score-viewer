@@ -1,6 +1,6 @@
 # Dual musical reading receiver
 
-The source checkpoint uses the independently reviewed, still unmerged ISO PR348 head `80b38442e3d987cf22add926fe85fed1b8405bc2` in this isolated branch. This is a provisional source dependency, not a selected native build or installed capability.
+The source checkpoint deliberately pins merged ISO `536c48b537e9bced305bb1b3b3a1d62988c2d055`, including the reviewed guide correction, source-revision performance path and public portable MusicXML parser. Source and browser receiving checks are distinct from a selected native build, installed capability and human acceptance; those delivery gates remain separate.
 
 `instrument-reading-package-v2` stores one canonical selected source part and complete written-component ledger, with independent ISO and TAB pages, owners, scenes and geometry evidence. Its default manifest pages are ISO. The receiver runs the public `prepareFrettedViews` once and compares both complete results exactly before exposing either view. Existing compressed, member, expanded and file-count limits apply to the combined archive; each view remains limited to 500 pages. Both page sets pass the existing passive SVG gate. Descriptor v1 continues its literal historical preparation and byte identity.
 
