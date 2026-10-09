@@ -20,7 +20,7 @@ The browser scheduler excludes the predecessor's terminal boundary pulse within 
 
 The reproducible `scripts/inspect-practice-countin.mjs` uses real Chromium `PracticeView`, running WebAudio oscillators and source-linked note timing. Private archives enter only through a caller-supplied file and are never stored in Git. The probe records actual oscillator starts, frequencies, source exits, count receipts, display changes and unchanged score/page/seat data. It asserts one correctly accented pulse at every completed repeat count position and exact source-end handoff. All temporary servers and browsers close in its `finally` path.
 
-The final V2-shape receipt is retained privately at `/home/qqp/.local/state/score-viewer-repeat-countin-20261009/meter-v2-final/receipt.json`:
+The final integrated V2-shape receipt is retained privately at `/home/qqp/.local/state/score-viewer-repeat-countin-20261009/source-final-ack-expiry/receipt.json`:
 
 | Case | Completed tempos | Repeat preparation/adoption | Artificial save delay |
 | --- | --- | --- | --- |
@@ -28,9 +28,9 @@ The final V2-shape receipt is retained privately at `/home/qqp/.local/state/scor
 | Original private Zelda, conventional, manual | 80 → 80 | 2 / 2 | 350 ms |
 | Original private Zelda, Jankó, measured | 60 → 60.8 | 2 / 2 | 350 ms |
 
-Every checked complete cue had the expected accent and spacing, exactly one boundary click and no additional silent bar. The underlying score, pages and seats remained unchanged. Earlier failed double-click and Vite WebSocket harness receipts remain available alongside the passing receipts. The probe's isolated HTTP/WebSocket server now owns an ephemeral port and does not use an existing studio or application server.
+Every checked complete cue had the expected accent and spacing, exactly one boundary click and no additional silent bar. The underlying score, pages and seats remained unchanged. Earlier failed double-click and Vite WebSocket harness receipts remain available alongside the passing receipts. The probe's isolated HTTP/WebSocket server owns an ephemeral port and does not use an existing studio or application server.
 
-Focused source tests also cover two complete pickup repeats, complementary short endings, written repeated pickups, mixed meters, fractional reference units, bounded vectors, delayed/absent acknowledgements, cancellation before acknowledgement, original ownership at `35,037,631,353,801` microseconds, save failure, reversible Done, held terminal notes and repeated selector arrows. A configured Viewer run passed 526 tests before the final acknowledgement/save/disposal hardening; final integrated checks belong to the reviewed source receipt.
+Focused source tests also cover two complete pickup repeats, complementary short endings, written repeated pickups, mixed meters, fractional reference units, bounded vectors, delayed/absent acknowledgements, cancellation before acknowledgement, original ownership at `35,037,631,353,801` microseconds, save failure, reversible Done, held terminal notes and repeated selector arrows. The final configured Viewer suite passes all 531 tests; TypeScript/Vite build, strict OpenSpec and whitespace checks pass. These checks and the final browser receipt bind runtime head `5df580e96d9c1d3dd7fbd7581989e53fa57bae3e`, with ISO `42ac072da5af34de00b2fe8096cc434210ef05e9`. A retained earlier 530/531 run exposed an already-expired acknowledgement deadline being deferred through a timer; completion now immediately cancels/falls back when its entry deadline has already passed.
 
 These observations establish source scheduling and real browser audio-event behavior. They do not certify the user's speaker latency, physical MIDI/pedal path, audible musical acceptance or an installed native package. Windows/Mac compilation, native waveform/owner-race tests, paired packet verification and activation remain separate delivery gates owned by the parent.
 
