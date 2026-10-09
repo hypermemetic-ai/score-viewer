@@ -95,14 +95,21 @@ Transposed editions SHALL preserve the original archives, corrections, calculati
 - **WHEN** the original contains personal corrections and practice progress
 - **THEN** those originals remain unchanged and recoverable
 - **AND** a newly transposed edition starts with independently valid calculated fingerings and no falsely inherited correction or achievement claim
+- **AND** non-achievement practice preferences remain available without copying played progress or completion
 
 ### Requirement: Reading and assessment use one effective pitch context
 Displayed notation, practice obligations and performance assessment SHALL use the same admitted effective pitches. Changing transposition SHALL stop transient playback/assessment and rebuild the relevant view before resumption, preserving the selected passage where its owner/bar identities remain applicable. Live piano passthrough SHALL continue sounding the physical incoming MIDI pitches.
 
-#### Scenario: Transpose from practice Options
-- **WHEN** a paused practice user commits a valid offset
+#### Scenario: Transpose from practice Options to a new pitch edition
+- **WHEN** a paused practice user commits a valid offset to a new pitch edition
 - **THEN** the passage range remains selected with newly admitted notation and expected pitches, and resumed assessment uses the new pitch context
 - **AND** pending events from the prior pitch context cannot advance or complete the new one
+
+#### Scenario: Retained edition has a crossing joined range
+- **WHEN** the retained edition's admitted grouping cannot also represent the previously selected joined passage
+- **THEN** its saved grouping, preferences and evidence take priority over the incoming navigation context
+- **AND** the selector explicitly reports that the prior passage is unavailable rather than failing after activation or silently practicing another range
+- **AND** practice state and grouping admission complete before the library pointer changes
 
 #### Scenario: Original reference MIDI attachment
 - **WHEN** an archive contains reference MIDI and is transposed
