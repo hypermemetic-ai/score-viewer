@@ -19,13 +19,16 @@ import {PIANO_ASSIGNMENT_VERSION,validatePianoAssignments} from '../vendor/iso-n
 import {validatePianoPreparationIdentity,type PianoPreparationIdentity} from './piano-preparation-identity';
 import {sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry} from '../vendor/iso-notation/src/score-presentation';
 import {admitCalculatedHandEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
+import {admitScoreTransposition,type ScoreTransposition} from './score-transposition';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
 export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
 export interface Seat {id:string;page:number;ownerIds:string[];actionId:string;contactId:string;pitchDigit:string;x:number;baseline:number;fontSize:number;system:number;writtenBar:number;continuation?:boolean}
 export interface Metadata {title:string;composer:string;opus?:number;opusLabel?:string;piece?:number;provenance:string[];variant?:string}
-export interface Manifest {format:'iso-score';version:1|2|3;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;reading?:ReadingDescriptor}
+
+export interface Manifest {format:'iso-score';version:1|2|3;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;transposition?:ScoreTransposition;reading?:ReadingDescriptor}
 export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;calculationContext?:PianoCalculationContext|null}
-export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;reading?:ReadingContent}
+export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;transposition?:ScoreTransposition;transpositionOriginal?:ScorePackage;archiveSha256?:string;reading?:ReadingContent}
+
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
 function fail(s:string):never{throw Error(s);}
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -201,7 +204,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   pages.forEach((svg,page)=>passiveSvg(svg,[],page));
   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
   freezeSource(score);
-  return {manifest:m,score,seats:[],pages,files,reading,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
+  return {manifest:m,score,seats:[],pages,files,reading,archiveSha256:await hashBytes(bytes),sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    generationAvailable:false,fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
  }
  async function presentation(viewManifest:Manifest,scoreName:string,seatsName:string,fingersName?:string,context:Partial<ScorePackage>={}):Promise<ScorePackage>{
@@ -219,11 +222,11 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  const pages=m.pages.map((name,i)=>{if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);return svg;});
  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
 
-  const p:ScorePackage={manifest:m,score,seats,pages,files,...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages)};
+  const p:ScorePackage={manifest:m,score,seats,pages,files,archiveSha256:await hashBytes(bytes),...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages)};
   if(fingersName&&files[fingersName])p.fingerLayer=await validateLayerAsync(parse(fingersName),p);
   return p;
  }
- if(m.version===1){const p=await presentation(m,'score.json','seats.json','fingers.json');
+ if(m.version===1){if(m.transposition!==undefined)fail('Transposition requires its linked effective source and retained original.');const p=await presentation(m,'score.json','seats.json','fingers.json');
   if(p.score.performingHandPresentation||p.score.notes.some(n=>n.derivedHand)||m.calculatedHandReceipt||m.engineVersion===CALCULATED_HAND_SCORE_RENDERING_ENGINE)fail('Calculated editions require an independently preserved linked original source.');
   p.keyboardLayout='janko-four-row';p.availablePresentations=['janko-four-row'];p.sourceScore=p.score;p.sourceRevision=m.revision;p.sourceSha256=m.semanticSha256;
   p.effectiveHandSha256=await handDigest(p.score,p.score,false);
@@ -234,6 +237,8 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
  const source=normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore);
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
+ const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore]);
+ if(transposition&&JSON.stringify(m.referenceMidi)!==JSON.stringify((transposition.original.collectionManifest??transposition.original.manifest).referenceMidi))fail('Transpose reference attachment differs from its original archive.');
  const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
  if(source.performingHandPresentation||source.notes.some(n=>n.derivedHand))fail('Immutable original source cannot be substituted by a calculated display projection.');
  freezeSource(source);
@@ -248,11 +253,12 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(d.fingers)requireReferencePerformanceTempo(planningSource);
   const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe,preparationIdentity:d.preparationIdentity,calculatedHandReceipt:d.calculatedHandReceipt};
   if(viewContext)viewManifest.calculationContext=viewContext;else delete viewManifest.calculationContext;
-  const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(viewContext?{calculationContext:viewContext}:{})});
+  const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(transposition?{transposition:transposition.envelope,transpositionOriginal:transposition.original}:{}),...(viewContext?{calculationContext:viewContext}:{})});
   // Context is an explicit known field, never a blanket exclusion of source tempo.
   if(viewContext&&JSON.stringify(p.score.referencePerformanceTempo)!==JSON.stringify(viewContext.referencePerformanceTempo))
    fail('Linked presentation differs from its piano calculation reference');
   const derived=!!p.score.performingHandPresentation||p.score.notes.some(n=>n.derivedHand)||d.engineVersion===CALCULATED_HAND_SCORE_RENDERING_ENGINE||d.calculatedHandReceipt!==undefined;
+  if(transposition){const map=transposition.envelope.handMaps[key];if(!map||map.some(o=>p.score.notes.find(n=>n.id===o.id)?.hand!==o.hand)||!derived)fail('Transposed presentation differs from its selected owner-hand authority.');}
   if(derived){if(JSON.stringify(sourceFactsProjection(planningSource))!==JSON.stringify(sourceFactsProjection(p.score)))fail('Linked calculated presentation changes immutable musical source facts');}
   else if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
   if(await handDigest(source,p.score)!==d.effectiveHandSha256)fail('Linked effective-hand identity differs');
@@ -262,6 +268,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
    p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats]);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
   views.set(key,p);
  }
+ if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');
  const primary=views.get(m.keyboardLayout)!;
  const d=m.presentations[m.keyboardLayout]!;
  if(!primary||d.score!=='score.json'||d.seats!=='seats.json'||d.fingers!==('fingers.json' in m.files?'fingers.json':undefined)||

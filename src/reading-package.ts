@@ -42,7 +42,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
     d.version!=='instrument-reading-package-v1'||d.engineId!==INSTRUMENT_READING_ENGINE||m.engineVersion!==d.engineId||
     d.owners!=='reading-owners.json'||d.layout!=='reading-layout.json'||!object(d.options)||!object(d.tokens)||
     ['keyboardLayout','presentations','fingerGeometry','renderingRecipe','calculationContext','preparationIdentity','calculatedHandReceipt',
-      'effectiveHandSha256','profileId','profileSha256','layerSourceHash','referenceMidi','sourceScore','sourceRevision','sourceSha256'].some(k=>k in m)||
+      'transposition','effectiveHandSha256','profileId','profileSha256','layerSourceHash','referenceMidi','sourceScore','sourceRevision','sourceSha256'].some(k=>k in m)||
     files['fingers.json']||!files[d.owners]||!files[d.layout]||m.pages.length>500||
     m.files[m.font]!=='5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae'||!m.notices.length)
     throw Error('Unsupported or incomplete musical reading package.');

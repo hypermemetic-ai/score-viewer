@@ -13,13 +13,16 @@ import {annotationPositions} from './fingering-presentation';
 
 import {ANNOTATION_INK_POLICY,validateAnnotationInkPolicy,ensureAnnotationInkPolicyReady,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
 
+import {admitTranspositionBaselineRecipe} from './score-transposition';
+
 interface CalculatedHandEvidence {
  outputIdentity:{pageSha256:string[];seatSha256:string};
  sourceInventory:SourceStatementInventory;sourceCoverage:PresentationSourceCoverage;
  annotationGeometry:PresentationAnnotationGeometry;
 }
 export type CalculatedHandReceipt=CalculatedHandEvidence&({version:'viewer-calculated-hand-edition-v1'}|
- {version:'viewer-calculated-hand-edition-v2';annotationInkPolicy:ViewerAnnotationInkPolicy});
+ {version:'viewer-calculated-hand-edition-v2';annotationInkPolicy:ViewerAnnotationInkPolicy}|
+ {version:'viewer-calculated-hand-edition-v3';annotationInkPolicy:ViewerAnnotationInkPolicy;transpositionSha256:string});
 const same=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 export const ownerHands=(layer:FingerLayer):OwnerHand[]=>layer.attacks.flatMap(a=>a.owners.map(o=>({id:o.id,pitch:a.pitch,
  startTick:a.startTick,durationTicks:o.durationTicks,hand:a.hand}))).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
@@ -34,17 +37,20 @@ export async function calculatedHandInputs(p:ScorePackage,layer:FingerLayer,poli
    authorityId:'viewer-operator-choice:'+await identityHash(c)});
  return{inputs:{sourceSha256:p.sourceSha256!,assignmentSha256:await identityHash(canonicalOwnerAssignments(layer)),
   handPolicyRevision:'viewer-performing-hand-policy-v1:'+policy,constraintSha256:await authorityIdentity(constraints),keyboardId:p.keyboardLayout!,
-  profileSha256:layer.profileSha256 as string,calculationContextSha256:await identityHash({referencePerformanceTempo:source.referencePerformanceTempo,calculationContext:p.calculationContext,...(inkPolicy?{annotationInkPolicy:inkPolicy}:{})}),
+  profileSha256:layer.profileSha256 as string,calculationContextSha256:await identityHash({referencePerformanceTempo:source.referencePerformanceTempo,calculationContext:p.calculationContext,...(inkPolicy?{annotationInkPolicy:inkPolicy}:{ }),...(p.transposition?{transposition:p.transposition}:{})}),
   calculatorEvidenceSha256:await identityHash(calculatorEvidence(layer)),recipeSha256:await calculatedRecipeIdentity(recipe)},operatorRequirements};
 }
-const receiptFor=(r:Awaited<ReturnType<typeof prepareCalculatedHandPresentation>>,inkPolicy?:ViewerAnnotationInkPolicy):CalculatedHandReceipt=>({
- ...(inkPolicy?{version:'viewer-calculated-hand-edition-v2' as const,annotationInkPolicy:inkPolicy}:{version:'viewer-calculated-hand-edition-v1' as const}),
+const receiptFor=(r:Awaited<ReturnType<typeof prepareCalculatedHandPresentation>>,inkPolicy?:ViewerAnnotationInkPolicy,transpositionSha256?:string):CalculatedHandReceipt=>({
+ ...(transpositionSha256?{version:'viewer-calculated-hand-edition-v3' as const,annotationInkPolicy:inkPolicy!,transpositionSha256}:inkPolicy?{version:'viewer-calculated-hand-edition-v2' as const,annotationInkPolicy:inkPolicy}:{version:'viewer-calculated-hand-edition-v1' as const}),
  outputIdentity:r.outputIdentity,sourceInventory:r.sourceInventory,sourceCoverage:r.sourceCoverage,annotationGeometry:r.annotationGeometry!});
 
 /** Only reviewed factories produce new recipes. An old raw baseline is actually
  * replayed before adopting new rules; a derived baseline was cold-replayed on import. */
 export async function calculatedRecipeForRequest(p:ScorePackage):Promise<ScoreRenderingRecipe>{
  if(!p.renderingRecipe)throw Error('Calculated hands require a matching native rendering preparation.');
+ if(p.transposition){if(!p.transpositionOriginal)throw Error('Transpose has no independently admitted original baseline.');
+  await admitTranspositionBaselineRecipe(p.transpositionOriginal);
+  return createCalculatedHandRenderingRecipe(p.sourceSha256!,p.renderingRecipe.options,p.renderingRecipe.tokens);}
  const source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256!),
   prior=p.renderingRecipe.engineId===CALCULATED_HAND_SCORE_RENDERING_ENGINE?p.renderingRecipe:
    await replayRetainedRecipeBaseline(source,p.renderingRecipe,p.sourceSha256!);
@@ -55,23 +61,24 @@ export async function prepareCalculatedEdition(p:ScorePackage,layer:FingerLayer,
  const recipe=await calculatedRecipeForRequest(p),source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256!),
   {inputs,operatorRequirements}=await calculatedHandInputs(p,layer,policy,recipe,constraints,ANNOTATION_INK_POLICY),
   result=await prepareCalculatedHandPresentation(source,ownerHands(layer),recipe,inputs,operatorRequirements);
- return{result,recipe:finalizeCalculatedHandRenderingRecipe(recipe,result.recipeBaseline),receipt:receiptFor(result,ANNOTATION_INK_POLICY)};
+ return{result,recipe:finalizeCalculatedHandRenderingRecipe(recipe,result.recipeBaseline),receipt:receiptFor(result,ANNOTATION_INK_POLICY,p.transposition?.sha256)};
 }
 
 /** Cold admission is an actual source-owned engine replay with no optimizer.
  * The saved ledger or its hashes cannot substitute for source/paint audit. */
 export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seatBytes:Uint8Array):Promise<CalculatedHandReceipt>{
- const r=raw as CalculatedHandReceipt,inkPolicy=r?.version==='viewer-calculated-hand-edition-v2'?validateAnnotationInkPolicy(r.annotationInkPolicy):undefined;
+ const r=raw as CalculatedHandReceipt,inkPolicy=(r?.version==='viewer-calculated-hand-edition-v2'||r?.version==='viewer-calculated-hand-edition-v3')?validateAnnotationInkPolicy(r.annotationInkPolicy):undefined;
  if(r?.version!=='viewer-calculated-hand-edition-v1'&&!inkPolicy)throw Error('Unsupported calculated edition receipt.');
+ if(!!p.transposition!==(r?.version==='viewer-calculated-hand-edition-v3')||p.transposition&&r.version==='viewer-calculated-hand-edition-v3'&&r.transpositionSha256!==p.transposition.sha256)throw Error('Calculated receipt has another transposition authority.');
  if(inkPolicy)await ensureAnnotationInkPolicyReady(inkPolicy);
- if(!p.fingerLayer||p.preparationIdentity?.version!==(inkPolicy?'viewer-piano-preparation-v3':'viewer-piano-preparation-v2')||!p.renderingRecipe||p.renderingRecipe.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE||
+ if(!p.fingerLayer||p.preparationIdentity?.version!==(p.transposition?'viewer-piano-preparation-v4':inkPolicy?'viewer-piano-preparation-v3':'viewer-piano-preparation-v2')||!p.renderingRecipe||p.renderingRecipe.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE||
   p.manifest.engineVersion!==CALCULATED_HAND_SCORE_RENDERING_ENGINE)throw Error('Calculated edition lacks its complete layer, preparation or recipe identity.');
  const source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256!),policy=p.preparationIdentity.handPolicy,
   constraints=pianoRequestAuthority(p,source,p.keyboardLayout!,p.fingerLayer,undefined,policy),recipe=p.renderingRecipe as ScoreRenderingRecipe,
   {inputs,operatorRequirements}=await calculatedHandInputs(p,p.fingerLayer,policy,recipe,constraints,inkPolicy),owners=ownerHands(p.fingerLayer),
   identity=await createHandPresentationIdentity(inputs,owners);
  await validateHandPresentationAgainstSource(source,p.score,identity,operatorRequirements);
- const replay=await prepareCalculatedHandPresentation(source,owners,recipe,inputs,operatorRequirements),expected=receiptFor(replay,inkPolicy);
+ const replay=await prepareCalculatedHandPresentation(source,owners,recipe,inputs,operatorRequirements),expected=receiptFor(replay,inkPolicy,p.transposition?.sha256);
  if(!same(raw,expected))throw Error('Calculated edition receipt differs from original-source actual paint, coverage or annotation geometry.');
  if(!same(p.score,replay.score)||p.pages.length!==replay.pages.length||p.pages.some((page,i)=>page!==replay.pages[i])||
   new TextDecoder('utf-8',{fatal:true}).decode(seatBytes)!==JSON.stringify(replay.seats)||!same(p.seats,replay.seats))

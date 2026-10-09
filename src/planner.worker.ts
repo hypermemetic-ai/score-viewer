@@ -1,5 +1,4 @@
 import {requirePianoEvent} from './piano-event';
-import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {performanceFingerProfile,fingerPlanningClock,FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
 import {normalizeHandPlanningInput,type PlanningGesture} from '../vendor/iso-notation/src/model/hand-planning-input';
