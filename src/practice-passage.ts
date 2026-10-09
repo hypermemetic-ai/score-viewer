@@ -14,12 +14,12 @@ const ns='http://www.w3.org/2000/svg';
 const projectedRelationPaint='.janko-phrase,.janko-phrase-grid-knockout,path[data-tie-note]';
 const carrierCache=new WeakMap<ScorePackage,ReturnType<typeof fingeringCarriers>>();
 const pageCache=new WeakMap<ScorePackage,Map<number,{source:string;doc:Document}>>();
-/** Parsed source documents stay private and read-only; each crop imports its
- * own mutable ink. Exact page bytes invalidate even an altered test package. */
+/** Keep at most eight private read-only source pages per live package. Each
+ * crop imports its own mutable ink; exact page bytes invalidate old parses. */
 function sourcePage(p:ScorePackage,page:number):Document {
  let pages=pageCache.get(p);if(!pages){pages=new Map();pageCache.set(p,pages);}
- const source=p.pages[page],saved=pages.get(page);if(saved?.source===source)return saved.doc;
- const doc=new DOMParser().parseFromString(source,'image/svg+xml');pages.set(page,{source,doc});return doc;
+ const source=p.pages[page],saved=pages.get(page);if(saved?.source===source){pages.delete(page);pages.set(page,saved);return saved.doc;}
+ const doc=new DOMParser().parseFromString(source,'image/svg+xml');pages.delete(page);pages.set(page,{source,doc});if(pages.size>8)pages.delete(pages.keys().next().value!);return doc;
 }
 export interface Crop {bar:number;svg:SVGSVGElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
 /** Copy real-engine ink; attach source group ownership to existing vector elements, never invent notes. */

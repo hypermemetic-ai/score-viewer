@@ -47,8 +47,9 @@ Pending fonts and failed geometry builds are never reused. Every preview read
 checks the pinned footer-face capability. Active practice never uses these
 inert SVGs. Closing practice releases the preview cache.
 
-Private source-page documents are reused only for the same package and exact
-source bytes; crops always clone them. The reader helper retains at most eight
+Private source-page documents retain at most eight pages per live package,
+touch hits in LRU order and reuse only the same package and exact source bytes;
+crops always clone them. The reader helper retains at most eight
 pages, resets its seat/owner indices for a new package and preserves actual
 glyph nodes/focus when the page group is unchanged. Its application hook is
 owned by the keyboard/options integration. Mutable annotations, contact state
@@ -82,7 +83,8 @@ visually inspected. Existing strict geometry refusals remain refusals.
 
 The complete integrated suite passed 505 tests and configured build; the
 final font/interactivity refinement passed 35 affected tests, configured
-build and the 18 browser controls. All 29 configured carrier/runtime checks
+build and the 18 browser controls. The final source-page LRU bound passed
+45 affected tests and the same 18 actual browser controls. All 29 configured carrier/runtime checks
 passed. No native delivery, physical MIDI, audio latency, low-end laptop or
 human musical acceptance is claimed by this rendering audit.
 
