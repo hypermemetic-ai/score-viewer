@@ -5,11 +5,12 @@ Opening a retained Zelda edition takes about 22 seconds in the actual viewer. Ea
 ## What Changes
 
 - Reuse one pure rest scene per actual source-layout coverage pass (independently reviewed ISO PR342).
+- Reuse final read-only scenes within a single phase-owned presentation call, preserving distinct score contexts and mutation/refusal boundaries (independently reviewed ISO PR344).
 - Add a bounded, runtime-private package admission session with exact-byte keys and independent returned copies.
 - Reuse receiving-realm admission only after that realm has fully cold-admitted worker output.
 - Read unchanged retained presentations through the existing policy/personal/layer service, without launching a redundant calculation worker.
 - Reuse tiny written-head IDs derived by actual strict replay, with exact mutation checks and the existing strict fallback.
-- Measure actual first import, repeated opens, keyboard switching and library summaries; investigate bounded yielding separately before changing cold admission scheduling.
+- Show loading/cancellation and yield at approved completed operation-phase boundaries; measure actual first import, repeated opens, keyboard switching and library summaries while retaining synchronous strict cold replay.
 
 ## Capabilities
 
