@@ -112,22 +112,23 @@ export class PracticeView {
    // The complete cue may already be audible while its bridge acknowledgement is in flight.
    // Preserve it until its own score entry; never stop it and play a second partial count.
    const generation=this.startGeneration,clock=this.clock,deadline=prepared.plan.boundaryMs+prepared.plan.countInMs;
+   this.repeatSavePending=true;const completionSave=this.save();
    const finish=async()=>{const pending=this.repeatCompletion;if(!pending||pending.session!==session||pending.generation!==generation||generation!==this.startGeneration||session!==this.session||clock!==this.clock)return;clearTimeout(pending.timer);this.repeatCompletion=undefined;
     if(!prepared.receipt||clock.now()>=deadline){try{await clock.cancelRepeat();}catch(error){if(generation===this.startGeneration){this.audioError=(error as Error).message;this.pause();this.status(this.audioError!);}return;}if(generation!==this.startGeneration)return;prepared.receipt=undefined;}
-    this.finishCompletedTrial(session,anchor,measured);
+    this.finishCompletedTrial(session,anchor,measured,completionSave);
    };
    this.repeatCompletion={session,generation,timer:setTimeout(()=>void finish(),Math.max(0,deadline-clock.now()))};void prepared.settled?.then(()=>finish());this.paintControls();return;
   }
   this.finishCompletedTrial(session,anchor,measured);
  }
- private finishCompletedTrial(session:PracticeSession,anchor:{previousStartMs:number;phraseEndMs:number;previousBpm:number},measured:boolean){
+ private finishCompletedTrial(session:PracticeSession,anchor:{previousStartMs:number;phraseEndMs:number;previousBpm:number},measured:boolean,completionSave?:Promise<boolean>){
   const prepared=this.repeatPreparation,next=measured?nextPracticePassage(this.plan,this.state,session.chunk):session.chunk;
   if(prepared?.session===session&&prepared.generation===this.startGeneration&&prepared.receipt&&prepared.rate===this.state.working&&next?.id===session.chunk.id&&this.carryPrepared()&&this.clock){
-   this.repeatPreparation=undefined;this.repeatSavePending=true;const generation=this.startGeneration;void this.save().then(()=>{if(generation===this.startGeneration)this.repeatSavePending=false;});
+   this.repeatPreparation=undefined;this.repeatSavePending=true;const generation=this.startGeneration;void (completionSave??this.save()).then(()=>{if(generation===this.startGeneration)this.repeatSavePending=false;});
    try{this.repeatGap=this.clock.adoptRepeat(prepared.receipt);this.loopRate=this.state.working;this.slots?.prime();this.refill?.prime();this.preview.clear();session.ready(prepared.receipt.countStartMs,this.heldPitches,!session.measured,{sustain:this.options.sustain?.(),contacts:this.heldStreams},prepared.plan?.grid??session.sourcePulseGrid);for(const a of session.carryIn??[])this.contacts.press(a);this.done=false;this.paint();}catch(error){this.audioError=(error as Error).message;this.pause();this.status(this.audioError!);}return;
   }
   this.stopClock();const generation=this.startGeneration;
-  void this.save().then(ok=>{if(ok&&!this.disposed&&generation===this.startGeneration&&session===this.session&&session.phase==='complete'){if(measured)void this.continueTrial(anchor);else void this.action('ready',planPracticeRepeat({...anchor,nextBpm:this.state.working,grid:session.pulseGrid,sourceBoundary:true}));}});this.paintControls();
+  void (completionSave??this.save()).then(ok=>{if(ok&&!this.disposed&&generation===this.startGeneration&&session===this.session&&session.phase==='complete'){if(measured)void this.continueTrial(anchor);else void this.action('ready',planPracticeRepeat({...anchor,nextBpm:this.state.working,grid:session.pulseGrid,sourceBoundary:true}));}});this.paintControls();
  }
  private paintCue(){const cue=this.app.querySelector<HTMLElement>('.practice-countin');if(!cue)return;const s=this.session,now=this.clock?.now();cue.hidden=this.overview||now===undefined||s?.phase!=='countin';if(!cue.hidden){const timing=practiceTiming(this.state.working,s!.pulseGrid),elapsed=now!-(s!.startMs-timing.countInMs),number=cue.querySelector('strong')!,label=countBeatAt(elapsed,this.state.working,s!.pulseGrid);if(number.textContent!==label)number.textContent=label;number.dataset.accent=String(elapsed>=0&&(s!.pulseGrid.countStartPhasePulses!+Math.floor(elapsed/timing.eighthMs))%s!.pulseGrid.countBarPulses!<s!.pulseGrid.countBeatPulses!);const gap=cue.querySelector('[data-repeat-gap]');if(gap)gap.textContent=this.repeatGap?.extraBeats?`${this.repeatGap.totalGapBeats} beat repeat gap`:'';}}
 
@@ -291,5 +292,5 @@ export class PracticeView {
  overlay(active:boolean){if(this.inspection===active)return;this.inspection=active;this.session?.inspect(active);this.paintVisibility();}
  key(code:string,repeated=false){if(repeated&&!(this.overview&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(code)))return !this.settingsDialog&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(code);if(code!=='ArrowLeft'&&code!=='ArrowRight')this.cancelTempoHold();if(this.settingsDialog)return false;if(this.overview){const result=this.browser.key(code,this.state);if(result==='practice'&&document.activeElement?.closest('.practice-overview')){const chunk=this.browser.current(this.state);if(chunk)this.selectPassage(chunk);return true;}if(result==='handled'){this.paintBrowser(true);return true;}}else{if(code==='Space'){void this.action('ready');return true;}if(code==='KeyK'){this.state.keepTempo=!this.state.keepTempo;void this.save();this.paintControls();return true;}if(code==='ArrowLeft'||code==='ArrowRight')return true;if(code==='ArrowUp'||code==='ArrowDown')return true;if(code==='KeyV'&&(this.options.freeViewKey?.()??'V')){void this.action('pause');return true;}}if(code==='Escape'){void this.action(this.overview?'back':'overview');return true;}return false;}
  pause(){this.resetCarrySetup();this.cancelTempoHold();this.contacts.clear();this.groundworkPaused=true;this.clearPose();this.enterFreeView();this.session?.pause();this.stopClock();this.paint();}
- close(){this.session?.pause();this.resetCarrySetup();this.manual.dispose();this.previewFrames.clear();this.disposed=true;window.removeEventListener('resize',this.refitCue);cancelAnimationFrame(this.raf);this.clock?.close();this.settingsDialog=undefined;this.app.removeAttribute('data-practice-phase');}
+ close(){this.session?.pause();this.resetCarrySetup();this.manual.dispose();this.previewFrames.clear();this.disposed=true;this.stopClock();window.removeEventListener('resize',this.refitCue);cancelAnimationFrame(this.raf);this.clock?.close();this.settingsDialog=undefined;this.app.removeAttribute('data-practice-phase');}
 }
