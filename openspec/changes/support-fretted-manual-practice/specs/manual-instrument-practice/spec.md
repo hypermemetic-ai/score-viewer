@@ -39,3 +39,13 @@ Manual notation SHALL retain full musical ink without fabricating observed attac
 - **WHEN** the display rotates during manual playback or its clock reaches the loop end
 - **THEN** full notation, musical phase and retained progress remain correct
 - **AND** no measured success is recorded merely because time elapsed
+
+### Requirement: Explicit source-part playing reference
+Full notation reading and switching SHALL remain available without a performance reference. Entering manual Practice SHALL use the canonical source reference when present; otherwise it SHALL request an explicit playing reference and save it separately, bound to the exact source part and musical digest. Source tempo maps or words SHALL NOT be silently promoted into or rewritten in the canonical archive. The planner SHALL capture the fallback before its first await and bind the effective clock to the practice revision, while retaining the original source identity for view anchors. ISO/TAB SHALL share the same saved choice and manual journal; distinct parts SHALL NOT borrow it.
+
+#### Scenario: Missing reference and cancelled choice
+- **WHEN** a reference-less dual source enters Practice and the player cancels the chooser
+- **THEN** the reader remains usable in both notations and all archive/library/reference bytes remain unchanged
+- **WHEN** the player explicitly chooses a valid duration and rate
+- **THEN** both notations can practice with the separate reference, including after a cold reopen
+- **AND** a canonical source reference, including its retained unknown facts, remains authoritative and unchanged

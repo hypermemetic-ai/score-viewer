@@ -1,11 +1,12 @@
 import {ownPackageAdmission,type ScorePackage} from './package';
 import {PACKAGE_MATERIAL_BUDGET_BYTES} from './package-material';
+import {capturedReadingExecution,checkReadingExecution,waitForReading,type ReadingExecution} from './reading-execution';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 
-interface Options {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId}
+interface Options {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
 type OwnedAdmission=Awaited<ReturnType<typeof ownPackageAdmission>>;
 interface Entry {bytes:Uint8Array;allowLegacyTempo:boolean;admission:OwnedAdmission;retainedBytes:number}
-interface Pending {bytes:Uint8Array;allowLegacyTempo:boolean;generation:number;promise:Promise<OwnedAdmission>}
+interface Pending {bytes:Uint8Array;allowLegacyTempo:boolean;generation:number;owner?:AbortSignal|ReadingExecution;promise:Promise<OwnedAdmission>}
 const sameBytes=(a:Uint8Array,b:Uint8Array)=>a.byteLength===b.byteLength&&a.every((v,i)=>v===b[i]);
 const bounded=(value:number|undefined,maximum:number)=>value===undefined?maximum:Number.isFinite(value)?Math.min(maximum,Math.max(0,Math.floor(value))):0;
 
@@ -33,23 +34,26 @@ export class PackageAdmissionSession {
  clear():void {this.#generation++;this.#entries=[];}
  /** Wait for the one producer without exposing its graph or storing a queue.
   * Background callers must recheck their own generation after this wait. */
- async waitForIdle():Promise<void>{const active=[...this.#pending][0];if(active)await active.promise.then(()=>undefined,()=>undefined);}
+ async waitForIdle(signal?:AbortSignal):Promise<void>{const active=[...this.#pending][0];if(active)await waitForReading(active.promise.then(()=>undefined,()=>undefined),signal);else checkReadingExecution({signal});}
 
  async import(bytes:Uint8Array,options:Options={}):Promise<ScorePackage>{
+  const inputExecution=options.execution,execution=inputExecution?capturedReadingExecution(inputExecution):undefined,owner=execution?.signal??inputExecution;checkReadingExecution(execution);
   if(bytes.byteLength>50_000_000)throw Error('Package exceeds 50 MB');
   // Capture bytes AND effective options before the first asynchronous boundary.
   const snapshot=new Uint8Array(bytes),allowLegacyTempo=!!options.allowLegacyTempo,keyboardLayout=options.keyboardLayout,
    matches=(e:{bytes:Uint8Array;allowLegacyTempo:boolean})=>e.allowLegacyTempo===allowLegacyTempo&&sameBytes(e.bytes,snapshot),
    hit=this.#entries.find(matches);
+  if(this.#pending.size&&[...this.#pending].some(p=>p.owner!==owner))throw Error('Package admission is busy; retry after the active import finishes.');
   if(hit){
    this.#entries=this.#entries.filter(e=>e!==hit);this.#entries.push(hit);
-   try{return await hit.admission.copy(keyboardLayout);}catch(error){this.#entries=this.#entries.filter(e=>e!==hit);throw error;}
+   let result:ScorePackage;try{result=await hit.admission.copy(keyboardLayout);}catch(error){this.#entries=this.#entries.filter(e=>e!==hit);throw error;}checkReadingExecution(execution);return result;
   }
-  let pending=[...this.#pending].find(e=>e.generation===this.#generation&&matches(e));
+  let pending=[...this.#pending].find(e=>e.generation===this.#generation&&e.owner===owner&&matches(e));
   if(!pending){
    if(this.#pending.size)throw Error('Package admission is busy; retry after the active import finishes.');
-   const generation=this.#generation,request:Pending={bytes:snapshot,allowLegacyTempo,generation,promise:undefined!};
-   request.promise=ownPackageAdmission(snapshot,{allowLegacyTempo}).then(admission=>{
+   const generation=this.#generation,request:Pending={bytes:snapshot,allowLegacyTempo,generation,owner,promise:undefined!};
+   request.promise=ownPackageAdmission(snapshot,{allowLegacyTempo,execution}).then(admission=>{
+    checkReadingExecution(execution);
     const retainedBytes=snapshot.byteLength+admission.retainedBytes;
     if(generation===this.#generation&&this.#maxEntries>0&&retainedBytes<=this.#maxRetainedBytes){
      while(this.#entries.length&&(this.#entries.length>=this.#maxEntries||this.retained.bytes+retainedBytes>this.#maxRetainedBytes))this.#entries.shift();
@@ -59,6 +63,6 @@ export class PackageAdmissionSession {
    }).finally(()=>this.#pending.delete(request));
    this.#pending.add(request);pending=request;
   }
-  return (await pending.promise).copy(keyboardLayout);
+  const admission=await pending.promise;checkReadingExecution(execution);const result=await admission.copy(keyboardLayout);checkReadingExecution(execution);return result;
  }
 }

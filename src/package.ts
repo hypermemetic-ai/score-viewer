@@ -1,5 +1,7 @@
 import {admitReadingContent,type ReadingDescriptor,type ReadingContent} from './reading-package';
-import {selectReadingNotation} from './dual-reading-package';
+import {selectReadingNotation,admitDualReadingContentAsync} from './dual-reading-package';
+import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
+import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {conservativeMaterialBytes} from './package-material';
 import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady} from './annotation-ink-policy';
 import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
@@ -33,6 +35,14 @@ export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:strin
 export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;transposition?:ScoreTransposition;transpositionOriginal?:ScorePackage;archiveSha256?:string;reading?:ReadingContent}
 
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
+// Only a completed ordinary cold import can bind an archive to these frozen
+// dual source identities. Wrapper fields and saved hashes grant no authority.
+const admittedDualArchives=new WeakMap<Manifest,{score:QuantizedGridScore;sha256:string}>();
+export function admittedDualArchiveSha256(p:ScorePackage):string|undefined {
+ const record=admittedDualArchives.get(p.manifest);
+ if(!record||record.score!==p.score||!Object.isFrozen(p.manifest)||!Object.isFrozen(p.score))return;
+ try{selectReadingNotation(p,p.reading?.dual?.notation??'iso');return record.sha256;}catch{return;}
+}
 function fail(s:string):never{throw Error(s);}
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
 function passiveSvg(svg:string,seats:Seat[],page:number){
@@ -246,25 +256,35 @@ export async function selectPresentation(p:ScorePackage,id:PhysicalKeyboardId):P
  if(p.manifest.version===1){if(id!=='janko-four-row')fail('This package has no conventional-keyboard presentation');return p;}
  const view=linkedViews.get(p)?.get(id);if(!view)fail('This package has no compatible presentation for the selected keyboard');return view;
 }
-export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId}={}):Promise<ScorePackage>{
+export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}={}):Promise<ScorePackage>{
+ options={...options};const execution=options.execution?capturedReadingExecution(options.execution):undefined;checkReadingExecution(execution);
  if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;const members=new Set<string>();
  const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(members.has(f.name)||members.size>=10000)fail('Duplicate or excessive archive members');members.add(f.name);if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
  const parse=(name:string)=>{if(!files[name])fail(`Missing ${name}`);try{return JSON.parse(strFromU8(files[name]));}catch{return fail(`Invalid JSON: ${name}`);}};
- const m=parse('manifest.json') as Manifest;
+ let m=parse('manifest.json') as Manifest;
  if(m.format!=='iso-score'||![1,2,3].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||!Array.isArray(m.metadata.provenance)||m.metadata.provenance.some(v=>typeof v!=='string')||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
- if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
- for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);}
+ // Unzip and this owned digest capture happen before the first member await.
+ // A later caller mutation cannot bind different bytes to admitted dual ink.
+ const dualArchiveSha256=m.version===3&&m.reading?.version==='instrument-reading-package-v2'?await hashBytes(new Uint8Array(bytes)):undefined;
+ checkReadingExecution(execution);if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
+ for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);checkReadingExecution(execution);}
  let referenceMidi:Uint8Array|undefined;
  if(m.referenceMidi!==undefined){if(!isObject(m.referenceMidi)||m.referenceMidi.file!=='reference.mid'||Object.keys(m.referenceMidi).length!==1||!m.files['reference.mid'])fail('Invalid/missing reference MIDI descriptor');referenceMidi=files['reference.mid'];validateReferenceMidi(referenceMidi);}
  if(m.semanticSha256!==m.files['score.json']||m.revision!==m.semanticSha256)fail('Semantic revision mismatch');
  if(m.version===3){
   if(options.keyboardLayout)fail('This score has no piano keyboard presentation.');
-  const {score,pages,reading}=admitReadingContent(m,files);
-  if(reading.dual){for(const view of Object.values(reading.dual.views))view.pages.forEach((svg,page)=>passiveSvg(svg,[],page));}
-  else pages.forEach((svg,page)=>passiveSvg(svg,[],page));
-  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
+  const admitted=execution&&m.reading?.version==='instrument-reading-package-v2'?await admitDualReadingContentAsync(m,files,execution):admitReadingContent(m,files),{score,pages,reading}=admitted;
+  if('manifest' in admitted)m=admitted.manifest as Manifest;checkReadingExecution(execution);
+  function* passiveChecks():Generator<PreparationStage,void,void>{
+   if(reading.dual){for(const view of Object.values(reading.dual.views))for(const[page,svg]of view.pages.entries()){passiveSvg(svg,[],page);yield 'paint';}}
+   else for(const[page,svg]of pages.entries()){passiveSvg(svg,[],page);yield 'paint';}
+   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});yield 'commit';
+  }
+  if(execution)await drainReadingChecks(passiveChecks(),execution);else for(const _ of passiveChecks()){}
   freezeSource(score);
-  return {manifest:m,score,seats:[],pages,files,reading,archiveSha256:await hashBytes(bytes),sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
+  const archiveSha256=dualArchiveSha256??await hashBytes(bytes);
+  checkReadingExecution(execution);if(reading.dual)admittedDualArchives.set(m,{score,sha256:archiveSha256});
+  return {manifest:m,score,seats:[],pages,files,reading,archiveSha256,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    generationAvailable:false,fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
  }
  if(m.reading!==undefined)fail('Legacy piano packages cannot carry a musical reading descriptor.');
@@ -345,15 +365,15 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
 /** Ordinary reading preserves historical v1 pages/fingers without inventing
  * a performance reference. V2 supplied fingers and tempo-bound layers still
  * pass their strict source/clock validators; generation and practice are gated. */
-export const importPackageForReading=(bytes:Uint8Array)=>importPackage(bytes,{allowLegacyTempo:true});
+export const importPackageForReading=(bytes:Uint8Array,execution?:ReadingExecution)=>importPackage(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})});
 
 /** A runtime-owned admission never exposes its canonical package or bytes.
  * Every copy preserves this realm's companion registry; another realm must
  * independently import its own archive. This is not a serialized certificate. */
-export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyTempo?:boolean}={}):Promise<{
+export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;execution?:ReadingExecution}={}):Promise<{
  retainedBytes:number;copy(keyboardLayout?:PhysicalKeyboardId):Promise<ScorePackage>
 }> {
- const original=await importPackage(new Uint8Array(bytes),{allowLegacyTempo:!!options.allowLegacyTempo});
+ const original=await importPackage(new Uint8Array(bytes),{allowLegacyTempo:!!options.allowLegacyTempo,...(options.execution?{execution:options.execution}:{})});
  const packages:ScorePackage[]=[],groups:Array<[ScorePackage,Array<[PhysicalKeyboardId,ScorePackage]>]>=[],seen=new Set<ScorePackage>();
  const visit=(p:ScorePackage)=>{
   if(seen.has(p))return;seen.add(p);packages.push(p);
@@ -370,7 +390,14 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
   // A cached package cannot grant a stale or ambiguous font family authority.
   // In Node this also rereads and hashes the actual font file on every use.
   for(const p of packages){const policy=annotationInkPolicyFor(p);if(policy)await ensureAnnotationInkPolicyReady(policy);}
-  const clone=structuredClone(graph);
+  // A dual source/view is already privately admitted and recursively frozen.
+  // Do not copy megabytes of immutable scenes merely to discard them below.
+  // This map is owned by the cold admission closure, never caller input; all
+  // mutable wrappers and archive member buffers still cross structuredClone.
+  const copyInputs=new Map(packages.map(p=>[p,p.reading?.dual?{...p,manifest:undefined,score:undefined,
+   sourceScore:undefined,reading:undefined,pages:undefined}:p] as const)),
+   clone=structuredClone({original:copyInputs.get(original)!,packages:packages.map(p=>copyInputs.get(p)!),
+    groups:groups.map(([p,views])=>[copyInputs.get(p)!,views.map(([keyboard,view])=>[keyboard,copyInputs.get(view)!])])}) as typeof graph;
   // Dual scenes retain this realm's immutable actual preparation. A plain
   // clone cannot carry their source-owned projector registration. Only this
   // private cold-admission graph supplies that shared frozen source/context;

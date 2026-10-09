@@ -44,11 +44,25 @@ interface MusicalPassagePresentation {
 
 These shapes are integration requirements; the exact public ISO API/receipt versions are owned and reviewed there. The first Viewer foundation uses actually admitted ISO reading content and canonical clocks. It does not expose TAB until source-owned preparation and complete admission exist. Structural staff/string lines and barlines are separate from musical ink. Every displayed component and relation must have true source ownership; rests are included. Source geometry stays immutable. Cross-system relations use shared source-owned contour rules, not a Viewer TAB engraver.
 
+### Public import and source-part selection
+
+The public GP provider captures discovery input and selected source track IDs, calls the supported converter Worker once per single-part scope and independently replays retained original/report/XML before a private family context is available. Single-part projection keeps stable actual P1/source event IDs without relabeling musical facts. The receiving builder returns its complete independent cold packet directly; no third scene replay or callback-owned admission cache is required. Generic MusicXML remains Unknown. The Instrument picker groups only actual admitted siblings by the provider's input-bound group identity; stored descriptive hints offer Prepare source part, never family authority.
+
+All selected parts must complete both views and receiving before managed staging. Each self-contained archive retains original input/report/XML. A finite 64 MiB conservative staged-material budget counts shared frozen graphs once and includes owned archive copies. The managed helper preserves an actual initial library snapshot and checks its exact bytes again before one serialized pointer write; all previous archive/personal pointers and unknown supported metadata remain intact. Precommit failure/cancel never changes referenced rows. A lost pointer acknowledgement is not assumed to roll back: exact readback can confirm the commit, otherwise its outcome stays explicitly unknown with files retained.
+
+### Cooperative receiving execution
+
+Execution signals/budgets/callbacks are separate from saved rendering recipes. Construction and cold receiving use the same public shared cooperative engine, then exact scene/page/owner/geometry comparison and passive SVG gates. All source/manifest/member inputs are captured before the first await through literal data descriptors. Final registration, cache insertion and returned copies check cancellation. Producer reuse requires the same captured cancellation owner; unrelated cancellable requests busy-refuse until settlement, including after clear. A cache or Worker result cannot create a raw-clone scene context. Ordinary default preparation and historical dispatch remain literal. Task budgets do not claim a hard maximum for every indivisible ZIP/JSON/DOM step.
+
 ### Musical identity and state
 
 New manual evidence is bound to a versioned digest of canonical musical facts, the selected real source part and partition. The digest includes owner clocks/pitches or explicit unpitched references, written components, tuning/positions, ties/techniques, measure/traversal/meter and reference tempo. It excludes renderer, pagination, center/guides/stem policy and notation choice. Existing v3 facts use a bounded deterministic projection until the coordinated source ledger lands. Unknown semantic additions must not be silently discarded.
 
 Use an additive manual-practice storage namespace keyed by that musical identity and part; retain all existing piano filenames/journals byte-exact. ISO/TAB have separate saved page/scale cursors and a shared written-bar/component anchor. Switching maps the anchor into the chosen view rather than reusing page indices. Distinct source parts never borrow progress. Historical archives retain old admission; missing physical TAB facts require additive regeneration from the retained authorized source.
+
+### Explicit per-part playing reference
+
+Canonical performance references remain authoritative and literal. When absent, entering Practice asks for an explicit duration/rate through the shared reference chooser; reading/import and ISO/TAB selection need no reference. Source tempo maps/words are not promoted or rewritten. A detached fallback is captured before any planner await, validated and bound to a separate practice revision. The original source-musical revision remains the notation view/anchor identity. A versioned reference envelope is saved separately under an existing native-valid practice hash name bound to the real source part and musical digest. Both notations share that choice and practice journal; another part cannot borrow it. Cancel leaves original/library/reference bytes unchanged. Scripted editorial references used for diagnostics are never called player selections.
 
 ### Explicit readable manual windows
 

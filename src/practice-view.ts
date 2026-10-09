@@ -1,3 +1,4 @@
+import {practiceOptionsMarkup} from './practice-options-markup';
 import {cropMeasure,composePassage,passageTrack,fitPassageRelations,fitPassageFrame,type Crop,type PassageTrack} from './practice-passage';
 import {projectRelations,type ProjectedRelation} from './practice-relations';
 import {PracticeRefill} from './practice-refill';
@@ -11,7 +12,7 @@ import type {Rotation} from './state';
 import{isMusicalSustain,musicalControllerTime,type MidiStream}from'./midi-sustain';
 import {practiceOutput} from './device-options';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
-import {metronomeUnit,beatUnitLabel,metronomeMark,tempoRateNumber} from './metronome-mark';
+import {tempoRateNumber} from './metronome-mark';
 import {tempoRateEdit,speedNumber,speedEdit,adjustDuration,adjustPercent,adjustProgression,manualSpeedNumber} from './tempo-presentation';
 import type {ScorePackage,Seat} from './package';
 import {fingerFor,practiceStorageName,legacyPracticeStorageName,type PersonalState} from './state';
@@ -159,7 +160,7 @@ export class PracticeView {
  }
  get canMarkDone(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!!this.session;}
  get canTurnPage(){return !this.preparingStart&&!this.overview&&!!this.session&&(!this.session.measured||!['countin','trial'].includes(this.session.phase));}
- get bindingContext(){return {active:!this.disposed&&!this.overview&&!!this.session,measureNavigation:this.canTurnPage&&(this.slots?.windows.length??0)>1};}
+ get bindingContext(){const active=!this.disposed&&!this.overview&&!!this.session;return {active,measureNavigation:active&&(this.slots?.windows.length??0)>1};}
  turnPage(direction:1|-1){if(!this.canTurnPage||!this.slots)return false;const changed=this.slots.turn(direction);if(changed){if(this.refill){this.manualWindow=true;this.sourceTrack=undefined;}this.paintControls();if(this.session&&['paused','error'].includes(this.session.phase))this.status('Free view');this.paintScore();}return changed;}
  private doneTarget(){return this.session?this.doneClaims.target({passage:this.session.chunk.id,pattern:this.session.chunk.pattern,rate:this.loopRate||this.state.working},this.session.phase==='countin',this.state):undefined;}
  private doneControl(){if(this.options.connected())return '';const target=this.doneTarget()!,marked=hasDone(this.state,target),enabled=this.doneClaims.canToggle(this.state,target);return `<button data-practice="done" class="practice-done" aria-label="${marked?'Withdraw Done':'Done'}" aria-pressed="${marked}" ${enabled?'':'disabled'} title="${enabled?'Self-reported completion':'Finish a full loop at this speed first'}">${marked?'✓ ':''}Done <kbd>${escape(this.options.doneKey?.()??'Enter')}</kbd></button>`;}
@@ -276,7 +277,7 @@ export class PracticeView {
 
  private completeGroundwork(){if(!this.groundwork?.complete||!this.session)return;this.state.groundwork??={};this.state.groundwork[this.session.chunk.pattern]=true;this.session.phase='ready';this.session.message='Positions complete · Ready for timed practice.';void this.save();this.paintControls();}
  private settingsControl(){const label=readingActionLabel('practiceSettings'),hint=this.options.settingsKey?.()??'O';return `<button data-practice="settings" aria-label="${label}">${label}${hint?` <kbd>${escape(hint)}</kbd>`:''}</button>`;}
- optionsMarkup(){const reference=requireReferencePerformanceTempo(this.options.package.score);return `<section class="options-practice" data-practice-options><h3>Practice</h3><label class="dialog-row">Starting speed <span class="practice-speed">${this.speedInput('start',this.state.start,5,500,'Starting speed percent')}</span></label><label class="dialog-row">Increase per success <span class="practice-speed">${this.speedInput('step',this.state.step,.025,100,'Increase percent of target')}</span></label><label class="dialog-row practice-reference practice-target">Performance target <span data-reference-tempo class="metronome-mark">${manualTempoField('target',`<input type="text" inputmode="decimal" data-practice-setting="target" data-absolute="${this.state.target}" value="${tempoRateNumber(this.state.target)}" aria-label="Target ${beatUnitLabel(reference.beat)} notes per minute">`,'target tempo',metronomeUnit(reference.beat))}</span></label><p class="dialog-row practice-reference" data-personal-goal-only ${this.state.personalGoal?'':'hidden'}>Score reference ${metronomeMark(reference)}</p><button data-use-reference data-personal-goal-only ${this.state.personalGoal?'':'hidden'}>Use score reference</button><p data-goal-error class="error" role="alert"></p><p class="help" data-tempo-help>Starting speed and each success increase are percentages of the tempo shown above.</p></section>`;}
+ optionsMarkup(){return practiceOptionsMarkup(requireReferencePerformanceTempo(this.options.package.score),this.state,this.speedInput('start',this.state.start,5,500,'Starting speed percent'),this.speedInput('step',this.state.step,.025,100,'Increase percent of target'));}
  mountOptions(d:HTMLDialogElement,close:()=>void){
   this.settingsDialog=d;const section=d.querySelector<HTMLElement>('[data-practice-options]')!,abort=new AbortController();
   section.addEventListener('change',e=>this.setting(e.target as HTMLInputElement),{signal:abort.signal});

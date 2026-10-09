@@ -3,15 +3,17 @@ import {scoreCapabilities} from './score-capabilities';
 import {manualTempoField} from './manual-tempo-control';
 import type {ScorePackage} from './package';
 import type {Entry,PersonalState} from './state';
+import {readingNotationControl} from './reading-notation-control';
 
 const escape=(text:string)=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const button=(label:string,action:string,disabled=false)=>`<button type="button" data-action="${action}"${disabled?' disabled':''}>${label}</button>`;
 
 /** Shared reader/practice Score section. Only provenance is a disclosure. */
-export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string}){
+export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string},instrumentControl=''){
  if(!scoreCapabilities(p).pianoPreparation)return `<section class="score-options" aria-labelledby="score-options-heading">
   <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${escape(entry.metadata.title)}</p></header>
-  <p class="help">Read the score with its notes, rhythm and articulations.</p>
+  ${instrumentControl?`<label class="option-setting" data-options-row><span>Instrument</span>${instrumentControl}</label>`:''}
+  ${p.reading?.dual?`<label class="option-setting" data-options-row><span>Notation</span>${readingNotationControl(p)}</label>`:'<p class="help">Read the score with its notes, rhythm and articulations.</p>'}
   <div class="dialog-actions score-primary-actions" data-options-row>${button('Share score','share')}</div>
   <details class="score-source-review"><summary>Source & review</summary>
    ${p.manifest.metadata.provenance.map(text=>`<p class="help">${escape(text)}</p>`).join('')}

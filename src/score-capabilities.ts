@@ -15,12 +15,15 @@ export interface ScoreCapabilities {
   fingerEditing:boolean;
 }
 
-type CapabilitySource={manifest:Pick<Manifest,'version'>;fingerLayer?:FingerLayer;score?:QuantizedGridScore;reading?:Pick<ReadingContent,'owners'|'geometryEvidence'>};
+type CapabilitySource={manifest:Pick<Manifest,'version'>;fingerLayer?:FingerLayer;score?:QuantizedGridScore;reading?:Pick<ReadingContent,'owners'|'geometryEvidence'|'dual'>};
 function manualReadingAvailable(p:CapabilitySource):boolean {
  const score=p.score,bars=score?.sourceBarTicks;
  if(p.manifest.version!==3||!score||!p.reading?.geometryEvidence.ok||p.reading.owners.length!==score.notes.length||
    score.graceGroups?.length||!bars||bars.length<2||bars.length>2001||bars[0]!==0||bars.at(-1)!==score.totalTicks||
    bars.some((tick,i)=>!Number.isSafeInteger(tick)||tick<0||i>0&&tick<=bars[i-1]))return false;
+ // Complete new dual reading can ask for a separately chosen playing tempo.
+ // Historical v1 keeps its declared reference requirement and literal reader.
+ if(p.reading.dual&&score.referencePerformanceTempo===undefined)return true;
  try{requireReferencePerformanceTempo(score);return true;}catch{return false;}
 }
 export function scoreCapabilities(p:CapabilitySource):ScoreCapabilities {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
-import {hashBytes,importPackage,type Manifest} from '../src/package';
+import {hashBytes,importPackage,admittedDualArchiveSha256,type Manifest} from '../src/package';
 import {admitDualReadingContent,prepareDualReadingPackage,prepareDualReadingPacket,selectReadingNotation} from '../src/dual-reading-package';
 import {planManualPractice} from '../src/manual-practice-plan';
 import {initialPractice} from '../src/practice';
@@ -119,4 +119,17 @@ test('packet builder preserves legacy bytes and returns the actual independent r
  const forged=await changed((files,m)=>{const descriptor=m.reading;assert.equal(descriptor?.version,'instrument-reading-package-v2');if(descriptor?.version!=='instrument-reading-package-v2')throw Error('Expected dual descriptor');files[descriptor.views.tab.pages[0]]=strToU8('<svg xmlns="http://www.w3.org/2000/svg" data-forged="true"></svg>');},packet.bytes);
  await assert.rejects(importPackage(forged),/page differs/);
  assert.equal(selectReadingNotation(packet.package,'tab').pages.some(page=>page.includes('data-forged')),false);
+});
+
+test('only complete cold dual admission binds its originally captured archive across caller mutation and real session copies',async()=>{
+ const supplied=bytes.slice(),originalHash=await hashBytes(supplied),pending=importPackage(supplied);supplied.fill(0);const actual=await pending;
+ assert.equal(actual.archiveSha256,originalHash);assert.equal(admittedDualArchiveSha256(actual),originalHash);
+ actual.archiveSha256='f'.repeat(64);assert.equal(admittedDualArchiveSha256(actual),originalHash,'A mutable wrapper hash does not supply the binding');
+ const tab=selectReadingNotation(actual,'tab');assert.equal(admittedDualArchiveSha256(tab),originalHash);
+ assert.equal(admittedDualArchiveSha256(structuredClone(actual)),undefined);
+ assert.equal(admittedDualArchiveSha256({...actual,score:new Proxy(actual.score,{})}),undefined);
+ assert.equal(admittedDualArchiveSha256({...actual,manifest:new Proxy(actual.manifest,{})}),undefined);
+ const session=new PackageAdmissionSession();for(let i=0;i<2;i++)assert.equal(admittedDualArchiveSha256(await session.import(bytes)),originalHash);
+ const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest,content=admitDualReadingContent(m,files);
+ assert.equal(admittedDualArchiveSha256({...actual,manifest:m,score:content.score,reading:content.reading}),undefined,'A direct scene replay without full archive admission cannot bind bytes');
 });
