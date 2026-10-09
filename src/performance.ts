@@ -1,3 +1,5 @@
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
+import {requirePianoCapability} from './score-capabilities';
 import{MidiSoundingNotes,type MidiStream}from'./midi-sustain';
 import type{MidiCC}from'./midi';
 import {scoreTickMs,scorePulseGrid,type PracticePulseGrid} from './score-clock';
@@ -7,14 +9,15 @@ import type {ScorePackage} from './package';import {planPractice,type PracticeAt
 export function performanceAudioErrorHandler(generation:number,current:()=>number,stop:()=>void,report:(message:string)=>void){return(message:string)=>{if(generation!==current())return;stop();report(message);};}
 export interface PerformanceAttack extends PracticeAttack {performedOwners?:string[]}
 export interface PerformancePlan {revision:string;events:PerformanceAttack[];totalTicks:number;ticksPerBeat:number;referencePerformanceTempo?:ReferencePerformanceTempo;grid:PracticePulseGrid}
-export function planPerformance(p:ScorePackage):PerformancePlan {const source=planPractice(p),occurrences=p.score.writtenPresentation?.occurrences;if(!occurrences?.length)return {revision:source.revision,events:source.attacks,totalTicks:p.score.totalTicks,ticksPerBeat:source.ticksPerBeat,referencePerformanceTempo:source.referencePerformanceTempo,grid:scorePulseGrid(source,source.barTicks)};
+export function planPerformance(p:ScorePackage):PerformancePlan {
+ requirePianoCapability(p,'pianoPerformance');const source=planPractice(p),occurrences=p.score.writtenPresentation?.occurrences;if(!occurrences?.length)return {revision:source.revision,events:source.attacks,totalTicks:p.score.totalTicks,ticksPerBeat:source.ticksPerBeat,referencePerformanceTempo:source.referencePerformanceTempo,grid:scorePulseGrid(source,source.barTicks)};
  const presentation=p.score.writtenPresentation!,maps=presentation.events.notes;
  if(occurrences.some((o,i)=>!Number.isSafeInteger(o.writtenBar)||o.writtenBar<1||o.writtenBar>=source.barTicks.length||o.writtenTick!==source.barTicks[o.writtenBar-1]||o.performedBar!==i+1||o.performedTick!==(i?occurrences[i-1].performedTick+source.barTicks[occurrences[i-1].writtenBar]-occurrences[i-1].writtenTick:0))||occurrences.at(-1)!.performedTick+source.barTicks[occurrences.at(-1)!.writtenBar]-occurrences.at(-1)!.writtenTick!==presentation.performedTotalTicks)throw Error('Performance needs a complete source-linked repeat bar clock.');
  if(!Array.isArray(maps)||maps.some(e=>!Number.isSafeInteger(e.performedIndex)||e.performedIndex<0||e.performedIndex>=maps.length||!Number.isSafeInteger(e.writtenIndex))||new Set(maps.map(e=>e.performedIndex)).size!==maps.length||new Set(maps.map(e=>e.writtenIndex)).size!==p.score.notes.length)throw Error('Performance needs complete source-linked note occurrences for its repeats and endings.');
  const physical=new Map<string,PerformanceAttack>(),performedOwners=new Set<string>();
  for(const map of [...maps].sort((a,b)=>a.performedIndex-b.performedIndex)){
-  const written=p.score.notes[map.writtenIndex];if(!written)throw Error('Performance note occurrence has no written source owner.');
-  const note={...structuredClone(written),...structuredClone(map.overrides)},pitch=note.pitch?.octave*12+note.pitch?.pitchClass,tick=note.startTick,end=tick+note.durationTicks,original=source.attacks.find(a=>a.owners.includes(written.id))!,occurrence=occurrences.find(o=>tick>=o.performedTick&&tick<o.performedTick+source.barTicks[o.writtenBar]-o.writtenTick);
+  const event=p.score.notes[map.writtenIndex];if(!event)throw Error('Performance note occurrence has no written source owner.');const written=requirePitchedEvent(event);
+  const note=requirePitchedEvent({...structuredClone(written),...structuredClone(map.overrides)}),pitch=note.pitch.octave*12+note.pitch.pitchClass,tick=note.startTick,end=tick+note.durationTicks,original=source.attacks.find(a=>a.owners.includes(written.id))!,occurrence=occurrences.find(o=>tick>=o.performedTick&&tick<o.performedTick+source.barTicks[o.writtenBar]-o.writtenTick);
   if(pitch!==written.pitch.octave*12+written.pitch.pitchClass||note.durationTicks!==written.durationTicks)throw Error('Performance needs an explicit written owner for changed pitches or durations in its repeat endings.');
   if(!Number.isInteger(pitch)||!Number.isFinite(tick)||tick<0||!Number.isFinite(end)||end<=tick||end>presentation.performedTotalTicks||typeof note.id!=='string'||performedOwners.has(note.id)||!occurrence||occurrence.writtenBar!==original.bar+1)throw Error('Performance note occurrence has an incompatible pitch, clock or owner.');
   performedOwners.add(note.id);const id=`performed:${tick}:${pitch}`;let attack=physical.get(id);

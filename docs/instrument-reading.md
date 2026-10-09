@@ -1,0 +1,59 @@
+# Common musical reading and instrument policy
+
+This increment admits common musical reading independently of piano physical preparation. Musical events share one canonical ISO pitched/unpitched model. Instrument policy selects center, guides and stem behavior as data passed into the shared ISO layout and ink engine. The Viewer retains its library, saved view, page navigation, rotation, scale and file-saving paths.
+
+For the approved bass policy, actual sounding C2/MIDI 36 is the stable center; C1/C2/C3 are MIDI 24/36/48 guides. ISO coordinates subtract 12 from MIDI, so the policy stores center 24 and guides 12/24/36. Source written-to-sounding transpose is resolved by the shared MusicXML projection before coordinates are calculated. This reading path keeps actual source pitch fixed, uses the selected center, and supplies no inferred fingers or visible frets. Existing piano transposition remains available for piano packages; player transposition for common instrument reading is a later feature.
+
+New preparation uses outward stems relative to the selected center. Below-center heads vote down, above-center heads vote up and center heads abstain. A strict majority chooses one direction for the complete chord or beam; ties continue the previous contiguous same-part/staff/voice group, then use mean register and finally down for an exact-center tie. Shared clearance checks govern feasibility without changing source pitch, event spacing or rhythmic ownership. This deterministic preference does not claim a globally optimal collision solver. H/P relationships retain source-owner endpoints and use curved connectors with H/P labels, as requested. Shared ISO engraving supplies their ink.
+
+The new `instrument-reading-v2` policy declares `stemPolicy:'outward'` and `stemDirectionSemantics:'visual'`. It refuses source, editorial or calculated performing-hand authority before layout; missing hand facts alone do not authorize changing stem meaning. Existing piano packages retain performing-hand semantics. Historical `instrument-reading-v1` register policy retains its original preparation authority and direction rules.
+
+Unpitched events carry `soundingPitch:null` and a separately named notation reference. They cannot carry a definite `pitch`. The reference may position an x head but cannot produce a MIDI note, physical key, frequency or piano fingering.
+
+## Package admission and compatibility
+
+The additive `iso-score` version 3 archive contains:
+
+| Member | Responsibility |
+| --- | --- |
+| `score.json` | Canonical common musical events, parts/instruments, exact clocks, written/actual pitches, source relations and reading policy |
+| `reading-owners.json` | Independent event ID, part/staff/voice ownership, event kind, sounding or notation-only coordinate, and every prepared head appearance |
+| `reading-layout.json` | Shared system/page geometry, stable center/guides and owner-linked positions |
+| `pages/*.svg` | Passive prepared pages from the declared shared real-engine authority |
+| `seats.json` | Empty physical-seat layer; reading creates no keyboard contacts |
+| Font and notices | The existing exact URW font and its retained notices |
+
+The manifest's reading descriptor records shared engine authority, policy and resolved preparation inputs. Admission verifies the ordinary file hashes, validates canonical source facts, regenerates pages/ownership/layout with that exact shared authority, compares their content, requires complete event appearances and a passing shared engraving report, and applies passive SVG checks before library writes. Source recovery can therefore succeed while an unresolved engraving collision prevents a reading archive. It refuses piano keyboard descriptors, finger layers, calculation contexts and reference-MIDI descriptors in this version. Bounds are 10,000 musical events, 2,000 measures and 500 prepared pages within the existing archive byte limits. These are prototype admission limits, not claims about every MusicXML score.
+
+Versions 1/2 retain their original serialized score, hashes, source revisions, owner/action IDs, pages, fingers and personal bindings. Their passive boundary normalizes an absent event discriminator into a pitched canonical event without rewriting the archive. Unknown or contradictory kinds refuse. Current consumers use the same event union; physical operations validate a pitched event and a genuine performing role at their own use sites. Reading never assigns LH because a track is bass or because a reference position is low.
+
+The shared page reader exposes ordinary navigation and options for version 3. Its keyboard switch, finger controls, MIDI note assessment, guided piano practice and piano performance are unavailable. Existing piano score requirements remain in effect. Hidden saved control assignments and their conflict checks remain intact when options display only available actions. Ordinary library staging retains earlier packages and saved views without a personal-data migration.
+
+## Local preparation
+
+Run the checked private notation dependency and existing frontend toolchain:
+
+```sh
+node --import tsx scripts/prepare-reading-score.ts source.musicxml output.tuna \
+  --part=PART_ID --center-midi=36 --guide-midi=24,36,48
+```
+
+This local command invokes ISO's MusicXML reader/projector and shared outward preparation, writes a new `.tuna` archive with retained font notices, and prints the policy, engine authority, coverage and event/page counts. It refuses output overwrite. Source selection and center/guide parameters are explicit data; the command supplies no alternate instrument renderer. Inputs and generated repertoire archives belong outside Git. Conversion and score redistribution remain separate authorities.
+
+The browser probes `scripts/inspect-instrument-reading.mjs` and `scripts/inspect-piano-score-options.mjs` exercise the real app in isolated browser storage. The piano probe uses the existing original transfer study and checks visible physical controls, transposition through Score options, paired actual/written pitch movement, restoration of zero and unchanged original archive bytes. The reading probe checks actual outward stem lines against owned head coordinates, source-owned x heads, curved H/P connectors and every modified written component's visible ratio, including rests, together with available actions, saved-view reopening and unchanged archive bytes. Set `READING_REQUIRE_BOTH_OUTWARD=1` to require visible below-center and above-center outward stems in a representative archive. Their screenshots and receipts belong outside Git; source replay and observed SVG/DOM establish what was prepared and displayed, while human musical acceptance remains separate.
+
+Preparation records resolved page dimensions as part of the replayed receipt. New packages use `janko-real-engine-instrument-reading-v3-outward`. The shared `instrumentReadingEngine(policy)` admits historical v1/register archives only through `janko-real-engine-instrument-reading-v2-curved-techniques`, with exact historical pages and ownership. Crossclaimed policy/engine identities refuse. Earlier square-connector prototype archives remain unchanged and refuse their unsupported engine; they are not silently relabeled. Neither reading version changes legacy piano serialization or personal bindings.
+
+The notation dependency is deliberately pinned to merged ISO `42ac072da5af34de00b2fe8096cc434210ef05e9`, recorded in [source provenance](source-provenance.json), retaining the original application extraction revision. That merge has exactly the reviewed `0c0892d5163c2fe5e8594a9ee4a47fcc34df63e5` source tree. The branch also incorporates Viewer main `e23f3d5372146f3b5875b6b094e596fcfb724069`, including PR25 transposition, PR27 bounded storage aliases and PR29 practice relation/cue repairs. See [migration](migration.md).
+
+The combined Viewer suite passes all 502 tests with no skips or cancellations, and configured TypeScript/Vite production build passes at that exact reviewed source tree. Tests include explicit outward below/above-center directions, historical curved replay and policy crossclaim refusal, canonical event/authority validation, real workers, legacy and canonical transposition, retained original archives, calculated-hand receipts, recipes, personal bindings and storage aliases. The merge commit changes no source code; final pin checking and independent archive replay also exercise its merged identity. Historical 490/113/29-test checkpoints remain historical evidence, not the current combined gate.
+
+A fresh private outward bass archive cold-admits with 10 pages, 1,013 independent events, 1,026 written heads, nine curved H/P connections, no physical seats and zero geometry errors or warnings. All source musical facts remain exact when only the deliberately changed reading policy is excluded; canonical owner facts remain exact. Every owner retains a visible appearance, and all systems retain actual C2 and C1/C2/C3 guides. The prior curved-register archive remains byte-identical and cold-replays its literal pages under its own authority.
+
+Actual-app reading checks observe outward stem ink both below and above center, the x head, all nine curved H/P connections and all 34 modified written components, including one rest, across 12 visible ratio fragments. Saved views reopen, physical actions remain unavailable and original archive bytes remain unchanged. The piano probe observes visible physical controls, Score Options transposition +1, paired actual/written pitch movement, restoration to zero and unchanged original bytes. Neither probe observes a page error. The actual reader captures were inspected for visible outward stems and a curved H-labeled connection; these observations do not claim human musical acceptance.
+
+Independent cold admission of retained Zelda original and +1 archives passes in both piano layouts with every serialized member exact. Original declared personal journals and library bytes/content remain exact. Retained piano SVG title text keeps the historical literal quote encoding, while reading retains its declared encoding; strict calculated receipts and page hashes continue to replay without rewriting archives or weakening checks. The PR29 relation probe also checks traced/uniform source-owned endpoints, owner visibility/restoration and malformed source/clearance refusals through real browser DOM.
+
+The ordinary browser Worker and independent receiving admission retain the exact four original/+1 archive hashes. Real `PracticeView` checks cover 36 leaf previews, 16 Free view windows and eight active loops for ranges 17–20 and 25–29. All source-timed attacks are accepted, held cues clear retired ink, pause/restart restores owned notation, and the 25–29 loop refills once with zero protected-measure drift. Source models, pages, seats and in-memory saved state remain unchanged. These are Chromium and synthetic source-clock checks; existing larger-range placement refusals remain documented in [practice validation](practice-rendering-validation.md).
+
+The broader shared-source research selection retains documented baseline failures; the affected outward/legacy compatibility gates pass. Frontend tests/builds and browser observations do not establish an installed native Windows/Mac build or physical MIDI/audio acceptance. The Viewer delivery owner coordinates the reviewed merge and one paired native release; this source branch does not dispatch or activate a competing build.

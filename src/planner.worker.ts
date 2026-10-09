@@ -1,3 +1,4 @@
+import {requirePianoEvent} from './piano-event';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {performanceFingerProfile,fingerPlanningClock,FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
 import {normalizeHandPlanningInput,type PlanningGesture} from '../vendor/iso-notation/src/model/hand-planning-input';
@@ -19,7 +20,7 @@ self.onmessage=async e=>{try{const {score,manifest,seed,reviewedAuthority,calibr
  if(rrSeed&&seed?.profileId!==RR_PERFORMANCE_POSE_PROFILE.id)throw Error('Unsupported RR profile; existing choices retained.');
  if(rrSeed&&calibration)throw Error('Historical span observations use a different keyboard geometry. Re-observe under RR geometry before calibrated generation; existing choices retained.');
  const compiled=calibration?await compileSpanCalibration(validateSpanCalibrationRecord(calibration)):undefined;
- const source=normalizeHandPlanningInput(score),profile=rrSeed?RR_PERFORMANCE_POSE_PROFILE:performanceFingerProfile(compiled?withSpanCalibration(ACTION_FINGER_PROFILE,compiled):ACTION_FINGER_PROFILE),clock=fingerPlanningClock(source,profile),hands=Object.fromEntries(score.notes.map(n=>[n.id,n.hand]));let selected:JointFingerGrip[];
+ const source=normalizeHandPlanningInput(score),profile=rrSeed?RR_PERFORMANCE_POSE_PROFILE:performanceFingerProfile(compiled?withSpanCalibration(ACTION_FINGER_PROFILE,compiled):ACTION_FINGER_PROFILE),clock=fingerPlanningClock(source,profile),hands=Object.fromEntries(score.notes.map(n=>[n.id,requirePianoEvent(n).hand]));let selected:JointFingerGrip[];
  const reviewed=new Map<string,{hand:'LH'|'RH';finger:number;row?:number}>(reviewedAuthority?.constraints?.map((q:any)=>[q.id,{hand:q.hand,finger:q.finger,row:q.row}])??[]);
  if(seed){send('Replaying imported source-linked fingers…');const owners=new Map(seed.attacks.flatMap(a=>a.owners.map(o=>[o.id,a] as const)));
  selected=source.gestures.map(g=>{const roles:NonNullable<JointFingerGrip['attackRoles']>={};const all=[...g.attacks,...g.carried];for(const a of all){const q=owners.get(a.owners[0].id);if(q&&!Number.isInteger(q.row))throw Error('Seed physical row missing');if(!q)throw Error('Seed owner missing');for(const o of a.owners){const r=reviewed.get(o.id);if(r&&(r.hand!==q.hand||r.finger!==q.finger||r.row!==undefined&&r.row!==q.row))throw Error('Seed differs from reviewed source contact; existing choices retained.');roles[o.id]={hand:q.hand,key:{pitch:q.pitch,finger:q.finger,row:q.row!}};}}
