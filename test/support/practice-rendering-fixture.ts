@@ -6,7 +6,7 @@ import type {ScorePackage,Seat} from '../../src/package';
 
 /** Small authored source, engraved by the pinned production engine. No SVG paint
  * is synthesized by the viewer test. It includes real silence and written ties. */
-export function durationFixture(marker:'hollow-stem'|'ring'='hollow-stem',finalOverlay=true,tieProfile:'traced'|'uniform'='traced',pairedTie=false,longHold=false,measuresPerSystem=2):ScorePackage {
+export function durationFixture(marker:'hollow-stem'|'ring'='hollow-stem',finalOverlay=true,tieProfile:'traced'|'uniform'='traced',pairedTie=false,longHold=false,measuresPerSystem=2,threeComponentTie=false):ScorePackage {
  const score:QuantizedGridScore={id:'practice-duration-source',title:'Practice duration source',composer:'Viewer regression',ticksPerBeat:48,totalTicks:2304,sourceBarTicks:Array.from({length:13},(_,i)=>i*192),
   writtenPresentation:{sourceScoreId:'practice-duration-source',sourceHash:'authored-regression-source',performedTotalTicks:2304,writtenBars:12,performedBars:12,repeats:[{startBar:4,endBar:6,times:2}],occurrences:Array.from({length:12},(_,i)=>({performedBar:i+1,writtenBar:i+1,pass:1,performedTick:i*192,writtenTick:i*192})),events:{}},
   referencePerformanceTempo:{version:'reference-performance-tempo-v1',bpm:80,beat:{numerator:1,denominator:4},provenance:{kind:'editorial',reference:'Regression clock'}},
@@ -25,6 +25,14 @@ export function durationFixture(marker:'hollow-stem'|'ring'='hollow-stem',finalO
    {id:'unison-b',startTick:1344,durationTicks:48,hand:'LH',pitch:{pitchClass:0,octave:4}},
   ],sourceSilences:[{voice:'upper',hand:'RH',startTick:768,durationTicks:192,kind:'rest',bar:5,occurrence:1,staff:'upper',file:'practice-duration-source',line:1,col:1},...Array.from({length:4},(_,i)=>({voice:'upper',hand:'RH' as const,startTick:(i+8)*192,durationTicks:192,kind:'rest' as const,bar:i+9,occurrence:1,staff:'upper',file:'practice-duration-source',line:1,col:1}))],tieChains:[{noteId:'carry',voice:'upper',soundingTicks:288,components:[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},{startTick:1152,durationTicks:96,tieForward:false,tieWait:false,voice:'upper'}]}]};
  if(longHold){score.notes.push({id:'long-held-owner',startTick:0,durationTicks:1200,hand:'LH',pitch:{pitchClass:1,octave:4}});score.tieChains!.push({noteId:'long-held-owner',voice:'lower',soundingTicks:1200,components:Array.from({length:7},(_,i)=>({startTick:i*192,durationTicks:i===6?48:192,tieForward:i<6,tieWait:false,voice:'lower'}))});}
+ if(threeComponentTie){
+  const owner=score.notes.find(n=>n.id==='carry')!;owner.durationTicks=264;owner.pitch={pitchClass:7,octave:6};
+  score.tieChains![0].soundingTicks=264;score.tieChains![0].components=[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},
+   {startTick:1152,durationTicks:48,tieForward:true,tieWait:false,voice:'upper'},
+   {startTick:1200,durationTicks:24,tieForward:false,tieWait:false,voice:'upper',sourceBeam:{group:'authored-third-component',noBeam:false}}];
+  score.notes.push({id:'third-component-neighbor',startTick:1224,durationTicks:24,hand:'RH',pitch:{pitchClass:9,octave:6},sourceBeam:{group:'authored-third-component',noBeam:false}});
+  score.notes.push({id:'lower-component-neighbor',startTick:1176,durationTicks:24,hand:'LH',pitch:{pitchClass:8,octave:6}});
+ }
  if(pairedTie){score.notes.push({id:'carry-companion',startTick:960,durationTicks:288,hand:'RH',pitch:{pitchClass:2,octave:5}});score.tieChains!.push({noteId:'carry-companion',voice:'upper',soundingTicks:288,components:[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},{startTick:1152,durationTicks:96,tieForward:false,tieWait:false,voice:'upper'}]});}
  if(!finalOverlay)score.barlines=score.barlines?.filter(b=>b.type!=='final');
  for(const note of score.notes)note.readingDisplay={pitchClass:note.pitch.pitchClass,relativeOctave:note.pitch.octave-4,referencePitch:48,isAnchor:false,mode:'absolute'};

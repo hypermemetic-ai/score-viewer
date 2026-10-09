@@ -135,7 +135,10 @@ export function admitRefill(plan:PracticePlan,chunk:PracticeChunk,input:readonly
  const compact=selected.map(p=>p.width).sort((a,b)=>b-a).slice(0,4).reduce((sum,w)=>sum+w,0)+3*breakGap+2*edge;
  const upper=Math.min(safety,options.maxFrameWidth??safety),widths=Array.from({length:49},(_,i)=>compact+(upper-compact)*i/48);
  let reason='';
- for(const width of [...new Set(widths)].filter(width=>width>=compact-epsilon)){
+ // The compact estimate reserves three possible breaks even when the source
+ // stays consecutive. A smaller permitted frame still deserves the exact
+ // exhaustive placement proof; its conservative estimate is not a refusal.
+ for(const width of compact>upper?[upper]:[...new Set(widths)].filter(width=>width>=compact-epsilon)){
   if(options.maxFrameWidth!==undefined&&width>options.maxFrameWidth+epsilon)break;
   const frame={width,edge,breakGap};
   try{const result=enumerate(plan,chunk,measures,frame,maxStates);return {frame,measures,rates:[5,500],proof:'enumerated',...result};}catch(error){reason=(error as Error).message;}
