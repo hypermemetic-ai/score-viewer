@@ -35,7 +35,7 @@ export interface ManualPracticeViewOptions {
 export class ManualPracticeView {
  readonly assessment='manual' as const;readonly plan;readonly state;private browser:PracticeBrowser;
  private mounted=new AbortController();private transport?:ManualPracticeTransport;private overview=true;private disposed=false;private raf=0;
- private settingsDialog?:HTMLDialogElement;private saves=Promise.resolve();private saveError?:string;private renderError?:string;
+ private surface?:HTMLElement;private settingsDialog?:HTMLDialogElement;private saves=Promise.resolve();private saveError?:string;private renderError?:string;
  private manual:ManualTempoControls;private frames=new Map<string,string>();private rendered='';private cueLabel='';private lastWorking=0;
  constructor(readonly app:HTMLElement,readonly options:ManualPracticeViewOptions){
   this.plan=options.context.plan;this.state=options.context.state;this.browser=options.context.browser;
@@ -52,7 +52,7 @@ export class ManualPracticeView {
   if(this.disposed)return;
   if(context){this.browser.includeManual=context.includeManual;this.browser.select(this.state,context.parent??context.selected);if(context.component)this.browser.select(this.state,context.component,true);}
   this.app.innerHTML='<section class="surface practice-surface manual-practice-surface"><header class="practice-header"></header><div class="practice-overview"></div><main class="practice-stage" tabindex="-1"><div class="practice-score"></div><div class="practice-countin" hidden aria-live="off"><strong></strong></div></main><div class="practice-status" role="status"></div><nav class="practice-controls"></nav></section>';
-  const surface=this.app.querySelector<HTMLElement>('.practice-surface')!;
+  const surface=this.app.querySelector<HTMLElement>('.practice-surface')!;this.surface=surface;
   surface.addEventListener('click',event=>{const control=(event.target as HTMLElement).closest<HTMLElement>('[data-practice]');if(control)void this.action(control.dataset.practice!);},{signal:this.mounted.signal});
   surface.addEventListener('change',event=>{const field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'){this.browser.setIncludeManual(field.checked);this.paintBrowser(false);this.app.querySelector<HTMLInputElement>('[data-practice-display="manual"]')?.focus();}else this.setting(field);},{signal:this.mounted.signal});
   surface.addEventListener('keydown',event=>{const field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&['Enter','Escape'].includes(event.code)){event.preventDefault();if(!event.repeat){if(event.code==='Enter')field.click();else void this.action('back');}}},{signal:this.mounted.signal});
@@ -60,8 +60,8 @@ export class ManualPracticeView {
   window.addEventListener('resize',this.resized);this.paint();this.refit();this.frame();
  }
  contextSnapshot():PracticeViewContext {const bars=this.session?.windows.bars??[];return {partition:this.plan.partition,composites:structuredClone(this.state.composites??{}),preferences:practicePreferences(this.state),selected:this.browser.selected,parent:this.browser.parent,component:this.browser.component,includeManual:this.browser.includeManual,...(!this.overview&&this.session?{passage:this.session.chunk.id}:{}),...(bars.length?{window:[bars[0],bars.at(-1)!] as [number,number]}:{})};}
- private status(message=''){const node=this.app.querySelector('.practice-status');if(node)node.textContent=this.saveError??this.renderError??message;}
- private save(){if(this.session)this.state.workingByPattern[this.session.chunk.pattern]=this.state.working;const record=this.options.context.record(),view=this.options.context.viewRecord();this.saves=this.saves.then(()=>this.options.save(record,view)).then(()=>{this.saveError=undefined;this.options.changed(displayedPracticeTotal(this.plan,record.state),wholePracticeProgress(this.plan,record.state)>=1);}).catch(error=>{this.saveError=`Progress has not saved: ${(error as Error).message}`;this.pause();this.status();});return this.saves;}
+ private status(message=''){if(this.disposed||!this.surface||!this.app.contains(this.surface))return;const node=this.surface.querySelector('.practice-status');if(node)node.textContent=this.saveError??this.renderError??message;}
+ private save(){if(this.session)this.state.workingByPattern[this.session.chunk.pattern]=this.state.working;const record=this.options.context.record(),view=this.options.context.viewRecord();this.saves=this.saves.then(()=>this.options.save(record,view)).then(()=>{this.saveError=undefined;if(this.disposed)return;this.options.changed(displayedPracticeTotal(this.plan,record.state),wholePracticeProgress(this.plan,record.state)>=1);}).catch(error=>{this.saveError=`Progress has not saved: ${(error as Error).message}`;this.pause();this.status();});return this.saves;}
  async flush(){this.pause();await this.save();await this.saves;if(this.saveError)throw Error(this.saveError);}
  private passage(bars:readonly number[]){const notation=this.options.context.view.notation,key=`${notation}:${bars.join(',')}`;let source=this.frames.get(key);if(source!==undefined){this.frames.delete(key);this.frames.set(key,source);}else{source=this.options.passage(bars,notation);this.frames.set(key,source);if(this.frames.size>16)this.frames.delete(this.frames.keys().next().value!);}
   const document=new DOMParser().parseFromString(source,'image/svg+xml'),svg=document.documentElement as unknown as SVGSVGElement;
