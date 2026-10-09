@@ -68,6 +68,10 @@ class PacketAdmission(unittest.TestCase):
 
 
 class MatchedAdmission(unittest.TestCase):
+    def test_empty_or_clipped_correlation_refuses(self):
+        for source, captured in [([], []), ([1.0, 2.0], [1.0]), ([1.0], [1.0, 2.0])]:
+            with self.assertRaises(AssertionError): module.correlation(source, captured)
+
     def write_pcm(self, path, samples):
         content = array.array("f", samples).tobytes()
         path.write_bytes(b"RIFF" + struct.pack("<I", 36 + len(content)) + b"WAVEfmt "

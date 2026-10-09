@@ -70,6 +70,7 @@ def validate_packets(packets, sample_start, sample_end, time_start, time_end, to
 
 
 def correlation(reference, captured):
+    assert len(reference) == len(captured) and len(reference) > 0, "Incomplete signature"
     dot = a = b = 0.0
     for x, y in zip(reference, captured):
         dot += x * y
@@ -116,8 +117,9 @@ def admit(render_dir, capture_dir):
         choices = []
         for shift in range(-2, 3):
             start = candidate + shift * 2
-            if start >= 0:
+            if start >= 0 and start + count <= len(recorded):
                 choices.append((correlation(reference, recorded[start:start + count]), start))
+        assert choices, "No complete captured signature"
         corr, onset = max(choices)
         assert corr >= 0.98, f"Signature mismatch {corr}"
         quiet_frames = round(0.050 * 44100)
