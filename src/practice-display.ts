@@ -1,5 +1,5 @@
 import {attainedRate} from './practice-attainment';
-import type {PracticeChunk,PracticePlan,PracticeState} from './practice';
+import type {PracticeChunk,PracticePassagePlan,PracticeState} from './practice';
 
 /** Presentation never manufactures assessment evidence or untimed preparation. */
 export function displayedPracticeProgress(chunk:PracticeChunk,state:PracticeState,includeManual=true){
@@ -7,7 +7,7 @@ export function displayedPracticeProgress(chunk:PracticeChunk,state:PracticeStat
  return Math.max(0,Math.min(1,rate/state.target));
 }
 /** Original source groups count once; a joined run keeps its independent rate. */
-export function displayedPracticeTotal(plan:PracticePlan,state:PracticeState,includeManual=true){
+export function displayedPracticeTotal(plan:PracticePassagePlan,state:PracticeState,includeManual=true){
  const weight=plan.chunks.reduce((n,c)=>n+c.weight,0);
  return weight?plan.chunks.reduce((n,c)=>n+c.weight*displayedPracticeProgress(c,state,includeManual),0)/weight:0;
 }
