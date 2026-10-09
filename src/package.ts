@@ -261,7 +261,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(m.format!=='iso-score'||![1,2,3].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||!Array.isArray(m.metadata.provenance)||m.metadata.provenance.some(v=>typeof v!=='string')||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
  // Unzip and this owned digest capture happen before the first member await.
  // A later caller mutation cannot bind different bytes to admitted dual ink.
- const dualArchiveHash=m.version===3&&m.reading?.version==='instrument-reading-package-v2'?hashBytes(new Uint8Array(bytes)):undefined;
+ const dualArchiveSha256=m.version===3&&m.reading?.version==='instrument-reading-package-v2'?await hashBytes(new Uint8Array(bytes)):undefined;
  if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
  for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);}
  let referenceMidi:Uint8Array|undefined;
@@ -274,7 +274,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   else pages.forEach((svg,page)=>passiveSvg(svg,[],page));
   m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
   freezeSource(score);
-  const archiveSha256=await(dualArchiveHash??hashBytes(bytes));
+  const archiveSha256=dualArchiveSha256??await hashBytes(bytes);
   if(reading.dual)admittedDualArchives.set(m,{score,sha256:archiveSha256});
   return {manifest:m,score,seats:[],pages,files,reading,archiveSha256,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    generationAvailable:false,fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
