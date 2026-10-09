@@ -4,11 +4,11 @@
 
 - [ ] 1.1 Implement a deterministic Viewer transposition envelope and complete supported pitch transformation with legal offsets; verify positive/negative/octave changes, notes/repeats/ties/grace/guards, unchanged timing/owners and explicit unsupported/range refusals in focused tests.
 - [ ] 1.2 Integrate the new policy with preparation identity and ordinary worker requests, preserving selected owner hands while freshly engraving and replanning both keyboards; verify same-hand pitch changes cannot reuse old pages/contacts and stale request cancellation refuses.
-- [ ] 1.3 Independently replay transposition during receiving-realm and archive cold admission, retaining original source/reference bytes and historical policy dispatch; verify valid round trips and tampered steps/source/receipt/pages/seats/layers all refuse, and document the new archive authority.
+- [ ] 1.3 Independently replay transposition during receiving-realm and archive cold admission, retaining the exact nonnested untransposed baseline, original source/reference bytes, complete original-guarded selected hand-map authority and historical policy dispatch; verify valid shared round trips, requested-map equality and tampered steps/source/map/receipt/pages/seats/layers all refuse, and document the new archive authority.
 
 ## 2. Reversible edition selection and musical state
 
-- [ ] 2.1 Add strictly admitted collection-level selected steps and retained original/derived edition selection with additive transactional installation; verify 0 restores exact original archive/state, reopen/layout changes retain the offset, and failed/superseded writes leave the current pointer/value intact.
+- [ ] 2.1 Add strictly admitted collection-level selected steps and retained original/derived edition selection with additive transactional installation and baseline/map/hand-policy-compatible offset reuse; verify 0 restores exact original archive/state including shared-import restoration, reopen/layout changes retain the offset, and failed/superseded writes leave the current pointer/value intact.
 - [ ] 2.2 Keep corrections and practice/performance evidence bound to the actual pitch edition without weakening existing pitch/contact guards; verify original edited/progress state is unchanged, new pitch evidence starts independently and retained editions recover their own journals.
 - [ ] 2.3 Rebuild paused practice and performance input against the admitted effective score while retaining the selected passage where applicable; verify expected MIDI pitches change, old pending events cannot affect the new context, and physical piano passthrough remains unchanged. Document the user-facing restoration and evidence behavior.
 
