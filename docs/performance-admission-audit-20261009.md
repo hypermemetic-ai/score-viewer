@@ -1,6 +1,6 @@
 # Package admission performance audit
 
-This change removes repeated validation of identical bytes within one operation without granting a saved package or worker certificate new authority. Default `importPackage` remains cold. Application open/import/keyboard hooks are a separate coordinated follow-up; module timings below are not complete-open or native-installation claims.
+This change removes repeated validation of identical bytes within a bounded app-reader lifetime without granting a saved package or worker certificate new authority. Default `importPackage` remains cold. Application open/import/keyboard hooks are a separate coordinated follow-up; module timings below are not complete-open or native-installation claims.
 
 ## Measured causes and scope
 
@@ -23,12 +23,28 @@ Every session copy checks applicable actual annotation font authority. Browser c
 
 Written-head records live only in a private WeakMap populated after all actual replay/geometry/coverage/receipt comparisons and all outer/companion checks succeed. The getter checks semantic/source/seat/recipe/authority state, literal page data and private membership of the actual graph objects, then returns copied IDs. Caller-installed claims, changed semantics/pages, accessors, substituted Proxies and unknown objects cannot attach evidence. Only the private clone factory can transfer exact evidence and recapture object membership in its own new graph. Unknown/changed packages retain the existing exact source replay fallback.
 
-Every returned Worker archive still gets first cold admission in a fresh receiving session. Independent request binding may reuse only exact bytes admitted there, and independently checks source, tempo, transposition, hands, policy, personal state and layer. No request result is cached. Direct saved reading uses a fresh operation session's cold admission and the existing readiness/binding checks only for saved matching layout/tempo/pitch without force. Changed inputs, missing views and new calculations retain Worker execution and its original refusal rules. Cancellation terminates the owned worker and invalidates late retention.
+Every returned Worker archive still gets first cold admission in a fresh receiving session. Independent request binding may reuse only exact bytes admitted there, and independently checks source, tempo, transposition, hands, policy, personal state and layer. No request result is cached. The private bounded app-reader session can survive exact repeated opens; first admission of each bytes/options combination in that realm remains cold, and all later results are fresh clones with new-request binding and current-font checks. It remains separate from the library and fresh receiving sessions and clears on reader disposal. Direct saved reading uses its actual admission and existing readiness/binding checks only for saved matching layout/tempo/pitch without force. Changed inputs, missing views and new calculations retain Worker execution and original refusal rules. Cancellation terminates the owned worker and ignores late results.
+
+## Frozen module measurements
+
+Chromium measurements at application source `e55599940937198f4aaadc17ccf926f4a7e618f2` use fresh browser contexts, actual font loading and a heartbeat flush after each stopwatch. These measurements exercise strict module APIs, not the full main UI.
+
+| Fixture | First cold import | Exact hit | Retained service after cold | Largest cold heartbeat gap |
+| --- | ---: | ---: | ---: | ---: |
+| Original Zelda, both saved layouts | 3,921 ms | 65 ms | 211–264 ms | 3,922 ms |
+| +1 Jankó | 5,785 ms | 93 ms | 377 ms | 5,786 ms |
+| +1 Conventional | 5,851 ms | 95 ms | 295 ms | 5,852 ms |
+| Public No14, both saved layouts | 247 ms | 34 ms | 121–152 ms | 247 ms |
+| 1,013-owner/10-page bass | 5,174 ms | 13 ms | Reading only | 5,175 ms |
+
+Each warm and post-mutation proof includes exact page/seat/score/receipt/raw-member hashes and retained-original proof. All agree. Original font ambiguity refuses both reuse and head access, evicts the entry, then requires a 3,731-ms fresh cold import after restoration. The strengthened head getter, including private object membership, takes 31–40 ms against 1,614–1,729 ms for independent old exact replay across the four retained editions; all 207 seat/head identities agree. No complete-opening speedup is inferred from these module ratios.
+
+Logical retained material is 21.1 MiB for original and 33.1–33.5 MiB for each +1 archive, including complete companions/originals and private bindings. Two large +1 entries exceed the 64-MiB budget and evict rather than grow. In a separate forced-GC Chromium observation, returned caller clones are released: used JS heap rises from 11.0 MiB before admission to 29.0 MiB with original, 47.0 MiB with original/+1, then falls to 36.2 MiB after adding the other +1 triggers eviction and 18.6 MiB after clear. ArrayBuffer backing storage separately rises from 11.2 to 19.4 MiB and returns to 11.6 MiB after clear. Compiled modules/fonts/JIT remain live; this is not whole-process RSS, a 64-MiB heap promise or native-app memory evidence. The session reports zero entries/bytes/producers after disposal.
 
 ## Evidence and remaining work
 
 Private measurements and fixture hashes live under `~/.local/state/score-viewer-performance-admission-20261009`. `immutable-gates.mjs` independently cold-admits all four retained Zelda views and the 1,013-owner/10-page outward bass archive. After both deliberate dependency advances, every raw member, page, receipt, policy and original journal outcome equals the PR26 baseline; all 48 original JSON files remain hash-identical. Existing historical curved policy dispatch and crossclaim/tamper controls remain required.
 
-Session controls cover caller/options/result/companion mutation, exact-byte collision refusal, distinct producer bounds, clear while active, eviction/material budgets, actual font ambiguity and private head transfer. The real browser new-calculation control still uses an actual module Worker, emits progress and cold-admits its returned archive independently. A fast retained result cannot bypass that path.
+Session controls cover caller/options/result/companion mutation, exact-byte collision refusal, distinct producer bounds, clear while active, eviction/material budgets, actual font ambiguity and private head transfer. The real browser new-calculation control still uses an actual module Worker, emits progress and cold-admits its returned archive independently. A fast retained result cannot bypass that path. The frozen configured Viewer suite passes 520/520 with zero failures/skips/cancellations, configured TypeScript/Vite build and strict scoped OpenSpec validation pass. Main's later PR33 repeat change was merged normally without changing any of these admission/runtime/test inputs; combined follow-up checks remain explicit.
 
 Cold imports still block the main thread for seconds. Warm cache hits and removing redundant validation do not establish responsive first-open behavior. Complete main-operation hooks and matched keyboard/heartbeat measurements remain pending. Further pure per-call final-scene reuse or cooperative yielding requires a separate concrete proposal and source review; this change introduces neither a global scene cache nor weakened admission. Native deployment and human musical acceptance are separate gates.

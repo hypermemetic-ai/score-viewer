@@ -27,7 +27,7 @@ A session SHALL snapshot exact bytes and effective admission options before awai
 - **THEN** it waits for the single producer and rechecks generation/context before admission, while stale refreshes publish nothing
 
 ### Requirement: Retained reading preserves request policy
-Direct retained reading SHALL use a fresh operation's actual cold admission, the existing readiness policy and independent request binding. Changed tempo/pitch, forced preparation or missing companions SHALL retain genuine computation and strict receiving validation.
+Direct retained reading SHALL use the private app-reader realm's actual cold admission of exact bytes/options, the existing readiness policy and independent new-request binding. The bounded reader session MAY survive exact repeated opens, SHALL recheck applicable fonts on every reuse and SHALL clear on disposal. Library and fresh Worker receiving sessions SHALL remain separate. Changed tempo/pitch, forced preparation or missing companions SHALL retain Worker execution, original refusal rules and strict receiving validation.
 
 #### Scenario: Exact saved keyboard
 - **WHEN** a saved presentation is opened without changing pitch, tempo, policy, personal state or layer
