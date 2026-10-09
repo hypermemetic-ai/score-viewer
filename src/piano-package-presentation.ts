@@ -10,6 +10,8 @@ import type {PerformingHandPolicy} from './piano-request-authority';
 import type {CalculatedHandReceipt} from './calculated-hand-edition';
 import type {PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 
+import type {ScoreTransposition} from './score-transposition';
+
 export interface PianoPresentationPayload {
   layoutId:PhysicalKeyboardId;sourceSha256:string;score:string;seats:string;pages:string[];
   layer:FingerLayer;effectiveHandSha256:string;engineVersion:string;
@@ -17,24 +19,26 @@ export interface PianoPresentationPayload {
   preparationRequest?:{handPolicy:PerformingHandPolicy;maxExpansions?:number};
   calculatedHandReceipt?:CalculatedHandReceipt;
   calculationContext?:PianoCalculationContext|null;
+  transpositionPreparation?:{envelope:ScoreTransposition;originalBytes:Uint8Array;sourceBytes:Uint8Array;source:ScorePackage['score']};
 }
 
 /** Immutable checked assembly for either layout. Other presentations retain
  * their exact bytes; publication first verifies the ORIGINAL installed pins. */
 export async function packagePianoPresentation(p:ScorePackage,next:PianoPresentationPayload):Promise<Uint8Array>{
   const prior=(await publishPackage(p)).package,original=prior.collectionManifest??prior.manifest,
-    sourcePath=original.version===2?original.sourceScore!:'score.json',source=prior.files[sourcePath];
-  if(await hashBytes(source)!==next.sourceSha256||prior.sourceRevision!==next.sourceSha256)
+    sourcePath=original.version===2?original.sourceScore!:'score.json',source=next.transpositionPreparation?.sourceBytes??prior.files[sourcePath];
+  if(await hashBytes(source)!==next.sourceSha256||!next.transpositionPreparation&&prior.sourceRevision!==next.sourceSha256)
     throw Error('Calculated presentation has a different immutable source or collection identity.');
   if(!['conventional-piano','janko-four-row'].includes(next.layoutId)||!next.pages.length||
     typeof next.layer.profileId!=='string'||typeof next.layer.profileSha256!=='string')throw Error('Incomplete calculated piano presentation.');
   const m=structuredClone(original),files:Record<string,Uint8Array>={...prior.files};delete files['manifest.json'];
-  const presentations={...(m.presentations??{})};
+  const presentations=next.transpositionPreparation?{}:{...(m.presentations??{})};
+  if(next.transpositionPreparation){m.transposition=next.transpositionPreparation.envelope;files[m.transposition.originalArchive]=next.transpositionPreparation.originalBytes;}
   // Capture a companion's actual old clock before changing the collection's
   // primary context. Explicit null retains the immutable source clock.
   for(const [layout,d]of Object.entries(presentations))if(d&&layout!==next.layoutId)
     presentations[layout as PhysicalKeyboardId]={...d,calculationContext:d.calculationContext===undefined?m.calculationContext??null:d.calculationContext};
-  if(m.version===1){
+  if(m.version===1&&!next.transpositionPreparation){
     if(!prior.fingerLayer||!prior.profileId||!prior.profileSha256||!prior.effectiveHandSha256)
       throw Error('Legacy generation needs a declared compatible piano presentation; the old archive is retained.');
     presentations['janko-four-row']={layoutId:'janko-four-row',score:'score.json',seats:'seats.json',fingers:'fingers.json',
@@ -87,7 +91,8 @@ export async function packagePianoPresentation(p:ScorePackage,next:PianoPresenta
     if(!next.preparationRequest)throw Error('Calculated edition requires independently identified request policy.');
     const candidate:ScorePackage={...prior,manifest:m,score:JSON.parse(next.score),seats:JSON.parse(next.seats),pages:next.pages,
       keyboardLayout:next.layoutId,profileId:selected.profileId,profileSha256:selected.profileSha256,effectiveHandSha256:selected.effectiveHandSha256,
-      calculatedHandReceipt:next.calculatedHandReceipt,sourceSha256:next.sourceSha256,sourceScore:prior.sourceScore??prior.score,fingerLayer:layer,renderingRecipe:next.recipe,calculationContext:selected.calculationContext??undefined};
+      calculatedHandReceipt:next.calculatedHandReceipt,sourceSha256:next.sourceSha256,sourceScore:next.transpositionPreparation?.source??prior.sourceScore??prior.score,
+      ...(next.transpositionPreparation?{transposition:next.transpositionPreparation.envelope,transpositionOriginal:prior.transpositionOriginal??prior}:{}),fingerLayer:layer,renderingRecipe:next.recipe,calculationContext:selected.calculationContext??undefined};
     m.preparationIdentity=selected.preparationIdentity=await createPianoPreparationIdentity(candidate,next.preparationRequest.handPolicy,next.preparationRequest.maxExpansions);
     checked=await importPackage(archivePackage(m,files));
   }else if(next.preparationRequest){
