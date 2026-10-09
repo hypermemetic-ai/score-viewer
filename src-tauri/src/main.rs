@@ -24,7 +24,7 @@ fn write_managed(app:tauri::AppHandle,store:tauri::State<Store>,name:String,data
  #[cfg(windows)] {use std::os::windows::ffi::OsStrExt;unsafe extern "system" {fn MoveFileExW(a:*const u16,b:*const u16,flags:u32)->i32;}let a:Vec<u16>=tmp.as_os_str().encode_wide().chain(Some(0)).collect();let b:Vec<u16>=p.as_os_str().encode_wide().chain(Some(0)).collect();if unsafe{MoveFileExW(a.as_ptr(),b.as_ptr(),1|8)}==0{return Err(std::io::Error::last_os_error().to_string());}}
  #[cfg(not(windows))] fs::rename(&tmp,&p).map_err(|e|e.to_string())?;Ok(())}
 #[tauri::command]
-async fn pick_score()->Result<Option<String>,String>{tauri::async_runtime::spawn_blocking(||{match rfd::FileDialog::new().add_filter("Native score",&["tuna","isoscore"]).pick_file(){None=>Ok(None),Some(p)=>{let n=fs::metadata(&p).map_err(|e|e.to_string())?.len();if n>50_000_000{return Err("Package exceeds 50 MB".into())};Ok(Some(STANDARD.encode(fs::read(p).map_err(|e|e.to_string())?)))}}}).await.map_err(|e|e.to_string())?}
+async fn pick_score()->Result<Option<String>,String>{tauri::async_runtime::spawn_blocking(||{match rfd::FileDialog::new().add_filter("Scores",&["tuna","isoscore","gp","gpx","gp3","gp4","gp5"]).pick_file(){None=>Ok(None),Some(p)=>{let n=fs::metadata(&p).map_err(|e|e.to_string())?.len();if n>50_000_000{return Err("Package exceeds 50 MB".into())};Ok(Some(STANDARD.encode(fs::read(p).map_err(|e|e.to_string())?)))}}}).await.map_err(|e|e.to_string())?}
 #[tauri::command]
 async fn save_score(data:String,filename:String)->Result<bool,String>{
  if data.len()>66_666_668{return Err("Shared score exceeds 50 MB".into());}
