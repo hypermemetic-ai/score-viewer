@@ -1,12 +1,12 @@
 import {strFromU8,strToU8,zipSync} from 'fflate';
-import {prepareInstrumentReading,validateInstrumentReadingScore,INSTRUMENT_READING_ENGINE,
+import {prepareInstrumentReading,validateInstrumentReadingScore,instrumentReadingEngine,
   type ReadingOwner,type JankoLayoutOptions,type JankoTokens} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,type Manifest,type Metadata} from './package';
 
 export interface ReadingDescriptor {
   version:'instrument-reading-package-v1';
-  engineId:typeof INSTRUMENT_READING_ENGINE;
+  engineId:ReturnType<typeof prepareInstrumentReading>['engineId'];
   policy:InstrumentReadingPolicy;
   owners:'reading-owners.json';
   layout:'reading-layout.json';
@@ -51,7 +51,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
 } {
   const d=m.reading;
   if(!d||!object(d)||Object.keys(d).some(k=>!['version','engineId','policy','owners','layout','options','tokens'].includes(k))||
-    d.version!=='instrument-reading-package-v1'||d.engineId!==INSTRUMENT_READING_ENGINE||m.engineVersion!==d.engineId||
+    d.version!=='instrument-reading-package-v1'||typeof d.engineId!=='string'||m.engineVersion!==d.engineId||
     d.owners!=='reading-owners.json'||d.layout!=='reading-layout.json'||!object(d.options)||!object(d.tokens)||
     ['keyboardLayout','presentations','fingerGeometry','renderingRecipe','calculationContext','preparationIdentity','calculatedHandReceipt',
       'transposition','effectiveHandSha256','profileId','profileSha256','layerSourceHash','referenceMidi','sourceScore','sourceRevision','sourceSha256'].some(k=>k in m)||
@@ -60,10 +60,13 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
     throw Error('Unsupported or incomplete musical reading package.');
   const score=parse(files,'score.json') as QuantizedGridScore;
   boundedScore(score);
+  if(d.engineId!==instrumentReadingEngine(score.readingPolicy!))
+    throw Error('Reading preparation authority differs from its admitted musical policy.');
   if(score.id!==m.scoreId||score.title!==m.metadata.title||score.composer!==m.metadata.composer||
     JSON.stringify(score.readingPolicy)!==JSON.stringify(d.policy)||strFromU8(files['seats.json']??strToU8('null'))!=='[]')
     throw Error('Reading source identity or policy differs.');
   const result=checkedPreparation(score,d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
+  if(result.engineId!==d.engineId)throw Error('Reading preparation authority differs from its musical source.');
   if(result.pages.length!==m.pages.length||JSON.stringify(result.owners)!==JSON.stringify(owners)||
     JSON.stringify(result.layoutMetadata)!==JSON.stringify(layout))throw Error('Reading event ownership or geometry differs from its musical source.');
   const pages=m.pages.map((name,index)=>{

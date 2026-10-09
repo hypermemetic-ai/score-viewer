@@ -20,8 +20,8 @@ async function main():Promise<void> {
   if((await stat(input)).size>10_000_000)throw Error('MusicXML input exceeds 10 MB.');
   const xml=new TextDecoder('utf-8',{fatal:true}).decode(await readFile(input)),written=parseMusicXml(xml,'source.musicxml');
   if(!written.parts?.some(p=>p.id===values.part))throw Error('The selected part is absent from this MusicXML file.');
-  const {score,coverage}=projectMusicXml(written,{id:'local-'+written.rawSha256,readingPolicy:{version:'instrument-reading-v1',
-    partId:values.part,centerPitch:center-12,guidePitches:guides.map(p=>p-12),pitchFolding:'literal',stemPolicy:'register'}});
+  const {score,coverage}=projectMusicXml(written,{id:'local-'+written.rawSha256,readingPolicy:{version:'instrument-reading-v2',
+    partId:values.part,centerPitch:center-12,guidePitches:guides.map(p=>p-12),pitchFolding:'literal',stemPolicy:'outward',stemDirectionSemantics:'visual'}});
   const root=new URL('../',import.meta.url),notices:Record<string,Uint8Array>={};
   for(const name of ['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'])
     notices['licenses/'+name]=await readFile(new URL('licenses/'+name,root));
@@ -31,6 +31,6 @@ async function main():Promise<void> {
   await writeFile(output,bytes,{flag:'wx'});
   console.log(JSON.stringify({output:resolve(output),
     events:score.notes.length,pitched:score.notes.filter(isPitchedEvent).length,unpitched:score.notes.filter(e=>!isPitchedEvent(e)).length,
-    pages:p.pages.length,centerMidi:center,guideMidi:guides,coverage},null,2));
+    pages:p.pages.length,centerMidi:center,guideMidi:guides,readingPolicy:score.readingPolicy,engineId:p.manifest.reading!.engineId,coverage},null,2));
 }
 main().catch(error=>{console.error((error as Error).message);process.exitCode=1;});

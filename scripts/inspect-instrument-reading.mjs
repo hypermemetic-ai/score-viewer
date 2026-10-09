@@ -14,6 +14,10 @@ const bytes=process.env.READING_PACKAGE?await readFile(process.env.READING_PACKA
   file=`package-${createHash('sha256').update(bytes).digest('hex')}.isoscore`,owners=JSON.parse(strFromU8(files['reading-owners.json'])),
   layouts=JSON.parse(strFromU8(files['reading-layout.json']));
 assert.equal(manifest.version,3);
+assert.equal(score.readingPolicy.version,'instrument-reading-v2');
+assert.equal(score.readingPolicy.stemPolicy,'outward');
+assert.equal(score.readingPolicy.stemDirectionSemantics,'visual');
+assert.equal(manifest.reading.engineId,'janko-real-engine-instrument-reading-v3-outward');
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
 page.on('pageerror',error=>errors.push(error.message));
@@ -39,6 +43,36 @@ try {
   assert.ok(await page.locator('.page svg').count()>0);
   assert.equal(await page.locator('.page [data-viewer-seat]').count(),0);
   await page.screenshot({path:output+'/reading-first-page.png'});
+  const outwardStemSamples=[];
+  for(const side of ['below','above']){
+    const direction=side==='below'?1:-1,candidates=layouts.flatMap(system=>system.notes.filter(head=>
+      head.eventKind==='pitched'&&head.direction===direction&&
+      (side==='below'?head.notationPitch<system.centerPitch:head.notationPitch>system.centerPitch))
+      .map(head=>({...head,page:system.page,centerPitch:system.centerPitch}))),observed=[];
+    for(const head of candidates){
+      await goTo(head.page);
+      const stem=await page.locator('.page svg').evaluateAll((svgs,head)=>{
+        for(const svg of svgs){
+          if(!Array.from(svg.querySelectorAll('[data-note-id]')).some(note=>note.getAttribute('data-note-id')===head.id))continue;
+          for(const line of svg.querySelectorAll('.janko-stem')){
+            const x1=Number(line.getAttribute('x1')),x2=Number(line.getAttribute('x2')),
+              y1=Number(line.getAttribute('y1')),y2=Number(line.getAttribute('y2'));
+            if(Math.abs(x1-head.x)<.03&&Math.abs(x2-head.x)<.03&&
+              (y1-head.y)*head.direction>0&&(y2-head.y)*head.direction>0&&Math.abs(y2-y1)>1)
+              return {x1,y1,x2,y2};
+          }
+        }
+      },head);
+      if(!stem)continue;
+      observed.push({id:head.id,page:head.page,notationPitch:head.notationPitch,centerPitch:head.centerPitch,
+        direction:head.direction,head:{x:head.x,y:head.y},stem});
+      if(observed.length===3)break;
+    }
+    if(process.env.READING_REQUIRE_BOTH_OUTWARD==='1')assert.ok(observed.length,`Actual reader needs a painted outward ${side}-center stem`);
+    if(observed.length)await page.screenshot({path:output+`/reading-outward-${side}.png`});
+    outwardStemSamples.push(...observed);
+  }
+  assert.ok(outwardStemSamples.length,'Outward policy must reach actual reader stem ink');
   const dead=owners.find(owner=>owner.eventKind==='unpitched');
   if(dead?.heads.length){await goTo(dead.heads[0].page);
     assert.ok(await page.locator('.page svg').evaluateAll((svgs,id)=>svgs.some(svg=>
@@ -118,7 +152,8 @@ try {
   assert.equal(await page.locator('#app').getAttribute('data-page'),savedPage);
   assert.equal(await page.evaluate(file=>localStorage.getItem('iso-viewer-dev/'+file),file),Buffer.from(bytes).toString('base64'));
   assert.deepEqual(errors,[]);
-  const result={url,engineId:manifest.reading.engineId,pages:manifest.pages.length,events:owners.length,unpitched:owners.filter(o=>o.eventKind==='unpitched').length,
+  const result={url,engineId:manifest.reading.engineId,readingPolicy:score.readingPolicy,outwardStemSamples,
+    pages:manifest.pages.length,events:owners.length,unpitched:owners.filter(o=>o.eventKind==='unpitched').length,
     ordinaryReader:true,noFabricatedKeyboardSeats:true,physicalActionsGated:true,sourceBytesUnchanged:true,
     reopensSavedView:true,percussiveHeadObserved:!!dead,techniqueLabelsObserved,curvedTechniqueConnectorsObserved,
     modifiedComponentsObserved:modifiedComponents.length,modifiedRestComponentsObserved:modifiedRests.length,

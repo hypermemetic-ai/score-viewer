@@ -15,8 +15,8 @@ import {publishPackage} from '../src/publication';
 import {authoredReadingPackage,authoredReadingScore} from './support/instrument-reading-fixture';
 
 const bytes=await authoredReadingPackage(),p=await importPackage(bytes);
-async function changed(change:(files:Record<string,Uint8Array>,manifest:Manifest)=>void):Promise<Uint8Array> {
-  const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;
+async function changed(change:(files:Record<string,Uint8Array>,manifest:Manifest)=>void,original=bytes):Promise<Uint8Array> {
+  const files=unzipSync(original),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;
   delete files['manifest.json'];change(files,m);
   m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,b])=>[name,await hashBytes(b)])));
   m.revision=m.semanticSha256=m.files['score.json'];files['manifest.json']=strToU8(JSON.stringify(m));return zipSync(files);
@@ -35,6 +35,18 @@ test('common musical reading retains actual pitch, independent voice owners and 
   const deadOwner=p.reading!.owners.find(o=>o.id==='dead')!;assert.equal(deadOwner.soundingPitch,null);assert.equal('pitch' in deadOwner,false);
   assert.equal(deadOwner.referencePitch,26);
   assert.ok(p.reading!.layoutMetadata.every(system=>system.centerPitch===24&&JSON.stringify(system.guidePitches)==='[12,24,36]'));
+});
+
+test('outward reading prepares clear below-center stems down and above-center stems up',async()=>{
+  const source=authoredReadingScore();source.techniques=[];
+  const below=source.notes.find(event=>event.id==='below-guide')!,above=source.notes.find(event=>event.id==='upper-guide')!;
+  source.notes=[{...below,startTick:0,durationTicks:48,sourceWrittenValue:{type:'quarter',dots:0}},
+    {...above,startTick:48,durationTicks:48,sourceWrittenValue:{type:'quarter',dots:0}}];
+  const prepared=await importPackage(await authoredReadingPackage(source)),heads=prepared.reading!.layoutMetadata.flatMap(system=>system.notes);
+  assert.equal(prepared.score.readingPolicy!.stemPolicy,'outward');
+  assert.equal(heads.find(head=>head.id===below.id)!.direction,1);
+  assert.equal(heads.find(head=>head.id===above.id)!.direction,-1);
+  assert.deepEqual(prepared.score,source);assert.equal(prepared.reading!.geometryEvidence.ok,true);
 });
 
 test('reading pages and owner geometry must reproduce the shared musical source',async()=>{
@@ -71,7 +83,23 @@ test('H/P reading retains curved connections and refuses the historical bracket 
   await assert.rejects(importPackage(await changed((_files,m)=>{
     m.engineVersion='janko-real-engine-instrument-reading-v1';
     (m.reading! as {engineId:string}).engineId=m.engineVersion;
-  })),/musical reading package/);
+  })),/preparation authority/);
+});
+
+test('historical curved register archives replay explicitly without silent outward promotion',async()=>{
+  const source=authoredReadingScore();
+  source.readingPolicy={version:'instrument-reading-v1',partId:'original-part',centerPitch:24,guidePitches:[12,24,36],
+    pitchFolding:'literal',stemPolicy:'register'};
+  const historicalBytes=await authoredReadingPackage(source),historical=await importPackage(historicalBytes),raw=unzipSync(historicalBytes);
+  assert.equal(historical.manifest.reading!.engineId,'janko-real-engine-instrument-reading-v2-curved-techniques');
+  assert.deepEqual(historical.score,source);assert.deepEqual(historical.files['score.json'],raw['score.json']);
+  assert.equal(historical.manifest.revision,await hashBytes(raw['score.json']));
+  for(const [archive,engine]of [[bytes,'janko-real-engine-instrument-reading-v2-curved-techniques'],
+    [historicalBytes,'janko-real-engine-instrument-reading-v3-outward']] as const){
+    await assert.rejects(importPackage(await changed((_files,m)=>{
+      m.engineVersion=engine;(m.reading! as {engineId:string}).engineId=engine;
+    },archive)),/preparation authority/);
+  }
 });
 
 test('rehashed reading archives cannot replace performing-hand meaning with visual stem directions',async()=>{

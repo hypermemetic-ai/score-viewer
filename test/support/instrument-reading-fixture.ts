@@ -10,8 +10,8 @@ export function authoredReadingScore():QuantizedGridScore {
     referencePerformanceTempo:{version:'reference-performance-tempo-v1',bpm:100,beat:{numerator:1,denominator:4},
       provenance:{kind:'composer',reference:'Original study tempo'}},
     parts:[{id:'original-part',name:'Original bass part',instruments:[{id:'original-bass',name:'Bass',midiProgram:34}]}],
-    readingPolicy:{version:'instrument-reading-v1',partId:'original-part',centerPitch:24,guidePitches:[12,24,36],
-      pitchFolding:'literal',stemPolicy:'register'},
+    readingPolicy:{version:'instrument-reading-v2',partId:'original-part',centerPitch:24,guidePitches:[12,24,36],
+      pitchFolding:'literal',stemPolicy:'outward',stemDirectionSemantics:'visual'},
     notes:[
       {...owner,id:'center',eventKind:'pitched',pitch:{octave:2,pitchClass:0},writtenPitch:{octave:3,pitchClass:0},startTick:0,durationTicks:24,sourceWrittenValue:{type:'eighth',dots:0}},
       {...owner,id:'same-pitch-independent-voice',voiceId:'2',eventKind:'pitched',pitch:{octave:2,pitchClass:0},startTick:0,durationTicks:24,sourceWrittenValue:{type:'eighth',dots:0}},
