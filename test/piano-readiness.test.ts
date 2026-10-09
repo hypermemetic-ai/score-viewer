@@ -20,10 +20,10 @@ import type {SourceHandRequirement} from '../vendor/iso-notation/src/model/physi
 async function prepared({reference=true,recipe=true,dual=false,leap=false}={}){
   const source:QuantizedGridScore&{sourceHandRequirements:SourceHandRequirement[]}={id:'authored-readiness-piano',title:'Piano study',composer:'Fixture',
     ticksPerBeat:48,totalTicks:192,sourceBarTicks:[0,192],productionLayout:true,notes:[48,50,52,53,55,57].map((pitch,i)=>({id:`owner-${i}`,
-      pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*24,durationTicks:24,hand:'RH'})),
+      eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*24,durationTicks:24,hand:'RH'})),
     barlines:[{tick:0,barNumber:1,type:'regular'},{tick:192,barNumber:2,type:'final'}],
     timeSignatures:[{tick:0,numerator:4,denominator:4}],tempos:[],dynamics:[],pedals:[],sourceHandRequirements:[]};
-  if(leap)source.notes=[54,66,32,75].map((pitch,i)=>({id:'owner-'+i,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},
+  if(leap)source.notes=[54,66,32,75].map((pitch,i)=>({id:'owner-'+i,eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},
     startTick:i<2?24:72,durationTicks:48,hand:pitch<60?'LH':'RH'}));
   source.sourceHandRequirements=source.notes.map(n=>({version:'source-hand-requirement-v1',ownerId:n.id,hand:n.hand,
     guard:{pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},

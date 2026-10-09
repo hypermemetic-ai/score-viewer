@@ -1,3 +1,4 @@
+import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,type ScorePackage} from './package';
 import {personalStorageName,readPersonal,initialPersonal,installLayer,type Entry,type PersonalState} from './state';
 export class PersonalEditionConflict extends Error {
@@ -17,7 +18,7 @@ export function personalForCalculatedEdition(s:PersonalState,from:ScorePackage,t
   for(const c of corrections)for(const id of c.ownerIds){
     const before=from.score.notes.find(n=>n.id===id),after=to.score.notes.find(n=>n.id===id),
       assignment=to.fingerLayer.attacks.find(a=>a.id===to.fingerLayer!.sourceOwnerToAttack[id]);
-    if(!before||!after||before.startTick!==after.startTick||before.durationTicks!==after.durationTicks||
+    if(!before||!after||!isPitchedEvent(before)||!isPitchedEvent(after)||before.startTick!==after.startTick||before.durationTicks!==after.durationTicks||
       before.pitch.octave!==after.pitch.octave||before.pitch.pitchClass!==after.pitch.pitchClass||
       !assignment||assignment.id!==c.actionId||assignment.hand!==c.hand||assignment.finger!==c.replacement||
       c.proposedRow!==undefined&&assignment.row!==c.proposedRow||

@@ -1,3 +1,4 @@
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {CONVENTIONAL_PIANO,RR_JANKO_FOUR_ROW,physicalContact,jankoContact} from '../vendor/iso-notation/src/model/physical-keyboard';
@@ -29,7 +30,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     edited=new Set(Object.values(personal?.overrides??{}).flatMap(c=>c.ownerIds));
   const guard=(id:string)=>{
     const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('Saved authority names a stale source owner.',[id]);
-    return{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks};
+    return{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks};
   };
   const check=(raw:unknown):PianoAssignmentConstraint=>{
     if(!object(raw)||typeof raw.ownerId!=='string')throw new PianoAuthorityConflict('Saved authority has an incomplete owner record.');

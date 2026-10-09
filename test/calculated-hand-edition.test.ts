@@ -109,7 +109,7 @@ test('repeat visits, unequal-release aliases and written holds keep original obl
  }
 });
 test('actual all-five replacement failure retains complete fresh long-value annotations and correction seats',async()=>{
- const source=transferStudy();source.id='viewer-authored-long-value';source.title='Long carrier annotation study';source.notes=[{id:'long-carrier',startTick:0,durationTicks:96,hand:'LH',pitch:{octave:4,pitchClass:1}}];source.sourceSilences=[];
+ const source=transferStudy();source.id='viewer-authored-long-value';source.title='Long carrier annotation study';source.notes=[{id:'long-carrier',startTick:0,durationTicks:96,hand:'LH',eventKind:'pitched' as const,pitch:{octave:4,pitchClass:1}}];source.sourceSilences=[];
  for(const layout of ['conventional-piano','janko-four-row'] as const){const prior=await sourcePackage(source,{}, {knockoutMargin:0}),q=await calculatedStudy(prior.p,layout,{'long-carrier':'RH'}),seat=q.p.seats[0],position=annotationPositions(q.p).get(seat.id)!;
   assert.equal(q.r.allFive,false);assert.equal(q.p.fingerEligibility.eligible,false);assert.equal(fingerDisplayAvailable(q.p,initialPersonal(q.p),'replacement'),false);
   assert.equal(fingerDisplayAvailable(q.p,initialPersonal(q.p),'annotations'),true);assert.equal(q.p.annotationGeometry!.seats.length,1);

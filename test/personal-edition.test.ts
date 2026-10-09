@@ -6,7 +6,7 @@ import type {ScorePackage} from '../src/package';
 // These are isolated state-boundary fixtures. They do not assert rendered page
 // admission, which requires the exact reviewed ISO real-engine contract.
 function fixture():ScorePackage{
- const notes=[48,72].map((pitch,i)=>({id:'owner-'+i,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*48,durationTicks:24,hand:i?'RH':'LH'})),
+ const notes=[48,72].map((pitch,i)=>({id:'owner-'+i,eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*48,durationTicks:24,hand:i?'RH':'LH'})),
   attacks=notes.map((n,i)=>({id:n.startTick+':'+(n.pitch.octave*12+n.pitch.pitchClass),pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,hand:n.hand,finger:i?3:5,row:2,owners:[{id:n.id}]}));
  return{manifest:{version:2,revision:'b'.repeat(64)},score:{notes},sourceSha256:'a'.repeat(64),sourceRevision:'a'.repeat(64),
   keyboardLayout:'janko-four-row',profileId:'profile',profileSha256:'c'.repeat(64),effectiveHandSha256:'d'.repeat(64),pages:['page'],

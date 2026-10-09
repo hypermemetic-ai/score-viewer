@@ -11,21 +11,21 @@ export function durationFixture(marker:'hollow-stem'|'ring'='hollow-stem',finalO
   writtenPresentation:{sourceScoreId:'practice-duration-source',sourceHash:'authored-regression-source',performedTotalTicks:2304,writtenBars:12,performedBars:12,repeats:[{startBar:4,endBar:6,times:2}],occurrences:Array.from({length:12},(_,i)=>({performedBar:i+1,writtenBar:i+1,pass:1,performedTick:i*192,writtenTick:i*192})),events:{}},
   referencePerformanceTempo:{version:'reference-performance-tempo-v1',bpm:80,beat:{numerator:1,denominator:4},provenance:{kind:'editorial',reference:'Regression clock'}},
   timeSignatures:[{tick:0,numerator:4,denominator:4}],barlines:[{tick:576,type:'repeat-start',barNumber:4},{tick:1152,type:'repeat-end',barNumber:6},{tick:2304,type:'final',barNumber:12}],tempos:[],dynamics:[],pedals:[],notes:[
-   {id:'half',startTick:0,durationTicks:96,hand:'RH',pitch:{pitchClass:0,octave:5}},
-   {id:'whole',startTick:192,durationTicks:192,hand:'LH',pitch:{pitchClass:0,octave:3}},
-   {id:'dotted',startTick:384,durationTicks:144,hand:'RH',pitch:{pitchClass:7,octave:4}},
-   {id:'dotted-cross-hand',startTick:384,durationTicks:144,hand:'LH',pitch:{pitchClass:8,octave:4}},
-   {id:'dotted-compatible',startTick:384,durationTicks:144,hand:'RH',pitch:{pitchClass:0,octave:5}},
-   {id:'eighth-a',startTick:576,durationTicks:24,hand:'RH',pitch:{pitchClass:2,octave:5},sourceProvenance:{voices:['upper.0'],staves:['upper'],hands:['RH'],unison:false}},
-   {id:'eighth-b',startTick:600,durationTicks:24,hand:'RH',pitch:{pitchClass:4,octave:5},sourceProvenance:{voices:['upper.1'],staves:['upper'],hands:['RH'],unison:false}},
-   {id:'quarter',startTick:648,durationTicks:48,hand:'LH',pitch:{pitchClass:7,octave:3}},
-   {id:'flag',startTick:696,durationTicks:24,hand:'LH',pitch:{pitchClass:2,octave:3}},
-   {id:'carry',startTick:960,durationTicks:288,hand:'RH',pitch:{pitchClass:0,octave:5}},
-   {id:'unison-a',startTick:1344,durationTicks:48,hand:'RH',pitch:{pitchClass:0,octave:4}},
-   {id:'unison-b',startTick:1344,durationTicks:48,hand:'LH',pitch:{pitchClass:0,octave:4}},
+   {id:'half',startTick:0,durationTicks:96,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:0,octave:5}},
+   {id:'whole',startTick:192,durationTicks:192,hand:'LH',eventKind:'pitched' as const,pitch:{pitchClass:0,octave:3}},
+   {id:'dotted',startTick:384,durationTicks:144,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:7,octave:4}},
+   {id:'dotted-cross-hand',startTick:384,durationTicks:144,hand:'LH',eventKind:'pitched' as const,pitch:{pitchClass:8,octave:4}},
+   {id:'dotted-compatible',startTick:384,durationTicks:144,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:0,octave:5}},
+   {id:'eighth-a',startTick:576,durationTicks:24,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:2,octave:5},sourceProvenance:{voices:['upper.0'],staves:['upper'],hands:['RH'],unison:false}},
+   {id:'eighth-b',startTick:600,durationTicks:24,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:4,octave:5},sourceProvenance:{voices:['upper.1'],staves:['upper'],hands:['RH'],unison:false}},
+   {id:'quarter',startTick:648,durationTicks:48,hand:'LH',eventKind:'pitched' as const,pitch:{pitchClass:7,octave:3}},
+   {id:'flag',startTick:696,durationTicks:24,hand:'LH',eventKind:'pitched' as const,pitch:{pitchClass:2,octave:3}},
+   {id:'carry',startTick:960,durationTicks:288,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:0,octave:5}},
+   {id:'unison-a',startTick:1344,durationTicks:48,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:0,octave:4}},
+   {id:'unison-b',startTick:1344,durationTicks:48,hand:'LH',eventKind:'pitched' as const,pitch:{pitchClass:0,octave:4}},
   ],sourceSilences:[{voice:'upper',hand:'RH',startTick:768,durationTicks:192,kind:'rest',bar:5,occurrence:1,staff:'upper',file:'practice-duration-source',line:1,col:1},...Array.from({length:4},(_,i)=>({voice:'upper',hand:'RH' as const,startTick:(i+8)*192,durationTicks:192,kind:'rest' as const,bar:i+9,occurrence:1,staff:'upper',file:'practice-duration-source',line:1,col:1}))],tieChains:[{noteId:'carry',voice:'upper',soundingTicks:288,components:[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},{startTick:1152,durationTicks:96,tieForward:false,tieWait:false,voice:'upper'}]}]};
- if(longHold){score.notes.push({id:'long-held-owner',startTick:0,durationTicks:1200,hand:'LH',pitch:{pitchClass:1,octave:4}});score.tieChains!.push({noteId:'long-held-owner',voice:'lower',soundingTicks:1200,components:Array.from({length:7},(_,i)=>({startTick:i*192,durationTicks:i===6?48:192,tieForward:i<6,tieWait:false,voice:'lower'}))});}
- if(pairedTie){score.notes.push({id:'carry-companion',startTick:960,durationTicks:288,hand:'RH',pitch:{pitchClass:2,octave:5}});score.tieChains!.push({noteId:'carry-companion',voice:'upper',soundingTicks:288,components:[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},{startTick:1152,durationTicks:96,tieForward:false,tieWait:false,voice:'upper'}]});}
+ if(longHold){score.notes.push({id:'long-held-owner',startTick:0,durationTicks:1200,hand:'LH',eventKind:'pitched' as const,pitch:{pitchClass:1,octave:4}});score.tieChains!.push({noteId:'long-held-owner',voice:'lower',soundingTicks:1200,components:Array.from({length:7},(_,i)=>({startTick:i*192,durationTicks:i===6?48:192,tieForward:i<6,tieWait:false,voice:'lower'}))});}
+ if(pairedTie){score.notes.push({id:'carry-companion',startTick:960,durationTicks:288,hand:'RH',eventKind:'pitched' as const,pitch:{pitchClass:2,octave:5}});score.tieChains!.push({noteId:'carry-companion',voice:'upper',soundingTicks:288,components:[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},{startTick:1152,durationTicks:96,tieForward:false,tieWait:false,voice:'upper'}]});}
  if(!finalOverlay)score.barlines=score.barlines?.filter(b=>b.type!=='final');
  for(const note of score.notes)note.readingDisplay={pitchClass:note.pitch.pitchClass,relativeOctave:note.pitch.octave-4,referencePitch:48,isAnchor:false,mode:'absolute'};
  const options=resolveJankoOptions({core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',tieProfile,sharedRhCarrier:true,authoredRestMode:'source',restStyle:'classical-urtext',...(longHold?{continuityLayout:true}:{}),...(marker==='hollow-stem'?{standaloneLongMarker:'hollow-stem' as const}:{}),readingGlyphSeats:{},measuresPerSystem,showMeasureNumbers:true,ticksPerMeasure:192,showHonorHalo:false}),tokens=resolveJankoTokens({stemLength:18});

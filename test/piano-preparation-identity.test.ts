@@ -3,7 +3,7 @@ import {createPianoPreparationIdentity,validatePianoPreparationIdentity,canonica
 import type {ScorePackage,FingerLayer} from '../src/package';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 const source:QuantizedGridScore={id:'authored-identity',title:'Identity study',composer:'Fixture',ticksPerBeat:48,totalTicks:192,sourceBarTicks:[0,192],
- notes:[48,72].map((pitch,i)=>({id:'owner-'+i,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*48,durationTicks:24,hand:i?'RH':'LH'})),barlines:[],timeSignatures:[],tempos:[],dynamics:[],pedals:[],
+ notes:[48,72].map((pitch,i)=>({id:'owner-'+i,eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*48,durationTicks:24,hand:i?'RH':'LH'})),barlines:[],timeSignatures:[],tempos:[],dynamics:[],pedals:[],
  referencePerformanceTempo:{version:'reference-performance-tempo-v1',bpm:90,beat:{numerator:1,denominator:4},provenance:{kind:'editorial',reference:'Authored fixture'}}};
 function fixture(){const fingerLayer={version:'piano-finger-assignments-v1',plannerVersion:'finite-static-piano-assignments-v1',inputSha256:'e'.repeat(64),operatorConstraints:[],
  attacks:source.notes.map((n,i)=>({id:n.startTick+':'+(n.pitch.octave*12+n.pitch.pitchClass),hand:n.hand,finger:i?3:5,row:2,owners:[{id:n.id}]})),sourceOwnerToAttack:{}} as unknown as FingerLayer;

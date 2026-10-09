@@ -36,7 +36,7 @@ test('hand projection preserves genuine editorial guards; authored unguarded pro
   assert.throws(()=>scoreWithPerformingHands(score,assignments,'conventional-test'),/editorial authority/);
   assert.equal(JSON.stringify(score),original);
   const authored:QuantizedGridScore={id:'authored-hand-projection',title:'Projection control',composer:'Fixture',ticksPerBeat:48,totalTicks:96,sourceBarTicks:[0,96],
-    notes:[0,1].map(i=>({id:'authored-'+i,pitch:{octave:4,pitchClass:i*4},startTick:i*48,durationTicks:48,hand:'LH'})),
+    notes:[0,1].map(i=>({id:'authored-'+i,eventKind:'pitched' as const,pitch:{octave:4,pitchClass:i*4},startTick:i*48,durationTicks:48,hand:'LH'})),
     barlines:[],timeSignatures:[],tempos:[],dynamics:[],pedals:[]};
   const hands=authored.notes.map(n=>({id:n.id,pitch:12*n.pitch.octave+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks,hand:'RH' as const})),
     before=JSON.stringify(authored),effective=scoreWithPerformingHands(authored,hands,'authored-test');

@@ -28,6 +28,7 @@ export function publicationMembers(m:Manifest):Set<string> {
       [d.score,d.seats,d.fingers,d.renderingRecipe,d.calculatedHandReceipt,...d.pages].forEach(n=>{if(n)names.add(n);});
     }
   }
+  if(m.version===3&&m.reading){names.add(m.reading.owners);names.add(m.reading.layout);}
   if(m.referenceMidi)names.add(m.referenceMidi.file);
   return names;
 }

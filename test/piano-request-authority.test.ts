@@ -6,7 +6,7 @@ import type {PianoAssignmentConstraint} from '../vendor/iso-notation/src/model/p
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {SourceHandRequirement} from '../vendor/iso-notation/src/model/physical-source-constraints';
 const source:QuantizedGridScore&{sourceHandRequirements?:SourceHandRequirement[]}={id:'authored-owner-authority',title:'Authority study',composer:'Fixture',ticksPerBeat:48,totalTicks:192,sourceBarTicks:[0,192],
- notes:[48,67,72].map((pitch,i)=>({id:'owner-'+i,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*24,durationTicks:24,hand:i?'RH':'LH'})),barlines:[],timeSignatures:[],tempos:[],dynamics:[],pedals:[]};
+ notes:[48,67,72].map((pitch,i)=>({id:'owner-'+i,eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:24+i*24,durationTicks:24,hand:i?'RH':'LH'})),barlines:[],timeSignatures:[],tempos:[],dynamics:[],pedals:[]};
 const p={manifest:{version:2,revision:'a'.repeat(64)},score:source,sourceRevision:'b'.repeat(64),keyboardLayout:'janko-four-row',
  profileId:'profile',profileSha256:'c'.repeat(64),effectiveHandSha256:'d'.repeat(64),pages:['page'],seats:[]} as unknown as ScorePackage;
 const automatic=(id='owner-0'):PianoAssignmentConstraint=>{const n=source.notes.find(n=>n.id===id)!;return{ownerId:id,hand:n.hand,

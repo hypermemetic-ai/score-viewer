@@ -11,7 +11,7 @@ import {DOMParser} from '@xmldom/xmldom';
 import {actualPageObstacles,boxesOverlap,type AnnotationBox} from '../src/svg-annotation-clearance';
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
 const base=p.score.notes[0];
-function note(id:string,pitch:number,tick=0,duration=48,hand:'LH'|'RH'='RH') {return {...base,id,startTick:tick,durationTicks:duration,hand,pitch:{...base.pitch,octave:Math.floor(pitch/12),pitchClass:pitch%12}};}
+function note(id:string,pitch:number,tick=0,duration=48,hand:'LH'|'RH'='RH') {return {...base,id,startTick:tick,durationTicks:duration,hand,eventKind:'pitched' as const,pitch:{...base.pitch,octave:Math.floor(pitch/12),pitchClass:pitch%12}};}
 function seat(id:string,owners:string[],y:number,x=50,continuation=false):Seat {return {...p.seats[0],id,ownerIds:owners,x,baseline:y+3,fontSize:6,system:0,page:0,continuation};}
 const head=(seat:Seat,x=seat.x)=>`<g class="janko-reading-head" data-note-x="${x}" data-owner-ids="${seat.ownerIds.join('|')}"><rect class="janko-knockout" x="${x-3}" y="${seat.baseline-7}" width="6" height="8"/><text data-viewer-seat="${seat.id}">${seat.pitchDigit}</text></g>`;
 const stem=(x:number,y1:number,y2:number)=>`<line class="janko-stem" x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke-width=".9"/>`;

@@ -1,3 +1,6 @@
+import {admitReadingContent,type ReadingDescriptor,type ReadingContent} from './reading-package';
+import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
+import {requirePianoEvent} from './piano-event';
 import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
 import {validateOperatorFingerJournal} from './operator-finger-authority';
@@ -20,9 +23,9 @@ export interface Attack {id:string;writtenBar:number;startTick:number;pitch:numb
 export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
 export interface Seat {id:string;page:number;ownerIds:string[];actionId:string;contactId:string;pitchDigit:string;x:number;baseline:number;fontSize:number;system:number;writtenBar:number;continuation?:boolean}
 export interface Metadata {title:string;composer:string;opus?:number;opusLabel?:string;piece?:number;provenance:string[];variant?:string}
-export interface Manifest {format:'iso-score';version:1|2;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string}
+export interface Manifest {format:'iso-score';version:1|2|3;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;reading?:ReadingDescriptor}
 export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;calculationContext?:PianoCalculationContext|null}
-export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry}
+export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;reading?:ReadingContent}
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
 function fail(s:string):never{throw Error(s);}
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -92,7 +95,7 @@ export function validateLayer(layer:FingerLayer,p:Pick<ScorePackage,'score'|'sea
  }
  const notes=new Map(p.score.notes.map(n=>[n.id,n]));const actions=new Set<string>(),owners=new Set<string>();
  for(const a of layer.attacks){if(actions.has(a.id)||!Number.isInteger(a.finger)||a.finger<1||a.finger>5||!(rr?[2-a.pitch%2,4-a.pitch%2]:[1+a.pitch%2,3+a.pitch%2]).includes(a.row??NaN)||!Array.isArray(a.owners)||!a.owners.length)fail('Invalid finger action');actions.add(a.id);
- for(const owner of a.owners){const n=notes.get(owner.id);if(!n||owners.has(n.id)||a.pitch!==n.pitch.octave*12+n.pitch.pitchClass||a.hand!==n.hand||a.startTick!==n.startTick||owner.durationTicks!==n.durationTicks||owner.releaseTick!==n.startTick+n.durationTicks||layer.sourceOwnerToAttack[n.id]!==a.id)fail(`Finger owner mismatch: ${owner.id}`);owners.add(n!.id);}}
+ for(const owner of a.owners){const n=notes.get(owner.id);if(!n||owners.has(n.id)||a.pitch!==requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass||a.hand!==n.hand||a.startTick!==n.startTick||owner.durationTicks!==n.durationTicks||owner.releaseTick!==n.startTick+n.durationTicks||layer.sourceOwnerToAttack[n.id]!==a.id)fail(`Finger owner mismatch: ${owner.id}`);owners.add(n!.id);}}
  if(owners.size!==notes.size||Object.keys(layer.sourceOwnerToAttack).length!==notes.size)fail('Incomplete finger coverage');
  if(layer.reviewedFingerAuthority!==undefined){
   const authority=layer.reviewedFingerAuthority;if(!isObject(authority)||authority.kind!=='explicit-operator-review'||!Array.isArray(authority.constraints))fail('Invalid provided finger authority');
@@ -112,12 +115,13 @@ const layoutId=(value:unknown):value is PhysicalKeyboardId=>value==='conventiona
 function freezeSource(value:unknown):void{if(value&&typeof value==='object'){for(const child of Object.values(value))freezeSource(child);Object.freeze(value);}}
 const linkedViews=new WeakMap<ScorePackage,Map<PhysicalKeyboardId,ScorePackage>>();
 export async function validateLayerAsync(value:unknown,p:ScorePackage,options:{history?:boolean;requireCurrent?:boolean}={}):Promise<FingerLayer>{
+ if(p.manifest.version===3)fail('Piano finger choices cannot be attached to this reading score');
  if(!isObject(value))fail('Invalid finger layer');
  if(value.version===PIANO_ASSIGNMENT_VERSION){
   if(!p.keyboardLayout||!p.sourceScore||!p.sourceSha256)fail('Piano assignments have no immutable source/layout binding');
   const checked=await validatePianoAssignments(value,normalizeHandPlanningInput(pianoPlanningScore(p)),{
    sourceHash:p.manifest.layerSourceHash??p.sourceSha256,sourceBytesSha256:p.sourceSha256,revision:p.manifest.revision,
-   layout:p.keyboardLayout,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand]))});
+   layout:p.keyboardLayout,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,requirePianoEvent(n).hand]))});
   if(checked.profileId!==p.profileId||checked.profileSha256!==p.profileSha256||checked.effectiveHandSha256!==p.effectiveHandSha256)
    fail('Piano assignment presentation/profile binding differs');
   for(const seat of p.seats)if(seat.ownerIds.some(id=>checked.sourceOwnerToAttack[id]!==seat.actionId))fail('Piano assignment finger seat alias mismatch');
@@ -127,7 +131,7 @@ export async function validateLayerAsync(value:unknown,p:ScorePackage,options:{h
   if(p.keyboardLayout!=='janko-four-row'||!p.sourceScore||!p.sourceSha256||typeof value.candidateId!=='string')fail('Temporal four-row layer has no immutable source/layout binding');
   const checked=await validateRRTemporalFingerLayer(value,normalizeHandPlanningInput(pianoPlanningScore(p)),{
    sourceHash:p.manifest.layerSourceHash??p.sourceSha256,sourceBytesSha256:p.sourceSha256,revision:p.manifest.revision,
-   candidateId:value.candidateId,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand]))});
+   candidateId:value.candidateId,effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,requirePianoEvent(n).hand]))});
   if(checked.profileId!==p.profileId||checked.profileSha256!==p.profileSha256||checked.effectiveHandSha256!==p.effectiveHandSha256)fail('Temporal four-row presentation/profile binding differs');
   for(const seat of p.seats)if(seat.ownerIds.some(id=>checked.sourceOwnerToAttack[id]!==seat.actionId))fail('Temporal four-row finger seat alias mismatch');
   return checked;
@@ -138,7 +142,7 @@ export async function validateLayerAsync(value:unknown,p:ScorePackage,options:{h
    sourceHash:p.manifest.layerSourceHash??p.sourceSha256,sourceBytesSha256:p.sourceSha256,
    // Imports retain known historical contracts. New conventional calculations
    // can require the corrected common-hand action replay explicitly.
-   effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand])),requireCurrent:options.requireCurrent??false});
+   effectiveHands:Object.fromEntries(p.score.notes.map(n=>[n.id,requirePianoEvent(n).hand])),requireCurrent:options.requireCurrent??false});
   if(checked.profileId!==p.profileId||checked.profileSha256!==p.profileSha256||checked.effectiveHandSha256!==p.effectiveHandSha256)fail('Conventional presentation/profile binding differs');
   for(const seat of p.seats)if(seat.ownerIds.some(id=>checked.sourceOwnerToAttack[id]!==seat.actionId))fail('Conventional finger seat alias mismatch');
   return checked;
@@ -167,8 +171,8 @@ export async function handDigest(source:QuantizedGridScore,effective:QuantizedGr
  const byId=new Map(effective.notes.map(n=>[n.id,n.hand]));
  // Legacy reading must not acquire the planner's terminal-repeat restrictions.
  if(!checkSource){const groups=new Map<string,typeof source.notes>();
-  for(const n of source.notes){const id=`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`;groups.set(id,[...(groups.get(id)??[]),n]);}
-  const attacks=[...groups.values()].sort((a,b)=>a[0].startTick-b[0].startTick||(a[0].pitch.octave*12+a[0].pitch.pitchClass)-(b[0].pitch.octave*12+b[0].pitch.pitchClass));
+  for(const event of source.notes){const n=requirePianoEvent(event),id=`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`;groups.set(id,[...(groups.get(id)??[]),n]);}
+  const attacks=[...groups.values()].sort((a,b)=>a[0].startTick-b[0].startTick||(requirePitchedEvent(a[0]).pitch.octave*12+requirePitchedEvent(a[0]).pitch.pitchClass)-(requirePitchedEvent(b[0]).pitch.octave*12+requirePitchedEvent(b[0]).pitch.pitchClass));
   return hashBytes(JSON.stringify(attacks.flatMap(a=>a.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(o=>[o.id,byId.get(o.id)]))));}
  const input=normalizeHandPlanningInput(source),requirements=compilePlanningRequirements(input);
  for(const a of input.gestures.flatMap(g=>g.attacks)){const hands=new Set(a.owners.map(o=>byId.get(o.id)));
@@ -176,6 +180,7 @@ export async function handDigest(source:QuantizedGridScore,effective:QuantizedGr
  return hashBytes(JSON.stringify(input.gestures.flatMap(g=>g.attacks.flatMap(a=>a.owners.map(o=>[o.id,byId.get(o.id)])))));
 }
 export async function selectPresentation(p:ScorePackage,id:PhysicalKeyboardId):Promise<ScorePackage>{
+ if(p.manifest.version===3)fail('This score has no piano keyboard presentation.');
  if(!layoutId(id))fail('Unsupported keyboard layout');
  if(p.manifest.version===1){if(id!=='janko-four-row')fail('This package has no conventional-keyboard presentation');return p;}
  const view=linkedViews.get(p)?.get(id);if(!view)fail('This package has no compatible presentation for the selected keyboard');return view;
@@ -185,23 +190,31 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
  const parse=(name:string)=>{if(!files[name])fail(`Missing ${name}`);try{return JSON.parse(strFromU8(files[name]));}catch{return fail(`Invalid JSON: ${name}`);}};
  const m=parse('manifest.json') as Manifest;
- if(m.format!=='iso-score'||![1,2].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
+ if(m.format!=='iso-score'||![1,2,3].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||!Array.isArray(m.metadata.provenance)||m.metadata.provenance.some(v=>typeof v!=='string')||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
  if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
  for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);}
  let referenceMidi:Uint8Array|undefined;
  if(m.referenceMidi!==undefined){if(!isObject(m.referenceMidi)||m.referenceMidi.file!=='reference.mid'||Object.keys(m.referenceMidi).length!==1||!m.files['reference.mid'])fail('Invalid/missing reference MIDI descriptor');referenceMidi=files['reference.mid'];validateReferenceMidi(referenceMidi);}
  if(m.semanticSha256!==m.files['score.json']||m.revision!==m.semanticSha256)fail('Semantic revision mismatch');
+ if(m.version===3){
+  const {score,pages,reading}=admitReadingContent(m,files);
+  pages.forEach((svg,page)=>passiveSvg(svg,[],page));
+  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
+  freezeSource(score);
+  return {manifest:m,score,seats:[],pages,files,reading,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
+   generationAvailable:false,fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
+ }
  async function presentation(viewManifest:Manifest,scoreName:string,seatsName:string,fingersName?:string,context:Partial<ScorePackage>={}):Promise<ScorePackage>{
   const m=viewManifest;
- const score=parse(scoreName) as QuantizedGridScore,seats=parse(seatsName) as Seat[];
+ const score=normalizeLegacyScoreEvents(parse(scoreName) as QuantizedGridScore),seats=parse(seatsName) as Seat[];
  if(score.id!==m.scoreId||!Array.isArray(score.notes)||!Number.isInteger(score.ticksPerBeat)||score.ticksPerBeat<=0||!Number.isInteger(score.totalTicks)||!Array.isArray(seats))fail('Invalid semantic score');
  if(score.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(score.referencePerformanceTempo);else if(!options.allowLegacyTempo&&(m.version===1||!!fingersName&&!!files[fingersName]))requireReferencePerformanceTempo(score);
  const notes=new Map(score.notes.map(n=>[n.id,n]));if(notes.size!==score.notes.length)fail('Duplicate source owner');
- for(const n of score.notes){if(!n.id||!['LH','RH'].includes(n.hand)||!Number.isInteger(n.startTick)||!Number.isInteger(n.durationTicks)||n.startTick<0||n.durationTicks<=0||n.startTick+n.durationTicks>score.totalTicks||!Number.isInteger(n.pitch?.octave)||!Number.isInteger(n.pitch?.pitchClass)||n.pitch.pitchClass<0||n.pitch.pitchClass>11)fail('Invalid pitch/timing/hand');}
+ for(const n of score.notes){if(!isPitchedEvent(n))fail('Legacy piano packages require pitched events');if(!n.id||!['LH','RH'].includes(n.hand??'')||!Number.isInteger(n.startTick)||!Number.isInteger(n.durationTicks)||n.startTick<0||n.durationTicks<=0||n.startTick+n.durationTicks>score.totalTicks||!Number.isInteger(n.pitch?.octave)||!Number.isInteger(n.pitch?.pitchClass)||n.pitch.pitchClass<0||n.pitch.pitchClass>11)fail('Invalid pitch/timing/hand');}
  const seen=new Set<string>(),covered=new Set<string>();
  for(const s of seats){if(seen.has(s.id)||!s.id||!Number.isInteger(s.page)||s.page<0||s.page>=m.pages.length||!Array.isArray(s.ownerIds)||!s.ownerIds.length||s.ownerIds.some(id=>!notes.has(id))||!s.actionId||!s.contactId||s.contactId!==s.actionId||![s.x,s.baseline,s.fontSize].every(Number.isFinite))fail('Invalid source-linked seat');seen.add(s.id);s.ownerIds.forEach(id=>covered.add(id));
- const n=notes.get(s.ownerIds[0])!;if(!s.continuation&&s.actionId!==`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`)fail('Wrong physical action seat');
- if(s.ownerIds.some(id=>{const q=notes.get(id)!;return q.hand!==n.hand||q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');}
+ const n=requirePianoEvent(notes.get(s.ownerIds[0])!);if(!s.continuation&&s.actionId!==`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`)fail('Wrong physical action seat');
+ if(s.ownerIds.some(id=>{const q=requirePianoEvent(notes.get(id)!);return q.hand!==n.hand||q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');}
  if(covered.size!==notes.size)fail('Incomplete source-owner seating');
  const pages=m.pages.map((name,i)=>{if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);return svg;});
  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
@@ -219,7 +232,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   return options.keyboardLayout?selectPresentation(p,options.keyboardLayout):p;
  }
  if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
- const source=parse(m.sourceScore) as QuantizedGridScore;
+ const source=normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore);
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
  const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
  if(source.performingHandPresentation||source.notes.some(n=>n.derivedHand))fail('Immutable original source cannot be substituted by a calculated display projection.');
