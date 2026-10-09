@@ -17,7 +17,7 @@ export class ManualPracticeWindows {
  get bars():readonly number[]{return this.windows[this.index];}
  turn(direction:1|-1){const next=Math.max(0,Math.min(this.windows.length-1,this.index+direction));if(next===this.index)return false;this.index=next;return true;}
  reset(){const changed=this.index!==0;this.index=0;return changed;}
- showBar(bar:number){const index=this.windows.findIndex(window=>window.includes(bar));if(index<0)return false;const changed=index!==this.index;this.index=index;return changed;}
+ showBar(bar:number){const exact=this.windows.findIndex(window=>window[0]===bar),index=exact>=0?exact:this.windows.findIndex(window=>window.includes(bar));if(index<0)return false;const changed=index!==this.index;this.index=index;return changed;}
 }
 
 /** No MIDI contacts, match sets, note retirement or measured-success writer. */

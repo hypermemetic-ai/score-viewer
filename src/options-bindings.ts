@@ -10,7 +10,7 @@ export function optionsBindingRows(practice?:PracticeBindingContext,capabilities
  const candidates=practice?practice.active?readingActions.filter(action=>action!=='edit'&&(!['previous','next'].includes(action)||practice.measureNavigation)):['practiceSettings'] as ReadingAction[]:reader===false?['practiceSettings'] as ReadingAction[]:readingActions.filter(action=>reader!==true||action!=='done');
  const actions=candidates.filter(action=>!capabilities||
   !['toggle','edit'].includes(action)&&action!=='done'||
-  ['toggle','edit'].includes(action)&&capabilities.pianoPreparation||action==='done'&&capabilities.pianoPractice);
+  ['toggle','edit'].includes(action)&&capabilities.pianoPreparation||action==='done'&&capabilities.manualPractice);
  return actions.map(action=>({action,label:practice&&['previous','next'].includes(action)?action==='previous'?'Previous measures':'Next measures':readingActionLabel(action)}));
 }
 export interface OptionsBindingsApi {

@@ -3,6 +3,8 @@ import {hashBytes} from './package';
 const prepared=/^(state|practice|performance)-[a-f0-9]{64}-(?:conventional-piano|janko-four-row)-[a-f0-9]{64}-[a-f0-9]{64}-[a-f0-9]{64}\.json$/;
 const legacy=/^(?:state|practice|performance)-[a-fA-F0-9]{64}\.json$/;
 const presentation=/^(?:state|practice|performance)-[a-f0-9]{64}-(?:conventional-piano|janko-four-row)-[a-f0-9]{64}-[a-f0-9]{64}\.json$/;
+const manualPractice=/^practice-manual-v1-[a-f0-9]{64}\.json$/;
+const manualView=/^manual-reading-view-v1-[a-f0-9]{64}\.json$/;
 const fixed=new Set(['library.json','preferences.json','calibration.json','practice-error-log.json']);
 
 /** The existing native contract stays bounded and accepts no paths. The full
@@ -16,6 +18,10 @@ export function validPhysicalManagedName(name:string):boolean {
  * already satisfy the retained native filename contract. */
 export async function physicalManagedName(name:string):Promise<string> {
  if(typeof name!=='string'||/[^A-Za-z0-9.-]/.test(name))throw Error('Invalid managed file identity');
+ // Neutral journals keep their literal logical identity and JSON binding.
+ // Full-key hashing fits the existing native path-free storage contract.
+ if(manualPractice.test(name))return `practice-${await hashBytes(name)}.json`;
+ if(manualView.test(name))return `state-${await hashBytes(name)}.json`;
  if(prepared.test(name))return `${name.slice(0,name.indexOf('-'))}-${await hashBytes(name)}.json`;
  if(!validPhysicalManagedName(name))throw Error('Invalid managed file identity');
  return name;

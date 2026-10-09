@@ -6,6 +6,12 @@ import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} f
 import {assertSelectedTransposition} from './score-transposition-selection';
 import {getScoreTransposition} from './score-transposition';
 import {PackageAdmissionSession} from './package-admission-session';
+import {planManualPractice} from './manual-practice-plan';
+import {manualPracticeStorageName,readManualPractice} from './manual-practice-state';
+import {selectReadingNotation} from './dual-reading-package';
+import {scoreCapabilities} from './score-capabilities';
+import {ReadingPresentationController} from './reading-presentation';
+import {manualReferenceStorageName,readManualReference} from './manual-reference-context';
 
 export interface LibraryPracticeReader {
  readPackage(file:string):Promise<Uint8Array|null>;
@@ -14,7 +20,8 @@ export interface LibraryPracticeReader {
 export interface LibraryPracticeSummary {
  entryId:string;
  file:string;
- keyboard:PhysicalKeyboardId;
+ keyboard?:PhysicalKeyboardId;
+ assessment?:'manual';
  sections:number;
  whole:boolean;
 }
@@ -28,7 +35,17 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  if(admission)await admission.waitForIdle();
  if(!isCurrent())return;
  const imported=await (admission?admission.import(bytes,{allowLegacyTempo:true}):importPackage(bytes,{allowLegacyTempo:true}));
- if(collectionId(imported)!==entry.id||!imported.availablePresentations?.includes(keyboard))return;
+ if(collectionId(imported)!==entry.id)return;
+ if(imported.reading?.dual&&scoreCapabilities(imported).manualPractice){
+  assertSelectedTransposition(entry,imported);
+  const iso=selectReadingNotation(imported,'iso');let fallback;
+  if(iso.score.referencePerformanceTempo===undefined){const context=await ReadingPresentationController.open(iso),identity={partId:iso.reading!.dual!.sourcePartId,musicalRevision:context.revision};
+   fallback=readManualReference(await reader.readRecord(await manualReferenceStorageName(identity)),identity);if(!fallback)return;
+  }
+  const plan=await planManualPractice(iso,'connection-boundary-v1',fallback),state=readManualPractice(await reader.readRecord(manualPracticeStorageName(plan)),plan);
+  return {entryId:entry.id,file:entry.file,assessment:'manual',sections:displayedPracticeTotal(plan,state),whole:wholePracticeProgress(plan,state)>=1};
+ }
+ if(!imported.availablePresentations?.includes(keyboard))return;
  assertSelectedTransposition(entry,imported);
  const p=await selectPresentation(imported,keyboard);
  const raw=await reader.readRecord(practiceStorageName(entry.id,p)),legacy=legacyPracticeStorageName(p);
@@ -46,7 +63,7 @@ export class LibraryPracticeSummaries {
 
  get(entry:Entry,keyboard:PhysicalKeyboardId):LibraryPracticeSummary|undefined {
   const summary=this.summaries.get(entry.id);
-  return summary?.file===entry.file&&summary.keyboard===keyboard?summary:undefined;
+  return summary?.file===entry.file&&(summary.assessment==='manual'||summary.keyboard===keyboard)?summary:undefined;
  }
 
  async refresh(entries:Entry[],keyboard:PhysicalKeyboardId,reader:LibraryPracticeReader,isCurrent:()=>boolean):Promise<boolean> {
@@ -67,5 +84,11 @@ export class LibraryPracticeSummaries {
   ++this.generation;
   this.summaries.set(liveEntry.id,{entryId:liveEntry.id,file:liveEntry.file,keyboard,sections,whole});
   return true;
+ }
+ recordManual(liveEntry:Entry|undefined,targetEntry:Entry,p:ScorePackage,sections:number,whole:boolean):boolean {
+  if(!liveEntry||liveEntry.id!==targetEntry.id||liveEntry.file!==targetEntry.file||collectionId(p)!==liveEntry.id||!p.reading?.dual||
+   !Number.isFinite(sections)||sections<0||sections>1||typeof whole!=='boolean')return false;
+  try{selectReadingNotation(p,'iso');}catch{return false;}
+  ++this.generation;this.summaries.set(liveEntry.id,{entryId:liveEntry.id,file:liveEntry.file,assessment:'manual',sections,whole});return true;
  }
 }

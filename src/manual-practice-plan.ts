@@ -1,5 +1,5 @@
 import {validateInstrumentReadingScore,validateSourceWrittenComponents,isPitchedEvent} from '../vendor/iso-notation/src/score-presentation';
-import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
+import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import type {ScorePackage} from './package';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
 import {scorePulseGrid,sourceBarPhaseTicks} from './score-clock';
@@ -19,6 +19,8 @@ export interface ManualMusicalOwner {
 }
 export interface ManualPracticePlan extends PracticePassagePlan {
  version:'manual-practice-plan-v1';assessment:'manual';partId:string;sourceId:string;
+ /** A separately chosen clock binds attainment while reading retains source identity. */
+ sourceMusicalRevision?:string;
  owners:ManualMusicalOwner[];components:ManualWrittenComponent[];
 }
 
@@ -48,17 +50,19 @@ function barAt(bars:readonly number[],tick:number):number {
 /** Consumes the actual strict reading result. It never substitutes seats or
  * guesses omitted source physical positions. New dual-view source contracts
  * will supply exact source-written component IDs through their own adapter. */
-export async function planManualPractice(input:ScorePackage,partition:PracticePartition='connection-boundary-v1'):Promise<ManualPracticePlan> {
+export async function planManualPractice(input:ScorePackage,partition:PracticePartition='connection-boundary-v1',fallbackReference?:ReferencePerformanceTempo):Promise<ManualPracticePlan> {
  // Caller-owned packages may change while WebCrypto settles. Capture every
  // consumed source/admission/appearance field together, before any await, so
  // returned clocks and components have the same meaning as their digest.
- const p=structuredClone({manifest:input.manifest,score:input.score,reading:input.reading,seats:input.seats,pages:input.pages});
+ const snapshot=structuredClone({package:{manifest:input.manifest,score:input.score,reading:input.reading,seats:input.seats,pages:input.pages},fallbackReference}),p=snapshot.package;
  if(p.manifest.version!==3||!p.reading||!p.reading.geometryEvidence.ok||p.seats.length||!p.pages.length)
   throw Error('Manual instrument practice needs admitted musical reading notation.');
  validateInstrumentReadingScore(p.score);
  if(p.score.graceGroups?.length)throw Error('Timed practice needs performed timing for grace notes; the score remains available for reading.');
  if(partition!=='fixed-four-v1'&&partition!=='connection-boundary-v1')throw Error('Unsupported musical practice partition.');
- const bars=sourceBars(p),partId=p.score.readingPolicy!.partId,reference=requireReferencePerformanceTempo(p.score),
+ const separateReference=p.score.referencePerformanceTempo===undefined,
+  reference=separateReference&&snapshot.fallbackReference!==undefined?validateReferencePerformanceTempo(snapshot.fallbackReference):requireReferencePerformanceTempo(p.score),
+  bars=sourceBars(p),partId=p.score.readingPolicy!.partId,
   byOwner=new Map(p.reading.owners.map(owner=>[owner.id,owner]));
  if(byOwner.size!==p.score.notes.length||p.reading.owners.length!==p.score.notes.length)
   throw Error('Manual practice has incomplete musical ownership.');
@@ -130,7 +134,8 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
  }
  owners.sort((a,b)=>a.tick-b.tick||a.id.localeCompare(b.id));
  components.sort((a,b)=>a.tick-b.tick||a.id.localeCompare(b.id));
- const revision=await identityHash({version:'musical-manual-practice-v1',partId,partition,source:manualMusicalFacts(p)}),
+ const sourceMusicalRevision=await identityHash({version:'musical-manual-practice-v1',partId,partition,source:manualMusicalFacts(p)}),
+  revision=separateReference?await identityHash({version:'manual-reference-practice-v1',sourceMusicalRevision,referencePerformanceTempo:reference}):sourceMusicalRevision,
   occurrences=p.score.writtenPresentation?.occurrences??[],weights=bars.slice(0,-1).map((_,bar)=>Math.max(1,occurrences.filter(o=>o.writtenBar===bar+1).length));
  const protectedAt=(cut:number)=>{
   const tick=bars[cut],reasons=owners.filter(owner=>owner.tick<tick&&owner.end>tick).map(owner=>`held:${owner.id}`);
@@ -154,6 +159,7 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
   first=cut;
  }
  const plan:ManualPracticePlan={version:'manual-practice-plan-v1',assessment:'manual',sourceId:p.score.id,partId,partition,revision,
+  ...(separateReference?{sourceMusicalRevision}:{}),
   timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),
   referencePerformanceTempo:structuredClone(reference),barTicks:bars,ticksPerBeat:p.score.ticksPerBeat,chunks,owners,components};
  scorePulseGrid(plan,bars);return plan;

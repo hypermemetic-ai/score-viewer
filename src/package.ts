@@ -375,7 +375,14 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
   // A cached package cannot grant a stale or ambiguous font family authority.
   // In Node this also rereads and hashes the actual font file on every use.
   for(const p of packages){const policy=annotationInkPolicyFor(p);if(policy)await ensureAnnotationInkPolicyReady(policy);}
-  const clone=structuredClone(graph);
+  // A dual source/view is already privately admitted and recursively frozen.
+  // Do not copy megabytes of immutable scenes merely to discard them below.
+  // This map is owned by the cold admission closure, never caller input; all
+  // mutable wrappers and archive member buffers still cross structuredClone.
+  const copyInputs=new Map(packages.map(p=>[p,p.reading?.dual?{...p,manifest:undefined,score:undefined,
+   sourceScore:undefined,reading:undefined,pages:undefined}:p] as const)),
+   clone=structuredClone({original:copyInputs.get(original)!,packages:packages.map(p=>copyInputs.get(p)!),
+    groups:groups.map(([p,views])=>[copyInputs.get(p)!,views.map(([keyboard,view])=>[keyboard,copyInputs.get(view)!])])}) as typeof graph;
   // Dual scenes retain this realm's immutable actual preparation. A plain
   // clone cannot carry their source-owned projector registration. Only this
   // private cold-admission graph supplies that shared frozen source/context;

@@ -5,6 +5,7 @@ import {manualPracticeRecord,readManualPractice,manualPracticeStorageName} from 
 import {ManualPracticeSession} from './manual-practice-session';
 import {PracticeBrowser} from './practice-browser';
 import type {PracticeChunk,PracticePartition,PracticeState} from './practice';
+import type {ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 
 export interface ReadingSourceAnchor {writtenBar:number;sourceEventId?:string}
 export interface ManualReadingViewState {
@@ -21,28 +22,29 @@ export class ManualReadingContext {
   this.state=readManualPractice(saved,plan);this.browser=new PracticeBrowser(plan);
   this.view=this.readView(view);
  }
- static async open(input:ScorePackage,saved?:unknown,view?:unknown,partition:PracticePartition='connection-boundary-v1'){
+ static async open(input:ScorePackage,saved?:unknown,view?:unknown,partition:PracticePartition='connection-boundary-v1',fallbackReference?:ReferencePerformanceTempo){
   // Check actual realm admission and capture BOTH choices before any await.
   // A caller mutation while plan hashing settles cannot alter this context.
   const iso=selectReadingNotation(input,'iso'),tab=selectReadingNotation(input,'tab'),
    // Source and both complete views are already recursively frozen by the
    // receiving realm. Retain the actual prepared scenes for source-owned
    // projection, while owning wrappers and all mutable personal/view input.
-   packages={iso:{...iso,seats:[]},tab:{...tab,seats:[]}},snapshot={saved:structuredClone(saved),view:structuredClone(view)};
-  const plan=await planManualPractice(packages.iso,partition);
+   packages={iso:{...iso,seats:[]},tab:{...tab,seats:[]}},snapshot=structuredClone({saved,view,fallbackReference});
+  const plan=await planManualPractice(packages.iso,partition,snapshot.fallbackReference);
   return new ManualReadingContext(plan,packages,snapshot.saved,snapshot.view);
  }
  get package(){return this.packages[this.view.notation];}
  get storageName(){return manualPracticeStorageName(this.plan);}
- get viewStorageName(){return `manual-reading-view-v1-${this.plan.revision}.json`;}
+ get sourceMusicalRevision(){return this.plan.sourceMusicalRevision??this.plan.revision;}
+ get viewStorageName(){return `manual-reading-view-v1-${this.sourceMusicalRevision}.json`;}
  record(){return manualPracticeRecord(this.plan,this.state);}
  viewRecord(){return structuredClone(this.view);}
  private readView(raw:unknown):ManualReadingViewState {
-  const fallback:ManualReadingViewState={version:'manual-reading-view-v1',partId:this.plan.partId,musicalRevision:this.plan.revision,
+  const fallback:ManualReadingViewState={version:'manual-reading-view-v1',partId:this.plan.partId,musicalRevision:this.sourceMusicalRevision,
    notation:'iso',anchor:{writtenBar:0},cursors:{iso:defaults(),tab:defaults()}};
   if(raw===undefined||raw===null)return fallback;
   const v=structuredClone(raw) as ManualReadingViewState;
-  if(!v||v.version!==fallback.version||v.partId!==this.plan.partId||v.musicalRevision!==this.plan.revision||
+  if(!v||v.version!==fallback.version||v.partId!==this.plan.partId||v.musicalRevision!==this.sourceMusicalRevision||
    !['iso','tab'].includes(v.notation)||!v.anchor||!v.cursors||Object.keys(v.cursors).sort().join(',')!=='iso,tab')
    throw Error('Manual reading view differs from its source part.');
   this.checkAnchor(v.anchor);

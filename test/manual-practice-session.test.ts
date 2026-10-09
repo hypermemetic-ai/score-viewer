@@ -48,6 +48,13 @@ test('explicit long manual turns preserve clock, phase, rate and every source ow
  s.pause();assert.equal(s.phase,'paused');assert.deepEqual(s.windows.bars,[8,9,10,11]);
 });
 
+test('restoring an overlapping source window prefers its exact start over an earlier containing window',()=>{
+ const {state,chunk}=whole(),session=new ManualPracticeSession(plan,chunk,state);
+ for(const window of session.windows.windows){session.windows.reset();session.windows.showBar(window[0]);assert.deepEqual(session.windows.bars,window);}
+ assert.equal(session.windows.showBar(3),true);assert.deepEqual(session.windows.bars,[0,1,2,3]);
+ assert.equal(session.windows.showBar(999),false);assert.deepEqual(session.windows.bars,[0,1,2,3]);
+});
+
 test('a repeat restores its first window only at actual beat-aligned count-in',()=>{
  const {state,chunk}=whole(),s=new ManualPracticeSession(plan,chunk,state);s.ready(1000);s.update(s.startMs);s.turn(1);s.turn(1);
  const oldStart=s.startMs,end=oldStart+s.durationMs;s.update(end);
