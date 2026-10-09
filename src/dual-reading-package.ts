@@ -113,7 +113,7 @@ export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Arra
 /** One owned graph before asynchronous hashing. This path remains generic
  * MusicXML/source intake and does not manufacture a Guitar Pro family claim. */
 export async function prepareDualReadingPackage(input:{score:QuantizedGridScore;metadata:Metadata;createdAt:string;
- font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;options?:Partial<JankoLayoutOptions>;tokens?:Partial<JankoTokens>}):Promise<Uint8Array>{
+ font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;retainedFiles?:Record<string,Uint8Array>;options?:Partial<JankoLayoutOptions>;tokens?:Partial<JankoTokens>}):Promise<Uint8Array>{
  const owned=structuredClone(input),score=owned.score;
  if(!owned.createdAt||owned.metadata.title!==score.title||owned.metadata.composer!==score.composer||!owned.font.name||
   !owned.font.bytes.length||!Object.keys(owned.notices).length)throw Error('Incomplete dual reading preparation.');
@@ -124,6 +124,7 @@ export async function prepareDualReadingPackage(input:{score:QuantizedGridScore;
    throw Error('Conflicting or unsafe dual reading member: '+name);files[name]=new Uint8Array(bytes);
  };
  put(owned.font.name,owned.font.bytes);for(const [name,bytes]of Object.entries(owned.notices))put(name,bytes);
+ for(const [name,bytes]of Object.entries(owned.retainedFiles??{}))put(name,bytes);
  const views={} as DualReadingDescriptor['views'];
  for(const kind of ['iso','tab'] as const){const p=prepared[kind],prefix=`reading/${kind}/`,
   descriptor: DualReadingViewDescriptor={engineId:p.engineId,pages:[],owners:prefix+'owners.json',scene:prefix+'scene.json',geometry:prefix+'geometry.json'};
