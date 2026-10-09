@@ -11,7 +11,7 @@ import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 
 const reference={version:'reference-performance-tempo-v1' as const,bpm:120,beat:{numerator:1,denominator:4},provenance:{kind:'editorial' as const,reference:'Authored arrangement fixture: printed quarter note =120'}};
 const score:QuantizedGridScore={id:'authored-context-probe',title:'Study',composer:'Fixture',ticksPerBeat:48,totalTicks:96,sourceBarTicks:[0,48,96],
-  notes:[{id:'held-owner',pitch:{octave:4,pitchClass:0},startTick:0,durationTicks:96,hand:'RH'}],
+  notes:[{id:'held-owner',eventKind:'pitched' as const,pitch:{octave:4,pitchClass:0},startTick:0,durationTicks:96,hand:'RH'}],
   barlines:[],timeSignatures:[],tempos:[{tick:0,bpm:120}],dynamics:[],pedals:[]};
 const seats=[{id:'a',page:0,ownerIds:['held-owner'],actionId:'0:48',contactId:'0:48',pitchDigit:'0',x:10,baseline:20,fontSize:5,system:0,writtenBar:1},
   {id:'b',page:0,ownerIds:['held-owner'],actionId:'0:48',contactId:'0:48',pitchDigit:'0',x:30,baseline:20,fontSize:5,system:0,writtenBar:2,continuation:true}];

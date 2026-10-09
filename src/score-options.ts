@@ -1,4 +1,5 @@
 import {annotationInkPolicyFor,footerFontNoticeUrl} from './annotation-ink-policy';
+import {scoreCapabilities} from './score-capabilities';
 import {manualTempoField} from './manual-tempo-control';
 import type {ScorePackage} from './package';
 import type {Entry,PersonalState} from './state';
@@ -8,6 +9,14 @@ const button=(label:string,action:string,disabled=false)=>`<button type="button"
 
 /** Shared reader/practice Score section. Only provenance is a disclosure. */
 export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string}){
+ if(!scoreCapabilities(p).pianoPreparation)return `<section class="score-options" aria-labelledby="score-options-heading">
+  <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${escape(entry.metadata.title)}</p></header>
+  <p class="help">Read the score with its notes, rhythm and articulations.</p>
+  <div class="dialog-actions score-primary-actions" data-options-row>${button('Share score','share')}</div>
+  <details class="score-source-review"><summary>Source & review</summary>
+   ${p.manifest.metadata.provenance.map(text=>`<p class="help">${escape(text)}</p>`).join('')}
+  </details>
+ </section>`;
  const corrections=Object.keys(s.overrides).length,busy=job?.state==='working'||job?.state==='installing',disabled=busy||!!transpose.error;
  let field=manualTempoField('transpose',`<input type="text" inputmode="numeric" data-score-transpose aria-label="Transpose, steps" value="${transpose.steps}" data-min="${transpose.min}" data-max="${transpose.max}"${disabled?' disabled':''}>`,'transpose','steps');
  if(disabled)field=field.replaceAll('<button type="button"','<button type="button" disabled');

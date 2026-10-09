@@ -1,3 +1,4 @@
+import {requirePianoEvent} from './piano-event';
 import {digitMetrics,type ScorePackage,type Seat} from './package';
 import type {FingerPresentation} from './input';
 import {fingeringCarriers,type FingerCarrier} from './fingering-carriers';
@@ -42,7 +43,7 @@ export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|
   obstacles=geometry?p.pages.map((svg,page)=>actualPageObstacles(svg,new Map(geometry.seats.filter(s=>s.page===page).map(s=>[s.seatId,box(s.headBounds)])),annotationInkPolicyFor(p))):undefined;
  if(geometry&&(geometry.version!=='annotation-carrier-geometry-v1'||geometry.coverage!=='owned-head-and-duration'||
   geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length))throw Error('Calculated annotation ownership differs from the admitted presentation.');
- const pitch=(seat:Seat)=>{const n=notes.get(seat.ownerIds[0])!;return n.pitch.octave*12+n.pitch.pitchClass;};
+ const pitch=(seat:Seat)=>{const n=requirePianoEvent(notes.get(seat.ownerIds[0])!);return n.pitch.octave*12+n.pitch.pitchClass;};
  for(const seat of p.seats){const key=carriers.get(seat.id)!.id,group=groups.get(key)??[];group.push(seat);groups.set(key,group);}
  const columns=new Map<string,number[]>();
  for(const group of groups.values()){const key=group[0].page+':'+group[0].system,x=carriers.get(group[0].id)!.x,values=columns.get(key)??[];

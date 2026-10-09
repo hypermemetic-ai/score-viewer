@@ -11,6 +11,7 @@ import {packagePianoPresentation} from './piano-package-presentation';
 import {readPersonal,initialPersonal,type PersonalState} from './state';
 import {calculatePianoAssignments,PIANO_ASSIGNMENT_VERSION,type PianoCalculationDiagnostic} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {strFromU8} from 'fflate';
+import {scoreCapabilities} from './score-capabilities';
 import {replayProvidedRRLayer} from './operator-finger-update';
 import {RR_PERFORMANCE_POSE_PROFILE} from '../vendor/iso-notation/src/model/isomorphic-rr-personal-pose';
 import {pianoRequestAuthority,PianoAuthorityConflict,type PerformingHandPolicy} from './piano-request-authority';
@@ -69,6 +70,8 @@ export async function ensurePianoReady(request:PianoReadinessRequest):Promise<Pi
         failure('unsupported','package-admission',message);
     }
     let bytes:Uint8Array=original,p=prior;
+    if(!scoreCapabilities(p).pianoPreparation)
+      return failure('unsupported','instrument-reading','This score is available for reading. Piano finger preparation applies to piano scores.');
     if(!['conventional-piano','janko-four-row'].includes(request.layout))return failure('unsupported','layout','Choose a supported piano keyboard.');
     if(request.performingHandPolicy!==undefined&&!['calculate','retain-imported'].includes(request.performingHandPolicy))
       return failure('unsupported','performing-hand-policy','Choose a supported performing-hand preparation.');
