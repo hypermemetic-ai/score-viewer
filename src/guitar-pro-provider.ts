@@ -5,8 +5,9 @@ import {hashBytes,type ScorePackage,type Metadata} from './package';
 import {selectReadingNotation} from './dual-reading-package';
 import {assertGuitarProArchive} from './guitar-pro-archive';
 import {guitarProRuntime} from './guitar-pro-runtime';
+import {assertGuitarProStagedMaterial} from './guitar-pro-material';
 import {GUITAR_PRO_FILES,GuitarProImportRefusal,type GuitarProInspection,type GuitarProSourceIdentity,type GuitarProContext,
- type GuitarProStageOptions,type GuitarProColdOptions,type StagedGuitarProImport} from './guitar-pro-types';
+ type GuitarProStageOptions,type GuitarProColdOptions,type GuitarProPreparedInput,type StagedGuitarProImport} from './guitar-pro-types';
 export * from './guitar-pro-types';
 
 const converterArchiveSha256=identity.archive.sha256,converterSourceTree=identity.sourceTree;
@@ -61,7 +62,7 @@ function family(result:ConversionSuccess,trackId:string):{family:'guitar'|'bass'
  if(!located)throw Error('Converter family has no located successful admission evidence.');
  return {family:a.instrumentFamily,profile:a.profile,partId:p.musicxmlPartId};
 }
-async function projected(result:ConversionSuccess,source:GuitarProSourceIdentity){
+async function projected(result:Pick<ConversionSuccess,'musicxml'>,source:GuitarProSourceIdentity){
  const written=await parseMusicXmlAsync(result.musicxml,'guitar-pro/converted.musicxml',{frettedSource:'retain-v1'});
  if(written.parts?.length!==1||written.parts[0].id!==source.musicxmlPartId)throw Error('Converted MusicXML does not assign the selected source part.');
  return projectMusicXml(written,{id:source.scoreId,readingPolicy:{version:'instrument-reading-v2',partId:source.musicxmlPartId,
@@ -79,13 +80,47 @@ function assertDual(p:ScorePackage,score:ScorePackage['score'],source:GuitarProS
  if(!same(p.score,score)||p.manifest.scoreId!==source.scoreId||p.manifest.reading?.version!=='instrument-reading-package-v2'||
   p.manifest.reading.sourcePartId!==source.musicxmlPartId)throw Error('Receiving dual admission does not match the converted source.');
 }
-function retained(result:ConversionSuccess,bytes:Uint8Array,source:GuitarProSourceIdentity):Record<string,Uint8Array>{
+function retained(result:Pick<ConversionSuccess,'musicxml'|'report'>,bytes:Uint8Array,source:GuitarProSourceIdentity):Record<string,Uint8Array>{
  return {[GUITAR_PRO_FILES.original]:copiedBytes(bytes),[GUITAR_PRO_FILES.xml]:encoder.encode(result.musicxml),
  [GUITAR_PRO_FILES.report]:encoder.encode(JSON.stringify(result.report)),[GUITAR_PRO_FILES.descriptor]:encoder.encode(JSON.stringify(source))};
 }
 function bind(p:ScorePackage,source:GuitarProSourceIdentity,admission:ReturnType<typeof family>,sourceName?:string){
  const context=freeze({...source,...{family:admission.family,profile:admission.profile},...(sourceName?{sourceName}:{})});
  contexts.set(p.manifest,{score:p.score,context});return context;
+}
+type MaterialCheck=(pending:unknown)=>void;
+/** Consume the actual public result in this scope. Its complete intermediate
+ * converter model is not retained after the located part admission is checked. */
+async function selectedConversion(api:Awaited<ReturnType<typeof guitarProRuntime>>,bytes:Uint8Array,id:string,inputSha256:string,
+ signal?:AbortSignal,budget?:MaterialCheck){
+ const result=await api.convertGuitarPro(bytes,{trackIds:[id],signal});aborted(signal);
+ if(!result.ok)throw new GuitarProImportRefusal(result.report,'Selected Guitar Pro source track refused.');
+ if(result.report.inputSha256!==inputSha256)throw Error('Guitar Pro conversion changed the retained original.');
+ budget?.(result);
+ return {musicxml:result.musicxml,report:result.report,admission:family(result,id),sourceName:result.score.parts[0].name};
+}
+async function convertedInput(api:Awaited<ReturnType<typeof guitarProRuntime>>,bytes:Uint8Array,id:string,inputSha256:string,
+ signal:AbortSignal|undefined,budget:MaterialCheck):Promise<GuitarProPreparedInput>{
+ const result=await selectedConversion(api,bytes,id,inputSha256,signal,budget),source=await sourceIdentity(inputSha256,id,result.admission.partId),
+  score=await projected(result,source);
+ budget({result,source,score});
+ const files=retained(result,bytes,source),metadata:Metadata={title:score.title,composer:score.composer,
+  provenance:['Retained Guitar Pro original; public source-track conversion; independent ISO and TAB admission.']};
+ budget({result,source,score,files,metadata});
+ return {score,metadata,retainedFiles:files,sourceIdentity:source};
+}
+/** The input projection/member snapshots expire before the next public cold
+ * replay. Only the actual admitted package and its matched archive escape. */
+async function preparedPart(input:GuitarProPreparedInput,prepare:GuitarProStageOptions['prepareAndAdmit'],
+ signal:AbortSignal|undefined,budget:MaterialCheck,paint:GuitarProColdOptions['checkpoint']){
+ await checkpoint({signal,checkpoint:paint});budget(input);
+ const prepared=await prepare(input,signal);aborted(signal);budget({input,prepared});
+ const archive=copiedBytes(prepared.bytes,64*1024*1024);budget({input,prepared,archive});
+ assertDual(prepared.package,input.score,input.sourceIdentity);
+ for(const [name,expected]of Object.entries(input.retainedFiles))if(!prepared.package.files[name]||await hashBytes(prepared.package.files[name])!==await hashBytes(expected))
+  throw Error('Dual preparation did not retain the exact Guitar Pro source closure.');
+ await assertGuitarProArchive(prepared.package,archive,signal);
+ return {package:prepared.package,bytes:archive};
 }
 /** Public discovery always runs against our bounded owned original snapshot. */
 export async function inspectGuitarProSource(bytes:Uint8Array,options:GuitarProColdOptions={}):Promise<GuitarProInspection>{
@@ -107,29 +142,22 @@ export async function stageGuitarProParts(inspection:GuitarProInspection,trackId
  if(typeof prepare!=='function')throw Error('Guitar Pro requires independent dual preparation.');
  return serialized(signal,async()=>{
   const publicApi=await guitarProRuntime(),parts:StagedGuitarProImport['parts'][number][]=[];
+  const budget=(pending:unknown)=>assertGuitarProStagedMaterial({retainedInput,inspection,parts},pending);
+  budget(undefined);
   for(const id of ids){
-   await checkpoint({signal,checkpoint:paint});const result=await publicApi.convertGuitarPro(retainedInput.bytes,{trackIds:[id],signal});aborted(signal);
-   if(!result.ok)throw new GuitarProImportRefusal(result.report,'Selected Guitar Pro source track refused.');
-   if(result.report.inputSha256!==inspection.inputSha256)throw Error('Guitar Pro conversion changed the retained original.');
-   const admission=family(result,id),source=await sourceIdentity(inspection.inputSha256,id,admission.partId),score=await projected(result,source);
-   await checkpoint({signal,checkpoint:paint});const files=retained(result,retainedInput.bytes,source),metadata:Metadata={title:score.title,composer:score.composer,
-    provenance:['Retained Guitar Pro original; public source-track conversion; independent ISO and TAB admission.']};
-   const prepared=await prepare({score,metadata,retainedFiles:files,sourceIdentity:source},signal);aborted(signal);
-   const archive=copiedBytes(prepared.bytes,64*1024*1024);
-   assertDual(prepared.package,score,source);
-   for(const [name,expected]of Object.entries(files))if(!prepared.package.files[name]||await hashBytes(prepared.package.files[name])!==await hashBytes(expected))
-    throw Error('Dual preparation did not retain the exact Guitar Pro source closure.');
+   await checkpoint({signal,checkpoint:paint});
+   const prepared=await preparedPart(await convertedInput(publicApi,retainedInput.bytes,id,inspection.inputSha256,signal,budget),prepare,signal,budget,paint);
    // Grant only after a SECOND actual public converter replay against admitted retained bytes.
-   await assertGuitarProArchive(prepared.package,archive,signal);
-   const context=await replayGuitarProContext(prepared.package,{signal,checkpoint:paint});aborted(signal);
-   parts.push(Object.freeze({sourceTrackId:id,package:prepared.package,bytes:archive,context}));
+   const context=await replayGuitarProContext(prepared.package,{signal,checkpoint:paint},pending=>budget({prepared,pending}));aborted(signal);
+   budget({prepared,context});
+   parts.push(Object.freeze({sourceTrackId:id,...prepared,context}));
   }
   return Object.freeze({groupId:parts[0].context.groupId,inputSha256:inspection.inputSha256,parts:Object.freeze(parts)});
  });
 }
 /** Cold receiving admission. Serialized descriptors and labels never grant
  * authority: exact original/scope/public replay must agree with both views. */
-async function replayGuitarProContext(p:ScorePackage,options:GuitarProColdOptions={}):Promise<GuitarProContext>{
+async function replayGuitarProContext(p:ScorePackage,options:GuitarProColdOptions={},budget?:MaterialCheck):Promise<GuitarProContext>{
  const signal=options.signal,paint=options.checkpoint,files=Object.fromEntries(Object.values(GUITAR_PRO_FILES).map(name=>{
   if(!p.files[name]||!p.manifest.files[name])throw Error('Missing retained Guitar Pro source member: '+name);
   return [name,copiedBytes(p.files[name],name===GUITAR_PRO_FILES.original?MAX_BYTES:name===GUITAR_PRO_FILES.descriptor?8192:16*1024*1024)];
@@ -137,16 +165,17 @@ async function replayGuitarProContext(p:ScorePackage,options:GuitarProColdOption
  selectReadingNotation(p,'iso');selectReadingNotation(p,'tab');
  const source=JSON.parse(decoder.decode(files[GUITAR_PRO_FILES.descriptor])) as GuitarProSourceIdentity;
  if(!source||typeof source!=='object'||typeof source.sourceTrackId!=='string'||!/^\d{1,6}$/.test(source.sourceTrackId))throw Error('Unsupported Guitar Pro source descriptor.');
+ budget?.({files,source});
  await checkpoint({signal,checkpoint:paint});
  for(const[name,bytes]of Object.entries(files))if(await hashBytes(bytes)!==p.manifest.files[name])throw Error('Retained Guitar Pro member hash differs.');
  const inputSha=await hashBytes(files[GUITAR_PRO_FILES.original]),publicApi=await guitarProRuntime();aborted(signal);
- const result=await publicApi.convertGuitarPro(files[GUITAR_PRO_FILES.original],{trackIds:[source.sourceTrackId],signal});aborted(signal);
- if(!result.ok)throw new GuitarProImportRefusal(result.report,'Cold Guitar Pro conversion refused the retained source.');
- const admission=family(result,source.sourceTrackId),expected=await sourceIdentity(inputSha,source.sourceTrackId,admission.partId);
+ const result=await selectedConversion(publicApi,files[GUITAR_PRO_FILES.original],source.sourceTrackId,inputSha,signal,pending=>budget?.({files,source,pending})),
+  admission=result.admission,expected=await sourceIdentity(inputSha,source.sourceTrackId,admission.partId);
  if(!same(source,expected)||result.report.inputSha256!==inputSha||result.musicxml!==decoder.decode(files[GUITAR_PRO_FILES.xml])||
   !same(result.report,JSON.parse(decoder.decode(files[GUITAR_PRO_FILES.report]))))throw Error('Cold Guitar Pro source, mapping or report differs from public replay.');
- const score=await projected(result,expected);await checkpoint({signal,checkpoint:paint});assertDual(p,score,expected);
- aborted(signal);return bind(p,expected,admission,result.score.parts[0].name);
+ const score=await projected(result,expected);budget?.({files,source,result,expected,score});
+ await checkpoint({signal,checkpoint:paint});assertDual(p,score,expected);
+ aborted(signal);return bind(p,expected,admission,result.sourceName);
 }
 export function guitarProContext(p:ScorePackage):GuitarProContext|undefined{
  const admitted=contexts.get(p.manifest);if(!admitted)return undefined;
