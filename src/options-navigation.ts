@@ -2,7 +2,7 @@ export interface NavigationMode {horizontal?:boolean;focusOnPrepare?:boolean;sec
 /** Control browsing never changes values. Open pickers, drafts and capture own keys first. */
 export class OptionsNavigation {
  private observer:MutationObserver;private popup?:HTMLElement;private picker?:HTMLSelectElement;private index=0;private active?:HTMLElement;private disposed=false;private interacted=false;
- private selectObservers:MutationObserver[]=[];private resize?:ResizeObserver;
+ private selectObservers:MutationObserver[]=[];private resize?:ResizeObserver;private search='';private searchTime=0;
  constructor(private root:HTMLElement,private beforeActivate:(target?:HTMLElement)=>void,private ownsKeys:()=>boolean,private mode:NavigationMode={}){
   root.dataset.navigationOwned='';this.observer=new MutationObserver(()=>this.prepare());this.observer.observe(root,{childList:true,subtree:true});this.prepare();root.addEventListener('click',this.click,true);root.addEventListener('focusin',this.focus);root.addEventListener('scroll',this.positionMarker,true);if(typeof ResizeObserver!=='undefined'){this.resize=new ResizeObserver(this.positionMarker);this.resize.observe(root);}
  }
@@ -14,11 +14,11 @@ export class OptionsNavigation {
  private prepare(){
   if(this.disposed)return;
   for(const select of this.root.querySelectorAll<HTMLSelectElement>('select:not([data-options-native])')){
-   select.dataset.optionsNative='';select.hidden=true;const button=document.createElement('button');button.type='button';button.className='options-picker';button.dataset.optionsPicker='';button.dataset.optionsKey=select.id||select.name||select.dataset.option||(select.hasAttribute('data-keyboard')?'keyboard':select.getAttribute('aria-label')??'');
+   const hadFocus=document.activeElement===select;select.dataset.optionsNative='';select.hidden=true;const button=document.createElement('button');button.type='button';button.className='options-picker';button.dataset.optionsPicker='';button.dataset.optionsKey=select.id||select.name||select.dataset.option||(select.hasAttribute('data-keyboard')?'keyboard':select.getAttribute('aria-label')??'');
    if(select.dataset.optionsSize==='content')button.dataset.optionsSize='content';
    button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');select.after(button);
    const paint=()=>{button.textContent=select.selectedOptions[0]?.textContent??'Choose';button.disabled=select.disabled;button.setAttribute('aria-label',select.getAttribute('aria-label')??select.closest('label')?.textContent?.trim()??'Choose');};
-   select.addEventListener('change',paint);select.addEventListener('options-selection',paint);button.onclick=()=>this.open(select,button);const watch=new MutationObserver(paint);watch.observe(select,{attributes:true,childList:true,subtree:true});this.selectObservers.push(watch);paint();
+   select.addEventListener('change',paint);select.addEventListener('options-selection',paint);button.onclick=()=>this.open(select,button);const watch=new MutationObserver(paint);watch.observe(select,{attributes:true,childList:true,subtree:true});this.selectObservers.push(watch);paint();if(hadFocus)button.focus();
   }
   this.positionMarker();if(!this.active?.isConnected){this.active=this.selected()??this.controls()[0];if(this.active&&this.mode.focusOnPrepare!==false&&!this.popup&&!this.ownsKeys()&&!this.interacted)this.active.focus();}
  }
@@ -31,9 +31,9 @@ export class OptionsNavigation {
  }
  private focus=(event:FocusEvent)=>{const el=event.target as HTMLElement;if(el.hasAttribute('data-options-section'))this.selectSection(el as HTMLButtonElement,false);if(this.controls().includes(el))this.active=el;};
  get picking(){return !!this.popup;}
- focusInitial(){if(!this.interacted)(this.selected()??this.controls()[0])?.focus();}
+ focusInitial(){if(!this.interacted&&(!this.root.contains(document.activeElement)||document.activeElement===this.selected()))(this.selected()??this.controls()[0])?.focus();}
  private click=(event:MouseEvent)=>{this.interacted=true;const el=(event.target as HTMLElement).closest<HTMLElement>('button,input,select,summary,a[href]');if(el&&!el.closest('[data-options-popup]')){if(el.hasAttribute('data-options-section'))this.selectSection(el as HTMLButtonElement);else this.beforeActivate(el);}};
- private open(select:HTMLSelectElement,button:HTMLElement){this.cancelPicker(false);this.picker=select;this.active=button;this.index=Math.max(0,select.selectedIndex);const popup=document.createElement('div');popup.dataset.optionsPopup='';popup.className='options-popover';popup.setAttribute('role','listbox');popup.setAttribute('aria-label',button.getAttribute('aria-label')??'Choose');popup.tabIndex=0;button.setAttribute('aria-expanded','true');button.after(popup);this.popup=popup;this.draw();popup.focus();}
+ private open(select:HTMLSelectElement,button:HTMLElement){this.cancelPicker(false);this.search='';this.picker=select;this.active=button;this.index=Math.max(0,select.selectedIndex);const popup=document.createElement('div');popup.dataset.optionsPopup='';popup.className='options-popover';popup.setAttribute('role','listbox');popup.setAttribute('aria-label',button.getAttribute('aria-label')??'Choose');popup.tabIndex=0;button.setAttribute('aria-expanded','true');button.after(popup);this.popup=popup;this.draw();popup.focus();}
  private draw(){if(!this.popup||!this.picker)return;this.popup.innerHTML='';[...this.picker.options].forEach((option,index)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','option');b.setAttribute('aria-selected',String(index===this.index));b.disabled=option.disabled;b.tabIndex=-1;b.textContent=option.textContent;b.onclick=()=>this.choose(index);this.popup!.append(b);});this.popup.querySelector('[aria-selected=true]')?.scrollIntoView({block:'nearest'});}
  private choose(index:number){const picker=this.picker;if(!picker||picker.options[index].disabled)return;const changed=picker.selectedIndex!==index;picker.selectedIndex=index;this.cancelPicker();if(changed)picker.dispatchEvent(new Event('change',{bubbles:true}));}
  cancelPicker(focus=true){this.popup?.remove();this.popup=undefined;this.picker=undefined;this.active?.setAttribute('aria-expanded','false');if(focus&&this.active?.isConnected)this.active.focus();}
@@ -41,8 +41,8 @@ export class OptionsNavigation {
  keyDown(event:KeyboardEvent):boolean {
   this.interacted=true;
   if(this.popup){
-   if(event.code==='Tab'){this.cancelPicker();return false;}
-   if(event.code==='Escape'||event.code==='ArrowLeft'){this.cancelPicker();return true;}
+   if(event.code==='Tab'){this.cancelPicker();if(this.root.matches('dialog')){this.tab(event.shiftKey);return true;}return false;}
+   if(event.code==='Escape'||event.code==='ArrowLeft'){if(event.code!=='Escape'||!event.repeat)this.cancelPicker();return true;}
    if(event.ctrlKey||event.altKey||event.metaKey)return false;
    if(['ArrowDown','ArrowUp','Home','End'].includes(event.code)){
     const options=[...this.picker!.options],step=event.code==='ArrowUp'?-1:1;
@@ -50,10 +50,12 @@ export class OptionsNavigation {
     while(next>=0&&next<options.length&&options[next].disabled)next+=event.code==='End'?-1:step;
     if(next>=0&&next<options.length){this.index=next;this.draw();}
    }else if(event.code==='Enter'||event.code==='ArrowRight'){if(!event.repeat)this.choose(this.index);}
-   return ['Escape','Enter','Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.code);
+   else if(event.key.length===1){const now=performance.now(),letter=event.key.toLowerCase();this.search=now-this.searchTime>700||this.search===letter?letter:this.search+letter;this.searchTime=now;const options=[...this.picker!.options];for(let step=1;step<=options.length;step++){const at=(this.index+step)%options.length;if(!options[at].disabled&&options[at].textContent?.trim().toLowerCase().startsWith(this.search)){this.index=at;this.draw();break;}}}
+   return true;
   }
   if(this.ownsKeys())return false;
   const focused=document.activeElement as HTMLElement;
+  if(event.code==='Tab'&&this.root.matches('dialog')&&!event.ctrlKey&&!event.altKey&&!event.metaKey){this.tab(event.shiftKey);return true;}
   if(focused?.matches('textarea,[contenteditable=true],input:not([readonly]):not([type=checkbox]):not([type=radio])'))return false;
   if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space'].includes(event.code)||event.ctrlKey||event.altKey||event.metaKey)return false;
   const sections=this.sections();
@@ -72,5 +74,6 @@ export class OptionsNavigation {
   else{const target=rows[Math.max(0,Math.min(rows.length-1,rows.indexOf(row)+(event.code==='ArrowDown'?1:-1)))];target[Math.min(at,target.length-1)]?.focus();}
   return true;
  }
+ private tab(backwards:boolean){const controls=this.controls(),index=controls.indexOf(document.activeElement as HTMLElement);if(controls.length)controls[(index+(backwards?-1:1)+controls.length)%controls.length]?.focus();}
  dispose(){this.disposed=true;this.cancelPicker(false);this.observer.disconnect();this.resize?.disconnect();this.root.removeEventListener('scroll',this.positionMarker,true);this.selectObservers.forEach(o=>o.disconnect());this.root.removeEventListener('click',this.click,true);this.root.removeEventListener('focusin',this.focus);delete this.root.dataset.navigationOwned;}
 }

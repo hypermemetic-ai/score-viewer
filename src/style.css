@@ -79,6 +79,7 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 .options-redesigned .options-sections button{border:0;min-height:52px;padding:14px 12px;line-height:1.4;text-align:left;font-size:15px;flex:none;white-space:normal}
 .options-sections [aria-selected=true]{background:#202020;color:#fff}
 .options-redesigned .options-sections :focus-visible{outline:1px solid #aaa;outline-offset:0}
+.options-dialog.options-redesigned button:focus-visible,.options-dialog.options-redesigned input:focus-visible,.options-dialog.options-redesigned summary:focus-visible{outline:1px solid #bbb;outline-offset:-1px}
 .options-panels{min-width:0;min-height:0;position:relative;padding:4px 8px 4px 4px}
 .options-panels [data-options-panel]{height:100%;overflow:auto;scrollbar-width:none;padding:0 6px 8px 0}
 .options-redesigned .options-panels [data-options-panel]>h3,.options-panels .options-section-title,.options-panels .score-options-heading{min-height:44px;margin:0 0 20px;display:flex;align-items:center}
@@ -87,7 +88,7 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 .options-panels .options-practice h3,.options-panels .options-fingering h3,.options-panels .piano-options h3{min-height:44px;margin:0 0 20px;display:flex;align-items:center}
 .options-redesigned .options-panels .options-setup{gap:22px}
 .options-redesigned .options-panels .option-setting{margin:14px 0;grid-template-columns:145px minmax(0,1fr)}
-.options-redesigned .options-panels .options-practice label.dialog-row:has([data-manual-key]){grid-template-columns:145px minmax(0,1fr);gap:16px;margin:18px 0}
+.options-redesigned .options-panels .options-practice label.dialog-row:has([data-manual-key]){grid-template-columns:195px minmax(0,1fr);gap:16px;margin:18px 0}
 .options-redesigned .options-panels .options-binding-table th{padding:13px 0}
 .options-redesigned .options-panels .options-binding-table td{padding:9px 0}
 .options-redesigned .options-footer{flex:none;margin-top:20px;padding-top:18px;justify-content:space-between}
