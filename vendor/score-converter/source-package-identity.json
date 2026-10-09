@@ -1,0 +1,54 @@
+{
+  "schema": "score-converter-private-package/1",
+  "sourceHead": "aea081ed914f66009ca84d2fe68fa134a95c182a",
+  "sourceTree": "3c9c629fb5bba1cd144643fa28bd7834bc719308",
+  "archive": {
+    "path": "/tmp/score-converter-intrinsic-input-final-package-20261009-2mnKfR/score-converter-proof-0.0.0.tgz",
+    "bytes": 719891,
+    "entries": 431,
+    "sha256": "2cace1ed51280a406051f195f71fc99d7b2e166e798df89e677ed47283adf044"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json",
+    "./guitar-pro/webview": {
+      "types": "./dist/src/webview/index.d.ts",
+      "import": "./dist/webview/index.js"
+    }
+  },
+  "workerAsset": "dist/webview/guitar-pro.worker.js",
+  "runtimeGraph": {
+    "sha256": "8a5067c302bffa77f5ad0602d315e55bee89444788cf8890d9c1fc65e40cb66f",
+    "sourceCount": 120,
+    "assets": [
+      {
+        "path": "dist/webview/NOTICE.txt",
+        "bytes": 21551,
+        "sha256": "f571f4b0ad228008ad24e68b681c3e44e67ec78b53ad1d6d7c304822849b2a0b"
+      },
+      {
+        "path": "dist/webview/guitar-pro.worker.js",
+        "bytes": 637085,
+        "sha256": "5bc42c6b5b89eeaf57c8e1e3dc299f183653dba3a392e8cb681b9531986da051"
+      },
+      {
+        "path": "dist/webview/guitar-pro.worker.js.LEGAL.txt",
+        "bytes": 656,
+        "sha256": "7c8f23d0a40e5fda506e55c252e9aa93d489882a419bb9f3aff3f70c42dab276"
+      },
+      {
+        "path": "dist/webview/index.js",
+        "bytes": 12256,
+        "sha256": "983a57d5d34da7cd5e8c190e37fd81dc6a8f91f74fa719d743f49aa27ce74499"
+      }
+    ]
+  },
+  "alphaTab": {
+    "pin": "022a45c8e42370f9e12e68949d11eada370da83d",
+    "inventorySha256": "47f26109ba6e24a2d32fd96ccc63a98ce750411fbd7a27fc7ef85a98aa69df6e"
+  },
+  "noticeSha256": "f571f4b0ad228008ad24e68b681c3e44e67ec78b53ad1d6d7c304822849b2a0b"
+}

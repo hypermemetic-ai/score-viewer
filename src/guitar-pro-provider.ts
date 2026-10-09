@@ -1,0 +1,161 @@
+import type {ConversionSuccess,SourceTrackInfo,GuitarProReport} from 'score-converter-proof/guitar-pro/webview';
+import {parseMusicXmlAsync,projectMusicXml} from '../vendor/iso-notation/src/musicxml';
+import identity from '../vendor/score-converter/source-package-identity.json';
+import {hashBytes,type ScorePackage,type Metadata} from './package';
+import {selectReadingNotation} from './dual-reading-package';
+import {assertGuitarProArchive} from './guitar-pro-archive';
+import {guitarProRuntime} from './guitar-pro-runtime';
+import {GUITAR_PRO_FILES,GuitarProImportRefusal,type GuitarProInspection,type GuitarProSourceIdentity,type GuitarProContext,
+ type GuitarProStageOptions,type GuitarProColdOptions,type StagedGuitarProImport} from './guitar-pro-types';
+export * from './guitar-pro-types';
+
+const converterArchiveSha256=identity.archive.sha256,converterSourceTree=identity.sourceTree;
+const MAX_BYTES=8*1024*1024,encoder=new TextEncoder(),decoder=new TextDecoder('utf-8',{fatal:true});
+const typedArrayPrototype=Object.getPrototypeOf(Uint8Array.prototype),byteLength=Object.getOwnPropertyDescriptor(typedArrayPrototype,'byteLength')!.get!,
+ byteOffset=Object.getOwnPropertyDescriptor(typedArrayPrototype,'byteOffset')!.get!,bufferOf=Object.getOwnPropertyDescriptor(typedArrayPrototype,'buffer')!.get!;
+const inspections=new WeakMap<GuitarProInspection,{bytes:Uint8Array;tracks:readonly SourceTrackInfo[]}>();
+const contexts=new WeakMap<object,{score:ScorePackage['score'];context:GuitarProContext}>();
+let activeOperation=false;
+function aborted(signal?:AbortSignal){if(signal?.aborted)throw new DOMException('Guitar Pro operation canceled.','AbortError');}
+function copiedBytes(value:Uint8Array,max=MAX_BYTES):Uint8Array{
+ // Intrinsic view getters and set avoid overridden iterator/slice methods.
+ let size:number,offset:number,buffer:ArrayBuffer;
+ try{size=byteLength.call(value);offset=byteOffset.call(value);buffer=bufferOf.call(value);}catch{throw Error('Guitar Pro requires a byte view.');}
+ if(!(value instanceof Uint8Array)||!Number.isSafeInteger(size)||size<1||size>max||!(buffer instanceof ArrayBuffer))throw Error('Guitar Pro bytes exceed the supported input bound.');
+ const result=new Uint8Array(size);Uint8Array.prototype.set.call(result,new Uint8Array(buffer,offset,size));return result;
+}
+function selectedIds(value:readonly string[],tracks:readonly SourceTrackInfo[]):string[]{
+ if(!Array.isArray(value)||value.length<1||value.length>8)throw Error('Choose one to eight source tracks.');
+ const ids:string[]=[];
+ for(let index=0;index<value.length;index++){
+  const d=Object.getOwnPropertyDescriptor(value,String(index));
+  if(!d||!('value'in d)||typeof d.value!=='string'||!/^\d{1,6}$/.test(d.value)||ids.includes(d.value)||!tracks.some(t=>t.sourceId===d.value))
+   throw Error('Unsupported or duplicate Guitar Pro source track.');
+  ids.push(d.value);
+ }
+ return ids;
+}
+async function serialized<T>(signal:AbortSignal|undefined,work:()=>Promise<T>):Promise<T>{
+ if(activeOperation)throw Error('Another Guitar Pro receiving operation is active.');
+ activeOperation=true;
+ try{aborted(signal);return await work();}finally{activeOperation=false;}
+}
+const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
+function freeze<T>(value:T):T{if(value&&typeof value==='object'){for(const v of Object.values(value))freeze(v);Object.freeze(value);}return value;}
+async function checkpoint(options:GuitarProColdOptions){aborted(options.signal);await options.checkpoint?.();aborted(options.signal);}
+function family(result:ConversionSuccess,trackId:string):{family:'guitar'|'bass';profile:string;partId:string}{
+ const r=result.report,parts=r.convertedParts;
+ if(r.inputSha256!==result.inputSource.sha256||parts.length!==1||r.requestedScope==='all-tracks'||!same(r.requestedScope.trackIds,[trackId]))
+  throw Error('Converter did not return the exact selected source scope.');
+ const p=parts[0],a=p.admission;
+ if(p.sourceTrackId!==trackId||!p.musicxmlPartId||!['guitar','bass'].includes(a.instrumentFamily)||a.profile!==r.profile||
+  result.score.parts.length!==1||result.score.parts[0].id!==trackId||!Array.isArray(a.evidenceFindingIndices)||a.evidenceFindingIndices.length>256)
+  throw Error('Converter part mapping or admission differs from its report.');
+ let located=false;
+ for(const index of a.evidenceFindingIndices){
+  if(!Number.isSafeInteger(index)||index<0||index>=r.findings.length)throw Error('Converter admission refers to absent evidence.');
+  const f=r.findings[index],fact=f.fact as Record<string,unknown>|undefined;
+  if(f.code==='instrument-admitted'&&f.disposition==='preserved'&&(f.location?.trackId??f.location?.id)===trackId&&
+   fact?.sourceTrackId===trackId&&fact.instrumentFamily===a.instrumentFamily&&fact.profile===a.profile)located=true;
+ }
+ if(!located)throw Error('Converter family has no located successful admission evidence.');
+ return {family:a.instrumentFamily,profile:a.profile,partId:p.musicxmlPartId};
+}
+async function projected(result:ConversionSuccess,source:GuitarProSourceIdentity){
+ const written=await parseMusicXmlAsync(result.musicxml,'guitar-pro/converted.musicxml',{frettedSource:'retain-v1'});
+ if(written.parts?.length!==1||written.parts[0].id!==source.musicxmlPartId)throw Error('Converted MusicXML does not assign the selected source part.');
+ return projectMusicXml(written,{id:source.scoreId,readingPolicy:{version:'instrument-reading-v2',partId:source.musicxmlPartId,
+  centerPitch:24,guidePitches:[12,24,36],pitchFolding:'literal',stemPolicy:'outward',stemDirectionSemantics:'visual'}}).score;
+}
+async function sourceIdentity(inputSha256:string,sourceTrackId:string,musicxmlPartId:string):Promise<GuitarProSourceIdentity>{
+ return freeze({version:'viewer-guitar-pro-source-v1',inputSha256,sourceTrackId,musicxmlPartId,
+ scoreId:`gp-${inputSha256}-${sourceTrackId}`,groupId:await hashBytes(`viewer-gp-group-v1\n${inputSha256}\n${converterArchiveSha256}`),
+ converterArchiveSha256,converterSourceTree,
+ projection:'portable-musicxml-retain-v1/shared-c2-outward-v1'});
+}
+function assertDual(p:ScorePackage,score:ScorePackage['score'],source:GuitarProSourceIdentity){
+ const current=selectReadingNotation(p,p.reading?.dual?.notation??'iso');selectReadingNotation(p,'iso');selectReadingNotation(p,'tab');
+ if(!same(p.pages,current.pages))throw Error('Receiving package exposes stale or foreign pages.');
+ if(!same(p.score,score)||p.manifest.scoreId!==source.scoreId||p.manifest.reading?.version!=='instrument-reading-package-v2'||
+  p.manifest.reading.sourcePartId!==source.musicxmlPartId)throw Error('Receiving dual admission does not match the converted source.');
+}
+function retained(result:ConversionSuccess,bytes:Uint8Array,source:GuitarProSourceIdentity):Record<string,Uint8Array>{
+ return {[GUITAR_PRO_FILES.original]:copiedBytes(bytes),[GUITAR_PRO_FILES.xml]:encoder.encode(result.musicxml),
+ [GUITAR_PRO_FILES.report]:encoder.encode(JSON.stringify(result.report)),[GUITAR_PRO_FILES.descriptor]:encoder.encode(JSON.stringify(source))};
+}
+function bind(p:ScorePackage,source:GuitarProSourceIdentity,admission:ReturnType<typeof family>,sourceName?:string){
+ const context=freeze({...source,...{family:admission.family,profile:admission.profile},...(sourceName?{sourceName}:{})});
+ contexts.set(p.manifest,{score:p.score,context});return context;
+}
+/** Public discovery always runs against our bounded owned original snapshot. */
+export async function inspectGuitarProSource(bytes:Uint8Array,options:GuitarProColdOptions={}):Promise<GuitarProInspection>{
+ const owned=copiedBytes(bytes),signal=options.signal,paint=options.checkpoint;
+ return serialized(signal,async()=>{
+  await checkpoint({signal,checkpoint:paint});const publicApi=await guitarProRuntime(),inputSha256=await hashBytes(owned);
+  aborted(signal);const result=await publicApi.inspectGuitarPro(owned,{signal});aborted(signal);
+  if(!result.ok)throw new GuitarProImportRefusal(result.report,'Guitar Pro inspection refused.');
+  if(result.report.inputSha256!==inputSha256||result.tracks.length>64)throw Error('Guitar Pro inspection input or inventory differs.');
+  const inspection=freeze({inputSha256,tracks:result.tracks,report:result.report}) as GuitarProInspection;
+  inspections.set(inspection,{bytes:owned,tracks:result.tracks});return inspection;
+ });
+}
+/** Stage all selected parts without a managed write. Each public conversion has
+ * a single source track, preserving identities across future part selection. */
+export async function stageGuitarProParts(inspection:GuitarProInspection,trackIds:readonly string[],options:GuitarProStageOptions):Promise<StagedGuitarProImport>{
+ const retainedInput=inspections.get(inspection);if(!retainedInput)throw Error('Guitar Pro discovery belongs to a different receiving operation.');
+ const ids=selectedIds(trackIds,retainedInput.tracks),signal=options.signal,paint=options.checkpoint,prepare=options.prepareAndAdmit;
+ if(typeof prepare!=='function')throw Error('Guitar Pro requires independent dual preparation.');
+ return serialized(signal,async()=>{
+  const publicApi=await guitarProRuntime(),parts:StagedGuitarProImport['parts'][number][]=[];
+  for(const id of ids){
+   await checkpoint({signal,checkpoint:paint});const result=await publicApi.convertGuitarPro(retainedInput.bytes,{trackIds:[id],signal});aborted(signal);
+   if(!result.ok)throw new GuitarProImportRefusal(result.report,'Selected Guitar Pro source track refused.');
+   if(result.report.inputSha256!==inspection.inputSha256)throw Error('Guitar Pro conversion changed the retained original.');
+   const admission=family(result,id),source=await sourceIdentity(inspection.inputSha256,id,admission.partId),score=await projected(result,source);
+   await checkpoint({signal,checkpoint:paint});const files=retained(result,retainedInput.bytes,source),metadata:Metadata={title:score.title,composer:score.composer,
+    provenance:['Retained Guitar Pro original; public source-track conversion; independent ISO and TAB admission.']};
+   const prepared=await prepare({score,metadata,retainedFiles:files,sourceIdentity:source},signal);aborted(signal);
+   const archive=copiedBytes(prepared.bytes,64*1024*1024);
+   assertDual(prepared.package,score,source);
+   for(const [name,expected]of Object.entries(files))if(!prepared.package.files[name]||await hashBytes(prepared.package.files[name])!==await hashBytes(expected))
+    throw Error('Dual preparation did not retain the exact Guitar Pro source closure.');
+   // Grant only after a SECOND actual public converter replay against admitted retained bytes.
+   await assertGuitarProArchive(prepared.package,archive,signal);
+   const context=await replayGuitarProContext(prepared.package,{signal,checkpoint:paint});aborted(signal);
+   parts.push(Object.freeze({sourceTrackId:id,package:prepared.package,bytes:archive,context}));
+  }
+  return Object.freeze({groupId:parts[0].context.groupId,inputSha256:inspection.inputSha256,parts:Object.freeze(parts)});
+ });
+}
+/** Cold receiving admission. Serialized descriptors and labels never grant
+ * authority: exact original/scope/public replay must agree with both views. */
+async function replayGuitarProContext(p:ScorePackage,options:GuitarProColdOptions={}):Promise<GuitarProContext>{
+ const signal=options.signal,paint=options.checkpoint,files=Object.fromEntries(Object.values(GUITAR_PRO_FILES).map(name=>{
+  if(!p.files[name]||!p.manifest.files[name])throw Error('Missing retained Guitar Pro source member: '+name);
+  return [name,copiedBytes(p.files[name],name===GUITAR_PRO_FILES.original?MAX_BYTES:name===GUITAR_PRO_FILES.descriptor?8192:16*1024*1024)];
+ }));
+ selectReadingNotation(p,'iso');selectReadingNotation(p,'tab');
+ const source=JSON.parse(decoder.decode(files[GUITAR_PRO_FILES.descriptor])) as GuitarProSourceIdentity;
+ if(!source||typeof source!=='object'||typeof source.sourceTrackId!=='string'||!/^\d{1,6}$/.test(source.sourceTrackId))throw Error('Unsupported Guitar Pro source descriptor.');
+ await checkpoint({signal,checkpoint:paint});
+ for(const[name,bytes]of Object.entries(files))if(await hashBytes(bytes)!==p.manifest.files[name])throw Error('Retained Guitar Pro member hash differs.');
+ const inputSha=await hashBytes(files[GUITAR_PRO_FILES.original]),publicApi=await guitarProRuntime();aborted(signal);
+ const result=await publicApi.convertGuitarPro(files[GUITAR_PRO_FILES.original],{trackIds:[source.sourceTrackId],signal});aborted(signal);
+ if(!result.ok)throw new GuitarProImportRefusal(result.report,'Cold Guitar Pro conversion refused the retained source.');
+ const admission=family(result,source.sourceTrackId),expected=await sourceIdentity(inputSha,source.sourceTrackId,admission.partId);
+ if(!same(source,expected)||result.report.inputSha256!==inputSha||result.musicxml!==decoder.decode(files[GUITAR_PRO_FILES.xml])||
+  !same(result.report,JSON.parse(decoder.decode(files[GUITAR_PRO_FILES.report]))))throw Error('Cold Guitar Pro source, mapping or report differs from public replay.');
+ const score=await projected(result,expected);await checkpoint({signal,checkpoint:paint});assertDual(p,score,expected);
+ aborted(signal);return bind(p,expected,admission,result.score.parts[0].name);
+}
+export function guitarProContext(p:ScorePackage):GuitarProContext|undefined{
+ const admitted=contexts.get(p.manifest);if(!admitted)return undefined;
+ selectReadingNotation(p,'iso');selectReadingNotation(p,'tab');
+ if(admitted.score!==p.score)throw Error('Guitar Pro source identity no longer matches its receiving context.');
+ return admitted.context;
+}
+
+export function admitGuitarProContext(p:ScorePackage,options:GuitarProColdOptions={}):Promise<GuitarProContext>{
+ const signal=options.signal,paint=options.checkpoint;
+ return serialized(signal,()=>replayGuitarProContext(p,{signal,checkpoint:paint}));
+}
