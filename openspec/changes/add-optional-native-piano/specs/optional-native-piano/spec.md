@@ -69,3 +69,18 @@ The combined source, engine/license closure and paired native build SHALL be ind
 #### Scenario: Paired replacement build
 - **WHEN** the integrated piano build is delivered
 - **THEN** Windows and Mac package inputs, engine/bank identity, notices and observed integration are recorded, and physical acceptance is reported only after the operator performs it
+
+### Requirement: Bounded native piano render lookahead
+The Windows shared output SHALL distinguish packet storage capacity from queued render lookahead. It SHALL prime and refill only to the explicit selected-tier target `min(capacity, (tier + 1) * actualPeriod)`, without changing legal period selection or automatically escalating the tier. MIDI and panic ingress SHALL be checked at each sampler quantum within one bounded transfer-wide message budget. Prepared-cue admission SHALL retain actual submitted and in-flight horizons.
+
+#### Scenario: Lowest tier with larger allocated capacity
+- **WHEN** a stream has a 512-frame actual period, 1126-frame capacity and lowest latency selected
+- **THEN** its render target is 512 frames, every refill fits actual available space, and already queued PCM is neither flushed nor extended to unrelated capacity
+
+#### Scenario: Coincident engine periods
+- **WHEN** the selected output exposes the same actual engine period for every latency tier
+- **THEN** higher tiers add bounded queue headroom until capacity is reached, without changing the saved tier silently
+
+#### Scenario: Actual source and loopback evidence
+- **WHEN** the root-controlled diagnostic compares the admitted piano on the same endpoint
+- **THEN** native note before/after enqueue brackets, source PCM, actual padding/service and correlated loopback timestamps are retained with quiet/signature controls over both sample-index and timestamp-window overlap, fine-timing failures are preserved separately from independently admitted coarse intervals, and software evidence is not represented as physical MIDI or sound-to-ear acceptance
