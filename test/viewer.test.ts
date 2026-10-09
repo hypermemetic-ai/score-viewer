@@ -1,3 +1,4 @@
+import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {strToU8,strFromU8} from 'fflate';
 import {importPackage as importPackageStrict,archivePackage,hashBytes,libraryOrder,validateLayer,sameFrozenPayload,type ScorePackage} from '../src/package';
 import {initialPersonal,corrected,fingerFor,restoreAll,readPersonal,installLayer,feedback,viewportFit,turnPage,effectiveLabelMode} from '../src/state';
@@ -8,7 +9,7 @@ const p=await importPackage(fixture);
 async function changed(change:(q:ScorePackage)=>void){const q=await importPackage(fixture);delete q.files['manifest.json'];change(q);for(const [name,bytes] of Object.entries(q.files))q.manifest.files[name]=await hashBytes(bytes);q.manifest.semanticSha256=q.manifest.files['score.json'];q.manifest.revision=q.manifest.semanticSha256;return archivePackage(q.manifest,q.files);}
 test('reviewed package preserves every owner, attack, source meaning and exact vector seats',()=>{
  assert.equal(p.fingerEligibility.eligible,true);assert.equal(p.score.notes.length,383);assert.equal(p.fingerLayer!.attacks.length,381);assert.equal(p.seats.length,381);assert.equal(p.pages.length,3);assert.equal(p.fingerLayer!.attacks.filter(a=>a.owners.length===2).length,2);assert.equal(p.fingerLayer!.attacks.filter(a=>a.owners.length===2).every(a=>a.writtenBar===48),true);
- assert.deepEqual(JSON.parse(strFromU8(p.files['score.json'])),p.score);
+ assert.deepEqual(normalizeLegacyScoreEvents(JSON.parse(strFromU8(p.files['score.json'])) as ScorePackage['score']),p.score);
  const baseline=p.pages.join('');for(const finger of [1,2,3,4,5]){const swapped=baseline.replace(/(<text data-viewer-seat="[^"]+"[^>]*>)[^<]+(<\/text>)/g,`$1${finger}$2`);assert.equal(swapped.replace(/(<text data-viewer-seat="[^"]+"[^>]*>)[^<]+(<\/text>)/g,'$1LABEL$2'),baseline.replace(/(<text data-viewer-seat="[^"]+"[^>]*>)[^<]+(<\/text>)/g,'$1LABEL$2'));}
 });
 test('valid package without fingers remains readable',async()=>{const bytes=await changed(q=>{delete q.files['fingers.json'];delete q.manifest.files['fingers.json'];});const q=await importPackage(bytes);assert.equal(q.fingerLayer,undefined);assert.equal(q.pages.length,3);});

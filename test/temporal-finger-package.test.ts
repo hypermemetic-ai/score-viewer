@@ -15,7 +15,7 @@ const source:QuantizedGridScore={id:'authored-temporal-package',title:'Held cont
   referencePerformanceTempo:{version:'reference-performance-tempo-v1',bpm:104,beat:{numerator:1,denominator:4},
     provenance:{kind:'editorial',reference:'Explicit authored package test clock'}},
   notes:[[48,0,24],[48,0,72],[52,24,24],[55,48,24]].map(([pitch,startTick,durationTicks],i)=>({id:`owner-${i}`,
-    pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick,durationTicks,hand:'RH',voice:i}))};
+    eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick,durationTicks,hand:'RH',voice:i}))};
 async function prepared(){
   const input=normalizeTemporalHandPlanningInput(source),selected=input.gestures.map(g=>{
     const all=[...g.attacks,...g.carried],keys=all.map(a=>({pitch:a.pitch,finger:a.pitch===48?1:a.pitch===52?3:5,row:2-a.pitch%2})),

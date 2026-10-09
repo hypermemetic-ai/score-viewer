@@ -1,3 +1,4 @@
+import {requirePianoEvent} from '../src/piano-event';
 import {validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import {publishPackage} from '../src/publication';
 import test from 'node:test';
@@ -18,7 +19,7 @@ const files=unzipSync(fixture),outer=JSON.parse(strFromU8(files['manifest.json']
 const piano=await importPackage(fixture),janko=await selectPresentation(piano,'janko-four-row');
 const sourceSha='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27';
 async function prepared(){
- const input=normalizeHandPlanningInput(piano.sourceScore!),layer=await validateConventionalFingerLayer(piano.fingerLayer,input,{sourceHash:sourceSha,sourceBytesSha256:sourceSha,effectiveHands:Object.fromEntries(piano.score.notes.map(n=>[n.id,n.hand]))});
+ const input=normalizeHandPlanningInput(piano.sourceScore!),layer=await validateConventionalFingerLayer(piano.fingerLayer,input,{sourceHash:sourceSha,sourceBytesSha256:sourceSha,effectiveHands:Object.fromEntries(piano.score.notes.map(n=>[n.id,requirePianoEvent(n).hand]))});
  const byId=new Map(layer.attacks.map(a=>[a.id,a]));
  const routes=input.gestures.map(g=>({id:g.id,nominalCost:0,pattern:g.attacks.map(a=>byId.get(a.id)!.hand[0]).join(''),assignments:g.attacks.map(a=>{const q=byId.get(a.id)!;return{attackId:a.id,hand:q.hand,finger:q.finger,contact:q.contact};})}));
  const replay=replayConventionalRoute(input,routes);assert.equal(replay.valid,true);
@@ -41,7 +42,7 @@ test('linked conventional and original RR presentations preserve exact source by
  assert.deepEqual(janko.fingerLayer!.attacks.map(({id,pitch,hand,finger,row,owners})=>({id,pitch,hand,finger,row,owners})),rr.attacks);
  assert.deepEqual(janko.fingerLayer!.traversal,rr.traversal);assert.equal(janko.fingerLayer!.physicalRowOrder,rr.physicalRowOrder);
  assert.equal(janko.manifest.revision,sourceSha);assert.equal(await selectPresentation(janko,'conventional-piano'),piano);
- for(const p of [piano,janko])for(const a of p.fingerLayer!.attacks)for(const o of a.owners)assert.equal(p.score.notes.find(n=>n.id===o.id)!.hand,a.hand);
+ for(const p of [piano,janko])for(const a of p.fingerLayer!.attacks)for(const o of a.owners)assert.equal(requirePianoEvent(p.score.notes.find(n=>n.id===o.id)!).hand,a.hand);
 });
 test('historical conventional contract remains exact and readable but cannot stand in for current action replay',async()=>{
  const layer=piano.fingerLayer!;
