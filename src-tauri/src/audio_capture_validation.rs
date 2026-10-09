@@ -80,6 +80,9 @@ pub(super) fn validate(packets: &[Packet], window: &Window) -> Result<Controls, 
                 {
                     controls.position_gaps += 1;
                 }
+                if packet.qpc_100ns <= previous.qpc_100ns {
+                    return Err("nonmonotonic adjacent capture QPC");
+                }
                 let actual = packet.qpc_100ns as f64 - previous.qpc_100ns as f64;
                 let expected = previous.frames as f64 * 10_000_000. / window.rate as f64;
                 if (actual - expected).abs() > 1000. {
@@ -144,7 +147,11 @@ mod tests {
     fn invalid_qpc_cannot_hide_flagged_signature_or_quiet_samples() {
         for flags in [1, 4, 5] {
             let (mut packets, window) = fixture();
-            packets[3].qpc_100ns = 0;
+            // Keep the bad-QPC region monotonic but outside the time window;
+            // sample-index overlap must still inspect all its flags.
+            for packet in &mut packets[3..] {
+                packet.qpc_100ns += 10_000_000;
+            }
             packets[3].flags = flags;
             let controls = validate(&packets, &window).unwrap();
             assert_eq!(controls.data_discontinuity, u32::from(flags & 1 != 0));
@@ -174,6 +181,34 @@ mod tests {
         let (mut packets, window) = fixture();
         packets[3].qpc_100ns += 1001;
         assert_eq!(validate(&packets, &window).unwrap().qpc_gaps_over_100us, 2);
+    }
+    fn one_frame_fixture() -> (Vec<Packet>, Window) {
+        let (mut packets, mut window) = fixture();
+        for (index, packet) in packets.iter_mut().enumerate() {
+            packet.start_sample = index * 2;
+            packet.frames = 1;
+            packet.device_position = index as u64;
+            packet.qpc_100ns = 1_000_000 + index as u64 * 227;
+        }
+        window.rate = 44100;
+        window.sample_start = 4;
+        window.sample_end = 10;
+        window.time_start_micros = 40.;
+        window.time_end_micros = 120.;
+        (packets, window)
+    }
+    #[test]
+    fn one_frame_equal_qpc_refuses_even_inside_fine_tolerance() {
+        let (mut packets, window) = one_frame_fixture();
+        assert_eq!(validate(&packets, &window).unwrap(), Controls::default());
+        packets[3].qpc_100ns = packets[2].qpc_100ns;
+        assert!(validate(&packets, &window).is_err());
+    }
+    #[test]
+    fn one_frame_backward_qpc_refuses_even_inside_fine_tolerance() {
+        let (mut packets, window) = one_frame_fixture();
+        packets[3].qpc_100ns = packets[2].qpc_100ns - 1;
+        assert!(validate(&packets, &window).is_err());
     }
     #[test]
     fn incomplete_or_malformed_sample_inventory_refuses() {
