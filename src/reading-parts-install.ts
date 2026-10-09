@@ -18,16 +18,23 @@ export async function stageReadingPartsInstall(host:ManagedHost,request:{
  if(!Array.isArray(request.parts)||request.parts.length<1||request.parts.length>8)throw Error('Choose one to eight source parts.');
  // All mutable bytes/library pointers are owned before the first await. The
  // source/view graph is the privately admitted immutable context, not a clone.
- const canCommit=request.canCommit,onCommitStarted=request.onCommitStarted,prior=structuredClone(request.entries),parts=request.parts.map(part=>{
+ const canCommit=request.canCommit,onCommitStarted=request.onCommitStarted,requestedPrior=structuredClone(request.entries),parts=request.parts.map(part=>{
   if(!(part.bytes instanceof Uint8Array)||part.bytes.byteLength>50_000_000)throw Error('Source archive exceeds the supported package bound.');
   const p=selectReadingNotation(part.package,'iso'),sha256=admittedDualArchiveSha256(p);
   if(!sha256)throw Error('The source part has no complete admitted archive identity.');
   return {p,sha256,bytes:new Uint8Array(part.bytes),id:collectionId(p)};
  }),check=()=>{if(canCommit&&!canCommit())throw Error('Import cancelled. Your library and choices are retained.');};
- if(new Set(parts.map(p=>p.id)).size!==parts.length||prior.some(e=>!validEntryStorage(e)))
+ if(new Set(parts.map(p=>p.id)).size!==parts.length||requestedPrior.some(e=>!validEntryStorage(e)))
   throw Error('Invalid or duplicate source parts; the library is retained.');
  const staged:Array<{entry:Entry;bytes:Uint8Array;personalFile?:string;personalBytes?:Uint8Array}>=[];
  check();
+ const priorLibraryBytes=await host.read('library.json');check();
+ let library:Record<string,unknown>&{version:1;entries:Entry[]};
+ try{library=priorLibraryBytes?JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(priorLibraryBytes)):{version:1,entries:[]};}
+ catch{throw Error('The managed library is invalid; its bytes and choices are retained.');}
+ if(!library||library.version!==1||!Array.isArray(library.entries)||library.entries.some(e=>!validEntryStorage(e))||
+  JSON.stringify(library.entries)!==JSON.stringify(requestedPrior))throw Error('The managed library changed; its current scores and choices are retained.');
+ const prior=library.entries;
  for(const part of parts){
   if(await hashBytes(part.bytes)!==part.sha256)throw Error('The source archive differs from its actual admission; the library is retained.');check();
   const file=`package-${part.sha256}.isoscore`,existing=prior.find(e=>e.id===part.id);
@@ -48,7 +55,13 @@ export async function stageReadingPartsInstall(host:ManagedHost,request:{
   if(!retained){await host.write(part.entry.file,part.bytes);check();}
   if(part.personalFile){await host.write(part.personalFile,part.personalBytes!);check();}
  }
- const libraryBytes=encoder.encode(JSON.stringify({version:1,entries}));check();onCommitStarted?.();check();
+ const currentLibraryBytes=await host.read('library.json');check();
+ if(priorLibraryBytes?!same(currentLibraryBytes,priorLibraryBytes):currentLibraryBytes!==null)
+  throw Error('The managed library changed during import; its current scores and choices are retained.');
+ if(entries.length===prior.length)return {entries,selected,commitConfirmedByReadback:false};
+ // The host supplies atomic file writes; the app owns serial operation guards.
+ // This snapshot check does not claim a cross-process compare-and-swap.
+ const libraryBytes=encoder.encode(JSON.stringify({...library,version:1,entries}));check();onCommitStarted?.();check();
  try{await host.write('library.json',libraryBytes);return {entries,selected,commitConfirmedByReadback:false};}
  catch(error){
   // A write can finish even when its acknowledgement is lost. Never report

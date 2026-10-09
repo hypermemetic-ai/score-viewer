@@ -37,15 +37,26 @@ test('existing part selection preserves personal pointers while invalid or forge
  await assert.rejects(stageReadingPartsInstall(host,{parts:[{bytes:second.bytes,package:forged}],entries:installed.entries}),/archive differs/);assert.deepEqual(host.writes,[]);
  await assert.rejects(stageReadingPartsInstall(host,{parts:[{bytes:first.bytes,package:structuredClone(first.package)}],entries:installed.entries}),/actual receiving-realm/);assert.deepEqual(host.writes,[]);
  const conflicting:Entry={...installed.entries[0],file:'package-'+'f'.repeat(64)+'.isoscore'};
- await assert.rejects(stageReadingPartsInstall(host,{parts:[first],entries:[conflicting]}),/different retained edition/);assert.deepEqual(host.writes,[]);
+ const conflictHost=memoryHost();conflictHost.files.set('library.json',new TextEncoder().encode(JSON.stringify({version:1,entries:[conflicting]})));
+ await assert.rejects(stageReadingPartsInstall(conflictHost,{parts:[first],entries:[conflicting]}),/different retained edition/);assert.deepEqual(conflictHost.writes,[]);
 });
 test('the owned request snapshot survives caller mutation and a committed lost acknowledgement is reported as readback-confirmed',async()=>{
  const host=memoryHost(),bytes=first.bytes.slice(),entries:Entry[]=[],pending=stageReadingPartsInstall(host,{parts:[{bytes,package:first.package}],entries});bytes.fill(0);entries.push({} as Entry);
  const installed=await pending;assert.deepEqual(host.files.get(installed.selected[0].file),first.bytes);
  const write=host.write.bind(host);host.write=async(n,b)=>{await write(n,b);if(n==='library.json')throw Error('acknowledgement lost');};
  const checked=await stageReadingPartsInstall(host,{parts:[second],entries:installed.entries});assert.equal(checked.commitConfirmedByReadback,true);assert.equal(checked.entries.length,2);
- host.write=async n=>{if(n==='library.json')throw Error('unknown write outcome');};
- await assert.rejects(stageReadingPartsInstall(host,{parts:[first],entries:[]}),ReadingPartsCommitUnconfirmed);
+ const unknown=memoryHost();unknown.write=async n=>{if(n==='library.json')throw Error('unknown write outcome');};
+ await assert.rejects(stageReadingPartsInstall(unknown,{parts:[first],entries:[]}),ReadingPartsCommitUnconfirmed);
+});
+test('stale library snapshots and changes during staging refuse without replacing current pointers',async()=>{
+ const host=memoryHost(),installed=await stageReadingPartsInstall(host,{parts:[first],entries:[]}),before=host.files.get('library.json')!.slice();host.writes.length=0;
+ await assert.rejects(stageReadingPartsInstall(host,{parts:[second],entries:[]}),/managed library changed/);assert.equal(host.writes.length,0);assert.deepEqual(host.files.get('library.json'),before);
+ const write=host.write.bind(host),external=new TextEncoder().encode(JSON.stringify({version:1,entries:installed.entries,unknownFuture:{keep:'exact'}}));
+ host.write=async(n,b)=>{await write(n,b);if(n.startsWith('state-version-'))host.files.set('library.json',external.slice());};
+ await assert.rejects(stageReadingPartsInstall(host,{parts:[second],entries:installed.entries}),/changed during import/);
+ assert.equal(host.writes.includes('library.json'),false);assert.deepEqual(host.files.get('library.json'),external);
+ host.write=write;const reopened=await stageReadingPartsInstall(host,{parts:[second],entries:installed.entries});
+ assert.deepEqual(JSON.parse(new TextDecoder().decode(host.files.get('library.json'))).unknownFuture,{keep:'exact'});assert.equal(reopened.entries.length,2);
 });
 test('changing the request cannot replace its captured operation cancellation guard',async()=>{
  const host=memoryHost();host.files.set('library.json',initial());let live=true;
