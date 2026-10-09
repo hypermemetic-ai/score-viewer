@@ -6,6 +6,7 @@ import {pianoRequestAuthority} from './piano-request-authority';
 import {canonicalJson,authorityIdentity,preparationRequestIdentity} from './piano-preparation-identity';
 import {validatePianoCalculationContext,scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {prepareCalculatedEdition} from './calculated-hand-edition';
+import {createScoreTransposition,getScoreTransposition} from './score-transposition';
 const equal=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 const exactBytes=(a:Uint8Array,b:Uint8Array)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
 
@@ -15,6 +16,29 @@ export async function admitPianoRequestResult(request:PianoReadinessRequest,p:Sc
   const original=await importPackage(request.packageBytes,{allowLegacyTempo:true}),has=original.availablePresentations?.includes(request.layout)??original.keyboardLayout===request.layout,
     prior=has?await selectPresentation(original,request.layout):original,
     saved=request.personal?readPersonal(request.personal,prior):undefined;
+  const steps=request.transposeSteps??getScoreTransposition(prior),pitchChanged=steps!==getScoreTransposition(prior);
+  if(!Number.isSafeInteger(steps)||pitchChanged&&(steps===0||request.intent==='read-retained'))throw Error('Prepared output has an invalid requested transposition intent.');
+  if(steps!==0&&(pitchChanged||request.forceRecalculate||request.intent!=='read-retained')){
+    const transformed=await createScoreTransposition(prior,request.packageBytes,steps,request.layout);
+    if(!equal(p.transposition,transformed.envelope)||p.sourceSha256!==transformed.envelope.effectiveSourceSha256||p.keyboardLayout!==request.layout||
+      !exactBytes(p.files[(p.collectionManifest??p.manifest).sourceScore!],transformed.sourceBytes)||
+      !exactBytes(p.referenceMidi??new Uint8Array(),original.referenceMidi??new Uint8Array()))throw Error('Prepared output differs from its requested pitch transformation or retained original reference.');
+    let context=prior.calculationContext;
+    if(context)context=validatePianoCalculationContext({...context,sourceSha256:p.sourceSha256},p.sourceSha256!,transformed.source);
+    if(request.referenceTempo)context=validatePianoCalculationContext({version:'piano-calculation-context-v1',sourceSha256:p.sourceSha256!,referencePerformanceTempo:request.referenceTempo},p.sourceSha256!,transformed.source);
+    if(!equal(p.calculationContext,context))throw Error('Transposed output has another requested calculation context.');
+    const source=scoreWithCalculationContext(transformed.source,context,p.sourceSha256!),
+      rawConstraints=pianoRequestAuthority(prior,source,request.layout,pitchChanged?undefined:saved?.layer??prior.fingerLayer,pitchChanged?undefined:saved,'retain-imported'),
+      constraints=[...new Map(rawConstraints.map(c=>[canonicalJson(c),c])).values()],
+      identity=p.preparationIdentity;
+    if(!identity||!layer||identity.handPolicy!=='retain-imported'||identity.authoritySha256!==await authorityIdentity(constraints)||
+      identity.requestSha256!==await preparationRequestIdentity(p,'retain-imported',constraints,request.maxExpansions)||!equal(layer,p.fingerLayer))throw Error('Transposed output belongs to another selected hand map or layer request.');
+    const expectedPersonal=!pitchChanged&&saved?personalForCalculatedEdition(saved,prior,p):undefined;
+    if(!equal(personal,expectedPersonal))throw Error('Transposed output inherits another pitch edition correction journal.');
+    const prepared=await prepareCalculatedEdition({...p,calculationContext:context},layer,'retain-imported',constraints),rendered=prepared.result;
+    if(!equal(p.renderingRecipe,prepared.recipe)||!equal(p.score,rendered.score)||!equal(p.pages,rendered.pages)||!equal(p.seats,rendered.seats)||!equal(p.calculatedHandReceipt,prepared.receipt))throw Error('Transposed output differs from complete independently replayed engraving.');
+    return;
+  }
   if(p.sourceSha256!==original.sourceSha256||p.sourceRevision!==original.sourceRevision||p.keyboardLayout!==request.layout||
     !exactBytes(p.files[(p.collectionManifest??p.manifest).sourceScore??'score.json'],original.files[(original.collectionManifest??original.manifest).sourceScore??'score.json']))
     throw Error('Prepared output differs from the requested immutable source or keyboard.');
