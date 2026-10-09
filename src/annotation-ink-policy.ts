@@ -13,6 +13,7 @@ export const footerFontNoticeUrl=new URL('../licenses/LiberationSerif-Italic-NOT
 const canonical=(v:any):string=>JSON.stringify(v&&typeof v==='object'?Array.isArray(v)?v.map(x=>JSON.parse(canonical(x))):
  Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(canonical(v[k]))])):v);
 export function validateAnnotationInkPolicy(raw:unknown):ViewerAnnotationInkPolicy{
+ if(raw===ANNOTATION_INK_POLICY)return ANNOTATION_INK_POLICY;
  if(canonical(raw)!==canonical(ANNOTATION_INK_POLICY))throw Error('Unsupported or altered Viewer annotation ink policy.');
  return ANNOTATION_INK_POLICY;
 }
