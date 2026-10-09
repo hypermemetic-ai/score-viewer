@@ -140,7 +140,7 @@ test('source techniques, part ownership and geometry cannot invent unsupported m
 });
 
 test('physical piano operations reject reading packages before making actions or changing source',async()=>{
-  assert.deepEqual(scoreCapabilities(p),{reading:true,pianoPreparation:false,pianoPractice:false,pianoPerformance:false,fingerEditing:false});
+  assert.deepEqual(scoreCapabilities(p),{reading:true,manualPractice:true,pianoPreparation:false,pianoPractice:false,pianoPerformance:false,fingerEditing:false});
   assert.throws(()=>planSource(p),/available for reading/);assert.throws(()=>planPerformance(p),/available for reading/);
   assert.throws(()=>scoreTranspositionRange(p),/available for reading/);
   const markup=scoreOptionsMarkup({id:collectionId(p),file:'package-'+p.archiveSha256+'.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-08'},p,initialPersonal(p),{steps:0,min:0,max:0});
