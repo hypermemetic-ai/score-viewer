@@ -1,9 +1,11 @@
 import {strFromU8,strToU8,zipSync} from 'fflate';
-import {prepareFrettedViews,FRETTED_ISO_ENGINE,FRETTED_TAB_ENGINE,validateInstrumentReadingScore,
+import {prepareFrettedViews,prepareFrettedViewsAsync,FRETTED_ISO_ENGINE,FRETTED_TAB_ENGINE,validateInstrumentReadingScore,
  type FrettedReadingScene,type JankoLayoutOptions,type JankoTokens,type ReadingOwner} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,type Manifest,type Metadata,type ScorePackage} from './package';
 import type {ReadingContent} from './reading-package';
+import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
+import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 
 export type ReadingNotation='iso'|'tab';
 type PreparedViews=ReturnType<typeof prepareFrettedViews>;
@@ -36,6 +38,25 @@ const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 interface AdmittedViews {score:QuantizedGridScore;manifest:Manifest;reading:ReadingContent}
 const admittedViews=new WeakMap<ReadingContent,AdmittedViews>();
 const frozenData=new WeakSet<object>();
+function literalCopy<T>(input:T):T {
+ const copied=new WeakMap<object,unknown>(),active=new WeakSet<object>();
+ const copy=(value:unknown):unknown=>{
+  if(typeof value==='function'||typeof value==='symbol'||typeof value==='bigint')throw Error('Dual reading requires literal data.');
+  if(!value||typeof value!=='object')return value;
+  if(value instanceof Uint8Array)return new Uint8Array(value);
+  if(active.has(value))throw Error('Dual reading requires acyclic literal data.');
+  if(copied.has(value))return copied.get(value);
+  const result:Array<unknown>|Record<string,unknown>=Array.isArray(value)?[]:{};active.add(value);copied.set(value,result);
+  for(const key of Reflect.ownKeys(value)){
+   const descriptor=Object.getOwnPropertyDescriptor(value,key);
+   if(typeof key!=='string'||!descriptor||!('value' in descriptor))throw Error('Dual reading cannot admit callable or accessor authority.');
+   if(Array.isArray(value)&&key==='length')continue;
+   Object.defineProperty(result,key,{value:copy(descriptor.value),enumerable:descriptor.enumerable,writable:true,configurable:true});
+  }
+  active.delete(value);return result;
+ };
+ return copy(input) as T;
+}
 function freezeGraph(value:unknown,seen=new WeakSet<object>()){
  if(typeof value==='function'||typeof value==='symbol'||typeof value==='bigint')throw Error('Dual reading requires literal data.');
  if(!value||typeof value!=='object'||frozenData.has(value))return;
@@ -57,7 +78,9 @@ function scoreBounds(score:QuantizedGridScore){
  validateInstrumentReadingScore(score);
 }
 function checkedViews(score:QuantizedGridScore,options:Partial<JankoLayoutOptions>,tokens:Partial<JankoTokens>){
- scoreBounds(score);const result=prepareFrettedViews(score,options,tokens);
+ scoreBounds(score);return completeViews(score,prepareFrettedViews(score,options,tokens));
+}
+function completeViews(score:QuantizedGridScore,result:PreparedViews){
  for(const kind of ['iso','tab'] as const){const view=result[kind];
   if(!view.pages.length||view.pages.length>500||!view.geometryEvidence.ok||view.geometryEvidence.violations.length||view.geometryEvidence.warnings.length)
    throw Error('Dual reading '+kind.toUpperCase()+' needs complete clear source-owned geometry.');
@@ -79,7 +102,7 @@ function content(prepared:PreparedViews):ReadingContent {
 }
 /** Exact receiving-realm replay of BOTH presentations. A page hash or saved
  * geometry certificate never substitutes for this shared-source preparation. */
-export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Array>):{score:QuantizedGridScore;pages:string[];reading:ReadingContent}{
+function captureDualSource(m:Manifest,files:Record<string,Uint8Array>){
  const d=m.reading;
  if(!d||d.version!=='instrument-reading-package-v2'||!exactKeys(d,['version','sourcePartId','sourceStaffId','policy','options','tokens','views'])||
   !exactKeys(d.views,['iso','tab'])||!object(d.options)||!object(d.tokens)||forbidden.some(k=>k in m)||files['fingers.json']||
@@ -89,7 +112,10 @@ export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Arra
  scoreBounds(score);
  if(score.id!==m.scoreId||score.title!==m.metadata.title||score.composer!==m.metadata.composer||!same(score.readingPolicy,d.policy)||
   m.engineVersion!==FRETTED_ISO_ENGINE||!same(m.pages,d.views.iso.pages))throw Error('Dual reading source identity or default presentation differs.');
- const prepared=checkedViews(score,d.options,d.tokens);
+ return {score,descriptor:d};
+}
+function* finishDualReading(m:Manifest,files:Record<string,Uint8Array>,score:QuantizedGridScore,prepared:PreparedViews):Generator<PreparationStage,{score:QuantizedGridScore;pages:string[];reading:ReadingContent;manifest:Manifest},void>{
+ const d=m.reading as DualReadingDescriptor;
  if(d.sourcePartId!==prepared.sourcePartId||d.sourceStaffId!==prepared.sourceStaffId)throw Error('Dual reading selected source part differs.');
  const allNames=new Set<string>();
  for(const kind of ['iso','tab'] as const){const descriptor=d.views[kind],view=prepared[kind],prefix=`reading/${kind}/`;
@@ -102,12 +128,24 @@ export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Arra
   }
   if(!same(parse(files,descriptor.owners),view.owners)||!same(parse(files,descriptor.scene),view.scene)||
    !same(parse(files,descriptor.geometry),view.geometryEvidence))throw Error('Dual reading ownership, scene or geometry differs from shared preparation.');
-  descriptor.pages.forEach((name,i)=>{if(strFromU8(files[name])!==view.pages[i])throw Error('Dual reading page differs from shared preparation: '+name);});
+  yield 'geometry';
+  for(const[name,i]of descriptor.pages.map((name,i)=>[name,i] as const)){if(strFromU8(files[name])!==view.pages[i])throw Error('Dual reading page differs from shared preparation: '+name);yield 'paint';}
  }
+ yield 'commit';
  const reading=content(prepared);
  freezeGraph(score);freezeGraph(m);freezeGraph(reading);
  admittedViews.set(reading,{score,manifest:m,reading});
- return {score,pages:prepared.iso.pages,reading};
+ return {score,pages:prepared.iso.pages,reading,manifest:m};
+}
+export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Array>){
+ const {score,descriptor}=captureDualSource(m,files),steps=finishDualReading(m,files,score,checkedViews(score,descriptor.options,descriptor.tokens));
+ for(;;){const next=steps.next();if(next.done){const {manifest:_manifest,...reading}=next.value;return reading;}}
+}
+export async function admitDualReadingContentAsync(inputManifest:Manifest,inputFiles:Record<string,Uint8Array>,inputExecution:ReadingExecution){
+ const m=literalCopy(inputManifest),files=literalCopy(inputFiles),execution=capturedReadingExecution(inputExecution),{score,descriptor}=captureDualSource(m,files);
+ checkReadingExecution(execution);
+ const prepared=completeViews(score,await prepareFrettedViewsAsync(score,descriptor.options,descriptor.tokens,execution));
+ return drainReadingChecks(finishDualReading(m,files,score,prepared),execution);
 }
 
 /** One owned graph before asynchronous hashing. This path remains generic
@@ -117,11 +155,13 @@ export interface DualReadingPreparationInput {score:QuantizedGridScore;metadata:
 export interface DualReadingPacket {bytes:Uint8Array;package:ScorePackage}
 /** Includes the existing independent final cold receiving result; a caller
  * does not need to replay a third time just to retain its actual scene context. */
-export async function prepareDualReadingPacket(input:DualReadingPreparationInput):Promise<DualReadingPacket>{
- const owned=structuredClone(input),score=owned.score;
+export async function prepareDualReadingPacket(input:DualReadingPreparationInput,inputExecution?:ReadingExecution):Promise<DualReadingPacket>{
+ const owned=literalCopy(input),score=owned.score,execution=inputExecution?capturedReadingExecution(inputExecution):undefined;checkReadingExecution(execution);
  if(!owned.createdAt||owned.metadata.title!==score.title||owned.metadata.composer!==score.composer||!owned.font.name||
   !owned.font.bytes.length||!Object.keys(owned.notices).length)throw Error('Incomplete dual reading preparation.');
- const prepared=checkedViews(score,owned.options??{},owned.tokens??{}),files:Record<string,Uint8Array>={
+ scoreBounds(score);
+ const prepared=execution?completeViews(score,await prepareFrettedViewsAsync(score,owned.options??{},owned.tokens??{},execution)):checkedViews(score,owned.options??{},owned.tokens??{});checkReadingExecution(execution);
+ const files:Record<string,Uint8Array>={
   'score.json':strToU8(JSON.stringify(score)),'seats.json':strToU8('[]')};
  const put=(name:string,bytes:Uint8Array)=>{
   if(name==='manifest.json'||name in files||!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||name.startsWith('/'))
@@ -141,7 +181,7 @@ export async function prepareDualReadingPacket(input:DualReadingPreparationInput
   reading:{version:'instrument-reading-package-v2',sourcePartId:prepared.sourcePartId,sourceStaffId:prepared.sourceStaffId,
    policy:score.readingPolicy!,options:prepared.iso.options,tokens:prepared.iso.tokens,views}};
  m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
- files['manifest.json']=strToU8(JSON.stringify(m));const bytes=zipSync(files,{level:6}),packageValue=await importPackageForReading(bytes);return {bytes,package:packageValue};
+ checkReadingExecution(execution);files['manifest.json']=strToU8(JSON.stringify(m));const bytes=zipSync(files,{level:6});checkReadingExecution(execution);const packageValue=await importPackageForReading(bytes,execution);checkReadingExecution(execution);return {bytes,package:packageValue};
 }
 
 /** Legacy byte-only entry retains exactly the same builder and cold replay. */

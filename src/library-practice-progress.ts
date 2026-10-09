@@ -34,7 +34,9 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  // No additional replay/queue is launched while that producer owns the slot.
  if(admission)await admission.waitForIdle();
  if(!isCurrent())return;
- const imported=await (admission?admission.import(bytes,{allowLegacyTempo:true}):importPackage(bytes,{allowLegacyTempo:true}));
+ const options={allowLegacyTempo:true,execution:{onCheckpoint:()=>{if(!isCurrent())throw new DOMException('Library reading was superseded.','AbortError');}}};
+ const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options));
+ if(!isCurrent())return;
  if(collectionId(imported)!==entry.id)return;
  if(imported.reading?.dual&&scoreCapabilities(imported).manualPractice){
   assertSelectedTransposition(entry,imported);
