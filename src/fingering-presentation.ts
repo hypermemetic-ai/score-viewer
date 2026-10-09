@@ -9,6 +9,7 @@ export const ANNOTATION_SIZE_RATIO=.68;
 export const ANNOTATION_COLOR='#56788f';
 export interface AnnotationPosition {x:number;baseline:number;fontSize:number;bounds:[number,number,number,number];carrier:FingerCarrier}
 const ns='http://www.w3.org/2000/svg';
+const attribute=(el:Element,key:string,value:string)=>{if(el.getAttribute(key)!==value)el.setAttribute(key,value);};
 const cache=new WeakMap<object,Map<string,AnnotationPosition>>();
 /** Keep the entire stack in its original source column's reading space. The
  * original x wins; otherwise select the smallest cleared local displacement.
@@ -78,12 +79,13 @@ export interface FingerPaint {visible:boolean;presentation:FingerPresentation;fi
 export function paintFinger(text:SVGTextElement,seat:Seat,options:FingerPaint):void{
  const {visible,presentation,finger,position}=options;
  if(visible&&(!Number.isInteger(finger)||finger!<1||finger!>5))throw Error('Finger mapping is incomplete');
- text.textContent=visible&&presentation==='replacement'?String(finger):options.pitchText??seat.pitchDigit;
- if(options.label)text.setAttribute('aria-label',options.label);
+ const pitch=visible&&presentation==='replacement'?String(finger):options.pitchText??seat.pitchDigit;
+ if(text.textContent!==pitch)text.textContent=pitch;
+ if(options.label)attribute(text,'aria-label',options.label);
  let annotation=Array.from(text.parentNode!.childNodes).find(n=>n.nodeType===1&&(n as Element).getAttribute('data-finger-seat')===seat.id) as SVGTextElement|undefined;
  if(!visible||presentation!=='annotations'){annotation?.remove();return;}
  if(!annotation){annotation=text.ownerDocument.createElementNS(ns,'text') as SVGTextElement;annotation.setAttribute('data-finger-seat',seat.id);annotation.setAttribute('class','viewer-finger-annotation');annotation.setAttribute('font-family','URW Gothic');annotation.setAttribute('font-weight','700');annotation.setAttribute('text-anchor','middle');text.parentNode!.appendChild(annotation);}
- annotation.setAttribute('x',String(position.x));annotation.setAttribute('y',String(position.baseline));annotation.setAttribute('font-size',`${position.fontSize}pt`);annotation.style.fill=ANNOTATION_COLOR;annotation.textContent=String(finger);
- annotation.setAttribute('aria-label',options.label??`Finger ${finger}, pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`);
- if(options.interactive){annotation.setAttribute('role','button');annotation.setAttribute('tabindex','-1');annotation.style.cursor='pointer';}else{annotation.setAttribute('aria-hidden','true');annotation.style.pointerEvents='none';}
+ attribute(annotation,'x',String(position.x));attribute(annotation,'y',String(position.baseline));attribute(annotation,'font-size',`${position.fontSize}pt`);if(annotation.style.fill!==ANNOTATION_COLOR)annotation.style.fill=ANNOTATION_COLOR;if(annotation.textContent!==String(finger))annotation.textContent=String(finger);
+ attribute(annotation,'aria-label',options.label??`Finger ${finger}, pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`);
+ if(options.interactive){attribute(annotation,'role','button');attribute(annotation,'tabindex','-1');if(annotation.style.cursor!=='pointer')annotation.style.cursor='pointer';}else{attribute(annotation,'aria-hidden','true');if(annotation.style.pointerEvents!=='none')annotation.style.pointerEvents='none';}
 }
