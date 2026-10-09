@@ -52,6 +52,17 @@ test('all bounded successor branches are preflighted; compact admission keeps or
  }
 });
 
+test('a conservative break estimate still tests the permitted frame with complete cue air and exhaustive placement proof',()=>{
+ const f=fixture([136,136,136,425,119]);for(const m of f.measures){m.leftAir=.8;m.rightAir=.8;}f.measures[3].leftAir=8.7;f.measures[4].rightAir=5;
+ const edge=9.5,maximum=864,estimate=425+3*136+3*8+2*edge;assert.ok(estimate>maximum);
+ const certificate=admitRefill(f.plan,f.chunk,f.measures,{edge,breakGap:8,maxFrameWidth:maximum});
+ assert.equal(certificate.proof,'enumerated');assert.equal(certificate.frame.width,maximum);assert.ok(certificate.states>f.measures.length);assert.ok(certificate.transitions>=certificate.states-1);
+ assert.deepEqual([...certificate.measures.values()],f.measures,'no source interval or required cue footprint is squeezed');
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,certificate);s.ready(0);
+ for(const attack of s.events){assert.equal(s.note(attack.midi,s.startMs+attack.tick*s.tickMs),'accepted');const current=readingBar(f.plan,f.chunk,s,refill.layout.current),pinned=refill.layout.placements.find(p=>p.bar===current);refill.update(s,true);assert.deepEqual(refill.layout.placements.find(p=>p.bar===current),pinned);within(refill.layout,maximum,edge);}
+ assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{edge,breakGap:8,maxFrameWidth:600}),/cannot be admitted at a readable size/,'an actually infeasible bound still refuses');
+});
+
 test('the conservative interval certificate covers every possible pinned coordinate',()=>{
  const f=fixture([20,80,110,75,120,45]),certificate=admitRefill(f.plan,f.chunk,f.measures,{maxStates:1}),maximum=Math.max(...f.measures.map(p=>p.width+certificate.frame.breakGap));
  assert.equal(certificate.proof,'interval-bound');assert.equal(certificate.frame.width,5*maximum+2*certificate.frame.edge);

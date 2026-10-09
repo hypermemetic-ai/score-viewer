@@ -1,40 +1,79 @@
 import type {ScorePackage,Seat} from './package';
 import type {PracticePlan} from './practice';
 import {cropMeasure,type Crop,type PassageTrack} from './practice-passage';
-import {taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments,tieArcDepth,tieArcInkBox} from '../vendor/iso-notation/src/render/janko/ties';
+import {deriveTieDisplayPlan,taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments,tieArcDepth,tieArcInkBox} from '../vendor/iso-notation/src/render/janko/ties';
 import {resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
 import {expressionIntersectsBox,expressionsOverlap,expressionContourOutwardShift,expressionSliceAtX,type ExpressionInk} from '../vendor/iso-notation/src/render/janko/elements/expressions';
+import {layoutJankoScore} from '../vendor/iso-notation/src/render/janko/engine';
+import {buildInkScene} from '../vendor/iso-notation/src/render/janko/ink-scene';
+import {scoreRenderingRecipeOptions,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 type Contour=NonNullable<ExpressionInk['contour']>;
-export interface InkBox {x0:number;x1:number;y0:number;y1:number}
-interface Fragment {path:SVGPathElement;frame:number;page:number;system:number;contour:Contour}
-interface Relation {id:string;kind:'phrase'|'tie';start:number;end:number;from:Seat;to:Seat;first:Fragment;last:Fragment;groups:string[]}
+export interface InkBox {x0:number;x1:number;y0:number;y1:number;seatId?:string}
+interface SourceFragment {path:SVGPathElement;systemElement:Element;page:number;system:number}
+interface Fragment extends SourceFragment {frame:number;contour:Contour}
+interface Relation {id:string;kind:'phrase'|'tie';start:number;end:number;from:Seat;to:Seat;first:Fragment;last:Fragment;groups:string[];reconcileSides:boolean}
 export interface ProjectedRelation {id:string;kind:'phrase'|'tie';groups:string[];path:SVGPathElement;contour:Contour;left:number;right:number;knockout:boolean;bounds:InkBox;strokeSegments?:ExpressionInk['strokeSegments']}
-const cache=new WeakMap<ScorePackage,Relation[]>();
+// Cache inventory, never a whole-score or previously selected range's geometry
+// admission. A malformed later bow must not gate an unrelated earlier passage.
+const cache=new WeakMap<ScorePackage,Map<string,SourceFragment[]>>();
+const headCache=new WeakMap<ScorePackage,Map<string,string[]>>();
+/** Retained pages may predate the optional data-note-id wrappers. Replay the
+ * admitted recipe's real head ledger and bind its literal glyph to the frozen
+ * seat; neither nearest-head guesses nor continuation suffixes establish it. */
+function replayedHeads(p:ScorePackage):Map<string,string[]> {
+ const saved=headCache.get(p);if(saved)return saved;
+ const recipe=validateScoreRenderingRecipe(p.renderingRecipe),options=scoreRenderingRecipeOptions(recipe),heads=new Map<string,string[]>(),display=deriveTieDisplayPlan(p.score,options.chordGrouping==='compatible-stems'),owners=new Set(p.score.notes.map(n=>n.id));
+ for(const layout of layoutJankoScore(p.score,options,recipe.tokens))for(const [id,pieces]of buildInkScene(layout,options,recipe.tokens,p.score).heads){
+  const glyph=pieces.find(q=>q.primitive.kind==='glyph'&&q.paint.cls==='janko-digit');if(!glyph||glyph.primitive.kind!=='glyph')continue;
+  const match=glyph.svg.match(/<text[^>]+x="([^"]+)"[^>]+y="([^"]+)"[^>]+font-size="([^"]+)pt"/);if(!match)throw Error('Unsupported source relation head typography.');
+  const digit=glyph.primitive.digit,sourceOwners=[...new Set(glyph.ownerIds.flatMap(owner=>owners.has(owner)?[owner]:display.chains.filter(c=>c.components.some(k=>k.added&&k.headId===owner)).map(c=>c.noteId)))].sort();
+  for(const seat of p.seats.filter(s=>s.system===layout.index&&s.page===pieces[0].pagePiece&&s.x===Number(match[1])&&s.baseline===Number(match[2])&&s.fontSize===Number(match[3])&&s.pitchDigit===digit&&JSON.stringify([...s.ownerIds].sort())===JSON.stringify(sourceOwners))){
+   const ids=heads.get(seat.id)??[];ids.push(id);heads.set(seat.id,ids);
+  }
+ }
+ headCache.set(p,heads);return heads;
+}
+export function consecutiveRelationRuns(positions:ReadonlyArray<number|undefined>):Array<{first:number;last:number}>{
+ const runs:Array<{first:number;last:number}>=[];for(let slot=0;slot<positions.length;slot++){if(positions[slot]===undefined)continue;const last=runs.at(-1);if(last&&positions[last.last]!+1===positions[slot])last.last=slot;else runs.push({first:slot,last:slot});}return runs;
+}
+export function relationIntersectsRuns(start:number,end:number,barTicks:readonly number[],positions:ReadonlyArray<number|undefined>):boolean {
+ return consecutiveRelationRuns(positions).some(run=>end>=barTicks[positions[run.first]!]&&start<barTicks[positions[run.last]!+1]);
+}
 /** Decode the retained tapered ribbon; all projected tips originate here. */
 function contour(path:SVGPathElement):Contour {
  const d=path.getAttribute('d')??'',commands=d.match(/[A-Za-z]/g)?.join(''),v=d.match(/[+-]?(?:\d*\.)?\d+/g)?.map(Number)??[];
+ if(!v.every(Number.isFinite))throw Error('Unsupported source relation contour.');
  if(commands==='MQ'&&v.length===6){const [xStart,yStart,cx,cy,xEnd,yEnd]=v,side: -1|1=cy-(yStart+yEnd)/2<0?-1:1;return {xStart,xEnd,yStart,yEnd,side,depth:Math.abs(cy-(yStart+yEnd)/2)/2,thickness:Number(path.getAttribute('stroke-width'))||.7,indent:cx-xStart};}
  if(commands==='MC'&&v.length===8){const [xStart,yStart,ax,ay,bx,by,xEnd,yEnd]=v,w=xEnd-xStart,side: -1|1=path.getAttribute('data-tie-side')==='below'?1:-1;return {xStart,xEnd,yStart,yEnd,side,depth:Math.max(.5,Math.abs(ay-yStart),Math.abs(by-yEnd),Math.abs(yEnd-yStart)),thickness:Number(path.getAttribute('stroke-width'))||.7,indent:(ax-xStart+xEnd-bx)/2,startIndent:ax-xStart,endIndent:xEnd-bx};}
  if(commands!=='MCLCZ'||v.length!==16||v[6]<=v[0]||Math.abs(v[8]-v[6])>.03||Math.abs(v[14]-v[0])>.03)throw Error('Unsupported source relation contour.');
  const [xStart,yStart,ax,ay,bx,by,xEnd,yEnd]=v,w=xEnd-xStart,aAxis=yStart+(yEnd-yStart)*(ax-xStart)/w,bAxis=yStart+(yEnd-yStart)*(bx-xStart)/w,side: -1|1=ay+by-aAxis-bAxis<0?-1:1,tipThickness=Math.abs(v[9]-yEnd),body=Math.abs(ay-v[13]);
  return {xStart,xEnd,yStart,yEnd,side,depth:Math.max(.5,Math.abs(ay-aAxis)*.75,Math.abs(by-bAxis)*.75),startDepth:Math.abs(ay-aAxis)*.75,endDepth:Math.abs(by-bAxis)*.75,thickness:tipThickness?(3*body+tipThickness)/4:body*.75,indent:(ax-xStart+xEnd-bx)/2,startIndent:ax-xStart,endIndent:xEnd-bx,chordAligned:true,...(tipThickness?{tipThickness}:{})};
 }
-function sources(p:ScorePackage,plan:PracticePlan):Relation[]{
- const saved=cache.get(p);if(saved)return saved;const fragments=new Map<string,Fragment[]>();
+function inventory(p:ScorePackage):Map<string,SourceFragment[]>{
+ const saved=cache.get(p);if(saved)return saved;const fragments=new Map<string,SourceFragment[]>();
  for(const [page,svg]of p.pages.entries()){
   const doc=new DOMParser().parseFromString(svg,'image/svg+xml');
   for(const system of doc.querySelectorAll('[id^="system-"]')){
-   const lanes=[...system.querySelectorAll<SVGLineElement>('.janko-pitch-lane')],span=Math.max(...lanes.map(l=>Number(l.getAttribute('x2'))-Number(l.getAttribute('x1')))),frame=Math.min(...lanes.filter(l=>Math.abs(Number(l.getAttribute('x2'))-Number(l.getAttribute('x1'))-span)<.03).map(l=>Number(l.getAttribute('y1'))));
    for(const path of system.querySelectorAll<SVGPathElement>('.janko-phrase[data-phrase],path[data-tie-note]')){
     const id=path.hasAttribute('data-phrase')?'phrase:'+path.getAttribute('data-phrase'):`tie:${path.getAttribute('data-tie-note')}:${path.getAttribute('data-tie-component')}`;
-    const group=fragments.get(id)??[];group.push({path,frame,page,system:Number(system.id.slice(7))-1,contour:contour(path)});fragments.set(id,group);
+    const group=fragments.get(id)??[];group.push({path,systemElement:system,page,system:Number(system.id.slice(7))-1});fragments.set(id,group);
    }
   }
  }
+ cache.set(p,fragments);return fragments;
+}
+function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number|undefined>):Relation[]{
  const relations:Relation[]=[];
- for(const [id,parts]of fragments){
-  const kind=id.startsWith('phrase:')?'phrase':'tie',phrase=kind==='phrase'?p.score.phrases?.find(q=>'phrase:'+q.id===id):undefined,firstPath=parts[0].path;
-  const fromIds=phrase?.fromNoteIds??[firstPath.getAttribute('data-tie-from')!],toIds=phrase?.toNoteIds??[firstPath.getAttribute('data-tie-to')!],start=phrase?.startTick??Number(firstPath.getAttribute('data-tie-from-tick')),end=phrase?.endTick??Number(firstPath.getAttribute('data-tie-to-tick'));
+ for(const [id,raw]of inventory(p)){
+  const kind=id.startsWith('phrase:')?'phrase':'tie',phrase=kind==='phrase'?p.score.phrases?.find(q=>'phrase:'+q.id===id):undefined,firstPath=raw[0].path,
+   component=Number(firstPath.getAttribute('data-tie-component')),chain=kind==='tie'?p.score.tieChains?.find(q=>q.noteId===firstPath.getAttribute('data-tie-note')):undefined,
+   fromComponent=chain?.components[component],toComponent=chain?.components[component+1],start=phrase?.startTick??fromComponent?.startTick??Number(firstPath.getAttribute('data-tie-from-tick')),end=phrase?.endTick??toComponent?.startTick??Number(firstPath.getAttribute('data-tie-to-tick'));
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)throw Error(`Unresolved relation endpoints: ${id}.`);
+  if(!relationIntersectsRuns(start,end,plan.barTicks,positions))continue;
+  if(kind==='tie'&&fromComponent&&toComponent&&raw.some(part=>Number(part.path.getAttribute('data-tie-from-tick'))!==start||Number(part.path.getAttribute('data-tie-to-tick'))!==end))throw Error(`Source tie component timing differs: ${id}.`);
+  const parts:Fragment[]=raw.map(part=>{const lanes=[...part.systemElement.querySelectorAll<SVGLineElement>('.janko-pitch-lane')],span=Math.max(...lanes.map(l=>Number(l.getAttribute('x2'))-Number(l.getAttribute('x1')))),frame=Math.min(...lanes.filter(l=>Math.abs(Number(l.getAttribute('x2'))-Number(l.getAttribute('x1'))-span)<.03).map(l=>Number(l.getAttribute('y1'))));if(!Number.isFinite(frame))throw Error(`Unresolved source relation frame: ${id}.`);return {...part,frame,contour:contour(part.path)};});
+  if(parts.some((a,i)=>parts.slice(i+1).some(b=>a.page===b.page&&a.system===b.system&&a.contour.side!==b.contour.side)))throw Error(`Incompatible source relation sides: ${id}.`);
+  const fromIds=phrase?.fromNoteIds??[firstPath.getAttribute('data-tie-from')!],toIds=phrase?.toNoteIds??[firstPath.getAttribute('data-tie-to')!];
   if(!fromIds.length||!toIds.length||!Number.isFinite(start)||!Number.isFinite(end))throw Error(`Unresolved relation endpoints: ${id}.`);
   const original=(id:string)=>id.replace(/~c\d+$/,'');
   const anchor=(ids:string[],tick:number,ending:boolean)=>{
@@ -48,26 +87,58 @@ function sources(p:ScorePackage,plan:PracticePlan):Relation[]{
    return pairs[0];
   };
   const a=anchor(fromIds,start,false),b=anchor(toIds,end,true);
-  if(a.part.contour.side!==b.part.contour.side)throw Error(`Incompatible source relation sides: ${id}.`);
+  const reconcileSides=a.part.contour.side!==b.part.contour.side;
+  if(reconcileSides){
+   const keys=['data-tie-note','data-tie-component','data-tie-from','data-tie-to','data-tie-from-tick','data-tie-to-tick','data-tie-profile'],profile=firstPath.getAttribute('data-tie-profile');
+   const display=deriveTieDisplayPlan(p.score,p.renderingRecipe?.options.chordGrouping==='compatible-stems').chains.find(q=>q.noteId===chain?.noteId),fromHead=display?.components[component],toHead=display?.components[component+1];
+   const head=(endpoint:typeof a)=>{const explicit=[...endpoint.part.systemElement.querySelectorAll('[data-viewer-seat]')].find(el=>el.getAttribute('data-viewer-seat')===endpoint.seat.id)?.closest('[data-note-id]')?.getAttribute('data-note-id');if(explicit)return explicit;const ids=replayedHeads(p).get(endpoint.seat.id);return ids?.length===1?ids[0]:undefined;};
+   if(kind!=='tie'||a.part.page===b.part.page&&a.part.system===b.part.system||!Number.isSafeInteger(component)||component<0||String(component)!==firstPath.getAttribute('data-tie-component')||!fromComponent||!toComponent||!['traced','uniform'].includes(profile??'')||
+    fromHead?.headId!==fromIds[0]||toHead?.headId!==toIds[0]||fromHead?.startTick!==start||toHead?.startTick!==end||
+    !a.seat.ownerIds.includes(chain!.noteId)||!b.seat.ownerIds.includes(chain!.noteId)||head(a)!==fromIds[0]||head(b)!==toIds[0]||
+    Number(firstPath.getAttribute('data-tie-from-tick'))!==start||Number(firstPath.getAttribute('data-tie-to-tick'))!==end||
+    parts.some(part=>keys.some(key=>!firstPath.hasAttribute(key)||part.path.getAttribute(key)!==firstPath.getAttribute(key))||part.path.getAttribute('data-tie-side')!==(part.contour.side===1?'below':'above')))
+    throw Error(`Incompatible source relation sides: ${id}.`);
+  }
   const owners=kind==='tie'?[original(firstPath.getAttribute('data-tie-note')!)]:[...fromIds,...toIds].map(original),hands=new Set(p.score.notes.filter(n=>owners.includes(n.id)).map(n=>n.hand));
   const groups=[...new Set([...owners.map(owner=>plan.ownerGroup.get(owner)),...(kind==='phrase'?plan.gestures.filter(g=>g.start<=end&&g.end>=start&&hands.has(g.hand)).map(g=>g.id):[])].filter((g):g is string=>!!g))];
   if(!groups.length)throw Error(`Unresolved relation contributors: ${id}.`);
-  relations.push({id,kind,start,end,from:a.seat,to:b.seat,first:a.part,last:b.part,groups});
+  relations.push({id,kind,start,end,from:a.seat,to:b.seat,first:a.part,last:b.part,groups,reconcileSides});
  }
- cache.set(p,relations);return relations;
+ return relations;
 }
 function overlaps(a:ExpressionInk,b:ExpressionInk){
  const stroke=a.strokeSegments?a:b.strokeSegments?b:undefined,other=stroke===a?b:a;
  if(!stroke)return expressionsOverlap(a,b);
  return stroke.strokeSegments!.some(s=>expressionIntersectsBox(other,{x0:Math.min(s.x0,s.x1)-s.width/2,x1:Math.max(s.x0,s.x1)+s.width/2,y0:Math.min(s.y0,s.y1)-s.width/2,y1:Math.max(s.y0,s.y1)+s.width/2}));
 }
+/** A common-side bow attaches to the same frozen heads with each source
+ * fragment's own mask-to-tip air. Actual text enclosures remain protected;
+ * source and destination tips never borrow a neighbouring head or stem. */
+function sideTip(endpoint:Seat,fragment:Fragment,ending:boolean,side:-1|1,track:PassageTrack):number {
+ const text=[...fragment.systemElement.querySelectorAll('[data-viewer-seat]')].find(el=>el.getAttribute('data-viewer-seat')===endpoint.id),mask=text?.closest('.janko-reading-head')?.querySelector('.janko-knockout')??text?.previousElementSibling;
+ if(!mask||mask.localName!=='rect'||!mask.classList.contains('janko-knockout')||mask.hasAttribute('transform'))throw Error('Unsupported source tie attachment mask.');
+ const top=Number(mask.getAttribute('y')),bottom=top+Number(mask.getAttribute('height')),tip=ending?fragment.contour.yEnd:fragment.contour.yStart,gap=fragment.contour.side===1?tip-bottom:top-tip;
+ if(!Number.isFinite(top)||!Number.isFinite(bottom)||bottom<=top||!Number.isFinite(gap)||gap<-.03)throw Error('Unresolved source tie attachment gap.');
+ const actual=(track.boxes.get(endpoint.writtenBar-1)??[]).filter(b=>b.seatId===endpoint.id),low=Math.min(top,...actual.map(b=>b.y0)),high=Math.max(bottom,...actual.map(b=>b.y1));
+ return (side===1?high+Math.max(0,gap):low-Math.max(0,gap))-fragment.frame;
+}
+/** The same shared cubic supplies an unequal-height uniform tie's centerline;
+ * the retained uniform source stroke paints it, without closing/doubling ink. */
+function uniformCubicPath(c:Contour):string {
+ return taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,0,c.indent,c).split(' L ')[0];
+}
+function uniformCubicSegments(c:Contour):NonNullable<ExpressionInk['strokeSegments']>{
+ const v=uniformCubicPath(c).match(/[+-]?(?:\d*\.)?\d+/g)!.map(Number),point=(u:number)=>{const t=1-u;return {x:t*t*t*v[0]+3*t*t*u*v[2]+3*t*u*u*v[4]+u*u*u*v[6],y:t*t*t*v[1]+3*t*t*u*v[3]+3*t*u*u*v[5]+u*u*u*v[7]};};
+ let previous=point(0);return Array.from({length:512},(_,i)=>{const next=point((i+1)/512),segment={x0:previous.x,y0:previous.y,x1:next.x,y1:next.y,width:c.thickness};previous=next;return segment;});
+}
 /** Relations are projected independently of frozen note seats. Source identities
  * select tips, source contours supply side/body/taper, and the pinned primitive
  * paints one complete ribbon. Runs never bridge a nonconsecutive source wrap. */
 export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>,placements?:ReadonlyArray<{bar:number;x:number}>):ProjectedRelation[]{
- const selected=positions.filter((b):b is number=>b!==undefined),min=Math.min(...selected),max=Math.max(...selected),relations=sources(p,plan).filter(q=>q.end>=plan.barTicks[min]&&q.start<plan.barTicks[max+1]),offsets:number[]=[];let x=0;
+ if(!positions.some(b=>b!==undefined))return [];
+ const relations=sources(p,plan,positions),offsets:number[]=[];let x=0;
  for(const bar of positions){if(placements&&bar!==undefined){const placement=placements.find(p=>p.bar===bar);if(!placement)throw Error(`Measure ${bar+1}: missing admitted relation placement.`);x=placement.x;}offsets.push(x);const c=crops.find(c=>c.bar===bar);x+=policy==='fixed'?track.width:c?c.right-c.left:0;}
- const runs:Array<{first:number;last:number}>=[];for(let slot=0;slot<positions.length;slot++){if(positions[slot]===undefined)continue;const last=runs.at(-1);if(last&&positions[last.last]!+1===positions[slot])last.last=slot;else runs.push({first:slot,last:slot});}
+ const runs=consecutiveRelationRuns(positions);
  const output:ProjectedRelation[]=[];
  // Different source runs have disjoint relation clips on the continuous staff.
  // Ghost endpoints outside one clip must not displace a bow in another run.
@@ -85,21 +156,31 @@ export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],t
   const obstacles=positions.flatMap((bar,slot)=>{if(slot<run.first||slot>run.last||bar===undefined)return [];const c=crops.find(c=>c.bar===bar)!;return (track.boxes.get(bar)??[]).map(b=>({x0:offsets[slot]+b.x0-c.left,x1:offsets[slot]+b.x1-c.left,y0:b.y0-c.frame,y1:b.y1-c.frame}));});
   for(const q of relations.filter(q=>q.end>=plan.barTicks[aBar]&&q.start<plan.barTicks[bBar+1]).sort((a,b)=>Number(a.kind==='phrase')-Number(b.kind==='phrase')||a.end-a.start-(b.end-b.start))){
    const first=q.first.contour,last=q.last.contour,xStart=mapped(q.from,first.xStart),xEnd=mapped(q.to,last.xEnd);if(xEnd<=left||xStart>=right)continue;if(xEnd<=xStart)throw Error(`Nonpositive projected relation: ${q.id}.`);
-   const width=xEnd-xStart,c:Contour={xStart,xEnd,yStart:first.yStart-q.first.frame,yEnd:last.yEnd-q.last.frame,side:first.side,depth:Math.max(first.depth,last.depth),startDepth:first.startDepth??first.depth,endDepth:last.endDepth??last.depth,thickness:first.thickness,indent:width*.21,startIndent:width*(first.startIndent??first.indent)/(first.xEnd-first.xStart),endIndent:width*(last.endIndent??last.indent)/(last.xEnd-last.xStart),chordAligned:true,...(first.tipThickness!==undefined?{tipThickness:first.tipThickness}:{})};
-   const ink:ExpressionInk={kind:'phrase',id:q.id,startTick:q.start,endTick:q.end,continuationStart:q.start<plan.barTicks[aBar],continuationEnd:q.end>=plan.barTicks[bBar+1],contour:c,x0:xStart,x1:xEnd,y0:0,y1:0,svg:''};
-   const uniform=q.first.path.getAttribute('data-tie-profile')==='uniform',arc=()=>({x1:c.xStart,x2:c.xEnd,y:c.yStart,side:c.side,depth:c.depth,profile:'uniform' as const,thickness:c.thickness}),knockout=q.first.path.previousElementSibling?.classList.contains('janko-phrase-grid-knockout')??false,air=knockout?.75:.35,protectedBoxes=obstacles.map((b,i)=>({id:String(i),x0:Math.max(left,b.x0-air),x1:Math.min(right,b.x1+air),y0:b.y0-air,y1:b.y1+air}));
-   let admitted=false;for(let step=0;step<33;step++){
-    const ay=c.yStart+(c.yEnd-c.yStart)*(c.startIndent??c.indent)/width+c.side*c.depth/.75,by=c.yEnd-(c.yEnd-c.yStart)*(c.endIndent??c.indent)/width+c.side*c.depth/.75;ink.y0=Math.min(c.yStart,c.yEnd,ay,by)-1;ink.y1=Math.max(c.yStart,c.yEnd,ay,by)+1;
-    if(uniform){ink.contour=undefined;ink.strokeSegments=tieArcSegments(arc(),256).map(s=>({x0:s.x1,y0:s.y1,x1:s.x2,y1:s.y2,width:c.thickness}));}
-    const hits=protectedBoxes.filter(b=>uniform?tieArcEntersBoxes(arc(),[b],p.renderingRecipe?.tokens):expressionIntersectsBox(ink,b)),overlap=settled.some(other=>overlaps(ink,other));
-    if(!hits.length&&!overlap){admitted=true;break;}
-    // Only actual intersecting paint earns a quiet corridor. An unrelated
-    // pedal/dynamic far below a clear bow must never displace its endpoints.
-    const shift=hits.length?Math.max(.1,expressionContourOutwardShift(c,hits)+.02):2;c.yStart+=c.side*shift;c.yEnd+=c.side*shift;
-   }
-   if(!admitted)throw Error(`Relation has no admitted passage clearance: ${q.id}.`);
-   const path=document.importNode(q.first.path,true);if(uniform&&Math.abs(c.yStart-c.yEnd)>.03)throw Error(`Uniform source tie endpoints differ: ${q.id}.`);path.setAttribute('d',uniform?tieArcPath(c.xStart,c.yStart,c.xEnd,c.side,c.depth,'uniform',c.thickness):taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent,c));path.setAttribute('data-practice-relation',q.id);path.setAttribute('data-practice-continuation-start',String(ink.continuationStart));path.setAttribute('data-practice-continuation-end',String(ink.continuationEnd));path.setAttribute('data-practice-from-seat',q.from.id);path.setAttribute('data-practice-to-seat',q.to.id);path.setAttribute('data-practice-source-tip-offsets',JSON.stringify([first.xStart-q.from.x,first.yStart-q.from.baseline,last.xEnd-q.to.x,last.yEnd-q.to.baseline]));path.setAttribute('data-practice-clearance-shift',String(c.yStart-(first.yStart-q.first.frame)));path.removeAttribute('id');
-   const x0=Math.max(left,xStart),x1=Math.min(right,xEnd),ys:Array<number>=[];for(let i=0;i<=256;i++){const xx=x0+(x1-x0)*i/256,u=(xx-c.xStart)/width,slice=uniform?[c.yStart+c.side*4*c.depth*u*(1-u)]:expressionSliceAtX(ink,xx);ys.push(...(slice??[xx<=xStart?c.yStart:c.yEnd]));}const edge=knockout?.6:Number(path.getAttribute('stroke-width'))/2||0,bounds={x0,x1,y0:Math.min(...ys)-edge-.1,y1:Math.max(...ys)+edge+.1};output.push({id:q.id,kind:q.kind,groups:q.groups,path,contour:c,left,right,knockout,bounds});settled.push(ink);
+   const width=xEnd-xStart,base:Contour={xStart,xEnd,yStart:first.yStart-q.first.frame,yEnd:last.yEnd-q.last.frame,side:first.side,depth:Math.max(first.depth,last.depth),startDepth:first.startDepth??first.depth,endDepth:last.endDepth??last.depth,thickness:first.thickness,indent:width*.21,startIndent:width*(first.startIndent??first.indent)/(first.xEnd-first.xStart),endIndent:width*(last.endIndent??last.indent)/(last.xEnd-last.xStart),chordAligned:true,...(first.tipThickness!==undefined?{tipThickness:first.tipThickness}:{})};
+   const uniform=q.first.path.getAttribute('data-tie-profile')==='uniform',cubicUniform=uniform&&q.reconcileSides,knockout=q.first.path.previousElementSibling?.classList.contains('janko-phrase-grid-knockout')??false,air=knockout?.75:.35,protectedBoxes=obstacles.map((b,i)=>({id:String(i),x0:Math.max(left,b.x0-air),x1:Math.min(right,b.x1+air),y0:b.y0-air,y1:b.y1+air}));
+   const attempt=(side:-1|1)=>{
+    const c:Contour={...base,side,...(q.reconcileSides?{yStart:sideTip(q.from,q.first,false,side,track),yEnd:sideTip(q.to,q.last,true,side,track)}:{})},anchor=c.yStart,ink:ExpressionInk={kind:'phrase',id:q.id,startTick:q.start,endTick:q.end,continuationStart:q.start<plan.barTicks[aBar],continuationEnd:q.end>=plan.barTicks[bBar+1],contour:c,x0:xStart,x1:xEnd,y0:0,y1:0,svg:''},arc=()=>({x1:c.xStart,x2:c.xEnd,y:c.yStart,side:c.side,depth:c.depth,profile:'uniform' as const,thickness:c.thickness});
+    let admitted=false;for(let step=0;step<33;step++){
+     // New cross-system reconciliation stays attached to the verified heads;
+     // preserve the historical same-side clearance path and its exact paint.
+     if(q.reconcileSides&&Math.abs(c.yStart-anchor)>Math.min(q.from.fontSize,q.to.fontSize)/2)break;
+     const ay=c.yStart+(c.yEnd-c.yStart)*(c.startIndent??c.indent)/width+c.side*c.depth/.75,by=c.yEnd-(c.yEnd-c.yStart)*(c.endIndent??c.indent)/width+c.side*c.depth/.75;ink.y0=Math.min(c.yStart,c.yEnd,ay,by)-1;ink.y1=Math.max(c.yStart,c.yEnd,ay,by)+1;
+     if(uniform){ink.contour=undefined;ink.strokeSegments=cubicUniform?uniformCubicSegments(c):tieArcSegments(arc(),256).map(s=>({x0:s.x1,y0:s.y1,x1:s.x2,y1:s.y2,width:c.thickness}));}
+     const hits=protectedBoxes.filter(b=>uniform&&!cubicUniform?tieArcEntersBoxes(arc(),[b],p.renderingRecipe?.tokens):expressionIntersectsBox(ink,b)),overlap=settled.some(other=>overlaps(ink,other));
+     if(!hits.length&&!overlap){admitted=true;break;}
+     // Only actual intersecting paint earns a quiet corridor. An unrelated
+     // pedal/dynamic far below a clear bow must not displace its endpoints.
+     const shift=hits.length?Math.max(.1,expressionContourOutwardShift(c,hits)+.02):2;c.yStart+=c.side*shift;c.yEnd+=c.side*shift;
+    }
+    return {c,ink,admitted,shift:Math.abs(c.yStart-anchor),translation:c.yStart-anchor,displacement:Math.abs(c.yStart-base.yStart)+Math.abs(c.yEnd-base.yEnd)};
+   };
+   // At a real source break either authored side is available. Lowest actual
+   // clearance displacement wins; an exact tie retains the destination side.
+   const candidates=(q.reconcileSides?[last.side,first.side]:[first.side]).map(attempt),chosen=candidates.filter(q=>q.admitted).sort((a,b)=>a.displacement-b.displacement)[0];
+   if(!chosen)throw Error(`Relation has no admitted passage clearance: ${q.id}.`);
+   const {c,ink}=chosen,path=document.importNode(q.first.path,true);if(uniform&&!cubicUniform&&Math.abs(c.yStart-c.yEnd)>.03)throw Error(`Uniform source tie endpoints differ: ${q.id}.`);path.setAttribute('d',cubicUniform?uniformCubicPath(c):uniform?tieArcPath(c.xStart,c.yStart,c.xEnd,c.side,c.depth,'uniform',c.thickness):taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent,c));path.setAttribute('data-practice-relation',q.id);path.setAttribute('data-practice-continuation-start',String(ink.continuationStart));path.setAttribute('data-practice-continuation-end',String(ink.continuationEnd));path.setAttribute('data-practice-from-seat',q.from.id);path.setAttribute('data-practice-to-seat',q.to.id);path.setAttribute('data-practice-source-tip-offsets',JSON.stringify([first.xStart-q.from.x,first.yStart-q.from.baseline,last.xEnd-q.to.x,last.yEnd-q.to.baseline]));path.setAttribute('data-practice-clearance-shift',String(c.yStart-base.yStart));path.removeAttribute('id');
+   if(q.reconcileSides){path.setAttribute('data-practice-side-policy','cross-system-clearance');path.setAttribute('data-practice-tip-policy','owned-head-source-gap');path.setAttribute('data-practice-source-sides',JSON.stringify([first.side,last.side]));path.setAttribute('data-practice-passage-side',String(c.side));path.setAttribute('data-practice-clearance-shift',String(chosen.translation));path.setAttribute('data-practice-tip-offsets',JSON.stringify([first.xStart-q.from.x,c.yStart-(q.from.baseline-q.first.frame),last.xEnd-q.to.x,c.yEnd-(q.to.baseline-q.last.frame)]));path.setAttribute('data-practice-side-candidates',JSON.stringify(candidates.map(q=>({side:q.c.side,admitted:q.admitted,shift:q.shift,displacement:q.displacement}))));}
+   const x0=Math.max(left,xStart),x1=Math.min(right,xEnd),ys:Array<number>=[];for(let i=0;i<=256;i++){const xx=x0+(x1-x0)*i/256,u=(xx-c.xStart)/width,slice=cubicUniform?expressionSliceAtX({...ink,contour:{...c,thickness:0}},xx):uniform?[c.yStart+c.side*4*c.depth*u*(1-u)]:expressionSliceAtX(ink,xx);ys.push(...(slice??[xx<=xStart?c.yStart:c.yEnd]));}const edge=knockout?.6:Number(path.getAttribute('stroke-width'))/2||0,bounds={x0,x1,y0:Math.min(...ys)-edge-.1,y1:Math.max(...ys)+edge+.1};output.push({id:q.id,kind:q.kind,groups:q.groups,path,contour:c,left,right,knockout,bounds,...(cubicUniform?{strokeSegments:ink.strokeSegments}:{})});settled.push(ink);
   }
  }
  return output;
