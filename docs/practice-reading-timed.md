@@ -78,3 +78,7 @@ pedal, ear latency or a musician's successful re-entry. Historical once-only
 preparation and delivery receipts remain in their original validation documents.
 The [Reading/Timed source validation record](practice-reading-timed-validation.md)
 identifies the exact regression and browser checkpoints separately from delivery.
+
+The current [Speed and shortcut source validation](practice-speed-shortcuts-validation.md)
+records the integer-anchor refinement and exact keyboard/build evidence separately
+from the earlier Reading/Timed and native delivery receipts.
