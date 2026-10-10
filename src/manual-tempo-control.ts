@@ -46,6 +46,8 @@ export class ManualTempoControls {
  private start(code:string,owner:HTMLElement|undefined,adjust:(repeated:boolean,elapsed:number)=>boolean){this.owner=owner;this.repeat.begin(code,(repeated,elapsed)=>{const ok=!this.disposed&&!document.hidden&&(!owner||(owner.isConnected&&this.options.accepts(owner)))&&(!repeated||this.pointer===undefined||!!owner?.hasPointerCapture(this.pointer))&&adjust(repeated,elapsed);if(!ok)this.cancel();return ok;});}
  begin(code:string,adjust:(repeated:boolean,elapsed:number)=>boolean){this.start(code,undefined,adjust);}
  editField(field:HTMLInputElement){return !this.disposed&&field.isConnected&&!!this.control(field)&&!!this.options.edit&&this.beginEdit(field);}
+ /** Browser redraws can emit change before a draft is detached; only explicit commit owns that value. */
+ ownsDraft(field:HTMLInputElement){return !this.disposed&&this.editing?.field===field;}
  /** Retain only the explicitly opened draft during a harmless footer repaint. */
  retainDraft(root:HTMLElement){
   const editing=this.editing,field=editing?.field;if(!field||!root.contains(field))return ()=>{};

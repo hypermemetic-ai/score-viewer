@@ -50,6 +50,29 @@ test('deliberate edit cancellation cannot be revived by a previously captured fo
  }finally{f.close();}
 });
 
+test('draft identity remains owned through transient detachment and ends only on explicit commit or cancellation',()=>{
+ const f=fixture();try{
+  assert.equal(f.controls.ownsDraft(f.field),false);f.controls.editField(f.field);f.field.value='31';assert.equal(f.controls.ownsDraft(f.field),true);
+  const restore=f.controls.retainDraft(f.root),replacement=f.attach();assert.equal(f.field.isConnected,false);assert.equal(f.controls.ownsDraft(f.field),true);assert.equal(f.controls.ownsDraft(replacement),false);
+  restore();assert.equal(f.controls.ownsDraft(f.field),true);f.key('Enter');assert.equal(f.controls.ownsDraft(f.field),false);assert.equal(f.working,'31');
+  f.controls.editField(f.field);f.field.value='40';f.controls.cancelEdit();assert.equal(f.controls.ownsDraft(f.field),false);assert.equal(f.working,'31');
+ }finally{f.close();}
+});
+
+test('a browser change during piano footer replacement cannot commit the owned draft or queue a rate',()=>{
+ let view:any;const rates:number[]=[],f=fixture(root=>{
+  view=new PracticeView(root,{package:score,personal:{} as never,entryId:'test',connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back(){},settings(){},changed(){}});
+  view.state=initialPractice(view.plan);view.status=()=>{};view.applySetting=(next:any)=>{rates.push(next.working);Object.assign(view.state,next);view.queuedWorking=next.working;view.refreshTempoFields(root);};return view.manual;
+ });
+ try{
+  Object.assign(f.field.dataset,{practiceSetting:'working',absolute:String(view.state.working),presented:'30'});const rate=view.state.working;
+  f.controls.editField(f.field);f.field.value='31';assert.equal(view.settingChanged(f.field),false);assert.equal(view.state.working,rate);assert.equal(view.queuedWorking,undefined);assert.equal(rates.length,0);
+  const restore=f.controls.retainDraft(f.root);f.attach();assert.equal(view.settingChanged(f.field),false);restore();assert.equal(f.field.value,'31');assert.equal(f.field.readOnly,false);assert.equal(view.state.working,rate);
+  f.key('Enter');assert.equal(view.state.working,view.state.target*.31);assert.equal(view.queuedWorking,view.state.working);assert.deepEqual(rates,[view.state.working]);
+  assert.equal(view.settingChanged({dataset:{practiceSetting:'keepTempo'},type:'checkbox',checked:true}),true);assert.equal(view.state.keepTempo,true,'ordinary checkbox changes keep their event authority');
+ }finally{f.close();}
+});
+
 test('readonly working-field OS repeats leave the single application speed repeat alive until release',()=>{
  const f=fixture();let steps=0;try{
   f.field.focus();f.controls.begin('ArrowRight',()=>{steps++;return true;});assert.equal(steps,1);assert.equal(f.pending,1);
