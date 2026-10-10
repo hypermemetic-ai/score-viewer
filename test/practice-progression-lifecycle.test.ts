@@ -11,7 +11,7 @@ import {planPracticeRepeat} from '../src/practice-repeat';
 const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg);
 const until=async(condition:()=>boolean)=>{for(let i=0;i<100&&!condition();i++)await new Promise<void>(done=>setImmediate(done));assert.ok(condition(),'did not reach controlled asynchronous boundary');};
 function fixture(t:any,bpm=100,index=0){
- const oldWrite=host.write;t.after(()=>{host.write=oldWrite;});const state=initialPractice(plan);state.working=bpm;
+ const oldWrite=host.write;t.after(()=>{host.write=oldWrite;});const state=initialPractice(plan);state.working=bpm;(state as typeof state & {countInBars?:number}).countInBars=1;
  const session=new PracticeSession(plan,plan.chunks[index],state,true);session.ready(1000);for(const a of session.events)session.note(a.midi,session.startMs+(a.tick-session.startTick)*session.tickMs);session.update(session.startMs+(session.chunk.end-session.startTick)*session.tickMs);assert.equal(session.phase,'complete');
  const view=Object.create(PracticeView.prototype) as any,writes:unknown[]=[],messages:string[]=[];
  Object.assign(view,{plan,state,session,doneClaims:new PracticeDone(),loopRate:bpm,sourceCrops:new Map(),browser:new PracticeBrowser(plan),saved:Promise.resolve(),startGeneration:0,completionRevision:0,disposed:false,done:false,overview:false,manual:{cancel(){}},contacts:{clear(){}},clock:{stop:async()=>{}},app:{querySelector:()=>({focus(){}})},options:{package:pkg,entryId:pkg.manifest.revision,connected:()=>true,changed:()=>{}},preview:{clear(){}}});
@@ -76,6 +76,18 @@ test('Ready repeat uses actual returned count start; cancellation cannot install
  PracticeClock.prototype.unlock=async()=>{};PracticeClock.prototype.beginRepeat=()=>new Promise(done=>{resolve=done;});t.after(()=>{PracticeClock.prototype.unlock=oldUnlock;PracticeClock.prototype.beginRepeat=oldBegin;});
  const repeat=planPracticeRepeat({previousStartMs:1000,phraseEndMs:5800,previousBpm:100,nextBpm:100}),pending=f.view.action('ready',repeat);await until(()=>!!resolve);resolve({countStartMs:7600,startMs:8800,extraBeats:0,totalGapBeats:2});await pending;assert.equal(f.session.startMs,8800);
  const epoch=f.session.startMs,next=f.view.action('ready',repeat);await until(()=>f.view.startGeneration>=2);f.view.pause();resolve({countStartMs:10600,startMs:11800,extraBeats:0,totalGapBeats:2});await next;assert.equal(f.session.phase,'paused');assert.equal(f.session.startMs,epoch);
+});
+test('Ready owns one rate and count grid across pending unlock and native arming while desired edits queue',async t=>{
+ const f=fixture(t,100);f.view.audioOutputs={supported:true};f.view.clock=undefined;f.view.heldPitches=new Set();f.view.heldStreams=new Map();
+ let unlock!:()=>void,begin!:(origin:number)=>void,args:any[]=[];const oldUnlock=PracticeClock.prototype.unlock,oldBegin=PracticeClock.prototype.begin;
+ PracticeClock.prototype.unlock=()=>new Promise<void>(resolve=>unlock=resolve);PracticeClock.prototype.begin=(...input)=>{args=input;return new Promise<number>(resolve=>begin=resolve);};
+ t.after(()=>{PracticeClock.prototype.unlock=oldUnlock;PracticeClock.prototype.begin=oldBegin;f.view.clock?.close();});
+ const pending=f.view.action('ready');await until(()=>!!unlock);assert.equal(f.view.startingRate,100);
+ f.state.working=200;(f.state as typeof f.state & {countInBars?:number}).countInBars=8;unlock();await until(()=>!!begin);
+ assert.equal(args[0],100);assert.equal(args[3].countInBars,1);assert.equal(args[1],6000);
+ f.state.working=300;(f.state as typeof f.state & {countInBars?:number}).countInBars=2;begin(22000);await pending;
+ assert.equal(f.session.bpm,100);assert.equal(f.session.pulseGrid.countInBars,1);assert.equal(f.session.startMs,23200);assert.equal(f.view.loopRate,100);assert.equal(f.view.startingRate,undefined);
+ assert.equal(f.state.working,300);assert.equal(f.session.sourcePulseGrid.countInBars,2);
 });
 test('carry setup gates audio, checks actual contacts again after startup, and pause clears setup',async t=>{
  const f=fixture(t);const held={...plan.attacks[0],tick:0,end:plan.chunks[1].end+144},carryPlan={...plan,attacks:[held,...plan.attacks.filter(a=>a.id!==held.id)]};

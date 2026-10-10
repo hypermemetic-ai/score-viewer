@@ -795,6 +795,7 @@ pub async fn practice_audio_begin(
     score_offset_pulses: Option<u32>,
     bar_start_pulses: Option<Vec<u64>>,
     pulse_grid_v2: Option<lifecycle::PulseGridV2>,
+    pulse_grid_v3: Option<lifecycle::PulseGridV2>,
 ) -> Result<u64, String> {
     let request = lifecycle::Request::new_with_clock(
         &device,
@@ -804,7 +805,7 @@ pub async fn practice_audio_begin(
         pulses_per_beat,
         score_offset_pulses,
         bar_start_pulses,
-        pulse_grid_v2,
+        lifecycle::select_grid_version(pulse_grid_v2, pulse_grid_v3)?,
     )?
     .with_repeat_start(repeat_start_micros)?
     .with_full_repeat_count_in(full_repeat_count_in.unwrap_or(false))?;
@@ -837,11 +838,14 @@ pub async fn practice_audio_arm_repeat(
     duration_ms: f64,
     count_in_step_ms: f64,
     count_start_micros: f64,
-    pulse_grid_v2: lifecycle::PulseGridV2,
+    pulse_grid_v2: Option<lifecycle::PulseGridV2>,
+    pulse_grid_v3: Option<lifecycle::PulseGridV2>,
     previous_count_start_micros: f64,
     arm_id: f64,
 ) -> Result<repeat::ArmReceipt, String> {
     // Admission precedes any worker publication or lifecycle replacement.
+    let grid = lifecycle::select_grid_version(pulse_grid_v2, pulse_grid_v3)?
+        .ok_or("Future repeats require an explicit source-meter grid")?;
     let request = lifecycle::Request::new_with_clock(
         &device,
         bpm,
@@ -850,7 +854,7 @@ pub async fn practice_audio_arm_repeat(
         None,
         None,
         None,
-        Some(pulse_grid_v2),
+        Some(grid),
     )?;
     let origin = repeat::target(count_start_micros)?;
     let previous = repeat::safe_id(previous_count_start_micros)?;

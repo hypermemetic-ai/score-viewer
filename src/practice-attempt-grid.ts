@@ -1,4 +1,23 @@
-import {validatePulseGrid,type PracticePulseGrid} from './score-clock';
+import {isMeterPulseGrid,validatePulseGrid,type PracticePulseGrid} from './score-clock';
+import {practiceTiming} from './practice-timing';
+
+/** The same owned rate and grid cross every asynchronous Ready boundary. */
+export function capturePracticeAttempt(bpm:number,source:PracticePulseGrid){
+ if(!Number.isFinite(bpm)||bpm<5||bpm>500)throw Error('Choose a tempo from 5–500 BPM.');
+ const grid=validatePulseGrid(source);
+ for(const key of ['barStartPulses','barMeterPulses','barBeatPulses','barPhasePulses','beatStartPulses'] as const)if(grid[key])Object.freeze(grid[key]);
+ Object.freeze(grid);
+ return Object.freeze({bpm,grid,countInMs:practiceTiming(bpm,grid).countInMs});
+}
+
+/** Count duration is attempt configuration; score clocks remain literal. */
+export function practiceCountInGrid(source:PracticePulseGrid,countInBars=2):PracticePulseGrid {
+ const grid=validatePulseGrid(source);
+ if(!isMeterPulseGrid(grid)||!Number.isSafeInteger(countInBars)||countInBars<1||countInBars>8)
+  throw Error('Choose a count-in from 1–8 whole bars.');
+ const bar=grid.countBarPulses!,phase=(grid.scoreStartPhasePulses!-grid.countStartPhasePulses!+bar)%bar;
+ return validatePulseGrid({...grid,version:3,countInBars,scoreOffsetPulses:countInBars*bar+phase});
+}
 
 /** Repeat count origins may differ; the passage's admitted score meter cannot. */
 export function practiceAttemptGrid(source:PracticePulseGrid,attempt:PracticePulseGrid):PracticePulseGrid {
