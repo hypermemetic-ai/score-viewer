@@ -751,6 +751,7 @@ mod tests {
     fn metered_request(bpm: f64) -> lifecycle::Request {
         let grid = lifecycle::PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: 3,
             score_offset_pulses: 6,
             count_bar_pulses: 6,
@@ -792,6 +793,83 @@ mod tests {
             counts
         });
         assert_eq!(counts, (0, 0));
+    }
+    #[test]
+    fn v3_future_mixer_cue_keeps_two_compound_bars_and_exact_entry_after_a_rate_change() {
+        for rate in [44_100, 48_000] {
+            let mailbox = Arc::new(CueMailbox::default());
+            let stop = Arc::new(AtomicBool::new(false));
+            let old_grid = metered_request(36.).grid_v2.unwrap();
+            let old_duration = old_grid.source_end_micros(18.);
+            let old_request = lifecycle::Request::new_with_clock(
+                "same",
+                18.,
+                old_duration / 1000.,
+                60000. / (18. * 3.) / 2.,
+                None,
+                None,
+                None,
+                Some(old_grid),
+            )
+            .unwrap();
+            let old = Box::new(Cue::new(rate, old_request, stop.clone()));
+            let onset = old.onset.clone();
+            assert!(mailbox.publish(old).is_ok());
+            let mut mixer = empty_mixer(mailbox.clone());
+            let mut out = [0f32; 128];
+            watched_fill(&mut mixer, &mut out, rate, 1_000_000, 0);
+            let previous = onset.load(Ordering::Acquire);
+            let target = (previous as f64 + old_duration).ceil() as u64;
+            let mut grid = metered_request(30.).grid_v2.unwrap();
+            grid.version = 3;
+            grid.count_in_bars = Some(2);
+            grid.score_offset_pulses = 12;
+            let next = lifecycle::Request::new_with_clock(
+                "same",
+                30.,
+                grid.source_end_micros(30.) / 1000.,
+                2_000. / 3.,
+                None,
+                None,
+                None,
+                Some(grid),
+            )
+            .unwrap();
+            let arm = Arc::new(repeat::ArmControl::new(
+                1,
+                previous,
+                target,
+                Arc::new(AtomicBool::new(false)),
+            ));
+            let future = Box::new(Cue::future(rate, next, stop, arm.clone()));
+            let new_onset = future.onset.clone();
+            assert!(mailbox.publish(future).is_ok());
+            watched_fill(&mut mixer, &mut out, rate, target, 0);
+            // Actual submitted Mixer PCM: two bars 1,2 / 1,2 then source 1.
+            // Denominator subdivision remains distinct and quieter.
+            for (pulse, frequency, amplitude) in [
+                (0, 1200., 0.16),
+                (1, 650., 0.045),
+                (3, 900., 0.12),
+                (6, 1200., 0.16),
+                (9, 900., 0.12),
+                (12, 1200., 0.16),
+            ] {
+                let pulse_us = pulse as f64 * 2_000_000. / 3.;
+                let instant = target + pulse_us.ceil() as u64 + 2_000;
+                watched_fill(&mut mixer, &mut out, rate, instant, 0);
+                let age = (instant - target + 24 * 1_000_000 / rate as u64) as f64 / 1_000_000.
+                    - pulse_us / 1_000_000.;
+                let expected = (amplitude
+                    * (-age * 110.).exp()
+                    * (age * frequency * std::f64::consts::TAU).sin())
+                    as f32;
+                assert!((out[24] - expected).abs() < 1e-5, "rate{rate} pulse{pulse}");
+            }
+            assert!(arm.activated());
+            assert_eq!(new_onset.load(Ordering::Acquire), target);
+            mailbox.reclaim();
+        }
     }
     #[test]
     fn future_baton_changes_at_one_presented_sample_and_keeps_old_pcm_until_then() {
@@ -1008,6 +1086,7 @@ mod tests {
     fn two_pickup_batons_render_full_cycles_from_the_predecessors_exit_beat() {
         let grid = lifecycle::PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: 2,
             score_offset_pulses: 14,
             count_bar_pulses: 8,
