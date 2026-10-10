@@ -76,3 +76,5 @@ This guide describes source behavior. Automated tests and production-browser
 inspection do not certify a particular installed native package, physical MIDI,
 pedal, ear latency or a musician's successful re-entry. Historical once-only
 preparation and delivery receipts remain in their original validation documents.
+The [Reading/Timed source validation record](practice-reading-timed-validation.md)
+identifies the exact regression and browser checkpoints separately from delivery.
