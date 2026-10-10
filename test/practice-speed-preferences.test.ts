@@ -7,8 +7,8 @@ import {adjustPracticePercent as adjustPercent,adjustProgression,snapPracticeSpe
 const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
 const plan=planPractice(p);
 const onGrid=(value:number,goal:number)=>assert.ok(Math.abs(value/(goal*.005)-Math.round(value/(goal*.005)))<1e-9);
-test('fresh practice uses ten percent, fifty-percent connections, two-percent increments and existing timing defaults',()=>{
- const s=initialPractice(plan);assert.equal(s.working,plan.referencePerformanceTempo!.bpm*.1);assert.equal(s.start,s.working);assert.equal(s.connectionStart,s.target*.5);assert.equal(s.step,s.target*.02);assert.equal(s.countInBars,2);assert.equal(s.resumeCooldownSeconds,3);assert.equal(s.speedRevision,2);
+test('fresh piano practice uses thirty percent, fifty-percent connections, two-percent increments and existing timing defaults',()=>{
+ const s=initialPractice(plan);assert.equal(s.working,plan.referencePerformanceTempo!.bpm*.3);assert.equal(s.start,s.working);assert.equal(s.connectionStart,s.target*.5);assert.equal(s.step,s.target*.02);assert.equal(s.countInBars,2);assert.equal(s.resumeCooldownSeconds,3);assert.equal(s.speedRevision,2);
  const prefs=practicePreferences({...s,countInBars:4,resumeCooldownSeconds:7});const next=practiceStateForContext(plan,undefined,{partition:plan.partition,composites:{},selected:plan.chunks[0].id,includeManual:false,preferences:prefs});assert.equal(next.countInBars,4);assert.equal(next.resumeCooldownSeconds,7);
 });
 test('restored and typed preferences snap without rewriting historical attainment or caller data',()=>{

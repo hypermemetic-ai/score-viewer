@@ -1,19 +1,18 @@
-import {readingActions,readingActionLabel,type ReadingAction} from './input';
-import {changeControls,controlIdentity,readControlBindings,type ControlBinding,type ControlBindings,type ControlChange} from './control-bindings';
+import {changeControls,controlIdentity,controlActionLabel,controlActions,isPracticeModeAction,practiceControlBindings,readControlBindings,type ControlAction,type ControlBinding,type ControlBindings,type ControlChange} from './control-bindings';
 
 export type FreeViewNavigationAction='previous'|'next';
 /** Missing slots inherit; an owned null deliberately has no control. */
 export interface FreeViewControlOverrides {version:1;actions:Partial<Record<FreeViewNavigationAction,Partial<Record<0|1,ControlBinding|null>>>>}
-export const isFreeViewNavigation=(action:ReadingAction):action is FreeViewNavigationAction=>action==='previous'||action==='next';
-export const hasFreeViewOverride=(overrides:FreeViewControlOverrides|undefined,action:ReadingAction,slot:0|1)=>isFreeViewNavigation(action)&&Object.hasOwn(overrides?.actions[action]??{},slot);
-const label=(action:ReadingAction)=>isFreeViewNavigation(action)?action==='previous'?'Previous measures':'Next measures':readingActionLabel(action);
+export const isFreeViewNavigation=(action:ControlAction):action is FreeViewNavigationAction=>action==='previous'||action==='next';
+export const hasFreeViewOverride=(overrides:FreeViewControlOverrides|undefined,action:ControlAction,slot:0|1)=>isFreeViewNavigation(action)&&Object.hasOwn(overrides?.actions[action]??{},slot);
+const label=(action:ControlAction)=>isFreeViewNavigation(action)?action==='previous'?'Previous measures':'Next measures':controlActionLabel(action);
 const slotLabel=(slot:0|1)=>slot?'secondary':'primary';
 
 export function freeViewControlBindings(main:ControlBindings,overrides?:FreeViewControlOverrides):ControlBindings {
  const next=structuredClone(main);
  for(const action of ['previous','next'] as const)for(const slot of [0,1] as const)if(hasFreeViewOverride(overrides,action,slot))next.actions[action][slot]=overrides!.actions[action]![slot]!;
- const owners=new Map<string,{action:ReadingAction;slot:0|1}>();
- for(const action of readingActions)for(const slot of [0,1] as const){const binding=next.actions[action][slot];if(!binding)continue;const id=controlIdentity(binding),owner=owners.get(id);if(owner)throw Error(`Free view conflict: ${label(owner.action)} ${slotLabel(owner.slot)} control and ${label(action)} ${slotLabel(slot)} control. Change the conflicting local binding.`);owners.set(id,{action,slot});}
+ const owners=new Map<string,{action:ControlAction;slot:0|1}>();
+ for(const action of controlActions)for(const slot of [0,1] as const){const binding=next.actions[action]?.[slot];if(!binding)continue;const id=controlIdentity(binding),owner=owners.get(id);if(owner)throw Error(`Free view conflict: ${label(owner.action)} ${slotLabel(owner.slot)} control and ${label(action)} ${slotLabel(slot)} control. Change the conflicting local binding.`);owners.set(id,{action,slot});}
  return readControlBindings(next,{bindings:{}});
 }
 
@@ -34,7 +33,14 @@ export function changeScopedControls(main:ControlBindings,overrides:FreeViewCont
  const assign=(action:FreeViewNavigationAction,slot:0|1,binding:ControlBinding|null)=>{nextOverrides.actions[action]??={};nextOverrides.actions[action]![slot]=binding;};
  if(freeView&&change.kind==='restore-pages'){assign('previous',0,{kind:'key',key:'ArrowLeft'});assign('next',0,{kind:'key',key:'ArrowRight'});}
  else if(freeView&&change.kind==='assign'&&isFreeViewNavigation(change.action))assign(change.action,change.slot,change.binding);
- else nextMain=changeControls(main,change);
+ else{
+  // Editing a secondary control preserves the primary shown by the effective
+  // default, while an explicit empty slot remains owned on later reloads.
+  if(change.kind==='assign'&&isPracticeModeAction(change.action)&&!Object.hasOwn(main.actions,change.action)){
+   nextMain=structuredClone(main);nextMain.actions[change.action]=practiceControlBindings(freeViewControlBindings(main,overrides)).actions[change.action];
+  }
+  nextMain=changeControls(nextMain,change);
+ }
  freeViewControlBindings(nextMain,nextOverrides);
  return {main:nextMain,overrides:Object.keys(nextOverrides.actions).length?nextOverrides:undefined};
 }
