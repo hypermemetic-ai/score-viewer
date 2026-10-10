@@ -20,6 +20,18 @@ test('late preparation refuses without shortening a count or cancelling old audi
  const f=web(t),clock=new PracticeClock(false);t.after(()=>clock.close());const origin=await clock.begin(60,15000,true,grid),end=origin+15000,p=planPracticeRepeat({previousStartMs:origin+3000,phraseEndMs:end,previousBpm:60,nextBpm:60,grid,sourceBoundary:true});
  const ready=await clock.armRepeat(60,15000,p,grid);assert.ok(ready);assert.equal(await clock.cancelRepeat(),'queued');f.setTime((end-1)/1000);assert.equal(await clock.armRepeat(60,15000,p,grid),undefined);assert.equal(f.stops,0);
 });
+test('an ungraded browser candidate emits its complete count but no next-score pulses',async t=>{
+ const f=web(t),clock=new PracticeClock(false);t.after(()=>clock.close());const origin=await clock.begin(60,15000,true,grid),end=origin+15000,p=planPracticeRepeat({previousStartMs:origin+3000,phraseEndMs:end,previousBpm:60,nextBpm:120,grid,sourceBoundary:true}),ready=await clock.armRepeat(120,7500,p,grid);assert.ok(ready);
+ for(let ms=0;ms<ready.startMs+300;ms+=20)f.setTime(ms/1000);
+ const candidate=f.pulses.filter(q=>q.at>=end/1000-1e-8);assert.deepEqual(candidate.map(q=>q.hz),[1200,650,900,650,900,650]);assert.ok(candidate.every(q=>q.at<ready.startMs/1000-1e-8));assert.equal(await clock.cancelRepeat(),'activated');assert.ok(candidate.every(q=>q.stopped));
+});
+test('adoption before entry immediately schedules the source click on the same captured boundary',async t=>{
+ const f=web(t),clock=new PracticeClock(false);t.after(()=>clock.close());const origin=await clock.begin(60,15000,true,grid),end=origin+15000,p=planPracticeRepeat({previousStartMs:origin+3000,phraseEndMs:end,previousBpm:60,nextBpm:120,grid,sourceBoundary:true}),ready=await clock.armRepeat(120,7500,p,grid);assert.ok(ready);
+ for(let ms=0;ms<ready.startMs-50;ms+=20)f.setTime(ms/1000);f.setTime((ready.startMs-10)/1000);assert.ok(f.pulses.every(q=>q.at<ready.startMs/1000));clock.adoptRepeat(ready);assert.equal(f.pulses.filter(q=>Math.abs(q.at*1000-ready.startMs)<.002).length,1);
+});
+test('browser adoption too close to entry refuses instead of scheduling a source pulse in the past',async t=>{
+ const f=web(t),clock=new PracticeClock(false);t.after(()=>clock.close());const origin=await clock.begin(60,15000,true,grid),end=origin+15000,p=planPracticeRepeat({previousStartMs:origin+3000,phraseEndMs:end,previousBpm:60,nextBpm:120,grid,sourceBoundary:true}),ready=await clock.armRepeat(120,7500,p,grid);assert.ok(ready);f.setTime((ready.startMs-1)/1000);assert.throws(()=>clock.adoptRepeat(ready),/Resume starts a fresh count-in/);assert.ok(f.pulses.every(q=>q.at<ready.startMs/1000));assert.equal(await clock.cancelRepeat(),'activated');
+});
 test('fractional compound-bar boundary owns one count pulse, never both predecessor and prepared pulse',async t=>{
  const f=web(t),clock=new PracticeClock(false);t.after(()=>clock.close());const g=scorePulseGrid({...source,timeSignatures:[{tick:0,numerator:6,denominator:8}],referencePerformanceTempo:{...source.referencePerformanceTempo,beat:{numerator:3,denominator:8}}},[0,144,288,432,576]),origin=await clock.begin(180,10000/3,true,g),end=origin+2000/3+8000/3,p=planPracticeRepeat({previousStartMs:origin+2000/3,phraseEndMs:end,previousBpm:180,nextBpm:180,grid:g,sourceBoundary:true});
  const prepared=await clock.armRepeat(180,10000/3,p,g);assert.ok(prepared);for(let ms=0;ms<end+100;ms+=20)f.setTime(ms/1000);assert.equal(f.pulses.filter(q=>Math.abs(q.at*1000-end)<.002).length,1);
