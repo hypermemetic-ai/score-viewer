@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {admitRefill,allocateRefill,PracticeRefill,readingBar,refillCandidates,refillResidents,refillSuccessors,type RefillLayout,type RefillMeasure} from '../src/practice-refill';
+import {admitRefill,allocateRefill,PracticeRefill,readingBar,refillAllocationBars,refillCandidates,refillResidents,refillSuccessors,type RefillLayout,type RefillMeasure} from '../src/practice-refill';
 import {initialPractice,PracticeSession,type PracticePlan,type PracticeChunk,type PracticeAttack} from '../src/practice';
 
 function fixture(widths:number[],rests:number[]=[],hands:Record<number,'LH'|'RH'>={}){
@@ -129,4 +129,75 @@ test('a four-bar leaf keeps resident source and stable geometry; hand reveals re
 test('original three/four/five-bar leaves and terminal rests remain selected and bounded',()=>{
  for(const count of [3,4,5]){const f=fixture(Array.from({length:count},(_,i)=>40+20*i),[count-1]),c=admitRefill(f.plan,f.chunk,f.measures);assert.ok(c.initial.placements.length<=4);for(let bar=0;bar<count;bar++)assert.ok(refillResidents(f.plan,f.chunk,bar).every(b=>b<count));assert.deepEqual(refillSuccessors(f.plan,f.chunk,count-1),[]);}
  const f=fixture([50,60,70,500,80,90]);assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:100}),/cannot be admitted at a readable size/);
+});
+
+test('a complete short leaf certifies its consecutive frame without impossible refill gaps',()=>{
+ for(const widths of [[50,80,70],[50,80,70,100]]){
+  const f=fixture(widths),width=widths.reduce((a,b)=>a+b,0)+10,c=admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:width});
+  assert.equal(c.frame.width,width);assert.equal(c.proof,'enumerated');assert.ok(c.transitions>0);
+  const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c),placements=c.initial.placements;
+  for(const rate of [5,500]){s.state.working=rate;s.ready(0);refill.prime();for(const a of s.events){assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);assert.equal(refill.layout.placements,placements);}}
+  assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:width-1}),/cannot be admitted/);
+ }
+});
+
+test('a subset request retires no source frame and leaves every resident placement exact',()=>{
+ const f=fixture([60,70,80,90]),c=admitRefill(f.plan,f.chunk,f.measures),previous=c.initial;
+ const next=allocateRefill(previous,2,[2,3],c.measures,c.frame);
+ assert.equal(next.current,2);assert.equal(next.epoch,previous.epoch);assert.equal(next.placements,previous.placements);
+ assert.deepEqual(next.placements.map(p=>p.bar),[0,1,2,3]);
+});
+
+test('terminal incoming allocations retain four distinct source frames and the protected interval',()=>{
+ const f=fixture([40,70,80,90,60,50]),c=admitRefill(f.plan,f.chunk,f.measures),previous:RefillLayout={...c.initial,current:3};
+ // An early accepted attack requests the final source bar. There are only
+ // three forward bars; the cleared old interval still supplies the fourth.
+ const bars=refillAllocationBars(f.plan,f.chunk,previous,3,3);
+ assert.deepEqual(bars,[2,3,4,5]);
+ const next=allocateRefill(previous,3,bars,c.measures,c.frame);
+ assert.deepEqual(next.placements.find(p=>p.bar===3),previous.placements.find(p=>p.bar===3));assert.equal(next.placements.length,4);
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c);s.ready(0);
+ for(const a of s.events){const anchor=refill.layout.placements.find(p=>p.bar===a.bar);assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);assert.equal(refill.bars.length,4);assert.equal(new Set(refill.bars).size,4);assert.deepEqual(refill.layout.placements.find(p=>p.bar===a.bar),anchor);}
+ assert.ok(refill.retired.has(0));assert.deepEqual(refill.bars.slice().sort((a,b)=>a-b),[2,3,4,5]);
+});
+
+test('empty source frames reclaim space before a wide required measure without moving the active interval',()=>{
+ const f=fixture([135.87,135.87,135.87,424.57,118.91]);for(const m of f.measures){m.blankWidth=m.bar===4?m.width:4;m.leftAir=.8;m.rightAir=m.bar===4?5:.8;}
+ f.measures[3].leftAir=8.655;
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:.8,breakGap:8,boundaryAir:true,maxFrameWidth:580});
+ assert.equal(c.proof,'enumerated');assert.ok(c.states>0);assert.ok(c.frame.width<=580);assert.equal(c.initial.placements.length,4);
+ assert.ok(c.initial.placements.find(p=>p.bar===2)!.empty);assert.ok(c.initial.placements.find(p=>p.bar===3)!.empty);
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c);s.ready(0);
+ for(const a of s.events){
+  const before=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(before.width,f.measures[a.bar].width);assert.ok(!before.empty,'Incoming attack was not expanded before reveal');
+  assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);
+  const after=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(after.x,before.x);assert.equal(after.width,before.width);
+  assert.equal(refill.bars.length,4);assert.equal(new Set(refill.bars).size,4);
+  for(const required of refillResidents(f.plan,f.chunk,a.bar))assert.equal(refill.layout.placements.find(p=>p.bar===required)!.width,f.measures[required].width);
+ }
+ assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,maxFrameWidth:550}),/cannot be admitted/,'actual required source intervals still refuse when no readable placement exists');
+});
+
+test('empty-frame sizing cannot resize an unread protected interval or waive a visible source footprint',()=>{
+ const f=fixture([100,150,100,200,120]);f.measures.forEach(m=>{m.blankWidth=4;});f.measures[2].blankWidth=f.measures[2].width;
+ const previous:RefillLayout={current:0,epoch:0,placements:[{...f.measures[0],x:10},{...f.measures[1],x:110},{...f.measures[2],x:260},{...f.measures[3],width:4,empty:true,x:360}]};
+ assert.throws(()=>allocateRefill(previous,3,[1,2,3,4],new Map(f.measures.map(m=>[m.bar,m])),{width:600,edge:5,breakGap:8}),/fully admitted before entry/);
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:5,maxFrameWidth:800});assert.equal(c.initial.placements.find(p=>p.bar===2)!.width,100,'non-note footprint remains full width');
+});
+
+test('unused empty staff room is shared without changing required geometry or accepting invalid minima',()=>{
+ const f=fixture([135.87,135.87,135.87,424.57,118.91]);f.measures.forEach(m=>m.blankWidth=4);f.measures[4].blankWidth=f.measures[4].width;
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,maxFrameWidth:590});
+ const blanks=c.initial.placements.filter(p=>p.empty);assert.equal(blanks.length,2);assert.ok(blanks.every(p=>p.width>4));assert.equal(blanks[0].width,blanks[1].width);
+ const anchor={...f.measures[4],x:1.6},previous:RefillLayout={current:4,epoch:4,placements:[anchor,...f.measures.slice(1,4).map((p,i)=>({...p,width:4,empty:true,x:130+i*4}))]},map=new Map(f.measures.map(p=>[p.bar,p.bar===4?p:{...p,width:4,empty:true}]));
+ const candidates=refillCandidates(previous,4,[1,2,3,4],map,{width:590,edge:.8,breakGap:8,boundaryAir:true});
+ assert.deepEqual(candidates[0].placements.find(p=>p.bar===4),anchor);const shared=candidates[0].placements.filter(p=>p.empty);assert.ok(shared.every(p=>p.width>100));assert.ok(shared.every(p=>Math.abs(p.width-shared[0].width)<1e-7));
+ for(const invalid of [0,-1,NaN,Infinity,136]){const input=f.measures.map(p=>({...p}));input[0].blankWidth=invalid;assert.throws(()=>admitRefill(f.plan,f.chunk,input),/valid source footprint/);}
+});
+
+test('empty-frame admission works when native Map iterators provide no iterator helpers',()=>{
+ const prototype=Object.getPrototypeOf(new Map().values()),saved=Object.getOwnPropertyDescriptor(prototype,'some');
+ Object.defineProperty(prototype,'some',{value:undefined,configurable:true});
+ try{const f=fixture([100,100,100,250,100]);f.measures.forEach(m=>m.blankWidth=4);const c=admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:500});assert.equal(c.proof,'enumerated');assert.ok(c.transitions>0);}
+ finally{if(saved)Object.defineProperty(prototype,'some',saved);else delete prototype.some;}
 });

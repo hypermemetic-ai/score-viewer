@@ -64,7 +64,9 @@ test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every pe
 test('library shows the same combined manual/measured total without preparation bonus or record changes',async()=>{
  const state=initialPractice(plan);for(const c of plan.chunks){state.best[c.pattern]=.4*state.target;state.groundwork??={};state.groundwork[c.pattern]=true;}
  const first=plan.chunks[0];toggleDone(state,{passage:first.id,pattern:first.pattern,rate:.7*state.target});const before=JSON.stringify(state),summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async()=>JSON.parse(before)});
- assert.ok(Math.abs(summary!.sections-.4125)<1e-12);assert.equal(summary!.sections,displayedPracticeTotal(plan,state));assert.ok(Math.abs(displayedPracticeTotal(plan,state,false)-.4)<1e-12);assert.ok(totalProgress(plan,state)>summary!.sections);assert.equal(JSON.stringify(state),before);
+ // No14 has three literal copies of this four-bar musical unit, with weights
+ // 576, 576 and 1152. Its manual rate now counts at all three locations.
+ assert.ok(Math.abs(summary!.sections-(.4+.3*(576+576+1152)/13824))<1e-12);assert.equal(summary!.sections,displayedPracticeTotal(plan,state));assert.ok(Math.abs(displayedPracticeTotal(plan,state,false)-.4)<1e-12);assert.ok(totalProgress(plan,state)>summary!.sections);assert.equal(JSON.stringify(state),before);
 });
 
 test('an unavailable selected companion never reads another keyboard’s records',async()=>{

@@ -1,0 +1,13 @@
+import {manualTempoField} from './manual-tempo-control';
+import {metronomeUnit,beatUnitLabel,metronomeMark,tempoRateNumber} from './metronome-mark';
+import type {ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
+import type {PracticeState} from './practice';
+
+/** One visible Options section for both assessment modes. Controllers retain
+ * their own musical state validation and own the shared numeric editor. */
+export const integerPracticeSetting=(key:string)=>key==='countInBars'||key==='resumeCooldownSeconds';
+export function adjustPracticeInteger(key:string,value:number,direction:number){return Math.max(key==='countInBars'?1:0,Math.min(key==='countInBars'?8:30,value+direction));}
+function integerField(key:string,value:number,label:string,unit:string){return manualTempoField(key,`<input type="text" inputmode="numeric" data-practice-setting="${key}" data-absolute="${value}" data-presented="${value}" value="${value}" aria-label="${label}">`,label,unit);}
+export function practiceOptionsMarkup(reference:ReferencePerformanceTempo,state:PracticeState,startingField:string,increaseField:string){
+ return `<section class="options-practice" data-practice-options><h3>Practice</h3><label class="dialog-row">Starting speed <span class="practice-speed">${startingField}</span></label><label class="dialog-row">Increase per success <span class="practice-speed">${increaseField}</span></label><label class="dialog-row">Count-in <span class="practice-speed">${integerField('countInBars',state.countInBars??2,'Count-in bars','bars')}</span></label><label class="dialog-row">Resume cooldown <span class="practice-speed">${integerField('resumeCooldownSeconds',state.resumeCooldownSeconds??3,'Resume cooldown seconds','s')}</span></label><label class="dialog-row practice-reference practice-target">Performance target <span data-reference-tempo class="metronome-mark">${manualTempoField('target',`<input type="text" inputmode="decimal" data-practice-setting="target" data-absolute="${state.target}" value="${tempoRateNumber(state.target)}" aria-label="Target ${beatUnitLabel(reference.beat)} notes per minute">`,'target tempo',metronomeUnit(reference.beat))}</span></label><p class="dialog-row practice-reference" data-personal-goal-only ${state.personalGoal?'':'hidden'}>Score reference ${metronomeMark(reference)}</p><button data-use-reference data-personal-goal-only ${state.personalGoal?'':'hidden'}>Use score reference</button><p data-goal-error class="error" role="alert"></p><p class="help" data-tempo-help>Starting speed and each success increase are percentages of the tempo shown above.</p></section>`;
+}
