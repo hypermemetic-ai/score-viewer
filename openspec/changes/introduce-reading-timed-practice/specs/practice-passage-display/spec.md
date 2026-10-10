@@ -115,7 +115,7 @@ Reading and Timed SHALL be prominent centered choices beside Start/Resume. Free 
 - **AND** an explicit empty Free view control remains empty in every supported instrument context without adding piano hand-position assessment
 
 ### Requirement: Direct working-speed commands
-The active practice footer SHALL expose direct shortcuts and mouse actions without sequential keyboard navigation through its controls. Timed piano and neutral manual practice SHALL offer Left/Right working-speed changes of 0.5 percentage points with a compact horizontal decrease/value/increase presentation. Inherited/default previous/next arrows SHALL route to speed in those contexts; explicit local navigation overrides and other saved action/modifier owners SHALL remain authoritative. Reading and Free view SHALL retain their meaningful browsing actions. Unclaimed F2 or clicking the value SHALL enter a numeric draft, Enter SHALL commit through existing admission and queued boundary rules, and Escape SHALL cancel without triggering Back. Enter outside editing SHALL preserve the existing Done control. Options and the passage selector SHALL retain their real keyboard navigation.
+The active practice footer SHALL expose direct shortcuts and mouse actions without sequential keyboard navigation through its controls. Timed piano and neutral manual practice SHALL offer Left/Right working-speed changes of 0.5 percentage points with a compact horizontal decrease/value/increase presentation. Inherited/default previous/next arrows SHALL route to speed in those contexts; explicit local navigation overrides and other saved action/modifier owners SHALL remain authoritative. Reading and Free view SHALL retain their meaningful browsing actions. Unclaimed S or clicking the value SHALL enter a numeric draft, Enter SHALL commit through existing admission and queued boundary rules, and Escape SHALL cancel without triggering Back. Enter outside editing SHALL preserve the existing Done control. The contextual S speed command SHALL preserve explicitly saved S action ownership and the full-score reader’s scale shortcut outside active practice. Options and the passage selector SHALL retain their real keyboard navigation.
 
 #### Scenario: Direct speed after a mouse action
 - **WHEN** a user clicks a practice mode or transport control and then presses the available unmodified working-speed arrows in Timed or neutral manual practice
@@ -123,9 +123,9 @@ The active practice footer SHALL expose direct shortcuts and mouse actions witho
 - **AND** the number and arrow hints represent the same available commands while captured and queued rates keep their existing musical semantics
 
 #### Scenario: Explicit speed draft
-- **WHEN** the user opens the working-speed draft through an unclaimed F2 or a mouse click and types a new value
+- **WHEN** the user opens the working-speed draft through an unclaimed S or a mouse click and types a new value
 - **THEN** typed prefixes do not change current or queued speed, Enter commits the admitted value, and Escape discards the draft
-- **AND** neither Enter nor Escape leaks into Done or Back, and a saved F2 owner is not replaced by a hidden fallback
+- **AND** neither Enter nor Escape leaks into Done or Back, and a saved S owner is not replaced by a hidden fallback
 
 #### Scenario: Arrow commands in browsing modes
 - **WHEN** Reading or Free view is selected
