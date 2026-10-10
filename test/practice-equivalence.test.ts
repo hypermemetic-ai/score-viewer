@@ -130,3 +130,27 @@ test('heterogeneous parent association is preserved rather than flattened into a
  const tree=passageHierarchy(plan,state),left=tree.all.get('1-12')!,right=tree.all.get('13-24')!;
  toggleDone(state,target(left));assert.equal(progressFor(left,state),1);assert.equal(progressFor(right,state),0);
 });
+
+test('chooser key and render each derive one fresh tree without rewriting earned evidence',t=>{
+ const plan=planPractice(original),state=initialPractice(plan);for(const c of plan.chunks)state.best[c.pattern]=state.target;
+ const browser=new PracticeBrowser(plan),raw=JSON.stringify(state),owned=browser as any,derive=owned.tree;let calls=0;
+ owned.tree=function(value:typeof state){calls++;return derive.call(this,value);};
+ assert.equal(browser.key('ArrowDown',state),'handled');assert.equal(calls,1);
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'document');Object.defineProperty(globalThis,'document',{configurable:true,value:{activeElement:undefined}});
+ t.after(()=>{if(previous)Object.defineProperty(globalThis,'document',previous);else delete(globalThis as any).document;});
+ const preview={querySelector:()=>null},root={style:{setProperty(){}},querySelectorAll:()=>[],querySelector:()=>preview,innerHTML:''};
+ calls=0;browser.render(root as any,state,()=>{throw Error('joined passage must not request a leaf preview');});assert.equal(calls,1);
+ assert.match(root.innerHTML,/Total progress/);assert.equal(JSON.stringify(state),raw);
+});
+
+test('a later chooser operation rechecks source mutations, current evidence and a prior refusal',()=>{
+ const plan=planPractice(repeated([0,0])),state=initialPractice(plan),a=plan.chunks[0],browser=new PracticeBrowser(plan);
+ state.composites={'1-8':['1-4','5-8']};const parent=passageHierarchy(plan,state).all.get('1-8')!;
+ state.best[a.pattern]=state.target;browser.key('ArrowDown',state);assert.equal(measuredRate(state,parent.pattern,parent.id),state.target);
+ delete state.best[a.pattern];browser.key('ArrowUp',state);assert.equal(measuredRate(state,parent.pattern,parent.id),0);
+ state.best[a.pattern]=state.target;browser.key('ArrowDown',state);assert.equal(measuredRate(state,parent.pattern,parent.id),state.target);
+ plan.attacks[0].midi+=1;browser.key('ArrowUp',state);assert.equal(measuredRate(state,parent.pattern,parent.id),0);
+ plan.attacks[0].midi-=1;browser.key('ArrowDown',state);assert.equal(measuredRate(state,parent.pattern,parent.id),state.target);
+ const prior=state.composites;state.composites={'1-8':['missing','5-8']};assert.throws(()=>browser.key('ArrowUp',state),/Practice component differs/);
+ state.composites=prior;assert.equal(browser.key('ArrowDown',state),'handled');assert.equal(measuredRate(state,parent.pattern,parent.id),state.target);
+});

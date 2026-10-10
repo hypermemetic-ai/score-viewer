@@ -6,6 +6,7 @@ import {bindPracticePassages} from './practice-equivalence';
 import {measuredRate,manualRates} from './practice-attainment';
 
 export const practiceMeasureRange=(id:string)=>id.replace('-', ' – ');
+type PassageTree=ReturnType<typeof reconcilePassages>;
 
 /** At a list edge retain the previous row as page context, using logical coordinates. */
 export function practiceListScrollTop(scrollTop:number,height:number,max:number,target:{top:number;bottom:number},previous?:{top:number;bottom:number}){
@@ -22,25 +23,30 @@ export class PracticeBrowser {
  private tree(state:PracticeState){const tree=reconcilePassages(this.plan,structuredClone(state));bindPracticePassages(this.plan,state,tree.all);return tree;}
  progress(chunk:PracticeChunk,state:PracticeState){return displayedPracticeProgress(chunk,state,this.includeManual);}
  setIncludeManual(include:boolean){this.includeManual=include;this.retainedSelection=this.selected;}
- groups(state:PracticeState){const {frontier,all}=this.tree(state),completed:PracticeChunk[]=[];const attained=(c:PracticeChunk)=>displayedComponentsAttained(c,state,all,this.includeManual),collect=(c:PracticeChunk)=>{if(attained(c))completed.push(c);else for(const id of c.components??[])collect(all.get(id)!);};frontier.forEach(collect);const top=new Set(completed.map(c=>c.id)),unfinished=frontier.filter(c=>!top.has(c.id)),selected=all.get(this.recommended??this.retainedSelection??'');if(selected&&selected.id===this.selected&&![...completed,...unfinished].some(c=>c.id===selected.id))(attained(selected)?completed:unfinished).push(selected);return {completed:completed.sort((a,b)=>a.firstBar-b.firstBar),unfinished:unfinished.sort((a,b)=>this.progress(b,state)-this.progress(a,state)||a.firstBar-b.firstBar)};}
- rows(state:PracticeState){const {completed,unfinished}=this.groups(state);return [...completed,...unfinished];}
- current(state:PracticeState){const {all}=this.tree(state);return all.get(this.component??this.selected);}
+ groups(state:PracticeState){return this.groupsFromTree(state,this.tree(state));}
+ private groupsFromTree(state:PracticeState,{frontier,all}:PassageTree){const completed:PracticeChunk[]=[];const attained=(c:PracticeChunk)=>displayedComponentsAttained(c,state,all,this.includeManual),collect=(c:PracticeChunk)=>{if(attained(c))completed.push(c);else for(const id of c.components??[])collect(all.get(id)!);};frontier.forEach(collect);const top=new Set(completed.map(c=>c.id)),unfinished=frontier.filter(c=>!top.has(c.id)),selected=all.get(this.recommended??this.retainedSelection??'');if(selected&&selected.id===this.selected&&![...completed,...unfinished].some(c=>c.id===selected.id))(attained(selected)?completed:unfinished).push(selected);return {completed:completed.sort((a,b)=>a.firstBar-b.firstBar),unfinished:unfinished.sort((a,b)=>this.progress(b,state)-this.progress(a,state)||a.firstBar-b.firstBar)};}
+ rows(state:PracticeState){return this.rowsFromTree(state,this.tree(state));}
+ private rowsFromTree(state:PracticeState,tree:PassageTree){const {completed,unfinished}=this.groupsFromTree(state,tree);return [...completed,...unfinished];}
+ current(state:PracticeState){return this.currentFromTree(this.tree(state));}
+ private currentFromTree({all}:PassageTree){return all.get(this.component??this.selected);}
  originalGroups(_state:PracticeState,chunk:PracticeChunk){return chunk.components?this.plan.chunks.filter(c=>c.firstBar>=chunk.firstBar&&c.lastBar<=chunk.lastBar):[chunk];}
- select(state:PracticeState,id:string,component=false){const {all}=this.tree(state),chunk=all.get(id);if(!chunk)return;if(component)this.component=id;else{if(this.recommended!==id)this.recommended=undefined;if(this.retainedSelection!==id)this.retainedSelection=undefined;this.selected=id;this.parent=chunk.components?id:undefined;this.component=undefined;}}
- suggest(state:PracticeState,chunk:PracticeChunk){this.recommended=undefined;const row=this.rows(state).find(c=>c.firstBar<=chunk.firstBar&&c.lastBar>=chunk.lastBar);if(!row)return;if(row.id!==chunk.id&&chunk.components){this.recommended=chunk.id;this.select(state,chunk.id);}else{this.select(state,row.id);if(row.id!==chunk.id)this.select(state,chunk.id,true);}}
+ select(state:PracticeState,id:string,component=false){this.selectFromTree(id,component,this.tree(state));}
+ private selectFromTree(id:string,component:boolean,{all}:PassageTree){const chunk=all.get(id);if(!chunk)return;if(component)this.component=id;else{if(this.recommended!==id)this.recommended=undefined;if(this.retainedSelection!==id)this.retainedSelection=undefined;this.selected=id;this.parent=chunk.components?id:undefined;this.component=undefined;}}
+ suggest(state:PracticeState,chunk:PracticeChunk){this.recommended=undefined;const tree=this.tree(state),row=this.rowsFromTree(state,tree).find(c=>c.firstBar<=chunk.firstBar&&c.lastBar>=chunk.lastBar);if(!row)return;if(row.id!==chunk.id&&chunk.components){this.recommended=chunk.id;this.selectFromTree(chunk.id,false,tree);}else{this.selectFromTree(row.id,false,tree);if(row.id!==chunk.id)this.selectFromTree(chunk.id,true,tree);}}
  key(code:string,state:PracticeState):'practice'|'handled'|undefined {
-  const {all}=this.tree(state),rows=this.rows(state),parent=all.get(this.parent??this.selected),components=parent?this.originalGroups(state,parent):[];
+  const tree=this.tree(state),{all}=tree,rows=this.rowsFromTree(state,tree),parent=all.get(this.parent??this.selected),components=parent?this.originalGroups(state,parent):[];
   if(code==='Enter')return 'practice';
   if(code==='ArrowRight'&&components.length){const i=components.findIndex(c=>c.id===this.component);this.parent=parent!.id;this.component=components[(i+1)%components.length].id;return 'handled';}
   if(code==='ArrowLeft'&&this.component){this.component=undefined;return 'handled';}
-  if(code==='ArrowUp'||code==='ArrowDown'){const list=this.component?components:rows,id=this.component??this.selected,i=Math.max(0,list.findIndex(c=>c.id===id)),next=list[Math.max(0,Math.min(list.length-1,i+(code==='ArrowUp'?-1:1)))];if(next)this.select(state,next.id,!!this.component);return 'handled';}
+  if(code==='ArrowUp'||code==='ArrowDown'){const list=this.component?components:rows,id=this.component??this.selected,i=Math.max(0,list.findIndex(c=>c.id===id)),next=list[Math.max(0,Math.min(list.length-1,i+(code==='ArrowUp'?-1:1)))];if(next)this.selectFromTree(next.id,!!this.component,tree);return 'handled';}
   if(code==='ArrowLeft'||code==='ArrowRight')return 'handled';
  }
  render(root:HTMLElement,state:PracticeState,passage:(bars:number[])=>SVGSVGElement,focus=false){
   const lists=[...root.querySelectorAll<HTMLElement>('.practice-browser>.practice-chunks')],scrolls=lists.map(el=>el.scrollTop),active=document.activeElement as HTMLElement,previous=active?.closest<HTMLElement>('[data-passage-id]'),previousId=previous?.dataset.passageId,previousComponent=previous?.dataset.component;
   const digits=String(this.plan.barTicks.length-1).length;root.style.setProperty('--practice-list-width',`max(136px, calc(${2*digits+9}ch + 20px))`);
-  const rows=this.rows(state);if(!rows.some(c=>c.id===this.selected)){const old=this.tree(state).all.get(this.selected),enclosing=rows.find(c=>old&&c.firstBar<=old.firstBar&&c.lastBar>=old.lastBar);this.select(state,enclosing?.id??rows[0]?.id??'');}
-  const {all}=this.tree(state),parent=all.get(this.parent??this.selected),components=parent?this.originalGroups(state,parent):[],current=this.current(state),{completed,unfinished}=this.groups(state);
+  // One lexical tree per synchronous operation; public entry points remain fresh.
+  const tree=this.tree(state),rows=this.rowsFromTree(state,tree);if(!rows.some(c=>c.id===this.selected)){const old=tree.all.get(this.selected),enclosing=rows.find(c=>old&&c.firstBar<=old.firstBar&&c.lastBar>=old.lastBar);this.selectFromTree(enclosing?.id??rows[0]?.id??'',false,tree);}
+  const {all}=tree,parent=all.get(this.parent??this.selected),components=parent?this.originalGroups(state,parent):[],current=this.currentFromTree(tree),{completed,unfinished}=this.groupsFromTree(state,tree);
   const row=(c:PracticeChunk,child=false)=>{
    const best=measuredRate(state,c.pattern,c.id),claims=manualRates(state,{passage:c.id,pattern:c.pattern}),percent=practicePercent(this.progress(c,state)),bestLabel=best?`Best ${attainmentLabel(best,state.target)}`:'',doneLabel=claims.length?`Done ${attainmentLabel(Math.max(...claims),state.target)}`:'',evidence=[bestLabel,doneLabel].filter(Boolean).join(' · ');
    return `<button data-practice="${child?'component':'select'}:${c.id}" data-passage-id="${c.id}" data-component="${child}" tabindex="${(child?this.component===c.id:!this.component&&this.selected===c.id)?0:-1}" aria-current="${(child?current?.id===c.id:this.selected===c.id)}" aria-label="Measures ${practiceMeasureRange(c.id)}, ${percent}%${evidence?`, ${evidence}`:''}${c.components?', components available':''}"><span class="practice-range">${practiceMeasureRange(c.id)}</span><span>${percent}%</span></button>`;
