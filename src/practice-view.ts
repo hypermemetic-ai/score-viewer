@@ -111,8 +111,11 @@ export class PracticeView {
  private prepareRepeat(){
   const session=this.session,clock=this.clock;if(!session||!clock)return;const rate=this.predictedRepeatRate(session),prior=this.repeatPreparation;
   if(rate===undefined){if(prior){this.repeatPreparation=undefined;void clock.cancelRepeat().catch(error=>{if(this.clock===clock&&!this.disposed){this.audioError=error.message;this.pause();this.status(this.audioError!);}});}return;}
-  if(prior?.session===session&&prior.generation===this.startGeneration&&prior.rate===rate)return;
-  const anchor={previousStartMs:session.startMs,phraseEndMs:session.startMs+(session.chunk.end-session.startTick)*session.tickMs,previousBpm:this.loopRate},plan=planPracticeRepeat({...anchor,nextBpm:rate,grid:session.sourcePulseGrid,previousGrid:session.pulseGrid,sourceBoundary:true}),record={session,generation:this.startGeneration,rate,plan,pending:true,receipt:undefined as PreparedPracticeRepeat|undefined,settled:undefined as Promise<PreparedPracticeRepeat|undefined>|undefined};this.repeatPreparation=record;
+  const anchor={previousStartMs:session.startMs,phraseEndMs:session.startMs+(session.chunk.end-session.startTick)*session.tickMs,previousBpm:this.loopRate},plan=planPracticeRepeat({...anchor,nextBpm:rate,grid:session.sourcePulseGrid,previousGrid:session.pulseGrid,sourceBoundary:true});
+  // The next count setting can change without changing the captured playing
+  // tempo. Compare the admitted repeat grid, including a pickup's exit phase.
+  if(prior?.session===session&&prior.generation===this.startGeneration&&prior.rate===rate&&JSON.stringify(prior.plan.grid)===JSON.stringify(plan.grid))return;
+  const record={session,generation:this.startGeneration,rate,plan,pending:true,receipt:undefined as PreparedPracticeRepeat|undefined,settled:undefined as Promise<PreparedPracticeRepeat|undefined>|undefined};this.repeatPreparation=record;
   const duration=(session.chunk.end-session.chunk.start)*scoreTickMs(this.plan,rate)+plan.countInMs;
   record.settled=clock.armRepeat(rate,duration,plan,plan.grid??session.pulseGrid).then(receipt=>{record.pending=false;if(this.repeatPreparation===record&&clock===this.clock&&record.generation===this.startGeneration)record.receipt=receipt;return receipt;}).catch(error=>{record.pending=false;if(this.repeatPreparation===record&&clock===this.clock&&record.generation===this.startGeneration){this.audioError=error.message;this.pause();this.status(this.audioError!);}return undefined;});
  }
