@@ -41,7 +41,21 @@ pub fn pulse_v2(time: f64, pulse: f64, subdivision: f64, grid: &PulseGridV2) -> 
         } else {
             650.0
         },
-        if intermediate { 0.064 } else { 0.16 },
+        if grid.version == 3 {
+            if intermediate {
+                0.022
+            } else if primary {
+                0.16
+            } else if secondary {
+                0.12
+            } else {
+                0.045
+            }
+        } else if intermediate {
+            0.064
+        } else {
+            0.16
+        },
     )
 }
 pub fn pulse(time: f64, eighth: f64, subdivision: f64) -> (f64, f64, f64) {
@@ -139,6 +153,7 @@ mod tests {
             phases[0] = phase;
             let grid = PulseGridV2 {
                 version: 2,
+                count_in_bars: None,
                 pulses_per_beat: p,
                 count_bar_pulses: bar,
                 count_beat_pulses: beat,
@@ -180,6 +195,7 @@ mod tests {
     fn repeated_pickups_short_endings_and_mixed_meter_do_not_invent_downbeats() {
         let grid = PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: 2,
             count_bar_pulses: 6,
             count_beat_pulses: 2,
@@ -202,6 +218,7 @@ mod tests {
         assert_eq!(pulse_v2(27. * 0.5, 0.5, 0.5, &grid).2, 0.);
         let mixed = PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: 3,
             count_bar_pulses: 6,
             count_beat_pulses: 3,

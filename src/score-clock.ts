@@ -1,7 +1,10 @@
 import {referencePerformanceClock,requireReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import type {TimeSignatureOverlay,BarlineOverlay} from '../vendor/iso-notation/src/model/types';
 /** Transported identically to both audio adapters. Pulse indices are relative to count origin. */
-export interface PracticePulseGrid {pulsesPerBeat:number;scoreOffsetPulses:number;barStartPulses:number[];version?:2;countBarPulses?:number;countBeatPulses?:number;countStartPhasePulses?:number;scoreStartPhasePulses?:number;beatStartPulses?:number[];barMeterPulses?:number[];barBeatPulses?:number[];barPhasePulses?:number[]}
+export interface PracticePulseGrid {pulsesPerBeat:number;scoreOffsetPulses:number;barStartPulses:number[];version?:2|3;countInBars?:number;countBarPulses?:number;countBeatPulses?:number;countStartPhasePulses?:number;scoreStartPhasePulses?:number;beatStartPulses?:number[];barMeterPulses?:number[];barBeatPulses?:number[];barPhasePulses?:number[]}
+/** Only explicitly admitted meter protocols have source-bar/phase authority. */
+export type MeterPulseGrid=PracticePulseGrid & {version:2|3;countBarPulses:number;countBeatPulses:number;countStartPhasePulses:number;scoreStartPhasePulses:number;beatStartPulses:number[];barMeterPulses:number[];barBeatPulses:number[];barPhasePulses:number[]};
+export const isMeterPulseGrid=(grid:PracticePulseGrid|undefined):grid is MeterPulseGrid=>grid?.version===2||grid?.version===3;
 interface MeterSource {referencePerformanceTempo?:ReferencePerformanceTempo;ticksPerBeat:number;timeSignatures:TimeSignatureOverlay[];barPhaseTicks?:number[];barlines?:BarlineOverlay[];writtenPresentation?:{repeats:{startBar:number}[]}}
 const gcd=(a:number,b:number):number=>b?gcd(b,a%b):a;
 const lcm=(a:number,b:number)=>a/gcd(a,b)*b;
@@ -13,14 +16,16 @@ export function validatePulseGrid(grid:PracticePulseGrid):PracticePulseGrid {
  const invalid=()=>{throw Error('The score meter cannot use a finite metronome pulse grid.');},integer=(p:unknown,max=1e9):p is number=>Number.isSafeInteger(p)&&Number(p)>=0&&Number(p)<=max;
  const ordered=(a:unknown):a is number[]=>Array.isArray(a)&&a.length<=100000&&a.every((p,i)=>integer(p)&&(i===0||p>a[i-1]));
  if(!grid||!integer(grid.pulsesPerBeat,96)||grid.pulsesPerBeat<1||!integer(grid.scoreOffsetPulses)||!ordered(grid.barStartPulses)||!grid.barStartPulses.length||grid.barStartPulses[0]!==0)invalid();
- const keys=['pulsesPerBeat','scoreOffsetPulses','barStartPulses'],newKeys=['version','countBarPulses','countBeatPulses','countStartPhasePulses','scoreStartPhasePulses','beatStartPulses','barMeterPulses','barBeatPulses','barPhasePulses'];
- if(grid.version!==2){if(grid.version!==undefined||![0,2*grid.pulsesPerBeat].includes(grid.scoreOffsetPulses)||newKeys.some(k=>(grid as any)[k]!==undefined))invalid();return {...grid,barStartPulses:[...grid.barStartPulses]};}
+ const keys=['pulsesPerBeat','scoreOffsetPulses','barStartPulses'],newKeys=['version','countInBars','countBarPulses','countBeatPulses','countStartPhasePulses','scoreStartPhasePulses','beatStartPulses','barMeterPulses','barBeatPulses','barPhasePulses'];
+ if(!isMeterPulseGrid(grid)){if(grid.version!==undefined||![0,2*grid.pulsesPerBeat].includes(grid.scoreOffsetPulses)||newKeys.some(k=>(grid as any)[k]!==undefined))invalid();return {...grid,barStartPulses:[...grid.barStartPulses]};}
+ if(grid.version===2?grid.countInBars!==undefined:!integer(grid.countInBars,8)||grid.countInBars!<1)invalid();
+ const countBars=grid.version===3?grid.countInBars!:1;
  if(Object.keys(grid).some(k=>![...keys,...newKeys].includes(k))||grid.barStartPulses.length<2||!ordered(grid.beatStartPulses))invalid();
  const vectors=[grid.barMeterPulses,grid.barBeatPulses,grid.barPhasePulses];
  if(vectors.some(a=>!Array.isArray(a)||a.length!==grid.barStartPulses.length-1||a.some(p=>!integer(p,9216))))invalid();
  const meters=grid.barMeterPulses!,beats=grid.barBeatPulses!,phases=grid.barPhasePulses!,expected:number[]=[];
  const countPhase=grid.countStartPhasePulses;
- if(!integer(countPhase,9216)||countPhase!>=meters[0]||grid.countBarPulses!==meters[0]||grid.countBeatPulses!==beats[0]||grid.scoreStartPhasePulses!==phases[0]||![0,meters[0]+(phases[0]-countPhase!+meters[0])%meters[0]].includes(grid.scoreOffsetPulses))invalid();
+ if(!integer(countPhase,9216)||countPhase!>=meters[0]||grid.countBarPulses!==meters[0]||grid.countBeatPulses!==beats[0]||grid.scoreStartPhasePulses!==phases[0]||![0,countBars*meters[0]+(phases[0]-countPhase!+meters[0])%meters[0]].includes(grid.scoreOffsetPulses))invalid();
  for(let i=0;i<meters.length;i++){
   const full=meters[i],beat=beats[i],phase=phases[i],length=grid.barStartPulses[i+1]-grid.barStartPulses[i];
   if(full<1||beat<1||full%beat||phase>=full||![0,Math.max(0,full-length)].includes(phase))invalid();
@@ -34,11 +39,11 @@ export function validatePulseGrid(grid:PracticePulseGrid):PracticePulseGrid {
 }
 /** Keep the predecessor's actual exit phase, including a complementary short ending. */
 export function repeatPulseGrid(next:PracticePulseGrid,previous:PracticePulseGrid=next):PracticePulseGrid {
- next=validatePulseGrid(next);previous=validatePulseGrid(previous);if(next.version!==2||previous.version!==2)throw Error('A musical repeat needs source-meter pulse grids.');
+ next=validatePulseGrid(next);previous=validatePulseGrid(previous);if(!isMeterPulseGrid(next)||!isMeterPulseGrid(previous))throw Error('A musical repeat needs source-meter pulse grids.');
  const p=lcm(next.pulsesPerBeat,previous.pulsesPerBeat),factor=p/next.pulsesPerBeat,last=previous.barMeterPulses!.length-1,oldFull=previous.barMeterPulses![last],oldBeat=previous.barBeatPulses![last],newFull=next.countBarPulses!*factor,newBeat=next.countBeatPulses!*factor;
  const compatible=oldFull*p===newFull*previous.pulsesPerBeat&&oldBeat*p===newBeat*previous.pulsesPerBeat,exit=(previous.barPhasePulses![last]+previous.barStartPulses[last+1]-previous.barStartPulses[last])%oldFull,countStartPhasePulses=compatible?exit*p/previous.pulsesPerBeat:0;
  const scale=(a:number[])=>a.map(q=>q*factor),phase=next.scoreStartPhasePulses!*factor;
- return validatePulseGrid({...next,pulsesPerBeat:p,scoreOffsetPulses:newFull+(phase-countStartPhasePulses+newFull)%newFull,countBarPulses:newFull,countBeatPulses:newBeat,countStartPhasePulses,scoreStartPhasePulses:phase,barStartPulses:scale(next.barStartPulses),beatStartPulses:scale(next.beatStartPulses!),barMeterPulses:scale(next.barMeterPulses!),barBeatPulses:scale(next.barBeatPulses!),barPhasePulses:scale(next.barPhasePulses!)});
+ return validatePulseGrid({...next,pulsesPerBeat:p,scoreOffsetPulses:(next.version===3?next.countInBars!:1)*newFull+(phase-countStartPhasePulses+newFull)%newFull,countBarPulses:newFull,countBeatPulses:newBeat,countStartPhasePulses,scoreStartPhasePulses:phase,barStartPulses:scale(next.barStartPulses),beatStartPulses:scale(next.beatStartPulses!),barMeterPulses:scale(next.barMeterPulses!),barBeatPulses:scale(next.barBeatPulses!),barPhasePulses:scale(next.barPhasePulses!)});
 }
 /** Viewer-only phase authority; a short ending is not an upbeat merely because it is short. */
 export function sourceBarPhaseTicks(source:MeterSource,bars:readonly number[]){

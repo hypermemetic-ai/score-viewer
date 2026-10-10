@@ -5,6 +5,8 @@ import {PracticeClock} from '../src/practice-clock';
 import {PracticeView,practiceAudioTestAction} from '../src/practice-view';
 import {PerformanceSession,performanceAudioErrorHandler} from '../src/performance';
 import {host,practiceAudio} from '../src/host';
+import {scorePulseGrid} from '../src/score-clock';
+import {practiceCountInGrid} from '../src/practice-attempt-grid';
 
 const until=async(predicate:()=>boolean)=>{for(let i=0;i<100&&!predicate();i++)await new Promise<void>(done=>setImmediate(done));assert.ok(predicate(),'operation did not reach its controlled boundary');};
 function nativeHarness(t:any){
@@ -22,8 +24,9 @@ function practiceView(){
  // Assume successful visual admission and exercise the real async action/clock
  // logic. Admission failure is covered by practice-progression-lifecycle.test.ts.
  const view=Object.create(PracticeView.prototype) as any,ready:number[]=[],messages:string[]=[];
- const session={chunk:{start:0,end:1000},startTick:0,tickMs:1,phase:'ready',ready(start:number){ready.push(start);this.phase='countin';},pause(){this.phase='paused';}};
- Object.assign(view,{manual:{cancel(){}},contacts:{clear(){}},plan:{referencePerformanceTempo:testReference,ticksPerBeat:48,timeSignatures:[{tick:0,numerator:6,denominator:8}],barTicks:[0,1000]},session,state:{working:180},options:{connected:()=>true},audioOutputs:{supported:true},startGeneration:0,disposed:false,preview:{clear(){}},app:{querySelector:()=>null}});
+ const plan={referencePerformanceTempo:testReference,ticksPerBeat:48,timeSignatures:[{tick:0,numerator:6,denominator:8}],barTicks:[0,144,288,432,576]};
+ const session={chunk:{start:0,end:576},sourcePulseGrid:practiceCountInGrid(scorePulseGrid(plan,plan.barTicks)),startTick:0,tickMs:1,phase:'ready',ready(start:number){ready.push(start);this.phase='countin';},pause(){this.phase='paused';}};
+ Object.assign(view,{manual:{cancel(){}},contacts:{clear(){}},plan,session,state:{working:180,countInBars:2},options:{connected:()=>true},audioOutputs:{supported:true},startGeneration:0,disposed:false,preview:{clear(){}},app:{querySelector:()=>null}});
  view.paint=()=>{};view.paintScore=()=>{};view.paintControls=()=>{};view.status=(message:string)=>messages.push(message);
  return{view,session,ready,messages};
 }

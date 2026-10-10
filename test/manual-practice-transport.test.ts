@@ -61,3 +61,23 @@ test('late or cancelled repeat acknowledgement never starts a partial second cue
  g.transport.update();await settle();assert.equal(g.s.phase,'paused');assert.match(g.errors[0],/did not confirm/);assert.equal(g.calls.includes('beginRepeat'),false);
  f.transport.close();g.transport.close();
 });
+
+test('manual initial arming owns its rate/grid snapshot while settings queue for the following repeat',async()=>{
+ const f=fixture();let resolveBegin!:(origin:number)=>void;let captured:any[]=[];
+ f.transport.clock.begin=(...args)=>{captured=args;return new Promise(resolve=>{resolveBegin=resolve;});};
+ const pending=f.transport.start();assert.equal(f.transport.startingRate,100);
+ f.s.queueWorking(50);f.s.state.countInBars=8;resolveBegin(1000);await pending;
+ assert.equal(captured[0],100);assert.equal(captured[3].countInBars,2);assert.equal(f.s.bpm,100);assert.equal(f.s.pulseGrid.countInBars,2);
+ assert.equal(f.s.startMs,1000+practiceTiming(100,captured[3]).countInMs);assert.equal(f.s.state.working,50);assert.equal(f.transport.startingRate,undefined);
+ const end=f.s.startMs+f.s.durationMs;f.clock.time=end;f.transport.update();await settle();
+ assert.equal(f.s.bpm,50);assert.equal(f.s.pulseGrid.countInBars,8);assert.equal(f.s.startMs,end+practiceTiming(50,f.s.pulseGrid).countInMs);
+ assert.deepEqual(f.errors,[]);f.transport.close();
+});
+test('a manual count-length edit re-arms only the future cue, including a just-completed boundary',async()=>{
+ const f=fixture();await f.transport.start();await settle();const start=f.s.startMs,tick=f.s.tickMs,grid=JSON.stringify(f.s.pulseGrid);
+ f.s.state.countInBars=1;f.transport.prepare();await settle();assert.equal(f.calls.filter(c=>c==='arm').length,2);
+ assert.equal(f.s.startMs,start);assert.equal(f.s.tickMs,tick);assert.equal(JSON.stringify(f.s.pulseGrid),grid);
+ f.s.state.countInBars=3;const end=start+f.s.durationMs;f.clock.time=end;f.transport.update();await settle();
+ assert.equal(f.calls.includes('adopt'),false);assert.equal(f.calls.includes('beginRepeat'),true);assert.equal(f.s.pulseGrid.countInBars,3);
+ assert.deepEqual(f.errors,[]);f.transport.close();
+});

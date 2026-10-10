@@ -16,6 +16,12 @@ pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PulseGridV2 {
     pub version: u8,
+    #[serde(
+        default,
+        deserialize_with = "count_bars_field",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub count_in_bars: Option<u8>,
     pub pulses_per_beat: u32,
     pub score_offset_pulses: u32,
     pub bar_start_pulses: Vec<u64>,
@@ -28,6 +34,30 @@ pub struct PulseGridV2 {
     pub bar_beat_pulses: Vec<u32>,
     pub bar_phase_pulses: Vec<u32>,
 }
+fn count_bars_field<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u8>, D::Error> {
+    // Missing belongs to literal V2; an explicit null is not a missing field.
+    u8::deserialize(deserializer).map(Some)
+}
+/// Keep the historical field/tag literal; the new count protocol is explicit.
+pub fn select_grid_version(
+    v2: Option<PulseGridV2>,
+    v3: Option<PulseGridV2>,
+) -> Result<Option<PulseGridV2>, String> {
+    match (v2, v3) {
+        (None, None) => Ok(None),
+        (Some(g), None) if g.version == 2 => {
+            g.validate()?;
+            Ok(Some(g))
+        }
+        (None, Some(g)) if g.version == 3 => {
+            g.validate()?;
+            Ok(Some(g))
+        }
+        _ => Err("Mixed or incorrectly tagged metronome grid versions".into()),
+    }
+}
 impl PulseGridV2 {
     pub fn validate(&self) -> Result<(), String> {
         let ascending = |v: &[u64]| {
@@ -35,7 +65,12 @@ impl PulseGridV2 {
                 && v.iter().all(|n| *n <= 1_000_000_000)
                 && v.windows(2).all(|w| w[0] < w[1])
         };
-        if self.version != 2
+        let bars = match (self.version, self.count_in_bars) {
+            (2, None) => 1,
+            (3, Some(n @ 1..=8)) => n as u32,
+            _ => return Err("Invalid versioned score metronome grid".into()),
+        };
+        if !matches!(self.version, 2 | 3)
             || !(1..=96).contains(&self.pulses_per_beat)
             || !(1..=9216).contains(&self.count_bar_pulses)
             || self.count_beat_pulses == 0
@@ -45,7 +80,7 @@ impl PulseGridV2 {
             || self.count_start_phase_pulses >= self.count_bar_pulses
             || !(self.score_offset_pulses == 0
                 || self.score_offset_pulses
-                    == self.count_bar_pulses
+                    == bars * self.count_bar_pulses
                         + (self.score_start_phase_pulses + self.count_bar_pulses
                             - self.count_start_phase_pulses)
                             % self.count_bar_pulses)
@@ -485,6 +520,7 @@ mod tests {
     fn compound_grid() -> PulseGridV2 {
         PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: 3,
             score_offset_pulses: 6,
             bar_start_pulses: vec![0, 6, 12, 18, 24],
@@ -594,6 +630,47 @@ mod tests {
                     .unwrap_or(false)
                     == false,
                 "field {key}"
+            );
+        }
+    }
+    #[test]
+    fn v3_count_bars_require_exact_version_field_and_whole_meter_duration() {
+        let old = compound_grid();
+        assert_eq!(serde_json::to_value(&old).unwrap().get("countInBars"), None);
+        for bars in [1, 2, 8] {
+            let mut g = old.clone();
+            g.version = 3;
+            g.count_in_bars = Some(bars);
+            g.score_offset_pulses = 6 * bars as u32;
+            g.validate().unwrap();
+            assert!((g.count_micros(18.) - bars as f64 * 6_666_666.666666667).abs() < 0.001);
+            assert!(select_grid_version(None, Some(g.clone()))
+                .unwrap()
+                .is_some());
+            assert!(select_grid_version(Some(g.clone()), None).is_err());
+            assert!(select_grid_version(Some(old.clone()), Some(g.clone())).is_err());
+            for bad_bars in [None, Some(0), Some(9)] {
+                let mut bad = g.clone();
+                bad.count_in_bars = bad_bars;
+                assert!(bad.validate().is_err());
+            }
+            let mut bad = g.clone();
+            bad.score_offset_pulses += 1;
+            assert!(bad.validate().is_err());
+        }
+        let mut forged = old.clone();
+        forged.count_in_bars = Some(2);
+        assert!(forged.validate().is_err());
+        assert!(select_grid_version(None, Some(old.clone())).is_err());
+        for value in [
+            serde_json::Value::Null,
+            serde_json::json!(0),
+            serde_json::json!(2),
+        ] {
+            let mut payload = serde_json::to_value(&old).unwrap();
+            payload["countInBars"] = value;
+            assert!(
+                !serde_json::from_value::<PulseGridV2>(payload).is_ok_and(|g| g.validate().is_ok())
             );
         }
     }

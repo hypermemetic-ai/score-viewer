@@ -57,10 +57,10 @@ test('compatible meters retain a fractional exit phase by a bounded common pulse
 });
 test('attempts install the same pickup clock used by their audio while source note clocks stay literal',()=>{
  const s=source(4,4),barTicks=[0,48,240,384],chunk={id:'1-3',firstBar:0,lastBar:2,start:0,end:384,weight:384,pattern:'public-pickup'},plan:PracticePlan={...s,partition:'fixed-four-v1',revision:'public-pickup',barTicks,barPhaseTicks:[144,0,0],attacks:[0,48,240].map((tick,i)=>({id:String(i),tick,end:tick+24,midi:60+i,bar:i,owners:[String(i)],groups:[]})),gestures:[],chunks:[chunk],ownerGroup:new Map()},state=initialPractice(plan);state.working=60;
- const session=new PracticeSession(plan,chunk,state,true),before=JSON.stringify(plan.attacks);session.ready(0);assert.equal(session.startMs,7000);
+ const session=new PracticeSession(plan,chunk,state,true),before=JSON.stringify(plan.attacks);session.ready(0);assert.equal(session.startMs,11000);
  for(let loop=0;loop<3;loop++){
   for(const attack of session.events)assert.equal(session.note(attack.midi,session.startMs+attack.tick*session.tickMs),'accepted');const end:number=session.startMs+384*session.tickMs;session.update(end);assert.equal(session.phase,'complete');
-  if(loop<2){const repeat=planPracticeRepeat({previousStartMs:session.startMs,phraseEndMs:end,previousBpm:60,nextBpm:60,grid:session.sourcePulseGrid,previousGrid:session.pulseGrid,sourceBoundary:true});session.ready(end,new Set(),false,{},repeat.grid);assert.equal(session.startMs,end+4000);assert.equal(session.pulseGrid.countStartPhasePulses,6);}
+  if(loop<2){const repeat=planPracticeRepeat({previousStartMs:session.startMs,phraseEndMs:end,previousBpm:60,nextBpm:60,grid:session.sourcePulseGrid,previousGrid:session.pulseGrid,sourceBoundary:true});session.ready(end,new Set(),false,{},repeat.grid);assert.equal(session.startMs,end+8000);assert.equal(session.pulseGrid.countStartPhasePulses,6);}
  }
  assert.equal(JSON.stringify(plan.attacks),before);assert.equal(session.sourcePulseGrid.countStartPhasePulses,0);
 });

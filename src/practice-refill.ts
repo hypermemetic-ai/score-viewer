@@ -36,6 +36,10 @@ export function refillAllocationBars(plan:PracticePlan,chunk:PracticeChunk,previ
  const bars=new Set(required);
  for(const bar of resident.filter(b=>b>=current).sort((a,b)=>a-b))if(bars.size<4)bars.add(bar);
  for(let bar=current+1;bars.size<4&&bar<=chunk.lastBar;bar++)bars.add(bar);
+ // A terminal refill still owns a four-interval reading surface. Keep
+ // cleared resident intervals when there are no more incoming source bars;
+ // retirement hides their note ink, not their staff or measure frame.
+ for(const bar of resident.filter(b=>b<current).sort((a,b)=>b-a))if(bars.size<4)bars.add(bar);
  return [...bars].sort((a,b)=>a-b);
 }
 function separation(a:number,b:number,frame:RefillFrame,measures:ReadonlyMap<number,RefillMeasure>){return b===a+1?0:Math.max(frame.breakGap,(measures.get(a)?.rightAir??0)+(measures.get(b)?.leftAir??0)+1.6);}
@@ -73,7 +77,7 @@ export function refillCandidates(previous:RefillLayout,current:number,bars:numbe
 export function allocateRefill(previous:RefillLayout,current:number,bars:number[],measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame):RefillLayout {
  const same=bars.length===previous.placements.length&&bars.every(bar=>previous.placements.some(p=>p.bar===bar));
  if(same)return {...previous,current};
- if(bars.every(bar=>previous.placements.some(p=>p.bar===bar)))return {current,epoch:previous.epoch,placements:previous.placements.filter(p=>bars.includes(p.bar))};
+ if(bars.every(bar=>previous.placements.some(p=>p.bar===bar)))return {...previous,current};
  const layout=refillCandidates(previous,current,bars,measures,frame)[0];
  if(!layout)throw Error(`Measure ${current+1} has no verified placement around the unchanged reading interval.`);
  return layout;
@@ -132,7 +136,10 @@ export function admitRefill(plan:PracticePlan,chunk:PracticeChunk,input:readonly
  if(!Number.isSafeInteger(maxStates)||maxStates<1)throw Error('The practice allocation search bound is invalid.');
  for(let bar=chunk.firstBar;bar<=chunk.lastBar;bar++){const p=measures.get(bar);if(!p||!Number.isFinite(p.width)||p.width<=0)throw Error(`Measure ${bar+1} has no valid source footprint.`);}
  const selected=input.filter(p=>p.bar>=chunk.firstBar&&p.bar<=chunk.lastBar),maximumGap=Math.max(breakGap,Math.max(...selected.map(p=>p.rightAir??0))+Math.max(...selected.map(p=>p.leftAir??0))+1.6),maximum=Math.max(...selected.map(p=>p.width+maximumGap)),safety=5*maximum+2*edge;
- const compact=selected.map(p=>p.width).sort((a,b)=>b-a).slice(0,4).reduce((sum,w)=>sum+w,0)+3*breakGap+2*edge;
+ // A complete leaf with at most four bars never admits an incoming interval
+ // or a source wrap. Its only reachable surface is the consecutive source
+ // run; reserving three hypothetical gaps penalizes an impossible refill.
+ const compact=selected.map(p=>p.width).sort((a,b)=>b-a).slice(0,4).reduce((sum,w)=>sum+w,0)+(selected.length>4?3*breakGap:0)+2*edge;
  const upper=Math.min(safety,options.maxFrameWidth??safety),widths=Array.from({length:49},(_,i)=>compact+(upper-compact)*i/48);
  let reason='';
  // The compact estimate reserves three possible breaks even when the source
