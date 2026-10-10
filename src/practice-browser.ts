@@ -2,6 +2,8 @@ import {fitLeafPreview} from './practice-crop-fit';
 import {practicePercent,reconcilePassages,type PracticeChunk,type PracticePlan,type PracticeState} from './practice';
 import {displayedComponentsAttained,displayedPracticeProgress,displayedPracticeTotal} from './practice-display';
 import {attainmentLabel} from './tempo-presentation';
+import {bindPracticePassages} from './practice-equivalence';
+import {measuredRate,manualRates} from './practice-attainment';
 
 export const practiceMeasureRange=(id:string)=>id.replace('-', ' – ');
 
@@ -17,7 +19,7 @@ export function practiceListScrollTop(scrollTop:number,height:number,max:number,
 export class PracticeBrowser {
  selected:string;parent?:string;component?:string;includeManual=true;private recommended?:string;private retainedSelection?:string;
  constructor(readonly plan:PracticePlan){this.selected=plan.chunks[0]?.id??'';}
- private tree(state:PracticeState){return reconcilePassages(this.plan,structuredClone(state));}
+ private tree(state:PracticeState){const tree=reconcilePassages(this.plan,structuredClone(state));bindPracticePassages(this.plan,state,tree.all);return tree;}
  progress(chunk:PracticeChunk,state:PracticeState){return displayedPracticeProgress(chunk,state,this.includeManual);}
  setIncludeManual(include:boolean){this.includeManual=include;this.retainedSelection=this.selected;}
  groups(state:PracticeState){const {frontier,all}=this.tree(state),completed:PracticeChunk[]=[];const attained=(c:PracticeChunk)=>displayedComponentsAttained(c,state,all,this.includeManual),collect=(c:PracticeChunk)=>{if(attained(c))completed.push(c);else for(const id of c.components??[])collect(all.get(id)!);};frontier.forEach(collect);const top=new Set(completed.map(c=>c.id)),unfinished=frontier.filter(c=>!top.has(c.id)),selected=all.get(this.recommended??this.retainedSelection??'');if(selected&&selected.id===this.selected&&![...completed,...unfinished].some(c=>c.id===selected.id))(attained(selected)?completed:unfinished).push(selected);return {completed:completed.sort((a,b)=>a.firstBar-b.firstBar),unfinished:unfinished.sort((a,b)=>this.progress(b,state)-this.progress(a,state)||a.firstBar-b.firstBar)};}
@@ -40,7 +42,7 @@ export class PracticeBrowser {
   const rows=this.rows(state);if(!rows.some(c=>c.id===this.selected)){const old=this.tree(state).all.get(this.selected),enclosing=rows.find(c=>old&&c.firstBar<=old.firstBar&&c.lastBar>=old.lastBar);this.select(state,enclosing?.id??rows[0]?.id??'');}
   const {all}=this.tree(state),parent=all.get(this.parent??this.selected),components=parent?this.originalGroups(state,parent):[],current=this.current(state),{completed,unfinished}=this.groups(state);
   const row=(c:PracticeChunk,child=false)=>{
-   const best=state.best[c.pattern]??0,claims=state.manualAttainment?.marks[JSON.stringify([c.id,c.pattern])]??[],percent=practicePercent(this.progress(c,state)),bestLabel=best?`Best ${attainmentLabel(best,state.target)}`:'',doneLabel=claims.length?`Done ${attainmentLabel(Math.max(...claims),state.target)}`:'',evidence=[bestLabel,doneLabel].filter(Boolean).join(' · ');
+   const best=measuredRate(state,c.pattern,c.id),claims=manualRates(state,{passage:c.id,pattern:c.pattern}),percent=practicePercent(this.progress(c,state)),bestLabel=best?`Best ${attainmentLabel(best,state.target)}`:'',doneLabel=claims.length?`Done ${attainmentLabel(Math.max(...claims),state.target)}`:'',evidence=[bestLabel,doneLabel].filter(Boolean).join(' · ');
    return `<button data-practice="${child?'component':'select'}:${c.id}" data-passage-id="${c.id}" data-component="${child}" tabindex="${(child?this.component===c.id:!this.component&&this.selected===c.id)?0:-1}" aria-current="${(child?current?.id===c.id:this.selected===c.id)}" aria-label="Measures ${practiceMeasureRange(c.id)}, ${percent}%${evidence?`, ${evidence}`:''}${c.components?', components available':''}"><span class="practice-range">${practiceMeasureRange(c.id)}</span><span>${percent}%</span></button>`;
   };
   root.innerHTML=`<div class="practice-overall"><span>Total progress · <strong>${practicePercent(displayedPracticeTotal(this.plan,state,this.includeManual))}%</strong></span><label><input type="checkbox" data-practice-display="manual" ${this.includeManual?'checked':''}> Include manual</label></div><div class="practice-browser"><div class="practice-chunks" aria-label="Practice passages">${completed.length?`<section class="practice-completed" aria-label="Joined and learned passages">${completed.map(c=>row(c)).join('')}</section>`:''}<section class="practice-unfinished" aria-label="Unfinished passages">${unfinished.map(c=>row(c)).join('')}</section></div><div class="practice-components practice-chunks" aria-label="Original groups of measures ${practiceMeasureRange(parent?.id??'')}">${components.map(c=>row(c,true)).join('')}</div><aside class="practice-passage-detail" aria-label="Selected passage"><p>Measures ${practiceMeasureRange(current?.id??'')} · ${current?practicePercent(this.progress(current,state)):0}%</p><button class="practice-start" data-practice="passage:${current?.id??''}">Practice ${current?.components?'whole range':'these measures'} <kbd>Enter</kbd></button><div class="practice-leaf-preview"${current?.components?' hidden':''}></div></aside></div>`;
