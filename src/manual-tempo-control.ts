@@ -8,7 +8,7 @@ export function manualTempoField(key:string,input:string,label:string,unit=''){
 }
 /** Practice speed is a direct left/right command, separate from Options fields. */
 export function practiceSpeedField(input:string){
- const arrow=(direction:number,label:string)=>`<button type="button" tabindex="-1" data-manual-direction="${direction}" aria-label="${label} working speed"><svg aria-hidden="true" viewBox="0 0 6 10"><path d="${direction<0?'M5 1 L1 5 L5 9':'M1 1 L5 5 L1 9'}"/></svg></button>`;
+ const arrow=(direction:number,label:string)=>`<button type="button" tabindex="-1" data-manual-direction="${direction}" aria-label="${label} speed"><svg aria-hidden="true" viewBox="0 0 6 10"><path d="${direction<0?'M5 1 L1 5 L5 9':'M1 1 L5 5 L1 9'}"/></svg></button>`;
  return `<span class="manual-tempo practice-speed-field" data-manual-key="working">${arrow(-1,'Decrease')}<span class="manual-tempo-value">${input.replace(/<input\b/,'<input readonly tabindex="-1"')}<span class="manual-tempo-unit">%</span></span>${arrow(1,'Increase')}</span>`;
 }
 export interface ManualTempoOptions {
