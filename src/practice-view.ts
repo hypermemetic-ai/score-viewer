@@ -82,7 +82,7 @@ export class PracticeView {
  private refreshSettings(activeKey?:string){const d=this.settingsDialog;if(!d)return;const notice=d.querySelector('[data-goal-error]');if(notice)notice.textContent='';this.refreshTempoFields(d,activeKey);for(const el of d.querySelectorAll<HTMLElement>('[data-personal-goal-only]'))el.hidden=!this.state.personalGoal;}
  private applySetting(next:PracticeState,key:string,manual=false){
   if(!next.personalGoal)delete this.state.personalGoal;Object.assign(this.state,next);
-  const active=this.startingRate!==undefined||!!this.session&&['countin','trial'].includes(this.session.phase);
+  const active=this.startingRate!==undefined||!!this.session&&(['countin','trial'].includes(this.session.phase)||this.repeatCompletion?.session===this.session&&this.repeatCompletion.generation===this.startGeneration||!!this.startedRepeat());
   if(key==='working'&&active){this.queuedWorking=this.state.working;this.doneClaims.cancelIncrease();this.prepareRepeat();}
   else if(key==='target'||key==='working'){this.queuedWorking=undefined;this.loopRate=this.state.working;this.doneClaims.cancelIncrease();this.resetCarrySetup();this.contacts.clear();this.clearPose();this.session?.pause();this.stopClock();this.clock?.close();this.clock=undefined;}
   void this.save(key!=='target');this.refreshTempoFields(this.app,manual?key:undefined);this.refreshSettings(manual?key:undefined);
@@ -99,6 +99,7 @@ export class PracticeView {
  private repeatPreparation?:{session:PracticeSession;generation:number;rate:number;plan:PracticeRepeatPlan;receipt?:PreparedPracticeRepeat;pending:boolean;settled?:Promise<PreparedPracticeRepeat|undefined>};
  private repeatCompletion?:{session:PracticeSession;generation:number;timer:ReturnType<typeof setTimeout>};
  private repeatSavePending=false;
+ private startedRepeat(){const p=this.repeatPreparation;return p&&p.session===this.session&&p.generation===this.startGeneration&&(p.pending||p.receipt)&&this.clock&&this.clock.now()>=p.plan.boundaryMs?p:undefined;}
  private nextWorkingRate(rate:number){return rate===this.loopRate?rate:snapPracticeSpeed(rate,this.state.target);}
  private predictedRepeatRate(session:PracticeSession){
   if(this.repeatSavePending||this.saveError||session!==this.session||!this.clock||!['countin','trial'].includes(session.phase))return;
@@ -109,7 +110,7 @@ export class PracticeView {
   const projected=structuredClone(this.state);passed(session.chunk,projected);const next=nextPracticePassage(this.plan,projected,session.chunk);return next?.id===session.chunk.id?projected.working:undefined;
  }
  private prepareRepeat(){
-  const session=this.session,clock=this.clock;if(!session||!clock)return;const rate=this.predictedRepeatRate(session),prior=this.repeatPreparation;
+  const session=this.session,clock=this.clock;if(!session||!clock||this.startedRepeat())return;const rate=this.predictedRepeatRate(session),prior=this.repeatPreparation;
   if(rate===undefined){if(prior){this.repeatPreparation=undefined;void clock.cancelRepeat().catch(error=>{if(this.clock===clock&&!this.disposed){this.audioError=error.message;this.pause();this.status(this.audioError!);}});}return;}
   const anchor={previousStartMs:session.startMs,phraseEndMs:session.startMs+(session.chunk.end-session.startTick)*session.tickMs,previousBpm:this.loopRate},plan=planPracticeRepeat({...anchor,nextBpm:rate,grid:session.sourcePulseGrid,previousGrid:session.pulseGrid,sourceBoundary:true});
   // The next count setting can change without changing the captured playing
@@ -124,7 +125,7 @@ export class PracticeView {
   this.repeatAnchor=anchor;this.doneClaims.completed({passage:session.chunk.id,pattern:session.chunk.pattern,rate:this.loopRate});
   const requested=this.queuedWorking;this.queuedWorking=undefined;this.state.working=this.loopRate;const measured=session.measured&&!this.done;if(measured){passed(session.chunk,this.state);this.done=true;}else this.state.working=this.nextWorkingRate(this.doneClaims.nextRate(this.loopRate,this.state.keepTempo));if(requested!==undefined)this.state.working=requested;
   const prepared=this.repeatPreparation,next=measured?nextPracticePassage(this.plan,this.state,session.chunk):session.chunk;
-  if(prepared?.session===session&&prepared.generation===this.startGeneration&&prepared.pending&&prepared.rate===this.state.working&&next?.id===session.chunk.id&&this.carryPrepared()&&this.clock){
+  if(prepared?.session===session&&prepared.generation===this.startGeneration&&prepared.pending&&(prepared.rate===this.state.working||this.startedRepeat()===prepared)&&next?.id===session.chunk.id&&this.carryPrepared()&&this.clock){
    // The complete cue may already be audible while its bridge acknowledgement is in flight.
    // Preserve it until its own score entry; never stop it and play a second partial count.
    const generation=this.startGeneration,clock=this.clock,deadline=prepared.plan.boundaryMs+prepared.plan.countInMs;
@@ -139,7 +140,10 @@ export class PracticeView {
  }
  private finishCompletedTrial(session:PracticeSession,anchor:{previousStartMs:number;phraseEndMs:number;previousBpm:number},measured:boolean,completionSave?:Promise<boolean>){
   const prepared=this.repeatPreparation,next=measured?nextPracticePassage(this.plan,this.state,session.chunk):session.chunk;
-  if(prepared?.session===session&&prepared.generation===this.startGeneration&&prepared.receipt&&prepared.rate===this.state.working&&next?.id===session.chunk.id&&this.carryPrepared()&&this.clock){
+  if(prepared?.session===session&&prepared.generation===this.startGeneration&&prepared.receipt&&(prepared.rate===this.state.working||this.startedRepeat()===prepared)&&next?.id===session.chunk.id&&this.carryPrepared()&&this.clock){
+   // The audible count has committed this attempt's BPM and grid. A late edit
+   // remains desired state and applies after this captured attempt completes.
+   if(prepared.rate!==this.state.working)this.queuedWorking=this.state.working;
    this.repeatPreparation=undefined;this.repeatSavePending=true;const generation=this.startGeneration;void (completionSave??this.save()).then(()=>{if(generation===this.startGeneration)this.repeatSavePending=false;});
    try{this.repeatGap=this.clock.adoptRepeat(prepared.receipt);this.loopRate=prepared.receipt.nextBpm;this.slots?.prime();this.refill?.prime();this.preview.clear();session.ready(prepared.receipt.countStartMs,this.heldPitches,!session.measured,{sustain:this.options.sustain?.(),contacts:this.heldStreams},prepared.plan?.grid??session.sourcePulseGrid,prepared.receipt.nextBpm);for(const a of session.carryIn??[])this.contacts.press(a);this.done=false;this.paint();}catch(error){this.audioError=(error as Error).message;this.pause();this.status(this.audioError!);}return;
   }
