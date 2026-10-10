@@ -1,5 +1,5 @@
 import {practiceOptionsMarkup,integerPracticeSetting,adjustPracticeInteger} from './practice-options-markup';
-import {cropMeasure,composePassage,passageTrack,fitPassageRelations,fitPassageFrame,type Crop,type PassageTrack} from './practice-passage';
+import {cropMeasure,blankMeasureCrop,composePassage,passageTrack,fitPassageRelations,fitPassageFrame,type Crop,type PassageTrack} from './practice-passage';
 import {projectRelations,type ProjectedRelation} from './practice-relations';
 import {PracticeRefill} from './practice-refill';
 import {admitRefillPassage,heldTieCues} from './practice-refill-passage';
@@ -207,15 +207,17 @@ export class PracticeView {
    if(this.refillMode!==adaptive){if(!stationary){this.sourceTrack=undefined;this.refillGeometry=undefined;}this.refillMode=adaptive;}
    // A complete stationary staff needs no incoming allocation air. Keep its
    // full source/cue envelope readable before Start, with real white margins.
-   stage.style.paddingInline=stationary?'16px':'';
+   stage.style.paddingInline=framed?'16px':'';const surface=this.app.querySelector<HTMLElement>('.practice-surface')!;surface.style.paddingInline=adaptive&&!stationary?'12px':'';
    const available=Math.max(20,area.clientHeight-(context.hidden?0:context.offsetHeight)-24-(adaptive&&!stationary?24:0)),style=getComputedStyle(stage),width=Math.max(20,stage.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight));
    const sourceFont=Math.min(...all.flatMap(c=>c.seats.map(seat=>seat.fontSize))),minimumScale=Number.isFinite(sourceFont)?12/sourceFont:0;
    if(!this.sourceTrack||!framed){
     if(framed){
      const admitted=admitRefillPassage(p,this.plan,s.chunk,all,stage,minimumScale?width/minimumScale:undefined,this.refill?.certificate);this.sourceTrack=admitted.track;
-     // The staff center, rather than selected-score annotation asymmetry,
-     // establishes one live vertical frame before count-in.
-     if(!stationary){const center=(Math.min(...this.sourceTrack.lanes)+Math.max(...this.sourceTrack.lanes))/2,air=Math.max(center-this.sourceTrack.top+18,this.sourceTrack.bottom-center);this.sourceTrack.top=center-air+18;this.sourceTrack.bottom=center+air;}
+     // Fit the complete certified ink/cue union once before count-in. A
+     // mirrored annotation reserve is not source ink and can make an
+     // otherwise readable passage too small. The frozen frame below keeps
+     // its real staff position unchanged throughout every allocation.
+     this.sourceTrack.topAir=0;
      if(!this.refill)this.refill=new PracticeRefill(this.plan,s.chunk,admitted.certificate);
     }else{
      const bars=this.slots!.bars.filter((bar):bar is number=>bar!==undefined),shown=all.filter(c=>bars.includes(c.bar));
@@ -224,8 +226,9 @@ export class PracticeView {
     }
    }
    const track=this.sourceTrack,placements=framed?this.refill!.layout.placements:undefined,positions=placements?.map(p=>p.bar)??this.slots?.bars??all.map(c=>c.bar),policy='compact' as const;
-   this.projected=projectRelations(p,this.plan,all,track,policy,positions,placements);const cues=this.currentCues();this.cueKey=cues.map(q=>q.id+':'+q.left+':'+q.right).join('|');
-   const passage=composePassage(all,track,policy,positions,[...this.projected,...cues],placements),scale=this.refillGeometry?.scale??Math.min(width/passage.width,available/passage.height);
+   const visiblePositions=positions.map(bar=>placements?.find(p=>p.bar===bar)?.empty?undefined:bar),painted=all.map(c=>{const placement=placements?.find(p=>p.bar===c.bar);return placement?.empty?blankMeasureCrop(c,placement.width):c;});
+   this.projected=projectRelations(p,this.plan,all,track,policy,visiblePositions,placements);const cues=this.currentCues();this.cueKey=cues.map(q=>q.id+':'+q.left+':'+q.right).join('|');
+   const passage=composePassage(painted,track,policy,positions,[...this.projected,...cues],placements),scale=this.refillGeometry?.scale??Math.min(width/passage.width,available/passage.height);
    if(adaptive&&scale<minimumScale-1e-7)throw Error('Practice needs more room to keep this passage readable. Rotate or enlarge the view, or choose a shorter passage.');
    if(framed){
     const areaStyle=getComputedStyle(area),left=parseFloat(areaStyle.paddingLeft),right=parseFloat(areaStyle.paddingRight),top=parseFloat(areaStyle.paddingTop);

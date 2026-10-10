@@ -21,7 +21,7 @@ function sourcePage(p:ScorePackage,page:number):Document {
  const source=p.pages[page],saved=pages.get(page);if(saved?.source===source){pages.delete(page);pages.set(page,saved);return saved.doc;}
  const doc=new DOMParser().parseFromString(source,'image/svg+xml');pages.delete(page);pages.set(page,{source,doc});if(pages.size>8)pages.delete(pages.keys().next().value!);return doc;
 }
-export interface Crop {bar:number;svg:SVGSVGElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
+export interface Crop {bar:number;empty?:boolean;svg:SVGSVGElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
 /** Copy real-engine ink; attach source group ownership to existing vector elements, never invent notes. */
 export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  const seats=p.seats.filter(s=>s.writtenBar===bar+1);let first=seats[0],doc:Document,system:Element;
@@ -105,6 +105,46 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  return {bar,svg,seats,width:right!-left!+leftAir+rightAir,height:bottom-top,left:left!,right:right!,leftAir,rightAir,endingType,frame:lanes[0],lanes:lanes.map(y=>y-lanes[0]),owned};
 }
 
+/** Empty intervals retain their real staff, metric guides and authored boundary.
+ * A non-note mark keeps its full source footprint; it is never clipped to
+ * obtain room. Owned note/relation paint is already outside the reading lead. */
+const blankMeasures=new WeakMap<Crop,{width:number;ink:SVGElement[]}>();
+export function blankMeasureWidth(crop:Crop,mount:HTMLElement){
+ const cached=blankMeasures.get(crop);if(cached)return cached.width;
+ mount.append(crop.svg);const inverse=crop.svg.getScreenCTM()!.inverse(),ink:SVGElement[]=[];let full=false;
+ try{for(const el of crop.svg.querySelectorAll<SVGGraphicsElement>('path,line,rect,circle,ellipse,polygon,polyline,text')){
+  if(el.closest('defs,clipPath,mask')||crop.owned.some(o=>o.el===el||o.el.contains(el))||el.closest(projectedRelationPaint))continue;
+  const b=el.getBBox(),m=inverse.multiply(el.getScreenCTM()!),points=[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(m));
+  if(Math.max(...points.map(p=>p.x))<crop.left-.03||Math.min(...points.map(p=>p.x))>crop.right+.03)continue;
+  const lane=el.matches('.janko-pitch-lane'),structural=lane||el.closest('.janko-barlines,.janko-repeat')||el.matches('.janko-beat-line,.janko-repeat-barline');
+  if(!structural){full=true;break;}ink.push(el.cloneNode(false) as SVGElement);
+ }}finally{crop.svg.remove();}
+ const width=full?crop.right-crop.left:Math.min(4,crop.right-crop.left);blankMeasures.set(crop,{width,ink});return width;
+}
+export function blankMeasureCrop(crop:Crop,width:number):Crop {
+ const saved=blankMeasures.get(crop);if(!saved||!Number.isFinite(width)||width<saved.width-1e-7)throw Error(`Measure ${crop.bar+1}: no admitted empty frame.`);
+ const svg=document.createElementNS(ns,'svg');for(const el of crop.svg.children)if(['style','defs'].includes(el.localName))svg.append(el.cloneNode(true));
+ const rules=document.createElementNS(ns,'g');rules.setAttribute('class','janko-barlines');svg.append(rules);
+ const sourceWidth=crop.right-crop.left;
+ for(const original of saved.ink){const el=original.cloneNode(false) as SVGElement;
+  if(el.localName==='line'){
+   const x1=Number(el.getAttribute('x1')),x2=Number(el.getAttribute('x2'));
+   if(el.matches('.janko-pitch-lane')){el.setAttribute('x1',String(crop.left+Math.max(0,Math.min(1,(x1-crop.left)/sourceWidth))*width));el.setAttribute('x2',String(crop.left+Math.max(0,Math.min(1,(x2-crop.left)/sourceWidth))*width));}
+   else{const shift=x1>=crop.right-5?width-sourceWidth:x1<=crop.left+5?0:(x1-crop.left)*(width/sourceWidth-1);el.setAttribute('x1',String(x1+shift));el.setAttribute('x2',String(x2+shift));}
+  }else if(el.localName==='circle'){const x=Number(el.getAttribute('cx')),shift=x>=crop.right-5?width-sourceWidth:0;el.setAttribute('cx',String(x+shift));}
+  else throw Error(`Measure ${crop.bar+1}: unsupported empty structural paint.`);
+  rules.append(el);
+ }
+ // A source system break may omit its ordinary ending rule. The composed
+ // staff already continues that exact source style between intervals; keep
+ // its template available after replacing an empty interval's system crop.
+ if(!crop.endingType||crop.endingType==='regular'){
+  const ending=[...rules.querySelectorAll<SVGLineElement>('line')].some(l=>Math.abs(Number(l.getAttribute('x1'))-crop.left-width)<3&&Math.abs(Number(l.getAttribute('x2'))-Number(l.getAttribute('x1')))<.03);
+  if(!ending){const template=[...crop.svg.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(l=>Number(l.getAttribute('stroke-width'))===.6);if(!template)throw Error(`Measure ${crop.bar+1}: missing admitted empty separator.`);const line=template.cloneNode(false) as SVGLineElement;line.removeAttribute('id');line.setAttribute('x1',String(crop.left+width));line.setAttribute('x2',String(crop.left+width));rules.append(line);}
+ }
+ svg.dataset.practiceBar=String(crop.bar+1);svg.dataset.practiceEmpty='true';return {...crop,empty:true,svg,seats:[],owned:[],right:crop.left+width,width};
+}
+
 export interface Passage {svg:SVGSVGElement;crops:Crop[];relations:Crop['owned'];width:number;height:number}
 export interface PassageTrack {width:number;top:number;bottom:number;leftAir:number;rightAir:number;lanes:number[];boxes:Map<number,InkBox[]>;topAir?:number;frame?:{left:number;right:number}}
 let sequence=0;
@@ -174,7 +214,7 @@ export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|
   const source=crop.svg.cloneNode(true) as SVGSVGElement,sourceWidth=crop.right-crop.left;
   if(projected)source.querySelectorAll(projectedRelationPaint).forEach(el=>el.remove());
   const owned=crop.owned.flatMap(({groups},i)=>{const el=source.querySelector<SVGElement>(`[data-practice-owned="${i}"]`);return el?[{groups,el}]:[];});
-  const group=document.createElementNS(ns,'g');group.dataset.practiceBar=String(bar!+1);group.dataset.slot=String(slot);group.setAttribute('role','group');group.setAttribute('aria-label',`Measure ${bar!+1}`);group.setAttribute('transform',`translate(${x-crop.left} ${-crop.frame})`);
+  const group=document.createElementNS(ns,'g');group.dataset.practiceBar=String(bar!+1);group.dataset.slot=String(slot);group.setAttribute('role','group');group.setAttribute('aria-label',`Measure ${bar!+1}${crop.empty?', outside the current reading lead':''}`);if(crop.empty)group.dataset.practiceEmpty='true';group.setAttribute('transform',`translate(${x-crop.left} ${-crop.frame})`);
   // Clone namespaces, preserve inert seat/source identities. Clip only the
   // admitted interval, with a small ending edge allowance for authored rules.
   const clip=document.createElementNS(ns,'clipPath'),rect=document.createElementNS(ns,'rect'),id=`${prefix}bar-${slot}`;
