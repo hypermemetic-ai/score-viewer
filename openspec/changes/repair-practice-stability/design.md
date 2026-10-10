@@ -1,6 +1,6 @@
 ## Context
 
-Installed Viewer d7dc1e32 and current source have the same defective practice geometry. Actual browser probes reproduce a 15.83% Schumann scale reduction on measured Start. Tail allocation can return fewer resident bars and remove their structural frames. The active key handler acknowledges Up/Down without adjusting speed. Practice defaults store absolute 10 BPM rather than 10% of the target. Existing musical grid V2 admits exactly one source-meter count-in bar.
+Reproduction against installed Viewer d7dc1e32 and the pre-repair main source found the same defective practice geometry. Actual browser probes reproduced a 15.83% Schumann scale reduction on measured Start. Tail allocation could return fewer resident bars and remove their structural frames. The active key handler acknowledged Up/Down without adjusting speed. Practice defaults stored absolute 10 BPM rather than 10% of the target. Musical grid V2 admitted exactly one source-meter count-in bar.
 
 ## Goals / Non-Goals
 
@@ -21,9 +21,19 @@ Non-goals: redesign source notation, change sampler/device policy, certify physi
 
 Shared files require narrow ownership and combined review. No source tests alone prove usable native practice. Metric phase and tempo capture must agree across TypeScript and Rust. Equivalence must reject differences in timing, rests, ties, hands, reference or ordered heterogeneous components. Separate scoped source commits allow a repair-only delivery at the installed dependency if unrelated main features lack receiving-platform acceptance.
 
+Actual long-refill inspection exposed a tight but source-faithful constraint: Zelda measure 28 needs its original full ink interval, and the retained non-note rest in measure 29 keeps that frame full width. At the 1280px browser viewport, the two genuinely empty predecessor frames can therefore narrow to 4.48 source units (approximately 9px). Required/current note spacing, held cues and non-note obstacles stay exact; no equal-width or uniformly balanced strip is claimed. These narrow frames expand atomically before their source ink is revealed. Short passages retain their single complete-source fit.
+
 ## Migration Plan
 
 Land independently reviewed scoped repairs through ordinary PRs, integrate against the exact source head, and run combined tests/build plus real-browser flows on retained Schumann and Zelda in both keyboard layouts. Select and review the exact delivery source only after dependency reconciliation. The urgent repair-only branch starts from the installed Viewer d7dc1e324a532df50e5264680ee704c67a10d77b with unchanged ISO 7205da0d6b62a4a023eda5f2f5d66bdec4fa6493. Scoped source repairs also integrate onto current main through its ordinary reviewed path. The older delivery branch excludes unfinished fretted/manual/import foundations and fences equivalence against source-ledger facts unavailable in its retained notation contract. It receives its own exact combined review, tests, browser proof and reviewed PR merge before native freeze. Freeze frontend/native inputs, obtain the ordinary complete Windows/Mac pair, freshly preserve the user's current install/data, validate recipient identities, activate additively and inspect actual Windows practice. Retain previous packages and all original data. Stop temporary task processes.
+
+### Landed source evidence
+
+PR56 merged the repair-only source at `01a0c4c966e6dc03776729c3f641ea43f88634f0`, tree `caecc32d2dba15f95d5133c0c8fb433656263978`. PR57 merged main at `f4d39b3ab07a8a1405bf30cf855c6db4dc9a7865`, tree `555c27cc6b5e5771d1afb69ea0bd88ae7478674f`. Both merged trees equal their independently reviewed candidates. The repair-only configured suite passed 586 tests and main passed 661, with TypeScript/Vite builds; repair-only carrier/footer controls passed 22 plus seven. Independent composition review passed 79 controls. The bound repair-only source-checks receipt is SHA256 `6a370e212cb733afcc18b4e18c5596988990330c0aeed47bb8d2132502c87b40`.
+
+Four actual production-browser musical cases cover Schumann No14 and Zelda in both layouts, including 10% two-bar metric cues and queued changes. Separate geometry lifecycle inspection covers Ready/count-in/trial, owned-ink retirement, repeat, full Free view restoration and long terminal residency. The 24 keyboard cases cover retained No14 and authored connected/disconnected flows. Native input, device clocks and MIDI availability in these browser checks use test seams; they do not certify an installed application or physical performance.
+
+Seven private original files remained byte-exact: the library, retained No14 archive, preferences, two personal files and two practice journals. All 31 finger choices, one history row and raw earned evidence were retained. No private score or journal payload enters the source repository. Native compilation, installed musical/keyboard inspection, fresh Windows preservation and final activation/publication remain open; source completion alone does not close the delivery tasks.
 
 ## Open Questions
 
