@@ -8,7 +8,7 @@ import {practicePreferences,type PracticeViewContext} from './practice-context';
 import {displayedPracticeTotal} from './practice-display';
 import {hasDone} from './practice-attainment';
 import {practicePercent,passageStartTempo,reconcilePassages,setPracticeGoal,wholePracticeProgress,type PracticeChunk,type PracticeState} from './practice';
-import {ManualTempoControls,manualTempoField} from './manual-tempo-control';
+import {ManualTempoControls,manualTempoField,practiceSpeedField} from './manual-tempo-control';
 import {tempoRateEdit,speedNumber,speedEdit,adjustDuration,adjustPracticePercent as adjustPercent,adjustProgression} from './tempo-presentation';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {tempoRateNumber} from './metronome-mark';
@@ -28,7 +28,7 @@ export interface ManualPracticeViewOptions {
  passage:(bars:readonly number[],notation:ReadingNotation)=>string;
  save:(record:ManualPracticeRecord,view:ReturnType<ManualReadingContext['viewRecord']>)=>Promise<void>;
  rotation?:()=>Rotation;doneKey?:()=>string;settingsKey?:()=>string;freeViewKey?:()=>string;
- navigationKeys?:()=>{previous:string;next:string};audioOutput?:()=>string;
+ workingEditKey?:()=>string;navigationKeys?:()=>{previous:string;next:string};audioOutput?:()=>string;
  createClock?:()=>ManualClock;back:()=>void;settings:()=>void;changed:(progress:number,whole:boolean)=>void;
 }
 /** Musical manual practice owns its loop clock and all visible ink. The player
@@ -37,7 +37,7 @@ export class ManualPracticeView {
  readonly assessment='manual' as const;readonly plan;readonly state;private browser:PracticeBrowser;
  private mounted=new AbortController();private transport?:ManualPracticeTransport;private overview=true;private disposed=false;private raf=0;
  private surface?:HTMLElement;private settingsDialog?:HTMLDialogElement;private saves=Promise.resolve();private saveError?:string;private renderError?:string;
- private manual:ManualTempoControls;private frames=new Map<string,string>();private rendered='';private cueLabel='';private feedback='';private lastWorking=0;
+ private manual:ManualTempoControls;private frames=new Map<string,string>();private rendered='';private cueLabel='';private feedback='';private freeView=false;private lastWorking=0;
  constructor(readonly app:HTMLElement,readonly options:ManualPracticeViewOptions){
   this.plan=options.context.plan;this.state=options.context.state;this.browser=options.context.browser;
   this.manual=new ManualTempoControls({accepts:el=>!this.disposed&&(this.app.contains(el)||!!this.settingsDialog?.contains(el)),
@@ -47,6 +47,8 @@ export class ManualPracticeView {
  get session(){return this.options.context.session;}
  get modalOpen(){return !!this.settingsDialog;}
  get canTurnPage(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!!this.session;}
+ get canAdjustWorking(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!this.freeView&&!!this.session;}
+ editWorking(){const field=this.app.querySelector<HTMLInputElement>('[data-practice-setting=working]');return !!this.canAdjustWorking&&!!field&&this.manual.editField(field);}
  get canMarkDone(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!!this.session?.canDone;}
  get bindingContext(){const active=!this.disposed&&!this.overview&&!!this.session;return {active,measureNavigation:active&&(this.session?.windows.windows.length??0)>1};}
  async mount(context?:PracticeViewContext){
@@ -81,7 +83,7 @@ export class ManualPracticeView {
    if(!(box.width>0&&box.height>0))throw Error('The admitted passage has no bounded frame.');const style=getComputedStyle(root),width=Math.max(1,root.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),height=Math.max(1,stage.clientHeight-24),scale=Math.min(width/box.width,height/box.height);svg.style.width=`${box.width*scale}px`;svg.style.height=`${box.height*scale}px`;this.renderError=undefined;
   }catch(error){this.renderError=(error as Error).message;this.transport?.pause();root.replaceChildren();this.rendered='';this.status();}
  }
- private selectPassage(chunk:PracticeChunk,resetWorking=true){this.transport?.close();this.transport=undefined;this.browser.select(this.state,chunk.id);if(resetWorking)this.state.working=passageStartTempo(this.plan,this.state,chunk);this.options.context.selectPassage(chunk);this.overview=false;this.rendered='';this.renderError=undefined;}
+ private selectPassage(chunk:PracticeChunk,resetWorking=true){this.transport?.close();this.transport=undefined;this.freeView=false;this.browser.select(this.state,chunk.id);if(resetWorking)this.state.working=passageStartTempo(this.plan,this.state,chunk);this.options.context.selectPassage(chunk);this.overview=false;this.rendered='';this.renderError=undefined;}
  private paint(){if(this.disposed)return;const p=this.options.context.package,s=this.session,root=this.app.querySelector('.practice-header')!;
   root.innerHTML=`<h1>${escape(p.manifest.metadata.title)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>Measures ${escape(practiceMeasureRange(s.chunk.id))}</small><small data-practice-total>Total progress · ${practicePercent(displayedPracticeTotal(this.plan,this.state,this.browser.includeManual))}%</small>`:''}</div>`;
   this.app.querySelector<HTMLElement>('.practice-overview')!.hidden=!this.overview;this.app.querySelector<HTMLElement>('.practice-stage')!.hidden=this.overview;this.app.dataset.practicePhase=this.overview?'overview':s?.phase??'ready';
@@ -90,12 +92,13 @@ export class ManualPracticeView {
  private speedInput(key:'working'|'start'|'connectionStart'|'step',value:number,label:string){return manualTempoField(key,`<input type="text" inputmode="decimal" data-practice-setting="${key}" data-absolute="${value}" data-presented="${speedNumber(value,this.state.target)}" aria-label="${label}" value="${speedNumber(value,this.state.target)}">`,key==='step'?'increase percent of target':`${key==='start'?'starting':key==='connectionStart'?'connection':'working'} speed`,'%');}
  private settingsControl(){const hint=this.options.settingsKey?.()??'O';return `<button data-practice="settings">Options${hint?` <kbd>${escape(hint)}</kbd>`:''}</button>`;}
  private paintControls(){const root=this.app.querySelector<HTMLElement>('.practice-controls')!,active=document.activeElement as HTMLElement,hadFocus=root.contains(active),action=active?.dataset.practice,setting=active?.dataset.practiceSetting,s=this.session;
-  root.classList.toggle('practice-controls-active',!this.overview);const retry=this.saveError?'<button data-practice="retry-save">Retry saving progress</button>':'';
+  root.classList.toggle('practice-controls-active',!this.overview);root.toggleAttribute('data-practice-shortcuts',!this.overview);const retry=this.saveError?'<button data-practice="retry-save">Retry saving progress</button>':'';
   if(this.overview)root.innerHTML=`${retry}${navigationHint()}${this.settingsControl()}<button data-practice="back">Back <kbd>Esc</kbd></button>`;
-  else{const target=s?.doneTarget(),marked=target&&hasDone(this.state,target),keys=this.options.navigationKeys?.()??{previous:'←',next:'→'},navigation=this.bindingContext.measureNavigation?`<span class="options-nav-hint"><span>${escape(keys.previous)} Previous measures</span><span>${escape(keys.next)} Next measures</span></span>`:'',freeKey=this.options.freeViewKey?.()??'V';
-   root.innerHTML=`<div class="practice-primary-controls"><div class="practice-primary-extra"><span class="practice-status" role="status" hidden></span></div><div class="practice-mode-controls"><button class="practice-ready" data-practice="ready">${s?.phase==='ready'?'Ready':'Resume'} <kbd>Space</kbd></button><button data-practice="done" class="practice-done" aria-label="${marked?'Withdraw Done':'Done'}" aria-pressed="${!!marked}" ${s?.canDone?'':'disabled'}>${marked?'✓ ':''}Done <kbd>${escape(this.options.doneKey?.()??'Enter')}</kbd></button><label>Working speed ${this.speedInput('working',this.state.working,'Working speed percent')}</label></div><div class="practice-working-controls"></div></div><div class="practice-secondary-controls">${retry}<button data-practice="pause">Free view${freeKey?` <kbd>${escape(freeKey)}</kbd>`:''}</button><label><input type="checkbox" data-practice-setting="keepTempo" ${this.state.keepTempo?'checked':''}> Lock current speed <kbd>K</kbd></label>${navigation}${this.settingsControl()}<button data-practice="overview">Back <kbd>Esc</kbd></button></div>`;
+  else{const target=s?.doneTarget(),marked=target&&hasDone(this.state,target),keys=this.options.navigationKeys?.()??{previous:'←',next:'→'},navigation=!this.canAdjustWorking&&this.bindingContext.measureNavigation?`<span class="options-nav-hint"><span>${escape(keys.previous)} Previous measures</span><span>${escape(keys.next)} Next measures</span></span>`:'',freeKey=this.options.freeViewKey?.()??'V';
+   root.innerHTML=`<div class="practice-primary-controls"><div class="practice-primary-extra"><span class="practice-status" role="status" hidden></span></div><div class="practice-mode-controls"><button class="practice-ready" data-practice="ready">${s?.phase==='ready'?'Ready':'Resume'} <kbd>Space</kbd></button><button data-practice="done" class="practice-done" aria-label="${marked?'Withdraw Done':'Done'}" aria-pressed="${!!marked}" ${s?.canDone?'':'disabled'}>${marked?'✓ ':''}Done <kbd>${escape(this.options.doneKey?.()??'Enter')}</kbd></button><label>Working speed ${practiceSpeedField(`<input type="text" inputmode="decimal" data-practice-setting="working" data-absolute="${this.state.working}" data-presented="${speedNumber(this.state.working,this.state.target)}" aria-label="Working speed percent${this.canAdjustWorking&&(this.options.workingEditKey?.()??'F2')?`; ${(this.options.workingEditKey?.()??'F2')} edits`:''}" value="${speedNumber(this.state.working,this.state.target)}">`)}</label></div><div class="practice-working-controls"></div></div><div class="practice-secondary-controls">${retry}<button data-practice="pause">Free view${freeKey?` <kbd>${escape(freeKey)}</kbd>`:''}</button><label><input type="checkbox" data-practice-setting="keepTempo" ${this.state.keepTempo?'checked':''}> Lock current speed <kbd>K</kbd></label>${navigation}${this.settingsControl()}<button data-practice="overview">Back <kbd>Esc</kbd></button></div>`;
   }
-  if(!hadFocus)return;if(action)root.querySelector<HTMLElement>(`[data-practice="${CSS.escape(action)}"]`)?.focus({preventScroll:true});else if(setting)root.querySelector<HTMLElement>(`[data-practice-setting="${CSS.escape(setting)}"]`)?.focus({preventScroll:true});
+  if(!this.overview)for(const control of root.querySelectorAll<HTMLElement>('button,input,select,textarea,summary,a[href]'))control.tabIndex=-1;this.status(this.feedback);
+  if(!hadFocus||!this.overview)return;if(action)root.querySelector<HTMLElement>(`[data-practice="${CSS.escape(action)}"]`)?.focus({preventScroll:true});else if(setting)root.querySelector<HTMLElement>(`[data-practice-setting="${CSS.escape(setting)}"]`)?.focus({preventScroll:true});
  }
  private paintCue(){const root=this.app.querySelector<HTMLElement>('.practice-countin');if(!root)return;const s=this.session,clock=this.transport?.clock,future=this.transport?.futureCount,now=clock?.now(),grid=future?.grid??s?.pulseGrid,rate=future?.nextBpm??s?.bpm,origin=future?.boundaryMs??(s&&grid&&rate?s.startMs-practiceTiming(rate,grid).countInMs:undefined),visible=!this.overview&&now!==undefined&&grid&&rate&&origin!==undefined&&(s?.phase==='countin'||!!future)&&now>=origin;
   root.hidden=!visible;if(!visible){this.cueLabel='';return;}const label=countBeatAt(now!-origin!,rate!,grid!),number=root.querySelector<HTMLElement>('strong')!;if(this.cueLabel!==label){number.textContent=label;this.cueLabel=label;}const timing=practiceTiming(rate!,grid!);number.dataset.accent=String((grid!.countStartPhasePulses!+Math.floor((now!-origin!)/timing.eighthMs))%grid!.countBarPulses!<grid!.countBeatPulses!);
@@ -106,9 +109,9 @@ export class ManualPracticeView {
  async action(action:string){if(this.disposed)return;try{
   if(action.startsWith('select:')||action.startsWith('component:')){this.browser.select(this.state,action.slice(action.indexOf(':')+1),action.startsWith('component:'));this.paintBrowser(true);return;}
   if(action.startsWith('passage:')){const chunk=reconcilePassages(this.plan,this.state).all.get(action.slice(8));if(chunk){this.selectPassage(chunk);this.paint();this.app.querySelector<HTMLElement>('.practice-stage')!.focus();}return;}
-  if(action==='ready'){if(!this.session||this.saveError||this.renderError)return;this.manual.cancelEdit();if(!this.transport)this.replaceTransport();if(['countin','trial','complete'].includes(this.session.phase))this.transport!.pause();await this.transport!.start();return;}
-  if(action==='pause'){this.pause();return;}if(action==='overview'){this.pause();this.overview=true;this.paint();return;}
-  if(action==='free-view'){const chunk=this.browser.current(this.state);if(this.overview&&chunk)this.selectPassage(chunk);this.pause();this.paint();this.app.querySelector<HTMLElement>('.practice-stage')?.focus();return;}
+  if(action==='ready'){if(!this.session||this.saveError||this.renderError)return;this.manual.cancelEdit();this.freeView=false;if(!this.transport)this.replaceTransport();if(['countin','trial','complete'].includes(this.session.phase))this.transport!.pause();await this.transport!.start();return;}
+  if(action==='pause'){this.freeView=true;this.pause();return;}if(action==='overview'){this.pause();this.overview=true;this.paint();return;}
+  if(action==='free-view'){const chunk=this.browser.current(this.state);if(this.overview&&chunk)this.selectPassage(chunk);this.freeView=true;this.pause();this.paint();this.app.querySelector<HTMLElement>('.practice-stage')?.focus();return;}
   if(action==='back'){await this.flush();this.close();this.options.back();return;}
   if(action==='settings'){this.pause();this.options.settings();return;}
   if(action==='next'||action==='previous'){if(this.canTurnPage&&this.options.context.turn(action==='next'?1:-1)){this.paint();void this.save();}return;}
@@ -116,7 +119,7 @@ export class ManualPracticeView {
   if(action==='retry-save'){await this.save();this.paint();return;}
  }catch(error){this.pause();this.status((error as Error).message);}}
  key(code:string,repeated=false){if(this.settingsDialog||this.disposed)return false;if(this.overview){if(repeated&&!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(code))return false;const result=this.browser.key(code,this.state);if(result==='practice'&&document.activeElement?.closest('.practice-overview')){const chunk=this.browser.current(this.state);if(chunk){this.selectPassage(chunk);this.paint();this.app.querySelector<HTMLElement>('.practice-stage')!.focus();}return true;}if(result==='handled'){this.paintBrowser(true);return true;}}
-  else{if(code==='ArrowUp'||code==='ArrowDown'){if(!repeated)this.manual.begin(code,(again,elapsed)=>this.adjust('working',code==='ArrowUp'?1:-1,again,elapsed));return true;}if(['ArrowLeft','ArrowRight'].includes(code))return true;if(repeated)return ['Space','KeyK','Enter'].includes(code);if(code==='Space'){void this.action('ready');return true;}if(code==='KeyK'){this.state.keepTempo=!this.state.keepTempo;this.transport?.prepare();void this.save();this.paintControls();return true;}}
+  else{if(this.canAdjustWorking&&(code==='ArrowLeft'||code==='ArrowRight')){if(!repeated)this.manual.begin(code,(again,elapsed)=>this.adjust('working',code==='ArrowRight'?1:-1,again,elapsed));return true;}if(['ArrowLeft','ArrowRight'].includes(code))return true;if(repeated)return ['Space','KeyK','Enter'].includes(code);if(code==='Space'){void this.action('ready');return true;}if(code==='KeyK'){this.state.keepTempo=!this.state.keepTempo;this.transport?.prepare();void this.save();this.paintControls();return true;}}
   if(code==='Escape'){void this.action(this.overview?'back':'overview');return true;}return false;
  }
  pause(){if(this.disposed)return;this.manual.cancelEdit();if(this.transport)this.transport.pause();else{this.session?.pause();this.paint();}}
