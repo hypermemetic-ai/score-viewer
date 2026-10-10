@@ -40,7 +40,7 @@ export function changeControls(bindings:ControlBindings,change:ControlChange){re
 export const actionControlLabel=(bindings:ControlBindings,action:ControlAction)=>(bindings.actions[action]??[]).filter((b):b is ControlBinding=>!!b).map(controlLabel).join(' / ');
 export function practiceControlBindings(bindings:ControlBindings,pianoModes=true):ControlBindings {
  const next=structuredClone(bindings),used=new Set(Object.values(next.actions).flatMap(slots=>slots.filter((b):b is ControlBinding=>!!b).map(controlIdentity)));
- for(const [action,key]of [['practiceReading','KeyU'],['practiceTimed','KeyT'],['practiceFreeView','KeyV']] as const){if(!pianoModes&&action!=='practiceFreeView'||Object.hasOwn(next.actions,action))continue;next.actions[action]=[used.has(`key:${key}`)?null:{kind:'key',key},null];}
+ for(const [action,key]of [['practiceReading','KeyR'],['practiceTimed','KeyT'],['practiceFreeView','KeyV']] as const){if(!pianoModes&&action!=='practiceFreeView'||Object.hasOwn(next.actions,action))continue;next.actions[action]=[used.has(`key:${key}`)?null:{kind:'key',key},null];}
  return readControlBindings(next,{bindings:{}});
 }
 /** An explicit saved V assignment owns the key even when its action is unavailable. */

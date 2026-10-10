@@ -7,10 +7,19 @@ export function manualTempoField(key:string,input:string,label:string,unit=''){
  return `<span class="manual-tempo" data-manual-key="${key}"><span class="manual-tempo-value">${field}<span class="manual-tempo-buttons"><button type="button" tabindex="-1" data-manual-direction="1" aria-label="Increase ${label}"><svg aria-hidden="true" viewBox="0 0 10 6"><path d="M1 5 L5 1 L9 5"/></svg></button><button type="button" tabindex="-1" data-manual-direction="-1" aria-label="Decrease ${label}"><svg aria-hidden="true" viewBox="0 0 10 6"><path d="M1 1 L5 5 L9 1"/></svg></button></span></span>${unit?`<span class="manual-tempo-unit">${unit}</span>`:''}</span>`;
 }
 /** Practice speed is a direct left/right command, separate from Options fields. */
-export function practiceSpeedField(input:string){
+export function practiceSpeedField(input:string,shortcut=''){
+ const hint=shortcut?` <kbd>${shortcut.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}</kbd>`:'';
  const arrow=(direction:number,label:string)=>`<button type="button" tabindex="-1" data-manual-direction="${direction}" aria-label="${label} speed"><svg aria-hidden="true" viewBox="0 0 6 10"><path d="${direction<0?'M5 1 L1 5 L5 9':'M1 1 L5 5 L1 9'}"/></svg></button>`;
- return `<span class="manual-tempo practice-speed-field" data-manual-key="working">${arrow(-1,'Decrease')}<span class="manual-tempo-value">${input.replace(/<input\b/,'<input readonly tabindex="-1"')}<span class="manual-tempo-unit">%</span></span>${arrow(1,'Increase')}</span>`;
+ return `<span class="manual-tempo practice-speed-field" data-manual-key="working"><span class="practice-speed-caption">Speed</span>${arrow(-1,'Decrease')}<span class="manual-tempo-value">${input.replace(/<input\b/,'<input readonly tabindex="-1"')}<span class="practice-speed-number" aria-hidden="true"><span class="practice-speed-integer"><span data-speed-integer></span><span class="practice-speed-fraction" data-speed-fraction></span></span></span><span class="manual-tempo-unit">%</span></span>${arrow(1,'Increase')}<span class="practice-speed-shortcut">${hint}</span></span>`;
 }
+/** A readonly presentation of the genuine field; never interprets or admits a draft. */
+export function refreshPracticeSpeedDisplay(field:HTMLInputElement){
+ if(!field.readOnly)return;
+ const group=field.closest('.practice-speed-field'),integer=group?.querySelector<HTMLElement>('[data-speed-integer]'),fraction=group?.querySelector<HTMLElement>('[data-speed-fraction]');
+ if(!integer||!fraction)return;
+ const at=field.value.indexOf('.');integer.textContent=at<0?field.value:field.value.slice(0,at);fraction.textContent=at<0?'':field.value.slice(at);
+}
+export function refreshPracticeSpeedDisplays(root:HTMLElement){for(const field of root.querySelectorAll<HTMLInputElement>('.practice-speed-field input'))refreshPracticeSpeedDisplay(field);}
 export interface ManualTempoOptions {
  accepts:(element:HTMLElement)=>boolean;
  adjust:(key:string,direction:number,repeated:boolean,elapsed:number)=>boolean;
@@ -30,7 +39,7 @@ export class ManualTempoControls {
   window.addEventListener('blur',this.blur);document.addEventListener('visibilitychange',this.visibility);
  }
  private control(target:EventTarget|null){const el=target instanceof HTMLElement?target:undefined,group=el?.closest<HTMLElement>('[data-manual-key]');return group&&this.options.accepts(group)?{el:el!,group,key:group.dataset.manualKey!}:undefined;}
- private finishEdit(commit:boolean){const editing=this.editing;if(!editing)return true;this.cancel();const {field}=editing,c=this.control(field);if(commit&&field.isConnected&&c&&this.options.edit&&!this.options.edit.commit(c.key,field))return false;if(!commit)field.value=editing.original;field.readOnly=true;field.closest('[data-manual-key]')?.removeAttribute('data-manual-editing');delete field.dataset.manualDraft;delete field.dataset.manualDraftText;this.editing=undefined;if(!commit&&c)this.options.edit?.cancel?.(c.key,field);return true;}
+ private finishEdit(commit:boolean){const editing=this.editing;if(!editing)return true;this.cancel();const {field}=editing,c=this.control(field);if(commit&&field.isConnected&&c&&this.options.edit&&!this.options.edit.commit(c.key,field))return false;if(!commit)field.value=editing.original;field.readOnly=true;field.closest('[data-manual-key]')?.removeAttribute('data-manual-editing');delete field.dataset.manualDraft;delete field.dataset.manualDraftText;this.editing=undefined;if(!commit&&c)this.options.edit?.cancel?.(c.key,field);refreshPracticeSpeedDisplay(field);return true;}
  private beginEdit(field:HTMLInputElement){if(this.editing?.field===field)return true;if(this.editing&&!this.finishEdit(this.editing.field.isConnected))return false;this.cancel();this.editing={field,original:field.value};field.readOnly=false;field.closest('[data-manual-key]')?.setAttribute('data-manual-editing','');field.focus();field.select();return true;}
  private adjustDraft(key:string,field:HTMLInputElement,direction:number,elapsed:number){const changed=this.options.edit?.adjust(key,field,direction,elapsed)??false;if(changed&&document.activeElement===field)field.select();return changed;}
  private inputChanged=(event:Event)=>{const field=this.editing?.field;if(field&&event.target===field){delete field.dataset.manualDraft;delete field.dataset.manualDraftText;}};
