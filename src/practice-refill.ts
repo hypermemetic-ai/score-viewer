@@ -7,11 +7,11 @@ export interface RefillPlacement extends RefillMeasure {x:number}
 export interface RefillFrame {width:number;edge:number;breakGap:number;boundaryAir?:boolean}
 export interface RefillLayout {current:number;placements:RefillPlacement[];epoch:number}
 export interface RefillCertificate {
- frame:RefillFrame;initial:RefillLayout;measures:ReadonlyMap<number,RefillMeasure>;
+ frame:RefillFrame;initial:RefillLayout;fullSourceInitial?:true;fullRecovery?:true;measures:ReadonlyMap<number,RefillMeasure>;
  /** The entire supported rate range has the same conservative source lead. */
  rates:readonly [5,500];proof:'enumerated'|'interval-bound';states:number;transitions:number;
 }
-export interface RefillAdmissionOptions {edge?:number;breakGap?:number;maxStates?:number;maxFrameWidth?:number;boundaryAir?:boolean}
+export interface RefillAdmissionOptions {edge?:number;breakGap?:number;maxStates?:number;maxFrameWidth?:number;minFrameWidth?:number;fullSourceInitial?:boolean;fullRecovery?:boolean;boundaryAir?:boolean}
 const epsilon=1e-7,defaultStateBound=8192;
 
 /** Every next hand gesture is resident, even when an early accepted attack
@@ -97,9 +97,37 @@ export function allocateRefill(previous:RefillLayout,current:number,bars:number[
  if(!layout)throw Error(`Measure ${current+1} has no verified placement around the unchanged reading interval.`);
  return layout;
 }
-function initialLayout(plan:PracticePlan,chunk:PracticeChunk,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame,fillEmpty=true):RefillLayout {
+/** Restore full source ink only through the same interval allocator. The
+ * actual reading interval remains exact; nonconsecutive source boundaries
+ * retain their admitted air rather than inventing musical adjacency. */
+export function restoreRefill(certificate:RefillCertificate,previous:RefillLayout):RefillLayout {
+ const current=previous.placements.find(p=>p.bar===previous.current),source=certificate.measures.get(previous.current);
+ if(!current||!source||current.empty||Math.abs(current.width-source.width)>epsilon)throw Error('The recovery reading interval was not fully admitted.');
+ const candidates=refillCandidates(previous,previous.current,previous.placements.map(p=>p.bar),certificate.measures,certificate.frame);
+ const restored=candidates.find(c=>c.placements.every((p,i)=>p.bar===previous.placements[i].bar))??candidates[0];
+ if(!restored)throw Error('The complete resident source cannot be restored around the unchanged reading interval.');
+ return restored;
+}
+/** Free view restores complete literal source intervals on the same admitted
+ * frame. Prefer the current reading anchor when a real consecutive review
+ * window can enclose it; otherwise report the deliberate centering limit. */
+export function reviewRefill(certificate:RefillCertificate,windows:readonly (readonly number[])[],selected:readonly number[],anchor?:{bar:number;x:number}) {
+ const frame=certificate.frame;validFrame(frame);
+ const place=(bars:readonly number[])=>{
+  if(!bars.length||bars.length>4||new Set(bars).size!==bars.length||bars.some((bar,i)=>i>0&&bar!==bars[i-1]+1))throw Error('The complete review window is invalid.');
+  const source=bars.map(bar=>{const m=certificate.measures.get(bar);if(!m)throw Error('The review source interval is unavailable.');return m;}),width=source.reduce((sum,m)=>sum+m.width,0),left=edgeAir(bars[0],'left',certificate.measures,frame),right=edgeAir(bars.at(-1)!,'right',certificate.measures,frame);
+  if(width+left+right>frame.width+epsilon)throw Error('The complete review source window does not fit the admitted practice frame.');
+  const index=anchor?bars.indexOf(anchor.bar):-1,centered=(frame.width-width)/2,desired=index<0?centered:anchor!.x-source.slice(0,index).reduce((sum,m)=>sum+m.width,0),fits=desired>=left-epsilon&&desired+width<=frame.width-right+epsilon;
+  let x=fits?desired:Math.max(left,Math.min(centered,frame.width-right-width));return {fits,placements:source.map(m=>{const p={...m,empty:false,x};x+=m.width;return p;})};
+ };
+ if(anchor&&!Number.isFinite(anchor.x))throw Error('The review anchor is invalid.');
+ let bars=[...selected],result=place(bars);
+ if(anchor&&!result.fits){const alternative=windows.filter(b=>b.includes(anchor.bar)).map(b=>({bars:[...b],result:place(b)})).find(p=>p.result.fits);if(alternative){bars=alternative.bars;result=alternative.result;}}
+ return {bars,placements:result.placements,anchor:anchor?(result.fits?'preserved':'outside-complete-window'):'navigation'} as const;
+}
+function initialLayout(plan:PracticePlan,chunk:PracticeChunk,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame,fillEmpty=true,fullSource=false):RefillLayout {
  const initial=new Set(refillResidents(plan,chunk,chunk.firstBar,0));for(let bar=chunk.firstBar;initial.size<4&&bar<=chunk.lastBar;bar++)initial.add(bar);
- const required=refillResidents(plan,chunk,chunk.firstBar,0),allocated=allocationMeasures(measures,required),bars=[...initial].sort((a,b)=>a-b),width=runWidth(bars,allocated,frame);let x=(frame.width-width)/2;
+ const required=refillResidents(plan,chunk,chunk.firstBar,0),allocated=fullSource?measures:allocationMeasures(measures,required),bars=[...initial].sort((a,b)=>a-b),width=runWidth(bars,allocated,frame);let x=(frame.width-width)/2;
  if(frame.boundaryAir)x=Math.max(edgeAir(bars[0],'left',allocated,frame),Math.min(x,frame.width-edgeAir(bars.at(-1)!,'right',allocated,frame)-width));
  if(x<edgeAir(bars[0],'left',allocated,frame)-epsilon||x+width>frame.width-edgeAir(bars.at(-1)!,'right',allocated,frame)+epsilon)throw Error('The initial source passage does not fit the practice frame.');
  const blanks=fillEmpty?bars.filter(bar=>allocated.get(bar)!.empty):[],spare=blanks.length?Math.max(0,frame.width-edgeAir(bars.at(-1)!,'right',allocated,frame)-x-width)/blanks.length:0;
@@ -127,19 +155,27 @@ function revealedHands(plan:PracticePlan,session:PracticeSession,bar:number){
 /** Prefer a legal placement that also leaves room for the exact next source
  * reading entry. Exhaustive admission still checks every reveal/entry branch;
  * this is geometry lookahead, never a predicted musical success. */
-function allocateSourceRefill(plan:PracticePlan,chunk:PracticeChunk,previous:RefillLayout,current:number,revealed:number,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame){
+function allocateSourceRefill(plan:PracticePlan,chunk:PracticeChunk,previous:RefillLayout,current:number,revealed:number,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame,fullRecovery=false){
  const bars=refillAllocationBars(plan,chunk,previous,current,revealed),allocated=allocationMeasures(measures,refillResidents(plan,chunk,current,revealed));
+ const recoverable=(candidate:RefillLayout)=>!fullRecovery||refillCandidates(candidate,candidate.current,candidate.placements.map(p=>p.bar),measures,frame).length>0;
  const prefer=[...measures.values()].some(p=>p.blankWidth!==undefined)?(candidate:RefillLayout)=>{
+  if(!recoverable(candidate))return false;
   for(const next of refillSuccessors(plan,chunk,current)){
    const anchor=candidate.placements.find(p=>p.bar===next);if(!anchor||anchor.empty)continue;
    const required=refillResidents(plan,chunk,next,3),nextBars=refillAllocationBars(plan,chunk,candidate,next,3),nextMeasures=allocationMeasures(measures,required);
-   try{allocateRefill(candidate,next,nextBars,nextMeasures,frame);}catch{return false;}
+   try{const nextLayout=allocateRefill(candidate,next,nextBars,nextMeasures,frame,recoverable);if(!recoverable(nextLayout))return false;}catch{return false;}
   }return true;
  }:undefined;
- return allocateRefill(previous,current,bars,allocated,frame,prefer);
+ let layout=allocateRefill(previous,current,bars,allocated,frame,prefer);
+ if(fullRecovery&&!recoverable(layout)){
+  const candidates=refillCandidates(previous,current,bars,allocated,frame);
+  layout=(prefer?candidates.find(prefer):undefined)??candidates.find(recoverable)??layout;
+ }
+ if(!recoverable(layout))throw Error(`Measure ${current+1} cannot restore its complete resident source around the unchanged reading interval.`);
+ return layout;
 }
-function enumerate(plan:PracticePlan,chunk:PracticeChunk,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame,maxStates:number){
- const initial=initialLayout(plan,chunk,measures,frame),queue=[{layout:initial,revealed:0}],seen=new Set([layoutIdentity(initial)+'|0']);let transitions=0;
+function enumerate(plan:PracticePlan,chunk:PracticeChunk,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame,maxStates:number,fullSourceInitial=false,fullRecovery=false){
+ const initial=initialLayout(plan,chunk,measures,frame,true,fullSourceInitial),queue=[{layout:initial,revealed:0}],seen=new Set([layoutIdentity(initial)+'|0']);let transitions=0;
  for(let i=0;i<queue.length;i++){
   const {layout,revealed}=queue[i],hands=handMask(plan,layout.current),edges:Array<{bar:number;revealed:number}>=[];
   for(const bit of [1,2])if(hands&bit&&!(revealed&bit))edges.push({bar:layout.current,revealed:revealed|bit});
@@ -151,7 +187,7 @@ function enumerate(plan:PracticePlan,chunk:PracticeChunk,measures:ReadonlyMap<nu
    else edges.push({bar,revealed:0});
   }
   for(const edge of edges){
-   transitions++;const next=allocateSourceRefill(plan,chunk,layout,edge.bar,edge.revealed,measures,frame),key=layoutIdentity(next)+'|'+edge.revealed;
+   transitions++;const next=allocateSourceRefill(plan,chunk,layout,edge.bar,edge.revealed,measures,frame,fullRecovery),key=layoutIdentity(next)+'|'+edge.revealed;
    if(seen.has(key))continue;if(seen.size>=maxStates)throw Error('The bounded allocation search needs its interval safety certificate.');seen.add(key);queue.push({layout:next,revealed:edge.revealed});
   }
  }
@@ -173,16 +209,18 @@ export function admitRefill(plan:PracticePlan,chunk:PracticeChunk,input:readonly
  // or a source wrap. Its only reachable surface is the consecutive source
  // run; reserving three hypothetical gaps penalizes an impossible refill.
  const compact=selected.some(p=>p.blankWidth!==undefined)?initialLayout(plan,chunk,measures,{width:safety,edge,breakGap,boundaryAir:options.boundaryAir},false).placements.reduce((sum,p)=>sum+p.width,0)+3*breakGap+2*edge:selected.map(p=>p.width).sort((a,b)=>b-a).slice(0,4).reduce((sum,w)=>sum+w,0)+(selected.length>4?3*breakGap:0)+2*edge;
- const upper=Math.min(safety,options.maxFrameWidth??safety),widths=Array.from({length:49},(_,i)=>compact+(upper-compact)*i/48);
+ const lower=Math.max(compact,options.minFrameWidth??0),upper=Math.min(Math.max(safety,lower),options.maxFrameWidth??Math.max(safety,lower)),widths=Array.from({length:49},(_,i)=>lower+(upper-lower)*i/48);
+ if(options.minFrameWidth!==undefined&&(!Number.isFinite(options.minFrameWidth)||options.minFrameWidth<=0))throw Error('The complete source frame minimum is invalid.');
+ if(options.minFrameWidth!==undefined&&options.maxFrameWidth!==undefined&&options.minFrameWidth>options.maxFrameWidth+epsilon)throw Error('The complete source frame minimum exceeds the available frame.');
  let reason='';
  // The compact estimate reserves three possible breaks even when the source
  // stays consecutive. A smaller permitted frame still deserves the exact
  // exhaustive placement proof; its conservative estimate is not a refusal.
- for(const width of compact>upper?[upper]:[...new Set(widths)].filter(width=>width>=compact-epsilon)){
+ for(const width of lower>upper?[upper]:[...new Set(widths)].filter(width=>width>=lower-epsilon)){
   if(options.maxFrameWidth!==undefined&&width>options.maxFrameWidth+epsilon)break;
   const frame={width,edge,breakGap,...(options.boundaryAir?{boundaryAir:true}:{})};
-  try{const result=enumerate(plan,chunk,measures,frame,maxStates);return {frame,measures,rates:[5,500],proof:'enumerated',...result};}catch(error){reason=(error as Error).message;}
-  if(Math.abs(width-safety)<epsilon)return {frame,measures,rates:[5,500],proof:'interval-bound',initial:initialLayout(plan,chunk,measures,frame),states:0,transitions:0};
+  try{const result=enumerate(plan,chunk,measures,frame,maxStates,options.fullSourceInitial,options.fullRecovery);return {frame,measures,...(options.fullSourceInitial?{fullSourceInitial:true as const}:{}),...(options.fullRecovery?{fullRecovery:true as const}:{}),rates:[5,500],proof:'enumerated',...result};}catch(error){reason=(error as Error).message;}
+  if(!options.fullRecovery&&Math.abs(width-safety)<epsilon)return {frame,measures,...(options.fullSourceInitial?{fullSourceInitial:true as const}:{}),rates:[5,500],proof:'interval-bound',initial:initialLayout(plan,chunk,measures,frame,true,options.fullSourceInitial),states:0,transitions:0};
  }
  throw Error(`The selected passage cannot be admitted at a readable size. ${reason}`.trim());
 }
@@ -219,16 +257,19 @@ export class PracticeRefill {
   // phase freezes allocation; the annotation toggle cannot freeze reading.
   if(!connected||!session.measured||!['trial','countin'].includes(session.phase))return false;
   const current=readingBar(this.plan,this.chunk,session,this.layout.current);
+  // A complete initial staff remains literal through count-in. Reclaiming
+  // latent intervals begins only at an actual accepted/source entry.
+  if(this.certificate.fullSourceInitial&&this.layout===this.certificate.initial&&!session.matched.size&&current===this.chunk.firstBar)return false;
   let layout=this.layout;
   // Rest-clock steps must receive their promised one-written-bar lead even
   // if one browser frame crosses several rest boundaries.
   while(layout.current<current){
    const direct=session.events.some(a=>a.bar===current&&session.matched.has(a.id)),next=direct?current:layout.current+1;
    const revealed=revealedHands(this.plan,session,next);
-   layout=allocateSourceRefill(this.plan,this.chunk,layout,next,revealed,this.certificate.measures,this.certificate.frame);
+   layout=allocateSourceRefill(this.plan,this.chunk,layout,next,revealed,this.certificate.measures,this.certificate.frame,this.certificate.fullRecovery);
   }
   const revealed=revealedHands(this.plan,session,current);
-  layout=allocateSourceRefill(this.plan,this.chunk,layout,current,revealed,this.certificate.measures,this.certificate.frame);
+  layout=allocateSourceRefill(this.plan,this.chunk,layout,current,revealed,this.certificate.measures,this.certificate.frame,this.certificate.fullRecovery);
   if(session.phase==='trial'||session.matched.size)for(const attack of session.carryIn)for(const group of attack.groups)this.retired.add(Number(group.split(':')[0]));
   for(let bar=this.chunk.firstBar;bar<current;bar++)if(session.events.filter(a=>a.bar===bar).every(a=>session.matched.has(a.id)))this.retired.add(bar);
   const changed=layout.epoch!==this.layout.epoch;this.layout=layout;return changed;

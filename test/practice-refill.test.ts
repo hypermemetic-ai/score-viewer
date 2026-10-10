@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {admitRefill,allocateRefill,PracticeRefill,readingBar,refillAllocationBars,refillCandidates,refillResidents,refillSuccessors,type RefillLayout,type RefillMeasure} from '../src/practice-refill';
+import {restoreRefill,reviewRefill,admitRefill,allocateRefill,PracticeRefill,readingBar,refillAllocationBars,refillCandidates,refillResidents,refillSuccessors,type RefillLayout,type RefillMeasure} from '../src/practice-refill';
 import {initialPractice,PracticeSession,type PracticePlan,type PracticeChunk,type PracticeAttack} from '../src/practice';
 
 function fixture(widths:number[],rests:number[]=[],hands:Record<number,'LH'|'RH'>={}){
@@ -200,4 +200,56 @@ test('empty-frame admission works when native Map iterators provide no iterator 
  Object.defineProperty(prototype,'some',{value:undefined,configurable:true});
  try{const f=fixture([100,100,100,250,100]);f.measures.forEach(m=>m.blankWidth=4);const c=admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:500});assert.equal(c.proof,'enumerated');assert.ok(c.transitions>0);}
  finally{if(saved)Object.defineProperty(prototype,'some',saved);else delete prototype.some;}
+});
+
+
+test('complete first allocation retains all four source intervals and proves every later empty refill from that anchor',()=>{
+ const f=fixture([135.87,135.87,135.87,424.57,118.91]);f.measures.forEach(m=>m.blankWidth=4);f.measures[4].blankWidth=f.measures[4].width;
+ const sourceWidth=f.measures.slice(0,4).reduce((sum,m)=>sum+m.width,0),c=admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,minFrameWidth:sourceWidth+24,fullSourceInitial:true});
+ assert.equal(c.proof,'enumerated');assert.ok(c.transitions>0);assert.ok(c.frame.width>=sourceWidth+24);assert.deepEqual(c.initial.placements.map(p=>[p.bar,p.width,!!p.empty]),f.measures.slice(0,4).map(p=>[p.bar,p.width,false]));
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c);s.ready(0);assert.equal(refill.update(s,true),false);assert.deepEqual(refill.layout,c.initial);s.update(s.startMs);assert.equal(refill.update(s,true),false);assert.deepEqual(refill.layout,c.initial);let retired=false;
+ for(const a of s.events){const before=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(before.width,f.measures[a.bar].width);assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);const after=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(after.x,before.x);assert.equal(after.width,before.width);assert.equal(refill.bars.length,4);retired ||= refill.retired.size>0;}
+ assert.ok(retired);refill.prime();assert.deepEqual(refill.layout,c.initial);assert.equal(refill.retired.size,0);
+});
+
+test('invalid shared frame bounds cannot admit a narrower claimed complete restoration',()=>{
+ const f=fixture([100,100,100,200,100]);f.measures.forEach(m=>m.blankWidth=4);
+ for(const minFrameWidth of [NaN,Infinity,-1,0])assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{minFrameWidth,fullSourceInitial:true}),/minimum is invalid/);
+ assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{minFrameWidth:600,maxFrameWidth:500,fullSourceInitial:true}),/minimum exceeds/);
+});
+
+
+test('complete review restores literal source widths and preserves a feasible reading anchor',()=>{
+ const f=fixture([100,100,100,100,100]);f.measures.forEach(m=>m.blankWidth=4);const c=admitRefill(f.plan,f.chunk,f.measures,{minFrameWidth:450,fullSourceInitial:true}),windows=[[0,1,2,3],[1,2,3,4]];
+ const restored=reviewRefill(c,windows,windows[0],{bar:2,x:225});assert.equal(restored.anchor,'preserved');assert.deepEqual(restored.bars,windows[0]);assert.equal(restored.placements.find(p=>p.bar===2)!.x,225);assert.ok(restored.placements.every(p=>!p.empty&&p.width===100));
+ const alternate=reviewRefill(c,windows,windows[0],{bar:2,x:125});assert.equal(alternate.anchor,'preserved');assert.deepEqual(alternate.bars,windows[1]);assert.equal(alternate.placements.find(p=>p.bar===2)!.x,125);
+ const outside=reviewRefill(c,windows,windows[0],{bar:2,x:5});assert.equal(outside.anchor,'outside-complete-window');assert.ok(outside.placements.every(p=>!p.empty&&p.width===100));assert.ok(outside.placements[0].x>=c.frame.edge);assert.ok(outside.placements.at(-1)!.x+100<=c.frame.width-c.frame.edge);
+ assert.throws(()=>reviewRefill({...c,frame:{...c.frame,width:300}},windows,windows[0]),/complete review source window does not fit/);assert.throws(()=>reviewRefill(c,windows,[0,2,3]),/review window is invalid/);
+});
+
+
+test('full-recovery admission proves literal resident restoration at every source-prefix entry without moving its reading interval',()=>{
+ const f=fixture(Array.from({length:38},(_,i)=>i===27?424.57:i===28?118.91:135.87));
+ for(const m of f.measures){m.blankWidth=m.bar===28?m.width:4.48;m.leftAir=m.bar===27?8.655:.8;m.rightAir=.8;}
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,minFrameWidth:842.785,fullSourceInitial:true,fullRecovery:true});
+ assert.equal(c.proof,'enumerated');assert.equal(c.fullRecovery,true);assert.ok(c.states>0);assert.ok(c.transitions>0);
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c);s.ready(0);
+ for(const a of s.events){
+  const before=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);
+  const current=refill.layout.placements.find(p=>p.bar===refill.layout.current)!,recovered=restoreRefill(c,refill.layout),pin=recovered.placements.find(p=>p.bar===current.bar)!;
+  assert.equal(current.x,before.x);assert.equal(current.width,before.width);assert.equal(pin.x,current.x);assert.equal(pin.width,current.width);assert.equal(recovered.placements.length,4);
+  assert.deepEqual(recovered.placements.map(p=>p.bar).sort((a,b)=>a-b),refill.bars.slice().sort((a,b)=>a-b));
+  for(const p of recovered.placements){assert.ok(!p.empty);assert.equal(p.width,f.measures[p.bar].width);}
+  within(recovered,c.frame.width,.8,8);
+ }
+ assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,minFrameWidth:842.785,fullSourceInitial:true,fullRecovery:true,maxStates:1}),/bounded allocation search/,'a recovery claim cannot fall back to the interval-only safety shortcut');
+});
+
+test('restoration refuses unpaid full-source space and never resizes an empty or foreign reading interval',()=>{
+ const f=fixture([135.87,135.87,135.87,424.57,118.91]);f.measures.forEach(m=>m.blankWidth=4.48);
+ const c=admitRefill(f.plan,f.chunk,f.measures,{minFrameWidth:900,fullSourceInitial:true,fullRecovery:true}),previous:RefillLayout={current:2,epoch:7,placements:[{...f.measures[3],x:5},{...f.measures[0],x:437.57,width:100,empty:true},{...f.measures[1],x:537.57,width:100,empty:true},{...f.measures[2],x:637.57}]};
+ const narrow={...c,frame:{...c.frame,width:780}};
+ assert.throws(()=>restoreRefill(narrow,previous),/cannot be restored/);assert.equal(narrow.frame.width,780);assert.equal(previous.placements[3].x,637.57);
+ assert.throws(()=>restoreRefill(c,{...previous,placements:previous.placements.map(p=>p.bar===2?{...p,empty:true,width:4.48}:p)}),/not fully admitted/);
+ assert.throws(()=>restoreRefill(c,{...previous,current:99}),/not fully admitted/);
 });
