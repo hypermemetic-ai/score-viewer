@@ -33,7 +33,9 @@ test('a complete clock loop enables a truthful reversible claim without measured
  assert.equal(s.update(s.startMs+s.durationMs),'completed');assert.equal(s.update(s.startMs+s.durationMs+1),undefined);
  assert.equal(s.canDone,true);assert.equal(JSON.stringify(state),before);assert.deepEqual(state.best,{});
  assert.equal(s.toggleDone()!.marked,true);assert.equal(hasDone(state,s.doneTarget()),true);assert.deepEqual(state.best,{});
- assert.ok(Math.abs(displayedPracticeTotal(plan,state)-1/30)<1e-12);assert.equal(displayedPracticeTotal(plan,state,false),0);
+ // All three source-authored four-bar units are identical: one observed
+ // manual loop grants the same 10% rate at each location, never measured best.
+ assert.ok(Math.abs(displayedPracticeTotal(plan,state)-.1)<1e-12);assert.equal(displayedPracticeTotal(plan,state,false),0);
  assert.equal(s.toggleDone()!.marked,false);assert.equal(displayedPracticeTotal(plan,state),0);
 });
 

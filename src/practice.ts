@@ -1,5 +1,6 @@
 import {requirePianoEvent} from './piano-event';
 import {snapPracticeSpeed,snapPracticeStep} from './tempo-presentation';
+import {registerPracticePatterns,bindPracticePassages,equivalentPracticeClaims} from './practice-equivalence';
 import {requirePianoCapability} from './score-capabilities';
 import {attainedRate,readManualAttainment,claimIdentity,type ManualAttainment} from './practice-attainment';
 import{MidiSoundingNotes,type MidiStream,type PracticeMidiSetup}from'./midi-sustain';
@@ -64,9 +65,10 @@ export function planSource(p:ScorePackage,partition:PracticePartition='connectio
   chunks.push({id:`${first+1}-${last+1}`,firstBar:first,lastBar:last,start,end,weight:weights.slice(first,last+1).reduce((sum,w,i)=>sum+w*(bars[first+i+1]-bars[first+i]),0),pattern,boundaryReasons:protectedAt(cut)});first=cut;
  }
 
- return {partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
+ const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
+ registerPracticePatterns(plan,p.score,'piano');return plan;
 }
-export function initialPractice(plan:PracticePassagePlan):PracticeState{const target=requireReferencePerformanceTempo(plan).bpm;return {referenceBeat:requireReferencePerformanceTempo(plan).beat,partition:plan.partition,version:1,revision:plan.revision,target,working:snapPracticeSpeed(.10*target,target),step:.01*target,tolerance:500,offset:0,keepTempo:false,start:snapPracticeSpeed(.10*target,target),workingByPattern:{},best:{},usabilityRevision:1,speedRevision:2,countInBars:2,resumeCooldownSeconds:3};}
+export function initialPractice(plan:PracticePassagePlan):PracticeState{const target=requireReferencePerformanceTempo(plan).bpm;return bindPracticePassages(plan,{referenceBeat:requireReferencePerformanceTempo(plan).beat,partition:plan.partition,version:1,revision:plan.revision,target,working:snapPracticeSpeed(.10*target,target),step:.01*target,tolerance:500,offset:0,keepTempo:false,start:snapPracticeSpeed(.10*target,target),workingByPattern:{},best:{},usabilityRevision:1,speedRevision:2,countInBars:2,resumeCooldownSeconds:3});}
 /** Normalize copied preferences only. Historical attainment and raw journals remain exact. */
 export function normalizePracticePreferences(state:PracticeState):PracticeState {
  if(state.speedRevision!==undefined&&state.speedRevision!==2)throw Error('Practice speed preferences differ; saved evidence retained.');
@@ -97,7 +99,7 @@ export function passageHierarchy(plan:PracticePassagePlan,s:PracticeState){
  const children=new Set(parents.flatMap(c=>c.components!));
  const frontier=[...all.values()].filter(c=>!children.has(c.id)).sort((a,b)=>a.firstBar-b.firstBar);
  if(frontier.reduce((n,c)=>n+c.lastBar-c.firstBar+1,0)!==plan.chunks.reduce((n,c)=>n+c.lastBar-c.firstBar+1,0))throw Error('Practice coverage differs; saved evidence retained.');
- return {all,frontier};
+ bindPracticePassages(plan,s,all);return {all,frontier};
 }
 export function reconcilePassages(plan:PracticePassagePlan,s:PracticeState){
  let tree=passageHierarchy(plan,s);
@@ -117,11 +119,11 @@ export function nextPracticePassage(plan:PracticePassagePlan,s:PracticeState,cur
  const next=frontier.find(c=>progressFor(c,s)<1);return next?prerequisite(next):undefined;
 }
 /** Section learning counts source duration once; adding joins cannot reduce this evidence. */
-export function totalProgress(plan:PracticePassagePlan,s:PracticeState){const weight=plan.chunks.reduce((n,c)=>n+c.weight,0);return weight?plan.chunks.reduce((n,c)=>n+c.weight*progressFor(c,s),0)/weight:0;}
+export function totalProgress(plan:PracticePassagePlan,s:PracticeState){passageHierarchy(plan,s);const weight=plan.chunks.reduce((n,c)=>n+c.weight,0);return weight?plan.chunks.reduce((n,c)=>n+c.weight*progressFor(c,s),0)/weight:0;}
 /** Whole-piece attainment belongs to its full source-bound run, never a child average. */
-export function wholePracticeProgress(plan:PracticePassagePlan,s:PracticeState){const {all}=reconcilePassages(plan,structuredClone(s)),first=plan.chunks[0],last=plan.chunks.at(-1),root=[...all.values()].find(c=>c.firstBar===first?.firstBar&&c.lastBar===last?.lastBar);return root?progressFor(root,s):0;}
+export function wholePracticeProgress(plan:PracticePassagePlan,s:PracticeState){const {all}=reconcilePassages(plan,structuredClone(s)),first=plan.chunks[0],last=plan.chunks.at(-1),root=[...all.values()].find(c=>c.firstBar===first?.firstBar&&c.lastBar===last?.lastBar);bindPracticePassages(plan,s,all);return root?progressFor(root,s):0;}
 export function passed(chunk:PracticeChunk,s:PracticeState){s.best[chunk.pattern]=Math.max(s.best[chunk.pattern]??0,s.working);if(!s.keepTempo&&s.working<s.target)s.working=snapPracticeSpeed(Math.min(s.target,s.working+s.step),s.target);}
-export function resetProgress(chunk:PracticeChunk,s:PracticeState){delete s.best[chunk.pattern];if(s.groundwork)delete s.groundwork[chunk.pattern];}
+export function resetProgress(chunk:PracticeChunk,s:PracticeState){for(const claim of equivalentPracticeClaims(s,{passage:chunk.id,pattern:chunk.pattern})){delete s.best[claim.pattern];if(s.groundwork)delete s.groundwork[claim.pattern];}}
 /** Untimed source-ordered solo / adjacent-pair preparation. MIDI cannot identify physical fingers. */
 export class GroundworkSession {
  readonly steps:Array<{groups:string[];events:PracticeAttack[]}>;index=0;matched=new Set<string>();failure?:PracticeAttack;complete=false;

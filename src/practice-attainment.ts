@@ -1,3 +1,4 @@
+import {equivalentPracticeClaims} from './practice-equivalence';
 /** Player claims are additive evidence; legacy bests keep their original provenance. */
 export interface ManualAttainment {version:1;marks:Record<string,number[]>}
 export interface AttainmentState {best:Record<string,number>;manualAttainment?:ManualAttainment}
@@ -12,9 +13,18 @@ export function readManualAttainment(value:unknown):ManualAttainment|undefined {
  return structuredClone(v);
 }
 const claimKey=(t:Pick<DoneTarget,'passage'|'pattern'>)=>JSON.stringify([t.passage,t.pattern]);
-export function attainedRate(state:AttainmentState,pattern:string,passage?:string){return Math.max(state.best[pattern]??0,...(passage?state.manualAttainment?.marks[claimKey({pattern,passage})]??[]:[]));}
-export function hasDone(state:AttainmentState,target:DoneTarget){return !!state.manualAttainment?.marks[claimKey(target)]?.includes(target.rate);}
-export function toggleDone(state:AttainmentState,target:DoneTarget){if(!target.passage||!target.pattern||!validRate(target.rate))throw Error('Invalid passage/rate claim.');state.manualAttainment??={version:1,marks:{}};const rates=state.manualAttainment.marks[claimKey(target)]??[],marked=!rates.includes(target.rate);if(marked)state.manualAttainment.marks[claimKey(target)]=[...rates,target.rate];else{const remaining=rates.filter(rate=>rate!==target.rate);if(remaining.length)state.manualAttainment.marks[claimKey(target)]=remaining;else delete state.manualAttainment.marks[claimKey(target)];}return marked;}
+/** Aliases are derived from this plan's actual source, never copied into best. */
+export function measuredRate(state:AttainmentState,pattern:string,passage?:string){return Math.max(0,...(passage?equivalentPracticeClaims(state,{pattern,passage}):[{pattern}]).map(t=>state.best[t.pattern]??0));}
+export function manualRates(state:AttainmentState,target:Pick<DoneTarget,'passage'|'pattern'>){return equivalentPracticeClaims(state,target).flatMap(t=>state.manualAttainment?.marks[claimKey(t)]??[]);}
+export function attainedRate(state:AttainmentState,pattern:string,passage?:string){return Math.max(measuredRate(state,pattern,passage),...(passage?manualRates(state,{pattern,passage}):[]));}
+export function hasDone(state:AttainmentState,target:DoneTarget){return manualRates(state,target).includes(target.rate);}
+export function toggleDone(state:AttainmentState,target:DoneTarget){
+ if(!target.passage||!target.pattern||!validRate(target.rate))throw Error('Invalid passage/rate claim.');
+ state.manualAttainment??={version:1,marks:{}};const marked=!hasDone(state,target);
+ if(marked){const rates=state.manualAttainment.marks[claimKey(target)]??[];state.manualAttainment.marks[claimKey(target)]=[...rates,target.rate];}
+ else for(const claim of equivalentPracticeClaims(state,target)){const remaining=(state.manualAttainment.marks[claimKey(claim)]??[]).filter(rate=>rate!==target.rate);if(remaining.length)state.manualAttainment.marks[claimKey(claim)]=remaining;else delete state.manualAttainment.marks[claimKey(claim)];}
+ return marked;
+}
 const key=(t:DoneTarget)=>JSON.stringify([t.passage,t.pattern,t.rate]);
 /** Eligibility is local observed loop history, never manufactured attack evidence. */
 export class PracticeDone {
@@ -22,7 +32,7 @@ export class PracticeDone {
  private increase?:{target:DoneTarget;rate:number};private applied?:{target:DoneTarget;rate:number};
  select(){this.lastCompleted=undefined;this.undoTarget=undefined;this.increase=undefined;this.applied=undefined;}
  completed(target:DoneTarget){this.eligible.add(key(target));this.lastCompleted={...target};if(this.undoTarget&&key(this.undoTarget)!==key(target)){this.undoTarget=undefined;this.applied=undefined;}}
- target(current:DoneTarget,counting:boolean,state?:AttainmentState){const stable=this.undoTarget??(counting?this.lastCompleted:undefined);if(stable)return stable;if(!state||hasDone(state,current)||this.eligible.has(key(current)))return current;const prior=state.manualAttainment?.marks[claimKey(current)]?.at(-1);return prior===undefined?current:{passage:current.passage,pattern:current.pattern,rate:prior};}
+ target(current:DoneTarget,counting:boolean,state?:AttainmentState){const stable=this.undoTarget??(counting?this.lastCompleted:undefined);if(stable)return stable;if(!state||hasDone(state,current)||this.eligible.has(key(current)))return current;const prior=manualRates(state,current).at(-1);return prior===undefined?current:{passage:current.passage,pattern:current.pattern,rate:prior};}
  canToggle(state:AttainmentState,target:DoneTarget){return hasDone(state,target)||this.eligible.has(key(target));}
  toggle(state:AttainmentState,target:DoneTarget,keep:boolean,step:number,goal:number){if(!this.canToggle(state,target))return undefined;const marked=toggleDone(state,target);if(marked){this.undoTarget={...target};this.increase={target:{...target},rate:keep?target.rate:Math.min(goal,target.rate+step)};return {marked,rate:this.increase.rate};}const revert=this.applied&&key(this.applied.target)===key(target)?target.rate:undefined;this.undoTarget=undefined;if(this.increase&&key(this.increase.target)===key(target))this.increase=undefined;this.applied=undefined;return {marked,rate:revert};}
  /** Prediction is not attainment and does not consume the queued change. */
