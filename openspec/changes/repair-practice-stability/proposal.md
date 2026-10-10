@@ -27,8 +27,12 @@ None.
 
 Practice session/state, display/refill, shared Options and key routing, source pulse grids, native grid admission/scheduling, attainment interpretation and recipient verification. Existing score archives, historical evidence, piano/audio device policy and unrelated features remain intact. Square H/P source work proceeds separately and does not gate the urgent practice repair. A bounded repair delivery may retain the currently installed dependency rather than introduce unrelated unaccepted import or TAB changes.
 
-## Source status (2026-10-10)
+## Source and delivery status (2026-10-10)
 
 The scoped repairs are reviewed and landed through [repair-only PR56](https://github.com/hypermemetic-ai/score-viewer/pull/56) and [main PR57](https://github.com/hypermemetic-ai/score-viewer/pull/57). The former retains ISO `7205da0d6b62a4a023eda5f2f5d66bdec4fa6493` for urgent delivery; main retains its independently selected dependency. Configured source suites passed 586 and 661 tests respectively, with builds. Four actual browser musical cases and 24 production-build keyboard cases passed; original personal files and earned evidence remained exact.
 
-Source acceptance includes stable short-passage framing and longer atomic refill. In the narrow Zelda wide-measure case, two genuinely empty resident frames temporarily become approximately 9px wide; current/required source ink remains fixed. Actual Windows/Mac compilation, installed practice and human musical acceptance remain separate gates. The change stays open until native delivery evidence is reconciled.
+Source acceptance includes stable short-passage framing and longer atomic refill. In the narrow Zelda wide-measure case, two genuinely empty resident frames temporarily become approximately 9px wide; current/required source ink remains fixed.
+
+Repair-only Viewer `01a0c4c966e6dc03776729c3f641ea43f88634f0` / ISO `7205da0d6b62a4a023eda5f2f5d66bdec4fa6493` / carrier `697c6adb8aeae0f91b0e09e39dd6163e53a67be8` passed the independently admitted Windows x64/universal Mac pair in run `38017654769`, then recipient preservation/inspection and atomic publication. The usual Windows shortcut reopened No14 measures 9–12 at 10%, Ready with Piano connected on the original secondary display. The immutable delivery receipt SHA256 is `180fbcd9ec1e495b036777a998ab3e3a432b59322264f54c537f5060e8ad6515`.
+
+This completes the observed practice-core technical delivery. Keypad Enter PR60 merged to the repair source branch at `d8a59afe4da15f0c1a5680423c73d37f35d36c14`; it is not installed/published, and its main port is separate. Physical MIDI/audio/pedal and human musical acceptance remain unclaimed; Mac bounded arm64 WK evidence does not establish Tauri-origin or minimum-OS runtime acceptance. Tracking remains unarchived for coordinator review.
