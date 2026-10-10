@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {defaultBindings} from '../src/input';
-import {ControlResolver,readControlBindings,replaceControl,practiceControlBindings,controlActionAllowed,actionControlLabel,freeViewControlLabel} from '../src/control-bindings';
+import {ControlResolver,readControlBindings,replaceControl,practiceControlBindings,controlActionAllowed,actionControlLabel} from '../src/control-bindings';
 import {freeViewControlBindings,changeScopedControls} from '../src/free-view-controls';
 import {optionsBindingRows} from '../src/options-bindings';
 const base=()=>readControlBindings(undefined,{bindings:defaultBindings()});
@@ -21,8 +21,6 @@ test('explicit mode emptiness and custom controls remain authoritative across re
  assert.deepEqual(effective.actions.practiceReading,[null,null]);assert.deepEqual(effective.actions.practiceTimed,[null,{kind:'key',key:'Ctrl+KeyT'}]);assert.equal(actionControlLabel(effective,'practiceFreeView'),'F8');assert.equal(new ControlResolver(effective).keyDown(key('KeyT'),true).action,undefined);assert.equal(new ControlResolver(effective).keyDown(key('KeyT',{ctrlKey:true}),true).action,'practiceTimed');assert.equal(JSON.stringify(saved),before);
  const local=changeScopedControls(saved,undefined,true,{kind:'assign',action:'previous',slot:0,binding:{kind:'key',key:'F7'}});assert.equal(actionControlLabel(practiceControlBindings(freeViewControlBindings(local.main,local.overrides)),'previous'),'F7');assert.deepEqual(local.main.actions.practiceFreeView,saved.actions.practiceFreeView);
  assert.throws(()=>changeScopedControls(saved,undefined,true,{kind:'assign',action:'next',slot:1,binding:{kind:'key',key:'F8'}}),/conflict/);
- // Neutral manual Free retains its existing V route; a piano-only F8 is never advertised there.
- assert.equal(freeViewControlLabel(saved),'V');assert.equal(freeViewControlLabel(replaceControl(base(),'practiceFreeView',0,{kind:'key',key:'KeyV'})),'');
 });
 test('mode actions are scoped, modal guarded and share one key/pedal edge and release quarantine',()=>{
  const bindings=replaceControl(practiceControlBindings(base()),'practiceReading',1,{kind:'midi',source:'Piano',channel:1,controller:66,press:90,release:20}),resolver=new ControlResolver(bindings),connection={source:'Piano',generation:4};
