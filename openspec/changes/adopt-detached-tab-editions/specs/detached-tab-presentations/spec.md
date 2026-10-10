@@ -7,7 +7,7 @@ Provide readable source-owned detached TAB duration and rest notation under an e
 ## ADDED Requirements
 
 ### Requirement: Detached black duration vocabulary
-The new TAB recipe SHALL use black headless duration cues detached below the strings. Upward free tips SHALL share the band top; rails and hook ends SHALL be below. Short half, normal quarter and absent whole markers SHALL retain their selected meaning. Source-owned hook/rail geometry SHALL retain complete ownership.
+The new TAB recipe SHALL use black headless duration cues in the close 14pt row below the strings. Upward free tips SHALL share the band top; rails and hook ends SHALL be below, with grouped labels below the lower beams. Short half, normal quarter and absent whole markers SHALL retain their meaning and complete source-owned geometry.
 
 #### Scenario: Whole half quarter and beamed values
 - **WHEN** a supported source contains whole, half, quarter and beamed short values
@@ -15,15 +15,33 @@ The new TAB recipe SHALL use black headless duration cues detached below the str
 - **AND** absence of a whole-duration marker does not remove the fret, event ownership or musical clock
 
 ### Requirement: Written duration determines paint
-Duration and rest glyphs SHALL follow retained written value and dots, including the exact 16th/sixteenth alias. Performed elapsed ticks SHALL remain timing facts and SHALL NOT substitute for written notation.
+Duration and rest glyphs SHALL follow retained written value and dots, including the exact 16th/sixteenth alias, except for the explicitly versioned, independently source-proven isolated-rest display rule below. Performed elapsed ticks SHALL remain timing facts and SHALL NOT substitute for written notation or audit authority.
 
 #### Scenario: Dotted sixteenth rest and tuplets
-- **WHEN** a dotted sixteenth rest or a supported tuplet has elapsed ticks that differ from a simple written-duration threshold
+- **WHEN** a dotted sixteenth rest or supported tuplet has elapsed ticks that differ from a simple written-duration threshold and has no independently proven eligible isolated-rest display
 - **THEN** the glyph and dots retain its written value while loop timing retains the original elapsed ticks
 - **AND** rest ink is not silently promoted to an eighth glyph
 
+### Requirement: Shared exact isolated-rest display
+Only a source-proven isolated REST whose written value, dots and exact ratio resolve to an ordinary undotted rest MAY display that equivalent under an explicit new ISO/TAB recipe pair. One shared source decision SHALL be independently bound to actual raw XML, complete canonical source facts and full cross-bar chronology. Every complete/weighted window SHALL protect its rest members, and the entire candidate prefix and suffix within its completely bound ratio run SHALL each have an exact disjoint contiguous complete homogeneous partition; overlapping-window unions SHALL NOT prove that coverage. Canonical spelling, source bytes, silence/owner identity and clocks SHALL remain exact; derived display SHALL NOT become canonical written-value audit authority. Model-only or unknown scope SHALL remain literal.
+
+#### Scenario: Source-proven isolated rest with exact equivalence
+- **WHEN** full-source binding proves a sole ratio rest between straight members, at a genuine source start/end or a singleton with exact disjoint complete prefix/suffix partitions, the rest belongs to no protected window and exact BigInt arithmetic yields an ordinary undotted rest
+- **THEN** both opted-in ISO/TAB recipes use that same ordinary display with redundant dots and ratio removed together
+- **AND** canonical written dots/ratio, elapsed timing and all source identities remain unchanged
+
+#### Scenario: Protected grouping and genuine fractions
+- **WHEN** source scope is unknown, any normalType/normalDots hint exists, grouping is explicit/complete/weighted/mixed/rest-containing/continued/overlapping or the candidate has no exact ordinary equivalent
+- **THEN** display retains the meaningful written value, augmentation and scope without guessing isolation from elapsed ticks or nearby-item counts
+- **AND** notes and legacy recipe branches never take the new rest-only exception
+
+#### Scenario: Overlapping complete windows do not tile the neighbors
+- **WHEN** four neighboring eighth-triplet units are covered only by overlapping complete three-unit windows before or after a candidate
+- **THEN** the incomplete prefix/suffix has no disjoint complete partition, so the rest retains its literal spelling
+- **AND** complete/weighted windows protecting the rest remain a separate refusal obligation
+
 ### Requirement: Closely anchored augmentation squares
-The new recipe SHALL use 1.6pt augmentation squares with about 1.4pt edge/inter-square gaps, aligned closely to genuine stem/rest bases. The squares SHALL retain exact source augmentation meaning and complete owned geometry. A base-less whole SHALL NOT gain an unselected whole-symbol or fret-attached exception.
+Unsimplified values in the new recipe SHALL use 1.6pt augmentation squares with about 1.4pt edge/inter-square gaps, aligned closely to genuine stem/rest bases, retaining meaningful augmentation and complete owned geometry. The isolated-rest exception SHALL remove only independently proven redundant display augmentation. Base-less whole-note duration cues SHALL NOT gain an unselected whole-symbol or fret-attached exception.
 
 #### Scenario: Dotted stem or rest with a real base
 - **WHEN** a source augmentation belongs to a value with an actual duration stem or rest base
@@ -52,9 +70,10 @@ The new recipe SHALL paint each source rest on a neutral TAB-staff reference wit
 - **THEN** each appears once on the TAB staff with its source-correct shape and dots
 - **AND** the canonical silence identity and absence of a physical string remain exact
 
-#### Scenario: Isolated source triplet rest
-- **WHEN** a retained isolated rest has an actual source triplet scope
-- **THEN** its source-owned 3 is attached beside that rest without granting note/beam or physical-string membership
+#### Scenario: Unsimplified fractional isolated rest
+- **WHEN** a retained isolated rest has an actual source triplet scope and does not qualify for the independently proven equivalent-rest display
+- **THEN** its meaningful source-owned ratio remains visible below the staff without granting note/beam or physical-string membership
+- **AND** final contextual placement of genuinely fractional orphan labels requires separate source visual review
 
 ### Requirement: Explicit recipe and literal historical replay
 Every supported new-style archive SHALL bind a distinct known TAB engine. Historical archive bytes, source hashes and recipe interpretation SHALL remain literal, and previously valid/admitted historical archives and omitted public recipe selections SHALL reproduce their exact valid output. Reviewed written-value audit repairs MAY accept formerly invalid cases without changing those source/recipe/paint identities; their historical refusal receipts SHALL remain reproducible at the original pin. Unknown or inconsistent recipe identities SHALL refuse without guessing from SVG appearance or upgrading old content.
@@ -66,11 +85,12 @@ Every supported new-style archive SHALL bind a distinct known TAB engine. Histor
 - **THEN** admission refuses and existing library pointers remain unchanged
 
 ### Requirement: Source and ISO compatibility
-A style-only TAB edition SHALL retain exact canonical source bytes, ISO result, owners, written components, tuning/string-fret facts, clocks, repeats, relations and authored beam facts/ISO topology. Its source-proven TAB rail grouping SHALL NOT alter those facts. The style SHALL NOT change physical capabilities or grant an instrument family.
+A presentation edition SHALL retain exact canonical source bytes, owners, written components, tuning/string-fret facts, clocks, repeats, relations and authored grouping/ISO topology. A TAB-only edition SHALL retain exact ISO output. A new shared rest-display pair MAY change ISO paint only through explicit versioned source dispatch and independently replayed proof of the exact approved isolated-rest display and its geometry; generic unequal ISO output SHALL NOT qualify. Physical capabilities and family authority SHALL remain unchanged.
 
 #### Scenario: Same part with new duration paint
 - **WHEN** an admitted Bass or Guitar part is regenerated with the new TAB recipe
-- **THEN** the ISO view and all musical facts remain exact while only declared TAB presentation output and evidence change
+- **THEN** all canonical musical facts remain exact, while each view independently replays its declared known recipe
+- **AND** ISO output remains exact unless the explicit new pair proves only the approved isolated-rest display change; legacy ISO interpretation is never replaced
 - **AND** a connected piano cannot assess the neutral part
 
 ### Requirement: Actual Worker and independent cold replay
@@ -107,7 +127,7 @@ The new production recipe SHALL be inspected at normal reader and practice scale
 - **THEN** its evidence includes readable normal-scale full pages and joined manual windows with black cues and staff rests
 - **AND** any unexercised native or human inspection remains explicit
 
-#### Scenario: Augmented whole has no duration base
-- **WHEN** a source whole has augmentation but no duration base stroke and its lower-band squares appear isolated
+#### Scenario: Augmented whole-note duration has no base
+- **WHEN** a whole NOTE has augmentation but no duration base stroke and its lower-band squares appear isolated
 - **THEN** final production aesthetic acceptance remains explicitly open until a concrete source-owned treatment is reviewed
-- **AND** no unselected whole symbol, fret-attached exception or hidden augmentation is used to claim the issue resolved
+- **AND** no isolated-rest rule, unselected whole symbol, fret-attached exception or hidden augmentation is used to claim the note issue resolved
