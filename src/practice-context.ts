@@ -1,4 +1,5 @@
 import {initialPractice,readPractice,passageHierarchy,planPractice,practicePartition,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
+import type {PracticeMode,PracticePrimaryMode} from './practice-view';
 import type {ScorePackage} from './package';
 
 export type PracticePreferences=Pick<PracticeState,'start'|'connectionStart'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'|'countInBars'|'resumeCooldownSeconds'>;
@@ -21,7 +22,7 @@ export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:Pract
 export interface PracticeViewContext {
  partition:PracticePartition;composites:Record<string,string[]>;
  selected:string;parent?:string;component?:string;includeManual:boolean;
- passage?:string;window?:[number,number];
+ passage?:string;window?:[number,number];mode?:PracticeMode;previousMode?:PracticePrimaryMode;readingWindow?:number;
  preferences?:PracticePreferences;
 }
 export function restorePracticeGrouping(plan:PracticePassagePlan,state:PracticeState,context:PracticeViewContext):PracticeState {

@@ -68,7 +68,7 @@ export function planSource(p:ScorePackage,partition:PracticePartition='connectio
  const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
  registerPracticePatterns(plan,p.score,'piano');return plan;
 }
-export function initialPractice(plan:PracticePassagePlan):PracticeState{const target=requireReferencePerformanceTempo(plan).bpm;return bindPracticePassages(plan,{referenceBeat:requireReferencePerformanceTempo(plan).beat,partition:plan.partition,version:1,revision:plan.revision,target,working:snapPracticeSpeed(.10*target,target),step:.02*target,tolerance:500,offset:0,keepTempo:false,start:snapPracticeSpeed(.10*target,target),connectionStart:snapPracticeSpeed(.50*target,target),workingByPattern:{},best:{},usabilityRevision:1,speedRevision:2,countInBars:2,resumeCooldownSeconds:3});}
+export function initialPractice(plan:PracticePassagePlan):PracticeState{const target=requireReferencePerformanceTempo(plan).bpm,start=snapPracticeSpeed(('attacks' in plan&&'gestures' in plan ? .30 : .10)*target,target);return bindPracticePassages(plan,{referenceBeat:requireReferencePerformanceTempo(plan).beat,partition:plan.partition,version:1,revision:plan.revision,target,working:start,step:.02*target,tolerance:500,offset:0,keepTempo:false,start,connectionStart:snapPracticeSpeed(.50*target,target),workingByPattern:{},best:{},usabilityRevision:1,speedRevision:2,countInBars:2,resumeCooldownSeconds:3});}
 /** Normalize copied preferences only. Historical attainment and raw journals remain exact. */
 export function normalizePracticePreferences(state:PracticeState):PracticeState {
  if(state.speedRevision!==undefined&&state.speedRevision!==2)throw Error('Practice speed preferences differ; saved evidence retained.');
@@ -108,7 +108,7 @@ export function reconcilePassages(plan:PracticePassagePlan,s:PracticeState){
 }
 /** Grouping eligibility is distinct from a parent's independently earned run. */
 export function componentsAttained(chunk:PracticeChunk,s:PracticeState,all:ReadonlyMap<string,PracticeChunk>):boolean {
- return progressFor(chunk,s)>=1||!!chunk.components?.length&&chunk.components.every(id=>componentsAttained(all.get(id)!,s,all));
+ return chunk.components?.length?chunk.components.every(id=>componentsAttained(all.get(id)!,s,all)):attainedRate(s,chunk.pattern,chunk.id)>=s.target;
 }
 export function passageComponents(plan:PracticePassagePlan,s:PracticeState,chunk:PracticeChunk){const {all}=passageHierarchy(plan,s),out:PracticeChunk[]=[];const visit=(c:PracticeChunk)=>{for(const id of c.components??[]){const child=all.get(id)!;out.push(child);visit(child);}};visit(chunk);return out;}
 /** A new selection uses its configured default, never a previous run's working rate.
@@ -140,6 +140,28 @@ export class GroundworkSession {
  get current(){return this.steps[Math.min(this.index,this.steps.length-1)];}
  restart(){this.matched.clear();this.failure=undefined;}
  note(midi:number,velocity=127):NoteOutcome {if(this.complete)return 'inactive';const events=this.current.events;if(this.failure){if(!events.filter(a=>a.tick===events[0].tick).some(a=>a.midi===midi))return isQuietStray(velocity)?'quiet-ignored':'inactive';this.restart();}else if(this.matched.size&&events[0].midi===midi&&events.find(a=>!this.matched.has(a.id))?.midi!==midi){if(isQuietStray(velocity))return 'quiet-ignored';this.restart();}const next=events.find(a=>!this.matched.has(a.id));if(!next)return 'inactive';const found=events.find(a=>a.tick===next.tick&&!this.matched.has(a.id)&&a.midi===midi);if(!found){if(isQuietStray(velocity))return 'quiet-ignored';this.failure=next;return 'failed';}this.matched.add(found.id);if(events.every(a=>this.matched.has(a.id)))this.confirm();return 'accepted';}
+}
+/** Reading repeats genuine position steps forever. Its cursor is ephemeral:
+ * neither a completed cycle nor manual browsing is musical attainment. */
+export class ReadingSession extends GroundworkSession {
+ readonly windows:ReadonlyArray<readonly [number,number]>;readonly stepWindows:number[]=[];cycles=0;
+ constructor(plan:PracticePlan,chunk:PracticeChunk){
+  super(plan,chunk);this.windows=chunk.joins?.map(bar=>[bar,bar+1] as const)??[[chunk.firstBar,chunk.lastBar]];
+  this.steps.splice(0);
+  for(const [window,[firstBar,lastBar]]of this.windows.entries()){
+   const steps=new GroundworkSession(plan,{...chunk,firstBar,lastBar,joins:undefined}).steps;
+   // A held-only/rest-only boundary remains a truthful, browsable window.
+   // It cannot manufacture a note to make an assessment loop advance.
+   this.steps.push(...(steps.length?steps:[{groups:[],events:[]}]));
+   this.stepWindows.push(...Array.from({length:Math.max(1,steps.length)},()=>window));
+  }
+  this.complete=false;
+ }
+ get window(){return this.stepWindows[this.index]??0;}
+ get range(){return this.windows[this.window];}
+ override confirm(){this.index++;if(this.index>=this.steps.length){this.index=0;this.cycles++;}this.restart();}
+ selectWindow(window:number){if(!Number.isInteger(window)||window<0||window>=this.windows.length)return false;const index=this.stepWindows.indexOf(window);if(index===this.index)return false;this.index=index;this.restart();return true;}
+ turnWindow(direction:1|-1){return this.selectWindow((this.window+direction+this.windows.length)%this.windows.length);}
 }
 /** Optional setup aid: pitch contacts can arm a start, but cannot verify fingers or physical readiness. */
 export class PreparationPose {
