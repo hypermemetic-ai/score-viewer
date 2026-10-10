@@ -28,3 +28,5 @@ None; this refines the existing practice presentation and interaction capability
 ## Impact
 
 Viewer-owned `practice.ts`, `practice-view.ts`, practice context/settings, shared binding admission and keyboard dispatch, CSS and meaningful source/browser controls. Keep the shared notation dependency and native configuration pinned. Instrument-neutral Guitar/Bass manual practice retains its existing capability-bound transport without inventing piano positions or MIDI assessment; shared styles must preserve its layout and controls. Native publication/activation uses the existing separately reviewed paired delivery lane after exact-source verification. Original packages, fingerings, personal identities, raw measured/manual attainment and saved journals remain intact.
+
+The single Speed frame is ordered Speed, indicator, then its available S hint. Its readonly integer is centered in a fixed numeric area; a fractional suffix extends to the right without moving the frame, percent, chevrons or hint. The genuine field remains the sole editor and setting authority.

@@ -47,7 +47,7 @@ in half-percent steps in Timed and neutral manual transport, using the compact
 left-arrow/value/percent/right-arrow control. Free view retains measure navigation,
 and Reading retains its join navigation. Explicit local navigation slots and
 other saved owners take priority over the default working arrows. S opens the
-Working draft when unclaimed, with Speed and its hint inside the single framed control beside the value; clicking its value
+Working draft when unclaimed, with one framed control ordered Speed, indicator, then its available S hint; clicking its value
 does the same. Typing leaves the sounding and queued speed unchanged until Enter
 commits. Escape cancels without leaking Done or Back. An open draft keeps its
 value, selection and focus through harmless MIDI or feedback repaints without
@@ -56,7 +56,7 @@ a draft after a successful loop restores the current session speed, preserving
 that loop’s increase. An explicit
 pause cancels it. Leaving the editor uses its existing validated commit behavior.
 Enter outside the editor keeps its
-existing Done meaning. S does not edit speed in Reading or Free view, and the
+existing Done meaning. The readonly integer stays centered in its fixed numeric area; a fractional suffix sits to its right without moving the frame, chevrons, percent or shortcut. The same genuine field supplies the display and remains the sole draft editor. S does not edit speed in Reading or Free view, and the
 ordinary reader keeps its existing S scale shortcut. Options and passage selection retain keyboard focus
 navigation. Editable fields and modal dialogs keep their own behavior, and held
 or repeated mode keys do not trigger fresh starts.
