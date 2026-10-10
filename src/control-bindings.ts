@@ -1,4 +1,4 @@
-import {chord,inputCode,readBindings,readableChord,readingActions,readingActionLabel,practiceSettingsFallback,type ReadingAction} from './input';
+import {actionCode,chord,inputCode,readBindings,readableChord,readingActions,readingActionLabel,practiceSettingsFallback,type ReadingAction} from './input';
 import {readMidiBindings,readMidiMapping,validCC,type MidiCC,type MidiMapping} from './midi';
 export type ControlBinding={kind:'key';key:string}|({kind:'midi'}&MidiMapping);
 export type ControlSlots=[ControlBinding|null,ControlBinding|null];
@@ -41,13 +41,14 @@ export class ControlResolver {
  get fingersHeld(){return this.heldMatches.some(m=>m.action==='toggle');}
  get heldUnbound(){return [...this.physical.values()].filter(p=>p.down&&!p.blocked&&!p.match).map(p=>p.binding);}
  match(binding:ControlBinding){for(const action of readingActions)for(const slot of [0,1] as const){const b=this.bindings.actions[action][slot];if(b&&controlIdentity(b)===controlIdentity(binding))return {action,slot,binding:b};}return;}
+ matchKey(e:KeyInput){return this.match({kind:'key',key:chord(e)})??(actionCode(e)!==inputCode(e)?this.match({kind:'key',key:chord(e,actionCode(e))}):undefined);}
  configure(bindings:ControlBindings){this.clear();this.bindings=bindings;}
  clear(){const before=this.heldMatches.length;for(const p of this.physical.values())if(p.down)p.blocked=true;return !!before;}
  private press(id:string,binding:ControlBinding,enabled:boolean,extra:Partial<Physical>={}):ControlResult {
  const old=this.physical.get(id);if(old?.down)return {changed:false};const match=this.match(binding);this.physical.set(id,{binding,down:true,blocked:!enabled,match,...extra});return {action:enabled?match?.action:undefined,match:enabled?match:undefined,received:enabled?binding:undefined,changed:enabled};
  }
  keyDown(e:KeyInput,enabled:boolean):ControlResult {
- const code=inputCode(e);if(e.repeat||this.keys.has(code))return {changed:false};this.keys.add(code);if(/^(Control|Alt|Shift|Meta)/.test(e.code))return {changed:false};const binding:ControlBinding={kind:'key',key:chord(e)};return this.press(`key:${code}`,binding,enabled,{code,modifiers:binding.key.split('+').slice(0,-1)});
+ const code=inputCode(e);if(e.repeat||this.keys.has(code))return {changed:false};this.keys.add(code);if(/^(Control|Alt|Shift|Meta)/.test(e.code))return {changed:false};const matched=this.matchKey(e),binding=matched?.binding.kind==='key'?matched.binding:{kind:'key' as const,key:chord(e)};return this.press(`key:${code}`,binding,enabled,{code,modifiers:binding.key.split('+').slice(0,-1)});
  }
  keyUp(e:Pick<KeyboardEvent,'code'>&{key?:string}):boolean {
  const code=inputCode(e);this.keys.delete(code);const modifier=/^Control/.test(e.code)?'Ctrl':/^Alt/.test(e.code)?'Alt':/^Shift/.test(e.code)?'Shift':/^Meta/.test(e.code)?'Meta':undefined;let changed=false;
