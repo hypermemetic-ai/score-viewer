@@ -9,28 +9,54 @@ Selected passages of at most four measures SHALL retain one complete-source stat
 - **AND** disconnected Start uses the same framing, without accepting invented attacks
 
 ### Requirement: Current practice speed lattice
-Fresh practice Starting speed SHALL be 10% of the performance target. Current starting/working/increase controls SHALL admit half-percentage-point units, including typed, held, restored and automatic changes. The truthful native lower tempo limit MAY impose the nearest legal lattice floor. Raw attainment and history SHALL remain exact. An attempt SHALL capture its rate; live requested changes SHALL apply at the next musical boundary without changing its clock or crediting an unplayed rate.
+Fresh practice Starting speed SHALL be 10% of the performance target, Connection speed SHALL independently default to 50%, and fresh Increase per success SHALL default to 2%. Explicit selection of a new passage SHALL use the configured start for its category rather than saved workingByPattern or the previous passage. Connections SHALL require joined adjacent components with independently complete original leaves; labels or a completed parent alone SHALL NOT establish that category. Resume, repeat and restoration of the same session SHALL retain current captured/queued speed. Current starting/connection/working/increase controls SHALL admit half-percentage-point units, including typed, held, restored and automatic changes. The truthful native lower tempo limit MAY impose the nearest legal lattice floor. Present custom or historically ambiguous increments SHALL remain exact; changing a user's existing setting to the requested 2% SHALL be an explicit setting edit. Raw attainment and history SHALL remain exact. An attempt SHALL capture its rate; live requested changes SHALL apply at the next musical boundary without changing its clock or crediting an unplayed rate.
 
 #### Scenario: Fresh target and queued working speed
 - **WHEN** a fresh passage has target 360/min and the user presses Up while playing
 - **THEN** it starts at 36/min (10%) and requests 10.5% for the next attempt
 - **AND** the current attempt remains at 10% through completion and records that actual rate
 
+#### Scenario: Select new material after a fast passage
+- **WHEN** the user selects an unfinished leaf after practising another passage at 70%
+- **THEN** the leaf starts at its configured Starting speed, default 10%, even if a historical workingByPattern value exists
+- **AND** its raw attainment and custom increment remain unchanged
+
+#### Scenario: Select a completed connection
+- **WHEN** the user selects a joined adjacent run whose original leaves are independently complete
+- **THEN** it starts at independently editable Connection speed, default 50%, with a fresh default increase of 2%
+- **AND** resuming or repeating that same session retains its requested/captured working speed
+
 ### Requirement: Editable source-meter repeat cue
 Practice SHALL default to two count-in bars of the entry source meter, configurable from one to eight in Options. Startup, resume and every repeat SHALL supply a consistent audible metric hierarchy aligned to the overarching source beat structure and exact entry phase. Strict musical grid V3 SHALL bind the chosen bars and source phase; historical V2 replay SHALL remain literal and unrelated Performance policy SHALL remain unchanged.
+
+Ordinary repeats SHALL supply the configured cue without adding surprise bars because of unrelated journal persistence or UI work. Preparation SHALL preserve final-attack authority and captured-rate credit. A genuine backend readiness failure SHALL produce an honest stopped/refused state rather than a shortened, skipped, off-grid or concealed cue.
 
 #### Scenario: Compound-meter entry and repeat
 - **WHEN** a 6/8 passage starts or repeats at 10% working speed
 - **THEN** two complete 6/8 count-in bars clearly cue their two principal beats and subordinate subdivisions
 - **AND** source entry and subsequent repeats retain exact phase and queued-rate alignment
 
+#### Scenario: Repeat while a journal save is pending
+- **WHEN** an accepted attempt completes while unrelated serialized persistence is still pending
+- **THEN** the next complete configured count-in remains aligned to the admitted musical boundary without an extra bar
+- **AND** only accepted attacks and the captured actual rate determine the completed evidence
+
+### Requirement: Continuous native metronome waveform
+An admitted native click SHALL advance by emitted output sample frames after its eligible onset. Callback presentation-time jitter SHALL NOT reset its waveform phase across blocks or armed repeats. Existing timbre, gain, accents, strict onset admission, cancellation and output-device policy SHALL remain unchanged.
+
+#### Scenario: Armed repeat across jittered callbacks
+- **WHEN** a repeat cue spans varying callback blocks with monotonic presentation estimates containing small jitter
+- **THEN** its PCM remains continuous at the admitted sample rate and preserves the same crisp click waveform as an initial cue
+- **AND** lifecycle horizons and musical receipts retain their independent authority
+
 ### Requirement: Visible editable resume cooldown
-Practice error recovery SHALL guard resume for an Options-configured cooldown of zero to thirty seconds, default three. While guarded, a subtle centered lock silhouette SHALL show remaining seconds, then disappear at expiry. Close, changed attempt and cancellation SHALL clear obsolete timers without delayed musical activation.
+Practice error recovery SHALL guard resume for an Options-configured cooldown of zero to thirty seconds, default three. While guarded, a subtle centered lock silhouette SHALL show remaining seconds inside its body, then disappear at expiry. A blocked pointer or keyboard Resume SHALL retrigger one brief, restrained horizontal shake without resetting the guard or moving notation. Reduced-motion preferences SHALL disable the shake without removing the countdown. Close, changed attempt and cancellation SHALL clear obsolete timers without delayed musical activation.
 
 #### Scenario: Error recovery
 - **WHEN** a default practice attempt fails and the user presses Resume before three seconds elapse
 - **THEN** playback remains stopped and the visible lock explains the remaining wait
 - **AND** resume becomes available at expiry without starting automatically
+- **AND** the number sits within the lock body and a blocked press provides brief feedback without changing the remaining wait or staff geometry
 
 ### Requirement: End-to-end practice keyboard operation
 Keyboard operation SHALL be a delivery requirement throughout passage selection, active practice, Options, numeric draft editing, Free view and return. Plain active Up/Down SHALL adjust Working speed in 0.5% units when no authoritative binding, field, modal or capture owns them. Options browsing SHALL navigate rows without changing values; Enter activates editing, edit Up/Down adjusts values, and Escape cancels the draft before closing. Mouse chevrons SHALL add no keyboard stops. Saved controls, modifiers, repeated keys and capture SHALL retain coherent ownership; applicable Free view navigation, Space Resume, disconnected Done and Back SHALL remain usable.
