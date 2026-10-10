@@ -233,6 +233,56 @@ impl Metronome {
 mod tests {
     use super::*;
     #[test]
+    fn rendered_v3_two_bar_compound_cue_at_ten_percent_has_audible_beat_hierarchy() {
+        let grid = PulseGridV2 {
+            version: 3,
+            count_in_bars: Some(2),
+            pulses_per_beat: 3,
+            score_offset_pulses: 12,
+            count_bar_pulses: 6,
+            count_beat_pulses: 3,
+            count_start_phase_pulses: 0,
+            score_start_phase_pulses: 0,
+            bar_start_pulses: vec![0, 6, 12, 18, 24],
+            beat_start_pulses: vec![0, 3, 6, 9, 12, 15, 18, 21],
+            bar_meter_pulses: vec![6; 4],
+            bar_beat_pulses: vec![3; 4],
+            bar_phase_pulses: vec![0; 4],
+        };
+        grid.validate().unwrap();
+        let count = grid.count_micros(18.) / 1_000_000.;
+        assert!((count - 40. / 3.).abs() < 1e-9);
+        for rate in [44_100, 48_000] {
+            let duration = grid.source_end_micros(18.) / 1000.;
+            let metro = Metronome::new_with_clock(
+                rate,
+                18.,
+                duration,
+                5000. / 9.,
+                None,
+                Some(grid.clone()),
+            );
+            // Actual production PCM, not a pulse-parameter-only assertion.
+            let peaks: Vec<f32> = (0..24)
+                .map(|i| {
+                    let start = i as f64 * 5. / 9.;
+                    (0..(rate as f64 * 0.045).ceil() as usize)
+                        .map(|j| metro.at_time(start + j as f64 / rate as f64).abs())
+                        .fold(0., f32::max)
+                })
+                .collect();
+            for strong in [0, 6, 12, 18] {
+                assert!(peaks[strong] > peaks[strong + 2] * 2.4);
+                assert!(peaks[strong + 2] > peaks[strong + 1] * 1.7);
+            }
+            assert!(peaks[0] > peaks[6]);
+            assert!((peaks[0] - peaks[12]).abs() < 0.0001);
+            assert_eq!(metro.at_time(count - 0.1), 0.);
+            assert!(metro.at_time(count + 0.001).abs() > 0.05);
+            assert_eq!(metro.at_time(duration / 1000.), 0.);
+        }
+    }
+    #[test]
     fn v2_late_readiness_restarts_a_whole_entry_bar_with_every_count_pulse() {
         for (count, bar) in [
             (666_666.6666666667, 666_666.6666666667),
@@ -255,6 +305,7 @@ mod tests {
         for rate in [44_100, 48_000, 96_000] {
             let grid = PulseGridV2 {
                 version: 2,
+                count_in_bars: None,
                 pulses_per_beat: 2,
                 score_offset_pulses: 6,
                 count_bar_pulses: 6,

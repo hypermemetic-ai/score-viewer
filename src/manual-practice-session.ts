@@ -1,7 +1,8 @@
 import {PracticeDone,type DoneTarget} from './practice-attainment';
+import {snapPracticeSpeed} from './tempo-presentation';
 import {practiceTiming} from './practice-timing';
 import {scorePulseGrid,scoreTickMs,type PracticePulseGrid} from './score-clock';
-import {practiceAttemptGrid} from './practice-attempt-grid';
+import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
 import {passageWindows} from './practice-window';
 import {passageHierarchy,type PracticeChunk,type PracticeState} from './practice';
 import type {ManualPracticePlan} from './manual-practice-plan';
@@ -23,26 +24,27 @@ export class ManualPracticeWindows {
 /** No MIDI contacts, match sets, note retirement or measured-success writer. */
 export class ManualPracticeSession {
  readonly assessment='manual' as const;
- readonly sourcePulseGrid:PracticePulseGrid;readonly windows:ManualPracticeWindows;
+ private sourceGrid:PracticePulseGrid;readonly windows:ManualPracticeWindows;
+ get sourcePulseGrid(){return practiceCountInGrid(this.sourceGrid,this.state.countInBars??2);}
  phase:'ready'|'countin'|'trial'|'complete'|'paused'='ready';startMs=0;elapsedTick:number;
  private attemptGrid:PracticePulseGrid;private countStartMs=0;private resetAtCountIn=false;
- private loopRate:number;private claims=new PracticeDone();
+ private loopRate:number;private queuedWorking?:number;private claims=new PracticeDone();
  constructor(readonly plan:ManualPracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState){
   const admitted=passageHierarchy(plan,state).all.get(chunk.id);
   if(plan.assessment!=='manual'||state.revision!==plan.revision||!admitted||admitted.pattern!==chunk.pattern||
     admitted.firstBar!==chunk.firstBar||admitted.lastBar!==chunk.lastBar||admitted.start!==chunk.start||admitted.end!==chunk.end)
    throw Error('Manual practice context differs from its musical source.');
   this.elapsedTick=chunk.start;this.loopRate=state.working;
-  this.sourcePulseGrid=scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end);this.attemptGrid=this.sourcePulseGrid;
+  this.sourceGrid=scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end);this.attemptGrid=this.sourcePulseGrid;
   this.windows=new ManualPracticeWindows(plan,chunk);
  }
  get pulseGrid(){return this.attemptGrid;}
  get bpm(){return this.loopRate;}
  get tickMs(){return scoreTickMs(this.plan,this.loopRate);}
  get durationMs(){return (this.chunk.end-this.chunk.start)*this.tickMs;}
- ready(countStartMs:number,grid:PracticePulseGrid=this.sourcePulseGrid){
+ ready(countStartMs:number,grid:PracticePulseGrid=this.sourcePulseGrid,rate=this.state.working){
   if(!Number.isFinite(countStartMs)||countStartMs<0||countStartMs*1000>Number.MAX_SAFE_INTEGER)throw Error('Invalid manual practice count-in origin.');
-  const admitted=practiceAttemptGrid(this.sourcePulseGrid,grid),rate=this.state.working;
+  const admitted=practiceAttemptGrid(this.sourceGrid,grid);
   scoreTickMs(this.plan,rate);
   this.attemptGrid=admitted;this.countStartMs=countStartMs;this.loopRate=rate;
   this.startMs=countStartMs+practiceTiming(rate,admitted).countInMs;
@@ -64,9 +66,12 @@ export class ManualPracticeSession {
  get canDone(){return this.claims.canToggle(this.state,this.doneTarget());}
  toggleDone(){return this.claims.toggle(this.state,this.doneTarget(),this.state.keepTempo,this.state.step,this.state.target);}
  /** Predict for pre-arming audio; consume only at its existing safe boundary. */
- nextRate(){return this.claims.peekNextRate(this.loopRate,this.state.keepTempo);}
+ nextRate(){return this.queuedWorking??snapPracticeSpeed(this.claims.peekNextRate(this.loopRate,this.state.keepTempo),this.state.target);}
+ /** Desired speed is queued; the sounding attempt and its claim stay literal. */
+ queueWorking(rate:number){const next=snapPracticeSpeed(rate,this.state.target);if(next===this.nextRate())return false;this.queuedWorking=next;this.state.working=next;return true;}
  applyNextRate(){
   if(this.phase==='trial'||this.phase==='countin')throw Error('Working speed changes at a manual loop boundary.');
-  this.state.working=this.claims.nextRate(this.loopRate,this.state.keepTempo);return this.state.working;
+  const projected=this.claims.nextRate(this.loopRate,this.state.keepTempo);
+  this.state.working=this.queuedWorking??snapPracticeSpeed(projected,this.state.target);this.queuedWorking=undefined;return this.state.working;
  }
 }

@@ -234,6 +234,7 @@ mod tests {
     fn request(p: u32, bpm: f64, bar: u32, beat: u32) -> lifecycle::Request {
         let grid = lifecycle::PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: p,
             score_offset_pulses: bar,
             count_bar_pulses: bar,
@@ -271,6 +272,42 @@ mod tests {
             Some(grid),
         )
         .unwrap()
+    }
+    #[test]
+    fn prepared_v3_cue_changes_rate_on_the_owned_end_and_keeps_two_complete_bars() {
+        let old = request(3, 18., 6, 3);
+        let previous = 1_000_000;
+        let boundary =
+            (previous as f64 + old.grid_v2.as_ref().unwrap().source_end_micros(18.)).ceil() as u64;
+        for bpm in [18., 18.9, 36.] {
+            let mut next = request(3, bpm, 6, 3);
+            let grid = next.grid_v2.as_mut().unwrap();
+            grid.version = 3;
+            grid.count_in_bars = Some(2);
+            grid.score_offset_pulses = 12;
+            grid.validate().unwrap();
+            next.duration_ms = grid.source_end_micros(bpm) / 1000.;
+            let now = boundary - 200_000;
+            let receipt = admit(
+                &next,
+                1,
+                boundary,
+                now,
+                512,
+                44_100,
+                now + 12_000,
+                12_000,
+                previous,
+                &old,
+            )
+            .unwrap();
+            assert!(receipt.armed);
+            assert_eq!(receipt.count_start_micros, boundary);
+            assert!(
+                (receipt.score_start_micros as f64 - boundary as f64 - 240_000_000. / bpm).abs()
+                    < 1.
+            );
+        }
     }
     #[test]
     fn on_time_terminal_attacks_use_real_running_buffers_not_startup_lead() {
@@ -506,6 +543,7 @@ mod tests {
     fn two_pickup_repeats_continue_exit_phase_and_changed_meter_resets_explicitly() {
         let grid = lifecycle::PulseGridV2 {
             version: 2,
+            count_in_bars: None,
             pulses_per_beat: 2,
             score_offset_pulses: 14,
             count_bar_pulses: 8,
