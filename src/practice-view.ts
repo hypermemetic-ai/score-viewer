@@ -13,7 +13,7 @@ import{isMusicalSustain,musicalControllerTime,type MidiStream}from'./midi-sustai
 import {practiceOutput} from './device-options';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {tempoRateNumber} from './metronome-mark';
-import {tempoRateEdit,speedNumber,speedEdit,adjustDuration,adjustPracticePercent as adjustPercent,adjustProgression,manualSpeedNumber} from './tempo-presentation';
+import {tempoRateEdit,speedNumber,speedEdit,adjustDuration,adjustPracticePercent as adjustPercent,adjustProgression,manualSpeedNumber,snapPracticeSpeed} from './tempo-presentation';
 import type {ScorePackage,Seat} from './package';
 import {fingerFor,practiceStorageName,legacyPracticeStorageName,type PersonalState} from './state';
 import {practicePreferences,admitPracticeContext,type AdmittedPracticeContext,type PracticeViewContext} from './practice-context';
@@ -99,10 +99,11 @@ export class PracticeView {
  private repeatPreparation?:{session:PracticeSession;generation:number;rate:number;plan:PracticeRepeatPlan;receipt?:PreparedPracticeRepeat;pending:boolean;settled?:Promise<PreparedPracticeRepeat|undefined>};
  private repeatCompletion?:{session:PracticeSession;generation:number;timer:ReturnType<typeof setTimeout>};
  private repeatSavePending=false;
+ private nextWorkingRate(rate:number){return rate===this.loopRate?rate:snapPracticeSpeed(rate,this.state.target);}
  private predictedRepeatRate(session:PracticeSession){
   if(this.repeatSavePending||this.saveError||session!==this.session||!this.clock||!['countin','trial'].includes(session.phase))return;
   if(this.queuedWorking!==undefined)return this.queuedWorking;
-  if(!session.measured)return this.doneClaims.peekNextRate(this.loopRate,this.state.keepTempo);
+  if(!session.measured)return this.nextWorkingRate(this.doneClaims.peekNextRate(this.loopRate,this.state.keepTempo));
   // A late unmatched final attack can remain undecided beyond its source boundary.
   if(!session.events.every(a=>session.matched.has(a.id)))return;
   const projected=structuredClone(this.state);passed(session.chunk,projected);const next=nextPracticePassage(this.plan,projected,session.chunk);return next?.id===session.chunk.id?projected.working:undefined;
@@ -118,7 +119,7 @@ export class PracticeView {
  private completeTimedTrial(session:PracticeSession){
   const anchor={previousStartMs:session.startMs,phraseEndMs:session.startMs+(session.chunk.end-session.startTick)*session.tickMs,previousBpm:this.loopRate};
   this.repeatAnchor=anchor;this.doneClaims.completed({passage:session.chunk.id,pattern:session.chunk.pattern,rate:this.loopRate});
-  const requested=this.queuedWorking;this.queuedWorking=undefined;this.state.working=this.loopRate;const measured=session.measured&&!this.done;if(measured){passed(session.chunk,this.state);this.done=true;}else this.state.working=this.doneClaims.nextRate(this.loopRate,this.state.keepTempo);if(requested!==undefined)this.state.working=requested;
+  const requested=this.queuedWorking;this.queuedWorking=undefined;this.state.working=this.loopRate;const measured=session.measured&&!this.done;if(measured){passed(session.chunk,this.state);this.done=true;}else this.state.working=this.nextWorkingRate(this.doneClaims.nextRate(this.loopRate,this.state.keepTempo));if(requested!==undefined)this.state.working=requested;
   const prepared=this.repeatPreparation,next=measured?nextPracticePassage(this.plan,this.state,session.chunk):session.chunk;
   if(prepared?.session===session&&prepared.generation===this.startGeneration&&prepared.pending&&prepared.rate===this.state.working&&next?.id===session.chunk.id&&this.carryPrepared()&&this.clock){
    // The complete cue may already be audible while its bridge acknowledgement is in flight.
@@ -140,7 +141,7 @@ export class PracticeView {
    try{this.repeatGap=this.clock.adoptRepeat(prepared.receipt);this.loopRate=prepared.receipt.nextBpm;this.slots?.prime();this.refill?.prime();this.preview.clear();session.ready(prepared.receipt.countStartMs,this.heldPitches,!session.measured,{sustain:this.options.sustain?.(),contacts:this.heldStreams},prepared.plan?.grid??session.sourcePulseGrid,prepared.receipt.nextBpm);for(const a of session.carryIn??[])this.contacts.press(a);this.done=false;this.paint();}catch(error){this.audioError=(error as Error).message;this.pause();this.status(this.audioError!);}return;
   }
   this.stopClock();const generation=this.startGeneration;
-  void (completionSave??this.save()).then(ok=>{if(ok&&!this.disposed&&generation===this.startGeneration&&session===this.session&&session.phase==='complete'){if(measured)void this.continueTrial(anchor);else void this.action('ready',planPracticeRepeat({...anchor,nextBpm:this.state.working,grid:session.pulseGrid,sourceBoundary:true}));}});this.paintControls();
+  void (completionSave??this.save()).then(ok=>{if(ok&&!this.disposed&&generation===this.startGeneration&&session===this.session&&session.phase==='complete'){if(measured)void this.continueTrial(anchor);else void this.action('ready',planPracticeRepeat({...anchor,nextBpm:this.state.working,grid:session.sourcePulseGrid,previousGrid:session.pulseGrid,sourceBoundary:true}));}});this.paintControls();
  }
  private paintCue(){const cue=this.app.querySelector<HTMLElement>('.practice-countin');if(!cue)return;const s=this.session,now=this.clock?.now();cue.hidden=this.overview||now===undefined||s?.phase!=='countin';if(!cue.hidden){const timing=practiceTiming(this.loopRate,s!.pulseGrid),elapsed=now!-(s!.startMs-timing.countInMs),number=cue.querySelector('strong')!,label=countBeatAt(elapsed,this.loopRate,s!.pulseGrid);if(number.textContent!==label)number.textContent=label;number.dataset.accent=String(elapsed>=0&&(s!.pulseGrid.countStartPhasePulses!+Math.floor(elapsed/timing.eighthMs))%s!.pulseGrid.countBarPulses!<s!.pulseGrid.countBeatPulses!);const gap=cue.querySelector('[data-repeat-gap]');if(gap){const bars=Math.round((this.repeatGap?.extraBeats??0)*timing.goalBeatMs/timing.countBarMs);gap.textContent=bars?`Count-in delayed by ${bars} bar${bars===1?'':'s'}`:'';}}}
 
@@ -258,7 +259,7 @@ export class PracticeView {
   const revision=++this.completionRevision,phase=s.phase,pending=this.pendingCompletion;
   const inherited=pending?.session===s&&pending.generation===this.startGeneration?pending.anchor:undefined;
   const boundary=inherited??((phase==='countin'||phase==='complete')&&this.repeatAnchor?{previousStartMs:phase==='complete'?this.repeatAnchor.phraseEndMs:s.startMs-practiceTiming(this.loopRate,s.pulseGrid).countInMs,phraseEndMs:this.clock?.now()??this.repeatAnchor.phraseEndMs,previousBpm:this.loopRate}:undefined);
-  if(boundary){boundary.phraseEndMs=Math.max(boundary.previousStartMs,boundary.phraseEndMs);this.state.working=result.marked?this.doneClaims.nextRate(this.state.working,this.state.keepTempo):result.rate??target.rate;this.stopClock(true);s.pause();this.pendingCompletion={generation:this.startGeneration,session:s,anchor:boundary};}
+  if(boundary){boundary.phraseEndMs=Math.max(boundary.previousStartMs,boundary.phraseEndMs);this.state.working=result.marked?this.nextWorkingRate(this.doneClaims.nextRate(this.state.working,this.state.keepTempo)):result.rate??target.rate;this.stopClock(true);s.pause();this.pendingCompletion={generation:this.startGeneration,session:s,anchor:boundary};}
   else if(phase==='paused'||phase==='ready'||phase==='error')this.doneClaims.cancelIncrease();
   const generation=this.startGeneration,current=()=>!this.disposed&&!this.overview&&!this.settingsDialog&&revision===this.completionRevision&&generation===this.startGeneration&&s===this.session;
   this.paintControls();this.paintVisibility();this.status(result.marked?'Saving Done…':'Saving withdrawal…');
