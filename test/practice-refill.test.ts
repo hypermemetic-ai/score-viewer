@@ -194,3 +194,10 @@ test('unused empty staff room is shared without changing required geometry or ac
  assert.deepEqual(candidates[0].placements.find(p=>p.bar===4),anchor);const shared=candidates[0].placements.filter(p=>p.empty);assert.ok(shared.every(p=>p.width>100));assert.ok(shared.every(p=>Math.abs(p.width-shared[0].width)<1e-7));
  for(const invalid of [0,-1,NaN,Infinity,136]){const input=f.measures.map(p=>({...p}));input[0].blankWidth=invalid;assert.throws(()=>admitRefill(f.plan,f.chunk,input),/valid source footprint/);}
 });
+
+test('empty-frame admission works when native Map iterators provide no iterator helpers',()=>{
+ const prototype=Object.getPrototypeOf(new Map().values()),saved=Object.getOwnPropertyDescriptor(prototype,'some');
+ Object.defineProperty(prototype,'some',{value:undefined,configurable:true});
+ try{const f=fixture([100,100,100,250,100]);f.measures.forEach(m=>m.blankWidth=4);const c=admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:500});assert.equal(c.proof,'enumerated');assert.ok(c.transitions>0);}
+ finally{if(saved)Object.defineProperty(prototype,'some',saved);else delete prototype.some;}
+});

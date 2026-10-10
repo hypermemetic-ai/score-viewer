@@ -129,7 +129,7 @@ function revealedHands(plan:PracticePlan,session:PracticeSession,bar:number){
  * this is geometry lookahead, never a predicted musical success. */
 function allocateSourceRefill(plan:PracticePlan,chunk:PracticeChunk,previous:RefillLayout,current:number,revealed:number,measures:ReadonlyMap<number,RefillMeasure>,frame:RefillFrame){
  const bars=refillAllocationBars(plan,chunk,previous,current,revealed),allocated=allocationMeasures(measures,refillResidents(plan,chunk,current,revealed));
- const prefer=measures.values().some(p=>p.blankWidth!==undefined)?(candidate:RefillLayout)=>{
+ const prefer=[...measures.values()].some(p=>p.blankWidth!==undefined)?(candidate:RefillLayout)=>{
   for(const next of refillSuccessors(plan,chunk,current)){
    const anchor=candidate.placements.find(p=>p.bar===next);if(!anchor||anchor.empty)continue;
    const required=refillResidents(plan,chunk,next,3),nextBars=refillAllocationBars(plan,chunk,candidate,next,3),nextMeasures=allocationMeasures(measures,required);
