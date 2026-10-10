@@ -37,17 +37,17 @@ four-measure navigation. Space returns from Free view to the previous primary
 mode; joined Reading resumes its same join cursor. The selected mode and join
 cursor are transient navigation state, not saved musical credit.
 
-The effective defaults are U for Reading, T for Timed and V for Free view. Free view uses this same configurable control in piano and instrument-neutral
+The effective defaults are R for Reading, T for Timed and V for Free view. Free view uses this same configurable control in piano and instrument-neutral
 manual practice. These controls are configurable in Keys and pedals using the same key/pedal edge, capture and
 Test authority as other controls. Existing primary, secondary and local measure
 navigation bindings win over unclaimed defaults; explicit empty slots stay empty.
-R retains rotation. Practice footer controls are shortcut hints and mouse actions;
+Shift+R rotates in the library, score reader and practice when no saved action owns that modified key. Bare R never rotates. Practice footer controls are shortcut hints and mouse actions;
 keyboard navigation does not move focus through them. Left/Right adjust Working
 in half-percent steps in Timed and neutral manual transport, using the compact
 left-arrow/value/percent/right-arrow control. Free view retains measure navigation,
 and Reading retains its join navigation. Explicit local navigation slots and
 other saved owners take priority over the default working arrows. S opens the
-Working draft when unclaimed, with its hint beside the speed; clicking its value
+Working draft when unclaimed, with Speed and its hint inside the single framed control beside the value; clicking its value
 does the same. Typing leaves the sounding and queued speed unchanged until Enter
 commits. Escape cancels without leaking Done or Back. An open draft keeps its
 value, selection and focus through harmless MIDI or feedback repaints without

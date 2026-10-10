@@ -7,9 +7,10 @@ export function manualTempoField(key:string,input:string,label:string,unit=''){
  return `<span class="manual-tempo" data-manual-key="${key}"><span class="manual-tempo-value">${field}<span class="manual-tempo-buttons"><button type="button" tabindex="-1" data-manual-direction="1" aria-label="Increase ${label}"><svg aria-hidden="true" viewBox="0 0 10 6"><path d="M1 5 L5 1 L9 5"/></svg></button><button type="button" tabindex="-1" data-manual-direction="-1" aria-label="Decrease ${label}"><svg aria-hidden="true" viewBox="0 0 10 6"><path d="M1 1 L5 5 L9 1"/></svg></button></span></span>${unit?`<span class="manual-tempo-unit">${unit}</span>`:''}</span>`;
 }
 /** Practice speed is a direct left/right command, separate from Options fields. */
-export function practiceSpeedField(input:string){
+export function practiceSpeedField(input:string,shortcut=''){
+ const hint=shortcut?` <kbd>${shortcut.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}</kbd>`:'';
  const arrow=(direction:number,label:string)=>`<button type="button" tabindex="-1" data-manual-direction="${direction}" aria-label="${label} speed"><svg aria-hidden="true" viewBox="0 0 6 10"><path d="${direction<0?'M5 1 L1 5 L5 9':'M1 1 L5 5 L1 9'}"/></svg></button>`;
- return `<span class="manual-tempo practice-speed-field" data-manual-key="working">${arrow(-1,'Decrease')}<span class="manual-tempo-value">${input.replace(/<input\b/,'<input readonly tabindex="-1"')}<span class="manual-tempo-unit">%</span></span>${arrow(1,'Increase')}</span>`;
+ return `<span class="manual-tempo practice-speed-field" data-manual-key="working"><span class="practice-speed-caption">Speed${hint}</span>${arrow(-1,'Decrease')}<span class="manual-tempo-value">${input.replace(/<input\b/,'<input readonly tabindex="-1"')}<span class="manual-tempo-unit">%</span></span>${arrow(1,'Increase')}</span>`;
 }
 export interface ManualTempoOptions {
  accepts:(element:HTMLElement)=>boolean;
