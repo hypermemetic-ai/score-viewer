@@ -76,3 +76,7 @@ This guide describes source behavior. Automated tests and production-browser
 inspection do not certify a particular installed native package, physical MIDI,
 pedal, ear latency or a musician's successful re-entry. Historical once-only
 preparation and delivery receipts remain in their original validation documents.
+
+The current [Speed and shortcut source validation](practice-speed-shortcuts-validation.md)
+records the integer-anchor refinement and exact keyboard/build evidence separately
+from the earlier Reading/Timed and native delivery receipts.
