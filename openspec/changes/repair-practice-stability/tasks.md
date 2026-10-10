@@ -1,6 +1,6 @@
 ## 1. Reproduce and repair core practice
 
-- [ ] 1.1 Record actual installed-source MIDI/manual geometry, terminal residency, speed and count-in defects using retained repertoire.
+- [x] 1.1 Record actual installed-source MIDI/manual geometry, terminal residency, speed and count-in defects using retained repertoire.
 - [ ] 1.2 Repair stationary short-passage fit and bounded terminal refill while preserving current-measure geometry, note ownership and full Free view restoration.
 - [ ] 1.3 Implement 10% fresh speed, 0.5% current-control quantization and attempt-captured queued rates without changing earned evidence.
 - [ ] 1.4 Implement two-bar editable metric count-in through strict V3 browser/native grids, preserving literal V2 and unrelated Performance behavior.
