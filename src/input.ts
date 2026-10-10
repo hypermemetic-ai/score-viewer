@@ -25,6 +25,9 @@ export function actionCode(e:{code:string;key?:string}):string{const code=inputC
 export function directFingerKey(e:Pick<KeyboardEvent,'code'|'ctrlKey'|'altKey'|'shiftKey'|'metaKey'>&{key?:string}):number|undefined{if(e.ctrlKey||e.altKey||e.shiftKey||e.metaKey)return;const digit=e.key===undefined?e.code.replace(/^(Digit|Numpad)/,''):e.key;return /^[1-5]$/.test(digit)?Number(digit):undefined;}
 export function chord(e:Pick<KeyboardEvent,'code'|'ctrlKey'|'altKey'|'shiftKey'|'metaKey'>&{key?:string},code=inputCode(e)):string{return [e.ctrlKey?'Ctrl':'',e.altKey?'Alt':'',e.shiftKey?'Shift':'',e.metaKey?'Meta':'',code].filter(Boolean).join('+');}
 export function readableChord(c:string):string{return c.replace(/Key/g,'').replace(/Digit/g,'').replace(/PageUp/g,'Page Up').replace(/PageDown/g,'Page Down').replace(/ArrowLeft/g,'Left arrow').replace(/ArrowRight/g,'Right arrow').replace(/Arrow/g,'');}
+export const rotationKey='Shift+KeyR';
+/** Rotation is a global fallback only when the exact modified key is unclaimed. */
+export const rotationShortcut=(event:Pick<KeyboardEvent,'code'|'ctrlKey'|'altKey'|'shiftKey'|'metaKey'|'repeat'>&{key?:string},assigned=false)=>!assigned&&!event.repeat&&chord(event)===rotationKey;
 const modifier=(code:string)=>/^Control/.test(code)?'Ctrl':/^Alt/.test(code)?'Alt':/^Shift/.test(code)?'Shift':/^Meta/.test(code)?'Meta':undefined;
 export class InputController {held=new Set<string>();capture?:ReadingAction;bindings:Bindings;private fingerKeys=new Map<string,string[]>();private fingerPointers=new Set<number>();constructor(bindings=defaultBindings()){this.bindings=bindings;}
  get fingersHeld(){return this.fingerKeys.size>0||this.fingerPointers.size>0;}

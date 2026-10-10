@@ -19,7 +19,7 @@ Free view SHALL have one shared configurable control across supported piano, gui
 - **AND** selecting Reading or Timed itself only stops and selects, without starting playback
 
 #### Scenario: Saved or guarded V
-- **WHEN** a saved primary or secondary action already owns U, T or V, a mode control is explicitly empty, or a field/modal/capture owns input
+- **WHEN** a saved primary or secondary action already owns R, T or V, a mode control is explicitly empty, or a field/modal/capture owns input
 - **THEN** the new default does not steal that input or rewrite the old assignment
 - **AND** runtime and visible hints use the same effective admitted controls
 - **AND** repeated mode keydown does not repeatedly reset positions or restart transport
@@ -95,7 +95,7 @@ Reading for an unlocked joined passage SHALL cycle only the last measure before 
 - **AND** held sound or rest material cannot become fabricated attacks or speed attainment
 
 ### Requirement: Primary modes and configurable controls
-Reading, Timed, Start/Resume and applicable Done and Speed SHALL form one compact centered primary command group. The visible speed label SHALL be Speed, and its control SHALL sit beside the transport rather than in a separate right-side wing. Free view SHALL remain secondary alongside Options and Back. Speed and Lock current speed SHALL apply only to Timed; Done SHALL appear only in applicable disconnected Timed practice. Reading, Timed and Free view SHALL have scoped configurable keyboard/pedal controls with unclaimed defaults U, T and V. Shared rotation and local navigation inheritance SHALL remain intact.
+Reading, Timed, Start/Resume and applicable Done and Speed SHALL form one compact centered primary command group. The visible speed label SHALL be Speed, and its control SHALL sit beside the transport rather than in a separate right-side wing. Free view SHALL remain secondary alongside Options and Back. Speed and Lock current speed SHALL apply only to Timed; Done SHALL appear only in applicable disconnected Timed practice. Reading, Timed and Free view SHALL have scoped configurable keyboard/pedal controls with unclaimed defaults R, T and V. The unclaimed shared Rotate shortcut SHALL be Shift+R in the library, reader and practice, and bare R SHALL no longer be a hidden rotation fallback. Explicit saved Reading assignments and empty or occupied slots SHALL remain exact without rewriting preferences. Local navigation inheritance SHALL remain intact.
 
 #### Scenario: Reading and Timed command layout
 - **WHEN** either primary mode is shown with or without a MIDI connection
@@ -109,13 +109,19 @@ Reading, Timed, Start/Resume and applicable Done and Speed SHALL form one compac
 - **AND** shared reader assignments and explicit local navigation overrides remain exact
 - **AND** Reading/Timed actions are unavailable without their supported piano mode context, while Free view uses the same shared binding in neutral manual practice
 
+#### Scenario: Reading and rotation default separation
+- **WHEN** practice controls omit an unclaimed Reading slot
+- **THEN** R selects Reading, while unclaimed Shift+R rotates consistently in the library, reader and practice
+- **AND** explicit saved Reading U, empty Reading slots and existing R or Shift+R owners retain their authority
+- **AND** neither bare-R rotation fallback survives, nor can field editing, modal/capture or held/repeated input rotate unexpectedly
+
 #### Scenario: Shared Free view across instruments
 - **WHEN** the user configures Free view to a custom key or pedal in piano practice and then opens guitar or bass manual practice
 - **THEN** the same control enters Free view and is shown in its hint and Options; the old V route does not remain as a hidden fallback
 - **AND** an explicit empty Free view control remains empty in every supported instrument context without adding piano hand-position assessment
 
 ### Requirement: Direct working-speed commands
-The active practice footer SHALL expose direct shortcuts and mouse actions without sequential keyboard navigation through its controls. Timed piano and neutral manual practice SHALL offer Left/Right working-speed changes of 0.5 percentage points with a compact horizontal decrease/value/increase presentation labeled Speed in the centered primary command group beside Resume and applicable Done. Inherited/default previous/next arrows SHALL route to speed in those contexts; explicit local navigation overrides and other saved action/modifier owners SHALL remain authoritative. Reading and Free view SHALL retain their meaningful browsing actions. Unclaimed S or clicking the value SHALL enter a numeric draft, Enter SHALL commit through existing admission and queued boundary rules, and Escape SHALL cancel without triggering Back. Enter outside editing SHALL preserve the existing Done control. The contextual S speed command SHALL preserve explicitly saved S action ownership and the full-score reader’s scale shortcut outside active practice. Options and the passage selector SHALL retain their real keyboard navigation.
+The active practice footer SHALL expose direct shortcuts and mouse actions without sequential keyboard navigation through its controls. Timed piano and neutral manual practice SHALL offer Left/Right working-speed changes of 0.5 percentage points with a compact horizontal decrease/value/increase presentation labeled Speed in the centered primary command group beside Resume and applicable Done. Inherited/default previous/next arrows SHALL route to speed in those contexts; explicit local navigation overrides and other saved action/modifier owners SHALL remain authoritative. Reading and Free view SHALL retain their meaningful browsing actions. Unclaimed S or clicking the value SHALL enter a numeric draft, Enter SHALL commit through existing admission and queued boundary rules, and Escape SHALL cancel without triggering Back. Enter outside editing SHALL preserve the existing Done control. The single Speed frame SHALL contain its name and available S hint, with the centered value and horizontal chevrons. Draft focus SHALL be indicated on that outer frame without an inner input rectangle; caret and selection SHALL remain visible. Shared kbd hints SHALL never carry text decoration, including inherited active-control underlines. The contextual S speed command SHALL preserve explicitly saved S action ownership and the full-score reader’s scale shortcut outside active practice. Options and the passage selector SHALL retain their real keyboard navigation.
 
 #### Scenario: Direct speed after a mouse action
 - **WHEN** a user clicks a practice mode or transport control and then presses the available unmodified working-speed arrows in Timed or neutral manual practice
