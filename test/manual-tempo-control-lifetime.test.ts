@@ -59,6 +59,15 @@ test('draft identity remains owned through transient detachment and ends only on
  }finally{f.close();}
 });
 
+test('the keyboard opener stays consumed through held repeats until release, while fresh and mouse-entered typing remain native',()=>{
+ const f=fixture();try{
+  assert.equal(f.controls.editField(f.field,'KeyS'),true);assert.deepEqual(f.key('KeyS',f.field,true),{prevented:true,stopped:true});assert.equal(f.field.value,'30');assert.equal(f.commits,0);
+  f.controls.up({code:'KeyS'});assert.deepEqual(f.key('KeyS'),{prevented:false,stopped:false},'keyup restores ordinary typing');assert.equal(f.field.readOnly,false);
+  f.controls.cancelEdit();assert.equal(f.controls.editField(f.field),true);assert.deepEqual(f.key('KeyS',f.field,true),{prevented:false,stopped:false},'mouse entry has no keyboard opener to consume');f.controls.cancelEdit();
+  const replacement=f.attach();assert.equal(f.controls.editField(f.field,'KeyS'),false);assert.deepEqual(f.key('KeyS',replacement,true),{prevented:false,stopped:false},'failed editor entry cannot acquire the opener key');
+ }finally{f.close();}
+});
+
 test('a browser change during piano footer replacement cannot commit the owned draft or queue a rate',()=>{
  let view:any;const rates:number[]=[],f=fixture(root=>{
   view=new PracticeView(root,{package:score,personal:{} as never,entryId:'test',connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back(){},settings(){},changed(){}});
