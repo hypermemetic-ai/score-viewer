@@ -3,6 +3,7 @@ import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,type 
 import type {ScorePackage} from './package';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
 import {scorePulseGrid,sourceBarPhaseTicks} from './score-clock';
+import {registerPracticePatterns} from './practice-equivalence';
 import type {PracticeChunk,PracticePartition,PracticePassagePlan} from './practice';
 
 /** A historical reading head proves its admitted appearance and clock, not a
@@ -162,5 +163,5 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
   ...(separateReference?{sourceMusicalRevision}:{}),
   timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),
   referencePerformanceTempo:structuredClone(reference),barTicks:bars,ticksPerBeat:p.score.ticksPerBeat,chunks,owners,components};
- scorePulseGrid(plan,bars);return plan;
+ scorePulseGrid(plan,bars);registerPracticePatterns(plan,p.score,'manual');return plan;
 }
