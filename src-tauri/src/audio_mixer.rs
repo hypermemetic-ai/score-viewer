@@ -176,6 +176,8 @@ pub struct Cue {
     pub invalid: Arc<AtomicBool>,
     first: bool,
     rate: u32,
+    armed_start_seconds: f64,
+    armed_frame: u64,
     pub arm: Option<Arc<repeat::ArmControl>>,
 }
 impl Cue {
@@ -196,6 +198,8 @@ impl Cue {
             invalid: Arc::new(AtomicBool::new(false)),
             first: true,
             rate,
+            armed_start_seconds: 0.0,
+            armed_frame: 0,
             arm: None,
         }
     }
@@ -230,6 +234,12 @@ impl Cue {
             metronome::onset_micros(playback, 0)
         };
         if let Some(onset) = onset {
+            if self.arm.is_some() {
+                // Latch the eligible handoff's fractional sample offset once.
+                // Later callback playback estimates still govern ownership and
+                // completion, but cannot skip/repeat the click's PCM phase.
+                self.armed_start_seconds = (playback as f64 - onset as f64) / 1_000_000.0;
+            }
             self.onset.store(onset, Ordering::Release);
         } else {
             self.invalid.store(true, Ordering::Release);
@@ -248,8 +258,9 @@ impl Cue {
             return 0.0;
         }
         if self.arm.is_some() {
-            self.source
-                .at_time((now as f64 - onset as f64) / 1_000_000.0)
+            let elapsed = self.armed_start_seconds + self.armed_frame as f64 / self.rate as f64;
+            self.armed_frame += 1;
+            self.source.at_time(elapsed)
         } else {
             self.source.next()
         }
@@ -794,6 +805,328 @@ mod tests {
         });
         assert_eq!(counts, (0, 0));
     }
+    fn versioned_request(version: u8) -> lifecycle::Request {
+        let mut grid = metered_request(180.).grid_v2.unwrap();
+        grid.version = version;
+        if version == 3 {
+            grid.count_in_bars = Some(2);
+            grid.score_offset_pulses = 12;
+        }
+        lifecycle::Request::new_with_clock(
+            "same",
+            180.,
+            grid.source_end_micros(180.) / 1000.,
+            60000. / (180. * 3.),
+            None,
+            None,
+            None,
+            Some(grid),
+        )
+        .unwrap()
+    }
+    fn future_pcm<T: Copy + Default>(
+        rate: u32,
+        version: u8,
+        channels: usize,
+        first_offset: u64,
+        blocks: &[usize],
+        jitter: &[i64],
+        convert: impl Fn(f32) -> T,
+    ) -> Vec<T> {
+        let request = versioned_request(version);
+        let mailbox = Arc::new(CueMailbox::default());
+        let stop = Arc::new(AtomicBool::new(false));
+        let old = Box::new(Cue::new(rate, request.clone(), stop.clone()));
+        let previous = old.onset.clone();
+        assert!(mailbox.publish(old).is_ok());
+        let mut mixer = empty_mixer(mailbox.clone());
+        watched_fill(&mut mixer, &mut [0f32; 1], rate, 1_000_000, 0);
+        let previous = previous.load(Ordering::Acquire);
+        let target = (previous as f64 + request.duration_ms * 1000.).ceil() as u64;
+        let arm = Arc::new(repeat::ArmControl::new(
+            1,
+            previous,
+            target,
+            Arc::new(AtomicBool::new(false)),
+        ));
+        let future = Box::new(Cue::future(rate, request, stop, arm.clone()));
+        let onset = future.onset.clone();
+        let finished = future.finished.clone();
+        assert!(mailbox.publish(future).is_ok());
+        let frames = rate as usize * 2 / 5;
+        let mut result = Vec::with_capacity(frames * channels);
+        let mut frame = 0;
+        let mut callback = 0;
+        while frame < frames {
+            let count = blocks[callback % blocks.len()].min(frames - frame);
+            let mut out = vec![T::default(); count * channels];
+            let playback = target + first_offset + (frame as u64 * 1_000_000) / rate as u64;
+            let offset = if callback == 0 {
+                0
+            } else {
+                jitter[callback % jitter.len()]
+            };
+            // Vary callback-to-playback delay independently of the phase.
+            let delay = 5_000 + callback as u64 % 7;
+            let now = (playback as i64 + offset) as u64 - delay;
+            WATCH.with(|w| w.set(Some((0, 0))));
+            mixer.fill(&mut out, channels, now, delay, &convert);
+            let counts = WATCH.with(|w| {
+                let counts = w.get().unwrap();
+                w.set(None);
+                counts
+            });
+            assert_eq!(counts, (0, 0));
+            result.extend(out);
+            frame += count;
+            callback += 1;
+        }
+        assert!(arm.activated());
+        assert_eq!(onset.load(Ordering::Acquire), target);
+        assert!(!finished.load(Ordering::Acquire));
+        assert!(mailbox.submitted_end_micros.load(Ordering::Acquire) > target);
+        drop(mixer);
+        mailbox.reset();
+        assert_eq!(mailbox.submitted_end_micros.load(Ordering::Acquire), 0);
+        assert!(!mailbox.has_pending());
+        result
+    }
+    fn assert_pcm_equal<T: PartialEq + std::fmt::Debug>(actual: &[T], expected: &[T]) {
+        assert_eq!(actual.len(), expected.len());
+        if let Some((frame, (actual, expected))) = actual
+            .iter()
+            .zip(expected)
+            .enumerate()
+            .find(|(_, (actual, expected))| actual != expected)
+        {
+            panic!("PCM mismatch at sample{frame}: actual{actual:?}, expected{expected:?}");
+        }
+    }
+    #[test]
+    fn armed_pcm_phase_is_contiguous_under_callback_jitter_and_fractional_handoff() {
+        // Common rates plus both admitted WASAPI rate limits. Every sample is
+        // compared, including click tails, silence and later metrical accents.
+        for rate in [8_000, 22_050, 44_100, 48_000, 96_000, 192_000, 384_000] {
+            for version in [2, 3] {
+                for first_offset in [0, (1_000_000u64.div_ceil(rate as u64) / 2).max(1)] {
+                    let reference = metronome::Metronome::new_with_clock(
+                        rate,
+                        180.,
+                        versioned_request(version).duration_ms,
+                        60000. / (180. * 3.),
+                        None,
+                        versioned_request(version).grid_v2,
+                    );
+                    let expected: Vec<_> = (0..rate as usize * 2 / 5)
+                        .map(|frame| {
+                            reference.at_time(
+                                first_offset as f64 / 1_000_000. + frame as f64 / rate as f64,
+                            )
+                        })
+                        .collect();
+                    for (blocks, jitter) in [
+                        (&[1usize][..], &[0i64][..]),
+                        (&[64, 128, 257, 512][..], &[0, 13, -11, 7, -5][..]),
+                    ] {
+                        let actual =
+                            future_pcm(rate, version, 1, first_offset, blocks, jitter, |v| v);
+                        assert_pcm_equal(&actual, &expected);
+                    }
+                }
+            }
+        }
+        // Larger observed-clock disturbances at the usual output rates must
+        // also leave every emitted sample unchanged after the first handoff.
+        for rate in [44_100, 48_000, 96_000] {
+            let clean = future_pcm(rate, 3, 1, 1, &[512], &[0], |v| v);
+            let jittered = future_pcm(rate, 3, 1, 1, &[64, 257, 512], &[0, -250, 250], |v| v);
+            assert_pcm_equal(&clean, &jittered);
+        }
+    }
+    #[test]
+    fn armed_pcm_remains_identical_through_supported_sample_conversions_and_channels() {
+        for rate in [44_100, 48_000, 96_000] {
+            let expected = future_pcm(rate, 3, 1, 1, &[512], &[0], |v| v);
+            assert!(expected.iter().all(|v| v.is_finite() && v.abs() < 0.17));
+            for channels in [1, 2, 8] {
+                let expanded: Vec<_> = expected
+                    .iter()
+                    .flat_map(|v| (0..channels).map(move |c| if c < 2 { *v } else { 0. }))
+                    .collect();
+                let float = future_pcm(
+                    rate,
+                    3,
+                    channels,
+                    1,
+                    &[64, 257, 512],
+                    &[0, -250, 250],
+                    |v| v,
+                );
+                assert_pcm_equal(&float, &expanded);
+                let int16 = future_pcm(
+                    rate,
+                    3,
+                    channels,
+                    1,
+                    &[64, 257, 512],
+                    &[0, -250, 250],
+                    |v| (v * i16::MAX as f32).round() as i16,
+                );
+                assert_pcm_equal(
+                    &int16,
+                    &expanded
+                        .iter()
+                        .map(|v| (v * i16::MAX as f32).round() as i16)
+                        .collect::<Vec<_>>(),
+                );
+                let int32 = future_pcm(
+                    rate,
+                    3,
+                    channels,
+                    1,
+                    &[64, 257, 512],
+                    &[0, -250, 250],
+                    |v| (v as f64 * i32::MAX as f64).round() as i32,
+                );
+                assert_pcm_equal(
+                    &int32,
+                    &expanded
+                        .iter()
+                        .map(|v| (*v as f64 * i32::MAX as f64).round() as i32)
+                        .collect::<Vec<_>>(),
+                );
+                let int24 = future_pcm(
+                    rate,
+                    3,
+                    channels,
+                    1,
+                    &[64, 257, 512],
+                    &[0, -250, 250],
+                    |v| {
+                        let bytes = ((v * 8_388_607.).round() as i32).to_le_bytes();
+                        [bytes[0], bytes[1], bytes[2]]
+                    },
+                );
+                assert_pcm_equal(
+                    &int24,
+                    &expanded
+                        .iter()
+                        .map(|v| {
+                            let bytes = ((v * 8_388_607.).round() as i32).to_le_bytes();
+                            [bytes[0], bytes[1], bytes[2]]
+                        })
+                        .collect::<Vec<_>>(),
+                );
+            }
+        }
+    }
+    #[test]
+    fn armed_cancel_error_restart_and_output_rebuild_do_not_retain_pcm_phase() {
+        let mailbox = Arc::new(CueMailbox::default());
+        let mut now = 1_000_000;
+        for rate in [44_100, 48_000, 96_000] {
+            let mut mixer = empty_mixer(mailbox.clone());
+            for invalidated in [false, true] {
+                let request = versioned_request(3);
+                let stop = Arc::new(AtomicBool::new(false));
+                let initial = Box::new(Cue::new(rate, request.clone(), stop.clone()));
+                let previous = initial.onset.clone();
+                assert!(mailbox.publish(initial).is_ok());
+                watched_fill(&mut mixer, &mut [0f32; 1], rate, now, 0);
+                let previous = previous.load(Ordering::Acquire);
+                let target = (previous as f64 + request.duration_ms * 1000.).ceil() as u64;
+                let arm = Arc::new(repeat::ArmControl::new(
+                    1,
+                    previous,
+                    target,
+                    Arc::new(AtomicBool::new(false)),
+                ));
+                let future = Box::new(Cue::future(
+                    rate,
+                    request.clone(),
+                    stop.clone(),
+                    arm.clone(),
+                ));
+                let finished = future.finished.clone();
+                let invalid = future.invalid.clone();
+                assert!(mailbox.publish(future).is_ok());
+                let mut samples = [0f32; 257];
+                watched_fill(&mut mixer, &mut samples, rate, target + 1, 0);
+                assert!(samples.iter().any(|v| v.abs() > 0.1));
+                if invalidated {
+                    invalid.store(true, Ordering::Release);
+                } else {
+                    assert_eq!(arm.cancel(), repeat::CancelState::Activated);
+                }
+                watched_fill(&mut mixer, &mut samples, rate, target + 6_000, 0);
+                assert!(samples.iter().all(|v| *v == 0.));
+                assert!(finished.load(Ordering::Acquire));
+                now = target + 100_000;
+                let restarted = Box::new(Cue::new(
+                    rate,
+                    request.clone(),
+                    Arc::new(AtomicBool::new(false)),
+                ));
+                let origin = restarted.onset.clone();
+                assert!(mailbox.publish(restarted).is_ok());
+                let mut expected = metronome::Metronome::new_with_clock(
+                    rate,
+                    request.bpm,
+                    request.duration_ms,
+                    request.count_step_ms,
+                    None,
+                    request.grid_v2,
+                );
+                let count = rate as usize / 5;
+                let mut actual = vec![0f32; count];
+                watched_fill(&mut mixer, &mut actual, rate, now, 0);
+                assert_eq!(origin.load(Ordering::Acquire), now + metronome::LEAD_MICROS);
+                assert_pcm_equal(
+                    &actual,
+                    &(0..count).map(|_| expected.next()).collect::<Vec<_>>(),
+                );
+                assert!(actual[..rate as usize * 15 / 100].iter().all(|v| *v == 0.));
+                assert!(actual.iter().any(|v| v.abs() > 0.1));
+                now += 300_000;
+            }
+            drop(mixer);
+            mailbox.reset();
+            assert_eq!(mailbox.submitted_end_micros.load(Ordering::Acquire), 0);
+            assert_eq!(mailbox.block_micros.load(Ordering::Acquire), 0);
+            assert!(!mailbox.has_pending());
+        }
+    }
+    #[test]
+    fn armed_phase_latch_does_not_replace_clock_completion_or_cancellation_guards() {
+        for cancelled in [false, true] {
+            let target = 4_000_000;
+            let request = versioned_request(3);
+            let stop = Arc::new(AtomicBool::new(false));
+            let arm = Arc::new(repeat::ArmControl::new(
+                1,
+                1_150_000,
+                target,
+                Arc::new(AtomicBool::new(false)),
+            ));
+            let mut cue = Cue::future(48_000, request.clone(), stop.clone(), arm);
+            cue.prepare(target + 1);
+            assert!(cue.sample(target + 1) > 0.);
+            let end = target + (request.duration_ms * 1000.).ceil() as u64;
+            let now = if cancelled {
+                stop.store(true, Ordering::Release);
+                target + 2
+            } else {
+                end
+            };
+            assert_eq!(cue.sample(now), 0.);
+            assert!(cue.finished.load(Ordering::Acquire));
+            assert_eq!(
+                cue.armed_frame, 1,
+                "refused samples must not advance the PCM cursor"
+            );
+            assert_eq!(cue.onset.load(Ordering::Acquire), target);
+        }
+    }
     #[test]
     fn v3_future_mixer_cue_keeps_two_compound_bars_and_exact_entry_after_a_rate_change() {
         for rate in [44_100, 48_000] {
@@ -844,27 +1177,36 @@ mod tests {
             let future = Box::new(Cue::future(rate, next, stop, arm.clone()));
             let new_onset = future.onset.clone();
             assert!(mailbox.publish(future).is_ok());
-            watched_fill(&mut mixer, &mut out, rate, target, 0);
             // Actual submitted Mixer PCM: two bars 1,2 / 1,2 then source 1.
             // Denominator subdivision remains distinct and quieter.
-            for (pulse, frequency, amplitude) in [
+            let checks = [
                 (0, 1200., 0.16),
                 (1, 650., 0.045),
                 (3, 900., 0.12),
                 (6, 1200., 0.16),
                 (9, 900., 0.12),
                 (12, 1200., 0.16),
-            ] {
-                let pulse_us = pulse as f64 * 2_000_000. / 3.;
-                let instant = target + pulse_us.ceil() as u64 + 2_000;
-                watched_fill(&mut mixer, &mut out, rate, instant, 0);
-                let age = (instant - target + 24 * 1_000_000 / rate as u64) as f64 / 1_000_000.
-                    - pulse_us / 1_000_000.;
-                let expected = (amplitude
-                    * (-age * 110.).exp()
-                    * (age * frequency * std::f64::consts::TAU).sin())
-                    as f32;
-                assert!((out[24] - expected).abs() < 1e-5, "rate{rate} pulse{pulse}");
+            ];
+            let mut checked = 0;
+            let mut frame = 0;
+            while checked < checks.len() {
+                watched_fill(&mut mixer, &mut out, rate, target, frame);
+                let (pulse, frequency, amplitude) = checks[checked];
+                let pulse_seconds = pulse as f64 * 2. / 3.;
+                let check_frame = ((pulse_seconds + 0.002) * rate as f64).ceil() as u64 + 24;
+                if check_frame < frame + out.len() as u64 {
+                    let age = check_frame as f64 / rate as f64 - pulse_seconds;
+                    let expected = (amplitude
+                        * (-age * 110.).exp()
+                        * (age * frequency * std::f64::consts::TAU).sin())
+                        as f32;
+                    assert!(
+                        (out[(check_frame - frame) as usize] - expected).abs() < 1e-5,
+                        "rate{rate} pulse{pulse}"
+                    );
+                    checked += 1;
+                }
+                frame += out.len() as u64;
             }
             assert!(arm.activated());
             assert_eq!(new_onset.load(Ordering::Acquire), target);
@@ -929,6 +1271,7 @@ mod tests {
                 request.grid_v2.clone(),
             );
             let mut incoming_peak = 0f32;
+            let mut first_incoming = None;
             while base + (frame * 1_000_000) / (rate as u64) < target + 50_000 {
                 let time = base + (frame * 1_000_000) / rate as u64;
                 watched_fill(&mut mixer, &mut a, rate, base, frame);
@@ -943,7 +1286,11 @@ mod tests {
                             frame + i as u64
                         );
                     } else {
-                        let expected = expected.at_time((sample_time - target) as f64 / 1_000_000.);
+                        let (first_frame, first_time) =
+                            *first_incoming.get_or_insert((frame + i as u64, sample_time));
+                        let elapsed = (first_time - target) as f64 / 1_000_000.
+                            + (frame + i as u64 - first_frame) as f64 / rate as f64;
+                        let expected = expected.at_time(elapsed);
                         assert!(
                             (a[i] - expected).abs() < 1e-6,
                             "new pcm at rate{rate} frame{}",
@@ -1146,24 +1493,33 @@ mod tests {
             let origin = next.onset.clone();
             assert!(mailbox.publish(next).is_ok());
             // Check submitted PCM at the count's beats4,1,2,3, then pickup4.
-            // Each window samples the actual Mixer, not a separate clock.
-            for (pulse, hz) in [(0, 900.), (2, 1200.), (4, 900.), (6, 900.), (8, 900.)] {
-                watched_fill(
-                    &mut mixer,
-                    &mut samples,
-                    48_000,
-                    target + pulse * 250_000,
-                    0,
-                );
-                let age = 24_f64 / 48_000.;
-                let expected =
-                    (0.16_f64 * (-age * 110.).exp() * (age * hz * std::f64::consts::TAU).sin())
-                        as f32;
-                assert!(
-                    (samples[24] - expected).abs() < 1e-5,
-                    "repeat{id} pulse{pulse}"
-                );
+            // Render every frame through both counts and the pickup, rather
+            // than moving the callback clock past unrendered PCM.
+            let checks = [(0, 900.), (2, 1200.), (4, 900.), (6, 900.), (8, 900.)];
+            let mut checked = 0;
+            let mut frame = 0;
+            let end_frame = duration * 48_000 / 1_000_000;
+            while frame < end_frame {
+                let count = (end_frame - frame).min(samples.len() as u64) as usize;
+                watched_fill(&mut mixer, &mut samples[..count], 48_000, target, frame);
+                if let Some(&(pulse, hz)) = checks.get(checked) {
+                    let check_frame = pulse * 12_000 + 24;
+                    if check_frame < frame + count as u64 {
+                        let age = 24_f64 / 48_000.;
+                        let expected = (0.16_f64
+                            * (-age * 110.).exp()
+                            * (age * hz * std::f64::consts::TAU).sin())
+                            as f32;
+                        assert!(
+                            (samples[(check_frame - frame) as usize] - expected).abs() < 1e-5,
+                            "repeat{id} pulse{pulse}"
+                        );
+                        checked += 1;
+                    }
+                }
+                frame += count as u64;
             }
+            assert_eq!(checked, checks.len());
             assert!(arm.activated());
             assert_eq!(origin.load(Ordering::Acquire), target);
             mailbox.reclaim();
