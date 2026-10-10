@@ -17,6 +17,9 @@ const sorted=(values:unknown[])=>values.map(v=>JSON.stringify(v)).sort();
  * Positions and source IDs locate evidence; they do not make repeated music
  * different. Note multiplicity, hands, written clocks and source scopes do. */
 export function registerPracticePatterns(plan:PracticePassagePlan,score:ScorePackage['score'],assessment:'piano'|'manual') {
+ // This retained notation contract predates complete written-component ledgers.
+ // Unknown newer facts cannot gain an equivalence class through this hotfix.
+ if('sourceWrittenComponents' in score&&score.sourceWrittenComponents!==undefined)return;
  const classes=new Map<string,number>(),leaves:Patterns['leaves']=new Map(),chains=new Map((score.tieChains??[]).map(c=>[c.noteId,c]));
  for(const chunk of plan.chunks){
   const start=chunk.start,end=chunk.end,inRange=(tick:number,duration=0)=>tick<end&&(tick>=start||tick+duration>start),
@@ -30,16 +33,12 @@ export function registerPracticePatterns(plan:PracticePassagePlan,score:ScorePac
     components:chains.get(n.id)?.components.map(c=>[c.startTick-start,c.durationTicks,c.tieForward,c.tieWait,c.voice,c.sourceWrittenValue])
    })),
    silences=(score.sourceSilences??[]).filter(r=>inRange(r.startTick,r.durationTicks)).map(r=>[r.startTick-start,r.durationTicks,r.kind,r.hand,r.voice,r.staff,r.partId,r.sourceWrittenValue]),
-   written=score.sourceWrittenComponents?.components.filter(c=>inRange(c.tick,c.durationTicks)).map(c=>[
-    c.tick-start,c.durationTicks,c.eventKind,c.partId,c.staffId,c.voiceId,c.sourceWrittenValue,c.writtenPitch,c.writtenReferencePitch,c.physicalSource,c.tie,c.beams,
-    c.slurs?.map(s=>[s.type,s.number,s.side]),c.techniques?.map(t=>[t.kind,t.type,t.number,t.label])
-   ]),
    phrase=(score.phrases??[]).filter(p=>inRange(p.startTick,p.endTick-p.startTick)).map(p=>[p.startTick-start,p.endTick-start,p.kind,p.voice]),
    fact=JSON.stringify({assessment,length:end-start,ticksPerBeat:plan.ticksPerBeat,
     bars:plan.barTicks.slice(chunk.firstBar,chunk.lastBar+2).map(t=>t-start),
     phases:plan.barPhaseTicks?.slice(chunk.firstBar,chunk.lastBar+1),
     meters:plan.barTicks.slice(chunk.firstBar,chunk.lastBar+1).map(t=>{const m=meter(t);return m?[m.numerator,m.denominator]:null;}),
-    notes:sorted(notes),silences:sorted(silences),written:written?sorted(written):undefined,phrases:sorted(phrase)});
+    notes:sorted(notes),silences:sorted(silences),phrases:sorted(phrase)});
   let unit=classes.get(fact);if(unit===undefined){unit=classes.size;classes.set(fact,unit);}leaves.set(chunk,{shape:shape(chunk),unit});
  }
  plans.set(plan,{signature:signature(plan),leaves,pairs:new Map(),next:classes.size});
