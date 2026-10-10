@@ -12,7 +12,12 @@ export class PracticeClock {
  private audio?:AudioContext;private audioClosePending=Promise.resolve();private interval?:number;private nodes:OscillatorNode[]=[];private grid?:PracticePulseGrid;private origin=0;private eighth=0;private countStep=0;private index=0;private end=0;private nativeClock?:ClockOrigin;private midiClock?:ClockOrigin;private stopPending=Promise.resolve();private generation=0;
  private countOriginMicros=0;private armGeneration=0;private pending?:PendingRepeat;private inFlightArm?:{armId:number;ownerOriginMicros:number};private pendingNodes=new Set<OscillatorNode>();private armOperations=Promise.resolve();
  constructor(readonly native=false,readonly output='',private readonly onError:(message:string)=>void=()=>{}){}
- unlock(){if(this.native)return Promise.resolve();const audio=this.audio??=new AudioContext({latencyHint:'interactive'}),resume=audio.resume();let timeout:ReturnType<typeof setTimeout>;return Promise.race([resume,new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(Error('Audio did not start. Open practice settings and test the output.')),2500);})]).then(()=>{if(this.audio!==audio)throw Error('Practice start was cancelled');if(audio.state!=='running')throw Error(`Audio is ${audio.state}; test the output before starting.`);}).finally(()=>clearTimeout(timeout));}
+ unlock(){
+  if(this.native)return Promise.resolve();
+  if(!this.audio){this.audio=new AudioContext({latencyHint:'interactive'});this.audioClosePending=Promise.resolve();}
+  const audio=this.audio,resume=audio.resume();let timeout:ReturnType<typeof setTimeout>;
+  return Promise.race([resume,new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(Error('Audio did not start. Open practice settings and test the output.')),2500);})]).then(()=>{if(this.audio!==audio)throw Error('Practice start was cancelled');if(audio.state!=='running')throw Error(`Audio is ${audio.state}; test the output before starting.`);}).finally(()=>clearTimeout(timeout));
+ }
  async beginRepeat(bpm:number,durationMs:number,plan:PracticeRepeatPlan,grid?:PracticePulseGrid){
   grid=plan.grid??grid;
   if(plan.nextBpm!==bpm)throw Error('Repeat tempo differs from its musical boundary');

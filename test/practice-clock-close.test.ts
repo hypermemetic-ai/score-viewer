@@ -60,3 +60,9 @@ test('a stale close failure cannot report an output error against a replacement 
  const f=browser(t),messages:string[]=[],clock=new PracticeClock(false,'',message=>messages.push(message));await clock.unlock();let reject!:(error:Error)=>void;f.contexts[0].closeResult=new Promise<void>((_,r)=>reject=r);
  const closed=clock.close();await clock.unlock();reject(Error('Old backend close failed'));await assert.rejects(closed,/Old backend close failed/);assert.deepEqual(messages,[]);assert.equal(f.contexts[1].closeCalls,0);await clock.close();
 });
+
+test('already-closed replacement cleanup cannot return or revive the old pending close failure',async t=>{
+ const f=browser(t),messages:string[]=[],clock=new PracticeClock(false,'',message=>messages.push(message));await clock.unlock();let reject!:(error:Error)=>void;f.contexts[0].closeResult=new Promise<void>((_,r)=>reject=r);
+ const oldClose=clock.close();await clock.unlock();f.contexts[1].state='closed';const replacementClose=clock.close();assert.notEqual(replacementClose,oldClose);await replacementClose;
+ reject(Error('Old backend close failed'));await assert.rejects(oldClose,/Old backend close failed/);assert.deepEqual(messages,[]);assert.equal(f.contexts[0].closeCalls,1);assert.equal(f.contexts[1].closeCalls,0);assert.equal(clock.close(),replacementClose);await clock.close();
+});
