@@ -1,0 +1,56 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {ManualTempoControls} from '../src/manual-tempo-control';import {TempoRepeat} from '../src/tempo-repeat';
+
+/** Minimal field tree: real editor/repeat ownership, without emulating browser layout. */
+function fixture(){
+ const prior=Object.fromEntries(['document','window','HTMLElement','HTMLInputElement','CSS'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+ const doc=Object.assign(new EventTarget(),{activeElement:undefined as unknown,hidden:false});
+ class Element{
+  parent?:Element;children:Element[]=[];dataset:Record<string,string>={};attributes=new Set<string>();
+  get isConnected():boolean{return this===root||!!this.parent?.isConnected;}
+  closest(selector:string):Element|undefined{return selector==='[data-manual-key]'&&this.dataset.manualKey||selector==='[data-practice-shortcuts]'&&this===root?this:this.parent?.closest(selector);}
+  contains(element:Element):boolean{return this===element||this.children.some(child=>child.contains(element));}
+  querySelector(selector:string):Field|undefined{return selector==='input'||selector.includes('data-manual-key')?this.children.flatMap(child=>child instanceof Field?[child]:[child.querySelector(selector)]).find(Boolean):undefined;}
+  setAttribute(key:string){this.attributes.add(key);}removeAttribute(key:string){this.attributes.delete(key);}hasAttribute(key:string){return this.attributes.has(key);}
+  focus(){doc.activeElement=this;}matches(){return false;}
+ }
+ class Field extends Element{
+  value='30';readOnly=true;selectionStart:number|null=0;selectionEnd:number|null=0;selectionDirection:'forward'|'backward'|'none'='none';
+  select(){this.setSelectionRange(0,this.value.length);}setSelectionRange(start:number,end:number,direction:'forward'|'backward'|'none'='none'){this.selectionStart=start;this.selectionEnd=end;this.selectionDirection=direction;}
+  replaceWith(field:Field){const parent=this.parent!;if(field.parent)field.parent.children=field.parent.children.filter(child=>child!==field);parent.children[parent.children.indexOf(this)]=field;field.parent=parent;this.parent=undefined;}
+ }
+ const root=new Element();root.attributes.add('data-practice-shortcuts');
+ const attach=(field=new Field())=>{const group=new Element();group.dataset.manualKey='working';group.parent=root;group.children=[field];field.parent=group;for(const old of root.children)old.parent=undefined;root.children=[group];return field;};
+ const field=attach();Object.assign(globalThis,{document:doc,window:new EventTarget(),HTMLElement:Element,HTMLInputElement:Field,CSS:{escape:(value:string)=>value}});
+ let working='30',commits=0,cancels=0,now=0;const timers=new Map<unknown,()=>void>();
+ const controls=new ManualTempoControls({accepts:element=>root.contains(element as unknown as Element),adjust:()=>true,edit:{commit:(_key,input)=>{working=input.value;commits++;return true;},adjust:()=>false,cancel:()=>cancels++}}) as any;
+ controls.repeat=new TempoRepeat({now:()=>now,set:fn=>{const token={};timers.set(token,fn);return token;},clear:token=>{timers.delete(token);}});
+ const key=(code:string,target=field,repeat=false)=>{let prevented=false,stopped=false;controls.down({code,target,repeat,isComposing:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,preventDefault(){prevented=true;},stopImmediatePropagation(){stopped=true;}});return {prevented,stopped};};
+ return {root,field,doc,controls,attach,key,get working(){return working;},get commits(){return commits;},get cancels(){return cancels;},get pending(){return timers.size;},tick(){now+=500;const callbacks=[...timers.values()];timers.clear();for(const fn of callbacks)fn();},close(){controls.dispose();assert.equal(timers.size,0);for(const [key,descriptor]of Object.entries(prior)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}}};
+}
+
+test('an explicitly opened speed draft survives footer replacement with value, selection and focus until Enter',()=>{
+ const f=fixture();try{
+  assert.equal(f.controls.editField(f.field),true);f.field.value='38.5';f.field.setSelectionRange(1,3,'backward');
+  const restore=f.controls.retainDraft(f.root),replacement=f.attach();f.doc.activeElement=undefined;assert.equal(f.field.isConnected,false);
+  restore();assert.equal(f.root.querySelector('input'),f.field);assert.equal(replacement.isConnected,false);assert.equal(f.field.value,'38.5');assert.equal(f.field.readOnly,false);assert.equal(f.doc.activeElement,f.field);assert.deepEqual([f.field.selectionStart,f.field.selectionEnd,f.field.selectionDirection],[1,3,'backward']);assert.equal(f.working,'30');assert.equal(f.commits,0);
+  assert.deepEqual(f.key('Enter'),{prevented:true,stopped:true});assert.equal(f.working,'38.5');assert.equal(f.commits,1);assert.equal(f.field.readOnly,true);
+  f.key('Enter',f.field,true);assert.equal(f.commits,1,'held Enter cannot commit twice or leak another action');
+ }finally{f.close();}
+});
+
+test('deliberate edit cancellation cannot be revived by a previously captured footer restoration',()=>{
+ const f=fixture();try{
+  f.controls.editField(f.field);f.field.value='99';const restore=f.controls.retainDraft(f.root);f.controls.cancelEdit();const replacement=f.attach();restore();
+  assert.equal(f.root.querySelector('input'),replacement);assert.equal(f.field.readOnly,true);assert.equal(f.field.value,'30');assert.equal(f.commits,0);assert.equal(f.cancels,1);
+ }finally{f.close();}
+});
+
+test('readonly working-field OS repeats leave the single application speed repeat alive until release',()=>{
+ const f=fixture();let steps=0;try{
+  f.field.focus();f.controls.begin('ArrowRight',()=>{steps++;return true;});assert.equal(steps,1);assert.equal(f.pending,1);
+  f.key('ArrowRight',f.field,true);assert.equal(steps,1,'OS repeat itself never adds a step');assert.equal(f.pending,1);f.tick();assert.equal(steps,2);
+  assert.deepEqual(f.key('Enter'),{prevented:false,stopped:false},'readonly Enter stays available to the saved action resolver');assert.equal(f.field.readOnly,true);assert.equal(f.pending,0);
+  f.controls.begin('ArrowRight',()=>{steps++;return true;});f.controls.release('ArrowRight');f.tick();assert.equal(steps,3);assert.equal(f.pending,0);
+ }finally{f.close();}
+});

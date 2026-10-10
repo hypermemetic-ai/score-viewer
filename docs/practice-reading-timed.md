@@ -40,15 +40,31 @@ The effective defaults are U for Reading, T for Timed and V for Free view. Free 
 manual practice. These controls are configurable in Keys and pedals using the same key/pedal edge, capture and
 Test authority as other controls. Existing primary, secondary and local measure
 navigation bindings win over unclaimed defaults; explicit empty slots stay empty.
-R retains rotation. Up/Down adjust Working only in Timed. Editable fields and
-modal dialogs keep their own keyboard behavior, and held/repeated mode keys do
-not trigger fresh starts.
+R retains rotation. Practice footer controls are shortcut hints and mouse actions;
+keyboard navigation does not move focus through them. Left/Right adjust Working
+in half-percent steps in Timed and neutral manual transport, using the compact
+left-arrow/value/percent/right-arrow control. Free view retains measure navigation,
+and Reading retains its join navigation. Explicit local navigation slots and
+other saved owners take priority over the default working arrows. S opens the
+Working draft when unclaimed, with its hint beside the speed; clicking its value
+does the same. Typing leaves the sounding and queued speed unchanged until Enter
+commits. Escape cancels without leaking Done or Back. An open draft keeps its
+value, selection and focus through harmless MIDI or feedback repaints; an explicit
+pause cancels it. Leaving the editor uses its existing validated commit behavior.
+Enter outside the editor keeps its
+existing Done meaning. S does not edit speed in Reading or Free view, and the
+ordinary reader keeps its existing S scale shortcut. Options and passage selection retain keyboard focus
+navigation. Editable fields and modal dialogs keep their own behavior, and held
+or repeated mode keys do not trigger fresh starts.
 
 The source fit and footer reserve remain fixed across modes for an unchanged
 window. There is no extra preparation/Ready instruction row. Meaningful error,
 carry, audio and save feedback uses an existing reserved footer cell with its full
 accessible description. Joined two-measure Reading and different Free windows
-intentionally show different source intervals; their window changes are explicit.
+intentionally show different source intervals; their window changes are explicit. Entering Free view from a join opens the
+four-measure overlap around that boundary, rather than treating Reading's drawing
+reservations as a live Timed reading anchor. Responsive footer reserves follow
+the fitted surface's logical width, including rotated displays.
 The same clean feedback presentation applies to instrument-neutral manual
 practice, whose transport, assessment limits and 10% default remain unchanged.
 
@@ -56,11 +72,3 @@ This guide describes source behavior. Automated tests and production-browser
 inspection do not certify a particular installed native package, physical MIDI,
 pedal, ear latency or a musician's successful re-entry. Historical once-only
 preparation and delivery receipts remain in their original validation documents.
-
-The focused native-source port starts from the delivered Viewer `37aecb0c` and
-retains ISO `7205da0d`, all native audio, piano, package and lockfile inputs. It
-contains the piano Reading/Timed controls and shared Free-view binding authority;
-the main branch's instrument-neutral practice, GP intake and TAB rendering stay
-outside this port. Its source review and browser evidence precede a separate
-paired native build and recipient review. The currently installed build remains
-the one identified by its delivery receipt until that later activation completes.

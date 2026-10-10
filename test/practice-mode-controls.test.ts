@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {defaultBindings} from '../src/input';
-import {ControlResolver,readControlBindings,replaceControl,practiceControlBindings,controlActionAllowed,actionControlLabel,freeViewControlLabel} from '../src/control-bindings';
+import {ControlResolver,readControlBindings,replaceControl,practiceControlBindings,controlActionAllowed,actionControlLabel} from '../src/control-bindings';
 import {freeViewControlBindings,changeScopedControls} from '../src/free-view-controls';
 import {optionsBindingRows} from '../src/options-bindings';
 const base=()=>readControlBindings(undefined,{bindings:defaultBindings()});
@@ -21,8 +21,6 @@ test('explicit mode emptiness and custom controls remain authoritative across re
  assert.deepEqual(effective.actions.practiceReading,[null,null]);assert.deepEqual(effective.actions.practiceTimed,[null,{kind:'key',key:'Ctrl+KeyT'}]);assert.equal(actionControlLabel(effective,'practiceFreeView'),'F8');assert.equal(new ControlResolver(effective).keyDown(key('KeyT'),true).action,undefined);assert.equal(new ControlResolver(effective).keyDown(key('KeyT',{ctrlKey:true}),true).action,'practiceTimed');assert.equal(JSON.stringify(saved),before);
  const local=changeScopedControls(saved,undefined,true,{kind:'assign',action:'previous',slot:0,binding:{kind:'key',key:'F7'}});assert.equal(actionControlLabel(practiceControlBindings(freeViewControlBindings(local.main,local.overrides)),'previous'),'F7');assert.deepEqual(local.main.actions.practiceFreeView,saved.actions.practiceFreeView);
  assert.throws(()=>changeScopedControls(saved,undefined,true,{kind:'assign',action:'next',slot:1,binding:{kind:'key',key:'F8'}}),/conflict/);
- // Neutral manual Free retains its existing V route; a piano-only F8 is never advertised there.
- assert.equal(freeViewControlLabel(saved),'V');assert.equal(freeViewControlLabel(replaceControl(base(),'practiceFreeView',0,{kind:'key',key:'KeyV'})),'');
 });
 test('mode actions are scoped, modal guarded and share one key/pedal edge and release quarantine',()=>{
  const bindings=replaceControl(practiceControlBindings(base()),'practiceReading',1,{kind:'midi',source:'Piano',channel:1,controller:66,press:90,release:20}),resolver=new ControlResolver(bindings),connection={source:'Piano',generation:4};
@@ -41,4 +39,20 @@ test('Free view has the same configurable authority in piano and neutral manual 
  const saved=replaceControl(base(),'practiceFreeView',0,{kind:'key',key:'F8'}),manual=practiceControlBindings(freeViewControlBindings(saved),false),piano=practiceControlBindings(freeViewControlBindings(saved));
  assert.equal(actionControlLabel(manual,'practiceFreeView'),actionControlLabel(piano,'practiceFreeView'));assert.equal(new ControlResolver(manual).keyDown(key('F8'),true).action,'practiceFreeView');assert.equal(new ControlResolver(manual).keyDown(key('KeyV'),true).action,undefined);assert.equal(manual.actions.practiceReading,undefined);assert.equal(manual.actions.practiceTimed,undefined);assert.equal(controlActionAllowed('practiceFreeView',{modal:false,selecting:false,practice:true,practiceModes:false,practiceFreeView:true}),true);assert.equal(controlActionAllowed('practiceReading',{modal:false,selecting:false,practice:true,practiceModes:false,practiceFreeView:true}),false);
  assert.equal(actionControlLabel(practiceControlBindings(base(),false),'practiceFreeView'),'V');assert.deepEqual(practiceControlBindings(replaceControl(base(),'practiceFreeView',0,null),false).actions.practiceFreeView,[null,null]);assert.ok(optionsBindingRows({active:true,measureNavigation:true}).some(x=>x.action==='practiceFreeView'));assert.ok(!optionsBindingRows({active:true,measureNavigation:true}).some(x=>x.action==='practiceReading'));
+});
+
+
+test('Timed working arrows reuse only inherited primary navigation and preserve explicit local empty/custom owners',async()=>{
+ const {workingSpeedArrow}=await import('../src/practice-shortcuts');
+ const resolver=new ControlResolver(base());
+ assert.equal(workingSpeedArrow('ArrowLeft',resolver.matchKey(key('ArrowLeft'))),-1);
+ assert.equal(workingSpeedArrow('ArrowRight',resolver.matchKey(key('ArrowRight'))),1);
+ assert.equal(workingSpeedArrow('ArrowUp',undefined),undefined);
+ const owned=new ControlResolver(replaceControl(replaceControl(base(),'next',0,null),'edit',1,{kind:'key',key:'ArrowRight'}));
+ assert.equal(workingSpeedArrow('ArrowRight',owned.matchKey(key('ArrowRight'))),undefined);
+ for(const binding of [null,{kind:'key' as const,key:'F7'}]){
+  const local={version:1 as const,actions:{next:{0:binding}}};
+  assert.equal(workingSpeedArrow('ArrowRight',undefined,local),undefined);
+ }
+ assert.equal(workingSpeedArrow('ArrowRight',undefined),1);
 });
