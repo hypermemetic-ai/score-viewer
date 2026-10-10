@@ -1,7 +1,7 @@
 import type {ScorePackage} from './package';
 import type {PracticeChunk,PracticePlan,PracticeSession} from './practice';
 import {passageTrack,fitPassageFrame,blankMeasureWidth,type Crop,type PassageTrack} from './practice-passage';
-import {projectRelations,readableTieContinuation,type ProjectedRelation} from './practice-relations';
+import {visitProjectedRelationWindows,readableTieContinuation,type ProjectedRelation} from './practice-relations';
 import {admitRefill,type RefillCertificate,type RefillPlacement} from './practice-refill';
 
 export interface AdmittedRefillPassage {track:PassageTrack;certificate:RefillCertificate}
@@ -10,26 +10,38 @@ export interface AdmittedRefillPassage {track:PassageTrack;certificate:RefillCer
  * Translation does not change their interior geometry, corridor or vertical
  * paint. This is a conservative union of all note, annotation, bow and cue
  * states, independent of hand/chord order and sounding-owner expiry. */
-export function admitRefillPassage(p:ScorePackage,plan:PracticePlan,chunk:PracticeChunk,crops:Crop[],mount:HTMLElement,maximumWidth?:number,existing?:RefillCertificate):AdmittedRefillPassage {
+export function admitRefillPassage(p:ScorePackage,plan:PracticePlan,chunk:PracticeChunk,crops:Crop[],mount:HTMLElement,maximumWidth?:number,existing?:RefillCertificate,sharedReview=false):AdmittedRefillPassage {
  const stationary=chunk.lastBar-chunk.firstBar<4,track=passageTrack(crops,mount,p,true),cueAir=new Map<number,number>(),cueBounds:Array<{x0:number;x1:number}>=[];
+ const sourceWindows:number[][]=[];
  for(let first=chunk.firstBar;first<=chunk.lastBar;first++)for(let length=1;length<=4&&first+length-1<=chunk.lastBar;length++){
   // This leaf always keeps its complete original staff. Shorter clipped runs
   // cannot occur, even after their ordinary note bundles have been retired.
   if(stationary&&(first!==chunk.firstBar||length!==chunk.lastBar-chunk.firstBar+1))continue;
-  const bars=Array.from({length},(_,i)=>first+i);
-  const projected=projectRelations(p,plan,crops,track,'compact',bars);
+  sourceWindows.push(Array.from({length},(_,i)=>first+i));
+ }
+ visitProjectedRelationWindows(p,plan,crops,track,sourceWindows,(bars,projected)=>{
   for(const q of projected){track.top=Math.min(track.top,q.bounds.y0-3);track.bottom=Math.max(track.bottom,q.bounds.y1+3);}
   // Every potentially simultaneous owner is settled against the actual
   // previously reconstructed cue paint, not only its old authored bow.
   for(const current of bars){const start=plan.barTicks[current],settled:ProjectedRelation[]=[];
    for(const q of projected){if(q.kind!=='tie'||Number(q.path.getAttribute('data-tie-from-tick'))>=start||Number(q.path.getAttribute('data-tie-to-tick'))<start)continue;const cue=readableTieContinuation(p,q,current,crops,track,bars,undefined,[...projected,...settled]);if(!cue)continue;settled.push(cue);cueBounds.push(cue.bounds);track.top=Math.min(track.top,cue.bounds.y0-3);track.bottom=Math.max(track.bottom,cue.bounds.y1+3);const origin=bars.slice(0,bars.indexOf(current)).reduce((x,bar)=>{const c=crops.find(c=>c.bar===bar)!;return x+c.right-c.left;},0);if(cue.path.getAttribute('data-practice-cue-shape')==='authored-incoming')cueAir.set(current,Math.max(cueAir.get(current)??0,origin-cue.bounds.x0));}
   }
- }
+ });
  if(existing&&crops.some(c=>!existing.measures.has(c.bar)||Math.abs(existing.measures.get(c.bar)!.width-(c.right-c.left))>1e-7))throw Error('The certified source intervals changed and need inspection.');
  if(!stationary&&existing&&maximumWidth!==undefined&&existing.frame.width>maximumWidth+1e-7)throw Error('Practice needs more room to keep the current passage readable. Rotate or enlarge the view before resuming.');
  // A wrapped boundary may expose both repeat/final overhangs. Separate
  // their full source clip footprint and stroke air, not only the staff ends.
- const certificate=existing??admitRefill(plan,chunk,crops.map(c=>({bar:c.bar,width:c.right-c.left,...(!stationary?{blankWidth:blankMeasureWidth(c,mount)}:{}),leftAir:Math.max(c.leftAir,cueAir.get(c.bar)??0),rightAir:c.rightAir})),{edge:stationary?Math.max(track.leftAir,track.rightAir,...cueAir.values())+.8:.8,...(!stationary?{boundaryAir:true}:{}),breakGap:8,maxFrameWidth:stationary?undefined:maximumWidth});
+ // Review and playing share a complete four-source-window envelope. The
+ // caller may fit this once below its preferred digit size; phase changes
+ // never choose another scale or discard the literal source interval.
+ const measures=crops.map(c=>({bar:c.bar,width:c.right-c.left,...(!stationary?{blankWidth:blankMeasureWidth(c,mount)}:{}),leftAir:Math.max(c.leftAir,cueAir.get(c.bar)??0),rightAir:c.rightAir}));
+ // Playing can enter an odd-start window as well as the two-bar-step review
+ // windows. Admit every complete consecutive four-source run, including
+ // literal staff ends and real boundary/cue air, before any reading begins.
+ const windows=Array.from({length:chunk.lastBar-chunk.firstBar+1},(_,i)=>Array.from({length:Math.min(4,chunk.lastBar-chunk.firstBar-i+1)},(_,j)=>chunk.firstBar+i+j));
+ const review=sharedReview&&!stationary?fitPassageFrame(p,plan,crops,track,'compact',windows,mount).frame:undefined;
+ const completeWidth=review?Math.max(review.right-review.left,...windows.map(bars=>bars.reduce((sum,bar)=>sum+measures.find(m=>m.bar===bar)!.width,0)+measures.find(m=>m.bar===bars[0])!.leftAir+measures.find(m=>m.bar===bars.at(-1))!.rightAir+1.6)):undefined;
+ const certificate=existing??admitRefill(plan,chunk,measures,{edge:stationary?Math.max(track.leftAir,track.rightAir,...cueAir.values())+.8:.8,...(!stationary?{boundaryAir:true}:{}),breakGap:8,maxFrameWidth:stationary?undefined:maximumWidth,...(review?{minFrameWidth:completeWidth,fullSourceInitial:true,fullRecovery:true}:{})});
  if(stationary){
   const bars=certificate.initial.placements.map(p=>p.bar),offset=certificate.initial.placements[0].x;
   track.topAir=0;fitPassageFrame(p,plan,crops,track,'compact',[bars],mount,certificate.initial.placements);

@@ -12,6 +12,7 @@ export interface InkBox {x0:number;x1:number;y0:number;y1:number;seatId?:string}
 interface SourceFragment {path:SVGPathElement;systemElement:Element;page:number;system:number}
 interface Fragment extends SourceFragment {frame:number;contour:Contour}
 interface Relation {id:string;kind:'phrase'|'tie';start:number;end:number;from:Seat;to:Seat;first:Fragment;last:Fragment;groups:string[];reconcileSides:boolean}
+interface RelationSourceResolution {relations:Map<SourceFragment[],Relation>;heads?:Map<string,string[]>}
 export interface ProjectedRelation {id:string;kind:'phrase'|'tie';groups:string[];path:SVGPathElement;contour:Contour;left:number;right:number;knockout:boolean;bounds:InkBox;strokeSegments?:ExpressionInk['strokeSegments']}
 // Cache inventory, never a whole-score or previously selected range's geometry
 // admission. A malformed later bow must not gate an unrelated earlier passage.
@@ -63,7 +64,7 @@ function inventory(p:ScorePackage):Map<string,SourceFragment[]>{
  }
  cache.set(p,fragments);return fragments;
 }
-function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number|undefined>):Relation[]{
+function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number|undefined>,resolved?:RelationSourceResolution):Relation[]{
  const relations:Relation[]=[];
  for(const [id,raw]of inventory(p)){
   const kind=id.startsWith('phrase:')?'phrase':'tie',phrase=kind==='phrase'?p.score.phrases?.find(q=>'phrase:'+q.id===id):undefined,firstPath=raw[0].path,
@@ -71,6 +72,7 @@ function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number
    fromComponent=chain?.components[component],toComponent=chain?.components[component+1],start=phrase?.startTick??fromComponent?.startTick??Number(firstPath.getAttribute('data-tie-from-tick')),end=phrase?.endTick??toComponent?.startTick??Number(firstPath.getAttribute('data-tie-to-tick'));
   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)throw Error(`Unresolved relation endpoints: ${id}.`);
   if(!relationIntersectsRuns(start,end,plan.barTicks,positions))continue;
+  const prior=resolved?.relations.get(raw);if(prior){relations.push(prior);continue;}
   if(kind==='tie'&&fromComponent&&toComponent&&raw.some(part=>Number(part.path.getAttribute('data-tie-from-tick'))!==start||Number(part.path.getAttribute('data-tie-to-tick'))!==end))throw Error(`Source tie component timing differs: ${id}.`);
   const parts:Fragment[]=raw.map(part=>{const lanes=[...part.systemElement.querySelectorAll<SVGLineElement>('.janko-pitch-lane')],span=Math.max(...lanes.map(l=>Number(l.getAttribute('x2'))-Number(l.getAttribute('x1')))),frame=Math.min(...lanes.filter(l=>Math.abs(Number(l.getAttribute('x2'))-Number(l.getAttribute('x1'))-span)<.03).map(l=>Number(l.getAttribute('y1'))));if(!Number.isFinite(frame))throw Error(`Unresolved source relation frame: ${id}.`);return {...part,frame,contour:contour(part.path)};});
   if(parts.some((a,i)=>parts.slice(i+1).some(b=>a.page===b.page&&a.system===b.system&&a.contour.side!==b.contour.side)))throw Error(`Incompatible source relation sides: ${id}.`);
@@ -92,7 +94,7 @@ function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number
   if(reconcileSides){
    const keys=['data-tie-note','data-tie-component','data-tie-from','data-tie-to','data-tie-from-tick','data-tie-to-tick','data-tie-profile'],profile=firstPath.getAttribute('data-tie-profile');
    const display=deriveTieDisplayPlan(p.score,p.renderingRecipe?.options.chordGrouping==='compatible-stems').chains.find(q=>q.noteId===chain?.noteId),fromHead=display?.components[component],toHead=display?.components[component+1];
-   const head=(endpoint:typeof a)=>{const explicit=[...endpoint.part.systemElement.querySelectorAll('[data-viewer-seat]')].find(el=>el.getAttribute('data-viewer-seat')===endpoint.seat.id)?.closest('[data-note-id]')?.getAttribute('data-note-id');if(explicit)return explicit;const ids=replayedHeads(p).get(endpoint.seat.id);return ids?.length===1?ids[0]:undefined;};
+   const head=(endpoint:typeof a)=>{const explicit=[...endpoint.part.systemElement.querySelectorAll('[data-viewer-seat]')].find(el=>el.getAttribute('data-viewer-seat')===endpoint.seat.id)?.closest('[data-note-id]')?.getAttribute('data-note-id');if(explicit)return explicit;const heads=resolved?(resolved.heads??=replayedHeads(p)):replayedHeads(p),ids=heads.get(endpoint.seat.id);return ids?.length===1?ids[0]:undefined;};
    if(kind!=='tie'||a.part.page===b.part.page&&a.part.system===b.part.system||!Number.isSafeInteger(component)||component<0||String(component)!==firstPath.getAttribute('data-tie-component')||!fromComponent||!toComponent||!['traced','uniform'].includes(profile??'')||
     fromHead?.headId!==fromIds[0]||toHead?.headId!==toIds[0]||fromHead?.startTick!==start||toHead?.startTick!==end||
     !a.seat.ownerIds.includes(chain!.noteId)||!b.seat.ownerIds.includes(chain!.noteId)||head(a)!==fromIds[0]||head(b)!==toIds[0]||
@@ -103,7 +105,7 @@ function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number
   const owners=kind==='tie'?[original(firstPath.getAttribute('data-tie-note')!)]:[...fromIds,...toIds].map(original),hands=new Set(p.score.notes.filter(n=>owners.includes(n.id)).map(n=>n.hand));
   const groups=[...new Set([...owners.map(owner=>plan.ownerGroup.get(owner)),...(kind==='phrase'?plan.gestures.filter(g=>g.start<=end&&g.end>=start&&hands.has(g.hand)).map(g=>g.id):[])].filter((g):g is string=>!!g))];
   if(!groups.length)throw Error(`Unresolved relation contributors: ${id}.`);
-  relations.push({id,kind,start,end,from:a.seat,to:b.seat,first:a.part,last:b.part,groups,reconcileSides});
+  const relation:Relation={id,kind,start,end,from:a.seat,to:b.seat,first:a.part,last:b.part,groups,reconcileSides};resolved?.relations.set(raw,relation);relations.push(relation);
  }
  return relations;
 }
@@ -136,8 +138,19 @@ function uniformCubicSegments(c:Contour):NonNullable<ExpressionInk['strokeSegmen
  * select tips, source contours supply side/body/taper, and the pinned primitive
  * paints one complete ribbon. Runs never bridge a nonconsecutive source wrap. */
 export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>,placements?:ReadonlyArray<{bar:number;x:number}>):ProjectedRelation[]{
+ return projectRelationWindow(p,plan,crops,track,policy,positions,placements);
+}
+/** One synchronous preflight owns these source facts. Resolve each relevant
+ * relation in its original first-use order; every window still reconstructs
+ * its actual obstacles, sibling clearance and projected paint. No resolver
+ * escapes the call or attaches evidence to a package. */
+export function visitProjectedRelationWindows(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,windows:number[][],visit:(bars:number[],projected:ProjectedRelation[])=>void):void {
+ const resolved:RelationSourceResolution={relations:new Map()};
+ for(const bars of windows)visit(bars,projectRelationWindow(p,plan,crops,track,'compact',bars,undefined,resolved));
+}
+function projectRelationWindow(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',positions:Array<number|undefined>,placements?:ReadonlyArray<{bar:number;x:number}>,resolved?:RelationSourceResolution):ProjectedRelation[]{
  if(!positions.some(b=>b!==undefined))return [];
- const relations=sources(p,plan,positions),offsets:number[]=[];let x=0;
+ const relations=sources(p,plan,positions,resolved),offsets:number[]=[];let x=0;
  for(const bar of positions){if(placements&&bar!==undefined){const placement=placements.find(p=>p.bar===bar);if(!placement)throw Error(`Measure ${bar+1}: missing admitted relation placement.`);x=placement.x;}offsets.push(x);const c=crops.find(c=>c.bar===bar);x+=policy==='fixed'?track.width:c?c.right-c.left:0;}
  const runs=consecutiveRelationRuns(positions);
  const output:ProjectedRelation[]=[];
@@ -181,7 +194,7 @@ export function projectRelations(p:ScorePackage,plan:PracticePlan,crops:Crop[],t
    if(!chosen)throw Error(`Relation has no admitted passage clearance: ${q.id}.`);
    const {c,ink}=chosen,path=document.importNode(q.first.path,true);if(uniform&&!cubicUniform&&Math.abs(c.yStart-c.yEnd)>.03)throw Error(`Uniform source tie endpoints differ: ${q.id}.`);path.setAttribute('d',cubicUniform?uniformCubicPath(c):uniform?tieArcPath(c.xStart,c.yStart,c.xEnd,c.side,c.depth,'uniform',c.thickness):taperedSpanPath(c.xStart,c.yStart,c.xEnd,c.yEnd,c.side,c.depth,c.thickness,c.indent,c));path.setAttribute('data-practice-relation',q.id);path.setAttribute('data-practice-continuation-start',String(ink.continuationStart));path.setAttribute('data-practice-continuation-end',String(ink.continuationEnd));path.setAttribute('data-practice-from-seat',q.from.id);path.setAttribute('data-practice-to-seat',q.to.id);path.setAttribute('data-practice-source-tip-offsets',JSON.stringify([first.xStart-q.from.x,first.yStart-q.from.baseline,last.xEnd-q.to.x,last.yEnd-q.to.baseline]));path.setAttribute('data-practice-clearance-shift',String(c.yStart-base.yStart));path.removeAttribute('id');
    if(q.reconcileSides){path.setAttribute('data-practice-side-policy','cross-system-clearance');path.setAttribute('data-practice-tip-policy','owned-head-source-gap');path.setAttribute('data-practice-source-sides',JSON.stringify([first.side,last.side]));path.setAttribute('data-practice-passage-side',String(c.side));path.setAttribute('data-practice-clearance-shift',String(chosen.translation));path.setAttribute('data-practice-tip-offsets',JSON.stringify([first.xStart-q.from.x,c.yStart-(q.from.baseline-q.first.frame),last.xEnd-q.to.x,c.yEnd-(q.to.baseline-q.last.frame)]));path.setAttribute('data-practice-side-candidates',JSON.stringify(candidates.map(q=>({side:q.c.side,admitted:q.admitted,shift:q.shift,displacement:q.displacement}))));}
-   const x0=Math.max(left,xStart),x1=Math.min(right,xEnd),ys:Array<number>=[];for(let i=0;i<=256;i++){const xx=x0+(x1-x0)*i/256,u=(xx-c.xStart)/width,slice=cubicUniform?expressionSliceAtX({...ink,contour:{...c,thickness:0}},xx):uniform?[c.yStart+c.side*4*c.depth*u*(1-u)]:expressionSliceAtX(ink,xx);ys.push(...(slice??[xx<=xStart?c.yStart:c.yEnd]));}const edge=knockout?.6:Number(path.getAttribute('stroke-width'))/2||0,bounds={x0,x1,y0:Math.min(...ys)-edge-.1,y1:Math.max(...ys)+edge+.1};output.push({id:q.id,kind:q.kind,groups:q.groups,path,contour:c,left,right,knockout,bounds,...(cubicUniform?{strokeSegments:ink.strokeSegments}:{})});settled.push(ink);
+   const x0=Math.max(left,xStart),x1=Math.min(right,xEnd),ys:Array<number>=[];for(let i=0;i<=256;i++){const xx=x0+(x1-x0)*i/256,u=(xx-c.xStart)/width,slice=cubicUniform?expressionSliceAtX({...ink,contour:{...c,thickness:0}},xx):uniform?[c.yStart+c.side*4*c.depth*u*(1-u)]:expressionSliceAtX(ink,xx);ys.push(...(slice??[xx<=xStart?c.yStart:c.yEnd]));}const edge=knockout?.6:Number(path.getAttribute('stroke-width'))/2||0,bounds={x0,x1,y0:Math.min(...ys)-edge-.1,y1:Math.max(...ys)+edge+.1};output.push({id:q.id,kind:q.kind,groups:[...q.groups],path,contour:c,left,right,knockout,bounds,...(cubicUniform?{strokeSegments:ink.strokeSegments}:{})});settled.push(ink);
   }
  }
  return output;
