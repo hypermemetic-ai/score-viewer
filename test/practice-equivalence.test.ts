@@ -132,7 +132,7 @@ test('heterogeneous parent association is preserved rather than flattened into a
 });
 
 test('chooser key and render each derive one fresh tree without rewriting earned evidence',t=>{
- const plan=planPractice(original),state=initialPractice(plan);for(const c of plan.chunks)state.best[c.pattern]=state.target;
+ const plan=planPractice(repeated([0,0])),state=initialPractice(plan);state.best[plan.chunks[0].pattern]=state.target;
  const browser=new PracticeBrowser(plan),raw=JSON.stringify(state),owned=browser as any,derive=owned.tree;let calls=0;
  owned.tree=function(value:typeof state){calls++;return derive.call(this,value);};
  assert.equal(browser.key('ArrowDown',state),'handled');assert.equal(calls,1);
@@ -140,7 +140,7 @@ test('chooser key and render each derive one fresh tree without rewriting earned
  t.after(()=>{if(previous)Object.defineProperty(globalThis,'document',previous);else delete(globalThis as any).document;});
  const preview={querySelector:()=>null},root={style:{setProperty(){}},querySelectorAll:()=>[],querySelector:()=>preview,innerHTML:''};
  calls=0;browser.render(root as any,state,()=>{throw Error('joined passage must not request a leaf preview');});assert.equal(calls,1);
- assert.match(root.innerHTML,/Total progress/);assert.equal(JSON.stringify(state),raw);
+ assert.match(root.innerHTML,/Measures 1 – 8 · 100%/);assert.equal(measuredRate(state,`connected:${plan.revision}:1-8`,'1-8'),state.target);assert.equal(JSON.stringify(state),raw);
 });
 
 test('a later chooser operation rechecks source mutations, current evidence and a prior refusal',()=>{
