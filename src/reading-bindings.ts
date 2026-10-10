@@ -30,7 +30,7 @@ export class ReadingBindingSession {
   if(event.code==='Tab'){this.cancel();return false;}
   const code=inputCode(event);if(event.repeat||this.keysDown.has(code))return true;this.keysDown.add(code);
   if(/^(Control|Alt|Shift|Meta)/.test(event.code))return true;
-  if(operation.kind==='key'){if(event.code==='Enter'&&operation.action!=='done'){this.report(operation.action,'Choose another key; Enter confirms controls.');return true;}const key=chord(event);void this.save(operation,()=>this.api.saveKey(operation.action,key),`Key saved · ${readableChord(key)}. Ready to test.`);return true;}
+  if(operation.kind==='key'){if(code==='Enter'&&operation.action!=='done'){this.report(operation.action,'Choose another key; Enter confirms controls.');return true;}const key=chord(event);void this.save(operation,()=>this.api.saveKey(operation.action,key),`Key saved · ${readableChord(key)}. Ready to test.`);return true;}
   if(operation.kind==='test'&&chord(event)===this.api.keys()[operation.action]){operation.testKey={code,modifiers:chord(event).split('+').slice(0,-1)};this.report(operation.action,`Received key · pressed · ${readableChord(chord(event))}`);}
   return true;
  }

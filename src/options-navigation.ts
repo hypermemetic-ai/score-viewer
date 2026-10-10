@@ -1,3 +1,4 @@
+import {inputCode} from './input';
 export interface NavigationMode {horizontal?:boolean;focusOnPrepare?:boolean;sectionChanged?:(id:string)=>void}
 /** Control browsing never changes values. Open pickers, drafts and capture own keys first. */
 export class OptionsNavigation {
@@ -49,7 +50,7 @@ export class OptionsNavigation {
     let next=event.code==='Home'?0:event.code==='End'?options.length-1:this.index+step;
     while(next>=0&&next<options.length&&options[next].disabled)next+=event.code==='End'?-1:step;
     if(next>=0&&next<options.length){this.index=next;this.draw();}
-   }else if(event.code==='Enter'||event.code==='ArrowRight'){if(!event.repeat)this.choose(this.index);}
+   }else if(inputCode(event)==='Enter'||event.code==='ArrowRight'){if(!event.repeat)this.choose(this.index);}
    else if(event.key.length===1){const now=performance.now(),letter=event.key.toLowerCase();this.search=now-this.searchTime>700||this.search===letter?letter:this.search+letter;this.searchTime=now;const options=[...this.picker!.options];for(let step=1;step<=options.length;step++){const at=(this.index+step)%options.length;if(!options[at].disabled&&options[at].textContent?.trim().toLowerCase().startsWith(this.search)){this.index=at;this.draw();break;}}}
    return true;
   }
@@ -57,16 +58,16 @@ export class OptionsNavigation {
   const focused=document.activeElement as HTMLElement;
   if(event.code==='Tab'&&this.root.matches('dialog')&&!event.ctrlKey&&!event.altKey&&!event.metaKey){this.tab(event.shiftKey);return true;}
   if(focused?.matches('textarea,[contenteditable=true],input:not([readonly]):not([type=checkbox]):not([type=radio])'))return false;
-  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space'].includes(event.code)||event.ctrlKey||event.altKey||event.metaKey)return false;
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space'].includes(inputCode(event))||event.ctrlKey||event.altKey||event.metaKey)return false;
   const sections=this.sections();
   if(focused?.hasAttribute('data-options-section')){
-   if(event.code==='ArrowRight'||event.code==='Enter'){if(!event.repeat)this.settings()[0]?.focus();}
+   if(event.code==='ArrowRight'||inputCode(event)==='Enter'){if(!event.repeat)this.settings()[0]?.focus();}
    else if(event.code==='ArrowUp'||event.code==='ArrowDown'){const at=sections.indexOf(focused as HTMLButtonElement),next=Math.max(0,Math.min(sections.length-1,at+(event.code==='ArrowDown'?1:-1)));this.selectSection(sections[next]);}
    return true;
   }
   const controls=sections.length?this.settings():this.controls(),current=controls.includes(focused)?focused:this.active&&controls.includes(this.active)?this.active:controls[0];if(!current)return false;
   if(event.code==='Space'&&!current.matches('button,input[type=checkbox],input[type=radio],summary'))return false;
-  if(event.code==='Enter'||event.code==='Space'){if(!event.repeat){this.beforeActivate(current);current.click();}return true;}
+  if(inputCode(event)==='Enter'||event.code==='Space'){if(!event.repeat){this.beforeActivate(current);current.click();}return true;}
   if(sections.length&&event.code==='ArrowLeft'){this.selected()?.focus();return true;}
   if(this.mode.horizontal){const index=controls.indexOf(current),step=['ArrowRight','ArrowDown'].includes(event.code)?1:-1;controls[Math.max(0,Math.min(controls.length-1,index+step))]?.focus();return true;}
   const rows=this.rows(controls),row=rows.find(r=>r.includes(current))!,at=row.indexOf(current);
