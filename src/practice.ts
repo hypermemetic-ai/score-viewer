@@ -69,8 +69,7 @@ export function initialPractice(plan:PracticePassagePlan):PracticeState{const ta
 /** Normalize copied preferences only. Historical attainment and raw journals remain exact. */
 export function normalizePracticePreferences(state:PracticeState):PracticeState {
  if(state.speedRevision!==undefined&&state.speedRevision!==2)throw Error('Practice speed preferences differ; saved evidence retained.');
- const pristine=!Object.keys(state.best).length&&!Object.keys(state.manualAttainment?.marks??{}).length;
- if(state.speedRevision===undefined&&pristine&&state.start===10&&state.working===10&&Object.values(state.workingByPattern).every(n=>n===10)&&Math.abs(state.step-state.target*.01)<1e-10){state.start=state.target*.1;state.working=state.target*.1;for(const key of Object.keys(state.workingByPattern))state.workingByPattern[key]=state.target*.1;}
+ if(state.speedRevision===undefined&&(state.start===10||state.start===5)&&Math.abs(state.step-state.target*.01)<1e-10){const oldStart=state.start;state.start=state.target*.1;if(state.working===oldStart)state.working=state.target*.1;for(const key of Object.keys(state.workingByPattern))if(state.workingByPattern[key]===oldStart)state.workingByPattern[key]=state.target*.1;}
  state.start=snapPracticeSpeed(state.start,state.target);state.working=snapPracticeSpeed(state.working,state.target);state.step=snapPracticeStep(state.step,state.target);
  for(const key of Object.keys(state.workingByPattern))state.workingByPattern[key]=snapPracticeSpeed(state.workingByPattern[key],state.target);
  state.speedRevision=2;state.countInBars??=2;state.resumeCooldownSeconds??=3;
@@ -109,7 +108,7 @@ export function componentsAttained(chunk:PracticeChunk,s:PracticeState,all:Reado
  return progressFor(chunk,s)>=1||!!chunk.components?.length&&chunk.components.every(id=>componentsAttained(all.get(id)!,s,all));
 }
 export function passageComponents(plan:PracticePassagePlan,s:PracticeState,chunk:PracticeChunk){const {all}=passageHierarchy(plan,s),out:PracticeChunk[]=[];const visit=(c:PracticeChunk)=>{for(const id of c.components??[]){const child=all.get(id)!;out.push(child);visit(child);}};visit(chunk);return out;}
-export function passageStartTempo(plan:PracticePassagePlan,s:PracticeState,chunk:PracticeChunk){const saved=s.workingByPattern[chunk.pattern];if(saved!==undefined)return saved;if(!chunk.components)return s.start;const leaves=plan.chunks.filter(c=>c.firstBar>=chunk.firstBar&&c.lastBar<=chunk.lastBar);return Math.max(5,Math.min(500,.8*s.target,...leaves.map(c=>attainedRate(s,c.pattern,c.id)||s.start)));}
+export function passageStartTempo(plan:PracticePassagePlan,s:PracticeState,chunk:PracticeChunk){const saved=s.workingByPattern[chunk.pattern];if(saved!==undefined)return snapPracticeSpeed(saved,s.target);if(!chunk.components)return snapPracticeSpeed(s.start,s.target);const leaves=plan.chunks.filter(c=>c.firstBar>=chunk.firstBar&&c.lastBar<=chunk.lastBar);return snapPracticeSpeed(Math.min(.8*s.target,...leaves.map(c=>attainedRate(s,c.pattern,c.id)||s.start)),s.target);}
 export function nextPracticePassage(plan:PracticePassagePlan,s:PracticeState,current:PracticeChunk):PracticeChunk|undefined {
  const {all,frontier}=reconcilePassages(plan,s);if(s.keepTempo||progressFor(current,s)<1)return current;
  const prerequisite=(c:PracticeChunk):PracticeChunk=>{for(const id of c.components??[]){const child=all.get(id)!;if(progressFor(child,s)<1)return prerequisite(child);}return c;};
@@ -120,7 +119,7 @@ export function nextPracticePassage(plan:PracticePassagePlan,s:PracticeState,cur
 export function totalProgress(plan:PracticePassagePlan,s:PracticeState){const weight=plan.chunks.reduce((n,c)=>n+c.weight,0);return weight?plan.chunks.reduce((n,c)=>n+c.weight*progressFor(c,s),0)/weight:0;}
 /** Whole-piece attainment belongs to its full source-bound run, never a child average. */
 export function wholePracticeProgress(plan:PracticePassagePlan,s:PracticeState){const {all}=reconcilePassages(plan,structuredClone(s)),first=plan.chunks[0],last=plan.chunks.at(-1),root=[...all.values()].find(c=>c.firstBar===first?.firstBar&&c.lastBar===last?.lastBar);return root?progressFor(root,s):0;}
-export function passed(chunk:PracticeChunk,s:PracticeState){s.best[chunk.pattern]=Math.max(s.best[chunk.pattern]??0,s.working);if(!s.keepTempo&&s.working<s.target)s.working=Math.min(s.target,s.working+s.step);}
+export function passed(chunk:PracticeChunk,s:PracticeState){s.best[chunk.pattern]=Math.max(s.best[chunk.pattern]??0,s.working);if(!s.keepTempo&&s.working<s.target)s.working=snapPracticeSpeed(Math.min(s.target,s.working+s.step),s.target);}
 export function resetProgress(chunk:PracticeChunk,s:PracticeState){delete s.best[chunk.pattern];if(s.groundwork)delete s.groundwork[chunk.pattern];}
 /** Untimed source-ordered solo / adjacent-pair preparation. MIDI cannot identify physical fingers. */
 export class GroundworkSession {
