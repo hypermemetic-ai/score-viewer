@@ -5,6 +5,15 @@ import {ManualReadingContext} from '../src/manual-reading-context';
 import {ManualPracticeView} from '../src/manual-practice-view';
 
 const p=await importPackage(await authoredFrettedPackage());
+
+test('neutral event-driven settings cannot commit an owned numeric draft before explicit commit',async()=>{
+ const context=await ManualReadingContext.open(p),view=Object.create(ManualPracticeView.prototype) as any;let applied=0;
+ const field={dataset:{practiceSetting:'working',absolute:String(context.state.working),presented:'10'},value:'31'},before=context.state.working;
+ Object.assign(view,{plan:context.plan,state:context.state,manual:{ownsDraft:(target:unknown)=>target===field},applySetting(next:any){applied++;Object.assign(this.state,next);}});
+ assert.equal(view.settingChanged(field),false);assert.equal(view.state.working,before);assert.equal(applied,0);
+ assert.equal(view.setting(field),true,'the existing explicit editor commit still calls setting directly');assert.equal(view.state.working,context.state.target*.31);assert.equal(applied,1);
+ view.transport={prepare(){}};view.save=async()=>{};view.paintControls=()=>{};assert.equal(view.settingChanged({dataset:{practiceSetting:'keepTempo'},checked:true}),true);assert.equal(view.state.keepTempo,true);
+});
 for(const fails of [false,true])test(`a ${fails?'failed':'successful'} pending manual save cannot paint or announce a successor after close`,async()=>{
  const prior=Object.fromEntries(['document','window','cancelAnimationFrame'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  Object.assign(globalThis,{document:new EventTarget(),window:new EventTarget(),cancelAnimationFrame:()=>{}});
