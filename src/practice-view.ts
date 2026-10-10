@@ -17,7 +17,7 @@ import {tempoRateEdit,speedNumber,speedEdit,adjustDuration,adjustPracticePercent
 import type {ScorePackage,Seat} from './package';
 import {fingerFor,practiceStorageName,legacyPracticeStorageName,type PersonalState} from './state';
 import {practicePreferences,admitPracticeContext,type AdmittedPracticeContext,type PracticeViewContext} from './practice-context';
-import {readingActionLabel,type FingerPresentation} from './input';
+import {actionCode,readingActionLabel,type FingerPresentation} from './input';
 import {annotationPositions,paintFinger} from './fingering-presentation';
 import {host,practiceAudio,readJson,writeJson,type AudioOutputs} from './host';
 import type {MidiNote,MidiCC} from './midi';
@@ -70,7 +70,7 @@ export class PracticeView {
   this.app.innerHTML='<section class="surface practice-surface"><header class="practice-header"></header><div class="practice-overview"></div><main class="practice-stage" tabindex="-1"><aside class="practice-held-context" hidden></aside><div class="practice-score"></div><div class="practice-cooldown" hidden aria-live="off"><svg viewBox="0 0 48 56" aria-hidden="true"><path d="M12 24v-9a12 12 0 0 1 24 0v9h4a4 4 0 0 1 4 4v24H4V28a4 4 0 0 1 4-4Zm6 0h12v-9a6 6 0 0 0-12 0Z" fill="currentColor"/></svg><small data-cooldown-count></small></div><div class="practice-countin" hidden aria-live="off"><strong></strong><small data-repeat-gap></small></div></main><div class="practice-status" role="status"></div><nav class="practice-controls"></nav></section>';
   this.app.querySelector('.practice-surface')!.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-practice]');if(b)void this.action(b.dataset.practice!);});
   this.app.querySelector('.practice-surface')!.addEventListener('change',e=>{const field=e.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'){this.browser.setIncludeManual(field.checked);this.paintBrowser(false);this.app.querySelector<HTMLInputElement>('[data-practice-display="manual"]')?.focus();return;}this.setting(field);});
-  this.app.querySelector('.practice-surface')!.addEventListener('keydown',e=>{const event=e as KeyboardEvent,field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&['Enter','Escape'].includes(event.code)){event.preventDefault();if(!event.repeat){if(event.code==='Enter')field.click();else void this.action('back');}}});window.addEventListener('resize',this.refitCue);this.refit(false);this.paint();
+  this.app.querySelector('.practice-surface')!.addEventListener('keydown',e=>{const event=e as KeyboardEvent,field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&['Enter','Escape'].includes(actionCode(event))){event.preventDefault();if(!event.repeat){if(actionCode(event)==='Enter')field.click();else void this.action('back');}}});window.addEventListener('resize',this.refitCue);this.refit(false);this.paint();
   if(context?.passage){const chunk=reconcilePassages(this.plan,this.state).all.get(context.passage);if(chunk){this.selectPassage(chunk);this.pause();if(context.window)this.slots?.showRange(...context.window);this.paint();}else this.status('The previous passage is unavailable in this edition. Choose a passage.');}
   if(context&&!saved)await this.save(false);
   this.frame();
