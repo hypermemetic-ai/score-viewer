@@ -48,7 +48,7 @@ export class ManualPracticeView {
  get modalOpen(){return !!this.settingsDialog;}
  get canTurnPage(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!!this.session;}
  get canAdjustWorking(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!this.freeView&&!!this.session;}
- editWorking(){const field=this.app.querySelector<HTMLInputElement>('[data-practice-setting=working]');return !!this.canAdjustWorking&&!!field&&this.manual.editField(field);}
+ editWorking(openerCode?:string){const field=this.app.querySelector<HTMLInputElement>('[data-practice-setting=working]');return !!this.canAdjustWorking&&!!field&&this.manual.editField(field,openerCode);}
  get canMarkDone(){return !this.disposed&&!this.overview&&!this.settingsDialog&&!!this.session?.canDone;}
  get bindingContext(){const active=!this.disposed&&!this.overview&&!!this.session;return {active,measureNavigation:active&&(this.session?.windows.windows.length??0)>1};}
  async mount(context?:PracticeViewContext){
