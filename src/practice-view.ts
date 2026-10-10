@@ -165,15 +165,16 @@ export class PracticeView {
  private doneTarget(){return this.session?this.doneClaims.target({passage:this.session.chunk.id,pattern:this.session.chunk.pattern,rate:this.loopRate||this.state.working},this.session.phase==='countin',this.state):undefined;}
  private doneControl(){if(this.options.connected())return '';const target=this.doneTarget()!,marked=hasDone(this.state,target),enabled=this.doneClaims.canToggle(this.state,target);return `<button data-practice="done" class="practice-done" aria-label="${marked?'Withdraw Done':'Done'}" aria-pressed="${marked}" ${enabled?'':'disabled'} title="${enabled?'Self-reported completion':'Finish a full loop at this speed first'}">${marked?'✓ ':''}Done <kbd>${escape(this.options.doneKey?.()??'Enter')}</kbd></button>`;}
  private usesRefill(){return !!this.session?.measured&&!this.manualWindow&&!(this.groundwork&&!this.groundwork.complete)&&(this.preparingStart||['countin','trial'].includes(this.session.phase));}
+ private stationaryPassage(){return !!this.session&&this.session.chunk.lastBar-this.session.chunk.firstBar<4&&!(this.groundwork&&!this.groundwork.complete);}
  private activeRefill(){return !!this.refill&&this.refillMode&&this.usesRefill();}
- private enterFreeView(bar=this.session?.failure?.bar??this.refill?.layout.current??this.session?.chunk.firstBar){if(bar===undefined||!this.session)return;const chunk=this.session.chunk;this.slots?.review(Math.max(chunk.firstBar,Math.min(chunk.lastBar,bar)));this.manualWindow=true;this.sourceTrack=undefined;this.refillGeometry=undefined;}
+ private enterFreeView(bar=this.session?.failure?.bar??this.refill?.layout.current??this.session?.chunk.firstBar){if(bar===undefined||!this.session)return;const chunk=this.session.chunk;this.slots?.review(Math.max(chunk.firstBar,Math.min(chunk.lastBar,bar)));this.manualWindow=true;if(!this.stationaryPassage()){this.sourceTrack=undefined;this.refillGeometry=undefined;}}
  private measureNavigationHint(){if(!this.bindingContext.measureNavigation)return '';const keys=this.options.navigationKeys?.()??{previous:'←',next:'→'},hints=[keys.previous&&`<span>${escape(keys.previous)} Previous measures</span>`,keys.next&&`<span>${escape(keys.next)} Next measures</span>`].filter(Boolean).join('');return hints?`<span class="options-nav-hint">${hints}</span>`:'';}
- private prepareRefillStart(){this.session!.measured=this.options.connected();this.manualWindow=false;this.slots?.prime();this.refillGeometry=undefined;this.refill?.prime();this.cueKey='';this.preparingStart=true;try{this.paintControls();this.paintScore();}finally{this.preparingStart=false;}return !this.renderError;}
+ private prepareRefillStart(){this.session!.measured=this.options.connected();this.manualWindow=false;this.slots?.prime();if(!this.stationaryPassage())this.refillGeometry=undefined;this.refill?.prime();this.cueKey='';this.preparingStart=true;try{this.paintControls();this.paintScore();}finally{this.preparingStart=false;}return !this.renderError;}
  private currentCues(){const s=this.session,refill=this.refill;if(!s||!refill||!this.activeRefill()||!['countin','trial'].includes(s.phase))return [];const current=refill.layout.placements.find(p=>p.bar===refill.layout.current)!;return heldTieCues(this.options.package,this.plan,s,refill.retired,current,this.projected,[...this.sourceCrops.values()],this.sourceTrack!,refill.layout.placements);}
  private paintScore(){
   const s=this.session!,stage=this.app.querySelector<HTMLElement>('.practice-score')!,area=this.app.querySelector<HTMLElement>('.practice-stage')!;
   stage.replaceChildren();this.crops=[];this.relations=[];this.contextCrops=[];this.renderError=undefined;
-  const adaptive=this.usesRefill(),status=this.app.querySelector<HTMLElement>('.practice-status');if(status)status.style.display=adaptive?'block':'';const displayBars=adaptive?this.refill?.bars??this.slots!.bars:this.slots!.bars;
+  const adaptive=this.usesRefill(),stationary=this.stationaryPassage(),framed=adaptive||stationary,status=this.app.querySelector<HTMLElement>('.practice-status');if(status)status.style.display=framed?'block':'';const displayBars=framed?this.refill?.bars??this.slots!.bars:this.slots!.bars;
   const context=area.querySelector<HTMLElement>('.practice-held-context')!,contextBars=new Set(s.carryIn.map(a=>a.bar).filter(bar=>!displayBars.includes(bar)));
   if(s.failure&&(s.failure.bar<s.chunk.firstBar||s.failure.bar>s.chunk.lastBar)&&!displayBars.includes(s.failure.bar))contextBars.add(s.failure.bar);
   context.replaceChildren();context.hidden=!contextBars.size;
@@ -184,16 +185,18 @@ export class PracticeView {
   try {
    for(let bar=s.chunk.firstBar;bar<=s.chunk.lastBar;bar++)if(!this.sourceCrops.has(bar))this.sourceCrops.set(bar,cropMeasure(this.options.package,this.plan,bar));
    const all=[...this.sourceCrops.values()],p=this.options.package;
-   if(this.refillMode!==adaptive){this.sourceTrack=undefined;this.refillGeometry=undefined;this.refillMode=adaptive;}
-   const available=Math.max(20,area.clientHeight-(context.hidden?0:context.offsetHeight)-24-(adaptive?24:0)),style=getComputedStyle(stage),width=Math.max(20,stage.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight));
+   if(this.refillMode!==adaptive){if(!stationary){this.sourceTrack=undefined;this.refillGeometry=undefined;}this.refillMode=adaptive;}
+   // A complete stationary staff needs no incoming allocation air. Keep its
+   // full source/cue envelope readable before Start, with real white margins.
+   stage.style.paddingInline=stationary?'16px':'';
+   const available=Math.max(20,area.clientHeight-(context.hidden?0:context.offsetHeight)-24-(adaptive&&!stationary?24:0)),style=getComputedStyle(stage),width=Math.max(20,stage.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight));
    const sourceFont=Math.min(...all.flatMap(c=>c.seats.map(seat=>seat.fontSize))),minimumScale=Number.isFinite(sourceFont)?12/sourceFont:0;
-   if(!this.sourceTrack||!adaptive){
-    if(adaptive){
+   if(!this.sourceTrack||!framed){
+    if(framed){
      const admitted=admitRefillPassage(p,this.plan,s.chunk,all,stage,minimumScale?width/minimumScale:undefined,this.refill?.certificate);this.sourceTrack=admitted.track;
      // The staff center, rather than selected-score annotation asymmetry,
      // establishes one live vertical frame before count-in.
-     const center=(Math.min(...this.sourceTrack.lanes)+Math.max(...this.sourceTrack.lanes))/2,air=Math.max(center-this.sourceTrack.top+18,this.sourceTrack.bottom-center);
-     this.sourceTrack.top=center-air+18;this.sourceTrack.bottom=center+air;
+     if(!stationary){const center=(Math.min(...this.sourceTrack.lanes)+Math.max(...this.sourceTrack.lanes))/2,air=Math.max(center-this.sourceTrack.top+18,this.sourceTrack.bottom-center);this.sourceTrack.top=center-air+18;this.sourceTrack.bottom=center+air;}
      if(!this.refill)this.refill=new PracticeRefill(this.plan,s.chunk,admitted.certificate);
     }else{
      const bars=this.slots!.bars.filter((bar):bar is number=>bar!==undefined),shown=all.filter(c=>bars.includes(c.bar));
@@ -201,11 +204,11 @@ export class PracticeView {
 
     }
    }
-   const track=this.sourceTrack,placements=adaptive?this.refill!.layout.placements:undefined,positions=placements?.map(p=>p.bar)??this.slots?.bars??all.map(c=>c.bar),policy='compact' as const;
+   const track=this.sourceTrack,placements=framed?this.refill!.layout.placements:undefined,positions=placements?.map(p=>p.bar)??this.slots?.bars??all.map(c=>c.bar),policy='compact' as const;
    this.projected=projectRelations(p,this.plan,all,track,policy,positions,placements);const cues=this.currentCues();this.cueKey=cues.map(q=>q.id+':'+q.left+':'+q.right).join('|');
    const passage=composePassage(all,track,policy,positions,[...this.projected,...cues],placements),scale=this.refillGeometry?.scale??Math.min(width/passage.width,available/passage.height);
    if(adaptive&&scale<minimumScale-1e-7)throw Error('Practice needs more room to keep this passage readable. Rotate or enlarge the view, or choose a shorter passage.');
-   if(adaptive){
+   if(framed){
     const areaStyle=getComputedStyle(area),left=parseFloat(areaStyle.paddingLeft),right=parseFloat(areaStyle.paddingRight),top=parseFloat(areaStyle.paddingTop);
     this.refillGeometry??={scale,top:top+(context.hidden?0:context.offsetHeight+10)+Math.max(0,(available-passage.height*scale)/2)};
     // Status and footer changes alter the flex area's height. They must not
