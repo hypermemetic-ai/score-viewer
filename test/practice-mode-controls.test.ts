@@ -40,3 +40,19 @@ test('Free view has the same configurable authority in piano and neutral manual 
  assert.equal(actionControlLabel(manual,'practiceFreeView'),actionControlLabel(piano,'practiceFreeView'));assert.equal(new ControlResolver(manual).keyDown(key('F8'),true).action,'practiceFreeView');assert.equal(new ControlResolver(manual).keyDown(key('KeyV'),true).action,undefined);assert.equal(manual.actions.practiceReading,undefined);assert.equal(manual.actions.practiceTimed,undefined);assert.equal(controlActionAllowed('practiceFreeView',{modal:false,selecting:false,practice:true,practiceModes:false,practiceFreeView:true}),true);assert.equal(controlActionAllowed('practiceReading',{modal:false,selecting:false,practice:true,practiceModes:false,practiceFreeView:true}),false);
  assert.equal(actionControlLabel(practiceControlBindings(base(),false),'practiceFreeView'),'V');assert.deepEqual(practiceControlBindings(replaceControl(base(),'practiceFreeView',0,null),false).actions.practiceFreeView,[null,null]);assert.ok(optionsBindingRows({active:true,measureNavigation:true}).some(x=>x.action==='practiceFreeView'));assert.ok(!optionsBindingRows({active:true,measureNavigation:true}).some(x=>x.action==='practiceReading'));
 });
+
+
+test('Timed working arrows reuse only inherited primary navigation and preserve explicit local empty/custom owners',async()=>{
+ const {workingSpeedArrow}=await import('../src/practice-shortcuts');
+ const resolver=new ControlResolver(base());
+ assert.equal(workingSpeedArrow('ArrowLeft',resolver.matchKey(key('ArrowLeft'))),-1);
+ assert.equal(workingSpeedArrow('ArrowRight',resolver.matchKey(key('ArrowRight'))),1);
+ assert.equal(workingSpeedArrow('ArrowUp',undefined),undefined);
+ const owned=new ControlResolver(replaceControl(replaceControl(base(),'next',0,null),'edit',1,{kind:'key',key:'ArrowRight'}));
+ assert.equal(workingSpeedArrow('ArrowRight',owned.matchKey(key('ArrowRight'))),undefined);
+ for(const binding of [null,{kind:'key' as const,key:'F7'}]){
+  const local={version:1 as const,actions:{next:{0:binding}}};
+  assert.equal(workingSpeedArrow('ArrowRight',undefined,local),undefined);
+ }
+ assert.equal(workingSpeedArrow('ArrowRight',undefined),1);
+});

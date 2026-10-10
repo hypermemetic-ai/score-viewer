@@ -63,7 +63,10 @@ test('source pitch holding and releasing is only preview/setup and never implici
 test('joined Reading cursor survives explicit four-measure Free windows and a Timed error cannot leak into its pair',async t=>{
  const f=fixture(t);for(const c of plan.chunks.slice(0,4))f.state.best[c.pattern]=f.state.target;
  const joined=reconcilePassages(plan,f.state).all.get('1-16')!;f.view.selectPassage(joined);f.view.reading.selectWindow(1);f.view.showReadingWindow();assert.deepEqual(f.view.slots.bars,[7,8,undefined,undefined]);
- await f.view.action('free-view');assert.equal(f.view.mode,'free');assert.equal(f.view.slots.bars.filter((x:any)=>x!==undefined).length,4);const original=[...f.view.slots.bars];await f.view.action('next');assert.notDeepEqual(f.view.slots.bars,original);await f.view.action('ready');assert.equal(f.view.mode,'reading');assert.equal(f.view.reading.window,1);assert.deepEqual(f.view.slots.bars,[7,8,undefined,undefined]);
+ // A Reading frame owns no live Timed anchor, even after its complete-source
+ // certificate created a refill object for drawing.
+ f.view.refill={layout:{current:0,placements:[{bar:7,x:999,empty:false}]}};
+ await f.view.action('free-view');assert.equal(f.view.mode,'free');assert.equal(f.view.reviewAnchor,undefined);assert.deepEqual(f.view.slots.bars,[6,7,8,9]);const original=[...f.view.slots.bars];await f.view.action('next');assert.notDeepEqual(f.view.slots.bars,original);await f.view.action('ready');assert.equal(f.view.mode,'reading');assert.equal(f.view.reading.window,1);assert.deepEqual(f.view.slots.bars,[7,8,undefined,undefined]);
  await f.view.action('timed');f.view.session.fail(15,'A different note was played.',plan.attacks.find(a=>a.bar===15));assert.ok(f.view.session.failure);await f.view.action('reading');assert.equal(f.view.session.failure,undefined);assert.equal(f.view.session.errorMarked,false);assert.equal(f.view.reading.window,1);assert.deepEqual(f.view.slots.bars,[7,8,undefined,undefined]);
 });
 test('a started silent joined Reading window remains explicitly browsable with no manufactured attack or credit',async t=>{
