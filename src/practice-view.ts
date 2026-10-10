@@ -82,7 +82,7 @@ export class PracticeView {
  private refreshSettings(activeKey?:string){const d=this.settingsDialog;if(!d)return;const notice=d.querySelector('[data-goal-error]');if(notice)notice.textContent='';this.refreshTempoFields(d,activeKey);for(const el of d.querySelectorAll<HTMLElement>('[data-personal-goal-only]'))el.hidden=!this.state.personalGoal;}
  private applySetting(next:PracticeState,key:string,manual=false){
   if(!next.personalGoal)delete this.state.personalGoal;Object.assign(this.state,next);
-  const active=!!this.session&&['countin','trial'].includes(this.session.phase);
+  const active=this.startingRate!==undefined||!!this.session&&['countin','trial'].includes(this.session.phase);
   if(key==='working'&&active){this.queuedWorking=this.state.working;this.doneClaims.cancelIncrease();this.prepareRepeat();}
   else if(key==='target'||key==='working'){this.queuedWorking=undefined;this.loopRate=this.state.working;this.doneClaims.cancelIncrease();this.resetCarrySetup();this.contacts.clear();this.clearPose();this.session?.pause();this.stopClock();this.clock?.close();this.clock=undefined;}
   void this.save(key!=='target');this.refreshTempoFields(this.app,manual?key:undefined);this.refreshSettings(manual?key:undefined);
