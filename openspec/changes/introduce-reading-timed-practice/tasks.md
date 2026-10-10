@@ -9,8 +9,8 @@
 
 ## 2. Keyboard and binding authority
 
-- [ ] 2.1 Add scoped configurable Reading/Timed/Free controls to the shared authority with unclaimed defaultsU/T/V, retaining legacy dictionaries and inherited navigation; verify occupied primary/secondary/local owners, later unavailable owners, explicit null slots, modifier/capture/Test/pedal/release behavior and backward-compatible preference admission.
-- [ ] 2.2 Route buttons, hints and runtime mode controls through the same authority, retainingSpace explicitStart/Resume and Timed half-point Up/Down adjustment; verify repeat/held keys, focused buttons, fields/modal edits, R rotation, custom mode bindings, Free return to previous primary mode and no hidden Working changes in Reading; document controls in the same mode guide.
+- [ ] 2.1 Add configurable piano Reading/Timed and shared Free view controls to the single authority with unclaimed defaults U/T/V, retaining legacy dictionaries and inherited navigation; verify occupied primary/secondary/local owners, later unavailable owners, explicit null slots, modifier/capture/Test/pedal/release behavior and backward-compatible preference admission.
+- [ ] 2.2 Route buttons, hints and runtime controls through the same authority, retaining Space explicit Start/Resume and Timed half-point Up/Down adjustment; verify repeat/held keys, focused buttons, fields/modal edits, R rotation, custom mode bindings, shared Free key/pedal/null behavior across piano/guitar/bass, Free return to previous primary mode and no hidden Working changes in Reading; document controls in the same mode guide.
 
 ## 3. Shared frame and clean presentation
 

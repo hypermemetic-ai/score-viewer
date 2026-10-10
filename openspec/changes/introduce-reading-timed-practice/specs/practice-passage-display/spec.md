@@ -9,7 +9,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Free view entry respects saved controls
-Free view SHALL have a configurable control defaulting to V when unclaimed. Space SHALL start/resume the selected primary mode, or return from Free view to the previous primary mode. Existing authoritative controls SHALL take priority; occupied or explicitly empty mode controls SHALL not be bypassed by hardcoded fallbacks. P SHALL open practice only from the reader. Fields, modifiers, modal/capture, repeats and held-input ownership SHALL remain correct.
+Free view SHALL have one shared configurable control across supported piano, guitar and bass practice, defaulting to V when unclaimed. The same custom key/pedal or explicit empty slots SHALL govern its runtime, hints, capture and Test in each context. Space SHALL start/resume the selected primary mode, or return from Free view to the previous primary mode. Existing authoritative controls SHALL take priority; occupied or explicitly empty mode controls SHALL not be bypassed by hardcoded fallbacks. P SHALL open practice only from the reader. Fields, modifiers, modal/capture, repeats and held-input ownership SHALL remain correct.
 
 #### Scenario: Enter Free view and resume
 - **WHEN** the user activates Free view while Reading or Timed is selected
@@ -106,7 +106,12 @@ Reading and Timed SHALL be prominent centered choices beside Start/Resume. Free 
 - **WHEN** a mode binding is edited or tested in shared Options
 - **THEN** runtime, capture, conflict diagnostics, Test and visible hints use the same admitted effective slots
 - **AND** shared reader assignments and explicit local navigation overrides remain exact
-- **AND** mode actions are unavailable outside their supported piano practice context
+- **AND** Reading/Timed actions are unavailable without their supported piano mode context, while Free view uses the same shared binding in neutral manual practice
+
+#### Scenario: Shared Free view across instruments
+- **WHEN** the user configures Free view to a custom key or pedal in piano practice and then opens guitar or bass manual practice
+- **THEN** the same control enters Free view and is shown in its hint and Options; the old V route does not remain as a hidden fallback
+- **AND** an explicit empty Free view control remains empty in every supported instrument context without adding piano hand-position assessment
 
 ### Requirement: Stable mode frame without an instruction row
 Reading, Timed, Free view and connected/disconnected practice SHALL share stage and footer bounds at an unchanged viewport. An unchanged source window SHALL retain its complete source scale and origin across mode/start/error transitions; changing owned visibility SHALL not refit it. Generic preparation/ready instructions SHALL consume no layout row. Meaningful errors and carry context SHALL remain accessible without moving notes or controls.

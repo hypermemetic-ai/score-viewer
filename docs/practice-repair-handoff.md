@@ -1,5 +1,7 @@
 # Immediate practice repair handoff
 
+Current selectable piano practice behavior is described in [Reading and Timed practice](practice-reading-timed.md). Historical delivery receipts below retain their original source and installed-package meanings.
+
 ## User-feedback repair delivery (2026-10-10)
 
 The reviewed follow-up source is landed in both lanes. Urgent [PR70](https://github.com/hypermemetic-ai/score-viewer/pull/70) merged Viewer `37aecb0c9f2d099471efa585fa774da409730036`, tree `782c7a64763d2b3fb288cc0397118c6e6442fb1b`, retaining ISO `7205da0d6b62a4a023eda5f2f5d66bdec4fa6493`. Main [PR72](https://github.com/hypermemetic-ai/score-viewer/pull/72) merged `18a1cc88347d1b5cfb324fcdcb0d1527069beda2`, tree `7c97ed29991727c29f25c0512bcbef2d0f3a990c`, retaining its separate ISO `a5ef9270db44ce9afc4941ad24e95e26c536064a`. A later documentation commit does not supersede either runtime pin.

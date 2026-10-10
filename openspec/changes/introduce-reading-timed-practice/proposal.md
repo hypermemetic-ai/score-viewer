@@ -10,7 +10,7 @@ A one-time untimed introduction forces players to conflate learning note positio
 - Reuse genuine source-owned untimed position and adjacent-position evaluation for Reading, cycling again rather than entering Timed automatically or earning speed attainment.
 - In joined Reading passages, cycle the last measure before each original boundary and the first after it. Show a quiet top-right `1/3` counter inside the reading area with accessible measure context.
 - Emphasize Reading, Timed and Start/Resume in a centered primary control group; keep Free view secondary. Remove the generic preparation/ready instruction row and recover its height for notation.
-- Add configurable Reading U, Timed T and Free view V controls while preserving rotation, existing saved controls, local navigation inheritance and input ownership.
+- Add configurable piano Reading U and Timed T controls, with one shared Free view V control across piano, guitar and bass. Preserve rotation, existing saved controls, local navigation inheritance and input ownership.
 - Use 30% starting speed for new Timed settings, 50% for genuine completed connections, and 2% increase. Preserve explicitly saved preferences and all historical progress.
 - Require original component performance targets before newly unlocking connected passages; a parent's own completion cannot stand in for missing original component completion.
 
