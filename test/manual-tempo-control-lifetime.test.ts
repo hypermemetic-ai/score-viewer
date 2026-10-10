@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {ManualTempoControls} from '../src/manual-tempo-control';import {TempoRepeat} from '../src/tempo-repeat';
+import {ManualTempoControls,refreshPracticeSpeedDisplay} from '../src/manual-tempo-control';import {TempoRepeat} from '../src/tempo-repeat';
 import {PracticeView} from '../src/practice-view';import {initialPractice,passed} from '../src/practice';import {speedNumber} from '../src/tempo-presentation';import {referenceFixture} from './support/reference-score';
 
 const score=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
@@ -47,6 +47,24 @@ test('deliberate edit cancellation cannot be revived by a previously captured fo
  const f=fixture();try{
   f.controls.editField(f.field);f.field.value='99';const restore=f.controls.retainDraft(f.root);f.controls.cancelEdit();const replacement=f.attach();restore();
   assert.equal(f.root.querySelector('input'),replacement);assert.equal(f.field.readOnly,true);assert.equal(f.field.value,'30');assert.equal(f.commits,0);assert.equal(f.cancels,1);
+ }finally{f.close();}
+});
+
+test('the readonly Speed mirror follows formatted field writes without numeric admission or draft ownership',()=>{
+ const integer={textContent:''},fraction={textContent:''},group={querySelector:(selector:string)=>selector==='[data-speed-integer]'?integer:fraction},field={value:'30',readOnly:true,dataset:{absolute:'54',presented:'30'},closest:()=>group};
+ const before=JSON.stringify(field.dataset);
+ for(const [value,whole,suffix]of [['1','1',''],['1.5','1','.5'],['9.5','9','.5'],['10','10',''],['30','30',''],['30.5','30','.5'],['99.5','99','.5'],['100','100','']] as const){field.value=value;refreshPracticeSpeedDisplay(field as unknown as HTMLInputElement);assert.deepEqual([integer.textContent,fraction.textContent],[whole,suffix]);assert.equal(field.value,value);assert.equal(JSON.stringify(field.dataset),before);}
+ field.readOnly=false;field.value='100.5';refreshPracticeSpeedDisplay(field as unknown as HTMLInputElement);assert.deepEqual([integer.textContent,fraction.textContent],['100',''],'a genuine draft remains entirely owned by the input editor');assert.equal(field.value,'100.5');assert.equal(JSON.stringify(field.dataset),before);
+});
+
+test('explicit Speed commit and cancellation synchronize the readonly mirror after the original editor callbacks',()=>{
+ const f=fixture();try{
+  const integer={textContent:''},fraction={textContent:''},group={querySelector:(selector:string)=>selector==='[data-speed-integer]'?integer:fraction},closest=f.field.closest.bind(f.field);
+  (f.field as any).closest=(selector:string)=>selector==='.practice-speed-field'?group:closest(selector);
+  refreshPracticeSpeedDisplay(f.field as unknown as HTMLInputElement);assert.deepEqual([integer.textContent,fraction.textContent],['30','']);
+  f.controls.editField(f.field);f.field.value='30.5';refreshPracticeSpeedDisplay(f.field as unknown as HTMLInputElement);assert.deepEqual([integer.textContent,fraction.textContent],['30','']);assert.equal(f.commits,0);
+  f.key('Enter');assert.equal(f.working,'30.5');assert.equal(f.commits,1);assert.deepEqual([integer.textContent,fraction.textContent],['30','.5']);
+  f.controls.editField(f.field);f.field.value='100.5';f.key('Escape');assert.equal(f.field.value,'30.5');assert.equal(f.commits,1);assert.equal(f.cancels,1);assert.deepEqual([integer.textContent,fraction.textContent],['30','.5']);
  }finally{f.close();}
 });
 

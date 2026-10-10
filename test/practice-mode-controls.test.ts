@@ -8,8 +8,8 @@ const base=()=>readControlBindings(undefined,{bindings:defaultBindings()});
 const key=(code:string,extra={})=>({code,repeat:false,ctrlKey:false,altKey:false,shiftKey:false,metaKey:false,...extra});
 test('missing piano modes fill only unclaimed keys after all saved and local owners, preserving literal dictionaries',()=>{
  const raw=base(),before=JSON.stringify(raw),effective=practiceControlBindings(freeViewControlBindings(raw));
- assert.equal(actionControlLabel(effective,'practiceReading'),'U');assert.equal(actionControlLabel(effective,'practiceTimed'),'T');assert.equal(actionControlLabel(effective,'practiceFreeView'),'V');assert.equal(JSON.stringify(raw),before);
- for(const [action,code]of [['practiceReading','KeyU'],['practiceTimed','KeyT'],['practiceFreeView','KeyV']] as const){
+ assert.equal(actionControlLabel(effective,'practiceReading'),'R');assert.equal(actionControlLabel(effective,'practiceTimed'),'T');assert.equal(actionControlLabel(effective,'practiceFreeView'),'V');assert.equal(JSON.stringify(raw),before);
+ for(const [action,code]of [['practiceReading','KeyR'],['practiceTimed','KeyT'],['practiceFreeView','KeyV']] as const){
   for(const slot of [0,1] as const){const saved=replaceControl(raw,'edit',slot,{kind:'key',key:code}),admitted=practiceControlBindings(freeViewControlBindings(saved));assert.deepEqual(admitted.actions[action],[null,null]);assert.equal(new ControlResolver(admitted).keyDown(key(code),true).action,'edit');}
   const local={version:1 as const,actions:{next:{1:{kind:'key' as const,key:code}}}},admitted=practiceControlBindings(freeViewControlBindings(raw,local));assert.deepEqual(admitted.actions[action],[null,null]);assert.equal(new ControlResolver(admitted).keyDown(key(code),true).action,'next');
  }
@@ -26,13 +26,13 @@ test('mode actions are scoped, modal guarded and share one key/pedal edge and re
  const bindings=replaceControl(practiceControlBindings(base()),'practiceReading',1,{kind:'midi',source:'Piano',channel:1,controller:66,press:90,release:20}),resolver=new ControlResolver(bindings),connection={source:'Piano',generation:4};
  for(const context of [{practice:false,practiceModes:true},{practice:true,practiceModes:false},{practice:true,practiceModes:true,modal:true},{practice:true,practiceModes:true,selecting:true}])assert.equal(controlActionAllowed('practiceReading',{modal:false,selecting:false,...context}),false);
  assert.equal(controlActionAllowed('practiceReading',{modal:false,selecting:false,practice:true,practiceModes:true}),true);
- assert.equal(resolver.keyDown(key('KeyU'),true).action,'practiceReading');assert.equal(resolver.keyDown(key('KeyU',{repeat:true}),true).action,undefined);resolver.clear();assert.equal(resolver.keyDown(key('KeyU'),true).action,undefined);resolver.keyUp({code:'KeyU'});assert.equal(resolver.keyDown(key('KeyU'),true).action,'practiceReading');resolver.keyUp({code:'KeyU'});
+ assert.equal(resolver.keyDown(key('KeyR'),true).action,'practiceReading');assert.equal(resolver.keyDown(key('KeyR',{repeat:true}),true).action,undefined);resolver.clear();assert.equal(resolver.keyDown(key('KeyR'),true).action,undefined);resolver.keyUp({code:'KeyR'});assert.equal(resolver.keyDown(key('KeyR'),true).action,'practiceReading');resolver.keyUp({code:'KeyR'});
  const cc=(value:number,extra={})=>({...connection,channel:1,controller:66,value,...extra});assert.equal(resolver.receive(cc(100,{generation:3}),connection,true).action,undefined);assert.equal(resolver.receive(cc(100),connection,true).action,'practiceReading');resolver.clear();assert.equal(resolver.receive(cc(100),connection,true).action,undefined);resolver.receive(cc(20),connection,true);assert.equal(resolver.receive(cc(100),connection,true).action,'practiceReading');
  assert.ok(optionsBindingRows({active:true,modes:true,measureNavigation:false}).some(x=>x.action==='practiceTimed'));assert.ok(!optionsBindingRows({active:true,measureNavigation:true}).some(x=>x.action==='practiceTimed'));assert.ok(!optionsBindingRows({active:false,modes:true,measureNavigation:false}).some(x=>x.action==='practiceTimed'));
 });
 test('editing an implicitly shown secondary mode slot retains its primary without persisting other defaults',()=>{
  const raw=base(),before=JSON.stringify(raw),local={version:1 as const,actions:{next:{1:{kind:'key' as const,key:'KeyT'}}}},next=changeScopedControls(raw,local,true,{kind:'assign',action:'practiceReading',slot:1,binding:{kind:'key',key:'F7'}});
- assert.deepEqual(next.main.actions.practiceReading,[{kind:'key',key:'KeyU'},{kind:'key',key:'F7'}]);assert.equal(next.main.actions.practiceTimed,undefined);assert.deepEqual(practiceControlBindings(freeViewControlBindings(next.main,next.overrides)).actions.practiceTimed,[null,null]);assert.equal(JSON.stringify(raw),before);
+ assert.deepEqual(next.main.actions.practiceReading,[{kind:'key',key:'KeyR'},{kind:'key',key:'F7'}]);assert.equal(next.main.actions.practiceTimed,undefined);assert.deepEqual(practiceControlBindings(freeViewControlBindings(next.main,next.overrides)).actions.practiceTimed,[null,null]);assert.equal(JSON.stringify(raw),before);
  const removed=changeScopedControls(raw,undefined,true,{kind:'assign',action:'practiceReading',slot:0,binding:null});assert.deepEqual(removed.main.actions.practiceReading,[null,null]);
 });
 test('Free view has the same configurable authority in piano and neutral manual practice without inventing Reading',()=>{
@@ -55,4 +55,23 @@ test('Timed working arrows reuse only inherited primary navigation and preserve 
   assert.equal(workingSpeedArrow('ArrowRight',undefined,local),undefined);
  }
  assert.equal(workingSpeedArrow('ArrowRight',undefined),1);
+});
+
+
+test('new Reading R defaults never rewrite an explicit older U binding or an empty mode',()=>{
+ const saved=replaceControl(base(),'practiceReading',0,{kind:'key',key:'KeyU'}),raw=JSON.stringify(saved),effective=practiceControlBindings(readControlBindings(saved,{bindings:{}}));
+ assert.equal(actionControlLabel(effective,'practiceReading'),'U');assert.equal(JSON.stringify(saved),raw);
+ const resolver=new ControlResolver(effective);assert.equal(resolver.keyDown(key('KeyR'),true).action,undefined);assert.equal(resolver.keyDown(key('KeyU'),true).action,'practiceReading');
+ assert.deepEqual(practiceControlBindings(replaceControl(base(),'practiceReading',0,null)).actions.practiceReading,[null,null]);
+});
+
+test('global rotation requires only unclaimed Shift R and leaves saved key owners authoritative',async()=>{
+ const {rotationKey,rotationShortcut,readableChord}=await import('../src/input');
+ assert.equal(rotationKey,'Shift+KeyR');assert.equal(readableChord(rotationKey),'Shift+R');
+ assert.equal(rotationShortcut(key('KeyR')),false);assert.equal(rotationShortcut(key('KeyR',{shiftKey:true})),true);
+ for(const modifiers of [{repeat:true},{ctrlKey:true},{altKey:true},{metaKey:true}])assert.equal(rotationShortcut(key('KeyR',{shiftKey:true,...modifiers})),false);
+ assert.equal(rotationShortcut(key('KeyU',{shiftKey:true})),false);
+ const raw=replaceControl(base(),'practiceReading',0,{kind:'key',key:rotationKey}),before=JSON.stringify(raw),resolver=new ControlResolver(practiceControlBindings(raw));
+ const event=key('KeyR',{shiftKey:true});assert.equal(rotationShortcut(event,!!resolver.matchKey(event)),false);assert.equal(resolver.keyDown(event,true).action,'practiceReading');assert.equal(resolver.keyDown({...event,repeat:true},true).action,undefined);
+ resolver.clear();assert.equal(resolver.keyDown(event,true).action,undefined);resolver.keyUp({code:'KeyR'});assert.equal(resolver.keyDown(event,true).action,'practiceReading');assert.equal(JSON.stringify(raw),before);
 });
