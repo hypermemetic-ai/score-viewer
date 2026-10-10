@@ -1,0 +1,19 @@
+# Configurable musical count-ins
+
+The new practice default is two complete bars of the selected passage’s entry meter. Count-in length accepts whole bars from one through eight. Source notes, bar ticks, reference tempo units and saved musical evidence remain unchanged. Performance retains its prior one-bar V2 grid.
+
+In Schumann No.14, two 6/8 bars contain four dotted-quarter beats. At 10% of the 180 dotted-quarter reference, the count lasts 13.333333 seconds; the two-bar metric accents occur at 0, 3.333333, 6.666667 and 10 seconds. The notes enter at the next correctly phased beat. The same grid is used for initial Ready, resume and prepared/fallback repeats. In 3/4 there are six quarter beats over two bars.
+
+V3 adds the required integer `countInBars` field. Its count offset is `countInBars * countBarPulses + modulo(scoreStartPhasePulses - countStartPhasePulses, countBarPulses)`. Established pickups and complementary endings preserve the preceding exit phase; genuine meter changes adopt the entry meter explicitly. The source-bar, beat and phase vectors retain their existing exact admission. V2 keeps its literal one-bar meaning and original amplitudes; absent-version legacy requests retain their original meaning. Native IPC separates `pulseGridV2` and `pulseGridV3`, and refuses mixed, incorrectly tagged, missing or malformed versioned payloads. Repeat-owner and cancellation receipts remain protocol V2; their ownership meaning does not change.
+
+V3 distinguishes the musical hierarchy by both pitch and volume: downbeat 1200 Hz/0.16, metric beat 900 Hz/0.12, written subdivision 650 Hz/0.045, extra slow-tempo subdivision 650 Hz/0.022. Existing source-end silence is now honored by browser scheduling as well as native PCM generation. The extra slow subdivisions help pace long beats without competing with the compound beats.
+
+Each Ready owns one BPM and copied/frozen pulse grid before asynchronous audio startup. Audio duration, count origin, score entry, captured session tick clock and completion evidence use that same attempt. Later desired speed/count edits do not alter that armed attempt. The next attempt may adopt them at its source boundary. Pause/replacement still fences obsolete startup and future-cue ownership.
+
+## Evidence and limits
+
+The retained actual Chromium probe before correction exposed two clicks at the first acceleration boundary: an obsolete 650 Hz click and the next 1200 Hz downbeat at 4385.2941176470595 ms. Ready had computed audio duration using the session’s previous/constructor tick rate before capturing the desired rate for entry. The correction uses one captured attempt and silence at the source terminal boundary. The failing receipt is retained outside Git; it is not reclassified as a pass.
+
+Focused source controls cover two-bar 6/8 at 10%, simple/triple/fractional-reference meters, one/eight-bar bounds, literal V2, explicit IPC tags, pickup/complementary endings, speed changes, whole-bar late fallback and edits during both pending unlock and pending native start. The native pure-source controls render actual production Metronome PCM at 44.1/48 kHz and prove hierarchy, source entry, terminal silence, exact V3 admission and prepared tempo transitions. A retained WAV is generated from the production native sample function at 44.1 kHz, including its original 150 ms initial stream lead.
+
+Real Chromium scheduling evidence uses the actual PracticeView, WebAudio oscillators and original public Schumann archive. Source attacks are simulated when measuring completion; this is not physical MIDI, driver-latency, listener or installed-app acceptance. Private repertoire is supplied only by an external caller path. Final source receipts bind the exact modules, event timelines, gain automation and unchanged score/page/seat data. Full native package and human musical acceptance belong to the parent’s ordinary delivery lane.

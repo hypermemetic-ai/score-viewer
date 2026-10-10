@@ -4,9 +4,10 @@ import {attainedRate,readManualAttainment,claimIdentity,type ManualAttainment} f
 import{MidiSoundingNotes,type MidiStream,type PracticeMidiSetup}from'./midi-sustain';
 import type{MidiCC}from'./midi';
 import type {ScorePackage} from './package';
-import {scoreTickMs,scorePulseGrid,sourceBarPhaseTicks,validatePulseGrid,type PracticePulseGrid} from './score-clock';
+import {scoreTickMs,scorePulseGrid,sourceBarPhaseTicks,type PracticePulseGrid} from './score-clock';
 import type {TimeSignatureOverlay} from '../vendor/iso-notation/src/model/types';
 import {practiceTiming} from './practice-timing';
+import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
 import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 export interface PracticeAttack {id:string;tick:number;end:number;midi:number;bar:number;owners:string[];groups:string[]}
 export interface Gesture {id:string;bar:number;hand:'LH'|'RH';start:number;end:number;owners:string[];attackIds:string[]}
@@ -136,14 +137,16 @@ export function practiceErrorContext(plan:PracticePlan,attack:PracticeAttack|und
 export type Phase='ready'|'countin'|'trial'|'inspection'|'paused'|'complete'|'error';
 export class PracticeSession {
  phase:Phase='ready';startTick:number;startMs=0;elapsedTick=0;matched=new Set<string>();started=new Set<string>();message='Prepare both hands, then Ready.';inspection=false;private beforeInspection:Phase='ready';failure?:PracticeAttack;failureReason?:string;errorMarked=false;private sounding=new MidiSoundingNotes();
- readonly sourcePulseGrid:PracticePulseGrid;private attemptGrid:PracticePulseGrid;
+ private sourceGrid:PracticePulseGrid;private attemptGrid:PracticePulseGrid;private attemptRate:number;
+ get sourcePulseGrid(){return practiceCountInGrid(this.sourceGrid,(this.state as PracticeState & {countInBars?:number}).countInBars??2);}
  get pulseGrid(){return this.attemptGrid;}
- constructor(readonly plan:PracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState,public measured:boolean){this.startTick=chunk.start;this.sourcePulseGrid=scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end);this.attemptGrid=this.sourcePulseGrid;}
- get tickMs(){return scoreTickMs(this.plan,this.state.working);}
+ constructor(readonly plan:PracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState,public measured:boolean){this.startTick=chunk.start;this.attemptRate=state.working;this.sourceGrid=scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end);this.attemptGrid=this.sourcePulseGrid;}
+ get bpm(){return this.attemptRate;}
+ get tickMs(){return scoreTickMs(this.plan,this.attemptRate);}
  get events(){return this.plan.attacks.filter(a=>a.tick>=this.startTick&&a.tick<this.chunk.end);}
  get carryIn(){return this.plan.attacks.filter(a=>a.tick<this.startTick&&a.end>this.startTick);}
  get obligations(){return [...this.carryIn,...this.events];}
- ready(now:number,carryContacts:ReadonlySet<number>=new Set(),manualCarryConfirmed=false,input:PracticeMidiSetup={},grid:PracticePulseGrid=this.sourcePulseGrid){if(this.carryIn.length&&(this.measured?!this.carryIn.every(a=>carryContacts.has(a.midi)):!manualCarryConfirmed))throw Error('Prepare the earlier held notes before Ready.');const admitted=validatePulseGrid(grid),factor=admitted.pulsesPerBeat/this.sourcePulseGrid.pulsesPerBeat;for(const key of ['barStartPulses','barMeterPulses','barBeatPulses','barPhasePulses','beatStartPulses'] as const){const expected=this.sourcePulseGrid[key]!,actual=admitted[key]!;if(!Number.isSafeInteger(factor)||factor<1||actual.length!==expected.length||actual.some((p,i)=>p!==expected[i]*factor))throw Error('The attempt meter differs from the selected source passage.');}this.attemptGrid=admitted;this.failure=undefined;this.failureReason=undefined;this.errorMarked=false;this.startTick=this.chunk.start;this.sounding.reset(input.sustain);for(const a of this.carryIn)this.sounding.press(a.id,a.midi,input.contacts?.get(a.midi));this.phase='countin';this.matched.clear();this.started.clear();this.elapsedTick=this.startTick;this.startMs=now+practiceTiming(this.state.working,this.pulseGrid).countInMs;this.message='Count in';}
+ ready(now:number,carryContacts:ReadonlySet<number>=new Set(),manualCarryConfirmed=false,input:PracticeMidiSetup={},grid:PracticePulseGrid=this.sourcePulseGrid,bpm=this.state.working){if(this.carryIn.length&&(this.measured?!this.carryIn.every(a=>carryContacts.has(a.midi)):!manualCarryConfirmed))throw Error('Prepare the earlier held notes before Ready.');const admitted=practiceAttemptGrid(this.sourceGrid,grid);scoreTickMs(this.plan,bpm);this.attemptGrid=admitted;this.attemptRate=bpm;this.failure=undefined;this.failureReason=undefined;this.errorMarked=false;this.startTick=this.chunk.start;this.sounding.reset(input.sustain);for(const a of this.carryIn)this.sounding.press(a.id,a.midi,input.contacts?.get(a.midi));this.phase='countin';this.matched.clear();this.started.clear();this.elapsedTick=this.startTick;this.startMs=now+practiceTiming(this.attemptRate,this.pulseGrid).countInMs;this.message='Count in';}
  update(now:number){if(!['countin','trial'].includes(this.phase))return;this.expireSound(now);this.elapsedTick=this.startTick+(now-this.startMs)/this.tickMs;if(now>=this.startMs&&this.phase==='countin'){this.phase='trial';this.message='';}
  if(this.measured){const missed=this.events.find(a=>!this.matched.has(a.id)&&now>this.startMs+(a.tick-this.startTick)*this.tickMs+500);if(missed){this.fail(missed.bar,'A note was missed.',missed);return;}}
 
