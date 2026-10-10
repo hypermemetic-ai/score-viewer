@@ -583,6 +583,9 @@ window.addEventListener('keydown',e=>{syncControls();if(bindingOptions?.keyDown(
  if(!dialog&&current&&preferences.fingerBehavior==='momentary'&&focused.closest?.('[data-action=toggle]')&&['Enter','Space'].includes(uiCode)){e.preventDefault();if(!e.repeat&&!input.held.has(inputCode(e))){input.holdControl(inputCode(e));void act('toggle');}return;}
  if(e.repeat&&!inField&&['Enter','Space'].includes(uiCode)){e.preventDefault();return;}
  if(!dialog&&current&&!practice&&!keypadAssigned&&focused.closest?.('.toolbar')&&(toolbarNavigation?.keyDown(e)||toolbarNavigation?.picking)){e.preventDefault();return;}
+ // Plain Space starts the selected piano mode even while a footer button is
+ // focused. Input fields and explicitly assigned keys keep their own authority.
+ if(!dialog&&practice instanceof PracticeView&&practice.bindingContext.active&&uiCode==='Space'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&!capture&&!focused.closest?.('input,select,textarea,[contenteditable=true]')&&!controls.matchKey(e)&&readerFocused&&!document.hidden){const held=input.held.has(inputCode(e));input.down(e,false,true);controls.keyDown(e,false);e.preventDefault();if(!e.repeat&&!held)void practice.action('ready');return;}
  if(!dialog&&practice&&!keypadAssigned&&focused.closest?.('.practice-controls')&&practiceNavigation?.keyDown(e)){e.preventDefault();return;}
  if(!dialog&&practice&&focused.matches('[data-practice-display=manual]')&&['ArrowDown','ArrowRight'].includes(e.code)&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();app.querySelector<HTMLElement>('.practice-overview [data-passage-id][tabindex="0"]')?.focus();return;}
  const repeatedDown=input.held.has(inputCode(e)),selectionDigit=!!selection&&directFingerKey(e)!==undefined;input.down(e,false,true);const result=controls.keyDown(e,(!!current||controls.matchKey(e)?.action==='practiceSettings')&&readerFocused&&!document.hidden&&!dialog&&!inField&&!selectionDigit&&!practice?.modalOpen);
