@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {admitRefill,allocateRefill,PracticeRefill,readingBar,refillCandidates,refillResidents,refillSuccessors,type RefillLayout,type RefillMeasure} from '../src/practice-refill';
+import {admitRefill,allocateRefill,PracticeRefill,readingBar,refillAllocationBars,refillCandidates,refillResidents,refillSuccessors,type RefillLayout,type RefillMeasure} from '../src/practice-refill';
 import {initialPractice,PracticeSession,type PracticePlan,type PracticeChunk,type PracticeAttack} from '../src/practice';
 
 function fixture(widths:number[],rests:number[]=[],hands:Record<number,'LH'|'RH'>={}){
@@ -129,4 +129,34 @@ test('a four-bar leaf keeps resident source and stable geometry; hand reveals re
 test('original three/four/five-bar leaves and terminal rests remain selected and bounded',()=>{
  for(const count of [3,4,5]){const f=fixture(Array.from({length:count},(_,i)=>40+20*i),[count-1]),c=admitRefill(f.plan,f.chunk,f.measures);assert.ok(c.initial.placements.length<=4);for(let bar=0;bar<count;bar++)assert.ok(refillResidents(f.plan,f.chunk,bar).every(b=>b<count));assert.deepEqual(refillSuccessors(f.plan,f.chunk,count-1),[]);}
  const f=fixture([50,60,70,500,80,90]);assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:100}),/cannot be admitted at a readable size/);
+});
+
+test('a complete short leaf certifies its consecutive frame without impossible refill gaps',()=>{
+ for(const widths of [[50,80,70],[50,80,70,100]]){
+  const f=fixture(widths),width=widths.reduce((a,b)=>a+b,0)+10,c=admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:width});
+  assert.equal(c.frame.width,width);assert.equal(c.proof,'enumerated');assert.ok(c.transitions>0);
+  const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c),placements=c.initial.placements;
+  for(const rate of [5,500]){s.state.working=rate;s.ready(0);refill.prime();for(const a of s.events){assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);assert.equal(refill.layout.placements,placements);}}
+  assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{maxFrameWidth:width-1}),/cannot be admitted/);
+ }
+});
+
+test('a subset request retires no source frame and leaves every resident placement exact',()=>{
+ const f=fixture([60,70,80,90]),c=admitRefill(f.plan,f.chunk,f.measures),previous=c.initial;
+ const next=allocateRefill(previous,2,[2,3],c.measures,c.frame);
+ assert.equal(next.current,2);assert.equal(next.epoch,previous.epoch);assert.equal(next.placements,previous.placements);
+ assert.deepEqual(next.placements.map(p=>p.bar),[0,1,2,3]);
+});
+
+test('terminal incoming allocations retain four distinct source frames and the protected interval',()=>{
+ const f=fixture([40,70,80,90,60,50]),c=admitRefill(f.plan,f.chunk,f.measures),previous:RefillLayout={...c.initial,current:3};
+ // An early accepted attack requests the final source bar. There are only
+ // three forward bars; the cleared old interval still supplies the fourth.
+ const bars=refillAllocationBars(f.plan,f.chunk,previous,3,3);
+ assert.deepEqual(bars,[2,3,4,5]);
+ const next=allocateRefill(previous,3,bars,c.measures,c.frame);
+ assert.deepEqual(next.placements.find(p=>p.bar===3),previous.placements.find(p=>p.bar===3));assert.equal(next.placements.length,4);
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c);s.ready(0);
+ for(const a of s.events){const anchor=refill.layout.placements.find(p=>p.bar===a.bar);assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);assert.equal(refill.bars.length,4);assert.equal(new Set(refill.bars).size,4);assert.deepEqual(refill.layout.placements.find(p=>p.bar===a.bar),anchor);}
+ assert.ok(refill.retired.has(0));assert.deepEqual(refill.bars.slice().sort((a,b)=>a-b),[2,3,4,5]);
 });
