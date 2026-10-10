@@ -11,23 +11,27 @@ export function adjustDuration(bpm:number,direction:number,elapsed=0):number {
 }
 /** Move to the next half-percentage-point grid value; stored BPM stays exact. */
 export function adjustPercent(bpm:number,goal:number,direction:number,min=5,max=500):number {
+ return Math.max(min,Math.min(max,adjustPracticePercent(bpm,goal,direction,0,Infinity)));
+}
+/** Practice boundaries are themselves legal half-point choices. */
+export function adjustPracticePercent(bpm:number,goal:number,direction:number,min=5,max=500):number {
  if(!direction)return bpm;
  const step=manualProgressionStep(),units=100*bpm/goal/step,nearest=Math.round(units);
  const aligned=Math.abs(units-nearest)<=8*Number.EPSILON*Math.max(1,Math.abs(units))?nearest:units;
  const quantum=step*goal/100,lo=Math.ceil(min/quantum-1e-10),hi=Math.floor(max/quantum+1e-10);
  const next=direction>0?Math.floor(aligned)+1:Math.ceil(aligned)-1;
- return Math.max(lo,Math.min(hi,next))*quantum;
+ return Math.max(lo,Math.min(hi,next))*goal/200;
 }
 /** Preferences are half-point choices; attained historical rates are never snapped. */
 export function snapPracticeSpeed(bpm:number,goal:number,min=5,max=500):number {
  const quantum=goal*.005;
  if(!Number.isFinite(bpm)||!Number.isFinite(quantum)||quantum<=0)throw Error('Practice speed is unavailable.');
- return Math.max(Math.ceil(min/quantum-1e-10),Math.min(Math.floor(max/quantum+1e-10),Math.round(bpm/quantum)))*quantum;
+ return Math.max(Math.ceil(min/quantum-1e-10),Math.min(Math.floor(max/quantum+1e-10),Math.round(bpm*200/goal)))*goal/200;
 }
 export const snapPracticeStep=(step:number,goal:number)=>snapPracticeSpeed(step,goal,goal*.005,100);
 /** A progression policy uses the same percentage grid with its own physical bounds. */
 export function adjustProgression(step:number,goal:number,direction:number,_elapsed=0):number {
- return adjustPercent(step,goal,direction,goal*.005,100);
+ return adjustPracticePercent(step,goal,direction,goal*.005,100);
 }
 export function durationLabel(bpm:number):string {
  const ms=beatMilliseconds(bpm);

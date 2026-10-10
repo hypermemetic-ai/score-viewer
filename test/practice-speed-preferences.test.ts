@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
 import {planPractice,initialPractice,readPractice} from '../src/practice';
 import {practicePreferences,practiceStateForContext} from '../src/practice-context';
-import {adjustPercent,adjustProgression,snapPracticeSpeed,snapPracticeStep,speedEdit} from '../src/tempo-presentation';
+import {adjustPracticePercent as adjustPercent,adjustProgression,snapPracticeSpeed,snapPracticeStep,speedEdit} from '../src/tempo-presentation';
 const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
 const plan=planPractice(p);
 const onGrid=(value:number,goal:number)=>assert.ok(Math.abs(value/(goal*.005)-Math.round(value/(goal*.005)))<1e-9);
@@ -19,7 +19,7 @@ test('restored and typed preferences snap without rewriting historical attainmen
 test('half-point holds, progression and physical boundaries remain on the same lattice',()=>{
  for(const goal of [5,67.5,180,360,500]){let n=snapPracticeSpeed(5,goal);onGrid(n,goal);assert.ok(n>=5);for(let i=0;i<600;i++){n=adjustPercent(n,goal,1);onGrid(n,goal);}assert.ok(n<=500);n=adjustPercent(n,goal,-1);onGrid(n,goal);let step=snapPracticeStep(.025,goal);onGrid(step,goal);assert.equal(step,goal*.005);for(let i=0;i<10;i++){step=adjustProgression(step,goal,1,4000);onGrid(step,goal);}}
 });
-test('only untouched old defaults migrate; saved preferences and earned evidence survive',()=>{
- const s=initialPractice(plan);delete s.speedRevision;s.start=10;s.working=10;s.workingByPattern={};assert.equal(readPractice(s,plan).start,s.target*.1);s.best[plan.chunks[0].pattern]=70.123;const loaded=readPractice(s,plan);assert.equal(loaded.start,snapPracticeSpeed(10,s.target));assert.equal(loaded.best[plan.chunks[0].pattern],70.123);
+test('legacy absolute-ten defaults migrate beside exact earned evidence; deliberate saved rates survive',()=>{
+ const s=initialPractice(plan);delete s.speedRevision;s.start=10;s.working=10;s.workingByPattern={};assert.equal(readPractice(s,plan).start,s.target*.1);s.best[plan.chunks[0].pattern]=70.123;const loaded=readPractice(s,plan);assert.equal(loaded.start,s.target*.1);s.working=33.333;s.workingByPattern[plan.chunks[0].pattern]=45.678;const chosen=readPractice(s,plan);assert.equal(chosen.working,snapPracticeSpeed(33.333,s.target));assert.equal(chosen.workingByPattern[plan.chunks[0].pattern],snapPracticeSpeed(45.678,s.target));assert.equal(loaded.best[plan.chunks[0].pattern],70.123);
  for(const patch of [{countInBars:0},{countInBars:2.5},{resumeCooldownSeconds:31},{resumeCooldownSeconds:.5}])assert.throws(()=>readPractice({...s,...patch},plan),/count-in bars/);
 });
