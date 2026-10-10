@@ -1,4 +1,4 @@
-import {chord,inputCode,readBindings,readableChord,readingActions,readingActionLabel,practiceSettingsFallback,type ReadingAction} from './input';
+import {actionCode,chord,inputCode,readBindings,readableChord,readingActions,readingActionLabel,practiceSettingsFallback,type ReadingAction} from './input';
 import {readMidiBindings,readMidiMapping,validCC,type MidiCC,type MidiMapping} from './midi';
 export type ControlBinding={kind:'key';key:string}|({kind:'midi'}&MidiMapping);
 export type ControlSlots=[ControlBinding|null,ControlBinding|null];
@@ -47,7 +47,7 @@ export class ControlResolver {
  const old=this.physical.get(id);if(old?.down)return {changed:false};const match=this.match(binding);this.physical.set(id,{binding,down:true,blocked:!enabled,match,...extra});return {action:enabled?match?.action:undefined,match:enabled?match:undefined,received:enabled?binding:undefined,changed:enabled};
  }
  keyDown(e:KeyInput,enabled:boolean):ControlResult {
- const code=inputCode(e);if(e.repeat||this.keys.has(code))return {changed:false};this.keys.add(code);if(/^(Control|Alt|Shift|Meta)/.test(e.code))return {changed:false};const binding:ControlBinding={kind:'key',key:chord(e)};return this.press(`key:${code}`,binding,enabled,{code,modifiers:binding.key.split('+').slice(0,-1)});
+ const code=inputCode(e);if(e.repeat||this.keys.has(code))return {changed:false};this.keys.add(code);if(/^(Control|Alt|Shift|Meta)/.test(e.code))return {changed:false};const exact:ControlBinding={kind:'key',key:chord(e)},alias=actionCode(e)!==code?this.match({kind:'key',key:chord(e,actionCode(e))}):undefined,binding=this.match(exact)?exact:alias?.binding.kind==='key'?alias.binding:exact;return this.press(`key:${code}`,binding,enabled,{code,modifiers:binding.key.split('+').slice(0,-1)});
  }
  keyUp(e:Pick<KeyboardEvent,'code'>&{key?:string}):boolean {
  const code=inputCode(e);this.keys.delete(code);const modifier=/^Control/.test(e.code)?'Ctrl':/^Alt/.test(e.code)?'Alt':/^Shift/.test(e.code)?'Shift':/^Meta/.test(e.code)?'Meta':undefined;let changed=false;
