@@ -585,7 +585,7 @@ window.addEventListener('keydown',e=>{syncControls();if(bindingOptions?.keyDown(
  if(!dialog&&current&&!practice&&!keypadAssigned&&focused.closest?.('.toolbar')&&(toolbarNavigation?.keyDown(e)||toolbarNavigation?.picking)){e.preventDefault();return;}
  if(!dialog&&practice&&!keypadAssigned&&focused.closest?.('.practice-controls')&&practiceNavigation?.keyDown(e)){e.preventDefault();return;}
  if(!dialog&&practice&&focused.matches('[data-practice-display=manual]')&&['ArrowDown','ArrowRight'].includes(e.code)&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();app.querySelector<HTMLElement>('.practice-overview [data-passage-id][tabindex="0"]')?.focus();return;}
- const repeatedDown=input.held.has(inputCode(e)),selectionDigit=!!selection&&directFingerKey(e)!==undefined;input.down(e,false,true);const result=controls.keyDown(e,(!!current||controls.match({kind:'key',key:chord(e)})?.action==='practiceSettings')&&readerFocused&&!document.hidden&&!dialog&&!inField&&!selectionDigit&&!practice?.modalOpen);
+ const repeatedDown=input.held.has(inputCode(e)),selectionDigit=!!selection&&directFingerKey(e)!==undefined;input.down(e,false,true);const result=controls.keyDown(e,(!!current||controls.matchKey(e)?.action==='practiceSettings')&&readerFocused&&!document.hidden&&!dialog&&!inField&&!selectionDigit&&!practice?.modalOpen);
  if(capture||inField){practice?.cancelTempoHold();return;}
  if(e.ctrlKey||e.altKey||e.metaKey)practice?.cancelTempoHold();
  if(!inField&&!capture&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&inputCode(e)==='KeyR'&&!e.shiftKey&&!e.repeat&&!controls.match({kind:'key',key:chord(e)})){e.preventDefault();void act('rotate');return;}
