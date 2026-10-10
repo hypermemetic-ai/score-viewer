@@ -160,3 +160,37 @@ test('terminal incoming allocations retain four distinct source frames and the p
  for(const a of s.events){const anchor=refill.layout.placements.find(p=>p.bar===a.bar);assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);assert.equal(refill.bars.length,4);assert.equal(new Set(refill.bars).size,4);assert.deepEqual(refill.layout.placements.find(p=>p.bar===a.bar),anchor);}
  assert.ok(refill.retired.has(0));assert.deepEqual(refill.bars.slice().sort((a,b)=>a-b),[2,3,4,5]);
 });
+
+test('empty source frames reclaim space before a wide required measure without moving the active interval',()=>{
+ const f=fixture([135.87,135.87,135.87,424.57,118.91]);for(const m of f.measures){m.blankWidth=m.bar===4?m.width:4;m.leftAir=.8;m.rightAir=m.bar===4?5:.8;}
+ f.measures[3].leftAir=8.655;
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:.8,breakGap:8,boundaryAir:true,maxFrameWidth:580});
+ assert.equal(c.proof,'enumerated');assert.ok(c.states>0);assert.ok(c.frame.width<=580);assert.equal(c.initial.placements.length,4);
+ assert.ok(c.initial.placements.find(p=>p.bar===2)!.empty);assert.ok(c.initial.placements.find(p=>p.bar===3)!.empty);
+ const s=new PracticeSession(f.plan,f.chunk,initialPractice(f.plan),true),refill=new PracticeRefill(f.plan,f.chunk,c);s.ready(0);
+ for(const a of s.events){
+  const before=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(before.width,f.measures[a.bar].width);assert.ok(!before.empty,'Incoming attack was not expanded before reveal');
+  assert.equal(s.note(a.midi,s.startMs+a.tick*s.tickMs),'accepted');refill.update(s,true);
+  const after=refill.layout.placements.find(p=>p.bar===a.bar)!;assert.equal(after.x,before.x);assert.equal(after.width,before.width);
+  assert.equal(refill.bars.length,4);assert.equal(new Set(refill.bars).size,4);
+  for(const required of refillResidents(f.plan,f.chunk,a.bar))assert.equal(refill.layout.placements.find(p=>p.bar===required)!.width,f.measures[required].width);
+ }
+ assert.throws(()=>admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,maxFrameWidth:550}),/cannot be admitted/,'actual required source intervals still refuse when no readable placement exists');
+});
+
+test('empty-frame sizing cannot resize an unread protected interval or waive a visible source footprint',()=>{
+ const f=fixture([100,150,100,200,120]);f.measures.forEach(m=>{m.blankWidth=4;});f.measures[2].blankWidth=f.measures[2].width;
+ const previous:RefillLayout={current:0,epoch:0,placements:[{...f.measures[0],x:10},{...f.measures[1],x:110},{...f.measures[2],x:260},{...f.measures[3],width:4,empty:true,x:360}]};
+ assert.throws(()=>allocateRefill(previous,3,[1,2,3,4],new Map(f.measures.map(m=>[m.bar,m])),{width:600,edge:5,breakGap:8}),/fully admitted before entry/);
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:5,maxFrameWidth:800});assert.equal(c.initial.placements.find(p=>p.bar===2)!.width,100,'non-note footprint remains full width');
+});
+
+test('unused empty staff room is shared without changing required geometry or accepting invalid minima',()=>{
+ const f=fixture([135.87,135.87,135.87,424.57,118.91]);f.measures.forEach(m=>m.blankWidth=4);f.measures[4].blankWidth=f.measures[4].width;
+ const c=admitRefill(f.plan,f.chunk,f.measures,{edge:.8,boundaryAir:true,maxFrameWidth:590});
+ const blanks=c.initial.placements.filter(p=>p.empty);assert.equal(blanks.length,2);assert.ok(blanks.every(p=>p.width>4));assert.equal(blanks[0].width,blanks[1].width);
+ const anchor={...f.measures[4],x:1.6},previous:RefillLayout={current:4,epoch:4,placements:[anchor,...f.measures.slice(1,4).map((p,i)=>({...p,width:4,empty:true,x:130+i*4}))]},map=new Map(f.measures.map(p=>[p.bar,p.bar===4?p:{...p,width:4,empty:true}]));
+ const candidates=refillCandidates(previous,4,[1,2,3,4],map,{width:590,edge:.8,breakGap:8,boundaryAir:true});
+ assert.deepEqual(candidates[0].placements.find(p=>p.bar===4),anchor);const shared=candidates[0].placements.filter(p=>p.empty);assert.ok(shared.every(p=>p.width>100));assert.ok(shared.every(p=>Math.abs(p.width-shared[0].width)<1e-7));
+ for(const invalid of [0,-1,NaN,Infinity,136]){const input=f.measures.map(p=>({...p}));input[0].blankWidth=invalid;assert.throws(()=>admitRefill(f.plan,f.chunk,input),/valid source footprint/);}
+});

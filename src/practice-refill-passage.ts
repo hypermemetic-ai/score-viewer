@@ -1,6 +1,6 @@
 import type {ScorePackage} from './package';
 import type {PracticeChunk,PracticePlan,PracticeSession} from './practice';
-import {passageTrack,fitPassageFrame,type Crop,type PassageTrack} from './practice-passage';
+import {passageTrack,fitPassageFrame,blankMeasureWidth,type Crop,type PassageTrack} from './practice-passage';
 import {projectRelations,readableTieContinuation,type ProjectedRelation} from './practice-relations';
 import {admitRefill,type RefillCertificate,type RefillPlacement} from './practice-refill';
 
@@ -29,7 +29,7 @@ export function admitRefillPassage(p:ScorePackage,plan:PracticePlan,chunk:Practi
  if(!stationary&&existing&&maximumWidth!==undefined&&existing.frame.width>maximumWidth+1e-7)throw Error('Practice needs more room to keep the current passage readable. Rotate or enlarge the view before resuming.');
  // A wrapped boundary may expose both repeat/final overhangs. Separate
  // their full source clip footprint and stroke air, not only the staff ends.
- const certificate=existing??admitRefill(plan,chunk,crops.map(c=>({bar:c.bar,width:c.right-c.left,leftAir:Math.max(c.leftAir,cueAir.get(c.bar)??0),rightAir:c.rightAir})),{edge:Math.max(track.leftAir,track.rightAir,...cueAir.values())+.8,breakGap:8,maxFrameWidth:stationary?undefined:maximumWidth});
+ const certificate=existing??admitRefill(plan,chunk,crops.map(c=>({bar:c.bar,width:c.right-c.left,...(!stationary?{blankWidth:blankMeasureWidth(c,mount)}:{}),leftAir:Math.max(c.leftAir,cueAir.get(c.bar)??0),rightAir:c.rightAir})),{edge:stationary?Math.max(track.leftAir,track.rightAir,...cueAir.values())+.8:.8,...(!stationary?{boundaryAir:true}:{}),breakGap:8,maxFrameWidth:stationary?undefined:maximumWidth});
  if(stationary){
   const bars=certificate.initial.placements.map(p=>p.bar),offset=certificate.initial.placements[0].x;
   track.topAir=0;fitPassageFrame(p,plan,crops,track,'compact',[bars],mount,certificate.initial.placements);
@@ -41,12 +41,15 @@ export function admitRefillPassage(p:ScorePackage,plan:PracticePlan,chunk:Practi
  * head/stem, invent a pedal tie, or change the session's sound ledger. The
  * destination onset is intentionally not used as a lifetime boundary. */
 export function heldTieCues(p:ScorePackage,plan:PracticePlan,session:PracticeSession,retired:ReadonlySet<number>,current:RefillPlacement,projected:ProjectedRelation[],crops:Crop[],track:PassageTrack,placements:ReadonlyArray<RefillPlacement>):ProjectedRelation[] {
- const cues:ProjectedRelation[]=[],settled:ProjectedRelation[]=[];
+ const cues:ProjectedRelation[]=[],settled:ProjectedRelation[]=[],positions=placements.map(p=>p.empty?undefined:p.bar);
  for(const q of projected){
   if(q.kind!=='tie'||Number(q.path.getAttribute('data-tie-from-tick'))>=plan.barTicks[current.bar]||Number(q.path.getAttribute('data-tie-to-tick'))<plan.barTicks[current.bar])continue;
   // Geometry uses the same conservative simultaneous owner set as preflight.
   // Expiry/filtering cannot select a different clearance or move another cue.
-  const cue=readableTieContinuation(p,q,current.bar,crops,track,placements.map(p=>p.bar),placements,[...projected,...settled]);if(!cue)continue;settled.push(cue);
+  // Empty staff intervals expose no note obstacles. Use the same admitted
+  // paint positions as relation projection; non-note footprints retain full
+  // source intervals and remain in the clearance calculation.
+  const cue=readableTieContinuation(p,q,current.bar,crops,track,positions,placements,[...projected,...settled]);if(!cue)continue;settled.push(cue);
   const owner=(q.path.getAttribute('data-tie-note')??'').replace(/~c\d+$/,''),note=p.score.notes.find(n=>n.id===owner),group=plan.ownerGroup.get(owner),attack=session.obligations.find(a=>a.owners.includes(owner));
   if(!note||!group||!attack||!retired.has(Number(group.split(':')[0]))||!(session.matched.has(attack.id)||attack.tick<session.startTick))continue;
   const end=Math.min(plan.barTicks[current.bar+1],note.startTick+note.durationTicks);
