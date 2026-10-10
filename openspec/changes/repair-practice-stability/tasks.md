@@ -23,6 +23,8 @@
 
 ## Source and delivery evidence (2026-10-10)
 
+Sections 1–3 record the completed prior technical milestone. The user feedback below adds pending acceptance work; it does not alter the immutable earlier receipts.
+
 The reviewed repair-only integration landed in PR56 at `01a0c4c966e6dc03776729c3f641ea43f88634f0` with ISO `7205da0d6b62a4a023eda5f2f5d66bdec4fa6493`; main integration landed in PR57 at `f4d39b3ab07a8a1405bf30cf855c6db4dc9a7865`. Their configured suites passed 586 and 661 tests respectively, with TypeScript/Vite builds. The repair-only source also passed 22 carrier and seven footer checks, independent 79-control composition review, four actual browser musical cases and 24 production-build keyboard cases. Retained Schumann/Zelda geometry was inspected in both layouts. Browser input/native clock seams were simulated; this is source acceptance.
 
 The retained No14 archive, library, preferences, two personal files and two practice journals remained byte-exact across the browser checks, including all 31 finger choices, one history row and raw earned evidence. Long Zelda refill can temporarily leave two genuinely empty frames approximately 9px wide while required/current source ink retains its exact geometry. This is a disclosed constraint, not an equal-width layout claim.
@@ -34,3 +36,13 @@ The current pair was atomically published after recipient and data admission. Th
 The closed streamed audit retained all 815 originals, with 813 byte-exact, all 718 bank files exact and the 479-file original app preserved. Only the current No14 practice journal's exact production migration and two bound library pointer leaves changed; one additive personal version is byte/deep-identical to its effective baseline, including 31 corrections/history 1/view. Preferences are byte-exact. Of 86 captured JSON readbacks, 83 were independently hashed locally; three unavailable long-name copies remain unchanged in the actual streamed inventory. The immutable delivery receipt is SHA256 `180fbcd9ec1e495b036777a998ab3e3a432b59322264f54c537f5060e8ad6515`; independent data audit is `58e5141009dc168e58b79d8897ad3903fc700112ae87b3e87100a7c77383603f`.
 
 These checkboxes close the observed practice-core technical delivery. Keypad Enter [PR60](https://github.com/hypermemetic-ai/score-viewer/pull/60) merged to the repair source branch at `d8a59afe4da15f0c1a5680423c73d37f35d36c14`; it is not included in this installed/published pair, and its main port is separate. Regular Enter was checked in the production browser. Physical MIDI/note/pedal/audio/human acceptance is unclaimed. Mac WK evidence is actual arm64 standalone loopback, not Tauri-origin/CSP, minimum-OS or second-host-architecture acceptance. Keep the change unarchived for coordinator review.
+
+## 4. User feedback follow-up
+
+- [ ] 4.1 Reproduce degraded armed-repeat click PCM and implement sample-frame continuity without changing musical timing, timbre or output policy.
+- [ ] 4.2 Reproduce repeat readiness under real render/save load, remove unrelated persistence gates and preserve a complete aligned count-in without ordinary bar extensions.
+- [ ] 4.3 Reproduce and repair Free/Ready/active/error/restart framing transitions on short and longer retained passages, preserving complete restoration and current reading references.
+- [ ] 4.4 Place cooldown seconds inside the lock body and add restrained blocked-Resume feedback with keyboard/pointer and reduced-motion controls.
+- [ ] 4.5 Implement configured fresh-passage resets, separately editable 50% connection start and 2% fresh increase, preserving custom settings and raw evidence.
+- [ ] 4.6 Independently review the combined exact source, run configured checks/build and inspect production keyboard, musical, visual and PCM paths across both layouts.
+- [ ] 4.7 Land both applicable source lanes, freeze/review the ordinary complete Windows/Mac pair, freshly preserve current recipient data, activate additively and record actual acceptance limits.
