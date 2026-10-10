@@ -94,7 +94,7 @@ export class ManualPracticeView {
   root.hidden=!visible;if(!visible){this.cueLabel='';return;}const label=countBeatAt(now!-origin!,rate!,grid!),number=root.querySelector<HTMLElement>('strong')!;if(this.cueLabel!==label){number.textContent=label;this.cueLabel=label;}const timing=practiceTiming(rate!,grid!);number.dataset.accent=String((grid!.countStartPhasePulses!+Math.floor((now!-origin!)/timing.eighthMs))%grid!.countBarPulses!<grid!.countBeatPulses!);
  }
  private frame=()=>{if(this.disposed)return;if(this.transport&&this.session&&['countin','trial','complete'].includes(this.session.phase)){this.transport.update();this.paintCue();}this.raf=requestAnimationFrame(this.frame);};
- private replaceTransport(){this.transport?.close();const clock=this.options.createClock?.()??new PracticeClock('__TAURI_INTERNALS__' in window,this.options.audioOutput?.()??'',message=>{this.pause();this.status(message);});
+ private replaceTransport(){this.transport?.close();const clock:ManualClock=this.options.createClock?.()??new PracticeClock('__TAURI_INTERNALS__' in window,this.options.audioOutput?.()??'',message=>{if(this.disposed||this.transport?.clock!==clock)return;this.pause();this.status(message);});
   this.transport=new ManualPracticeTransport(this.session!,clock,()=>{if(this.disposed)return;this.options.context.syncWindowAnchor();const working=this.state.working;this.paint();if(this.lastWorking!==working){this.lastWorking=working;void this.save();}},message=>this.status(message));}
  async action(action:string){if(this.disposed)return;try{
   if(action.startsWith('select:')||action.startsWith('component:')){this.browser.select(this.state,action.slice(action.indexOf(':')+1),action.startsWith('component:'));this.paintBrowser(true);return;}

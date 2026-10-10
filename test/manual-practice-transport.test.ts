@@ -18,7 +18,7 @@ function fixture(){
    if(armMode==='refused')return undefined;if(armMode==='pending')return new Promise(resolve=>{resolveArm=resolve;});return value;},
   adoptRepeat:r=>{calls.push('adopt');clock.time=r.countStartMs;return {countStartMs:r.countStartMs,startMs:r.startMs,extraBeats:0,totalGapBeats:4};},
   beginRepeat:async(_b,_d,p)=>{calls.push('beginRepeat');clock.time=p.boundaryMs+p.repeatBarMs;return {countStartMs:clock.time,startMs:clock.time+p.countInMs,extraBeats:4,totalGapBeats:8};},
-  cancelRepeat:async()=>undefined,stop:async()=>{calls.push('stop');},close:()=>{calls.push('close');}};
+  cancelRepeat:async()=>undefined,stop:async()=>{calls.push('stop');},close:async()=>{calls.push('close');}};
  const errors:string[]=[],changes:string[]=[],transport=new ManualPracticeTransport(s,api,()=>changes.push(s.phase),m=>errors.push(m));
  return {s,clock,calls,transport,errors,changes,setMode:(m:typeof armMode)=>{armMode=m;},resolve:()=>resolveArm?.(undefined)};
 }
