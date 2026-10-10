@@ -109,3 +109,13 @@ test('cross-measure written ties keep one musical owner and honest retained appe
  const incomplete=structuredClone(tied);incomplete.reading!.owners.find(o=>o.id==='authored-tied-owner')!.heads.pop();
  await assert.rejects(planManualPractice(incomplete),/incomplete written source components/);
 });
+
+test('manual desired speed/count edits leave the sounding attempt and completion claim exact',()=>{
+ const state=initialPractice(plan);state.working=state.target;const s=new ManualPracticeSession(plan,plan.chunks[0],state);
+ s.ready(1000);const rate=s.bpm,start=s.startMs,tick=s.tickMs,grid=JSON.stringify(s.pulseGrid);
+ assert.equal(s.queueWorking(state.target*.505),true);state.countInBars=8;
+ assert.equal(s.bpm,rate);assert.equal(s.tickMs,tick);assert.equal(s.startMs,start);assert.equal(JSON.stringify(s.pulseGrid),grid);
+ assert.throws(()=>s.applyNextRate(),/loop boundary/);s.update(start+s.durationMs);assert.equal(s.doneTarget()?.rate,rate);
+ assert.equal(s.applyNextRate(),state.target*.505);s.ready(start+s.durationMs,s.sourcePulseGrid,state.working);
+ assert.equal(s.bpm,state.target*.505);assert.equal(s.pulseGrid.countInBars,8);assert.deepEqual(state.best,{});
+});
