@@ -20,7 +20,7 @@ async function fixture(t:any,{pickup=false,pending=false}={}){
  const clock=new PracticeClock(true),countMs=session.pulseGrid.scoreOffsetPulses*60000/(60*session.pulseGrid.pulsesPerBeat),duration=countMs+chunk.end*session.tickMs,origin=await clock.begin(60,duration,true,session.pulseGrid);session.ready(origin);
  let now=clock.now();clock.now=()=>now;
  const view=Object.create(PracticeView.prototype) as any;Object.assign(view,{plan,state,session,clock,loopRate:60,doneClaims:new PracticeDone(),startGeneration:0,disposed:false,overview:false,heldPitches:new Set(),heldStreams:new Map(),contacts:{clear(){},press(){}},preview:{clear(){}},options:{},app:{querySelector:()=>null},manual:{cancel(){}},save:()=>Promise.resolve(true),paint(){},paintControls(){},paintVisibility(){},paintProgress(){},refreshTempoFields(){},refreshSettings(){},resetCarrySetup(){},clearPose(){},status(){}});
- t.after(async()=>{await clock.stop();host.midiClock=old.sample;Object.assign(practiceAudio,{begin:old.begin,armRepeat:old.arm,cancelRepeat:old.cancel,stop:old.stop,onError:old.onError});});
+ t.after(async()=>{view.stopClock();await clock.stop();host.midiClock=old.sample;Object.assign(practiceAudio,{begin:old.begin,armRepeat:old.arm,cancelRepeat:old.cancel,stop:old.stop,onError:old.onError});});
  return {view,state,session,clock,arms,cancels,get stops(){return stops;},setNow(value:number){now=value;},settleOld(){resolveOld(receipt(arms[0]));}};
 }
 
