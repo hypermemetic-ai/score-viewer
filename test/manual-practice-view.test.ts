@@ -28,7 +28,7 @@ test('a footer-only manual repaint retains visible and accessible save/render/au
  Object.defineProperty(globalThis,'document',{configurable:true,value:{activeElement:{dataset:{}}}});
  try{
   const view=Object.create(ManualPracticeView.prototype) as any;
-  Object.assign(view,{app,surface,options:{context},plan:context.plan,state:context.state,overview:false,disposed:false,freeView:false,feedback:''});
+  Object.assign(view,{app,surface,options:{context},plan:context.plan,state:context.state,overview:false,disposed:false,freeView:false,feedback:'',manual:{retainDraft:()=>()=>{}}});
   for(const [field,cause,summary]of [['saveError','Progress has not saved: disk unavailable','Progress not saved. Retry saving.'],['renderError','A source relation could not be rendered','Passage unavailable. Inspect source.'],[undefined,'Audio could not prepare the count-in','Audio could not prepare the count-in']] as const){
    view.saveError=undefined;view.renderError=undefined;if(field)view[field]=cause;view.status(cause);
    view.paintControls();assert.equal(notice.hidden,false);assert.equal(notice.textContent,summary);assert.equal(notice.title,cause);assert.equal(notice.attributes['aria-label'],cause);
