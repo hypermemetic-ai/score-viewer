@@ -69,6 +69,12 @@ test('remapped and empty Done controls are not revived by either Enter key',()=>
  }
 });
 
+test('library eligibility and dispatch resolve admitted Enter Options together without overriding a keypad assignment',()=>{
+ const saved=replaceControl(replaceControl(defaults(),'done',0,{kind:'key',key:'F10'}),'practiceSettings',0,{kind:'key',key:'Enter'}),before=JSON.stringify(saved);
+ for(const code of ['Enter','NumpadEnter']){const r=new ControlResolver(saved);assert.equal(r.matchKey(key(code))?.action,'practiceSettings');assert.equal(r.keyDown(key(code),r.matchKey(key(code))?.action==='practiceSettings').action,'practiceSettings');r.keyUp({code});assert.equal(r.matchKey(key(code,{ctrlKey:true})),undefined);}
+ const exact=new ControlResolver(replaceControl(saved,'edit',0,{kind:'key',key:'NumpadEnter'}));assert.equal(exact.matchKey(key('NumpadEnter'))?.action,'edit');assert.equal(exact.keyDown(key('NumpadEnter'),exact.matchKey(key('NumpadEnter'))?.action==='practiceSettings').action,undefined);exact.keyUp({code:'NumpadEnter'});assert.equal(exact.keyDown(key('Enter'),true).action,'practiceSettings');assert.equal(JSON.stringify(saved),before);
+});
+
 test('legacy capture reserves both Enter confirmations but retains the exact captured Done chord',()=>{
  for(const code of ['Enter','NumpadEnter']){
   const c=new InputController(readBindings(undefined));c.capture='edit';
