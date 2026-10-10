@@ -28,7 +28,8 @@ remain their existing choices. Working speed moves in half-percent steps. Done
 appears only in disconnected Timed practice and keeps its existing reversible,
 exact-loop eligibility and independent manual/observed evidence.
 
-Reading, Timed and Start/Resume form the primary footer group. Mode selection
+Reading, Timed, Start/Resume, applicable Done and Speed form one compact centered
+primary footer group. Speed sits beside the transport rather than at the far right. Mode selection
 stops the current transport; Space explicitly starts or resumes the selected
 mode. Internal pauses from Options, focus or connection changes keep the selected
 mode. Free view shows complete source windows and uses the existing overlapping
@@ -49,7 +50,10 @@ other saved owners take priority over the default working arrows. S opens the
 Working draft when unclaimed, with its hint beside the speed; clicking its value
 does the same. Typing leaves the sounding and queued speed unchanged until Enter
 commits. Escape cancels without leaking Done or Back. An open draft keeps its
-value, selection and focus through harmless MIDI or feedback repaints; an explicit
+value, selection and focus through harmless MIDI or feedback repaints without
+committing the draft, including browser change events caused by redraw. Cancelling
+a draft after a successful loop restores the current session speed, preserving
+that loop’s increase. An explicit
 pause cancels it. Leaving the editor uses its existing validated commit behavior.
 Enter outside the editor keeps its
 existing Done meaning. S does not edit speed in Reading or Free view, and the
