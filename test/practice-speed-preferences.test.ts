@@ -23,3 +23,8 @@ test('legacy absolute-ten defaults migrate beside exact earned evidence; deliber
  const s=initialPractice(plan);delete s.speedRevision;s.start=10;s.working=10;s.workingByPattern={};assert.equal(readPractice(s,plan).start,s.target*.1);s.best[plan.chunks[0].pattern]=70.123;const loaded=readPractice(s,plan);assert.equal(loaded.start,s.target*.1);s.working=33.333;s.workingByPattern[plan.chunks[0].pattern]=45.678;const chosen=readPractice(s,plan);assert.equal(chosen.working,snapPracticeSpeed(33.333,s.target));assert.equal(chosen.workingByPattern[plan.chunks[0].pattern],snapPracticeSpeed(45.678,s.target));assert.equal(loaded.best[plan.chunks[0].pattern],70.123);
  for(const patch of [{countInBars:0},{countInBars:2.5},{resumeCooldownSeconds:31},{resumeCooldownSeconds:.5}])assert.throws(()=>readPractice({...s,...patch},plan),/count-in bars/);
 });
+
+test('observed persisted five-BPM floor recovers ten percent without altering attained evidence',()=>{
+ const raw=initialPractice(plan);delete raw.speedRevision;raw.start=raw.working=5;raw.step=raw.target*.01;raw.workingByPattern={a:5,b:33.24};raw.best={a:70.123};raw.manualAttainment={version:1,marks:{[JSON.stringify([plan.chunks[0].id,plan.chunks[0].pattern])]:[55.123]}};const captured=structuredClone(raw),s=readPractice(raw,plan);
+ assert.equal(s.start,s.target*.1);assert.equal(s.working,s.target*.1);assert.equal(s.workingByPattern.a,s.target*.1);assert.equal(s.workingByPattern.b,snapPracticeSpeed(33.24,s.target));assert.deepEqual(s.best,raw.best);assert.deepEqual(s.manualAttainment,raw.manualAttainment);assert.deepEqual(raw,captured);
+});
