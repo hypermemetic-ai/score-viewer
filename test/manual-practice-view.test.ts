@@ -21,9 +21,9 @@ for(const fails of [false,true])test(`a ${fails?'failed':'successful'} pending m
 
 test('a footer-only manual repaint retains visible and accessible save/render/audio failure context',async()=>{
  const context=await ManualReadingContext.open(p);context.selectPassage(context.plan.chunks[0]);
- const prior=Object.getOwnPropertyDescriptor(globalThis,'document');let notice:any;
+ const prior=Object.getOwnPropertyDescriptor(globalThis,'document');let notice:any,markup='';
  const freshNotice=()=>({hidden:true,textContent:'',title:'',attributes:{} as Record<string,string>,setAttribute(key:string,value:string){this.attributes[key]=value;}});
- const footer={classList:{toggle(){}},toggleAttribute(){},contains:()=>false,querySelectorAll:()=>[],set innerHTML(_value:string){notice=freshNotice();}};
+ const footer={classList:{toggle(){}},toggleAttribute(){},contains:()=>false,querySelectorAll:()=>[],set innerHTML(value:string){markup=value;notice=freshNotice();}};
  const surface={querySelector:()=>notice},app={contains:()=>true,querySelector:()=>footer};
  Object.defineProperty(globalThis,'document',{configurable:true,value:{activeElement:{dataset:{}}}});
  try{
@@ -32,7 +32,9 @@ test('a footer-only manual repaint retains visible and accessible save/render/au
   for(const [field,cause,summary]of [['saveError','Progress has not saved: disk unavailable','Progress not saved. Retry saving.'],['renderError','A source relation could not be rendered','Passage unavailable. Inspect source.'],[undefined,'Audio could not prepare the count-in','Audio could not prepare the count-in']] as const){
    view.saveError=undefined;view.renderError=undefined;if(field)view[field]=cause;view.status(cause);
    view.paintControls();assert.equal(notice.hidden,false);assert.equal(notice.textContent,summary);assert.equal(notice.title,cause);assert.equal(notice.attributes['aria-label'],cause);
+   assert.match(markup,/Working speed <kbd>S<\/kbd>/);assert.doesNotMatch(markup,/F2/);
    view.paintControls();assert.equal(notice.hidden,false);assert.equal(notice.title,cause);
   }
+  view.options.workingEditKey=()=>'';view.paintControls();assert.doesNotMatch(markup,/Working speed <kbd>S<\/kbd>|; S edits/,'a saved owner removes the contextual speed hint');
  }finally{if(prior)Object.defineProperty(globalThis,'document',prior);else Reflect.deleteProperty(globalThis,'document');}
 });
