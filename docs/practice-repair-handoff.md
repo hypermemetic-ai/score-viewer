@@ -1,5 +1,7 @@
 # Immediate practice repair handoff
 
+Current selectable piano practice behavior is described in [Reading and Timed practice](practice-reading-timed.md). Historical delivery receipts below retain their original source and installed-package meanings.
+
 ## Operator report
 
 The operator reports that the current Windows Score Viewer breaks Schumann No. 14 practice as well as Zelda practice. Consecutive measures in both the practice run and passage-selection preview are cut into independent fragments. They should read as one continuous strip. Zelda long-note stems remain visible after the corresponding played notes are removed; duration stem ink must participate in the same note lifecycle as ordinary stems.

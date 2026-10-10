@@ -26,8 +26,8 @@ function practiceView(){
  const view=Object.create(PracticeView.prototype) as any,ready:number[]=[],messages:string[]=[];
  const plan={referencePerformanceTempo:testReference,ticksPerBeat:48,timeSignatures:[{tick:0,numerator:6,denominator:8}],barTicks:[0,144,288,432,576]};
  const session={chunk:{start:0,end:576},sourcePulseGrid:practiceCountInGrid(scorePulseGrid(plan,plan.barTicks)),startTick:0,tickMs:1,phase:'ready',ready(start:number){ready.push(start);this.phase='countin';},pause(){this.phase='paused';}};
- Object.assign(view,{manual:{cancel(){}},contacts:{clear(){}},plan,session,state:{working:180,countInBars:2},options:{connected:()=>true},audioOutputs:{supported:true},startGeneration:0,disposed:false,preview:{clear(){}},app:{querySelector:()=>null}});
- view.paint=()=>{};view.paintScore=()=>{};view.paintControls=()=>{};view.status=(message:string)=>messages.push(message);
+ Object.assign(view,{mode:'timed',previousMode:'timed',readingPaused:true,feedback:'',manual:{cancel(){}},contacts:{clear(){}},plan,session,state:{working:180,countInBars:2},options:{connected:()=>true},audioOutputs:{supported:true},startGeneration:0,disposed:false,preview:{clear(){}},app:{querySelector:()=>null}});
+ view.paint=()=>{};view.paintScore=()=>{};view.paintControls=()=>{};view.paintVisibility=()=>{};view.status=(message:string)=>messages.push(message);
  return{view,session,ready,messages};
 }
 
