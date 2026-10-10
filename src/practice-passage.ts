@@ -154,9 +154,9 @@ export function passageInkBounds(passage:Passage,p?:ScorePackage):InkBox {
 }
 /** Horizontal framing is established before hiding. A joined run reserves the
  * union of every window/refill state, so no ordinary repaint recenters ink. */
-export function fitPassageFrame(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',windows:Array<Array<number|undefined>>,mount:HTMLElement){
+export function fitPassageFrame(p:ScorePackage,plan:PracticePlan,crops:Crop[],track:PassageTrack,policy:'compact'|'fixed',windows:Array<Array<number|undefined>>,mount:HTMLElement,placements?:ReadonlyArray<{bar:number;x:number}>){
  let left=Infinity,right=-Infinity;
- for(const positions of windows){const passage=composePassage(crops,track,policy,positions,projectRelations(p,plan,crops,track,policy,positions));mount.append(passage.svg);try{const b=passageInkBounds(passage,p);left=Math.min(left,b.x0);right=Math.max(right,b.x1);}finally{passage.svg.remove();}}
+ for(const positions of windows){const passage=composePassage(crops,track,policy,positions,projectRelations(p,plan,crops,track,policy,positions,placements),placements);mount.append(passage.svg);try{const b=passageInkBounds(passage,p);left=Math.min(left,b.x0);right=Math.max(right,b.x1);}finally{passage.svg.remove();}}
  track.frame={left:left-.8,right:right+.8};return track;
 }
 /** One source-to-display translation per position. Compact previews and
