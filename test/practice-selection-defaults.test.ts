@@ -36,10 +36,10 @@ test('missing defaults fill additively while explicit one-percent and custom inc
 test('actual passage action resets new selection, while restored context keeps its working rate',async()=>{
  const state=initialPractice(plan);state.working=72;state.workingByPattern[plan.chunks[0].pattern]=144;
  const view=Object.create(PracticeView.prototype) as any;
- Object.assign(view,{plan,state,browser:new PracticeBrowser(plan),sourceCrops:new Map(),doneClaims:new PracticeDone(),options:{connected:()=>false},app:{querySelector:()=>({focus(){}})}});
+ Object.assign(view,{plan,state,browser:new PracticeBrowser(plan),sourceCrops:new Map(),doneClaims:new PracticeDone(),queuedWorking:135,options:{connected:()=>false},app:{querySelector:()=>({focus(){}})}});
  view.cancelTempoHold=view.resetCarrySetup=view.stopClock=view.clearPose=view.paint=()=>{};view.contacts={clear(){}};
- await view.action('passage:'+plan.chunks[0].id);assert.equal(state.working,18);assert.equal(view.session.bpm,18);
- state.working=72;view.selectPassage(plan.chunks[0],false);assert.equal(state.working,72);assert.equal(view.session.bpm,72);
+ await view.action('passage:'+plan.chunks[0].id);assert.equal(state.working,18);assert.equal(view.session.bpm,18);assert.equal(view.queuedWorking,undefined);view.session.ready(0);view.loopRate=18;view.clock={};assert.equal(view.predictedRepeatRate(view.session),18);
+ state.working=72;view.queuedWorking=81;view.selectPassage(plan.chunks[0],false);assert.equal(state.working,72);assert.equal(view.session.bpm,72);assert.equal(view.queuedWorking,81);
  state.best[plan.chunks[0].pattern]=state.best[plan.chunks[1].pattern]=state.target;passageHierarchy(plan,state);reconcilePassages(plan,state);
- await view.action('passage:1-8');assert.equal(state.working,90);assert.equal(view.session.bpm,90);assert.equal(state.workingByPattern[plan.chunks[0].pattern],144);
+ await view.action('passage:1-8');assert.equal(view.queuedWorking,undefined);assert.equal(state.working,90);assert.equal(view.session.bpm,90);assert.equal(state.workingByPattern[plan.chunks[0].pattern],144);
 });
