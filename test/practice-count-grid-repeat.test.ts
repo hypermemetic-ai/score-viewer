@@ -18,9 +18,10 @@ async function fixture(t:any,{pickup=false,pending=false}={}){
  practiceAudio.armRepeat=(...args)=>{arms.push(args);return pending&&arms.length===1?new Promise(r=>resolveOld=r):Promise.resolve(receipt(args));};
  practiceAudio.cancelRepeat=async(armId,previousCountStartMicros)=>{cancels.push(armId);return {version:2,armId,previousCountStartMicros,state:'queued'};};
  const clock=new PracticeClock(true),countMs=session.pulseGrid.scoreOffsetPulses*60000/(60*session.pulseGrid.pulsesPerBeat),duration=countMs+chunk.end*session.tickMs,origin=await clock.begin(60,duration,true,session.pulseGrid);session.ready(origin);
- const view=Object.create(PracticeView.prototype) as any;Object.assign(view,{plan,state,session,clock,loopRate:60,doneClaims:new PracticeDone(),startGeneration:0,disposed:false});
+ let now=clock.now();clock.now=()=>now;
+ const view=Object.create(PracticeView.prototype) as any;Object.assign(view,{plan,state,session,clock,loopRate:60,doneClaims:new PracticeDone(),startGeneration:0,disposed:false,overview:false,heldPitches:new Set(),heldStreams:new Map(),contacts:{clear(){},press(){}},preview:{clear(){}},options:{},app:{querySelector:()=>null},manual:{cancel(){}},save:()=>Promise.resolve(true),paint(){},paintControls(){},paintVisibility(){},paintProgress(){},refreshTempoFields(){},refreshSettings(){},resetCarrySetup(){},clearPose(){},status(){}});
  t.after(async()=>{await clock.stop();host.midiClock=old.sample;Object.assign(practiceAudio,{begin:old.begin,armRepeat:old.arm,cancelRepeat:old.cancel,stop:old.stop,onError:old.onError});});
- return {view,state,session,clock,arms,cancels,get stops(){return stops;},settleOld(){resolveOld(receipt(arms[0]));}};
+ return {view,state,session,clock,arms,cancels,get stops(){return stops;},setNow(value:number){now=value;},settleOld(){resolveOld(receipt(arms[0]));}};
 }
 
 test('an already prepared two-bar cue is replaced by three bars at unchanged BPM and source exit',async t=>{
@@ -43,4 +44,22 @@ test('pickup repeat reuse compares the derived nonzero exit phase and preserves 
  const f=await fixture(t,{pickup:true});assert.equal(f.session.sourcePulseGrid.countStartPhasePulses,0);f.view.prepareRepeat();const previous=f.view.repeatPreparation;await previous.settled;assert.equal(previous.plan.grid.countStartPhasePulses,6);
  f.view.prepareRepeat();assert.equal(f.view.repeatPreparation,previous);assert.equal(f.arms.length,1);assert.deepEqual(f.cancels,[]);
  f.state.countInBars=3;f.view.prepareRepeat();const next=f.view.repeatPreparation;await next.settled;assert.equal(next.plan.grid.countStartPhasePulses,6);assert.equal(next.plan.grid.scoreStartPhasePulses,6);assert.equal(next.plan.boundaryMs,previous.plan.boundaryMs);assert.equal(next.receipt.startMs-next.receipt.countStartMs,12000);assert.deepEqual(f.cancels,[previous.receipt.armId]);
+});
+
+for(const offset of [0,1])test(`a count edit ${offset}ms after the audible boundary preserves the complete pending cue`,async t=>{
+ const f=await fixture(t,{pending:true});f.view.prepareRepeat();const prepared=f.view.repeatPreparation;await until(()=>f.arms.length===1);const stops=f.stops;
+ f.setNow(prepared.plan.boundaryMs+offset);f.state.countInBars=3;f.view.prepareRepeat();assert.equal(f.view.repeatPreparation,prepared);assert.equal(f.arms.length,1);assert.deepEqual(f.cancels,[]);assert.equal(f.stops,stops);
+ f.session.update(f.clock.now());assert.equal(f.session.phase,'complete');f.view.completeTimedTrial(f.session);assert.ok(f.view.repeatCompletion);f.settleOld();await prepared.settled;await until(()=>f.session.phase==='countin'&&!f.view.repeatSavePending);
+ assert.equal(f.session.pulseGrid.countInBars,2);assert.equal(f.session.startMs,prepared.receipt.startMs);assert.equal(f.state.countInBars,3);assert.equal(f.arms.length,1);assert.deepEqual(f.cancels,[]);assert.equal(f.stops,stops);
+ f.view.prepareRepeat();const next=f.view.repeatPreparation;await next.settled;assert.deepEqual(f.arms.map(a=>a[5].countInBars),[2,3]);assert.equal(next.plan.boundaryMs,f.session.startMs+f.session.chunk.end*f.session.tickMs);
+});
+
+for(const offset of [0,1])test(`Working edit during a pending ACK ${offset}ms after count start queues behind the captured BPM and grid`,async t=>{
+ const f=await fixture(t,{pending:true});f.view.prepareRepeat();const prepared=f.view.repeatPreparation;await until(()=>f.arms.length===1);const stops=f.stops;
+ f.setNow(prepared.plan.boundaryMs+offset);f.session.update(f.clock.now());assert.equal(f.session.phase,'complete');f.view.completeTimedTrial(f.session);assert.ok(f.view.repeatCompletion);
+ const field={dataset:{practiceSetting:'working',absolute:'60',presented:'100'},value:'150',type:'text'};assert.equal(f.view.setting(field),true);f.state.countInBars=3;
+ assert.equal(f.state.working,90);assert.equal(f.view.queuedWorking,90);assert.equal(f.view.clock,f.clock);assert.equal(f.view.repeatPreparation,prepared);assert.equal(f.session.phase,'complete');assert.deepEqual(f.cancels,[]);assert.equal(f.stops,stops);
+ f.settleOld();await prepared.settled;await until(()=>f.session.phase==='countin'&&!f.view.repeatSavePending);
+ assert.equal(f.view.loopRate,60);assert.equal(f.session.bpm,60);assert.equal(f.session.pulseGrid.countInBars,2);assert.equal(f.session.startMs,prepared.receipt.startMs);assert.equal(f.state.working,90);assert.equal(f.view.queuedWorking,90);assert.equal(f.state.best[f.session.chunk.pattern],undefined);assert.deepEqual(f.cancels,[]);assert.equal(f.stops,stops);
+ f.view.prepareRepeat();const next=f.view.repeatPreparation;await next.settled;assert.deepEqual(f.arms.map(a=>[a[1],a[5].countInBars]),[[60,2],[90,3]]);assert.equal(next.plan.boundaryMs,f.session.startMs+f.session.chunk.end*f.session.tickMs);assert.equal(next.plan.countInMs,4000);
 });
