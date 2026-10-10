@@ -124,7 +124,7 @@ test('public arrows queue across unlock and begin without cancelling the capture
  const f=fixture(t,100),view=f.view;view.audioOutputs={supported:true};view.clock=undefined;view.app={querySelector:()=>null,querySelectorAll:()=>[]};view.refreshSettings=()=>{};view.paintProgress=()=>{};view.prepareRepeat=()=>{};view.manual={cancel(){},begin(_key:string,adjust:any){adjust(false,0);}};
  let unlock!:()=>void,begin!:(origin:number)=>void,args:any[]=[],stops=0,closes=0;
  const previous={unlock:PracticeClock.prototype.unlock,begin:PracticeClock.prototype.begin,stop:PracticeClock.prototype.stop,close:PracticeClock.prototype.close};
- PracticeClock.prototype.unlock=()=>new Promise<void>(resolve=>unlock=resolve);PracticeClock.prototype.begin=(...input)=>{args=input;return new Promise<number>(resolve=>begin=resolve);};PracticeClock.prototype.stop=async()=>{stops++;};PracticeClock.prototype.close=()=>{closes++;};
+ PracticeClock.prototype.unlock=()=>new Promise<void>(resolve=>unlock=resolve);PracticeClock.prototype.begin=(...input)=>{args=input;return new Promise<number>(resolve=>begin=resolve);};PracticeClock.prototype.stop=async()=>{stops++;};PracticeClock.prototype.close=async()=>{closes++;};
  t.after(()=>Object.assign(PracticeClock.prototype,previous));
  const pending=view.action('ready');await until(()=>!!unlock);const generation=view.startGeneration;assert.equal(view.startingRate,100);
  assert.equal(view.key('ArrowUp'),true);assert.equal(f.state.working,100.8);assert.equal(view.queuedWorking,100.8);assert.equal(view.startGeneration,generation);assert.equal(stops,0);assert.equal(closes,0);
