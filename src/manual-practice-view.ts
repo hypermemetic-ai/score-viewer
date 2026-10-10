@@ -1,4 +1,5 @@
 import {practiceOptionsMarkup,integerPracticeSetting,adjustPracticeInteger} from './practice-options-markup';
+import {actionCode} from './input';
 import {ManualReadingContext} from './manual-reading-context';
 import {ManualPracticeTransport,type ManualClock} from './manual-practice-transport';
 import {PracticeClock} from './practice-clock';
@@ -55,7 +56,7 @@ export class ManualPracticeView {
   const surface=this.app.querySelector<HTMLElement>('.practice-surface')!;this.surface=surface;
   surface.addEventListener('click',event=>{const control=(event.target as HTMLElement).closest<HTMLElement>('[data-practice]');if(control)void this.action(control.dataset.practice!);},{signal:this.mounted.signal});
   surface.addEventListener('change',event=>{const field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'){this.browser.setIncludeManual(field.checked);this.paintBrowser(false);this.app.querySelector<HTMLInputElement>('[data-practice-display="manual"]')?.focus();}else this.setting(field);},{signal:this.mounted.signal});
-  surface.addEventListener('keydown',event=>{const field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&['Enter','Escape'].includes(event.code)){event.preventDefault();if(!event.repeat){if(event.code==='Enter')field.click();else void this.action('back');}}},{signal:this.mounted.signal});
+  surface.addEventListener('keydown',event=>{const field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&['Enter','Escape'].includes(actionCode(event))){event.preventDefault();if(!event.repeat){if(actionCode(event)==='Enter')field.click();else void this.action('back');}}},{signal:this.mounted.signal});
   if(context?.passage){const chunk=reconcilePassages(this.plan,this.state).all.get(context.passage);if(chunk){this.selectPassage(chunk);if(context.window)this.session!.windows.showBar(context.window[0]);this.options.context.syncWindowAnchor();}}
   window.addEventListener('resize',this.resized);this.paint();this.refit();this.frame();
  }
