@@ -14,6 +14,7 @@ Free view SHALL have one shared configurable control across supported piano, gui
 #### Scenario: Enter Free view and resume
 - **WHEN** the user activates Free view while Reading or Timed is selected
 - **THEN** active or pending playback stops and full source notation restores
+- **AND** leaving a joined Reading pair opens the normal four-measure browsing window that contains its transition, rather than resetting to an unrelated opening group
 - **AND** Space returns to the previous primary mode and explicitly starts/resumes it, with a full count-in only for Timed
 - **AND** selecting Reading or Timed itself only stops and selects, without starting playback
 
@@ -24,7 +25,7 @@ Free view SHALL have one shared configurable control across supported piano, gui
 - **AND** repeated mode keydown does not repeatedly reset positions or restart transport
 
 ### Requirement: Clear selector and practice settings presentation
-Selector rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance Tempo SHALL display a percentage above the absolute Score reference; Practice Performance target SHALL remain absolute. Performance percentage edits SHALL preserve exact selected rates and existing absolute admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; Performance helper text SHALL plainly describe the chosen tempo, note/timing checks and available fingerings without changing assessment. A fresh practice state's default increase per success SHALL be 2% of its performance target; retained saved increases and achievements SHALL remain unchanged.
+Selector rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Shared tempo controls in Options SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance Tempo SHALL display a percentage above the absolute Score reference; Practice Performance target SHALL remain absolute. Performance percentage edits SHALL preserve exact selected rates and existing absolute admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; Performance helper text SHALL plainly describe the chosen tempo, note/timing checks and available fingerings without changing assessment. A fresh practice state's default increase per success SHALL be 2% of its performance target; retained saved increases and achievements SHALL remain unchanged.
 
 #### Scenario: Uncompleted selector row and focused tempo decrement
 - **WHEN** an uncompleted group is shown in the selector or a tempo decrement button receives focus
@@ -99,7 +100,7 @@ Reading and Timed SHALL be prominent centered choices beside Start/Resume. Free 
 #### Scenario: Reading and Timed command layout
 - **WHEN** either primary mode is shown with or without a MIDI connection
 - **THEN** both mode choices and Start/Resume remain in the same primary control group, Free view remains secondary, and the selected mode is accessible
-- **AND** half-point Up/Down working-speed adjustment and queued boundary changes operate in Timed without being stolen by footer navigation
+- **AND** half-point Left/Right working-speed adjustment and queued boundary changes operate in Timed without sequential footer navigation or a previous mouse click stealing the command
 - **AND** Reading does not silently alter Timed working speed
 
 #### Scenario: Binding capture and test
@@ -112,6 +113,24 @@ Reading and Timed SHALL be prominent centered choices beside Start/Resume. Free 
 - **WHEN** the user configures Free view to a custom key or pedal in piano practice and then opens guitar or bass manual practice
 - **THEN** the same control enters Free view and is shown in its hint and Options; the old V route does not remain as a hidden fallback
 - **AND** an explicit empty Free view control remains empty in every supported instrument context without adding piano hand-position assessment
+
+### Requirement: Direct working-speed commands
+The active practice footer SHALL expose direct shortcuts and mouse actions without sequential keyboard navigation through its controls. Timed piano and neutral manual practice SHALL offer Left/Right working-speed changes of 0.5 percentage points with a compact horizontal decrease/value/increase presentation. Inherited/default previous/next arrows SHALL route to speed in those contexts; explicit local navigation overrides and other saved action/modifier owners SHALL remain authoritative. Reading and Free view SHALL retain their meaningful browsing actions. Unclaimed F2 or clicking the value SHALL enter a numeric draft, Enter SHALL commit through existing admission and queued boundary rules, and Escape SHALL cancel without triggering Back. Enter outside editing SHALL preserve the existing Done control. Options and the passage selector SHALL retain their real keyboard navigation.
+
+#### Scenario: Direct speed after a mouse action
+- **WHEN** a user clicks a practice mode or transport control and then presses the available unmodified working-speed arrows in Timed or neutral manual practice
+- **THEN** Left decreases and Right increases speed by 0.5 percentage points without navigating footer buttons or changing the score window
+- **AND** the number and arrow hints represent the same available commands while captured and queued rates keep their existing musical semantics
+
+#### Scenario: Explicit speed draft
+- **WHEN** the user opens the working-speed draft through an unclaimed F2 or a mouse click and types a new value
+- **THEN** typed prefixes do not change current or queued speed, Enter commits the admitted value, and Escape discards the draft
+- **AND** neither Enter nor Escape leaks into Done or Back, and a saved F2 owner is not replaced by a hidden fallback
+
+#### Scenario: Arrow commands in browsing modes
+- **WHEN** Reading or Free view is selected
+- **THEN** its configured previous/next controls browse the appropriate position/join or overlapping measure window without changing Timed speed
+- **AND** footer mouse actions and repainting do not create a keyboard menu
 
 ### Requirement: Stable mode frame without an instruction row
 Reading, Timed, Free view and connected/disconnected practice SHALL share stage and footer bounds at an unchanged viewport. An unchanged source window SHALL retain its complete source scale and origin across mode/start/error transitions; changing owned visibility SHALL not refit it. Generic preparation/ready instructions SHALL consume no layout row. Meaningful errors and carry context SHALL remain accessible without moving notes or controls.
