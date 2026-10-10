@@ -1,10 +1,10 @@
 import {initialPractice,readPractice,passageHierarchy,planPractice,practicePartition,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
 import type {ScorePackage} from './package';
 
-export type PracticePreferences=Pick<PracticeState,'start'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'|'countInBars'|'resumeCooldownSeconds'>;
+export type PracticePreferences=Pick<PracticeState,'start'|'connectionStart'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'|'countInBars'|'resumeCooldownSeconds'>;
 export function practicePreferences(state:PracticeState):PracticePreferences {
- const {start,step,target,personalGoal,tolerance,offset,keepTempo,audioOutput,countInBars,resumeCooldownSeconds}=state;
- return structuredClone({start,step,target,personalGoal,tolerance,offset,keepTempo,audioOutput,countInBars,resumeCooldownSeconds});
+ const {start,connectionStart,step,target,personalGoal,tolerance,offset,keepTempo,audioOutput,countInBars,resumeCooldownSeconds}=state;
+ return structuredClone({start,connectionStart,step,target,personalGoal,tolerance,offset,keepTempo,audioOutput,countInBars,resumeCooldownSeconds});
 }
 /** Retained evidence owns its settings; a fresh pitch only inherits preferences. */
 export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,context?:PracticeViewContext):PracticeState {

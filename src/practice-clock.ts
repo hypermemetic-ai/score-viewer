@@ -9,10 +9,15 @@ interface PendingRepeat extends PreparedPracticeRepeat {readonly ownerOriginMicr
 export class PracticeClock {
  private static nativeOwner?:PracticeClock;private static nativeStopPending=Promise.resolve();private static armSequence=0;
  private unlistenAudio?:()=>void;
- private audio?:AudioContext;private interval?:number;private nodes:OscillatorNode[]=[];private grid?:PracticePulseGrid;private origin=0;private eighth=0;private countStep=0;private index=0;private end=0;private nativeClock?:ClockOrigin;private midiClock?:ClockOrigin;private stopPending=Promise.resolve();private generation=0;
+ private audio?:AudioContext;private audioClosePending=Promise.resolve();private interval?:number;private nodes:OscillatorNode[]=[];private grid?:PracticePulseGrid;private origin=0;private eighth=0;private countStep=0;private index=0;private end=0;private nativeClock?:ClockOrigin;private midiClock?:ClockOrigin;private stopPending=Promise.resolve();private generation=0;
  private countOriginMicros=0;private armGeneration=0;private pending?:PendingRepeat;private inFlightArm?:{armId:number;ownerOriginMicros:number};private pendingNodes=new Set<OscillatorNode>();private armOperations=Promise.resolve();
  constructor(readonly native=false,readonly output='',private readonly onError:(message:string)=>void=()=>{}){}
- unlock(){if(this.native)return Promise.resolve();this.audio??=new AudioContext({latencyHint:'interactive'});const resume=this.audio.resume();return Promise.race([resume,new Promise<never>((_,reject)=>setTimeout(()=>reject(Error('Audio did not start. Open practice settings and test the output.')),2500))]).then(()=>{if(this.audio?.state!=='running')throw Error(`Audio is ${this.audio?.state}; test the output before starting.`);});}
+ unlock(){
+  if(this.native)return Promise.resolve();
+  if(!this.audio){this.audio=new AudioContext({latencyHint:'interactive'});this.audioClosePending=Promise.resolve();}
+  const audio=this.audio,resume=audio.resume();let timeout:ReturnType<typeof setTimeout>;
+  return Promise.race([resume,new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(Error('Audio did not start. Open practice settings and test the output.')),2500);})]).then(()=>{if(this.audio!==audio)throw Error('Practice start was cancelled');if(audio.state!=='running')throw Error(`Audio is ${audio.state}; test the output before starting.`);}).finally(()=>clearTimeout(timeout));
+ }
  async beginRepeat(bpm:number,durationMs:number,plan:PracticeRepeatPlan,grid?:PracticePulseGrid){
   grid=plan.grid??grid;
   if(plan.nextBpm!==bpm)throw Error('Repeat tempo differs from its musical boundary');
@@ -99,5 +104,5 @@ export class PracticeClock {
   }
   return this.stopPending;
  }
- close(){void this.stop();this.midiClock=undefined;this.nativeClock=undefined;void this.audio?.close();}
+ close(){const audio=this.audio;this.audio=undefined;const stopping=this.stop();this.midiClock=undefined;this.nativeClock=undefined;if(audio&&audio.state!=='closed'){const closing=audio.close();this.audioClosePending=closing;void closing.catch(error=>{if(this.audioClosePending===closing&&!this.audio)this.onError(`Audio could not close: ${error instanceof Error?error.message:String(error)}`);});}return this.native?stopping:this.audioClosePending;}
 }
