@@ -5,6 +5,15 @@ import {ManualReadingContext} from '../src/manual-reading-context';
 import {ManualPracticeView} from '../src/manual-practice-view';
 
 const p=await importPackage(await authoredFrettedPackage());
+
+test('neutral event-driven settings cannot commit an owned numeric draft before explicit commit',async()=>{
+ const context=await ManualReadingContext.open(p),view=Object.create(ManualPracticeView.prototype) as any;let applied=0;
+ const field={dataset:{practiceSetting:'working',absolute:String(context.state.working),presented:'10'},value:'31'},before=context.state.working;
+ Object.assign(view,{plan:context.plan,state:context.state,manual:{ownsDraft:(target:unknown)=>target===field},applySetting(next:any){applied++;Object.assign(this.state,next);}});
+ assert.equal(view.settingChanged(field),false);assert.equal(view.state.working,before);assert.equal(applied,0);
+ assert.equal(view.setting(field),true,'the existing explicit editor commit still calls setting directly');assert.equal(view.state.working,context.state.target*.31);assert.equal(applied,1);
+ view.transport={prepare(){}};view.save=async()=>{};view.paintControls=()=>{};assert.equal(view.settingChanged({dataset:{practiceSetting:'keepTempo'},checked:true}),true);assert.equal(view.state.keepTempo,true);
+});
 for(const fails of [false,true])test(`a ${fails?'failed':'successful'} pending manual save cannot paint or announce a successor after close`,async()=>{
  const prior=Object.fromEntries(['document','window','cancelAnimationFrame'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  Object.assign(globalThis,{document:new EventTarget(),window:new EventTarget(),cancelAnimationFrame:()=>{}});
@@ -16,4 +25,25 @@ for(const fails of [false,true])test(`a ${fails?'failed':'successful'} pending m
   assert.equal(successor.textContent,'successor ready');assert.equal(queries,beforeQueries);assert.equal(changed,0);assert.equal(writes,1);
   await view.action('retry-save');assert.equal(writes,1,'closed views cannot start another save');
  }finally{for(const [key,descriptor]of Object.entries(prior)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}}
+});
+
+
+test('a footer-only manual repaint retains visible and accessible save/render/audio failure context',async()=>{
+ const context=await ManualReadingContext.open(p);context.selectPassage(context.plan.chunks[0]);
+ const prior=Object.getOwnPropertyDescriptor(globalThis,'document');let notice:any,markup='';
+ const freshNotice=()=>({hidden:true,textContent:'',title:'',attributes:{} as Record<string,string>,setAttribute(key:string,value:string){this.attributes[key]=value;}});
+ const footer={classList:{toggle(){}},toggleAttribute(){},contains:()=>false,querySelectorAll:()=>[],set innerHTML(value:string){markup=value;notice=freshNotice();}};
+ const surface={querySelector:()=>notice},app={contains:()=>true,querySelector:()=>footer};
+ Object.defineProperty(globalThis,'document',{configurable:true,value:{activeElement:{dataset:{}}}});
+ try{
+  const view=Object.create(ManualPracticeView.prototype) as any;
+  Object.assign(view,{app,surface,options:{context},plan:context.plan,state:context.state,overview:false,disposed:false,freeView:false,feedback:'',manual:{retainDraft:()=>()=>{}}});
+  for(const [field,cause,summary]of [['saveError','Progress has not saved: disk unavailable','Progress not saved. Retry saving.'],['renderError','A source relation could not be rendered','Passage unavailable. Inspect source.'],[undefined,'Audio could not prepare the count-in','Audio could not prepare the count-in']] as const){
+   view.saveError=undefined;view.renderError=undefined;if(field)view[field]=cause;view.status(cause);
+   view.paintControls();assert.equal(notice.hidden,false);assert.equal(notice.textContent,summary);assert.equal(notice.title,cause);assert.equal(notice.attributes['aria-label'],cause);
+   assert.match(markup,/Speed <kbd>S<\/kbd>/);assert.doesNotMatch(markup,/F2/);
+   view.paintControls();assert.equal(notice.hidden,false);assert.equal(notice.title,cause);
+  }
+  view.options.workingEditKey=()=>'';view.paintControls();assert.doesNotMatch(markup,/Speed <kbd>S<\/kbd>|; S edits/,'a saved owner removes the contextual speed hint');
+ }finally{if(prior)Object.defineProperty(globalThis,'document',prior);else Reflect.deleteProperty(globalThis,'document');}
 });
