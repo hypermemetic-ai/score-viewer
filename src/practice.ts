@@ -70,7 +70,7 @@ export function planSource(p:ScorePackage,partition:PracticePartition='connectio
  }
 
  const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
- registerPersonalPracticeIdentity(plan,original.score,p.score,base?.chunks??chunks.map(c=>({...c})));registerPracticePatterns(plan,p.score,'piano');return plan;
+ registerPersonalPracticeIdentity(plan,original.score,p.score,base?.chunks??chunks.map(c=>({...c})));registerPracticePatterns(plan,original.score,'piano');return plan;
 }
 export function initialPractice(plan:PracticePassagePlan):PracticeState{const target=requireReferencePerformanceTempo(plan).bpm,start=snapPracticeSpeed(('attacks' in plan&&'gestures' in plan ? .30 : .10)*target,target);return bindPracticePassages(plan,{referenceBeat:requireReferencePerformanceTempo(plan).beat,partition:plan.partition,version:1,revision:plan.revision,target,working:start,step:.02*target,tolerance:500,offset:0,keepTempo:false,start,connectionStart:snapPracticeSpeed(.50*target,target),workingByPattern:{},best:{},usabilityRevision:1,speedRevision:2,countInBars:2,resumeCooldownSeconds:3});}
 /** Normalize copied preferences only. Historical attainment and raw journals remain exact. */
