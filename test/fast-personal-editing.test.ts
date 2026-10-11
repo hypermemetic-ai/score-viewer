@@ -27,3 +27,19 @@ test('a stale projection cannot publish over a later accepted choice and navigat
  const latest=f.editor.view;gate.resolve({...p,projection:'stale'});await first;assert.equal(f.editor.view,latest);assert.equal(f.context.selection.ownerIds[0],f.units[1].ownerIds[0]);
  f.disk.resolve();await f.editor.queue.flush();assert.equal(f.written.length,2);
 });
+
+test('switching score editions during a pending projection cannot paint or redirect its saved choice',async()=>{
+ const f=fixture(),gate=deferred(),owner=f.context.selection.ownerIds[0];f.editor.session.project=()=>gate.promise;
+ const pending=f.context.saveHandChoice('RH'),other={package:p,personal:initialPersonal(p)};f.context.current=other;f.context.selection=f.units[3];
+ gate.resolve({...p,projection:f.target.personal.assignments});await pending;
+ assert.equal(f.frames.length,0);assert.equal(other.personal.assignments,undefined);assert.equal(f.context.selection,f.units[3]);
+ f.disk.resolve();await f.editor.queue.flush();assert.equal(f.written.length,1);assert.equal(f.written[0].assignments.choices[owner].hand,'RH');
+});
+test('a failed durable save retains the accepted choice and refuses a subsequent edit until recovery',async()=>{
+ const f=fixture(),owner=f.context.selection.ownerIds[0],failures:Error[]=[];f.context.paintPersonalSaveError=(_target:any,error:Error)=>failures.push(error);
+ let broken=true;f.editor.queue=new PersonalEditQueue('source',async(snapshot,sequence)=>{await f.editor.projections.get(sequence);if(broken)throw Error('disk unavailable');f.written.push(snapshot);});
+ await f.context.saveHandChoice('RH');await assert.rejects(f.editor.queue.flush(),/disk unavailable/);
+ assert.equal(f.target.personal.assignments!.choices[owner].hand,'RH');assert.equal(f.editor.queue.recovery.length,1);assert.equal(failures.length,1);
+ const before=JSON.stringify(f.target.personal);await assert.rejects(f.context.saveFingerDigit(3),/disk unavailable/);assert.equal(JSON.stringify(f.target.personal),before);
+ broken=false;await f.editor.queue.retry();assert.equal(f.editor.queue.recovery.length,0);assert.equal(f.written[0].assignments.choices[owner].hand,'RH');
+});
