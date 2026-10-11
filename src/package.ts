@@ -297,13 +297,17 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(score.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(score.referencePerformanceTempo);else if(!options.allowLegacyTempo&&(m.version===1||!!fingersName&&!!files[fingersName]))requireReferencePerformanceTempo(score);
  const notes=new Map(score.notes.map(n=>[n.id,n]));if(notes.size!==score.notes.length)fail('Duplicate source owner');
  for(const n of score.notes){if(!isPitchedEvent(n))fail('Legacy piano packages require pitched events');if(!n.id||!['LH','RH'].includes(n.hand??'')||!Number.isInteger(n.startTick)||!Number.isInteger(n.durationTicks)||n.startTick<0||n.durationTicks<=0||n.startTick+n.durationTicks>score.totalTicks||!Number.isInteger(n.pitch?.octave)||!Number.isInteger(n.pitch?.pitchClass)||n.pitch.pitchClass<0||n.pitch.pitchClass>11)fail('Invalid pitch/timing/hand');}
+ const pages:string[]=[];
+ function* pianoChecks():Generator<PreparationStage,void,void>{
  const seen=new Set<string>(),covered=new Set<string>();
  for(const s of seats){if(seen.has(s.id)||!s.id||!Number.isInteger(s.page)||s.page<0||s.page>=m.pages.length||!Array.isArray(s.ownerIds)||!s.ownerIds.length||s.ownerIds.some(id=>!notes.has(id))||!s.actionId||!s.contactId||s.contactId!==s.actionId||![s.x,s.baseline,s.fontSize].every(Number.isFinite))fail('Invalid source-linked seat');seen.add(s.id);s.ownerIds.forEach(id=>covered.add(id));
  const n=requirePianoEvent(notes.get(s.ownerIds[0])!);if(!s.continuation&&s.actionId!==`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`)fail('Wrong physical action seat');
- if(s.ownerIds.some(id=>{const q=requirePianoEvent(notes.get(id)!);return q.hand!==n.hand||q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');}
+ if(s.ownerIds.some(id=>{const q=requirePianoEvent(notes.get(id)!);return q.hand!==n.hand||q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');yield 'geometry';}
  if(covered.size!==notes.size)fail('Incomplete source-owner seating');
- const pages=m.pages.map((name,i)=>{if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);return svg;});
- m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});
+ for(const [i,name] of m.pages.entries()){if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);pages.push(svg);yield 'paint';}
+ m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});yield 'commit';
+ }
+ if(execution)await drainReadingChecks(pianoChecks(),execution);else for(const _ of pianoChecks()){}
 
   const p:ScorePackage={manifest:m,score,seats,pages,files,archiveSha256:await hashBytes(bytes),...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages)};
   if(fingersName&&files[fingersName])p.fingerLayer=await validateLayerAsync(parse(fingersName),p);
@@ -320,7 +324,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
  const source=normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore);
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
- const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore]);
+ const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore],execution);
  if(transposition&&JSON.stringify(m.referenceMidi)!==JSON.stringify((transposition.original.collectionManifest??transposition.original.manifest).referenceMidi))fail('Transpose reference attachment differs from its original archive.');
  const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
  if(source.performingHandPresentation||source.notes.some(n=>n.derivedHand))fail('Immutable original source cannot be substituted by a calculated display projection.');
@@ -348,7 +352,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});try{validateScoreRenderingRecipe(p.renderingRecipe,{sourceSha256:m.sourceSha256!});requireReferencePerformanceTempo(planningSource);p.generationAvailable=true;}catch{p.generationAvailable=false;}}
   if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
   if(derived){if(!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
-   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats],heads=>actualHeads.set(p,heads));p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
+   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats],heads=>actualHeads.set(p,heads),execution);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
   views.set(key,p);
  }
  if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');

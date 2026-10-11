@@ -14,7 +14,7 @@ const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const production=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
 const pkg=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
 function keyboardFixture(){
- let key!:(e:any)=>void;const calls:string[]=[],first=pkg.seats.find(s=>s.page===0)!,context:any={
+ let key!:(e:any)=>void;const calls:string[]=[],first=pkg.seats.find(s=>s.page===0)!,context:any={startupReady:true,startupFailed:false,
   window:{addEventListener(_type:string,handler:any){key=handler;}},document:{hidden:false,activeElement:null},innerWidth:1280,innerHeight:720,
   input:new InputController(),controls:new ControlResolver(readControlBindings(undefined,{bindings:defaultBindings()})),
   current:{package:pkg,personal:{view:defaultView(),editContactId:first.contactId}},selection:first,readerFocused:true,preferences:{fingerBehavior:'toggle'},

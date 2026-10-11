@@ -45,6 +45,8 @@ import {scoreImportKind} from './score-import-kind';
 import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
 import {practicePercent} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
+import {loadingMarkup,updateLoading,preparationMessage} from './viewer-loading';
+import type {ReadingExecution} from './reading-execution';
 import {loadCalibration,saveCalibration,exportCalibration,type CalibrationLoad,type ViewerCalibration} from './calibration';
 import {mountCalibration} from './calibration-view';
 import {loadPilot} from './calibration-pilot';
@@ -75,6 +77,7 @@ import {practiceAudio} from './host';
 import {readMidiMapping,readMidiBindings,type MidiBindings,type MidiMapping,type MidiCC,type MidiNote} from './midi';
 import {scoreCapabilities,requirePianoCapability} from './score-capabilities';
 const app=document.querySelector<HTMLElement>('#app')!;
+let startupReady=false,startupFailed=false;
 let entries:Entry[]=[],preferences:{version:1;libraryRotation:Rotation;displayRotation?:Rotation;bindings:Bindings;fingerBehavior:FingerBehavior;fingerPresentation:FingerPresentation;keyboardLayout:PhysicalKeyboardId;midi?:MidiMapping;midiBindings?:MidiBindings;controlBindings?:ControlBindings;freeViewControls?:FreeViewControlOverrides;lastWorkedEntryId?:string;audioOutput?:string;piano?:PianoPreferences}={version:1,libraryRotation:0,bindings:defaultBindings(),...fingerPreferences(),keyboardLayout:'conventional-piano'},input=new InputController();
 let pianoSettings=defaultPianoPreferences(),pianoWarning='',pianoOptions:PianoOptionsPanel|undefined;
 let current:{entry:Entry;package:ScorePackage;personal:PersonalState}|undefined;let toolbarVisible=false,timer:number|undefined,dialog:HTMLDialogElement|undefined,focusReturn:HTMLElement|undefined;
@@ -100,7 +103,7 @@ function checkReadingOwner(op:ReadingOperation){
 function checkReading(op:ReadingOperation){
  checkReadingOwner(op);if(current!==op.previous||preferences.keyboardLayout!==op.keyboard)throw cancelledReading();
 }
-/** Let paint and input run between completed phases. Cold admission itself is synchronous. */
+/** Give completed phases a visible frame without delaying ordinary interaction. */
 async function paintCheckpoint(signal?:AbortSignal){
  await new Promise<void>(resolve=>{
   let finished=false,frame=0,task=0;
@@ -113,11 +116,12 @@ async function paintCheckpoint(signal?:AbortSignal){
 async function readingCheckpoint(op:ReadingOperation){checkReading(op);await paintCheckpoint(op.controller.signal);checkReading(op);}
 function readingDialog(op:ReadingOperation){
  checkReading(op);
- const d=showDialog(`<h2>Opening score</h2><p class="job" role="status">${esc(op.running.progress)}</p><div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'score-reading');
+ const d=showDialog(`${loadingMarkup('Opening score',op.running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'score-reading');
  op.dialog=d;d.addEventListener('close',()=>{if(op.dialog===d&&op.running.state==='working')op.running.cancel();},{once:true});return d;
 }
 function beginReading(entryId:string){
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
+ libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
  job?.cancel();
  const controller=new AbortController(),running:ReadingJob={cancel:()=>controller.abort(),entryId,state:'working',progress:'Opening score…'},
   op:ReadingOperation={controller,running,previous:current,keyboard:preferences.keyboardLayout,generation:++readingGeneration,
@@ -126,11 +130,15 @@ function beginReading(entryId:string){
 }
 async function admitReading(bytes:Uint8Array,op:ReadingOperation){
  await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
- const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:{signal:op.controller.signal}});await readingCheckpoint(op);
+ readingProgress(op,'Checking saved score…');
+ const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
  if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
  return p;
 }
-function readingProgress(op:ReadingOperation,text:string){checkReading(op);op.running.progress=text;const status=op.dialog?.querySelector('.job');if(status)status.textContent=text;}
+function readingProgress(op:ReadingOperation,text:string){checkReadingOwner(op);op.running.progress=text;if(op.dialog)updateLoading(op.dialog,text);}
+function readingExecution(op:ReadingOperation):ReadingExecution {
+ return {signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);readingProgress(op,preparationMessage(stage));}};
+}
 function suspendReadingDialog(op:ReadingOperation){checkReading(op);op.dialog=undefined;closeDialog(false);}
 function finishReading(op:ReadingOperation,success:boolean){
  if(readingOperation!==op)return;
@@ -141,7 +149,7 @@ function finishReading(op:ReadingOperation,success:boolean){
 const readerPages=new ReaderPageCache();let dialogBack:(()=>void)|undefined;let optionsSection:string|undefined;let toolbarNavigation:OptionsNavigation|undefined;let dialogNavigation:OptionsNavigation|undefined;
 let orientation=new ViewerOrientation(preferences);
 const effectiveView=(view:PersonalState['view'])=>({...view,rotation:orientation.rotation});
-let practice:PracticeView|ManualPracticeView|undefined,manualPracticeGeneration=0;const practiceSummaries=new LibraryPracticeSummaries();let librarySummaryPaintPending=false;
+let practice:PracticeView|ManualPracticeView|undefined,manualPracticeGeneration=0;const practiceSummaries=new LibraryPracticeSummaries();let librarySummaryPaintPending=false,libraryLoadingStatus:HTMLElement|undefined;
 const libraryMenu=new LibraryMenu();
 const matchingCurrent=(target:NonNullable<typeof current>)=>current&&current.entry.file===target.entry.file&&current.entry.id===target.entry.id&&current.package.sourceSha256===target.package.sourceSha256&&personalStorageName(current.entry.id,current.package)===personalStorageName(target.entry.id,target.package)?current:undefined;
 interface LivePersonalEditor {view:ScorePackage;visiblePersonal:PersonalState;session:PersonalPresentationSession;generation:number;queue:PersonalEditQueue<PersonalState>;projections:Map<number,Promise<ScorePackage>>}
@@ -338,7 +346,7 @@ async function chooseReference(actionLabel:'Calculate fingers'|'Practice'|'Use t
 async function preparePiano(bytes:Uint8Array,layout:PhysicalKeyboardId,entryId:string,personal?:PersonalState,forceRecalculate=false,referenceTempo?:ReferencePerformanceTempo,transposeSteps?:number,performingHandPolicy?:'calculate'|'retain-imported',op?:ReadingOperation):Promise<{q:PianoPrepared;running:NonNullable<typeof job>;dialog:HTMLDialogElement}>{
  if(job?.state==='installing')throw Error('Finger choices are being saved. Try again in a moment.');
  if(op)checkReading(op);else job?.cancel();const controller=op?.controller??new AbortController(),running=op?.running??{cancel:()=>controller.abort(),entryId,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Preparing finger choices…'};job=running;
- const d=op?.dialog??showDialog(`<h2>${transposeSteps===undefined?'Preparing fingers':'Transposing score'}</h2><p class="job" role="status">${running.progress}</p><div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');
+ const d=op?.dialog??showDialog(`${loadingMarkup(transposeSteps===undefined?'Preparing fingers':'Transposing score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');
  if(!op)d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
  if(op){await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);}
  const q=await runPianoReadiness({packageBytes:bytes,layout,personal,forceRecalculate,referenceTempo,transposeSteps,performingHandPolicy,intent:forceRecalculate?'calculate':'read-retained',signal:controller.signal,
@@ -360,7 +368,7 @@ async function prepareScore(bytes:Uint8Array,layout:PhysicalKeyboardId,entryId:s
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
  job?.cancel();
  const running={cancel:()=>{},entryId,state:'installing' as 'working'|'installing'|'complete'|'failed',progress:'Opening score…'};job=running;
- const d=showDialog('<h2>Opening score</h2><p class="job" role="status">Opening score…</p>','score-reading');d.setAttribute('aria-busy','true');
+ const d=showDialog(loadingMarkup('Opening score','Opening score…'),'score-reading');d.setAttribute('aria-busy','true');
  return {q:{packageBytes:bytes,package:p,...(personal?{personal:readPersonal(personal,p)}:{})},running,dialog:d};
 }
 async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNullable<typeof job>,personal:PersonalState,newEntry=false,personalFiles?:Record<string,string>,context?:PracticeViewContext){
@@ -409,6 +417,8 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,ent
 }
 let scoreActivation=0;
 async function activateScore(next:NonNullable<typeof current>,context?:PracticeViewContext,admitted?:AdmittedPracticeContext,op?:ReadingOperation,rememberOpened=false){
+ const ownsOperation=!op;op??=beginReading(next.entry.id);
+ try{
  if(op){checkReadingOwner(op);if(current!==op.previous)throw cancelledReading();}
  const activation=++scoreActivation,previous=current,keyboard=preferences.keyboardLayout;
  const check=()=>{if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==previous||preferences.keyboardLayout!==keyboard||(op&&previous!==op.previous))throw cancelledReading();};
@@ -419,7 +429,13 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Clock acquisition is an activation prerequisite too. Keep the old reader,
  // selection and preferences intact until every awaited prerequisite is owned.
  let clock:number|undefined,clockError:unknown;try{clock=await host.midiClock();}catch(error){clockError=error;}check();
- const nextEditor=personalEditor(next);await nextEditor.session.warm();check();nextEditor.view=await nextEditor.session.project(next.personal);resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ readingProgress(op,'Preparing your score for editing…');await paintCheckpoint(op.controller.signal);check();
+ const nextEditor=personalEditor(next);await nextEditor.session.warm(readingExecution(op));check();nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op));resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ // Publication begins here. Closing/canceling cannot roll back an installed
+ // score or a practice view while its remaining host prerequisites settle.
+ op.running.state='installing';op.dialog?.setAttribute('aria-busy','true');
+ const cancel=op.dialog?.querySelector<HTMLButtonElement>('[data-action=cancel-job]');if(cancel)cancel.disabled=true;
+ readingProgress(op,'Finishing score opening…');
  readingParts.remember(next.entry,next.package);
  ++manualPracticeGeneration;pitchInput.block();practice?.close();practice=undefined;selection=undefined;selectionPitchToggle=false;
  readingPresentation=nextPresentation;readingViewError=nextViewError;
@@ -427,7 +443,8 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
  if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
- void refreshLibrarySummaries();return next;
+ if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
+ }catch(error){if(ownsOperation)finishReading(op,false);throw error;}
 }
 let notationChanging=false;
 async function switchReadingNotation(value:string){
@@ -454,7 +471,7 @@ async function changeTransposition(steps:number){
   const layout=target.package.keyboardLayout??preferences.keyboardLayout,file=retainedTranspositionFile(target.entry,steps,layout);let retained:Awaited<ReturnType<typeof prepareRetainedEdition>>|undefined;
   if(file){
    const controller=new AbortController(),running={cancel:()=>controller.abort(),entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Opening retained score…'};job=running;
-   const d=showDialog(`<h2>Opening score</h2><p class="job" role="status">${running.progress}</p><div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
+   const d=showDialog(`${loadingMarkup('Opening score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
    try{retained=await prepareRetainedEdition(host,target.entry,file,layout);if(getScoreTransposition(retained.package)!==steps)throw Error('The retained edition has a different transposition; current score retained.');
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Score change cancelled. The current score is retained.');
     if(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout)){running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,calculationDiagnostics:[],availableFingerPresentations:[]},running,dialog:d};}
@@ -598,7 +615,7 @@ async function earlierEditions(){
 function closeDialog(returnParent=true){if(['piano-preparation','score-reading'].includes(dialog?.dataset.kind??'')&&job?.state==='installing')return;if(dialog&&readingOperation?.dialog===dialog&&readingOperation.running.state==='working')readingOperation.running.cancel();calibrationGeneration++;if(calibrationPilot){const pilot=calibrationPilot;calibrationPilot=undefined;pilot.unsubscribe();pilot.input.dispose();pilot.view.dispose();pilot.controller.dispose();}const back=dialogBack;dialogBack=undefined;practiceOptionsCleanup?.();practiceOptionsCleanup=undefined;transposeControls?.dispose();transposeControls=undefined;optionsNavigation?.dispose();optionsNavigation=undefined;dialogNavigation?.dispose();dialogNavigation=undefined;bindingOptions?.dispose();bindingOptions=undefined;midiOptions?.dispose();midiOptions=undefined;audioOptions?.dispose();audioOptions=undefined;pianoOptions?.dispose();pianoOptions=undefined;if(!dialog)return;dialog.close();dialog.remove();dialog=undefined;input.capture=undefined;resetInput();const practiceFocus=practiceFocusReturn?app.querySelector<HTMLElement>(practiceFocusReturn):undefined;practiceFocusReturn=undefined;if(selection)focusSelection();else if(practiceFocus)practiceFocus.focus();else if(focusReturn?.isConnected)focusReturn.focus();else app.querySelector<HTMLElement>('.practice-overview:not([hidden]) .practice-chunks [aria-current=true],.practice-stage,.reader')?.focus();focusReturn=undefined;if(librarySummaryPaintPending&&!current&&!practice)paintLibrarySummaries();if(returnParent)back?.();}
 function showDialog(html:string,kind='options'){const parentSection=dialog?.dataset.kind==='options'&&['calibration','earlier-editions'].includes(kind)?optionsSection:undefined,opener=document.activeElement as HTMLElement,openerAction=opener?.dataset.action;closeDialog(false);if(parentSection)dialogBack=()=>{options(parentSection);if(openerAction)dialog?.querySelector<HTMLElement>(`[data-action="${CSS.escape(openerAction)}"]`)?.focus();};focusReturn=document.activeElement as HTMLElement;dialog=document.createElement('dialog');dialog.innerHTML=html;dialog.dataset.kind=kind;dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});document.body.append(dialog);dialog.showModal();fitDialog(dialog,orientation.rotation);resetInput();if(kind!=='options')dialogNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});dialog.querySelector<HTMLElement>('input:not([hidden]),button:not([hidden]),select:not([hidden])')?.focus();return dialog;}
 async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore calculated','restore-one','',!current.personal.overrides[seat.contactId]&&!seat.ownerIds.some(id=>current!.personal.assignments?.choices[id]))}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{await commitPersonal(target,latest=>{delete latest.overrides[seat.contactId];return restorePersonalAssignment(target.package,latest,seat);});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
-function onMidi(event:MidiCC){if(dialog?.dataset?.kind==='calibration'){if(typeof calibrationPilot!=='undefined')calibrationPilot?.input.cc(event);return;}if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;syncControls();
+function onMidi(event:MidiCC){if(!startupReady)return;if(dialog?.dataset?.kind==='calibration'){if(typeof calibrationPilot!=='undefined')calibrationPilot?.input.cc(event);return;}if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;syncControls();
  midiOptions?.receive(event);
  if([120,121,123].includes(event.controller)){bindingOptions?.cancel('Input reset. Start again.');musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();resetInput();return;}
  if(isMusicalSustain(event)){if(readerFocused&&!document.hidden){musicalSustain.receive(event,midiConnection);if(!dialog){practice?.sustain(event);}}return;}
@@ -695,7 +712,7 @@ async function startManualPractice(snapshot?:PracticeViewContext){
 }
 async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPracticeContext){if(!current)return;if(readingPresentation){await startManualPractice(context);return;}requirePianoCapability(current.package,'pianoPractice');selection=undefined;resetInput();const target=current;const next=new PracticeView(app,{rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),modeKeys:()=>({reading:actionControlLabel(effectiveControls(),'practiceReading'),timed:actionControlLabel(effectiveControls(),'practiceTimed')}),...{navigationKeys:()=>{const bindings=effectiveControls();return {previous:actionControlLabel(bindings,'previous'),next:actionControlLabel(bindings,'next')};}},package:readerPackage(),basePackage:target.package,personal:target.personal,presentation:()=>currentFingerPresentation(target.package),audioOutput:()=>preferences.audioOutput??'',sustain:()=>musicalSustain.snapshot(),entryId:target.entry.id,connected:()=>!!midiConnection,source:()=>midiConnection?.source??preferences.midi?.source??'',connect:connectMidi,disconnect:disconnectMidi,back:()=>{practice=undefined;resetInput();render();},settings:()=>settings(),changed:(progress,whole)=>{if(practiceSummaries.record(entries.find(entry=>entry.id===target.entry.id),target.entry,target.package,preferences.keyboardLayout,progress,whole))paintLibrarySummaries();}});practice=next;await next.mount(context,admitted);}
 
-async function act(action:string){try{if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='practice'){await startPractice();return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='calibration'){await calibrate();return;}if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
+async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='practice'){await startPractice();return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='calibration'){await calibrate();return;}if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
  if(['toggle','edit','feedback','restore-all','undo-restore','earlier-editions','restore-header'].includes(action))requirePianoCapability(p,'pianoPreparation');
  if(action==='library'){selection=undefined;await savePersonal();closeDialog();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();void refreshLibrarySummaries();return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
  if(action==='generate'){await startJob();return;}
@@ -722,13 +739,13 @@ window.addEventListener('pointercancel',e=>{if(input.releasePointer(e.pointerId)
 app.addEventListener('change',e=>{const el=e.target as HTMLSelectElement;if(!current||!el.dataset.option)return;const v=current.personal.view,key=el.dataset.option as keyof typeof v;(v as any)[key]=['count','scale'].includes(key)?Number(el.value):el.value;renderPages();renderToolbar();savePersonalQuietly();});
 document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{notify(error.message);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}if(!current||!field.matches('dialog [data-history]'))return;const value=Number(field.value),target=current;void commitPersonal(target,latest=>{latest.calculatedVersion=value<0?undefined:value;latest.view.fingerSet='calculated';return latest;}).then(()=>{if(current===target){renderPages();renderToolbar();}}).catch(error=>paintPersonalSaveError(target,error));});
 window.addEventListener('mousemove',e=>{if(current&&(e.clientY>innerHeight-36||e.clientX<20||e.clientX>innerWidth-20))reveal();});
-window.addEventListener('resize',()=>{if(dialog)fitDialog(dialog,orientation.rotation);if(practice)return;if(current)renderPages();else transformSurface(app.querySelector('.surface')!,orientation.rotation);});
+window.addEventListener('resize',()=>{if(dialog)fitDialog(dialog,orientation.rotation);if(practice)return;if(current)renderPages();else {const surface=app.querySelector<HTMLElement>('.surface');if(surface)transformSurface(surface,orientation.rotation);}});
 window.addEventListener('pagehide',()=>{if(job?.state==='working')job.cancel();readerAdmission.clear();});
 window.addEventListener('blur',loseFocus);window.addEventListener('focus',gainFocus);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)loseFocus();else if(document.hasFocus())gainFocus();});
 document.addEventListener('focusin',e=>{const target=e.target as HTMLElement;bindingOptions?.focusChanged(target);if(target.closest?.('input,select,textarea,[contenteditable=true]'))resetInput();});
 window.addEventListener('keyup',e=>{if(typeof calibrationPilot!=='undefined'&&calibrationPilot?.input.key(e,'key-up'))return;bindingOptions?.keyUp(e);practice?.releaseTempoKey(inputCode(e));const released=controls.keyUp(e);if(input.up(e)||released)refreshPresentation();});
-window.addEventListener('keydown',e=>{if(typeof calibrationPilot!=='undefined'&&calibrationPilot?.input.key(e,'key-down')){e.preventDefault();return;}syncControls();if(bindingOptions?.keyDown(e)){e.preventDefault();return;}if(dialog?.dataset.kind==='options'){controls.keyDown(e,false);if(optionsNavigation?.picking&&optionsNavigation.keyDown(e)){e.preventDefault();return;}if(optionsSection==='keys'&&e.code==='KeyT'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.repeat&&!(e.target instanceof HTMLInputElement&&!e.target.readOnly&&e.target.closest('[data-manual-key]'))){e.preventDefault();optionsNavigation?.cancelPicker(false);bindingOptions?.startTest();return;}if(optionsNavigation?.keyDown(e)){e.preventDefault();return;}if(e.code==='Escape'){e.preventDefault();if(!e.repeat)closeDialog();return;}return;}if(dialog&&dialog.dataset.kind!=='options'){controls.keyDown(e,false);if(dialogNavigation?.keyDown(e)){e.preventDefault();return;}if(e.code==='Escape'){e.preventDefault();if(!e.repeat)closeDialog();}return;}const keypadAssigned=e.code==='NumpadEnter'&&controls.match({kind:'key',key:chord(e)}),uiCode=keypadAssigned?inputCode(e):actionCode(e),focused=e.target as HTMLElement,inField=!!focused.closest?.('input,select,textarea,[contenteditable=true]')&&!(focused instanceof HTMLInputElement&&(focused.readOnly&&focused.closest('[data-manual-key]:not([data-manual-editing])')||focused.type==='checkbox'&&practice?.bindingContext.active&&focused.closest('.practice-controls'))),capture=!!input.capture,activePracticeFooter=!!practice?.bindingContext.active&&!!focused.closest?.('.practice-controls');
+window.addEventListener('keydown',e=>{if(!startupReady){if(!startupFailed)e.preventDefault();return;}if(typeof calibrationPilot!=='undefined'&&calibrationPilot?.input.key(e,'key-down')){e.preventDefault();return;}syncControls();if(bindingOptions?.keyDown(e)){e.preventDefault();return;}if(dialog?.dataset.kind==='options'){controls.keyDown(e,false);if(optionsNavigation?.picking&&optionsNavigation.keyDown(e)){e.preventDefault();return;}if(optionsSection==='keys'&&e.code==='KeyT'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.repeat&&!(e.target instanceof HTMLInputElement&&!e.target.readOnly&&e.target.closest('[data-manual-key]'))){e.preventDefault();optionsNavigation?.cancelPicker(false);bindingOptions?.startTest();return;}if(optionsNavigation?.keyDown(e)){e.preventDefault();return;}if(e.code==='Escape'){e.preventDefault();if(!e.repeat)closeDialog();return;}return;}if(dialog&&dialog.dataset.kind!=='options'){controls.keyDown(e,false);if(dialogNavigation?.keyDown(e)){e.preventDefault();return;}if(e.code==='Escape'){e.preventDefault();if(!e.repeat)closeDialog();}return;}const keypadAssigned=e.code==='NumpadEnter'&&controls.match({kind:'key',key:chord(e)}),uiCode=keypadAssigned?inputCode(e):actionCode(e),focused=e.target as HTMLElement,inField=!!focused.closest?.('input,select,textarea,[contenteditable=true]')&&!(focused instanceof HTMLInputElement&&(focused.readOnly&&focused.closest('[data-manual-key]:not([data-manual-editing])')||focused.type==='checkbox'&&practice?.bindingContext.active&&focused.closest('.practice-controls'))),capture=!!input.capture,activePracticeFooter=!!practice?.bindingContext.active&&!!focused.closest?.('.practice-controls');
  if(!current&&!dialog&&libraryMenu.choosingInstrument&&e.repeat&&!['ArrowUp','ArrowDown'].includes(e.code)){e.preventDefault();return;}if(!current&&!dialog&&libraryMenu.popupKey(actionCode(e))){e.preventDefault();return;}
  if(!dialog&&current&&preferences.fingerBehavior==='momentary'&&focused.closest?.('[data-action=toggle]')&&['Enter','Space'].includes(uiCode)){e.preventDefault();if(!e.repeat&&!input.held.has(inputCode(e))){input.holdControl(inputCode(e));void act('toggle');}return;}
  if(e.repeat&&!inField&&['Enter','Space'].includes(uiCode)){e.preventDefault();return;}
@@ -761,6 +778,7 @@ window.addEventListener('keydown',e=>{if(typeof calibrationPilot!=='undefined'&&
  if(e.ctrlKey||e.altKey||e.metaKey)return;const commands:Record<string,string>={KeyC:'count',KeyS:'scale',KeyM:'import',...(!practice?{KeyP:'practice'}:{})};if(inputCode(e)==='KeyH'&&current){e.preventDefault();if(toolbarVisible)void act('hide');else reveal(true);return;}if(commands[inputCode(e)]){e.preventDefault();void act(commands[inputCode(e)]);}});
 
 function onMidiNote(event:MidiNote){
+ if(!startupReady)return;
  if(dialog?.dataset?.kind==='calibration'){if(typeof calibrationPilot!=='undefined')calibrationPilot?.input.midi(event);return;}
  if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;
  midiOptions?.receive(event);
@@ -802,19 +820,76 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
 function saveFingerDigit(replacement:number){return saveSelectedChoice({finger:replacement},true);}
 function saveHandChoice(hand:PersonalHand){return saveSelectedChoice({hand},false);}
 
-function paintLibrarySummaries(){if(current||practice)return;if(dialog){librarySummaryPaintPending=true;return;}renderLibrary();}
-const libraryProgressContext=()=>JSON.stringify([preferences.keyboardLayout,entries.map(entry=>[entry.id,entry.file])]);
+function paintLibrarySummaries(){if(!startupReady||current||practice)return;if(dialog){librarySummaryPaintPending=true;return;}renderLibrary();}
+const libraryProgressContext=()=>JSON.stringify([preferences.keyboardLayout,entries]);
 const summariesBlocked=()=>!!current||!!practice||!!readingOperation||job?.state==='working'||job?.state==='installing';
-async function loadPracticeTotals(){
+async function loadPracticeTotals(onProgress?:(completed:number,total:number)=>void){
  if(summariesBlocked())return false;
  const context=libraryProgressContext(),keyboard=preferences.keyboardLayout,epoch=readingGeneration,
   isCurrent=()=>epoch===readingGeneration&&context===libraryProgressContext()&&!summariesBlocked();
  return practiceSummaries.refresh(entries,keyboard,{
   readPackage:async file=>{await paintCheckpoint();return isCurrent()?host.read(file):null;},
-  readRecord:async file=>{await paintCheckpoint();if(!isCurrent())throw Error('Library summary was superseded.');return readJson(file);}
- },isCurrent);
+  readRecord:async file=>{await paintCheckpoint();if(!isCurrent())throw Error('Library summary was superseded.');return readJson(file);},
+  readCache:file=>host.read(file),writeCache:(file,bytes)=>host.write(file,bytes)
+ },isCurrent,onProgress);
 }
-async function refreshLibrarySummaries(){if(await loadPracticeTotals())paintLibrarySummaries();}
+let summaryLoadingGeneration=0;
+async function refreshLibrarySummaries(){
+ libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
+ const generation=++summaryLoadingGeneration;let status:HTMLElement|undefined,completed=0,total=entries.length;
+ const progress=(count:number,size:number)=>{if(generation!==summaryLoadingGeneration)return;completed=count;total=size;if(!startupReady)updateLoading(app,'Preparing your library…',count,size);else if(status)updateLoading(status,'Updating your library…',count,size);};
+ const timer=window.setTimeout(()=>{
+  if(!startupReady||generation!==summaryLoadingGeneration||summariesBlocked())return;
+  status=document.createElement('aside');status.className='viewer-library-loading';status.innerHTML=loadingMarkup('Updating library','Checking saved progress…');
+  app.querySelector('.surface')?.append(status);libraryLoadingStatus=status;progress(completed,total);
+ },120);
+ try{const changed=await loadPracticeTotals(progress);if(generation===summaryLoadingGeneration&&changed)paintLibrarySummaries();}
+ finally{clearTimeout(timer);status?.remove();if(libraryLoadingStatus===status)libraryLoadingStatus=undefined;}
+}
 
-async function boot(){calibration=await loadCalibration(host);try{const lib=await readJson<{version:number;entries:Entry[]}>('library.json');if(lib){if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');entries=lib.entries;}const saved=await readJson<typeof preferences>('preferences.json');if(saved){if(saved.version!==1||![0,90,180,270].includes(saved.libraryRotation))throw Error('Preferences version differs; data retained');preferences={...saved,keyboardLayout:keyboardPreference(saved.keyboardLayout,entries.some(e=>e.id==='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27')),bindings:readBindings(saved.bindings),...fingerPreferences(saved),midi:readMidiMapping(saved.midi),midiBindings:saved.midiBindings===undefined?undefined:readMidiBindings(saved.midiBindings,saved.midi)};}if(preferences.lastWorkedEntryId!==undefined&&(typeof preferences.lastWorkedEntryId!=='string'||!/^[a-f0-9]{64}$/.test(preferences.lastWorkedEntryId)))throw Error('Saved score selection differs; data retained');if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);mainControls=readControlBindings(preferences.controlBindings,preferences);preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);await host.onFocusChange(focused=>{if(!focused)loseFocus();else gainFocus();});await host.onMidi(onMidi,status=>{if(status.generation===midiConnection?.generation&&status.source===midiConnection?.source){bindingOptions?.connectionChanged();if(calibrationPilot)calibrationPilot.input.break();musicalSustain.clear();midiConnection=undefined;calibrationPilot?.view.setMidiConnected(false);bindingOptions?.paint();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();resetInput();practice?.pause();notify(status.message);midiOptions?.lost(status.message);}},onMidiNote);render();await host.fullscreen(true);void refreshLibrarySummaries();void enqueue(()=>configurePiano()).catch(error=>{pianoWarning=`Piano sound is off: ${error.message}`;});}catch(error){app.innerHTML='<p class="error">The library could not open. Your saved files have been retained.</p>';notify((error as Error).message);}}
+async function boot(){
+ try{
+  app.classList.add('viewer-startup');app.innerHTML=loadingMarkup('Starting Score Viewer','Opening your library…');
+  await paintCheckpoint();
+  calibration=await loadCalibration(host);
+  const lib=await readJson<{version:number;entries:Entry[]}>('library.json');
+  if(lib){
+   if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');
+   entries=lib.entries;
+  }
+  updateLoading(app,'Restoring your settings…');
+  const saved=await readJson<typeof preferences>('preferences.json');
+  if(saved){
+   if(saved.version!==1||![0,90,180,270].includes(saved.libraryRotation))throw Error('Preferences version differs; data retained');
+   preferences={...saved,keyboardLayout:keyboardPreference(saved.keyboardLayout,entries.some(e=>e.id==='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27')),
+    bindings:readBindings(saved.bindings),...fingerPreferences(saved),midi:readMidiMapping(saved.midi),midiBindings:saved.midiBindings===undefined?undefined:readMidiBindings(saved.midiBindings,saved.midi)};
+  }
+  if(preferences.lastWorkedEntryId!==undefined&&(typeof preferences.lastWorkedEntryId!=='string'||!/^[a-f0-9]{64}$/.test(preferences.lastWorkedEntryId)))throw Error('Saved score selection differs; data retained');
+  if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');
+  try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}
+  orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);
+  mainControls=readControlBindings(preferences.controlBindings,preferences);
+  preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);
+  updateLoading(app,'Connecting input controls…');
+  await host.onFocusChange(focused=>{if(!focused)loseFocus();else gainFocus();});
+  await host.onMidi(onMidi,status=>{
+   if(status.generation===midiConnection?.generation&&status.source===midiConnection?.source){
+    bindingOptions?.connectionChanged();if(calibrationPilot)calibrationPilot.input.break();musicalSustain.clear();midiConnection=undefined;
+    calibrationPilot?.view.setMidiConnected(false);bindingOptions?.paint();if(practice instanceof PracticeView)practice.clearHeldInput();
+    practice?.pause();resetInput();practice?.pause();notify(status.message);midiOptions?.lost(status.message);
+   }
+  },onMidiNote);
+  await host.fullscreen(true);await paintCheckpoint();
+  updateLoading(app,'Preparing your library…');
+  await refreshLibrarySummaries();
+  updateLoading(app,pianoSettings.enabled?'Preparing piano sound…':'Finishing startup…');await paintCheckpoint();
+  const requestedPiano=pianoSettings.enabled;
+  try{const audio=await configurePiano();if(requestedPiano&&(!audio?.enabled||!audio.ready||audio.error))pianoWarning=`Piano sound is off: ${audio?.error??'The saved sound configuration is unavailable. Review Piano sound in Options.'}`;}catch(error){pianoWarning=`Piano sound is off: ${(error as Error).message}`;}
+  startupReady=true;resetInput();app.classList.remove('viewer-startup');render();
+  if(pianoWarning)notify(pianoWarning);
+ }catch(error){
+  startupFailed=true;app.classList.add('viewer-startup');
+  app.innerHTML=`<section class="viewer-loading"><h2>The library could not open</h2><p>Your saved files have been retained.</p><p class="error" role="alert">${esc((error as Error).message)}</p><div class="dialog-actions">${button('Close Viewer','exit')}</div></section>`;
+ }
+}
 void boot();

@@ -3,7 +3,7 @@
 ## 1. Baseline and derived summaries
 
 - [x] 1.1 Retain named baseline cold/warm opening and library measurements with phase splits and browser/native limits; verify the private receipt hashes and original benchmark inputs.
-- [ ] 1.2 Implement bounded persistent display-summary caching with complete archive, selection, journal and null-fallback dependencies; verify restart hits, invalidation, corrupt-cache recovery and stale-generation controls in focused tests and document its disposable storage contract.
+- [x] 1.2 Implement bounded persistent display-summary caching with complete archive, selection, journal and null-fallback dependencies; verify restart hits, invalidation, corrupt-cache recovery and stale-generation controls in focused tests and document its disposable storage contract.
 
 ## 2. Cooperative shared preparation
 
@@ -12,7 +12,7 @@
 
 ## 3. Viewer reuse and readiness
 
-- [ ] 3.1 Implement bounded exact personal-preparation core reuse with independent current package wrappers and personal assignments; verify compatible reopen, changed input rejection, eviction, concurrent requests, failure and canceled-warm cleanup, and document retention limits.
+- [x] 3.1 Implement bounded exact personal-preparation core reuse with independent current package wrappers and personal assignments; verify compatible reopen, changed input rejection, eviction, concurrent requests, failure and canceled-warm cleanup, and document retention limits.
 - [ ] 3.2 Consolidate startup and score-opening feedback into one accessible loading surface, awaiting complete library and enabled-audio readiness and prioritizing foreground work; verify early visible feedback, actual phases/counts, errors, cancellation, supersession and unchanged keyboard/MIDI ownership in the built viewer.
 
 ## 4. Integrated performance and source delivery
