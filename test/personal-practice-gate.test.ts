@@ -20,9 +20,9 @@ function fixture(mode:'reading'|'timed'='reading'){
   diagnostics:{record(){hit('diagnostic');}},manual:{cancelEdit(){hit('cancel-edit');}},clock:{fromMidi:()=>1},
   options:{connected:()=>true,back(){hit('back');},settings(){hit('settings');}},
   status(s:string){messages.push(s);},paint(){hit('paint');},paintControls(){hit('paint-controls');},paintVisibility(){hit('paint-visibility');},
-  cancelTempoHold(){hit('cancel-tempo');},stopClock(){hit('stop-clock');},enterFreeView(){this.mode='free';},
+  cancelTempoHold(){hit('cancel-tempo');},stopClock(){hit('stop-clock');},enterFreeView(this:any){this.mode='free';},
   connectionChanged(){hit('connection');},readingActive(){return !this.readingPaused&&this.readingStarted;},readingMessage:()=> 'Reading',
-  selectMode(next:string){hit('select-mode');this.mode=next;},turnPage(){hit('turn-page');},selectPassage(){hit('select-passage');},toggleCompletion(){hit('completion');},
+  selectMode(this:any,next:string){hit('select-mode');this.mode=next;},turnPage(){hit('turn-page');},selectPassage(){hit('select-passage');},toggleCompletion(){hit('completion');},
   browser:{select(){hit('browser-select');}},async save(){hit('save');return true;},close(){hit('close');this.disposed=true;}});
  return {view,counts,messages,event,hit};
 }

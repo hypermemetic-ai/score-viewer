@@ -42,7 +42,7 @@ Introduce an effective personal presentation view separate from the frozen archi
 
 The existing full-edition API is not sufficient for per-key edits. If required, extend ISO in its own scoped checkout/PR with a reusable bounded projection and explicit personal-authority precedence, then deliberately update the Viewer dependency pin/provenance. Do not implement a competing engraving engine or weaken frozen-package admission. Full cold replay/package generation remains an export/install operation, not the editor's live path.
 
-This contract permits a synchronous cached projection or bounded worker output; the latency gate determines the viable implementation. Hand labels alone do not satisfy faithful-paint completion.
+This contract permits a synchronous cached projection or bounded worker output; correctness and measured latency determine the viable implementation. Hand labels alone do not satisfy faithful-paint completion.
 
 ### 5. Immediate ordered intent, independent durable commit
 
@@ -50,7 +50,7 @@ Reserve source targets at key arrival. Apply validated intent to an in-memory ed
 
 ### 6. Measurable performance acceptance
 
-Measure key-event receipt through the first animation frame containing correct visible notation, not setter duration or optimistic text alone. Benchmark warmed No14 plus public dense/long and reflow/tie cases in Conventional and Jankó presentations on a named host/viewport. Require p95 ≤100 ms for visible edits and aim for the next frame when possible. Include failed/timed-out edits in diagnostics, record sample count/score size and verify final notation correctness independently. Add delayed-save/rapid-input cases; edit responsiveness must not depend on disk completion. Cold score opening is a separate metric.
+Measure key-event receipt through the first animation frame containing correct visible notation, not setter duration or optimistic text alone. Benchmark warmed No14 plus public dense/long and reflow/tie cases in Conventional and Jankó presentations on a named host/viewport. Retain p95 ≤100 ms as a tuning goal and aim for the next frame when possible. On 2026-10-10, after being told that notation calculation alone measured 223–239 ms for No14 and 289–311 ms for the dense fixture, the user accepted delivery at the achieved speed unless a very promising optimization remained. Complete the promising geometry calculation check, report final end-to-end percentiles separately from source-only timings, and proceed with delivery without treating 100 ms as a release blocker. Correct rendering, complete benchmark coverage, source preservation and ordered save recovery remain required. Include failed/timed-out edits in diagnostics, record sample count/score size and verify final notation correctness independently. Add delayed-save/rapid-input cases; edit responsiveness must not depend on disk completion. Cold score opening is a separate metric.
 
 No timing is claimed before measurement. Native WebView2/WK, physical MIDI and actual installed behavior need their own delivery evidence.
 

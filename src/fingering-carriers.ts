@@ -113,7 +113,8 @@ function rememberCarrierPage(key:string,page:ReadonlyMap<string,FingerCarrier>):
 
 /** Every package keeps its own SVG and source/contact identities. No saved
  * geometry certificate, package migration or score rendering is performed. */
-export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>):Map<string,FingerCarrier>{
+export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>,pages?:ReadonlySet<number>):Map<string,FingerCarrier>{
+ if(pages)for(const page of pages)if(!Number.isSafeInteger(page)||page<0||page>=p.pages.length)throw Error('Annotation page differs from the complete score.');
  const result=new Map<string,FingerCarrier>(),notes=new Map(p.score.notes.map(n=>[n.id,n]));
  // Selection order and last-by-id note resolution remain the original ones.
  // Do not inspect accessors/custom seat collections merely to establish cache reuse.
@@ -125,6 +126,7 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>):
    const own=Object.getOwnPropertyDescriptors(s);return Reflect.ownKeys(s).every(k=>typeof k==='string'&&own[k].enumerable&&'value' in own[k]);
   });
  for(const [page,svg]of p.pages.entries()){
+  if(pages&&!pages.has(page))continue;
   const key=plainSeats?carrierPageKey(page,svg,p.seats.filter(s=>s.page===page),notes):undefined,saved=key===undefined?undefined:carrierPages.get(key);
   if(saved){carrierPages.delete(key!);carrierPages.set(key!,saved);for(const [id,c]of saved)result.set(id,detachCarrier(c));continue;}
   const pageResult=new Map<string,FingerCarrier>();
