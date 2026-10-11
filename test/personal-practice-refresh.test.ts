@@ -20,7 +20,7 @@ function fixture(){
  const settings={working:72,target:180,increase:3.6,countIn:2,cooldown:3,keepTempo:true};
  const evidence={leaf:{earned:[{at:123,tempo:96,correct:18,total:18}],done:true},join:{earned:[{at:456,tempo:108,correct:32,total:32}],done:false}};
  const snapshot={partition:'source-partition',composites:{join:['leaf-a','leaf-b']},preferences:settings,selected:'leaf-a',parent:'join',component:1,includeManual:true,mode:'timed',previousMode:'reading',passage:'leaf-a',window:[5,8]};
- const preparations:any[]=[],mounts:any[]=[],writes:any[]=[],errors:any[]=[];let context:any;
+ const preparations:any[]=[],mounts:any[]=[],writes:any[]=[],errors:any[]=[],readerPaints:string[]=[];let context:any;
  let projection=async(s:any)=>({...p,notationHands:p.score.notes.map(n=>handFor(p,s,n.id)),choiceSnapshot:structuredClone(s)});
  let flush=async()=>{},save=async(s:any)=>{writes.push(structuredClone(s));},prepare=async(base:any,id:string,c:any,s:any)=>({state:{evidence:structuredClone(evidence),preferences:structuredClone(c.preferences)},plan:{hands:base.score.notes.map((n:any)=>handFor(base,s,n.id))}});
  class FakePracticeView{
@@ -38,12 +38,13 @@ function fixture(){
   PersonalPresentationSession:class{project(s:any){return projection(structuredClone(s));}},personalStorageName:()=> 'bound-personal',
   readPersonal:(s:any)=>structuredClone(s),personalContext:async(t:any)=>({p:t.package,file:'bound-personal'}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.catch(()=>{});return result;},writeJson:async(_file:string,s:any)=>save(s),paintPersonalSaveError:(_t:any,error:any)=>errors.push(error),
-  app:{},readingPresentation:undefined,requirePianoCapability(){},resetInput(){},orientation:{rotation:0},actionControlLabel:()=>'',effectiveControls:()=>({}),controls:{match:()=>false},
+  app:{querySelector:()=>null},readingPresentation:undefined,requirePianoCapability(){},resetInput(){},orientation:{rotation:0},actionControlLabel:()=>'',effectiveControls:()=>({}),controls:{match:()=>false},renderPages(){readerPaints.push('pages');},renderToolbar(){readerPaints.push('toolbar');},
   currentFingerPresentation:()=> 'annotations',preferences:{keyboardLayout:'conventional-piano'},musicalSustain:{snapshot:()=>({})},midiConnection:undefined,connectMidi(){},disconnectMidi(){},settings(){},entries:[target.entry],practiceSummaries:{record:()=>false},paintLibrarySummaries(){},render(){}};
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('async function commitPersonal(','\nfunction labelMode('),context);
+ runInNewContext(body('async function retryPersonalEdits(','const personalFile='),context);
  runInNewContext(body('async function startPractice(','\nasync function act('),context);
- return {context,target,old,p,snapshot,settings,evidence,preparations,mounts,writes,errors,get editor(){return context.personalEditor(target);},
+ return {context,target,old,p,snapshot,settings,evidence,preparations,mounts,writes,errors,readerPaints,get editor(){return context.personalEditor(target);},
   setProjection(fn:typeof projection){projection=fn;},setFlush(fn:typeof flush){flush=fn;},setSave(fn:typeof save){save=fn;},setPrepare(fn:typeof prepare){prepare=fn;},
   changeHand(hand:string){return context.commitPersonal(target,(s:any)=>{s.choices.a.hand=hand;return s;});}};
 }
@@ -58,6 +59,31 @@ test('active restore admits new hand plan with projected notation before awaitin
  assert.deepEqual(mount.admitted.plan.hands,mount.notation.notationHands);assert.deepEqual(mount.owner.state.evidence,f.evidence);assert.deepEqual(mount.owner.state.preferences,f.settings);assert.deepEqual(f.old.state.evidence,f.evidence);
  assert.equal(f.old.closed,1);assert.equal(f.context.practice,mount.owner);let completed=false;void changing.then(()=>{completed=true;});await settle();assert.equal(completed,false);
  saved.resolve();await changing;await f.editor.queue.flush();assert.equal(completed,true);
+});
+
+test('retry after a failed projection saves retained intent and mounts its matching practice notation and hand plan without painting the reader',async()=>{
+ const f=fixture();f.setProjection(async()=>{throw Error('projection unavailable');});
+ await assert.rejects(f.changeHand('RH'),/projection unavailable/);await assert.rejects(f.editor.queue.flush(),/projection unavailable/);
+ assert.equal(f.writes.length,0);assert.equal(f.editor.queue.recovery.length,1);assert.equal(f.target.personal.choices.a.hand,'RH');assert.equal(f.editor.view,f.p);
+ f.setProjection(async s=>({...f.p,notationHands:f.p.score.notes.map(n=>handFor(f.p,s,n.id)),choiceSnapshot:structuredClone(s)}));
+ await f.context.retryPersonalEdits(f.target);
+ assert.equal(f.editor.queue.error,undefined);assert.equal(f.editor.queue.recovery.length,0);assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.hand,'RH');
+ assert.equal(f.mounts.length,1);const mount=f.mounts[0];assert.equal(f.context.practice,mount.owner);assert.equal(f.old.closed,1);
+ assert.equal(mount.notation,f.editor.view);assert.equal(mount.owner.options.basePackage,f.p);assert.equal(mount.owner.options.personal,f.target.personal);assert.deepEqual(mount.notation.notationHands,['RH','RH']);assert.deepEqual(mount.admitted.plan.hands,mount.notation.notationHands);
+ assert.deepEqual(mount.owner.state.evidence,f.evidence);assert.deepEqual(mount.owner.state.preferences,f.settings);assert.deepEqual(f.old.state.evidence,f.evidence);assert.deepEqual(f.readerPaints,[]);
+});
+
+test('retry after successful personal persistence but failed practice admission remounts the retained choice without another save or reader paint',async()=>{
+ const f=fixture();f.setPrepare(async()=>{throw Error('admission unavailable');});
+ await assert.rejects(f.changeHand('RH'),/admission unavailable/);await f.editor.queue.flush();
+ assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.hand,'RH');assert.equal(f.editor.queue.error,undefined);assert.equal(f.editor.queue.recovery.length,0);assert.equal(f.old.closed,0);assert.equal(f.mounts.length,0);
+ // The still-owning paused practice has later settings; retry must retain them.
+ f.snapshot.preferences.working=84;f.snapshot.includeManual=false;
+ f.setPrepare(async(base,_id,context,s)=>({state:{evidence:structuredClone(f.evidence),preferences:structuredClone(context.preferences)},plan:{hands:base.score.notes.map((n:any)=>handFor(base,s,n.id))}}));
+ await f.context.retryPersonalEdits(f.target);
+ assert.equal(f.writes.length,1,'A completed snapshot is not saved a second time');assert.equal(f.mounts.length,1);assert.equal(f.old.closed,1);const mount=f.mounts[0];
+ assert.equal(mount.notation,f.editor.view);assert.deepEqual(mount.notation.notationHands,['RH','RH']);assert.deepEqual(mount.admitted.plan.hands,mount.notation.notationHands);assert.equal(mount.owner.options.personal,f.target.personal);
+ assert.deepEqual(mount.owner.state.evidence,f.evidence);assert.equal(mount.owner.state.preferences.working,84);assert.equal(mount.context.includeManual,false);assert.deepEqual(mount.owner.state.preferences,f.snapshot.preferences);assert.deepEqual(f.readerPaints,[]);
 });
 
 test('history baseline changes are compared by effective source hands rather than explicit assignment presence',async()=>{
