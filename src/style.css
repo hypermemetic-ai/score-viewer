@@ -116,6 +116,8 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 .practice-catalog-label{margin:14px 6px 4px;color:#8d9695;font-size:11px;letter-spacing:.06em}
 .practice-catalog section:first-child .practice-catalog-label{margin-top:0}
 .practice-browser .practice-chunks .practice-excluded{color:#7e8987}
+.practice-browser .practice-row-progress{display:flex;flex-direction:column;align-items:flex-end}
+.practice-browser .practice-row-exclusion{font-size:10px;line-height:1.2}
 .practice-excluded .practice-range{position:relative}
 .practice-excluded .practice-range::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;border-top:1px solid #a2b6b06b;transform:rotate(-6deg);pointer-events:none}
 .practice-browser .practice-range small{display:block;font-size:11px;color:#8e9694}

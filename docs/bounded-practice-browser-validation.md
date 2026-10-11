@@ -103,3 +103,32 @@ its initial receipt SHA256 is
 The exact sparse baseline is reconstructed in the prior/current comparison,
 with the baseline module hashes recorded in that receipt. Scripts close their
 temporary servers and browser processes in `finally`.
+
+## Excluded row percentages
+
+A scoped follow-up on integrated Viewer `0de581c` keeps each excluded row's
+right-aligned percentage visible, with a compact `Excluded` status underneath.
+The accessible row label still identifies exclusion. Cancellation remains on
+the source range alone; percentages and keyboard hints remain undecorated.
+The same emitted-main guard script additionally checks that both labels fit
+inside each row and that every row retains its exact width and height across
+hovered and selected exclusions. This checks the existing selector geometry,
+not a new attainment rule.
+
+The configured build passed with the same test-only candidate6b. The targeted
+production guard run passed at 1280, 800 and 480 pixels with reduced motion and fresh
+isolated storage, including authoritative saved-X, modal, capture and numeric
+editor guards. Its best dictionaries are empty; numeric percentages are visible
+at 0%, while populated attainment preservation remains covered by the separate
+lifecycle evidence above. This run does not add installed, native timing or
+pianist acceptance.
+
+```sh
+PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-excluded-percent /home/qqp/.local/bin/qq-job -- node scripts/check-bounded-practice-guards.mjs
+```
+
+The retained selected/hovered screenshots are
+`production-1280-excluded-rows.png`, `production-800-excluded-rows.png` and
+`production-480-excluded-rows.png` in that artifact directory.
+The final receipt SHA256 is
+`a40b6bf3bac63890026f8a8418799e866a791c392388110c193c6bfd89d70e52`.
