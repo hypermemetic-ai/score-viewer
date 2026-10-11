@@ -26,12 +26,13 @@ export type LegacyPracticePartition='fixed-four-v1'|'connection-boundary-v1';
 export type PracticePartition=LegacyPracticePartition|'bounded-exercises-v1';
 export function practicePartition(raw:unknown):PracticePartition {if(!raw)return 'bounded-exercises-v1';const p=(raw as PracticeState).partition;if(p===undefined)return 'fixed-four-v1';if(p!=='fixed-four-v1'&&p!=='connection-boundary-v1'&&p!=='bounded-exercises-v1')throw Error('Practice partition differs; saved evidence retained.');return p;}
 /** Musical clock, passage and evidence identity; no physical assessment role. */
-export interface PracticePassagePlan {partition:PracticePartition;timeSignatures:TimeSignatureOverlay[];barPhaseTicks?:number[];referencePerformanceTempo?:ReferencePerformanceTempo;revision:string;barTicks:number[];ticksPerBeat:number;chunks:PracticeChunk[];catalog?:readonly PracticeExercise[];policyFingerprint?:string;boundaryProfile?:PracticeSectionPlanning;legacyPlans?:Partial<Record<LegacyPracticePartition,PracticePassagePlan>>}
+export interface PracticePassagePlan {partition:PracticePartition;timeSignatures:TimeSignatureOverlay[];barPhaseTicks?:number[];referencePerformanceTempo?:ReferencePerformanceTempo;revision:string;barTicks:number[];ticksPerBeat:number;chunks:PracticeChunk[];catalog?:readonly PracticeExercise[];policyFingerprint?:string;boundaryProfile?:PracticeSectionPlanning;legacyPlans?:Partial<Record<LegacyPracticePartition,PracticePassagePlan>>;sourcePracticeIdentity?:string;keyboardLayout?:string}
 /** Piano assessment adds genuine pitches and performing-hand groups. */
 export interface PracticePlan extends PracticePassagePlan {attacks:PracticeAttack[];gestures:Gesture[];ownerGroup:Map<string,string>}
 export interface PersonalPerformanceGoal {version:'personal-performance-goal-v1';bpm:number;beat:ReferencePerformanceTempo['beat']}
 export interface LegacyPracticeEnvelope {version:'legacy-practice-envelope-v1';partition:LegacyPracticePartition;revision:string;state:PracticeState;record?:unknown}
-export interface PracticeState {manualAttainment?:ManualAttainment;referenceBeat?:ReferencePerformanceTempo['beat'];partition?:PracticePartition;version:1;revision:string;target:number;personalGoal?:PersonalPerformanceGoal;working:number;step:number;tolerance:number;offset:number;keepTempo:boolean;start:number;connectionStart?:number;workingByPattern:Record<string,number>;best:Record<string,number>;usabilityRevision?:1;speedRevision?:2;countInBars?:number;resumeCooldownSeconds?:number;audioOutput?:string;groundwork?:Record<string,boolean>;composites?:Record<string,string[]>;policyFingerprint?:string;excluded?:Record<string,boolean>;legacy?:LegacyPracticeEnvelope}
+export interface PracticeEditionEvidence {version:'practice-edition-evidence-v1';sourceIdentity:string;keyboardLayout:string;revision:string;rawState:unknown}
+export interface PracticeState {manualAttainment?:ManualAttainment;referenceBeat?:ReferencePerformanceTempo['beat'];partition?:PracticePartition;version:1;revision:string;target:number;personalGoal?:PersonalPerformanceGoal;working:number;step:number;tolerance:number;offset:number;keepTempo:boolean;start:number;connectionStart?:number;workingByPattern:Record<string,number>;best:Record<string,number>;usabilityRevision?:1;speedRevision?:2;countInBars?:number;resumeCooldownSeconds?:number;audioOutput?:string;groundwork?:Record<string,boolean>;composites?:Record<string,string[]>;policyFingerprint?:string;excluded?:Record<string,boolean>;legacy?:LegacyPracticeEnvelope;editionEvidence?:PracticeEditionEvidence}
 /** A brushed wrong key is not a failure; an expected quiet key is still a real attack. */
 export const QUIET_STRAY_MAX_VELOCITY=8;
 export const isQuietStray=(velocity:number)=>velocity>0&&velocity<=QUIET_STRAY_MAX_VELOCITY;
@@ -68,7 +69,7 @@ export function planSource(p:ScorePackage,partition:PracticePartition='bounded-e
  const occurrences=p.score.writtenPresentation?.occurrences??[],weights=bars.slice(0,-1).map((_,i)=>Math.max(1,occurrences.filter(o=>o.writtenBar===i+1).length));
  const protectedAt=(cut:number)=>{const tick=bars[cut],reasons=ordered.filter(a=>a.tick<tick&&a.end>tick).map(a=>`held:${a.id}`);for(const phrase of p.score.phrases??[]){if(phrase.startTick>=tick||phrase.endTick<=tick)continue;const first=barFor(phrase.startTick),last=barFor(Math.max(phrase.startTick,phrase.endTick-1e-7));if(last-first+1<=2)reasons.push(`phrase:${phrase.id}`);}return reasons;};
  const chunks:PracticeChunk[]=[];
- const boundaryProfile=partition==='bounded-exercises-v1'?planPracticeSections(original.score):undefined;
+ const boundaryProfile=partition==='bounded-exercises-v1'?planPracticeSections(original.sourceScore??original.score):undefined;
  if(boundaryProfile)for(const section of boundaryProfile.sections){
   const {firstBar:first,lastBar:last,start,end}=section,carry=ordered.filter(a=>a.tick<start&&a.end>start),id=practiceSectionId(section,bars);
   const pattern=JSON.stringify({policy:boundedPracticePolicyFingerprint,length:end-start,attacks:ordered.filter(a=>a.tick>=start&&a.tick<end).map(a=>[a.tick-start,a.end-a.tick,a.midi,a.groups.map(g=>g.split(':')[1]).sort()]),...(carry.length?{carry:carry.map(a=>[a.tick-start,a.end-start,a.midi,a.owners])}:{})});
@@ -82,11 +83,11 @@ export function planSource(p:ScorePackage,partition:PracticePartition='bounded-e
   chunks.push({id:`${first+1}-${last+1}`,firstBar:first,lastBar:last,start,end,weight:weights.slice(first,last+1).reduce((sum,w,i)=>sum+w*(bars[first+i+1]-bars[first+i]),0),pattern,boundaryReasons:protectedAt(cut)});first=cut;
  }
 
- const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
- if(boundaryProfile)for(const chunk of chunks)chunk.pattern=JSON.stringify({version:'bounded-piano-passage-v1',policyFingerprint:boundedPracticePolicyFingerprint,music:musicalSpanFact(plan,original.score,chunk,'piano')});
+ const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,sourcePracticeIdentity:original.sourceRevision??original.manifest.revision,keyboardLayout:original.keyboardLayout,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
+ if(boundaryProfile)for(const chunk of chunks)chunk.pattern=JSON.stringify({version:'bounded-piano-passage-v1',policyFingerprint:boundedPracticePolicyFingerprint,music:musicalSpanFact(plan,original.sourceScore??original.score,chunk,'piano')});
  registerPersonalPracticeIdentity(plan,original.score,p.score,base?.chunks??chunks.map(c=>({...c})));
  if(boundaryProfile){plan.boundaryProfile=boundaryProfile;plan.policyFingerprint=boundedPracticePolicyFingerprint;populatePracticeCatalog(plan,p.score);plan.legacyPlans={'fixed-four-v1':planSource(original,'fixed-four-v1',personal),'connection-boundary-v1':planSource(original,'connection-boundary-v1',personal)};}
- registerPracticePatterns(plan,original.score,'piano');return plan;
+ registerPracticePatterns(plan,original.sourceScore??original.score,'piano');return plan;
 }
 export function practiceSectionId(section:Pick<PracticeChunk,'start'|'end'|'firstBar'|'lastBar'>,bars:readonly number[]){
  return section.start===bars[section.firstBar]&&section.end===bars[section.lastBar+1]?`${section.firstBar+1}-${section.lastBar+1}`:`section-${section.start}-${section.end}`;
@@ -130,6 +131,7 @@ export function readPractice(raw:unknown,plan:PracticePassagePlan):PracticeState
  const all=passageHierarchy(plan,state).all;
  if(state.excluded!==undefined&&(!state.excluded||typeof state.excluded!=='object'||Array.isArray(state.excluded)||Object.entries(state.excluded).some(([id,value])=>!all.has(id)||typeof value!=='boolean')))throw Error('Practice exclusion differs from its exercise catalog; saved evidence retained.');
  state.excluded??={};
+ if(state.editionEvidence){const evidence=state.editionEvidence,old=evidence.rawState as PracticeState;if(evidence.version!=='practice-edition-evidence-v1'||evidence.sourceIdentity!==plan.sourcePracticeIdentity||evidence.keyboardLayout!==plan.keyboardLayout||!old||old.version!==1||old.revision!==evidence.revision)throw Error('Prior practice edition evidence differs; saved data retained.');practicePartition(old);}
  if(state.legacy){const old=state.legacy,legacy=plan.legacyPlans?.[old.partition];if(old.version!=='legacy-practice-envelope-v1'||!legacy||old.revision!==legacy.revision||practicePartition(old.state)!==old.partition||old.state.legacy)throw Error('Legacy practice recovery differs; saved evidence retained.');readPracticeLiteral(old.state,legacy);}
  return state;
 }
@@ -155,6 +157,29 @@ export function migratePracticeState(raw:unknown,plan:PracticePassagePlan):Pract
   const marks=Object.entries(old.manualAttainment?.marks??{}).flatMap(([key,rates])=>{const [id,pattern]=claimIdentity(key);return id===match.id&&recognized(pattern)?rates:[];});
   if(marks.length){next.manualAttainment??={version:1,marks:{}};next.manualAttainment.marks[JSON.stringify([chunk.id,chunk.pattern])]=[...new Set(marks)];}
  }
+ return readPractice(next,plan);
+}
+/** Explicit hand/finger calculation keeps a complete same-source exercise's
+ * attainment. The old edition is validated before any claim is projected. */
+export function transferPracticeEdition(from:ScorePackage,raw:unknown,to:ScorePackage,toPersonal?:PersonalState):PracticeState {
+ if(!from.sourceSha256||from.sourceSha256!==to.sourceSha256||!from.keyboardLayout||from.keyboardLayout!==to.keyboardLayout)throw Error('Practice edition belongs to another source or keyboard; prior evidence retained.');
+ const oldPlan=planPractice(from,practicePartition(raw)),old=readPractice(raw,oldPlan),plan=planPractice(to,'bounded-exercises-v1',toPersonal),next=initialPractice(plan);
+ const full=(p:PracticePlan,score:ScorePackage['score'])=>musicalSpanFact(p,score,{id:'source',pattern:'source',start:0,end:p.barTicks.at(-1)!,firstBar:0,lastBar:p.barTicks.length-2,weight:1},'piano');
+ if(full(oldPlan,from.sourceScore??from.score)!==full(plan,to.sourceScore??to.score))throw Error('Practice edition changes musical source facts; prior evidence retained.');
+ const oldAll=passageHierarchy(oldPlan,old).all,newAll=passageHierarchy(plan,next).all;
+ for(const key of ['referenceBeat','target','personalGoal','working','step','tolerance','offset','keepTempo','start','connectionStart','usabilityRevision','speedRevision','countInBars','resumeCooldownSeconds','audioOutput'] as const)if(old[key]!==undefined)(next as unknown as Record<string,unknown>)[key]=structuredClone(old[key]);
+ const clipKey=(c:PracticeChunk)=>JSON.stringify([c.kind==='contrast'?'contrast':'span',c.clips?.map(clip=>[clip.start,clip.end])??[[c.start,c.end]],c.episode??null]);
+ for(const chunk of newAll.values()){
+  const match=[...oldAll.values()].find(c=>c.start===chunk.start&&c.end===chunk.end&&(chunk.kind==='contrast'?c.kind==='contrast'&&clipKey(c)===clipKey(chunk):c.kind!=='contrast'&&practiceSpanEvidenceKey(oldPlan,c)===practiceSpanEvidenceKey(plan,chunk)));
+  if(!match)continue;
+  const claims=equivalentPracticeClaims(old,{passage:match.id,pattern:match.pattern});
+  const rates=claims.flatMap(c=>old.best[c.pattern]===undefined?[]:[old.best[c.pattern]]);if(rates.length)next.best[chunk.pattern]=Math.max(...rates);
+  const marks=claims.flatMap(c=>old.manualAttainment?.marks[JSON.stringify([c.passage,c.pattern])]??[]);if(marks.length){next.manualAttainment??={version:1,marks:{}};next.manualAttainment.marks[JSON.stringify([chunk.id,chunk.pattern])]=[...new Set(marks)];}
+  if(claims.some(c=>old.groundwork?.[c.pattern])){next.groundwork??={};next.groundwork[chunk.pattern]=true;}
+  if(old.workingByPattern[match.pattern]!==undefined)next.workingByPattern[chunk.pattern]=old.workingByPattern[match.pattern];
+  if(old.excluded?.[match.id])next.excluded![chunk.id]=true;
+ }
+ next.editionEvidence={version:'practice-edition-evidence-v1',sourceIdentity:plan.sourcePracticeIdentity!,keyboardLayout:plan.keyboardLayout!,revision:oldPlan.revision,rawState:structuredClone(raw??old)};
  return readPractice(next,plan);
 }
 /** Visible percentages never round an unfinished passage up to completion. */

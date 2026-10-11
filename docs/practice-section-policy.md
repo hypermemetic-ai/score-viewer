@@ -15,3 +15,11 @@ journals similarly search the current revision first and then accepted old
 manual revisions; malformed current data never falls through to another file.
 Personal hand and finger choices update playing instructions while preserving
 attained progress and the original evidence. Source facts define claim identity.
+
+Explicit hand/finger calculation creates a new performing edition without
+changing the archived musical source. `transferPracticeEdition` validates the
+old edition's journal and transfers only matching complete source exercises to
+the new catalog, including each contrast's two actual clips. Source or keyboard
+changes refuse transfer. The former journal remains literal recovery evidence;
+it does not become a new attainment claim. Canonical archived source facts define
+boundaries and equivalence, while the current edition's hands drive practice.

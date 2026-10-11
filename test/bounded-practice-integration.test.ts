@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
-import {planPractice,initialPractice,readPractice,passageHierarchy,practiceCatalogChunks,practiceClipChunk,totalProgress,progressFor,PracticeSession} from '../src/practice';
+import {planPractice,initialPractice,readPractice,passageHierarchy,practiceCatalogChunks,practiceClipChunk,totalProgress,progressFor,PracticeSession,transferPracticeEdition} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {toggleExerciseExclusion} from '../src/practice-exercise-catalog';
 const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
@@ -56,4 +56,16 @@ test('contrast sessions reject unselected and invented continuous source spans b
  const state=initialPractice(plan),owner=practiceCatalogChunks(plan).find(c=>c.kind==='contrast')!;
  assert.throws(()=>new PracticeSession(plan,owner,state,true),/owning source clip/);
  const clip=practiceClipChunk(owner,0);assert.throws(()=>new PracticeSession(plan,{...clip,end:owner.clips![1].end},state,true),/owning source clip/);
+});
+
+test('materialized hand/finger editions preserve exact source exercises, exclusions and literal prior journals',()=>{
+ const from=structuredClone(p);from.sourceScore=structuredClone(from.score);from.sourceSha256='a'.repeat(64);from.sourceRevision='a'.repeat(64);from.keyboardLayout='janko-four-row';
+ const oldPlan=planPractice(from),old=initialPractice(oldPlan),rows=practiceCatalogChunks(oldPlan);old.best[rows[0].pattern]=90;toggleDone(old,{passage:rows[0].id,pattern:rows[0].pattern,rate:180});
+ const contrast=rows.find(c=>c.kind==='contrast')!;old.best[contrast.pattern]=120;old.excluded={[contrast.id]:true};
+ const to=structuredClone(from);to.manifest.revision='b'.repeat(64);for(const note of to.score.notes)note.hand=note.hand==='LH'?'RH':'LH';
+ const bytes=JSON.stringify(old),current=planPractice(to),state=transferPracticeEdition(from,old,to),next=practiceCatalogChunks(current),nextContrast=next.find(c=>c.kind==='contrast'&&c.episode===contrast.episode&&c.clips![0].start===contrast.clips![0].start)!;
+ assert.equal(JSON.stringify(old),bytes);assert.equal(progressFor(current.chunks[0],state),1);assert.equal(state.best[current.chunks[0].pattern],90);assert.equal(state.best[nextContrast.pattern],120);assert.equal(state.excluded![nextContrast.id],true);assert.deepEqual(state.editionEvidence!.rawState,old);
+ assert.deepEqual(readPractice(structuredClone(state),current),state);assert.notEqual(current.ownerGroup.get(to.score.notes[0].id),oldPlan.ownerGroup.get(from.score.notes[0].id));
+ const pitched=structuredClone(to);pitched.sourceScore!.notes[0].durationTicks++;assert.throws(()=>transferPracticeEdition(from,old,pitched),/musical source facts/);
+ assert.throws(()=>transferPracticeEdition(from,old,{...to,sourceSha256:'c'.repeat(64)}),/another source/);assert.throws(()=>transferPracticeEdition(from,old,{...to,keyboardLayout:'conventional-piano'}),/another source/);
 });

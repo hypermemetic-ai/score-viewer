@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {importPackage,selectPresentation,hashBytes} from '../src/package';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,personalStorageName,legacyPersonalStorageName,initialPersonal,type Entry} from '../src/state';
-import {planPractice,initialPractice,totalProgress,practicePercent,reconcilePassages} from '../src/practice';
+import {planPractice,initialPractice,totalProgress,practicePercent,reconcilePassages,readPractice} from '../src/practice';
 import {LibraryPracticeSummaries,readLibraryPracticeSummary,type LibraryPracticeReader} from '../src/library-practice-progress';
 import {displayedPracticeTotal} from '../src/practice-display';
 import {toggleDone} from '../src/practice-attainment';
@@ -16,7 +16,7 @@ const plan=planPractice(rr,'fixed-four-v1'),earned=initialPractice(plan);
 // Two earned source patterns cover five leaves; one groundwork pattern covers two.
 for(const i of [0,1])earned.best[plan.chunks[i].pattern]=earned.target;
 earned.groundwork=Object.fromEntries([2].map(i=>[plan.chunks[i].pattern,true]));
-const fraction=0.25;
+const currentPlan=planPractice(rr),fraction=displayedPracticeTotal(currentPlan,readPractice(earned,currentPlan)),leavesFraction=currentPlan.chunks.length/currentPlan.catalog!.length;
 const rrFile=practiceStorageName(entry.id,rr),cpFile=practiceStorageName(entry.id,cp);
 const records=new Map([[rrFile,JSON.stringify(earned)]]);
 const reader:LibraryPracticeReader={readPackage:async()=>bytes,readRecord:async name=>records.has(name)?JSON.parse(records.get(name)!):null};
@@ -27,11 +27,11 @@ test('warm summary reuse rereads progress and changed archive bytes never borrow
  const fresh={readPackage:async()=>{packageReads++;return currentBytes;},readRecord:async(name:string)=>{if(!name.startsWith('practice-'))return null;recordReads++;return structuredClone(saved);}};
  await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);
  saved=initialPractice(plan);for(const c of plan.chunks)saved.best[c.pattern]=saved.target;
- await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,1);
+ await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,leavesFraction);
  assert.equal(packageReads,2);assert.equal(recordReads,2);
  currentBytes=new Uint8Array(bytes.length);await cache.refresh([entry],'janko-four-row',fresh,()=>true);
  assert.equal(cache.get(entry,'janko-four-row'),undefined);assert.equal(recordReads,2);
- currentBytes=new Uint8Array(bytes);await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,1);
+ currentBytes=new Uint8Array(bytes);await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,leavesFraction);
  cache.clear();assert.equal(cache.get(entry,'janko-four-row'),undefined);
 });
 
@@ -47,14 +47,14 @@ test('newest refresh waits for a distinct old producer without omitting progress
  assert.equal(cache.get(entry,'conventional-piano'),undefined);
 });
 
-test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every persisted record',async()=>{
- assert.equal(totalProgress(plan,earned),0.2583333333333333);assert.equal(displayedPracticeTotal(plan,earned),fraction);
+test('Conventional 0 and Jankó bounded catalog preserve exact migrated fraction and every persisted record',async()=>{
+ assert.equal(totalProgress(plan,earned),0.2583333333333333);assert.equal(displayedPracticeTotal(plan,earned),.25);assert.equal(fraction,5/35);
  const before=[...records],cache=new LibraryPracticeSummaries();
  for(const keyboard of ['conventional-piano','janko-four-row','conventional-piano','janko-four-row'] as const){
   assert.equal(await cache.refresh([entry],keyboard,reader,()=>true),true);
   const summary=cache.get(entry,keyboard)!;
   assert.equal(summary.sections,keyboard==='janko-four-row'?fraction:0);
-  assert.equal(practicePercent(summary.sections),keyboard==='janko-four-row'?25:0);
+  assert.equal(practicePercent(summary.sections),keyboard==='janko-four-row'?14:0);
   assert.equal(summary.whole,false);
   assert.equal(cache.get(entry,keyboard==='janko-four-row'?'conventional-piano':'janko-four-row'),undefined);
  }
@@ -64,9 +64,9 @@ test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every pe
 test('library shows the same combined manual/measured total without preparation bonus or record changes',async()=>{
  const state=initialPractice(plan);for(const c of plan.chunks){state.best[c.pattern]=.4*state.target;state.groundwork??={};state.groundwork[c.pattern]=true;}
  const first=plan.chunks[0];toggleDone(state,{passage:first.id,pattern:first.pattern,rate:.7*state.target});const before=JSON.stringify(state),summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async(name:string)=>name.startsWith('practice-')?JSON.parse(before):null});
- // No14 has three literal copies of this four-bar musical unit, with weights
- // 576, 576 and 1152. Its manual rate now counts at all three locations.
- assert.ok(Math.abs(summary!.sections-(.4+.3*(576+576+1152)/13824))<1e-12);assert.equal(summary!.sections,displayedPracticeTotal(plan,state));assert.ok(Math.abs(displayedPracticeTotal(plan,state,false)-.4)<1e-12);assert.ok(totalProgress(plan,state)>summary!.sections);assert.equal(JSON.stringify(state),before);
+ const migrated=readPractice(state,currentPlan);
+ assert.equal(summary!.sections,displayedPracticeTotal(currentPlan,migrated));assert.ok(Math.abs(summary!.sections-(16*.4+3*.3)/35)<1e-12);
+ assert.ok(Math.abs(displayedPracticeTotal(currentPlan,migrated,false)-16*.4/35)<1e-12);assert.equal(totalProgress(currentPlan,migrated),summary!.sections);assert.equal(JSON.stringify(state),before);
 });
 
 test('an unavailable selected companion never reads another keyboard’s records',async()=>{
@@ -137,7 +137,7 @@ test('legacy fallback remains restricted to the original source-bound Jankó pre
  assert.deepEqual(seen,[cpFile,personalStorageName(entry.id,cp)]);
 });
 
-test('whole-piece badge still requires the full joined source run rather than completed leaves',async()=>{
+test('removed whole-piece run stays recovery evidence and never grants a current whole-piece badge',async()=>{
  const state=initialPractice(plan);for(const c of plan.chunks)state.best[c.pattern]=state.target;
  let tree=reconcilePassages(plan,state);
  while(tree.frontier.length>1){for(const c of tree.frontier)state.best[c.pattern]=state.target;tree=reconcilePassages(plan,state);}
@@ -145,5 +145,5 @@ test('whole-piece badge still requires the full joined source run rather than co
  assert.equal((await readLibraryPracticeSummary(entry,'janko-four-row',completeReader))!.whole,false);
  state.best[tree.frontier[0].pattern]=state.target;
  const summary=(await readLibraryPracticeSummary(entry,'janko-four-row',completeReader))!;
- assert.equal(summary.sections,1);assert.equal(summary.whole,true);
+ assert.equal(summary.sections,displayedPracticeTotal(currentPlan,readPractice(state,currentPlan)));assert.ok(summary.sections<1);assert.equal(summary.whole,false);
 });
