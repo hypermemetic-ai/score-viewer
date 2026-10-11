@@ -78,11 +78,12 @@ Accepted hand/finger edits SHALL reserve their source targets at key arrival and
 - **AND** the last valid saved state and pending source-bound intentions remain recoverable
 
 ### Requirement: Effective assignments shared with practice and calculation
-Reader, annotations, section practice and explicit future calculation SHALL resolve one source-guarded effective personal assignment map. Changing a hand SHALL retain old raw evidence but SHALL NOT relabel it as attainment under a different hand assignment. Finger-only edits SHALL preserve existing attainment behavior.
+Reader, annotations, section practice and explicit future calculation SHALL resolve one source-guarded effective personal assignment map. Hand and finger edits SHALL preserve attained progress for the same complete exercise. Historical evidence SHALL retain its original assignment provenance without automatic reset, hidden credit or reduced completion. Current practice SHALL use the current effective assignments. A provenance indication SHALL be quiet and nonintrusive; resetting progress SHALL require an explicit player action.
 
 #### Scenario: Changed hand and retained evidence
 - **WHEN** a personal hand changes in a previously practiced passage
-- **THEN** affected current practice identities reflect the effective assignment while old claims remain recoverable
-- **AND** unrelated exercises retain eligible evidence and new-hand attainment is not fabricated
+- **THEN** current practice uses the effective assignment and the passage retains its credited progress
+- **AND** old claims retain their original assignment provenance without claiming they were performed with the new choices
+- **AND** no progress is reset unless the player explicitly requests it
 - **AND** an explicit recalculation respects the current personal hand/finger constraints
 

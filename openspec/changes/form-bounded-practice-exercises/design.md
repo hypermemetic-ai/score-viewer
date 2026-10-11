@@ -2,7 +2,7 @@
 
 ## Context
 
-The separately prioritized `edit-score-hands-and-fingers` change delivers source-guarded effective personal assignments and passive viewing first. This change consumes that resolver rather than introducing another hand authority. Exercise claims incorporate effective hand content for their own spans; historical raw claims remain recoverable and finger-only edits retain existing attainment meaning.
+The separately prioritized `edit-score-hands-and-fingers` change delivers source-guarded effective personal assignments and passive viewing first. This change consumes that resolver rather than introducing another hand authority. Practice uses effective hand content for its spans, while hand and finger edits preserve credited progress for the same complete exercise. Historical claims retain their original assignment provenance; only explicit player reset removes attainment. This does not grant credit to different ranges or new contrast exercises.
 
 See `proposal.md` for motivation and the two delta specs for behavioral contracts. `src/practice.ts` and `src/manual-practice-plan.ts` currently choose nominal four-bar sections with nearby 3–5-bar alternatives. They avoid held notes and short source gestures but have no formal phrase or harmony detector. `passageHierarchy` validates a nonoverlapping recursive tree; `reconcilePassages` grows it indefinitely. Neither overlapping doubles nor distant contrast excerpts fit that representation.
 

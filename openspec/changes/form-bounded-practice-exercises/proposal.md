@@ -13,7 +13,7 @@ Growing practice joins repeatedly rehearse the beginning and make completion inc
 - Give every included original, adjacent pair and contrast exercise equal weight in Total. Define the full catalog before unlocking exercises.
 - Allow surgical, reversible exclusion of any exercise. Keep its row visible in place with tasteful canceled-out styling; exclusion changes the assessment set and never fabricates completion.
 - Preserve source packages, finger edits, library, settings, and raw measured/manual/history records through a versioned plan transition. This is primarily a logic change, with restrained selector additions.
-- Consume the effective personal hand/finger interface delivered first by `edit-score-hands-and-fingers`, retaining assignment-aware attainment and passive behavior outside active section modes.
+- Consume the effective personal hand/finger interface delivered first by `edit-score-hands-and-fingers`, preserving attainment across hand/finger edits with historical assignment provenance and passive behavior outside active section modes.
 
 ## Capabilities
 

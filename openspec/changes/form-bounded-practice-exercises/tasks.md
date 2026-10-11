@@ -10,7 +10,7 @@
 
 ## 2. Stable sections and adjacent doubles
 
-- [ ] 2.1 Introduce the source-bound exercise catalog and piano/manual planner adapters consuming the editing change's effective assignments, retaining original section IDs/ranges and source obligations; verify shared section decisions, assignment-aware attainment and genuine manual technique constraints without changing notation-package bytes.
+- [ ] 2.1 Introduce the source-bound exercise catalog and piano/manual planner adapters consuming the editing change's effective assignments, retaining original section IDs/ranges and source obligations; verify shared section decisions, preserved attainment across hand/finger edits with historical assignment provenance and genuine manual technique constraints without changing notation-package bytes.
 - [ ] 2.2 Replace recursive join creation with all independent adjacent-original pairs and genuine prerequisite/readiness handling; update passage/progression tests to verify A–B and B–C coexist, no larger joins appear and the catalog is defined before unlocking.
 - [ ] 2.3 Adapt original/double selection, preview and context restoration to catalog identities; verify existing start/connection-speed policy, keyboard component navigation and unavailable-range fallback with selection/context tests and document the bounded connection behavior.
 

@@ -2,19 +2,19 @@
 
 ## 1. Passive score interaction
 
-- [ ] 1.1 Restrict musical interpretation and contact paint to section Reading/Timed and owned preparation; verify passive reader/editor/selector/Free input, held-key re-entry and independent command/audio/Options routing with focused tests.
-- [ ] 1.2 Retire full-score Performance execution and controls while preserving historical records and current settings; verify production routing and document passive viewing.
+- [x] 1.1 Restrict musical interpretation and contact paint to section Reading/Timed and owned preparation; verify passive reader/editor/selector/Free input, held-key re-entry and independent command/audio/Options routing with focused tests.
+- [x] 1.2 Retire full-score Performance execution and controls while preserving historical records and current settings; verify production routing and document passive viewing.
 
 ## 2. Source-geometric navigation
 
-- [ ] 2.1 Add deterministic whole-system Up/Down navigation including visible continuation aliases, nearest horizontal targets, page crossing, empty systems and end clamps; verify geometric selection fixtures in both presentations.
-- [ ] 2.2 Integrate navigation with editor ownership and reveal/focus handling, preserving chronological keys; verify production keyboard behavior and document shortcuts.
+- [x] 2.1 Add deterministic whole-system Up/Down navigation including visible continuation aliases, nearest horizontal targets, page crossing, empty systems and end clamps; verify geometric selection fixtures in both presentations.
+- [x] 2.2 Integrate navigation with editor ownership and reveal/focus handling, preserving chronological keys; verify production keyboard behavior and document shortcuts.
 
 ## 3. Personal assignment authority
 
-- [ ] 3.1 Introduce compatible source-guarded personal hand/finger overlays and one effective assignment resolver; verify legacy sidecars, original facts, source aliases and stable package/storage identities.
-- [ ] 3.2 Route effective assignments into practice and explicit calculation requests, with assignment-aware local evidence identity; verify hand changes retain raw claims without granting current-hand credit and unrelated/finger-only evidence remains legitimate.
-- [ ] 3.3 Document overlay persistence and recovery; verify round trips preserve archives, library, history, preferences and original assignments.
+- [x] 3.1 Introduce compatible source-guarded personal hand/finger overlays and one effective assignment resolver; verify legacy sidecars, original facts, source aliases and stable package/storage identities.
+- [ ] 3.2 Route effective assignments into practice and explicit calculation requests, with retained assignment provenance; verify hand and finger changes preserve credited progress for the same complete exercise, current practice uses effective choices, and reset requires explicit player action.
+- [x] 3.3 Document overlay persistence and recovery; verify round trips preserve archives, library, history, preferences and original assignments.
 
 ## 4. Faithful shared projection
 
