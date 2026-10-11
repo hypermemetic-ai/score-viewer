@@ -77,7 +77,7 @@ test('No14 six fully shared onsets spanning a source pulse split later divergenc
  assert.equal(entries.length,2);
  assert.deepEqual(entries.map(e=>[e.divergenceStart,e.divergenceEnd,e.sharedTrunkStart,e.reconvergenceStart]),[[312,336,0,336],[480,576,336,undefined]]);
  assert.deepEqual(entries.map(e=>e.clips.map(c=>[c.start-(c.sectionId===a.id?a.start:b.start),c.end-(c.sectionId===a.id?a.start:b.start),c.cueOnsetCount,c.continuationOnsetCount])),[
-  [[0,336,13,1],[0,336,13,1]],[[432,576,2,4],[432,576,2,4]],
+  [[0,336,13,1],[0,336,13,1]],[[336,576,6,4],[336,576,6,4]],
  ]);
  assert.ok(entries[1].clips.every(c=>c.start>=((c.sectionId===a.id?a.start:b.start)+entries[1].sharedTrunkStart)));
  assert.notEqual(entries[0].id,entries[1].id);assert.notEqual(entries[0].clips[0].id,entries[0].clips[1].id);

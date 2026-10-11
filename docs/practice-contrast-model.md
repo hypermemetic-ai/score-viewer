@@ -58,12 +58,10 @@ The tracked No. 14 fixture has three qualifying four-bar occurrence pairs:
 All use shift 0. In 5–8/53–56, relative tick 456 begins a divergent ending;
 one matching note at 480 does not terminate it. In 13–16/29–32, divergence 312
 is followed by six shared onsets at 336–456; reconvergence at 336 separates a later
-divergence 480 into a second entry. Its available shared cue starts at 336.
-The initial shared boundary weights prefer the bar boundary at 432 to cutting
-the preceding one-bar authored gesture, so the actual cue contains only two
-onsets. This tradeoff needs musical inspection; neither choice establishes a
-formal phrase. Neither choice rounds backward across the earlier difference.
-Source pitches remain unchanged.
+divergence 480 into a second entry. Its shared cue starts at 336 and preserves
+all six available onsets. A phrasing crossing supplies soft boundary evidence;
+held-note and technique obligations retain stronger protection. The cue never
+rounds backward across the earlier difference. Source pitches remain unchanged.
 
 These pure modules do not implement A/B transport, complete-cycle attainment,
 native playback or visual acceptance. Those remain catalog/controller/display
