@@ -4,8 +4,9 @@ import {mkdtemp, mkdir, readFile, writeFile, rm, cp, symlink} from 'node:fs/prom
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {createCarrier} from '../scripts/create-native-release-carrier.mjs';
-import {canonical, inventory, sha256, sourceIdentity, validateCarrierInputs, validatePreparedCarrier, validateRecipientCarrier} from '../scripts/native-release-carrier/inputs.mjs';
+import {canonical, inventory, sha256, sourceIdentity, lockedLocalDependencies, validateCarrierInputs, validatePreparedCarrier, validateRecipientCarrier} from '../scripts/native-release-carrier/inputs.mjs';
 import {packagePianoNotices, validatePianoRecipient, verifyBundledPianoNotices, addPianoWorkerChecks, requirePianoWorkerChecks, verifyWindowsPianoRuntime, validateMacPianoDiagnostic, runMacPianoDiagnostic, macPianoDiagnosticPrefix, macPianoDiagnosticTest} from '../scripts/native-release-carrier/score-viewer-piano-release.mjs';
 
 function git(root, ...args) {return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();}
@@ -20,7 +21,7 @@ async function fixture() {
   await file(iso,'scripts/build-score-viewer-macos.mjs',"import {performance} from 'node:perf_hooks';\nconst packet = await mkdtemp(join(tmpdir(),'iso-mac-recipient-'));\nawait ctx.stage('nativeBuildMs',()=>run());\nconst bundledNoticeHashes={};\nconst noticeNames=['URW-base35-provenance.md','URW-base35-LICENSE','URW-base35-COPYING','OFL-Bravura.txt'];\nawait finishWorker(ctx,'macos-universal',packet,binary,\n  {tests:'passed',virtualMidi:'passed',signatures:'passed',resources:'passed'});\n");
   await file(iso,'licenses/NOTICE.txt','Shared notice\n');
   await file(iso,'score-viewer/src-tauri/old.rs','old native fixture\n');
-  await file(iso,'.gitignore','score-viewer/dist\n');
+  await file(iso,'.gitignore','score-viewer/dist\nscore-viewer/node_modules\n');
   const notationRevision=await commit(iso);
   await file(viewer,'package.json',JSON.stringify({name:'iso-score-viewer',version:'0.1.0'}));
   await file(viewer,'package-lock.json','{"lockfileVersion":3}\n');
@@ -48,6 +49,20 @@ async function bindViewer(f) {
   f.viewerRevision = await commit(f.viewer);
   f.receipt.viewerRevision = f.viewerRevision;
   await writeFile(f.checks,JSON.stringify(f.receipt,null,2)+'\n');
+}
+async function addConverter(f) {
+  const path='vendor/score-converter/score-converter-proof-0.0.0.tgz';
+  const archive=await readFile(new URL('../'+path,import.meta.url));
+  const identity=await readFile(new URL('../vendor/score-converter/source-package-identity.json',import.meta.url));
+  await file(f.viewer,'package.json',await readFile(new URL('../package.json',import.meta.url)));
+  await file(f.viewer,'package-lock.json',await readFile(new URL('../package-lock.json',import.meta.url)));
+  await file(f.viewer,path,archive);
+  await file(f.viewer,'scripts/native-release-carrier/score-viewer-converter-release.mjs',await readFile(new URL('../scripts/native-release-carrier/score-viewer-converter-release.mjs',import.meta.url)));
+  for(const name of ['SOURCE-NOTICE.txt','NOTICE.txt','guitar-pro.worker.js.LEGAL.txt'])await file(f.frontend,'converter/gp/'+name,'exact fixture '+name+'\n');
+  await file(f.frontend,'converter/gp/source-package.tgz',archive);
+  await file(f.frontend,'converter/gp/source-package-identity.json',identity);
+  f.frontendDigest=sha256(canonical(await inventory(f.frontend)));f.receipt.frontendDigest=f.frontendDigest;await bindViewer(f);
+  return {path,archive,identity};
 }
 async function addPiano(f) {
   await file(f.viewer,'.cargo/config.toml','[target.\'cfg(all(windows, target_env="msvc"))\']\nrustflags = ["-C", "target-feature=+crt-static"]\n');
@@ -402,10 +417,7 @@ test('a pre-existing conflicting root footer notice refuses before carrier write
 
 test('converter source delivery preserves existing resource maps and binds helper, packet and actual Mac resources',async()=>withFixture(async f=>{
  const names=['source-package.tgz','source-package-identity.json','SOURCE-NOTICE.txt','NOTICE.txt','guitar-pro.worker.js.LEGAL.txt'];
- await file(f.viewer,'scripts/native-release-carrier/score-viewer-converter-release.mjs',await readFile(new URL('../scripts/native-release-carrier/score-viewer-converter-release.mjs',import.meta.url)));
- await file(f.viewer,'package.json',JSON.stringify({name:'iso-score-viewer',version:'0.1.0',dependencies:{'score-converter-proof':'file:vendor/score-converter/score-converter-proof-0.0.0.tgz'}}));
- for(const name of names)await file(f.frontend,'converter/gp/'+name,'exact fixture '+name+'\n');
- f.frontendDigest=sha256(canonical(await inventory(f.frontend)));f.receipt.frontendDigest=f.frontendDigest;await bindViewer(f);
+ await addConverter(f);
  await createCarrier(args(f));
  const {inputs}=await validateCarrierInputs(f.iso),worker=await readFile(join(f.iso,'scripts/score-viewer-native-worker.mjs'),'utf8'),mac=await readFile(join(f.iso,'scripts/build-score-viewer-macos.mjs'),'utf8');
  assert.equal(inputs.converterNoticeHelper.path,'scripts/score-viewer-converter-release.mjs');
@@ -413,3 +425,59 @@ test('converter source delivery preserves existing resource maps and binds helpe
  for(const name of names)assert.equal(worker.includes(`"../dist/converter/gp/${name}":"notices/score-converter/${name}"`),true);
  const helper=join(f.iso,inputs.converterNoticeHelper.path);await writeFile(helper,'changed helper');await assert.rejects(validateCarrierInputs(f.iso),/Converter notice helper differs/);
 }));
+
+
+test('clean carrier retains the actual locked converter tarball required by npm ci',async()=>withFixture(async f=>{
+ const {path,archive}=await addConverter(f);await createCarrier(args(f));
+ const {inputs}=await validateCarrierInputs(f.iso);
+ assert.deepEqual(inputs.nativeFiles[path],{sha256:sha256(archive),size:archive.length});
+ assert.deepEqual(await readFile(join(f.iso,'score-viewer',path)),archive);
+ assert.deepEqual(inputs.nativeFiles['package-lock.json'],{sha256:sha256(await readFile(join(f.viewer,'package-lock.json'))),size:(await readFile(join(f.viewer,'package-lock.json'))).length});
+ const lock=JSON.parse(await readFile(join(f.iso,'score-viewer/package-lock.json')));
+ assert.equal(lock.packages['node_modules/score-converter-proof'].integrity,'sha512-'+createHash('sha512').update(archive).digest('base64'));
+ const frozen=await inventory(join(f.iso,'delivery-input/frontend'));
+ if(process.env.CARRIER_VERIFY_NPM_CI==='1'){
+  const output=execFileSync('npm',['ci','--prefix','score-viewer','--prefer-offline','--no-audit','--no-fund'],{cwd:f.iso,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:90000,maxBuffer:2000000});
+  assert.match(output,/added \d+ packages/);
+  assert.equal(JSON.parse(await readFile(join(f.iso,'score-viewer/node_modules/score-converter-proof/package.json'))).version,'0.0.0');
+  assert.deepEqual(await readFile(join(f.iso,'score-viewer',path)),archive);assert.deepEqual(await inventory(join(f.iso,'delivery-input/frontend')),frozen);
+  console.log('Actual clean generated carrier: npm ci --prefix score-viewer passed with unchanged lock, tarball and frozen frontend.');
+ }
+ await commit(f.iso);const windows=join(f.root,'windows-local-dependency');git(f.root,'clone','-q','--no-hardlinks','--config','core.autocrlf=true',f.iso,windows);
+ await validateCarrierInputs(windows);assert.deepEqual(await readFile(join(windows,'score-viewer',path)),archive);
+ const inputsPath=join(f.iso,'delivery-input/inputs.json'),boundBytes=await readFile(inputsPath),unbound=JSON.parse(boundBytes);delete unbound.nativeFiles[path];await writeFile(inputsPath,JSON.stringify(unbound));await assert.rejects(validateCarrierInputs(f.iso),/missing from native inventory/);await writeFile(inputsPath,boundBytes);
+ await rm(join(f.iso,'score-viewer',path));await assert.rejects(validateCarrierInputs(f.iso),/ENOENT/);
+ await file(f.iso,'score-viewer/'+path,Buffer.from('changed tarball'));await assert.rejects(validateCarrierInputs(f.iso),/integrity differs/);
+ await file(f.iso,'score-viewer/'+path,archive);await rm(join(f.iso,'score-viewer',path));await symlink(join(f.viewer,path),join(f.iso,'score-viewer',path));await assert.rejects(validateCarrierInputs(f.iso),/regular source file/);
+}));
+
+test('missing or lock-mismatched local tarballs refuse before writing the carrier',async()=>withFixture(async f=>{
+ const {path,archive}=await addConverter(f);
+ await rm(join(f.viewer,path));await bindViewer(f);await assert.rejects(createCarrier(args(f)),/tracked regular file/);assert.equal(git(f.iso,'status','--porcelain'),'');
+ await file(f.viewer,path,Buffer.from('changed locked source'));await bindViewer(f);await assert.rejects(createCarrier(args(f)),/integrity differs/);assert.equal(git(f.iso,'status','--porcelain'),'');
+ await file(f.viewer,path,archive);const lock=JSON.parse(await readFile(join(f.viewer,'package-lock.json')));lock.packages['node_modules/score-converter-proof'].resolved='file:vendor/other.tgz';await file(f.viewer,'package-lock.json',JSON.stringify(lock));await bindViewer(f);
+ await assert.rejects(createCarrier(args(f)),/declaration\/lock differs/);assert.equal(git(f.iso,'status','--porcelain'),'');
+}));
+
+test('locked converter must match the exact frozen source archive and authored identity',async()=>withFixture(async f=>{
+ const {archive,identity}=await addConverter(f);
+ await file(f.frontend,'converter/gp/source-package.tgz','different frozen source');f.receipt.frontendDigest=sha256(canonical(await inventory(f.frontend)));await writeFile(f.checks,JSON.stringify(f.receipt));
+ await assert.rejects(createCarrier(args(f)),/frozen source identity/);assert.equal(git(f.iso,'status','--porcelain'),'');
+ await file(f.frontend,'converter/gp/source-package.tgz',archive);const changed=JSON.parse(identity);changed.archive.sha256='0'.repeat(64);await file(f.frontend,'converter/gp/source-package-identity.json',JSON.stringify(changed));f.receipt.frontendDigest=sha256(canonical(await inventory(f.frontend)));await writeFile(f.checks,JSON.stringify(f.receipt));
+ await assert.rejects(createCarrier(args(f)),/frozen source identity/);assert.equal(git(f.iso,'status','--porcelain'),'');
+}));
+
+
+test('local lock closure includes transitive tarballs and refuses unsupported or unpinned paths',()=>{
+ const name='tool',specifier='file:vendor/tool.tgz',integrity='sha512-'+createHash('sha512').update('fixture').digest('base64');
+ const pkg={devDependencies:{[name]:specifier}},lock={packages:{'':{devDependencies:{[name]:specifier}},'node_modules/tool':{resolved:specifier,integrity},'node_modules/tool/node_modules/nested':{resolved:'file:vendor/nested.tgz',integrity}}};
+ assert.deepEqual([...lockedLocalDependencies(pkg,lock).keys()],['vendor/tool.tgz','vendor/nested.tgz']);
+ for(const bad of ['file:../tool.tgz','file:/tmp/tool.tgz','file:vendor/../tool.tgz','file:vendor/tool','file:elsewhere/tool.tgz']){
+  const changed=structuredClone(lock);changed.packages[''].devDependencies[name]=bad;changed.packages['node_modules/tool'].resolved=bad;
+  assert.throws(()=>lockedLocalDependencies({devDependencies:{[name]:bad}},changed),/Unsafe carrier path|Unsupported locked local dependency/);
+ }
+ for(const bad of [undefined,'sha256-unreviewed','sha512-'+'0'.repeat(88)]){
+  const changed=structuredClone(lock);changed.packages['node_modules/tool'].integrity=bad;assert.throws(()=>lockedLocalDependencies(pkg,changed),/SHA512 lock integrity/);
+ }
+ const changed=structuredClone(lock);delete changed.packages['node_modules/tool'];assert.throws(()=>lockedLocalDependencies(pkg,changed),/declaration\/lock differs/);
+});

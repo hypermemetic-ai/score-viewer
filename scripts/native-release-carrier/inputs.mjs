@@ -50,6 +50,48 @@ export function sourceIdentity(inputs, inputsBytes) {
 export function validateRecordedChecks(checks, inputs) {
   if (checks.schema !== 1 || checks.viewerRevision !== inputs.viewer.revision || checks.notationRevision !== inputs.notation.revision || checks.frontendDigest !== inputs.frontend.digest || ['tests', 'build', 'browserInspection', 'independentReview'].some(name => checks.checks?.[name]?.status !== 'passed')) fail('Reviewed check receipt does not bind final source and frontend');
 }
+/** npm ci needs every local tarball in the original package lock, even when
+ * the application frontend is already frozen. */
+export function lockedLocalDependencies(packageJson, lock) {
+  const files = new Map();
+  const localPath = specifier => {
+    const path = safePath(specifier.slice(5));
+    if (!path.startsWith('vendor/') || !path.endsWith('.tgz')) fail(`Unsupported locked local dependency: ${specifier}`);
+    return path;
+  };
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    for (const [name, specifier] of Object.entries(packageJson[section] ?? {})) {
+      if (typeof specifier !== 'string' || !specifier.startsWith('file:')) continue;
+      localPath(specifier);
+      const entry = lock.packages?.[`node_modules/${name}`];
+      if (lock.packages?.['']?.[section]?.[name] !== specifier || entry?.resolved !== specifier) fail(`Local dependency declaration/lock differs: ${name}`);
+    }
+  }
+  for (const [name, entry] of Object.entries(lock.packages ?? {})) {
+    if (typeof entry.resolved !== 'string' || !entry.resolved.startsWith('file:')) continue;
+    const path = localPath(entry.resolved);
+    if (!/^sha512-[A-Za-z0-9+/]{86}==$/.test(entry.integrity ?? '')) fail(`Missing SHA512 lock integrity: ${name}`);
+    const requirements = files.get(path) ?? [];
+    requirements.push({name, integrity:entry.integrity}); files.set(path, requirements);
+  }
+  return files;
+}
+export async function validateLockedLocalDependencies(packageJson, lock, readArtifact, frontendFiles, readFrontend) {
+  const files = lockedLocalDependencies(packageJson, lock);
+  for (const [path, requirements] of files) {
+    const bytes = await readArtifact(path);
+    const integrity = 'sha512-' + createHash('sha512').update(bytes).digest('base64');
+    if (requirements.some(entry => entry.integrity !== integrity)) fail(`Locked local dependency integrity differs: ${path}`);
+    if (requirements.some(entry => entry.name === 'node_modules/score-converter-proof')) {
+      converterResourceMap(frontendFiles);
+      const pin = frontendFiles['converter/gp/source-package.tgz'];
+      const identity = JSON.parse(await readFrontend('converter/gp/source-package-identity.json'));
+      if (!pin || bytes.length !== pin.size || sha256(bytes) !== pin.sha256 || identity.schema !== 'score-converter-private-package/1' ||
+          identity.archive?.bytes !== bytes.length || identity.archive.sha256 !== sha256(bytes)) fail('Locked converter package differs from frozen source identity');
+    }
+  }
+  return files;
+}
 export async function validatePreparedCarrier(prepared, identity) {
   validateSourceIdentity(identity.sourceInputs);
   const bytes = await readFile(join(prepared, 'source-inputs.json')), inputs = JSON.parse(bytes);
@@ -104,8 +146,18 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
   const expectedNative = Object.fromEntries(Object.entries(inputs.nativeFiles).filter(([path]) => path.startsWith('src-tauri/')).map(([path, pin]) => [path.slice(10), pin]));
   if (canonical(native) !== canonical(expectedNative)) fail('Native source inventory differs');
   if (inputs.nativeFiles['.cargo/config.toml'] && canonical(await inventory(join(source, 'score-viewer', '.cargo'))) !== canonical({'config.toml':inputs.nativeFiles['.cargo/config.toml']})) fail('Native Cargo configuration inventory differs');
+  const packageJson = JSON.parse(await readFile(join(source, 'score-viewer', 'package.json'))), lock = JSON.parse(await readFile(join(source, 'score-viewer', 'package-lock.json')));
+  const localFiles = await validateLockedLocalDependencies(packageJson, lock, async path => {
+    if (!inputs.nativeFiles[path]) fail(`Locked local dependency missing from native inventory: ${path}`);
+    const parts = path.split('/'); let parent = join(source, 'score-viewer');
+    for (let i = 0; i < parts.length; i++) {
+      parent = join(parent, parts[i]); const stat = await lstat(parent);
+      if (stat.isSymbolicLink() || (i === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) fail(`Locked local dependency must be a regular source file: ${path}`);
+    }
+    return readFile(join(source, 'score-viewer', path));
+  }, inputs.frontend.files, path => readFile(join(source, 'delivery-input', 'frontend', path)));
   for (const [path, pin] of Object.entries(inputs.nativeFiles)) {
-    if (!/^(?:src-tauri\/|licenses\/|\.cargo\/config\.toml$|package(?:-lock)?\.json$)/.test(path)) fail(`Unexpected native source path: ${path}`);
+    if (!/^(?:src-tauri\/|licenses\/|\.cargo\/config\.toml$|package(?:-lock)?\.json$)/.test(path) && !localFiles.has(path)) fail(`Unexpected native source path: ${path}`);
     const file = await readFile(join(source, 'score-viewer', path));
     if (sha256(file) !== pin.sha256 || file.length !== pin.size) fail(`Native source pin differs: ${path}`);
     if (path.startsWith('licenses/') && !(await readFile(join(source, path))).equals(file)) fail(`Shared/native notice differs: ${path}`);
@@ -127,7 +179,7 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
   if (!hash(inputs.checks?.sha256) || sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Reviewed check receipt differs');
   const checks = JSON.parse(checksBytes);
   validateRecordedChecks(checks, inputs);
-  const packageJson = JSON.parse(await readFile(join(source, 'score-viewer', 'package.json'))), config = JSON.parse(await readFile(join(source, 'score-viewer', 'src-tauri', 'tauri.conf.json')));
+  const config = JSON.parse(await readFile(join(source, 'score-viewer', 'src-tauri', 'tauri.conf.json')));
   if(packageJson.dependencies?.['score-converter-proof']&&!inputs.frontend.files['converter/gp/source-package-identity.json'])fail('Selected converter lacks emitted source/notice closure');
   if (packageJson.version !== inputs.version || config.version !== inputs.version || config.identifier !== 'dev.qqp.iso-score-viewer' || config.productName !== 'ISO Score Viewer') fail('Application identity differs');
   return {inputs, checks, sourceInputs:sourceIdentity(inputs, bytes)};
