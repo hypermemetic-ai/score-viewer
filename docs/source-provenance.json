@@ -1424,5 +1424,10 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "6b2ed7e30d256118e2c1d91360271f63bc096382"
+  "dependencyRevision": "e666b23973c83e6e77960b6e7a3e89649b92405d",
+  "dependencyReview": {
+    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/359",
+    "review": "https://github.com/hypermemetic-ai/iso-notation/pull/359#issuecomment-6105595088",
+    "scope": "Reviewed personal hand projection, source preservation, exact rendering reuse and shared authority; source-only timings are not visible-edit or native acceptance."
+  }
 }
