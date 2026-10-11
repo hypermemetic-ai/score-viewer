@@ -8,7 +8,7 @@ Completion requires the entire visible SVG's geometric primitives, stable paint/
 
 The long source uses the ordinary shared source renderer and native publisher to create both admitted source presentations without a calculated finger layer; its warm edits therefore cover the required no-layer path. The first attempt to calculate a 480-owner finger layer exhausted the ordinary regression helper's 200,000-expansion bound before any browser case opened. That separate fixture-preparation failure is retained as diagnostic evidence; it is not a warm-edit timing result. No. 14 and the small tie fixture retain their admitted calculated finger layers.
 
-After timing, native writes are blocked while a hand key and finger key are issued rapidly. The benchmark requires coherent latest notation before either write completes, stable owner intent, suppression of older projection publication and ordered saved snapshots. It also injects a write failure, verifies further edits pause without losing the rendered intent, retries the retained snapshot through the ordinary UI, and checks source-bound notation after switching scores and reopening. Original archives remain byte-exact.
+After timing, native writes are blocked while a hand key and finger key are issued rapidly. The benchmark requires coherent latest notation before either write completes, stable owner intent, suppression of older projection publication and ordered saved snapshots. The simulated storage gate identifies the active journal by its source and keyboard binding, including a new journal staged during cold activation, rather than assuming the seed filename stays active. Library transitions expand the correct composer group through ordinary controls. It also injects a write failure, verifies further edits pause without losing the rendered intent, retries the retained snapshot through the ordinary UI, and checks source-bound notation after switching scores and reopening. Original archives remain byte-exact.
 
 Run after the tracked shared source pin has been admitted:
 
@@ -20,6 +20,6 @@ FAST_EDIT_ARTIFACTS=/tmp/score-viewer-fast-personal-editing \
 /home/qqp/.local/bin/qq-job -- node --import tsx scripts/check-fast-personal-editing.mjs
 ```
 
-The receipt retains source/frontend/fixture hashes, named host/browser/viewport, all successful and failed timings, sample counts, cold-opening time, correctness checks and screenshot names. Freshly generated public fixtures and screenshots remain in the artifact directory. At least twenty samples per class are enforced; `FAST_EDIT_SAMPLES` may increase the count.
+The receipt retains source/frontend/fixture hashes, named host/browser/viewport, all successful and failed timings (including frame-callback arrival and correctness-verification overhead), sample counts, cold-opening time, correctness checks and screenshot names. Freshly generated public fixtures and screenshots remain in the artifact directory. At least twenty samples per class are enforced; `FAST_EDIT_SAMPLES` may increase the count.
 
 Results must be read from an actual retained receipt. This document describes the acceptance method until a successful run is recorded. Browser-frame correctness is evidence for this frontend and host, not display scanout, physical keyboard timing, native WebView timing or human musical acceptance.
