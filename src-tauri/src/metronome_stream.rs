@@ -247,6 +247,7 @@ mod tests {
             beat_start_pulses: vec![0, 3, 6, 9, 12, 15, 18, 21],
             bar_meter_pulses: vec![6; 4],
             bar_beat_pulses: vec![3; 4],
+            source_excerpt: None,
             bar_phase_pulses: vec![0; 4],
         };
         grid.validate().unwrap();
@@ -315,6 +316,7 @@ mod tests {
                 bar_start_pulses: vec![0, 6],
                 bar_meter_pulses: vec![6],
                 bar_beat_pulses: vec![2],
+                source_excerpt: None,
                 bar_phase_pulses: vec![0],
                 beat_start_pulses: vec![0, 2, 4],
             };

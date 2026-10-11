@@ -33,6 +33,23 @@ pub struct PulseGridV2 {
     pub bar_meter_pulses: Vec<u32>,
     pub bar_beat_pulses: Vec<u32>,
     pub bar_phase_pulses: Vec<u32>,
+    #[serde(default, deserialize_with = "excerpt_field", skip_serializing_if = "Option::is_none")]
+    pub source_excerpt: Option<SourceExcerpt>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceExcerpt {
+    pub start_pulse: u64,
+    pub end_pulse: u64,
+    pub first_bar_start_pulse: u64,
+    pub first_bar_end_pulse: u64,
+    pub first_bar_phase_pulses: u64,
+    pub last_bar_start_pulse: u64,
+    pub last_bar_end_pulse: u64,
+    pub last_bar_phase_pulses: u64,
+}
+fn excerpt_field<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<SourceExcerpt>, D::Error> {
+    SourceExcerpt::deserialize(deserializer).map(Some)
 }
 fn count_bars_field<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -106,6 +123,24 @@ impl PulseGridV2 {
             return Err("Incomplete v2 source meter facts".into());
         }
         let mut expected_count = 0u64;
+        if let Some(e) = &self.source_excerpt {
+            if [e.start_pulse,e.end_pulse,e.first_bar_start_pulse,e.first_bar_end_pulse,e.first_bar_phase_pulses,e.last_bar_start_pulse,e.last_bar_end_pulse,e.last_bar_phase_pulses].iter().any(|p| *p>1_000_000_000) {
+                return Err("Excerpt exceeds bounded source pulses".into());
+            }
+            let last = bars - 1;
+            let last_start = e.start_pulse + self.bar_start_pulses[last];
+            if [e.start_pulse,e.end_pulse,e.first_bar_start_pulse,e.first_bar_end_pulse,e.first_bar_phase_pulses,e.last_bar_start_pulse,e.last_bar_end_pulse,e.last_bar_phase_pulses].iter().any(|p| *p>1_000_000_000)
+                || !(e.start_pulse<e.end_pulse && e.first_bar_start_pulse<=e.start_pulse && e.start_pulse<e.first_bar_end_pulse && e.last_bar_start_pulse<e.end_pulse && e.end_pulse<=e.last_bar_end_pulse)
+                || e.end_pulse-e.start_pulse != *self.bar_start_pulses.last().unwrap()
+                || e.first_bar_end_pulse-e.first_bar_start_pulse+e.first_bar_phase_pulses != self.bar_meter_pulses[0] as u64
+                || e.last_bar_end_pulse-e.last_bar_start_pulse+e.last_bar_phase_pulses != self.bar_meter_pulses[last] as u64
+                || self.bar_phase_pulses[0] as u64 != e.first_bar_phase_pulses+e.start_pulse-e.first_bar_start_pulse
+                || self.bar_start_pulses[1] != e.end_pulse.min(e.first_bar_end_pulse)-e.start_pulse
+                || last_start != e.start_pulse.max(e.last_bar_start_pulse)
+                || self.bar_phase_pulses[last] as u64 != e.last_bar_phase_pulses+last_start-e.last_bar_start_pulse {
+                return Err("Excerpt bounds differ from original source bars".into());
+            }
+        }
         for i in 0..bars {
             let length = self.bar_start_pulses[i + 1] - self.bar_start_pulses[i];
             let meter = self.bar_meter_pulses[i] as u64;
@@ -116,7 +151,7 @@ impl PulseGridV2 {
                 || beat > meter
                 || meter % beat != 0
                 || phase >= meter
-                || !(phase == 0 || phase == meter.saturating_sub(length))
+                || !if self.source_excerpt.is_some() { phase+length<=meter && (i==0 || i==bars-1 || phase==0 && length==meter) } else { phase == 0 || phase == meter.saturating_sub(length) }
             {
                 return Err("Invalid v2 source meter facts".into());
             }
@@ -531,8 +566,24 @@ mod tests {
             beat_start_pulses: vec![0, 3, 6, 9, 12, 15, 18, 21],
             bar_meter_pulses: vec![6; 4],
             bar_beat_pulses: vec![3; 4],
+            source_excerpt: None,
             bar_phase_pulses: vec![0; 4],
         }
+    }
+    #[test]
+    fn exact_source_excerpt_keeps_partial_bar_phase_and_rejects_padding_or_forged_bounds() {
+        let mut g=compound_grid();g.version=3;g.count_in_bars=Some(2);
+        g.score_offset_pulses=13;g.score_start_phase_pulses=1;
+        g.bar_start_pulses=vec![0,1];g.bar_meter_pulses=vec![6];g.bar_beat_pulses=vec![3];g.bar_phase_pulses=vec![1];g.beat_start_pulses=vec![];
+        g.source_excerpt=Some(SourceExcerpt{start_pulse:1,end_pulse:2,first_bar_start_pulse:0,first_bar_end_pulse:6,first_bar_phase_pulses:0,last_bar_start_pulse:0,last_bar_end_pulse:6,last_bar_phase_pulses:0});
+        assert!(g.validate().is_ok());
+        let duration=g.source_end_micros(180.0)/1000.0;
+        assert!(Request::new_with_clock("",180.0,duration,60000.0/(180.0*3.0),None,None,None,Some(g.clone())).is_ok());
+        let mut legacy=g.clone();legacy.source_excerpt=None;assert!(legacy.validate().is_err());
+        let mut bad=g.clone();bad.source_excerpt.as_mut().unwrap().end_pulse=3;assert!(bad.validate().is_err());
+        let mut bad=g.clone();bad.source_excerpt.as_mut().unwrap().start_pulse=u64::MAX;assert!(bad.validate().is_err());
+        let mut payload=serde_json::to_value(g).unwrap();payload["sourceExcerpt"]=serde_json::Value::Null;
+        assert!(serde_json::from_value::<PulseGridV2>(payload).is_err());
     }
     #[test]
     fn v2_admission_preserves_meter_and_rejects_mixed_or_incomplete_grids() {
