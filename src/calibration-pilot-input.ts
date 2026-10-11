@@ -44,7 +44,7 @@ export class PilotInputScope {
   if(type==='key-up')void this.owner.input({kind:'manual',type,code:event.code},!!this.connection());
   else {
    const target=event.target as HTMLElement|null;
-   if(!this.focused()||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||target?.closest?.('input,select,textarea,[contenteditable=true]'))return false;
+   if(!this.focused()||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||target?.closest?.('input,select,textarea,[contenteditable=true],[data-options-popup]'))return false;
    void this.owner.input({kind:'manual',type,code:event.code,repeat:event.repeat},!!this.connection());
   }
   return true;

@@ -32,6 +32,17 @@ test('pending/failed clocks do not disable manual ratings; raw releases clear he
  assert.equal(f.scope.key(key('Digit5'),'key-down'),false);assert.equal(f.events[0].event.code,'Digit0');assert.equal(f.events[1].event.code,'Numpad4');assert.equal(f.events[1].event.repeat,true);
  assert.equal(f.events.filter(x=>x.event.type==='key-up').length,6);
 });
+test('open Options picker prevents grade entry while closed picker buttons retain ratings and releases clear',()=>{
+ const f=fixture();
+ // OptionsNavigation focuses its div listbox, including children that may receive the key event.
+ const popup={tagName:'DIV',attributes:{'data-options-popup':'',role:'listbox'},closest(selector:string){return selector.split(',').some(s=>s.trim()==='[data-options-popup]')?this:null;}},
+  option={closest(selector:string){return popup.closest(selector);}},closedButton={tagName:'BUTTON',closest(){return null;}};
+ assert.equal(f.scope.key(key('Digit2',{target:option}),'key-down'),false);assert.equal(f.events.length,0);
+ assert.equal(f.scope.key(key('Numpad2',{target:popup}),'key-down'),false);assert.equal(f.events.length,0);
+ assert.equal(f.scope.key(key('Digit2',{target:closedButton}),'key-down'),true);assert.equal(f.events.length,1);
+ assert.equal(f.scope.key(key('Digit2',{target:popup}),'key-up'),true);assert.deepEqual(f.events.map(x=>x.event),[
+  {kind:'manual',type:'key-down',code:'Digit2',repeat:false},{kind:'manual',type:'key-up',code:'Digit2'}]);
+});
 test('late activation clocks cannot revive closed, unfocused or replaced device scopes',async()=>{
  for(const transition of ['close','break','focus','connection']){
   let resolve!:(n:number)=>void;const f=fixture(()=>new Promise(r=>{resolve=r;})),pending=f.scope.activate();
