@@ -40,7 +40,7 @@ export function personalForCalculatedEdition(s:PersonalState,from:ScorePackage,t
     const fresh=initialPersonal(to),overrides=Object.fromEntries(Object.entries(prior.overrides).filter(([,c])=>!c.ownerIds.some(id=>superseded.has(id))));
     if(prior.assignments){fresh.assignments=structuredClone(prior.assignments);for(const c of Object.values(fresh.assignments.choices)){const n=to.score.notes.find(n=>n.id===c.ownerId)!,a=to.fingerLayer.attacks.find(a=>a.id===to.fingerLayer!.sourceOwnerToAttack[c.ownerId])!;c.original={hand:n.hand as 'LH'|'RH',finger:a.finger};}}
     return readPersonal({...fresh,view:structuredClone(prior.view),overrides,
-      ...(prior.editContactId?{editContactId:prior.editContactId}:{})},to);
+      ...(prior.editContactId?{editContactId:prior.editContactId}:{}),...(prior.navigation?{navigation:structuredClone(prior.navigation)}:{})},to);
   }catch(error){throw new PersonalEditionConflict((error as Error).message);}
 }
 /** Rebind only a validated companion with exactly the same source, layout,

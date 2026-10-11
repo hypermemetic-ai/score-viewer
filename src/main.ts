@@ -48,7 +48,7 @@ import {LibraryPracticeSummaries} from './library-practice-progress';
 import {loadCalibration,saveCalibration,exportCalibration,type CalibrationLoad,type ViewerCalibration} from './calibration';
 import {mountCalibration} from './calibration-view';
 import {hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
-import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,restoreAll,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type Rotation} from './state';
+import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,restoreAll,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
 import {host,readJson,writeJson} from './host';
@@ -145,8 +145,8 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  const existing=livePersonalEditors.get(target);if(existing)return existing;
  const editor:LivePersonalEditor={view:target.package,visiblePersonal:structuredClone(target.personal),session:new PersonalPresentationSession(target.package),generation:0,projections:new Map(),queue:undefined!};
  editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{
-  await editor.projections.get(sequence);
-  await enqueue(async()=>{const {p,file}=await personalContext(target);if(p!==target.package)throw Error('The score edition changed; pending choices are retained.');await writeJson(file,readPersonal(snapshot,p));});
+  const projected=await editor.projections.get(sequence);
+  await enqueue(async()=>{const {p,file}=await personalContext(target);if(p!==target.package)throw Error('The score edition changed; pending choices are retained.');const next=readPersonal(snapshot,p);if(projected)resolvePersonalNavigation(next,projected);await writeJson(file,next);});
   editor.projections.delete(sequence);
  });
  livePersonalEditors.set(target,editor);return editor;
@@ -155,6 +155,26 @@ function readerPackage(){if(!current)throw Error('No open score.');return livePe
 function visibleSourceSeat(p:ScorePackage,seat:Seat):Seat|undefined {
  const aliases=p.seats.filter(s=>s.ownerIds.some(id=>seat.ownerIds.includes(id)));
  return aliases.find(s=>s.id===seat.id)??aliases.find(s=>s.page===seat.page&&!!s.continuation===!!seat.continuation)??aliases.find(s=>!s.continuation)??aliases[0];
+}
+function sourceNavigationAliases(p:ScorePackage,anchor:Pick<PersonalSourceAnchor,'owners'|'writtenBar'|'actionId'|'continuation'>){
+ return p.seats.filter(s=>s.writtenBar===anchor.writtenBar&&s.actionId===anchor.actionId&&!!s.continuation===anchor.continuation&&s.ownerIds.some(id=>anchor.owners.includes(id))).sort((a,b)=>a.page-b.page||a.system-b.system||a.x-b.x||a.id.localeCompare(b.id));
+}
+function sourceNavigationAnchor(p:ScorePackage,seat:Seat|undefined):PersonalSourceAnchor|undefined {
+ if(!seat||!Number.isSafeInteger(seat.writtenBar)||!seat.actionId||!seat.ownerIds.length)return;
+ const anchor={owners:[...seat.ownerIds].sort(),writtenBar:seat.writtenBar,actionId:seat.actionId,continuation:!!seat.continuation},aliases=sourceNavigationAliases(p,anchor);
+ return {...anchor,alias:Math.max(0,aliases.findIndex(s=>s.id===seat.id))};
+}
+function sourceNavigationSeat(p:ScorePackage,anchor:PersonalSourceAnchor|undefined){if(!anchor)return;const aliases=sourceNavigationAliases(p,anchor);return aliases[Math.min(anchor.alias,aliases.length-1)];}
+function capturePersonalNavigation(state:PersonalState,p:ScorePackage,edit:Seat|undefined,followEdit:boolean){
+ const page=p.seats.filter(s=>s.page===state.view.page).sort((a,b)=>a.system-b.system||a.x-b.x||a.id.localeCompare(b.id))[0],cursor=edit??sourceNavigationSeat(p,state.navigation?.edit)??p.seats.find(s=>s.contactId===state.editContactId);
+ const pageAnchor=sourceNavigationAnchor(p,page),editAnchor=sourceNavigationAnchor(p,cursor);
+ if(p.seats.length)state.navigation={version:1,page:pageAnchor,edit:editAnchor,followEdit};
+ else delete state.navigation;
+}
+function resolvePersonalNavigation(state:PersonalState,p:ScorePackage){
+ const page=sourceNavigationSeat(p,state.navigation?.page),edit=sourceNavigationSeat(p,state.navigation?.edit);
+ state.view.page=Math.max(0,Math.min(p.pages.length-1,page?.page??state.view.page));
+ if(edit){state.editContactId=edit.contactId;if(state.navigation?.followEdit&&!viewportFit(innerWidth,innerHeight,effectiveView(state.view),p.pages.length).pages.includes(edit.page)){state.view.page=edit.page;state.navigation.page=sourceNavigationAnchor(p,edit);}}
 }
 function paintPersonalSaveError(target:NonNullable<typeof current>,error:Error){
  if(current!==target)return;
@@ -186,19 +206,24 @@ async function personalContext(target:NonNullable<typeof current>){
  if(!active&&entry.file!==target.entry.file)throw Error('The score edition changed; the pending choice stays with its previous edition.');
  return {entry,p,active,file:personalFile(entry,p)};
 }
-async function savePersonal(){if(!current)return;const target=current,view=structuredClone(target.personal.view),editContactId=target.personal.editContactId;
+async function savePersonal(){if(!current)return;const target=current,snapshot=structuredClone(target.personal),shown=livePersonalEditors.get(target)?.view??target.package,
+ anchor=sourceNavigationSeat(shown,snapshot.navigation?.page),cursor=current===target?selection:undefined;
+ const follow=!!snapshot.navigation?.followEdit&&anchor?.page===snapshot.view.page&&(!cursor||sourceNavigationSeat(shown,snapshot.navigation.edit)?.ownerIds.some(id=>cursor.ownerIds.includes(id))===true);
+ capturePersonalNavigation(snapshot,shown,cursor,follow);const view=snapshot.view;
  await livePersonalEditors.get(target)?.queue.flush();
  if(readingPresentation&&target.package.reading?.dual){if(readingViewError){notify(readingViewError);return;}const controller=readingPresentation;
   if(practice instanceof ManualPracticeView)controller.adoptView(practice.options.context.viewRecord());
   const record=practice instanceof ManualPracticeView?controller.record():retainManualReaderView(controller,view);await enqueue(()=>writeJson(controller.storageName,record));return;}
- await enqueue(async()=>{const {entry,p,file}=await personalContext(target),latest=await loadPersonalJournal(host,entry,p,{fallbackPersonal:p===target.package?target.personal:rebindPersonalPresentation(target.personal,target.package,p)});latest.view=view;latest.editContactId=editContactId;await writeJson(file,latest);});
+ await enqueue(async()=>{const {entry,p,file}=await personalContext(target),latest=await loadPersonalJournal(host,entry,p,{fallbackPersonal:p===target.package?target.personal:rebindPersonalPresentation(target.personal,target.package,p)}),projected=await personalEditor(target).session.project(snapshot);resolvePersonalNavigation(snapshot,projected);latest.view=snapshot.view;latest.editContactId=snapshot.editContactId;latest.navigation=snapshot.navigation;await writeJson(file,latest);});
 }
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
 async function commitPersonal(target:NonNullable<typeof current>,change:(s:PersonalState)=>PersonalState){
  const editor=personalEditor(target);if(editor.queue.error)throw editor.queue.error;
  // Restore/history commands are accepted in the same order as keyboard edits.
  // A durable write completing later must never replace a newer live choice.
- const next=readPersonal(change(structuredClone(target.personal)),target.package),generation=++editor.generation,
+ const next=readPersonal(change(structuredClone(target.personal)),target.package),generation=++editor.generation;
+ capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!next.navigation?.followEdit);
+ const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
   projection=editor.session.project(next),receipt=editor.queue.accept(next);
  const ownerPractice=target===current&&practice&&practice instanceof PracticeView?practice:undefined,
   handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,ownerPractice.options.personal,note.id)!==handFor(target.package,next,note.id));
@@ -207,8 +232,11 @@ async function commitPersonal(target:NonNullable<typeof current>,change:(s:Perso
  void receipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const projected=await projection;
  if(current===target&&editor.generation===generation){
-  editor.view=projected;editor.visiblePersonal=structuredClone(next);
-  if(selection)selection=visibleSourceSeat(projected,selection)??selection;
+  const cursor=sourceNavigationAnchor(editor.view,selection);editor.view=projected;
+  if(JSON.stringify([target.personal.view,target.personal.editContactId,target.personal.navigation])===navigation)resolvePersonalNavigation(target.personal,projected);
+  editor.visiblePersonal=structuredClone(target.personal);
+  if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
+  if(selection)target.personal.editContactId=selection.contactId;
   if(ownerPractice&&practice===ownerPractice){
    if(handsChanged)await refreshPersonalPractice(target,ownerPractice,generation);
    else{ownerPractice.options.personal=next;ownerPractice.refit();}
@@ -372,7 +400,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Clock acquisition is an activation prerequisite too. Keep the old reader,
  // selection and preferences intact until every awaited prerequisite is owned.
  let clock:number|undefined,clockError:unknown;try{clock=await host.midiClock();}catch(error){clockError=error;}check();
- const nextEditor=personalEditor(next);await nextEditor.session.warm();check();nextEditor.view=await nextEditor.session.project(next.personal);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ const nextEditor=personalEditor(next);await nextEditor.session.warm();check();nextEditor.view=await nextEditor.session.project(next.personal);resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  readingParts.remember(next.entry,next.package);
  ++manualPracticeGeneration;pitchInput.block();practice?.close();practice=undefined;selection=undefined;selectionPitchToggle=false;
  readingPresentation=nextPresentation;readingViewError=nextViewError;
@@ -707,6 +735,9 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  const nextPersonal=readPersonal(assigned(target.package,target.personal,seat,choice),target.package);
  const units=editUnits(readerPackage()),index=units.findIndex(s=>s.contactId===seat.contactId),nextSeat=advance?units[Math.min(units.length-1,index+1)]??seat:seat;
  nextPersonal.editContactId=nextSeat.contactId;
+ if(!viewportFit(innerWidth,innerHeight,effectiveView(nextPersonal.view),readerPackage().pages.length).pages.includes(nextSeat.page))nextPersonal.view.page=nextSeat.page;
+ capturePersonalNavigation(nextPersonal,readerPackage(),nextSeat,true);
+ const navigation=JSON.stringify([nextPersonal.view,nextPersonal.editContactId,nextPersonal.navigation]);
  const generation=++editor.generation,projection=editor.session.project(nextPersonal);
  const receipt=editor.queue.accept(nextPersonal);editor.projections.set(receipt.sequence,projection);
  target.personal=nextPersonal;selection=nextSeat;
@@ -715,9 +746,12 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  try{
   const projected=await projection;
   if(current===target&&editor.generation===generation){
-   editor.view=projected;editor.visiblePersonal=structuredClone(nextPersonal);
-   if(selection)selection=visibleSourceSeat(projected,selection)??selection;
-   if(selection){target.personal.editContactId=selection.contactId;target.personal.view.page=Math.max(0,Math.min(projected.pages.length-1,target.personal.view.page));const pages=viewportFit(innerWidth,innerHeight,effectiveView(target.personal.view),projected.pages.length).pages;if(!pages.includes(selection.page))target.personal.view.page=selection.page;}
+   const cursor=sourceNavigationAnchor(editor.view,selection);
+   editor.view=projected;
+   if(JSON.stringify([target.personal.view,target.personal.editContactId,target.personal.navigation])===navigation)resolvePersonalNavigation(target.personal,projected);
+   editor.visiblePersonal=structuredClone(target.personal);
+   if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
+   if(selection)target.personal.editContactId=selection.contactId;
    renderPages();renderToolbar();focusSelection();
   }
  }catch(error){notify(`The visible edit could not be rendered. Pending choices are retained: ${(error as Error).message}`);throw error;}
