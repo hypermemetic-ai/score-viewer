@@ -10,7 +10,7 @@ import type {PreparationStage} from '../vendor/iso-notation/src/score-presentati
 export type ReadingNotation='iso'|'tab';
 type PreparedViews=ReturnType<typeof prepareFrettedViews>;
 export interface DualReadingViewDescriptor {
- engineId:typeof FRETTED_ISO_ENGINE|typeof FRETTED_TAB_ENGINE;
+ engineId:PreparedViews[ReadingNotation]['engineId'];
  pages:string[];owners:string;scene:string;geometry:string;
 }
 export interface DualReadingDescriptor {
