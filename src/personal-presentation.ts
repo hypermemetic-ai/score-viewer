@@ -4,35 +4,72 @@ import {calculatedRecipeForRequest} from './calculated-hand-edition';
 import {effectiveAssignments} from './personal-assignments';
 import {hashBytes,type ScorePackage} from './package';
 import type {PersonalState} from './state';
+import {conservativeMaterialBytes} from './package-material';
+import {PersonalPreparationPool,type PreparationLease,type PreparationRequest} from './personal-preparation-pool';
+import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 
-/** A reader session owns detached views; the admitted package remains the source
- * of storage, calculation, personal-owner validation and durable identity. */
+type Core=ReturnType<typeof createPersonalHandProjection>;
+// The optional shape allows the viewer seam to compile against its historical
+// source pin. Once the reviewed cooperative pin lands these methods are used.
+type CooperativeCore=Core&{warmAsync?(execution?:ReadingExecution):Promise<void>;projectAsync?(owners:readonly OwnerHand[],identity:string,execution?:ReadingExecution):Promise<ReturnType<Core['project']>>};
+const preparations=new PersonalPreparationPool<CooperativeCore>();
+/** Literal value identity preserves undefined, nonfinite numbers and -0 too;
+ * a mutation cannot collide merely because JSON would erase its difference. */
+function literal(value:unknown):unknown {
+ if(value===undefined)return ['undefined'];if(value===null)return ['null'];
+ if(typeof value==='number')return ['number',Object.is(value,-0)?'-0':String(value)];
+ if(typeof value==='string'||typeof value==='boolean')return [typeof value,value];
+ if(Array.isArray(value))return ['array',value.map(literal)];
+ if(value instanceof Uint8Array)return ['bytes',[...value]];
+ if(typeof value==='object')return ['object',Object.entries(value).map(([k,v])=>[k,literal(v)])];
+ throw Error('Personal preparation requires captured literal package data.');
+}
+/** Each facade captures once before yielding. File bytes, rather than a mutable
+ * archiveSha claim, bind the exact current archive members to the source graph. */
+async function capture(base:ScorePackage):Promise<PreparationRequest<CooperativeCore>> {
+ const snapshot=structuredClone(base),files=snapshot.files;
+ const {files:ignored,...meaning}=snapshot;
+ const identity=JSON.stringify(literal(meaning));
+ const materialBytes=conservativeMaterialBytes(snapshot)+identity.length*2;
+ const members=await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)]));
+ const key=JSON.stringify([identity,members]);
+ return {key,materialBytes,async produce(execution){
+  checkReadingExecution(execution);
+  const recipe=await calculatedRecipeForRequest(snapshot,execution),source=scoreWithCalculationContext(snapshot.sourceScore??snapshot.score,
+   snapshot.calculationContext,snapshot.sourceSha256??snapshot.manifest.semanticSha256);
+  checkReadingExecution(execution);return createPersonalHandProjection(source,snapshot.score,recipe);
+ }};
+}
+/** A reader owns its package/wrapper/buffers and local last view. Shared cores
+ * are captured, bounded and serialized; changed pages are never a paint shortcut. */
 export class PersonalPresentationSession {
- private preparation?:Promise<ReturnType<typeof createPersonalHandProjection>>;
+ private preparation?:Promise<PreparationRequest<CooperativeCore>>;
+ private lease?:PreparationLease<CooperativeCore>;
  private lastKey?:string;
  private lastView?:ScorePackage;
- constructor(private readonly base:ScorePackage){}
- private prepare(){
-  return this.preparation??=(async()=>{
-   const recipe=await calculatedRecipeForRequest(this.base),source=scoreWithCalculationContext(this.base.sourceScore??this.base.score,
-    this.base.calculationContext,this.base.sourceSha256??this.base.manifest.semanticSha256);
-   return createPersonalHandProjection(source,this.base.score,recipe);
-  })();
+ private readonly base:ScorePackage;
+ private readonly pool:PersonalPreparationPool<CooperativeCore>;
+ constructor(base:ScorePackage,pool=preparations){this.base=base;this.pool=pool;}
+ private prepare(){return this.preparation??=capture(this.base).catch(error=>{this.preparation=undefined;throw error;});}
+ private async use<V>(action:(core:CooperativeCore,execution?:ReadingExecution)=>V|Promise<V>,execution?:ReadingExecution):Promise<V>{
+  const request=await this.prepare();checkReadingExecution(execution);
+  const result=await this.pool.use({...request,lease:this.lease},action,execution);this.lease=result.lease;return result.value;
  }
- /** Cold admission/layout work belongs to score opening, ahead of key handling. */
- async warm():Promise<void>{
+ /** Complete cold work ahead of key handling; shared execution may yield safely. */
+ async warm(input?:ReadingExecution):Promise<void>{
   if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
-  (await this.prepare()).warm();
+  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
+  await this.use((core,e)=>e&&core.warmAsync?core.warmAsync(e):core.warm(),execution);
  }
- async project(personal:PersonalState):Promise<ScorePackage>{
+ async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
+  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
   const owners:OwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
   if(owners.every(a=>this.base.score.notes.find(n=>n.id===a.id)?.hand===a.hand))return this.base;
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
-  const [session,digest]=await Promise.all([this.prepare(),hashBytes(key)]),result=session.project(owners,digest);
-  // Archive bytes, manifest, original source, receipts and fingering evidence are
-  // retained verbatim. This object is a transient reading, never package admission.
-  const view:ScorePackage={...this.base,score:result.score,pages:result.pages,seats:result.seats,annotationGeometry:result.annotationGeometry};
+  const digest=await hashBytes(key);checkReadingExecution(execution);
+  const result=await this.use((core,e)=>e&&core.projectAsync?core.projectAsync(owners,digest,e):core.project(owners,digest),execution);
+  const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry};
   this.lastKey=key;this.lastView=view;return view;
  }
 }

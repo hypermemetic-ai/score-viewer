@@ -1,3 +1,4 @@
+import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 import {strFromU8,strToU8,unzipSync} from 'fflate';
 import type {QuantizedGridScore,PitchCoordinate,Hand} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
@@ -89,11 +90,13 @@ export function scoreTranspositionRange(p:ScorePackage):{min:number;max:number}{
  const min=9-Math.min(...values),max=96-Math.max(...values);
  if(min>max)throw Error('This score cannot fit the piano range at a single offset.');return{min,max};
 }
-export async function admitTranspositionBaselineRecipe(p:ScorePackage):Promise<void>{
+export async function admitTranspositionBaselineRecipe(p:ScorePackage,input?:ReadingExecution):Promise<void>{
+ const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  if(!p.renderingRecipe)throw Error('Transpose needs a matching rendering preparation for the original edition.');
  // The calculated baseline has already passed full cold source/paint replay.
  // Raw historical recipes still need their literal factory-adoption gate.
- if(p.renderingRecipe.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE)await replayRetainedRecipeBaseline(pianoPlanningScore(p),p.renderingRecipe,p.sourceSha256!);
+ if(p.renderingRecipe.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE)await replayRetainedRecipeBaseline(pianoPlanningScore(p),p.renderingRecipe,p.sourceSha256!,execution);
+ checkReadingExecution(execution);
 }
 /** Serialization compatibility only: absent legacy discriminants remain
  * absent in frozen source bytes. Active transformed events stay canonical. */
@@ -113,7 +116,8 @@ export async function createScoreTransposition(p:ScorePackage,archive:Uint8Array
  const retained=p.transposition?.steps===steps&&canonicalJson(p.transposition.handMaps[keyboard])===canonicalJson(map)?p.transposition:undefined;
  return{envelope:retained?structuredClone(retained):{...content,sha256:await identityHash(content)} as ScoreTransposition,originalBytes,source:effective,sourceBytes};
 }
-export async function admitScoreTransposition(raw:unknown,files:Record<string,Uint8Array>,effectiveBytes:Uint8Array):Promise<{envelope:ScoreTransposition;original:ScorePackage}>{
+export async function admitScoreTransposition(raw:unknown,files:Record<string,Uint8Array>,effectiveBytes:Uint8Array,input?:ReadingExecution):Promise<{envelope:ScoreTransposition;original:ScorePackage}>{
+ const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  if(!object(raw)||raw.version!==SCORE_TRANSPOSITION_VERSION||Object.keys(raw).sort().join()!==
   ['version','originalArchive','originalArchiveSha256','baselineLayout','originalSourceSha256','selectedEditionSha256','steps','effectiveSourceSha256','handMaps','sha256'].sort().join()||
   raw.originalArchive!=='transposition/original.isoscore'||!layout(raw.baselineLayout)||
@@ -127,8 +131,9 @@ export async function admitScoreTransposition(raw:unknown,files:Record<string,Ui
  // archive reader; its own normal bounds/inventory then apply independently.
  const originalFiles=unzipSync(bytes,{filter:f=>{if(f.originalSize>20_000_000)throw Error('Oversized transpose baseline.');return f.name==='manifest.json';}}),manifest=JSON.parse(strFromU8(originalFiles['manifest.json']));
  if(manifest.transposition!==undefined)throw Error('A transpose baseline must be an untransposed original archive.');
- const original=await importPackage(bytes,{allowLegacyTempo:true,keyboardLayout:envelope.baselineLayout});
- await admitTranspositionBaselineRecipe(original);
+ const original=await importPackage(bytes,{allowLegacyTempo:true,keyboardLayout:envelope.baselineLayout,...(execution?{execution}:{})});
+ await admitTranspositionBaselineRecipe(original,execution);
+ checkReadingExecution(execution);
  const reference=files['reference.mid'],priorReference=original.referenceMidi;
  if(!!reference!==!!priorReference||reference&&priorReference&&(reference.length!==priorReference.length||reference.some((b,i)=>b!==priorReference[i])))throw Error('Transpose reference bytes differ from its original archive.');
  if(original.sourceSha256!==envelope.originalSourceSha256)throw Error('Transpose baseline source identity differs.');
@@ -144,5 +149,5 @@ export async function admitScoreTransposition(raw:unknown,files:Record<string,Ui
     o.pitch!==linear(requirePitchedEvent(n).pitch)||o.startTick!==n.startTick||o.durationTicks!==n.durationTicks||!['LH','RH'].includes(o.hand))throw Error('Transpose selected hand map has stale source guards.');
   }
  }
- return{envelope:structuredClone(envelope),original};
+ checkReadingExecution(execution);return{envelope:structuredClone(envelope),original};
 }

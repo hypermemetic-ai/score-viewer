@@ -1,4 +1,6 @@
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
+import * as presentation from '../vendor/iso-notation/src/score-presentation';
+import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 import {renderScorePresentation} from '../vendor/iso-notation/src/render/janko/score-presentation';
 import {APPROVED_SCORE_RENDERING_ENGINE,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
 import {approvedProductionJankoOptions} from '../vendor/iso-notation/src/render/janko/approved-production';
@@ -17,10 +19,14 @@ export async function compatiblePianoRecipe(source:QuantizedGridScore,recipe:Pas
 }
 /** Literal retained replay is its own gate. A new source-owned factory must
  * not require an intermediate old-policy engraving of a transferred gesture. */
-export async function replayRetainedRecipeBaseline(source:QuantizedGridScore,recipe:PassiveScoreRenderingRecipe,sourceSha256:string){
-  const checked=validateScoreRenderingRecipe(recipe,{sourceSha256}),baseline=renderScorePresentation(source,checked);
+export async function replayRetainedRecipeBaseline(source:QuantizedGridScore,recipe:PassiveScoreRenderingRecipe,sourceSha256:string,input?:ReadingExecution){
+  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
+  const checked=validateScoreRenderingRecipe(recipe,{sourceSha256}),captured=structuredClone(source),
+    asyncRender=(presentation as typeof presentation&{renderScorePresentationAsync?:(source:QuantizedGridScore,recipe:typeof checked,execution:ReadingExecution)=>Promise<ReturnType<typeof renderScorePresentation>>}).renderScorePresentationAsync,
+    baseline=execution&&asyncRender?await asyncRender(captured,checked,execution):renderScorePresentation(captured,checked);
+  checkReadingExecution(execution);
   if(JSON.stringify(await Promise.all(baseline.rawPages.map(hashBytes)))!==JSON.stringify(checked.baseline.pageSha256)||
     await hashBytes(JSON.stringify(baseline.seats))!==checked.baseline.seatSha256)
     throw Error('This rendering preparation does not reproduce its source pages. The current pages are retained.');
-  return checked;
+  checkReadingExecution(execution);return checked;
 }
