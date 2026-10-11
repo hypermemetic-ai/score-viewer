@@ -50,11 +50,11 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **AND** independent notes elsewhere remain unchanged
 
 ### Requirement: Faithful fast visible edits
-Hand/finger editing SHALL aim for the next display frame and SHALL achieve correctly rendered visible updates within 100 ms at the 95th percentile on named warm-score/device benchmarks. Each keystroke SHALL avoid complete calculator/package regeneration and waiting for durable saves. Hand changes SHALL update actual dependent notation through shared engraving rules, not only a hand label.
+Hand/finger editing SHALL aim for the next display frame and SHALL measure correctly rendered visible updates on named warm-score/device benchmarks, retaining 100 ms at the 95th percentile as a tuning goal. Delivery MAY proceed at the achieved measured speed under the user's accepted performance trade-off; measurements SHALL distinguish end-to-end visible latency from source-only calculation and SHALL not claim the 100 ms goal was met unless the evidence establishes it. Each keystroke SHALL avoid complete calculator/package regeneration and waiting for durable saves. Hand changes SHALL update actual dependent notation through shared engraving rules, not only a hand label.
 
 #### Scenario: Measured hand update
 - **WHEN** the benchmark applies repeated hand/finger edits to warmed named scores
-- **THEN** key-receipt-to-correct-visible-paint measurements meet the p95 target and record fixture sizes, host, viewport and presentation
+- **THEN** key-receipt-to-correct-visible-paint measurements report median, p95 and whether the tuning goal was met, and record fixture sizes, host, viewport and presentation
 - **AND** changed stems, beams, rests, finger placement and affected layout are coherent at the measured completion point
 - **AND** slow or failed edits are included in the result rather than excluded as unfinished work
 
