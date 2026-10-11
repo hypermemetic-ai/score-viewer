@@ -12,7 +12,11 @@ export const defaultView=():ViewState=>({page:0,rotation:0,scale:1,count:1,advan
 export function effectiveLabelMode(view:ViewState,behavior:FingerBehavior,held:boolean,available=true,selecting=false,selectionPitchToggle=false):LabelMode{return !available?'pitch':selecting?(behavior==='momentary'?(held?'pitch':'finger'):(selectionPitchToggle?'pitch':'finger')):behavior==='momentary'?(held?'finger':'pitch'):view.labelMode;}
 export interface Correction {contactId:string;actionId:string;ownerIds:string[];original:number;replacement:number;originalPlanner:string;originalLayerSource:string;createdAt:string;writtenBar:number;pitch:number;hand:'LH'|'RH';proposedRow?:number;proposedContact?:PhysicalKeyContact}
 export interface PersonalBinding {sourceRevision:string;keyboardLayout:'conventional-piano'|'janko-four-row';profileId:string;profileSha256:string;effectiveHandSha256:string;editionRevision?:string}
-export interface PersonalState {version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
+/** Source aliases locate navigation across a changed page layout. No pixels or
+ * projected contact IDs participate in the source/personal binding. */
+export interface PersonalSourceAnchor {owners:string[];writtenBar:number;actionId:string;continuation:boolean;alias:number}
+export interface PersonalNavigation {version:1;page?:PersonalSourceAnchor;edit?:PersonalSourceAnchor;followEdit:boolean}
+export interface PersonalState {version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
 const personalBinding=(p:ScorePackage):PersonalBinding|undefined=>{
  if(p.manifest.version!==2)return;
  if(!p.sourceRevision||!p.keyboardLayout||!p.profileId||!p.profileSha256||!p.effectiveHandSha256)throw Error('Incomplete presentation state identity');
@@ -50,7 +54,17 @@ export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJank
  if(s.calculatedVersion!==undefined&&(!Number.isInteger(s.calculatedVersion)||s.calculatedVersion<0||s.calculatedVersion>=s.history.length))throw Error('Saved calculated version differs; data retained');
  // A stale optional cursor must never discard otherwise valid personal corrections.
  if(s.editContactId!==undefined&&(typeof s.editContactId!=='string'||!p.seats.some(q=>q.contactId===s.editContactId)))delete s.editContactId;
- v.page=Math.max(0,Math.min(p.pages.length-1,v.page));
+ if(s.navigation!==undefined){
+  const owners=new Set(p.score.notes.map(n=>n.id)),navigation=s.navigation,
+   anchor=(a:PersonalSourceAnchor|undefined)=>a===undefined||!!a&&typeof a==='object'&&!Array.isArray(a)&&Array.isArray(a.owners)&&a.owners.length>0&&new Set(a.owners).size===a.owners.length&&a.owners.every(id=>typeof id==='string'&&owners.has(id))&&Number.isSafeInteger(a.writtenBar)&&a.writtenBar>0&&typeof a.actionId==='string'&&!!a.actionId&&typeof a.continuation==='boolean'&&Number.isSafeInteger(a.alias)&&a.alias>=0&&p.seats.some(seat=>seat.writtenBar===a.writtenBar&&seat.actionId===a.actionId&&seat.ownerIds.some(id=>a.owners.includes(id)));
+  // Navigation is optional recovery metadata. An obsolete alias must not
+  // discard otherwise valid hand/finger choices, history or source evidence.
+  if(!navigation||typeof navigation!=='object'||Array.isArray(navigation)||navigation.version!==1||typeof navigation.followEdit!=='boolean'||!anchor(navigation.page)||!anchor(navigation.edit))delete s.navigation;
+ }
+ // A projected page may not exist in the admitted base layout. Its optional
+ // source navigation is resolved/clamped after that projection, including a
+ // numeric fallback for source-empty pages.
+ v.page=s.navigation&&Number.isSafeInteger(v.page)?Math.max(0,v.page):Math.max(0,Math.min(p.pages.length-1,v.page));
  for(const [key,c]of [...Object.entries(s.overrides),...Object.entries(s.undo??{})]){
   const aliases=p.seats.filter(q=>q.contactId===key),owners=[...new Set(aliases.flatMap(q=>q.ownerIds))],note=p.score.notes.find(n=>owners.includes(n.id));
   if(!c||!note||!isPitchedEvent(note)||c.contactId!==key||!Array.isArray(c.ownerIds)||new Set(c.ownerIds).size!==c.ownerIds.length||c.ownerIds.length!==owners.length||owners.some(id=>!c.ownerIds.includes(id))||
