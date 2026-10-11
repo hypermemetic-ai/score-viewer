@@ -1,7 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
-const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),state=readFileSync(new URL('../src/state.ts',import.meta.url),'utf8'),selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
+const main=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),state=readFileSync(new URL('../src/state.ts',import.meta.url),'utf8'),selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
 const body=(source:string,start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))).replace(/^export /gm,''));
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
 const seat=(id:string,page:number,bar:number,continuation=false)=>({id:'seat-'+id,contactId:'contact-'+id,ownerIds:[id],actionId:'action-'+id,page,system:bar,x:20,baseline:40,writtenBar:bar,fontSize:12,continuation});
@@ -49,6 +49,22 @@ test('reverse projection completion preserves exact ordered snapshots rather tha
  const f=fixture(5,6),gate=deferred();let calls=0;f.setProject(async()=>++calls===1?gate.promise:f.projected);
  const first=f.context.saveHandChoice('RH');await f.context.saveFingerDigit(4);assert.equal(f.target.personal.view.page,5);gate.resolve({...f.p,seats:f.seats});await first;await f.editor.queue.flush();
  assert.equal(f.writes.length,2);assert.equal(f.writes[0].choices.a.finger,1);assert.equal(f.writes[1].choices.a.finger,4);assert.equal(f.disk.view.page,5);assert.equal(f.target.personal.view.page,5);
+});
+test('a generic restore/history command captures and durably resolves its selected source alias across reflow',async()=>{
+ const f=fixture(5,6);f.context.selection=f.seats[1];f.target.personal.editContactId=f.seats[1].contactId;f.target.personal.view.page=4;
+ await f.context.commitPersonal(f.target,(s:any)=>{s.choices.b.hand='LH';return s;});await f.editor.queue.flush();
+ assert.equal(f.target.personal.view.page,5);assert.equal(f.context.selection.id,'projected-b');assert.equal(f.target.personal.editContactId,'projected-contact-b');
+ assert.equal(f.writes.length,1);assert.equal(f.disk.choices.b.hand,'LH');assert.equal(f.disk.view.page,5);assert.equal(f.disk.editContactId,'projected-contact-b');assert.equal(f.disk.navigation.edit.writtenBar,9);
+ const cold=f.cold();assert.equal(cold.view.page,5);assert.equal(cold.editContactId,'projected-contact-b');
+});
+test('a later explicit page change wins over generic reflow while its earlier durable snapshot keeps its own navigation',async()=>{
+ const f=fixture(5,6),gate=deferred();f.setProject(()=>gate.promise);f.context.selection=f.seats[1];f.target.personal.editContactId=f.seats[1].contactId;f.target.personal.view.page=4;
+ const restoring=f.context.commitPersonal(f.target,(s:any)=>{s.choices.b.hand='LH';return s;});
+ f.context.selection=f.seats[0];f.target.personal.editContactId=f.seats[0].contactId;f.target.personal.view.page=0;const navigation=f.context.savePersonal();
+ gate.resolve(f.projected);await restoring;await navigation;await f.editor.queue.flush();
+ assert.equal(f.target.personal.view.page,0);assert.equal(f.context.selection.ownerIds[0],'a');assert.equal(f.target.personal.editContactId,'contact-a');
+ assert.equal(f.writes.length,2);assert.equal(f.writes[0].view.page,5);assert.equal(f.writes[0].editContactId,'projected-contact-b');assert.equal(f.writes[1].view.page,0);assert.equal(f.writes[1].editContactId,'contact-a');
+ assert.equal(f.disk.choices.b.hand,'LH');assert.equal(f.cold().view.page,0);assert.equal(f.cold().editContactId,'contact-a');
 });
 test('held continuation anchors resume the written alias instead of the original attack',()=>{
  const f=fixture(5,6),continuation={...f.seats[0],id:'held-continuation',page:4,writtenBar:7,continuation:true};f.p.seats.push(continuation);const projectedContinuation={...continuation,id:'projected-held',contactId:'projected-held-contact',page:5};f.projected.seats.push(projectedContinuation);
