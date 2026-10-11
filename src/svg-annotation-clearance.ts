@@ -1,6 +1,6 @@
 import {DOMParser} from '@xmldom/xmldom';
 import {svgClassStyles,resolvedSvgStyle} from './svg-style';
-import {footerGlyphPoints,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
+import {footerGlyphPoints,assertAnnotationInkPolicyReady,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
 export type AnnotationBox=[number,number,number,number];
 type Matrix=[number,number,number,number,number,number];
 const unit:Matrix=[1,0,0,1,0,0];
@@ -21,9 +21,14 @@ function transform(s:string):Matrix{
 function pointsBox(points:Array<[number,number]>,m:Matrix,stroke=0):AnnotationBox{
  if(!points.length)throw Error('Empty painted SVG geometry');
  if(points.some(p=>p.some(n=>!Number.isFinite(n))))throw Error('Nonfinite painted SVG geometry');
- const p=points.map(([x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]),pad=stroke/2*Math.hypot(m[0],m[1],m[2],m[3]);
- if(!Number.isFinite(pad)||p.some(p=>p.some(n=>!Number.isFinite(n))))throw Error('Unbounded transformed SVG geometry');
- return[Math.min(...p.map(p=>p[0]))-pad,Math.min(...p.map(p=>p[1]))-pad,Math.max(...p.map(p=>p[0]))+pad,Math.max(...p.map(p=>p[1]))+pad];
+ const pad=stroke/2*Math.hypot(m[0],m[1],m[2],m[3]);
+ if(!Number.isFinite(pad))throw Error('Unbounded transformed SVG geometry');
+ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+ for(const [x,y]of points){const px=m[0]*x+m[2]*y+m[4],py=m[1]*x+m[3]*y+m[5];
+  if(!Number.isFinite(px)||!Number.isFinite(py))throw Error('Unbounded transformed SVG geometry');
+  x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);
+ }
+ return[x0-pad,y0-pad,x1+pad,y1+pad];
 }
 type Point=[number,number];
 /** Only a proven x-monotone, noncrossing paired cubic ribbon gets this cover.
@@ -72,11 +77,39 @@ function pathPoints(d:string):Array<[number,number]>{
 }
 export const boxesOverlap=(a:AnnotationBox,b:AnnotationBox,gap=.2)=>a[0]<b[2]+gap&&a[2]>b[0]-gap&&a[1]<b[3]+gap&&a[3]>b[1]-gap;
 
+type PageObstacles={width:number;height:number;boxes:AnnotationBox[]};
+// Exact serialized page/head/policy inputs admit reuse across personal editions.
+// Bound both entry count and retained key bytes: opening other scores cannot
+// turn this into an unbounded library cache. Stored geometry is never exposed.
+const obstaclePages=new Map<string,PageObstacles>();
+const maximumObstaclePages=12,maximumObstacleKeyUnits=4_000_000;
+let obstacleKeyUnits=0;
+function obstacleKey(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy:ViewerAnnotationInkPolicy|undefined):string|undefined{
+ const entries=[...heads];
+ // Preserve the old uncached path for malformed/nonfinite caller geometry;
+ // JSON's nonfinite/null and negative-zero equivalences cannot establish reuse.
+ if(entries.some(([id,b])=>typeof id!=='string'||!Array.isArray(b)||b.length!==4||Reflect.ownKeys(b).length!==5||[0,1,2,3].some(i=>{const d=Object.getOwnPropertyDescriptor(b,i);return !d||!('value' in d)||typeof d.value!=='number'||!Number.isFinite(d.value);})))return;
+ const key=JSON.stringify([svg,entries,policy??null],(_key,value)=>typeof value==='number'&&Object.is(value,-0)?['negative-zero']:value);
+ return key.length<=maximumObstacleKeyUnits?key:undefined;
+}
+const detachedObstacles=(p:PageObstacles):PageObstacles=>({width:p.width,height:p.height,boxes:p.boxes.map(b=>[...b] as AnnotationBox)});
+function rememberObstacles(key:string,p:PageObstacles):void{
+ const owned=detachedObstacles(p);for(const box of owned.boxes)Object.freeze(box);Object.freeze(owned.boxes);Object.freeze(owned);
+ obstaclePages.set(key,owned);obstacleKeyUnits+=key.length;
+ while(obstaclePages.size>maximumObstaclePages||obstacleKeyUnits>maximumObstacleKeyUnits){const oldest=obstaclePages.keys().next().value!;
+  obstaclePages.delete(oldest);obstacleKeyUnits-=oldest.length;
+ }
+}
+
 /** Independently inventory every rendered SVG primitive, including foreign
  * voices, curves, rests and text. Owned carrier bounds are not this inventory.
  * Foreign text reserves a full page-width band, avoiding font substitution
  * assumptions. Unsupported geometry fails closed only for NEW editions. */
-export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy?:ViewerAnnotationInkPolicy):{width:number;height:number;boxes:AnnotationBox[]}{
+export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy?:ViewerAnnotationInkPolicy):PageObstacles{
+ // Readiness remains a live admission even when all geometry was seen before.
+ if(policy)assertAnnotationInkPolicyReady(policy);
+ const key=obstacleKey(svg,heads,policy),saved=key===undefined?undefined:obstaclePages.get(key);
+ if(saved){obstaclePages.delete(key!);obstaclePages.set(key!,saved);return detachedObstacles(saved);}
  const doc=new DOMParser().parseFromString(svg,'image/svg+xml'),root=doc.documentElement!,view=numbers(root.getAttribute('viewBox')??''),
   width=view[2]??Number(root.getAttribute('width')),height=view[3]??Number(root.getAttribute('height')),boxes:AnnotationBox[]=[];
  if(view.length&& (view.length!==4||view[0]!==0||view[1]!==0)||![width,height].every(n=>Number.isFinite(n)&&n>0))throw Error('Unsupported annotation page coordinates');
@@ -122,5 +155,5 @@ export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,Annotati
   }else if(points)boxes.push(pointsBox(points,m,stroke));
   for(const child of Array.from(el.childNodes))if(child.nodeType===1)visit(child as Element,m,style);
  }
- visit(root as unknown as Element,unit,{});return{width,height,boxes};
+ visit(root as unknown as Element,unit,{});const result={width,height,boxes};if(key===undefined)return result;rememberObstacles(key,result);return detachedObstacles(result);
 }
