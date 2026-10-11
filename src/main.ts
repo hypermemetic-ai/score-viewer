@@ -199,15 +199,31 @@ async function commitPersonal(target:NonNullable<typeof current>,change:(s:Perso
  // A durable write completing later must never replace a newer live choice.
  const next=readPersonal(change(structuredClone(target.personal)),target.package),generation=++editor.generation,
   projection=editor.session.project(next),receipt=editor.queue.accept(next);
+ const ownerPractice=target===current&&practice&&practice instanceof PracticeView?practice:undefined,
+  handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,ownerPractice.options.personal,note.id)!==handFor(target.package,next,note.id));
+ if(handsChanged)ownerPractice!.pause();
  editor.projections.set(receipt.sequence,projection);target.personal=next;
- if(practice&&target===current)practice.options.personal=next;
  void receipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const projected=await projection;
  if(current===target&&editor.generation===generation){
   editor.view=projected;editor.visiblePersonal=structuredClone(next);
   if(selection)selection=visibleSourceSeat(projected,selection)??selection;
+  if(ownerPractice&&practice===ownerPractice){
+   if(handsChanged)await refreshPersonalPractice(target,ownerPractice,generation);
+   else{ownerPractice.options.personal=next;ownerPractice.refit();}
+  }
  }
  await receipt.saved;
+}
+/** Replace both notation and hand grouping together, retaining the exact saved
+ * exercise evidence and UI context. No completion is invalidated by an edit. */
+async function refreshPersonalPractice(target:NonNullable<typeof current>,owner:PracticeView,generation:number){
+ const context=owner.contextSnapshot();await owner.flush();
+ const owns=()=>current===target&&practice===owner&&personalEditor(target).generation===generation;
+ if(!owns())return;
+ const admitted=await PracticeView.prepareContext(target.package,target.entry.id,context,target.personal);
+ if(!owns())return;
+ owner.close();await startPractice(context,admitted);
 }
 function labelMode(){if(!current)return 'pitch';const available=fingerDisplayAvailable(current.package,current.personal,currentFingerPresentation());return effectiveLabelMode(current.personal.view,preferences.fingerBehavior,input.fingersHeld||controls.fingersHeld,available,!!selection,selectionPitchToggle);}
 function toggleLabel(){return preferences.fingerBehavior==='momentary'?(selection?'Hold pitches':'Hold fingerings'):selection?(labelMode()==='pitch'?'Show fingerings':'Show pitches'):(labelMode()==='pitch'?'Show fingerings':'Hide fingerings');}
