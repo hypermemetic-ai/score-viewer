@@ -26,7 +26,7 @@ function fixture(){
  class FakePracticeView{
   options:any;paused=0;closed=0;refits=0;flushes=0;state={evidence:structuredClone(evidence),preferences:structuredClone(settings)};
   constructor(_app:any,options:any){this.options=options;}
-  pause(){this.paused++;}refit(){this.refits++;}close(){this.closed++;}
+  pause(){this.paused++;}holdForPersonalChoices(){this.pause();}releasePersonalChoices(){}refit(){this.refits++;}close(){this.closed++;}
   contextSnapshot(){return structuredClone(snapshot);}
   async flush(){this.flushes++;await flush();}
   static async prepareContext(base:any,id:string,c:any,s:any){preparations.push({base,id,context:c,personal:s});return prepare(base,id,c,s);}
@@ -61,7 +61,7 @@ test('active restore admits new hand plan with projected notation before awaitin
 });
 
 test('history baseline changes are compared by effective source hands rather than explicit assignment presence',async()=>{
- const f=fixture();delete f.target.personal.choices.a;delete f.old.options.personal.choices.a;
+ const f=fixture();delete (f.target.personal.choices as Record<string,unknown>).a;delete f.old.options.personal.choices.a;
  await f.context.commitPersonal(f.target,(s:any)=>({...s,calculatedVersion:1}));
  assert.equal(f.old.paused,1);assert.equal(f.mounts.length,1);assert.deepEqual(f.mounts[0].admitted.plan.hands,['RH','RH']);assert.deepEqual(f.mounts[0].owner.state.evidence,f.evidence);
 });

@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {assigned,effectiveAssignments,effectiveAssignmentDigest,handFor,restorePersonalAssignment,personalPracticePackage} from '../src/personal-assignments';
-import {initialPersonal,readPersonal,corrected,fingerFor,personalStorageName,practiceStorageName,restoreAll} from '../src/state';
+import {initialPersonal,readPersonal,corrected,fingerFor,personalStorageName,practiceStorageName,restoreAll,personalCorrectionCount} from '../src/state';
+import {scoreOptionsMarkup} from '../src/score-options';
 import {planPractice,initialPractice,readPractice,progressFor,passageHierarchy} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {pianoRequestAuthority} from '../src/piano-request-authority';
@@ -18,6 +19,20 @@ function fixture():ScorePackage {
   seats:notes.map((n,i)=>({id:'seat-'+i,page:0,system:0,x:i*10,baseline:10,fontSize:12,pitchDigit:'1',ownerIds:[n.id],actionId:attacks[i].id,contactId:attacks[i].id,writtenBar:i+1})),
   fingerLayer:{version:'piano-finger-assignments-v1',layoutId:'janko-four-row',profileId:'fixture',profileSha256:'c'.repeat(64),plannerVersion:'fixture',sourceHash:'a'.repeat(64),attacks,sourceOwnerToAttack:Object.fromEntries(notes.map((n,i)=>[n.id,attacks[i].id])),operatorConstraints:[]}} as unknown as ScorePackage;
 }
+test('hand-only choices expose surgical recovery controls without double counting legacy corrections',()=>{
+ const p=fixture();p.manifest.metadata={title:'Study',provenance:[]} as any;
+ const s=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),entry={id:'study',file:'study.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-11'};
+ assert.equal(personalCorrectionCount(s),1);
+ const markup=scoreOptionsMarkup(entry,p,s,{steps:0,min:-12,max:12});
+ assert.match(markup,/1 personal correction</);assert.match(markup,/data-action="restore-all"/);assert.match(markup,/data-action="feedback"/);
+ const legacy=corrected(p,initialPersonal(p),p.seats[0],5),combined=assigned(p,legacy,p.seats[0],{hand:'RH'});
+ assert.equal(personalCorrectionCount(combined),1);
+ const restored=restoreAll(s);delete restored.undo;
+ assert.match(scoreOptionsMarkup(entry,p,restored,{steps:0,min:-12,max:12}),/data-action="undo-restore"/);
+ const newFinger=corrected(p,restoreAll(s),p.seats[1],5),again=restoreAll(newFinger);
+ assert.equal(again.undoAssignments,undefined);assert.equal(again.undo?.[p.seats[1].contactId]?.replacement,5);
+ assert.deepEqual(s.assignments?.choices['owner-0'].hand,'RH');
+});
 test('hand choice keeps effective finger, legacy correction/history and immutable archive/storage bindings',async()=>{
  const p=fixture(),before=structuredClone(p),legacy=corrected(p,initialPersonal(p),p.seats[0],5);legacy.history=[structuredClone(p.fingerLayer!)];
  const initial=structuredClone(legacy),next=assigned(p,legacy,p.seats[0],{hand:'RH'});
