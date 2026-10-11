@@ -82,7 +82,7 @@ try{
   try{
    await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('.library').waitFor();const opened=performance.now();await openEntry(entry);await page.locator('.reader').waitFor({timeout:120000});await page.locator('dialog').waitFor({state:'detached'});await page.evaluate(()=>document.fonts.ready);result.coldOpenMs=performance.now()-opened;await page.locator('.reader').focus();await page.keyboard.press('e');await page.locator('[data-viewer-seat="'+selection.id+'"][data-edit-selected]').waitFor();
    for(let i=0;i<4;i++){const hand=handFor(base,state,selection.ownerIds[0])==='LH'?'RH':'LH';await edit({hand},hand==='LH'?'l':'r',false,'warmups');}await capture('warm');
-   for(let i=0;i<samples;i++){const hand=handFor(base,state,selection.ownerIds[0])==='LH'?'RH':'LH';await edit({hand},hand==='LH'?'l':'r',false);if(i%2===1&&i<samples-1)await nextSelection();}
+   for(let i=0;i<samples;i++){const hand=handFor(base,state,selection.ownerIds[0])==='LH'?'RH':'LH';await edit({hand},hand==='LH'?'l':'r',false);if(i<2)await capture(i===0?'hand-changed':'hand-restored');if(i%2===1&&i<samples-1)await nextSelection();}
    for(let i=0;i<samples;i++)await edit({finger:i%5+1},String(i%5+1),true);result.independentColdVariants=expectedVariants.size;
    await capture('edited');result.checks.push('Actual SVG geometry, every visible finger position/value, retained hand selection and advancing finger selection matched independent projections at completion frames');
    await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,50)));await page.waitForFunction(()=>window.__editNative.writes.every(w=>w.complete));const writeStart=await page.evaluate(()=>{window.__editNative.delay=true;return window.__editNative.writes.length;});
