@@ -6,7 +6,7 @@ test('pilot storage has one exact independent literal filename in browser and na
  const native=readFileSync(new URL('../src-tauri/src/managed_files.rs',import.meta.url),'utf8');
  assert.ok(native.includes('"calibration-pilot-v1.json"'));assert.equal(validPhysicalManagedName('calibration-pilot-v1.json'),true);
  assert.equal(await physicalManagedName('calibration-pilot-v1.json'),'calibration-pilot-v1.json');
- const records=new Map([['calibration.json',new Uint8Array([1,2,3])]]),storage=managedFileStorage({async read(name){return records.get(name)??null;},async write(name,bytes){records.set(name,bytes);}});
+ const records=new Map<string,Uint8Array>([['calibration.json',new Uint8Array([1,2,3])]]),storage=managedFileStorage({async read(name){return records.get(name)??null;},async write(name,bytes){records.set(name,bytes);}});
  await storage.write('calibration-pilot-v1.json',new Uint8Array([4,5,6]));assert.deepEqual(await storage.read('calibration-pilot-v1.json'),new Uint8Array([4,5,6]));assert.deepEqual(records.get('calibration.json'),new Uint8Array([1,2,3]));
 });
 test('pilot filename variants and traversal refuse before any physical I/O',async()=>{
