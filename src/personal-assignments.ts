@@ -22,7 +22,8 @@ const aliases=(p:ScorePackage,id:string)=>{const n=p.score.notes.find(n=>n.id===
 export function readPersonalAssignments(raw:unknown,p:ScorePackage):PersonalAssignments|undefined {
  if(raw===undefined)return;
  if(!object(raw)||raw.version!=='personal-owner-assignments-v1'||raw.sourceRevision!==sourceRevision(p)||!object(raw.choices))throw Error('Personal assignment source differs; original data retained.');
- const notes=new Map(p.score.notes.map(n=>[n.id,n]));
+ const notes=new Map(p.score.notes.map(n=>[n.id,n])),physical=new Map<string,string[]>();
+ for(const n of p.score.notes)if(isPitchedEvent(n)){const key=`${n.startTick}:${pitch(n)}`,ids=physical.get(key)??[];ids.push(n.id);physical.set(key,ids);}
  for(const [id,c]of Object.entries(raw.choices)){
   const n=notes.get(id);
   if(!n||!object(c)||c.ownerId!==id||!object(c.guard)||Object.keys(c.guard).length!==3||Object.entries(guard(n)).some(([k,v])=>c.guard[k]!==v)||
@@ -31,7 +32,7 @@ export function readPersonalAssignments(raw:unknown,p:ScorePackage):PersonalAssi
    typeof c.createdAt!=='string'||!Number.isFinite(Date.parse(c.createdAt)))throw Error('Personal assignment owner guard differs; original data retained.');
  }
  // A physical unison contact is one choice even when written with duplicate heads/voices.
- for(const [id,c]of Object.entries(raw.choices))for(const other of aliases(p,id)){
+ for(const [id,c]of Object.entries(raw.choices))for(const other of physical.get(`${c.guard.startTick}:${c.guard.pitch}`)??[]){
   const q=raw.choices[other];
   if(!q||q.hand!==c.hand||q.finger!==c.finger)throw Error('Personal assignment physical aliases disagree; original data retained.');
  }
