@@ -36,7 +36,7 @@ test('production edit arrows reveal the nearest note in the next page and restor
  f.context.input.clear();f.context.controls.clear();f.press('ArrowUp');assert.equal(f.context.selection.page,0);assert.equal(f.context.current.personal.view.page,0);
 });
 test('production vertical arrows respect editor fields, toolbar navigation, modals, capture and held/repeated keys',()=>{
- for(const owner of ['field','toolbar','modal','capture','repeat','held','modifier']){
+ for(const owner of ['field','toolbar','modal','capture','repeat','held','modifier','blurred','hidden']){
   const f=keyboardFixture(),initial=f.context.selection;
   let extra:any={};
   if(owner==='field')extra.target={closest(selector:string){return selector.includes('input')?{}:null;}};
@@ -46,6 +46,8 @@ test('production vertical arrows respect editor fields, toolbar navigation, moda
   if(owner==='repeat')extra.repeat=true;
   if(owner==='held')f.context.input.held.add('ArrowDown');
   if(owner==='modifier')extra.ctrlKey=true;
+  if(owner==='blurred')f.context.readerFocused=false;
+  if(owner==='hidden')f.context.document.hidden=true;
   f.press('ArrowDown',extra);assert.equal(f.context.selection.id,initial.id,owner);assert.deepEqual(f.calls,[],owner);
  }
 });
