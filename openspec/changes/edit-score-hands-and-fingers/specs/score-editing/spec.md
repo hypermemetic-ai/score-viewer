@@ -86,4 +86,3 @@ Reader, annotations, section practice and explicit future calculation SHALL reso
 - **AND** old claims retain their original assignment provenance without claiming they were performed with the new choices
 - **AND** no progress is reset unless the player explicitly requests it
 - **AND** an explicit recalculation respects the current personal hand/finger constraints
-
