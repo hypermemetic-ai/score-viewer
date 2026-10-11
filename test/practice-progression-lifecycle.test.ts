@@ -8,7 +8,7 @@ import {PracticeClock} from '../src/practice-clock';
 import {host} from '../src/host';
 import {planPractice,initialPractice,PracticeSession,reconcilePassages} from '../src/practice';
 import {planPracticeRepeat} from '../src/practice-repeat';
-const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg);
+const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg,'connection-boundary-v1');
 const until=async(condition:()=>boolean)=>{for(let i=0;i<100&&!condition();i++)await new Promise<void>(done=>setImmediate(done));assert.ok(condition(),'did not reach controlled asynchronous boundary');};
 function fixture(t:any,bpm=100,index=0){
  const oldWrite=host.write;t.after(()=>{host.write=oldWrite;});const state=initialPractice(plan);state.working=bpm;(state as typeof state & {countInBars?:number}).countInBars=1;

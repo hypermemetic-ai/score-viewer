@@ -37,8 +37,8 @@ test('planner owns the full fallback before hashing, and canonical references re
  caller.bpm=240;caller.beat.numerator=1;caller.provenance.reference='Changed after pending call';
  assert.deepEqual(await pending,expected);assert.equal(Object.isFrozen(caller),false);
  const canonical=await importPackage(await prepareDualReadingPackage(authoredFrettedInput())),original=await planManualPractice(canonical),
-  ignored=await planManualPractice(canonical,'connection-boundary-v1',reference);
- assert.deepEqual(ignored,original);assert.equal(original.sourceMusicalRevision,undefined);
+  ignored=await planManualPractice(canonical,'bounded-exercises-v1',reference);
+ assert.deepEqual(ignored,original);assert.equal(original.sourceMusicalRevision,(await ReadingPresentationController.open(canonical)).revision);
  const malformed=structuredClone(canonical);malformed.score.referencePerformanceTempo!.bpm=-1;
  await assert.rejects(planManualPractice(malformed,'connection-boundary-v1',reference),/positive numeric BPM/);
 });
@@ -47,8 +47,8 @@ test('saved reference and library progress are part/source bound without archive
  const reader=await ReadingPresentationController.open(p),identity={partId:p.reading!.dual!.sourcePartId,musicalRevision:reader.revision},
   refRecord=manualReferenceRecord(identity,reference),refName=await manualReferenceStorageName(identity),plan=await planManualPractice(p,'connection-boundary-v1',reference),
   journal=manualPracticeRecord(plan,initialPractice(plan)),entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.isoscore`,importedAt:'2026-10-09T00:00:00Z',metadata:p.manifest.metadata},reads:string[]=[];
- const summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async name=>{reads.push(name);return name===refName?refRecord:journal;}});
- assert.equal(summary!.assessment,'manual');assert.equal(summary!.sections,0);assert.deepEqual(reads,[refName,manualPracticeStorageName(plan)]);
+ const summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async name=>{reads.push(name);return name===refName?refRecord:name===manualPracticeStorageName(plan)?journal:undefined;}});
+ assert.equal(summary!.assessment,'manual');assert.equal(summary!.sections,0);assert.deepEqual(reads,[refName,manualPracticeStorageName(await planManualPractice(p,'bounded-exercises-v1',reference)),manualPracticeStorageName(plan)]);
  assert.equal(await readLibraryPracticeSummary(entry,'conventional-piano',{readPackage:async()=>bytes,readRecord:async()=>null}),undefined);
  assert.throws(()=>readManualReference(refRecord,{...identity,partId:'P2'}),/different source part/);
  assert.throws(()=>readManualReference(refRecord,{...identity,musicalRevision:'1'.repeat(64)}),/different source part/);

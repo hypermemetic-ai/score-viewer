@@ -2,9 +2,8 @@ import type {ScorePackage} from './package';
 import type {PersonalState} from './state';
 import {practiceStorageName,legacyPracticeStorageName,collectionId} from './state';
 import {getScoreTransposition} from './score-transposition';
-import {transferPracticeEdition} from './practice-edition-transfer';
-import {planPractice,practicePartition,readPractice,passageHierarchy,type PracticeState} from './practice';
-import {equivalentPracticeClaims} from './practice-equivalence';
+import {planPractice,readPractice,passageHierarchy,transferPracticeEdition,type PracticeState} from './practice';
+import {equivalentPracticeClaims,practiceExerciseEvidenceKey} from './practice-equivalence';
 
 interface PracticeInstallHost {read(name:string):Promise<Uint8Array|null>;write(name:string,data:Uint8Array):Promise<void>}
 export interface MergedEditionPracticeState extends PracticeState {editionMergeEvidence?:{version:'practice-edition-merge-v1';targetRaw:unknown;incomingRaw:unknown}}
@@ -12,15 +11,12 @@ export interface MergedEditionPracticeState extends PracticeState {editionMergeE
  * same-sized complete source claims add credit, never replace prior credit. */
 export function mergeEditionPractice(targetRaw:unknown,incomingRaw:PracticeState,p:ScorePackage,personal?:PersonalState):MergedEditionPracticeState {
  if(targetRaw===null||targetRaw===undefined)return structuredClone(incomingRaw);
- const targetPlan=planPractice(p,practicePartition(targetRaw),personal),incomingPlan=planPractice(p,practicePartition(incomingRaw),personal),target=readPractice(targetRaw,targetPlan),incoming=readPractice(incomingRaw,incomingPlan);
- if(targetPlan.chunks.length!==incomingPlan.chunks.length||targetPlan.chunks.some((c,i)=>c.start!==incomingPlan.chunks[i].start||c.end!==incomingPlan.chunks[i].end))throw Error('Saved exercise boundaries differ between these editions; both practice journals retained.');
- // Compatible original source trees can retain every genuinely attained join.
- // A crossing retained tree is not silently flattened or substituted.
- for(const [id,children]of Object.entries(incoming.composites??{})){target.composites??={};if(!target.composites[id])target.composites[id]=[...children];}
- let all:ReturnType<typeof passageHierarchy>['all'];try{all=passageHierarchy(targetPlan,target).all;}catch{throw Error('Saved practice joins conflict between these editions; both practice journals retained.');}
- const from=passageHierarchy(incomingPlan,incoming).all;
+ const targetPlan=planPractice(p,'bounded-exercises-v1',personal),target=readPractice(targetRaw,targetPlan),incoming=readPractice(incomingRaw,targetPlan);
+ // Both old journals are validated and projected onto the current peer
+ // catalog. Overlapping doubles never become a competing recursive tree.
+ const all=passageHierarchy(targetPlan,target).all,from=passageHierarchy(targetPlan,incoming).all,fromByEvidence=new Map([...from.values()].flatMap(c=>{const evidence=practiceExerciseEvidenceKey(targetPlan,c);return evidence?[[evidence,c] as const]:[];}));
  for(const chunk of all.values()){
-  const match=[...from.values()].find(c=>c.start===chunk.start&&c.end===chunk.end&&c.firstBar===chunk.firstBar&&c.lastBar===chunk.lastBar);if(!match)continue;
+  const evidence=practiceExerciseEvidenceKey(targetPlan,chunk),match=evidence&&fromByEvidence.get(evidence);if(!match)continue;
   const claims=equivalentPracticeClaims(incoming,{passage:match.id,pattern:match.pattern}).filter(c=>{const owner=from.get(c.passage);return owner&&owner.end-owner.start===match.end-match.start;});
   const rates=claims.flatMap(c=>incoming.best[c.pattern]===undefined?[]:[incoming.best[c.pattern]]);if(rates.length)target.best[chunk.pattern]=Math.max(target.best[chunk.pattern]??0,...rates);
   if(claims.some(c=>incoming.groundwork?.[c.pattern])){target.groundwork??={};target.groundwork[chunk.pattern]=true;}

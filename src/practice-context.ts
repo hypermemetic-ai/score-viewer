@@ -15,7 +15,7 @@ export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,c
 }
 export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean}
 export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState):AdmittedPracticeContext {
- const plan=planPractice(p,saved?practicePartition(saved):context?.partition??practicePartition(saved),personal);
+ const plan=planPractice(p,'bounded-exercises-v1',personal);
  return {plan,state:practiceStateForContext(plan,saved,context),saved:!!saved};
 }
 
@@ -27,6 +27,7 @@ export interface PracticeViewContext {
  preferences?:PracticePreferences;
 }
 export function restorePracticeGrouping(plan:PracticePassagePlan,state:PracticeState,context:PracticeViewContext):PracticeState {
+ if(plan.partition==='bounded-exercises-v1'){passageHierarchy(plan,state);return state;}
  if(plan.partition!==context.partition)return state;
  // Both trees must be independently sound. A retained tree has priority when
  // the old navigation joins would cross it; played evidence is never removed.

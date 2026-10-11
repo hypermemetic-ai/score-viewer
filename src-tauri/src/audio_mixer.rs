@@ -773,6 +773,7 @@ mod tests {
             beat_start_pulses: vec![0, 3, 6, 9, 12, 15, 18, 21],
             bar_meter_pulses: vec![6; 4],
             bar_beat_pulses: vec![3; 4],
+            source_excerpt: None,
             bar_phase_pulses: vec![0; 4],
         };
         lifecycle::Request::new_with_clock(
@@ -1443,6 +1444,7 @@ mod tests {
             bar_start_pulses: vec![0, 2, 10, 16],
             bar_meter_pulses: vec![8; 3],
             bar_beat_pulses: vec![2; 3],
+            source_excerpt: None,
             bar_phase_pulses: vec![6, 0, 0],
             beat_start_pulses: (0..16).step_by(2).collect(),
         };

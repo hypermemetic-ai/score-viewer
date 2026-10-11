@@ -7,6 +7,7 @@ import {displayedPracticeProgress,displayedPracticeTotal} from '../src/practice-
 import {PracticeBrowser} from '../src/practice-browser';
 import {equivalentPracticeClaims} from '../src/practice-equivalence';
 const original=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const legacyPlan=(p:Parameters<typeof planPractice>[0])=>planPractice(p,'connection-boundary-v1');
 const target=(c:{id:string;pattern:string},rate=180)=>({passage:c.id,pattern:c.pattern,rate});
 /** Repeated units retain the actual admitted No14 canonical events/voices. */
 function repeated(order:number[]){
@@ -20,7 +21,7 @@ function repeated(order:number[]){
 function aliases(plan:ReturnType<typeof planPractice>,state:ReturnType<typeof initialPractice>,id:string){const c=passageHierarchy(plan,state).all.get(id)!;return equivalentPracticeClaims(state,target(c)).map(t=>t.passage).sort();}
 
 test('actual No14 source repeated leaves share reversible manual evidence without granting fresh loop eligibility',()=>{
- const plan=planPractice(original),state=initialPractice(plan),a=plan.chunks[0],b=plan.chunks[4],done=new PracticeDone();
+ const plan=legacyPlan(original),state=initialPractice(plan),a=plan.chunks[0],b=plan.chunks[4],done=new PracticeDone();
  done.completed(target(a));assert.equal(done.canToggle(state,target(b)),false);
  assert.equal(done.toggle(state,target(a),true,1,180)?.marked,true);
  assert.equal(progressFor(b,state),1);assert.equal(hasDone(state,target(b)),true);
@@ -31,7 +32,7 @@ test('actual No14 source repeated leaves share reversible manual evidence withou
 });
 
 test('actual No14 identical ordered joined runs share earned evidence, not dissimilar leaf averages',()=>{
- const plan=planPractice(original),state=initialPractice(plan);
+ const plan=legacyPlan(original),state=initialPractice(plan);
  state.composites={'1-8':['1-4','5-8'],'17-24':['17-20','21-24']};
  let tree=passageHierarchy(plan,state),a=tree.all.get('1-8')!,b=tree.all.get('17-24')!;
  for(const c of plan.chunks.slice(0,2))toggleDone(state,target(c));
@@ -44,7 +45,7 @@ test('actual No14 identical ordered joined runs share earned evidence, not dissi
 });
 
 test('identical-unit supersets share completion while written playback and persistence retain their full range',()=>{
- const plan=planPractice(repeated([0,0,0,0])),state=initialPractice(plan),a=plan.chunks[0];
+ const plan=legacyPlan(repeated([0,0,0,0])),state=initialPractice(plan),a=plan.chunks[0];
  toggleDone(state,target(a));const rawClaims=JSON.stringify(state.manualAttainment),tree=reconcilePassages(plan,state),parent=tree.all.get('1-16')!;
  assert.equal(parent.end-parent.start,2304);assert.equal(parent.components?.length,2);
  assert.equal(progressFor(parent,state),1);assert.equal(wholePracticeProgress(plan,state),1);
@@ -56,7 +57,7 @@ test('identical-unit supersets share completion while written playback and persi
 });
 
 test('exact repeated AB parent structure shares its run while AB, BA and unequal structure remain distinct',()=>{
- const plan=planPractice(repeated([0,1,0,1,1,0])),state=initialPractice(plan);
+ const plan=legacyPlan(repeated([0,1,0,1,1,0])),state=initialPractice(plan);
  state.composites={'1-8':['1-4','5-8'],'9-16':['9-12','13-16'],'1-16':['1-8','9-16'],'17-24':['17-20','21-24']};
  const tree=passageHierarchy(plan,state),ab=tree.all.get('1-8')!,abab=tree.all.get('1-16')!,ba=tree.all.get('17-24')!;
  assert.deepEqual(aliases(plan,state,ab.id),['1-16','1-8','9-16']);
@@ -79,7 +80,7 @@ test('musical multiplicity, hands, rhythm, carry, rests and bar boundaries canno
 });
 
 test('equivalent Done undo removes only the chosen self-reported rate and preserves measured provenance and other rates',()=>{
- const plan=planPractice(repeated([0,0])),state=initialPractice(plan),a=plan.chunks[0],b=plan.chunks[1];
+ const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan),a=plan.chunks[0],b=plan.chunks[1];
  // Retained historical duplicate keys are read, not rewritten on load.
  state.manualAttainment={version:1,marks:{[JSON.stringify([a.id,a.pattern])]:[80,90],[JSON.stringify([b.id,b.pattern])]:[80]}};
  state.best[a.pattern]=70;state.composites={'1-8':['1-4','5-8']};const saved=JSON.stringify(state),loaded=readPractice(JSON.parse(saved),plan),tree=reconcilePassages(plan,loaded),parent=tree.all.get('1-8')!;
@@ -90,14 +91,14 @@ test('equivalent Done undo removes only the chosen self-reported rate and preser
 });
 
 test('chooser clone projections bind their full tree to original evidence without persisting aliases',()=>{
- const plan=planPractice(repeated([0,0])),state=initialPractice(plan);toggleDone(state,target(plan.chunks[0]));
+ const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan);toggleDone(state,target(plan.chunks[0]));
  const browser=new PracticeBrowser(plan),before=JSON.stringify(state);browser.select(state,'1-8');const parent=browser.current(state)!;
  assert.equal(parent.id,'1-8');assert.equal(browser.progress(parent,state),1);browser.setIncludeManual(false);assert.equal(browser.progress(parent,state),0);
  assert.equal(JSON.stringify(state),before);
 });
 
 test('a genuinely measured repeated parent remains measured when reused at its identical unit',()=>{
- const plan=planPractice(repeated([0,0])),state=initialPractice(plan);state.composites={'1-8':['1-4','5-8']};
+ const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan);state.composites={'1-8':['1-4','5-8']};
  const parent=passageHierarchy(plan,state).all.get('1-8')!;state.best[parent.pattern]=180;
  const raw=JSON.stringify(state),loaded=readPractice(JSON.parse(raw),plan);
  assert.equal(measuredRate(loaded,plan.chunks[0].pattern,plan.chunks[0].id),180);
@@ -107,7 +108,7 @@ test('a genuinely measured repeated parent remains measured when reused at its i
 
 test('changed plan clocks, pitches or reference cannot retain an earlier derived equivalence lookup',()=>{
  for(const change of ['clock','pitch','reference'] as const){
-  const plan=planPractice(repeated([0,0])),state=initialPractice(plan);state.composites={'1-8':['1-4','5-8']};
+  const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan);state.composites={'1-8':['1-4','5-8']};
   const parent=passageHierarchy(plan,state).all.get('1-8')!;toggleDone(state,target(plan.chunks[0]));assert.equal(progressFor(parent,state),1);
   if(change==='clock')plan.barPhaseTicks![0]+=1;
   if(change==='pitch')plan.attacks[0].midi+=1;
@@ -117,7 +118,7 @@ test('changed plan clocks, pitches or reference cannot retain an earlier derived
 });
 
 test('derived claim lookup is immutable and an equivalent numeric beat never depends on object key order',()=>{
- const plan=planPractice(repeated([0,0])),state=initialPractice(plan);state.referenceBeat={denominator:8,numerator:3};state.composites={'1-8':['1-4','5-8']};
+ const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan);state.referenceBeat={denominator:8,numerator:3};state.composites={'1-8':['1-4','5-8']};
  const parent=passageHierarchy(plan,state).all.get('1-8')!,claims=equivalentPracticeClaims(state,target(parent));
  assert.equal(Object.isFrozen(claims),true);assert.equal(Object.isFrozen(claims[0]),true);
  assert.throws(()=>{(claims as Array<{passage:string;pattern:string}>).push({passage:'forged',pattern:'forged'});});
@@ -125,26 +126,26 @@ test('derived claim lookup is immutable and an equivalent numeric beat never dep
 });
 
 test('heterogeneous parent association is preserved rather than flattened into an unordered component bag',()=>{
- const plan=planPractice(repeated([0,1,2,0,1,2])),state=initialPractice(plan);
+ const plan=legacyPlan(repeated([0,1,2,0,1,2])),state=initialPractice(plan);
  state.composites={'1-8':['1-4','5-8'],'1-12':['1-8','9-12'],'17-24':['17-20','21-24'],'13-24':['13-16','17-24']};
  const tree=passageHierarchy(plan,state),left=tree.all.get('1-12')!,right=tree.all.get('13-24')!;
  toggleDone(state,target(left));assert.equal(progressFor(left,state),1);assert.equal(progressFor(right,state),0);
 });
 
 test('chooser key and render each derive one fresh tree without rewriting earned evidence',t=>{
- const plan=planPractice(repeated([0,0])),state=initialPractice(plan);state.best[plan.chunks[0].pattern]=state.target;
+ const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan);state.best[plan.chunks[0].pattern]=state.target;
  const browser=new PracticeBrowser(plan),raw=JSON.stringify(state),owned=browser as any,derive=owned.tree;let calls=0;
  owned.tree=function(value:typeof state){calls++;return derive.call(this,value);};
  assert.equal(browser.key('ArrowDown',state),'handled');assert.equal(calls,1);
  const previous=Object.getOwnPropertyDescriptor(globalThis,'document');Object.defineProperty(globalThis,'document',{configurable:true,value:{activeElement:undefined}});
  t.after(()=>{if(previous)Object.defineProperty(globalThis,'document',previous);else delete(globalThis as any).document;});
- const preview={querySelector:()=>null},root={style:{setProperty(){}},querySelectorAll:()=>[],querySelector:()=>preview,innerHTML:''};
+ const preview={querySelector:()=>null,querySelectorAll:()=>[]},root={style:{setProperty(){}},querySelectorAll:()=>[],querySelector:()=>preview,innerHTML:''};
  calls=0;browser.render(root as any,state,()=>{throw Error('joined passage must not request a leaf preview');});assert.equal(calls,1);
  assert.match(root.innerHTML,/Measures 1 – 8 · 100%/);assert.equal(measuredRate(state,`connected:${plan.revision}:1-8`,'1-8'),state.target);assert.equal(JSON.stringify(state),raw);
 });
 
 test('a later chooser operation rechecks source mutations, current evidence and a prior refusal',()=>{
- const plan=planPractice(repeated([0,0])),state=initialPractice(plan),a=plan.chunks[0],browser=new PracticeBrowser(plan);
+ const plan=legacyPlan(repeated([0,0])),state=initialPractice(plan),a=plan.chunks[0],browser=new PracticeBrowser(plan);
  state.composites={'1-8':['1-4','5-8']};const parent=passageHierarchy(plan,state).all.get('1-8')!;
  state.best[a.pattern]=state.target;browser.key('ArrowDown',state);assert.equal(measuredRate(state,parent.pattern,parent.id),state.target);
  delete state.best[a.pattern];browser.key('ArrowUp',state);assert.equal(measuredRate(state,parent.pattern,parent.id),0);

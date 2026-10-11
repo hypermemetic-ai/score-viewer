@@ -254,6 +254,7 @@ mod tests {
                 .collect(),
             bar_meter_pulses: vec![bar; 4],
             bar_beat_pulses: vec![beat; 4],
+            source_excerpt: None,
             bar_phase_pulses: vec![0; 4],
         };
         let pulse = 60000. / (bpm * p as f64);
@@ -553,6 +554,7 @@ mod tests {
             bar_start_pulses: vec![0, 2, 10, 16],
             bar_meter_pulses: vec![8; 3],
             bar_beat_pulses: vec![2; 3],
+            source_excerpt: None,
             bar_phase_pulses: vec![6, 0, 0],
             beat_start_pulses: (0..16).step_by(2).collect(),
         };

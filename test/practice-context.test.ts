@@ -19,7 +19,7 @@ test('fresh pitch keeps practice preferences without earned speed; retained sett
  const context:PracticeViewContext={partition:plan.partition,composites:{},selected:plan.chunks[0].id,includeManual:true,preferences:practicePreferences(old)},fresh=practiceStateForContext(plan,undefined,context);
  assert.equal(fresh.target,150);assert.equal(fresh.start,42);assert.equal(fresh.working,42);assert.equal(fresh.step,3);assert.equal(fresh.keepTempo,true);assert.equal(fresh.audioOutput,'chosen-output');assert.deepEqual(fresh.best,{});assert.deepEqual(fresh.workingByPattern,{});assert.deepEqual(fresh.groundwork,{});assert.equal(fresh.manualAttainment,undefined);
  const saved=initialPractice(plan);saved.start=17;saved.working=23;saved.keepTempo=false;
- const retained=practiceStateForContext(plan,saved,context);assert.equal(retained.start,17.1);assert.equal(retained.working,22.95);assert.equal(retained.keepTempo,false);assert.equal(retained.target,saved.target);
+ const retained=practiceStateForContext(plan,saved,context);assert.equal(retained.start,17);assert.equal(retained.working,23);assert.equal(retained.keepTempo,false);assert.equal(retained.target,saved.target);
 });
 test('crossing retained and navigation trees preserve the retained journal rather than failing activation',async()=>{
  const p=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url)),{keyboardLayout:'janko-four-row'}),plan=planPractice(p,'fixed-four-v1'),source=initialPractice(plan),target=initialPractice(plan);
@@ -27,9 +27,9 @@ test('crossing retained and navigation trees preserve the retained journal rathe
  for(const chunk of plan.chunks.slice(1,3))target.best[chunk.pattern]=target.target;
  reconcilePassages(plan,source);reconcilePassages(plan,target);assert.ok(source.composites!['1-8']);assert.ok(target.composites!['5-12']);
  const before=structuredClone(target),context:PracticeViewContext={partition:plan.partition,composites:source.composites!,selected:'1-8',passage:'1-8',includeManual:true,preferences:practicePreferences(source)},admitted=admitPracticeContext(p,target,context);
- assert.deepEqual(target,before);assert.deepEqual(admitted.state,readPractice(before,plan));assert.equal(reconcilePassages(plan,admitted.state).all.has('1-8'),false);assert.equal(reconcilePassages(plan,admitted.state).all.has('5-12'),true);
+ assert.deepEqual(target,before);assert.equal(admitted.plan.partition,'bounded-exercises-v1');assert.deepEqual(admitted.state.legacy!.state,before);assert.equal(admitted.state.composites,undefined);assert.equal(reconcilePassages(admitted.plan,admitted.state).all.has('1-8'),false);
  assert.throws(()=>admitPracticeContext(p,{...target,revision:'0'.repeat(64)},context),/saved evidence retained/);
- assert.throws(()=>admitPracticeContext(p,target,{...context,composites:{'1-8':['unknown','5-8']}}),/saved evidence retained/);
+ assert.deepEqual(admitPracticeContext(p,target,{...context,composites:{'1-8':['unknown','5-8']}}).state.legacy!.state,before);
 });
 test('pending MIDI from an old pitch context is rejected while fresh input remains available',()=>{
  const epoch=new PitchInputEpoch();assert.equal(epoch.accepts({timestamp_micros:5}),true);epoch.block();assert.equal(epoch.accepts({timestamp_micros:1000}),false);epoch.reset(1000);assert.equal(epoch.accepts({timestamp_micros:999}),false);assert.equal(epoch.accepts({timestamp_micros:1000}),true);assert.equal(epoch.accepts({timestamp_micros:1001}),true);assert.equal(epoch.accepts({}),false);assert.throws(()=>epoch.reset(NaN),/clock/);

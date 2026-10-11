@@ -7,6 +7,15 @@ import {manualPassageScene} from '../src/manual-passage-scene';
 import {authoredFrettedLongInput,authoredFrettedFiveInput} from './support/fretted-dual-fixture';
 
 const bytes=await prepareDualReadingPackage(authoredFrettedLongInput()),session=new PackageAdmissionSession(),cold=await session.import(bytes),warm=await session.import(bytes);
+test('partial source excerpts retain only admitted written components and narrower actual source frames in ISO and TAB',()=>{
+ for(const notation of ['iso','tab'] as const){
+  const p=selectReadingNotation(cold,notation),scene=p.reading!.dual!.views[notation].scene,bars=scene.bars.filter(b=>b.writtenBar<2),start=scene.components.filter(c=>c.writtenBar===0).map(c=>c.tick).sort((a,b)=>a-b)[1],end=scene.components.filter(c=>c.writtenBar===1).map(c=>c.tick).sort((a,b)=>a-b).at(-1)!;
+  const clip={id:'actual-partial-source',start,end,firstBar:0,lastBar:1},full=manualPassageScene(p,[0,1]),partial=manualPassageScene(p,[0,1],clip);
+  assert.deepEqual(partial.components,scene.components.filter(c=>c.writtenBar<2&&c.tick>=start&&c.tick<end).map(c=>c.sourceEventId));
+  assert.ok(partial.bounds.x1-partial.bounds.x0<full.bounds.x1-full.bounds.x0);assert.ok(partial.svg.includes('data-practice-clip="actual-partial-source"'));assert.ok(partial.svg.includes('manual-excerpt-viewport'));
+  assert.throws(()=>manualPassageScene(p,[0,1],{...clip,start:bars[0].startTick-1}),/differs/);
+ }
+});
 test('actual cold and warm reader-session scenes compose all overlapping windows with exact original widths and one interior separator',()=>{
  const unchanged=JSON.stringify(cold.reading);
  for(const input of [cold,warm])for(const notation of ['iso','tab'] as const){

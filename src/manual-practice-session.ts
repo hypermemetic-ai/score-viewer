@@ -1,10 +1,10 @@
 import {PracticeDone,type DoneTarget} from './practice-attainment';
 import {snapPracticeSpeed} from './tempo-presentation';
 import {practiceTiming} from './practice-timing';
-import {scorePulseGrid,scoreTickMs,type PracticePulseGrid} from './score-clock';
+import {scoreExcerptPulseGrid,scorePulseGrid,scoreTickMs,type PracticePulseGrid} from './score-clock';
 import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
 import {passageWindows} from './practice-window';
-import {passageHierarchy,type PracticeChunk,type PracticeState} from './practice';
+import {passageHierarchy,practiceClipChunk,type PracticeChunk,type PracticeState} from './practice';
 import type {ManualPracticePlan} from './manual-practice-plan';
 
 /** Explicit views move only because the player asks, or a repeat count-in starts. */
@@ -28,20 +28,22 @@ export class ManualPracticeSession {
  get sourcePulseGrid(){return practiceCountInGrid(this.sourceGrid,this.state.countInBars??2);}
  phase:'ready'|'countin'|'trial'|'complete'|'paused'='ready';startMs=0;elapsedTick:number;
  private attemptGrid:PracticePulseGrid;private countStartMs=0;private resetAtCountIn=false;
- private loopRate:number;private queuedWorking?:number;private claims=new PracticeDone();
- constructor(readonly plan:ManualPracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState){
-  const admitted=passageHierarchy(plan,state).all.get(chunk.id);
+ private loopRate:number;private queuedWorking?:number;private claims:PracticeDone;readonly completionTick:number;
+ constructor(readonly plan:ManualPracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState,private options:{claims?:PracticeDone;completeClaim?:boolean}={}){
+  const owner=passageHierarchy(plan,state).all.get(chunk.id),admitted=owner&&chunk.clipIndex!==undefined?practiceClipChunk(owner,chunk.clipIndex):owner;
   if(plan.assessment!=='manual'||state.revision!==plan.revision||!admitted||admitted.pattern!==chunk.pattern||
     admitted.firstBar!==chunk.firstBar||admitted.lastBar!==chunk.lastBar||admitted.start!==chunk.start||admitted.end!==chunk.end)
    throw Error('Manual practice context differs from its musical source.');
+  const excerpt=chunk.clipIndex!==undefined||!plan.barTicks.includes(chunk.start)||!plan.barTicks.includes(chunk.end);
+  this.claims=options.claims??new PracticeDone();this.completionTick=plan.partition==='bounded-exercises-v1'||excerpt?Math.max(chunk.end,...plan.owners.filter(a=>a.tick<chunk.end&&a.end>chunk.start).map(a=>a.end)):chunk.end;
   this.elapsedTick=chunk.start;this.loopRate=state.working;
-  this.sourceGrid=scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end);this.attemptGrid=this.sourcePulseGrid;
+  this.sourceGrid=!excerpt&&this.completionTick===chunk.end?scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end):scoreExcerptPulseGrid(plan,plan.barTicks,chunk.start,this.completionTick);this.attemptGrid=this.sourcePulseGrid;
   this.windows=new ManualPracticeWindows(plan,chunk);
  }
  get pulseGrid(){return this.attemptGrid;}
  get bpm(){return this.loopRate;}
  get tickMs(){return scoreTickMs(this.plan,this.loopRate);}
- get durationMs(){return (this.chunk.end-this.chunk.start)*this.tickMs;}
+ get durationMs(){return (this.completionTick-this.chunk.start)*this.tickMs;}
  ready(countStartMs:number,grid:PracticePulseGrid=this.sourcePulseGrid,rate=this.state.working){
   if(!Number.isFinite(countStartMs)||countStartMs<0||countStartMs*1000>Number.MAX_SAFE_INTEGER)throw Error('Invalid manual practice count-in origin.');
   const admitted=practiceAttemptGrid(this.sourceGrid,grid);
@@ -55,9 +57,9 @@ export class ManualPracticeSession {
   if(!Number.isFinite(now))throw Error('Invalid manual practice clock.');
   if(this.phase!=='countin'&&this.phase!=='trial')return;
   if(this.resetAtCountIn&&now>=this.countStartMs){this.windows.reset();this.resetAtCountIn=false;}
-  this.elapsedTick=Math.max(this.chunk.start,Math.min(this.chunk.end,this.chunk.start+(now-this.startMs)/this.tickMs));
+  this.elapsedTick=Math.max(this.chunk.start,Math.min(this.completionTick,this.chunk.start+(now-this.startMs)/this.tickMs));
   if(now>=this.startMs)this.phase='trial';
-  if(this.elapsedTick>=this.chunk.end){this.phase='complete';this.claims.completed(this.currentTarget());return 'completed';}
+  if(this.elapsedTick>=this.completionTick){this.phase='complete';if(this.options.completeClaim!==false)this.claims.completed(this.currentTarget());return 'completed';}
  }
  pause(){this.phase='paused';this.resetAtCountIn=false;}
  turn(direction:1|-1){return this.windows.turn(direction);}

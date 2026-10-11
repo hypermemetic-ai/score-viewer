@@ -11,15 +11,35 @@ credit, and never automatically starts Timed. MIDI identifies pitches and contac
 not physical fingers. With no piano connected, Reading displays the full source
 window for manual reading without assessing notes or advancing automatically.
 
-A joined passage is available once its original source segments reach the
-performance target. Joined Reading cycles the real boundary pairs: for example,
-a 1–16 join has measures 4–5, 8–9 and 12–13. A small `1/3` counter in the notation's
-top-right corner identifies the current join; its accessible label includes the
-measure range. Previous/next controls can browse joins while stopped. A rest-only
-join also stays browsable while started, because no invented note can advance it.
-Existing saved joins and their independent attainment remain retained.
+The selector keeps three groups: original sections, connections between two
+consecutive sections, and contrasts between similar original sections. Sections
+balance musical boundary evidence with roughly 25 distinct onset positions;
+simultaneous chord notes share one sizing onset. This is a practice sizing
+heuristic, not a playback tempo or a measured memory limit. Schumann No. 14
+normally produces four-measure sections; other sources can produce different
+lengths. A connection becomes available when both original sections reach the
+target. Connection Reading focuses the two source bars around their boundary;
+Timed plays both sections. Connections overlap: first–second, second–third, and so on. New practice
+does not build longer recursive joins. Historical joins and their independent
+attainment remain retained as recovery evidence.
 
-Timed plays the whole selected passage with the existing source-meter count-in,
+Contrasts compare the full individual sections, allowing one consistent pitch
+transposition. They need at least 75% matching notes and exclude 100% matches.
+Each exercise shows two separate source excerpts: a shared cue before a local
+divergence and a short continuation through it. Later distinct divergence
+episodes remain separate exercises. The player performs A, then B, each with
+its own source-meter count-in. It never plays the intervening source measures.
+Only the complete successful A/B cycle earns that contrast's own credit; errors
+restart at A. Disconnected manual Done likewise requires the complete pair.
+
+Exclude from total removes an exercise only from the displayed total. It keeps
+the row, saved progress and eligibility of other exercises intact; Include in
+total restores it. Unclaimed X toggles the hovered row, or the selected exercise
+when no row is hovered. Saved bindings, editable fields, dialogs and binding
+capture keep ownership of X. If every exercise is excluded, the selector says
+“No exercises included.” The displayed total weights included exercises equally.
+
+Timed plays the selected section or two-section connection with the existing source-meter count-in,
 beat-aligned repeat clock and measured note/hold checks when MIDI is connected.
 Fresh piano settings start at 30% for a new passage, 50% for a completed-segment
 connection and increase by 2% per successful loop. All present saved starting
@@ -34,8 +54,8 @@ stops the current transport; Space explicitly starts or resumes the selected
 mode. Internal pauses from Options, focus or connection changes keep the selected
 mode. Free view shows complete source windows and uses the existing overlapping
 four-measure navigation. Space returns from Free view to the previous primary
-mode; joined Reading resumes its same join cursor. The selected mode and join
-cursor are transient navigation state, not saved musical credit.
+mode. Contrast practice returns to its paired source excerpts. Selected modes
+and excerpt cursors are transient navigation state, not saved musical credit.
 
 The effective defaults are R for Reading, T for Timed and V for Free view. Free view uses this same configurable control in piano and instrument-neutral
 manual practice. These controls are configurable in Keys and pedals using the same key/pedal edge, capture and
@@ -45,7 +65,7 @@ Shift+R rotates in the library, score reader and practice when no saved action o
 keyboard navigation does not move focus through them. Left/Right adjust Working
 in half-percent steps in Timed and neutral manual transport, using the compact
 left-arrow/value/percent/right-arrow control. Free view retains measure navigation,
-and Reading retains its join navigation. Explicit local navigation slots and
+and Reading retains source-position navigation. Explicit local navigation slots and
 other saved owners take priority over the default working arrows. S opens the
 Working draft when unclaimed, with one framed control ordered Speed, indicator, then its available S hint; clicking its value
 does the same. Typing leaves the sounding and queued speed unchanged until Enter
@@ -64,10 +84,9 @@ or repeated mode keys do not trigger fresh starts.
 The source fit and footer reserve remain fixed across modes for an unchanged
 window. There is no extra preparation/Ready instruction row. Meaningful error,
 carry, audio and save feedback uses an existing reserved footer cell with its full
-accessible description. Joined two-measure Reading and different Free windows
-intentionally show different source intervals; their window changes are explicit. Entering Free view from a join opens the
-four-measure overlap around that boundary, rather than treating Reading's drawing
-reservations as a live Timed reading anchor. Responsive footer reserves follow
+accessible description. Contrast excerpts and Free windows show their actual
+source intervals; window changes remain explicit. Free view retains its
+four-measure overlap navigation. Responsive footer reserves follow
 the fitted surface's logical width, including rotated displays.
 The same clean feedback presentation applies to instrument-neutral manual
 practice, whose transport, assessment limits and 10% default remain unchanged.

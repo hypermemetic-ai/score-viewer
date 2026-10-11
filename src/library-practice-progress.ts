@@ -7,7 +7,7 @@ import {assertSelectedTransposition} from './score-transposition-selection';
 import {getScoreTransposition} from './score-transposition';
 import {PackageAdmissionSession} from './package-admission-session';
 import {planManualPractice} from './manual-practice-plan';
-import {manualPracticeStorageName,readManualPractice} from './manual-practice-state';
+import {readManualPracticeWithLegacy} from './manual-practice-state';
 import {selectReadingNotation} from './dual-reading-package';
 import {scoreCapabilities} from './score-capabilities';
 import {ReadingPresentationController} from './reading-presentation';
@@ -44,7 +44,7 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
   if(iso.score.referencePerformanceTempo===undefined){const context=await ReadingPresentationController.open(iso),identity={partId:iso.reading!.dual!.sourcePartId,musicalRevision:context.revision};
    fallback=readManualReference(await reader.readRecord(await manualReferenceStorageName(identity)),identity);if(!fallback)return;
   }
-  const plan=await planManualPractice(iso,'connection-boundary-v1',fallback),state=readManualPractice(await reader.readRecord(manualPracticeStorageName(plan)),plan);
+  const plan=await planManualPractice(iso,'bounded-exercises-v1',fallback),{state}=await readManualPracticeWithLegacy(plan,file=>reader.readRecord(file));
   return {entryId:entry.id,file:entry.file,assessment:'manual',sections:displayedPracticeTotal(plan,state),whole:wholePracticeProgress(plan,state)>=1};
  }
  if(!imported.availablePresentations?.includes(keyboard))return;
@@ -55,7 +55,7 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  const personalKey=personalStorageName(entry.id,p),declared=entry.personalFiles?.[personalKey],personalRaw=await reader.readRecord(declared??personalKey),legacyPersonal=legacyPersonalStorageName(p);
  if(declared&&personalRaw==null)throw Error('Declared personal journal is missing; library evidence retained.');
  const personal=readPersonal(personalRaw??(!declared&&legacyPersonal?await reader.readRecord(legacyPersonal):undefined),p,{allowLegacyJanko:personalRaw==null&&!declared&&!!legacyPersonal});
- const plan=planPractice(p,practicePartition(saved),personal),state=readPractice(saved,plan);
+ const plan=planPractice(p,'bounded-exercises-v1',personal),state=readPractice(saved,plan);
  return {entryId:entry.id,file:entry.file,keyboard,sections:displayedPracticeTotal(plan,state),whole:wholePracticeProgress(plan,state)>=1};
 }
 

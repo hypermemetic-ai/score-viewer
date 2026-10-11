@@ -1,3 +1,4 @@
+import {admitPracticeContext} from '../src/practice-context';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {assigned,effectiveAssignments,effectiveAssignmentDigest,handFor,restorePersonalAssignment,personalPracticePackage} from '../src/personal-assignments';
 import {initialPersonal,readPersonal,corrected,fingerFor,personalStorageName,practiceStorageName,restoreAll,personalCorrectionCount} from '../src/state';
@@ -5,7 +6,7 @@ import {scoreOptionsMarkup} from '../src/score-options';
 import {planPractice,initialPractice,readPractice,progressFor,passageHierarchy} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {pianoRequestAuthority} from '../src/piano-request-authority';
-import {admitPracticeContext} from '../src/practice-context';
+
 import {personalForCalculatedEdition} from '../src/presentation-install';
 import type {ScorePackage} from '../src/package';
 import {testReference} from './support/reference-score';

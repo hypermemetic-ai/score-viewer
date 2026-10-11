@@ -22,7 +22,7 @@ export class ManualReadingContext {
   this.state=readManualPractice(saved,plan);this.browser=new PracticeBrowser(plan);
   this.view=this.readView(view);
  }
- static async open(input:ScorePackage,saved?:unknown,view?:unknown,partition:PracticePartition='connection-boundary-v1',fallbackReference?:ReferencePerformanceTempo){
+ static async open(input:ScorePackage,saved?:unknown,view?:unknown,partition:PracticePartition='bounded-exercises-v1',fallbackReference?:ReferencePerformanceTempo){
   // Check actual realm admission and capture BOTH choices before any await.
   // A caller mutation while plan hashing settles cannot alter this context.
   const iso=selectReadingNotation(input,'iso'),tab=selectReadingNotation(input,'tab'),

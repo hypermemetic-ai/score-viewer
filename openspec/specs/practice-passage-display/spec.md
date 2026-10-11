@@ -69,36 +69,6 @@ A selected original leaf SHALL display all its source measures together as one h
 - **AND** the first notation has clear breathing room from the preview's left edge, including after rotation or resize
 - **AND** changing the preview does not change component or joined-run attainment
 
-### Requirement: Bounded joined-passage browsing
-Completed adjacent groups SHALL retain their compact joined range and accessible list of original components. At an unchanged viewport, passage ranges, original groups and selected-group previews SHALL occupy three stable columns with compact lists and reserved middle space. Both lists SHALL anchor percentages to the right and reserve enough width for the full score's measure-number digits, including three-digit ranges, without wrapping or overlapping their percentages. Large joined selections SHALL retain component browsing; the system SHALL NOT compress an entire multi-page work into an unreadable selection image. Component and joined-run attainment SHALL remain independent.
-
-#### Scenario: Selecting a large joined range and its component
-- **WHEN** completed adjacent components form a multi-page joined passage
-- **THEN** one compact joined range and its original component side list remain available
-- **AND** selecting the joined range populates the reserved middle group list without narrowing or shifting the preview pane, while selecting a component displays that component's complete original leaf strip
-- **AND** Right enters the group list, Up/Down browses its components, and Left returns to the joined range list
-- **AND** Enter starts the selected parent or component, and browsing does not change independent attainment
-- **AND** the first range and group entries align vertically and the preview area has no white placeholder until a leaf is selected
-
-#### Scenario: Recommended nested range and long component list
-- **WHEN** automatic progression recommends a retained nested joined range within a larger frontier
-- **THEN** that exact selected range has a transient visible left-column row, its whole-range action and original middle-column groups
-- **AND** focus and Enter do not silently target a different passage or an invisible component
-- **WHEN** the user navigates to a late original group in a long list
-- **THEN** that group remains visible within the bounded list and its preview stays available in the right pane
-
-#### Scenario: Keyboard navigation beyond a visible list edge
-- **WHEN** Down selects the next row beyond the visible lower edge of either passage list
-- **THEN** the previously selected edge row becomes the top row and the new selection appears directly beneath it, without animated scrolling
-- **AND** further navigation uses the newly visible stretch without scrolling each selection by one row
-- **AND** an equivalent Up transition retains the previous top row at the bottom, with the new selection above it
-
-#### Scenario: Quiet overflowing selector lists
-- **WHEN** either selector list overflows at an ordinary or narrow viewport
-- **THEN** native scrollbars, tracks, arrows and scrollbar divider gutters SHALL remain visually hidden without adding a custom scroll control
-- **AND** wheel/trackpad scrolling, keyboard navigation, contextual page snaps and accessible row focus remain available
-- **AND** column widths, row alignment and component spacing remain stable without a separator between the lists
-
 ### Requirement: Consistent practice range rows
 Both selector lists and completed/unfinished sections SHALL use one roomier row rhythm, with text vertically centered within highlight and focus borders and aligned first-row baselines. Human measure ranges SHALL use consistently spaced dashes in the existing font without changing saved passage identities. Joined ranges SHALL retain accessible component identity without a redundant visible arrow.
 
@@ -108,35 +78,59 @@ Both selector lists and completed/unfinished sections SHALL use one roomier row 
 - **AND** each focused highlight encloses its centered row content, and three-digit ranges remain clear of right-aligned percentages
 
 ### Requirement: Quiet practice range context and progress summary
-Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the Total progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Library summaries and progress reported after a practice save SHALL use the same default manual-inclusive weighted-leaf total without a preparation bonus. Component and joined-run rates SHALL remain independent. Full-score measure numbering, saved evidence/hierarchy, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
+Practice strips SHALL omit individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Selector and active header SHALL identify the selected exercise. Each row SHALL show its highest measured or manual-inclusive achieved speed relative to target, without a preparation bonus. Total SHALL equally weight all included catalog exercises, including locked exercises. Include manual SHALL remain checked by default and affect presentation only. Library/save totals SHALL use the same manual-inclusive catalog total.
+
+#### Scenario: Original and independent connections
+- **WHEN** originals A, B, C, pairs A–B, B–C and one contrast are included
+- **THEN** each of those six exercises contributes one sixth of the Total weight regardless of length
+- **AND** each row retains its own genuine achieved-speed percentage without borrowing similar-section or component evidence
+- **AND** locked exercises remain in the denominator before unlocking
 
 #### Scenario: Select and practise measures 1–4
-- **WHEN** the user selects and starts a passage covering measures 1–4
-- **THEN** the selector and active header identify that range once outside their unnumbered practice notation
+- **WHEN** the user selects and starts a catalog section covering measures 1–4
+- **THEN** the selector and active header identify its range once outside unnumbered practice notation
 - **AND** full-score notation keeps its original numbering
 
 #### Scenario: Different section and joined-run attainment
-- **WHEN** component progress differs from a larger joined or whole-piece run
-- **THEN** each passage row retains its own correct achieved-speed percentage without borrowing component or joined-run evidence
-- **AND** one Total progress summary replaces the confusing paired Sections learned and Whole piece summary without recalculating stored attainment
+- **WHEN** original and adjacent-double attainment differ, or a historical whole-piece run is retained
+- **THEN** current exercise rows retain their own correct achieved-speed percentages without borrowing component or long-run evidence
+- **AND** Total summarizes the included bounded catalog without rewriting historical attainment
 
 #### Scenario: Mixed completion with manual results included
-- **WHEN** some groups are completed and others are still in progress
-- **THEN** completed/connected groups appear above a divider and unfinished groups sort by decreasing own progress then chronological score order
-- **AND** each row displays a single percentage rather than separate Best or Done figures
-- **AND** a manual rate at 25% of target displays 25% without a preparation contribution
+- **WHEN** some included exercises are completed and others are in progress with Include manual checked
+- **THEN** ordinary completed entries appear above the divider and unfinished entries sort by decreasing own progress then chronological source order
+- **AND** each row shows one percentage, with a manual rate at 25% of target displaying 25% without a preparation bonus
+- **AND** excluded rows retain their anchored positions and remain visibly excluded
 
 #### Scenario: Display measured results only
-- **WHEN** the user unchecks Include manual
-- **THEN** displayed rates, grouping and sorting use measured results only while retaining the selected passage and checkbox focus
-- **AND** manual marks, measured records and saved joins remain intact, and automatic suggestions, musical advancement and Done eligibility do not change
-- **AND** toggling the checkbox or pressing its native keys does not start a passage or persist practice evidence changes
+- **WHEN** the player unchecks Include manual
+- **THEN** rows, selected detail, active header and Total use measured results only while retaining selection and checkbox focus
+- **AND** manual marks, measured records and historical joins remain intact, with no change to completion eligibility or automatic progression
+- **AND** toggling or using the checkbox's native keys neither starts practice nor persists evidence changes
+
+#### Scenario: Manual display criterion and sorting
+- **WHEN** Include manual is checked
+- **THEN** ordinary completed/unfinished grouping and sorting use manual-inclusive achieved-speed progress without a preparation contribution
+- **WHEN** the player unchecks it
+- **THEN** rows, selected detail, active header and Total use measured results only while retaining selection and checkbox focus
+- **AND** manual marks, raw measured records and history remain intact; this display choice does not change completion eligibility or persist evidence changes
+
+#### Scenario: Exclude and restore
+- **WHEN** one exercise is excluded
+- **THEN** its contribution and one unit of denominator weight are removed together
+- **AND** the player receives no earned attainment for that decision
+- **WHEN** it is restored
+- **THEN** its existing attainment contributes again without needing to be recreated
+
+#### Scenario: No included exercises
+- **WHEN** every exercise is excluded
+- **THEN** Total identifies that no exercises are included rather than claiming earned 100% completion
 
 #### Scenario: Consistent library and saved progress totals
-- **WHEN** the library loads saved practice evidence or a practice save reports its progress
-- **THEN** the total uses the highest measured or manual rate for each original leaf relative to the current target, weighted once without a preparation bonus
-- **AND** clearing Include manual changes the open practice display only; library and save totals remain manual-inclusive
-- **AND** independent whole-run completion, measured/manual provenance, joins, preparation completion and history remain intact
+- **WHEN** the library loads practice evidence or a practice save reports progress
+- **THEN** the summary uses the same equally weighted included catalog and manual-inclusive achieved-speed criterion
+- **AND** legacy whole-piece claims are not relabeled as completion of adjacent pairs or of the new catalog
+- **AND** full-score numbering, genuine attainment provenance, settings and source bytes remain intact
 
 ### Requirement: Bottom return guide
 Reader, shared Options, selector and active-practice return controls SHALL use Back with Esc. Selector and active practice SHALL retain their bottom controls and existing return targets without a duplicate top-right action. Both actions SHALL remain accessible to mouse and keyboard, and musical status messages SHALL NOT replace the return guide. The selector SHALL group all four arrow hints under one Navigation label rather than separate Browse/Groups explanations, using the existing main Options arrow-first layout, paired arrows, text sizing and spacing rather than a separate hint style. Both shared footers SHALL use Enter Open as a general activation hint without changing the focused control's actual Enter behavior. At ordinary widths, selector guidance and actions SHALL occupy one compact row; they MAY wrap when needed by a narrow viewport. Empty status SHALL NOT waste list height.
@@ -225,7 +219,7 @@ Options SHALL have a configurable keyboard binding in the shared Keys and pedals
 - **AND** the library Options entry remains available
 
 ### Requirement: Clear selector and practice settings presentation
-Selector rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance Tempo SHALL display a percentage above the absolute Score reference; Practice Performance target SHALL remain absolute. Performance percentage edits SHALL preserve exact selected rates and existing absolute admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; Performance helper text SHALL plainly describe the chosen tempo, note/timing checks and available fingerings without changing assessment. A fresh practice state's default increase per success SHALL be 1% of its performance target; retained saved increases and achievements SHALL remain unchanged.
+Selector rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance controls and execution SHALL be absent; historical records SHALL remain retained. Practice Performance target SHALL remain absolute, and retained practice tempo controls SHALL preserve their existing admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; No helper text SHALL offer full-score note/timing assessment outside section Reading/Timed. Fresh and retained practice increase values and achievements SHALL retain their current admitted behavior; removing full-score assessment SHALL NOT change speed settings.
 
 #### Scenario: Uncompleted selector row and focused tempo decrement
 - **WHEN** an uncompleted group is shown in the selector or a tempo decrement button receives focus
@@ -235,7 +229,7 @@ Selector rows SHALL retain achieved-speed percentages and genuine completion evi
 
 #### Scenario: Target marking and fresh increase
 - **WHEN** a fresh practice state opens the Practice section in Options
-- **THEN** its increase per success reads 1% and its performance target retains the metronome marking
+- **THEN** its increase per success retains the current application default and its performance target retains the metronome marking
 - **AND** the explanation identifies that tempo as the reference for speed and increase percentages
 - **AND** reopening a retained state preserves its saved exact increase and achievements
 
@@ -246,10 +240,9 @@ Selector rows SHALL retain achieved-speed percentages and genuine completion evi
 - **AND** the beat duration and exact stored rate retain their existing musical meaning
 
 #### Scenario: Performance tempo relative to score reference
-- **WHEN** full-score Performance opens with the selected rate equal to a score reference of 180 notes per minute
-- **THEN** Tempo reads 100% and Score reference below retains the absolute metronome marking at 180/min
-- **AND** entering 50% selects 90 notes per minute while retaining the reference, absolute range admission and existing assessment rules
-- **AND** untouched, committed-unchanged and cancelled percentage edits preserve an exact retained selected rate
+- **WHEN** an existing saved score contains full-score Performance tempo or accuracy records
+- **THEN** those historical records remain retained without exposing a full-score Performance start or grading control
+- **AND** section practice keeps its genuine score reference, selected rates and numeric controls
 
 ### Requirement: Keyboard browse and edit modes for shared numeric tempo fields
 Existing shared numeric tempo fields SHALL distinguish keyboard option navigation from value editing. Browse-mode Up/Down SHALL move among visible options without changing values or visiting the mouse spinner buttons. Enter SHALL start a numeric draft edit; edit-mode Up/Down SHALL apply the established field-specific increments and typing SHALL replace the value. Enter SHALL admit and commit a valid draft, and Escape SHALL cancel without persisting draft changes or altering queued speed/progression state. Spinner buttons SHALL retain accessible Increase/Decrease names but SHALL NOT become extra keyboard navigation stops. Direct input clicks SHALL permit editing. Native select/popup ownership, modifier/capture guards, existing range admission and musical shortcuts SHALL remain correct.
@@ -335,3 +328,45 @@ Free view Previous/Next controls SHALL inherit the current main-menu controls pe
 - **WHEN** a local slot is explicitly unbound or a main/local edit would create a conflict in either effective context
 - **THEN** an explicit empty local slot does not fall back to main, and a conflicting edit reports the named conflict without changing saved values or silently discarding an override
 - **AND** runtime, binding Test, capture and visible hints use the same effective admitted controls
+
+### Requirement: Bounded exercise browsing
+Passage selection SHALL browse original sections, independent adjacent doubles and contrast exercises without recursive growing joins. Existing column geometry, row spacing, right-aligned percentages and accessible source/component identity SHALL remain stable. Originals and doubles SHALL retain coherent source previews; contrasts SHALL identify both excerpt locations without implying the intervening source is played. Attainment SHALL remain independent.
+
+#### Scenario: Selecting an adjacent double and its originals
+- **WHEN** A–B and B–C are available
+- **THEN** both have distinct accessible rows and exactly two original components
+- **AND** Right enters the component list, Up/Down browses it and Left returns to the exercise list
+- **AND** Enter starts the actual selected exercise or component without creating a larger join
+- **AND** the first list entries remain aligned and reserved preview space does not shift
+
+#### Scenario: Selecting a contrast exercise
+- **WHEN** a player selects a contrast between distant sections
+- **THEN** the selector identifies A and B by their genuine ranges and excerpt locations
+- **AND** its preview does not join unrelated source measures into one continuous passage
+- **AND** selection and active practice expose which alternative is current
+
+#### Scenario: Keyboard navigation beyond a visible list edge
+- **WHEN** Down selects the next row beyond the visible lower edge of either passage list
+- **THEN** the previously selected edge row becomes the top row and the new selection appears directly beneath it, without animated scrolling
+- **AND** further navigation uses the newly visible stretch without scrolling each selection by one row
+- **AND** an equivalent Up transition retains the previous top row at the bottom, with the new selection above it
+
+#### Scenario: Quiet overflowing selector lists
+- **WHEN** either selector list overflows at an ordinary or narrow viewport
+- **THEN** native scrollbars, tracks, arrows and scrollbar divider gutters remain visually hidden without adding a custom scroll control
+- **AND** wheel/trackpad scrolling, keyboard navigation, contextual page snaps and accessible row focus remain available
+- **AND** column widths, row alignment and component spacing remain stable without a separator between the lists
+
+### Requirement: Tasteful reversible selector exclusion
+Every exercise row SHALL support an accessible mouse and keyboard exclusion toggle. An excluded row SHALL remain in its existing list position, readable and selectable, with restrained canceled-out styling and an explicit accessible Excluded state. Toggling SHALL neither start practice nor masquerade as Done. Keyboard hints SHALL use undecorated shared kbd styling.
+
+#### Scenario: Toggle a hovered or keyboard-selected row
+- **WHEN** a player uses the row toggle or an admitted exclusion shortcut on the hovered or keyboard-selected exercise
+- **THEN** only that row changes inclusion state and remains at its position
+- **AND** muted styling and a fine cancellation line on its range identify the exclusion without obscuring percentage, focus or keyboard hints
+- **AND** restoring uses the same action without discarding progress
+
+#### Scenario: Guarded keyboard input
+- **WHEN** a text editor, numeric edit, modal, control capture or saved authoritative binding owns the proposed shortcut
+- **THEN** exclusion does not steal that input
+- **AND** the mouse control remains available and its accessible name describes the current Include or Exclude action

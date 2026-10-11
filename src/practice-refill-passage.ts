@@ -64,7 +64,8 @@ export function heldTieCues(p:ScorePackage,plan:PracticePlan,session:PracticeSes
   const cue=readableTieContinuation(p,q,current.bar,crops,track,positions,placements,[...projected,...settled]);if(!cue)continue;settled.push(cue);
   const owner=(q.path.getAttribute('data-tie-note')??'').replace(/~c\d+$/,''),note=p.score.notes.find(n=>n.id===owner),group=plan.ownerGroup.get(owner),attack=session.obligations.find(a=>a.owners.includes(owner));
   if(!note||!group||!attack||!retired.has(Number(group.split(':')[0]))||!(session.matched.has(attack.id)||attack.tick<session.startTick))continue;
-  const end=Math.min(plan.barTicks[current.bar+1],note.startTick+note.durationTicks);
+  // The final source interval may continue sounding after its display cut.
+  const end=Math.min(plan.partition==='bounded-exercises-v1'&&current.bar===session.chunk.lastBar?session.completionTick:plan.barTicks[current.bar+1],note.startTick+note.durationTicks);
   if(session.elapsedTick>=end-1e-7)continue;
   const path=cue.path;path.setAttribute('data-practice-held-cue',q.id);path.setAttribute('data-practice-cue-owner',owner);path.setAttribute('data-practice-cue-bar',String(current.bar+1));path.setAttribute('data-practice-cue-end',String(end));if(!path.hasAttribute('data-practice-cue-shape'))path.setAttribute('data-practice-cue-shape','complete-authored');
   cues.push({...cue,id:'cue:'+q.id});
