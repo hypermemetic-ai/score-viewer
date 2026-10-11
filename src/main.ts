@@ -220,7 +220,9 @@ async function commitPersonal(target:NonNullable<typeof current>,change:(s:Perso
  const editor=personalEditor(target);if(editor.queue.error)throw editor.queue.error;
  // Restore/history commands are accepted in the same order as keyboard edits.
  // A durable write completing later must never replace a newer live choice.
- const next=readPersonal(change(structuredClone(target.personal)),target.package),generation=++editor.generation,
+ const next=readPersonal(change(structuredClone(target.personal)),target.package),generation=++editor.generation;
+ capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!next.navigation?.followEdit);
+ const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
   projection=editor.session.project(next),receipt=editor.queue.accept(next);
  const ownerPractice=target===current&&practice&&practice instanceof PracticeView?practice:undefined,
   handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,ownerPractice.options.personal,note.id)!==handFor(target.package,next,note.id));
@@ -229,8 +231,11 @@ async function commitPersonal(target:NonNullable<typeof current>,change:(s:Perso
  void receipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const projected=await projection;
  if(current===target&&editor.generation===generation){
-  editor.view=projected;editor.visiblePersonal=structuredClone(next);
-  if(selection)selection=visibleSourceSeat(projected,selection)??selection;
+  const cursor=sourceNavigationAnchor(editor.view,selection);editor.view=projected;
+  if(JSON.stringify([target.personal.view,target.personal.editContactId,target.personal.navigation])===navigation)resolvePersonalNavigation(target.personal,projected);
+  editor.visiblePersonal=structuredClone(target.personal);
+  if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
+  if(selection)target.personal.editContactId=selection.contactId;
   if(ownerPractice&&practice===ownerPractice){
    if(handsChanged)await refreshPersonalPractice(target,ownerPractice,generation);
    else{ownerPractice.options.personal=next;ownerPractice.refit();}
