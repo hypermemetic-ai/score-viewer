@@ -3,23 +3,20 @@ import type {PracticeChunk,PracticePassagePlan} from './practice';
 
 type Claim=Readonly<{passage:string;pattern:string}>;
 type State={revision?:string;referenceBeat?:{numerator:number;denominator:number}};
-interface Patterns {signature:string;leaves:Map<PracticeChunk,{shape:string;unit:number}>;pairs:Map<string,number>;next:number}
+interface Patterns {signature:string;leaves:Map<PracticeChunk,{shape:string;unit:number}>;pairs:Map<string,number>;next:number;score:ScorePackage['score'];assessment:'piano'|'manual';facts:Map<string,string>;classes:Map<string,number>}
 const plans=new WeakMap<PracticePassagePlan,Patterns>(),states=new WeakMap<object,Map<string,readonly Claim[]>>();
 const key=(claim:Claim)=>JSON.stringify([claim.passage,claim.pattern]);
 const shape=(chunk:PracticeChunk)=>JSON.stringify([chunk.id,chunk.pattern,chunk.firstBar,chunk.lastBar,chunk.start,chunk.end]);
 const signature=(plan:PracticePassagePlan)=>{
  const musical=plan as PracticePassagePlan&{attacks?:unknown;gestures?:unknown;owners?:unknown;components?:unknown};
- return JSON.stringify([plan.revision,plan.partition,plan.chunks.map(shape),plan.ticksPerBeat,plan.barTicks,plan.barPhaseTicks,plan.timeSignatures,plan.referencePerformanceTempo,musical.attacks,musical.gestures,musical.owners,musical.components]);
+ return JSON.stringify([plan.revision,plan.partition,plan.chunks.map(shape),plan.catalog,plan.ticksPerBeat,plan.barTicks,plan.barPhaseTicks,plan.timeSignatures,plan.referencePerformanceTempo,musical.attacks,musical.gestures,musical.owners,musical.components]);
 };
 const sorted=(values:unknown[])=>values.map(v=>JSON.stringify(v)).sort();
 
-/** Only the real planners derive classes, from their captured canonical source.
- * Positions and source IDs locate evidence; they do not make repeated music
- * different. Note multiplicity, hands, written clocks and source scopes do. */
-export function registerPracticePatterns(plan:PracticePassagePlan,score:ScorePackage['score'],assessment:'piano'|'manual') {
- const classes=new Map<string,number>(),leaves:Patterns['leaves']=new Map(),chains=new Map((score.tieChains??[]).map(c=>[c.noteId,c]));
- for(const chunk of plan.chunks){
-  const start=chunk.start,end=chunk.end,inRange=(tick:number,duration=0)=>tick<end&&(tick>=start||tick+duration>start),
+
+function musicalSpanFact(plan:PracticePassagePlan,score:ScorePackage['score'],chunk:PracticeChunk,assessment:'piano'|'manual'):string {
+ const chains=new Map((score.tieChains??[]).map(c=>[c.noteId,c]));
+ const start=chunk.start,end=chunk.end,inRange=(tick:number,duration=0)=>tick<end&&(tick>=start||tick+duration>start),
    meter=(tick:number)=>[...score.timeSignatures].reverse().find(m=>m.tick<=tick),
    notes=score.notes.filter(n=>inRange(n.startTick,n.durationTicks)).map(n=>({
     tick:n.startTick-start,duration:n.durationTicks,kind:n.eventKind,
@@ -40,9 +37,25 @@ export function registerPracticePatterns(plan:PracticePassagePlan,score:ScorePac
     phases:plan.barPhaseTicks?.slice(chunk.firstBar,chunk.lastBar+1),
     meters:plan.barTicks.slice(chunk.firstBar,chunk.lastBar+1).map(t=>{const m=meter(t);return m?[m.numerator,m.denominator]:null;}),
     notes:sorted(notes),silences:sorted(silences),written:written?sorted(written):undefined,phrases:sorted(phrase)});
+ return fact;
+}
+
+/** Full musical content including carry, clock, voices/hands and source notation. */
+export function practiceSpanEvidenceKey(plan:PracticePassagePlan,chunk:PracticeChunk):string|undefined {
+ const p=plans.get(plan);if(!p||chunk.kind==='contrast')return;
+ const k=JSON.stringify([chunk.start,chunk.end,chunk.firstBar,chunk.lastBar]);let fact=p.facts.get(k);if(fact===undefined){fact=musicalSpanFact(plan,p.score,chunk,p.assessment);p.facts.set(k,fact);}return fact;
+}
+
+/** Only the real planners derive classes, from their captured canonical source.
+ * Positions and source IDs locate evidence; they do not make repeated music
+ * different. Note multiplicity, hands, written clocks and source scopes do. */
+export function registerPracticePatterns(plan:PracticePassagePlan,score:ScorePackage['score'],assessment:'piano'|'manual') {
+ const classes=new Map<string,number>(),leaves:Patterns['leaves']=new Map();
+ for(const chunk of plan.chunks){
+  const fact=musicalSpanFact(plan,score,chunk,assessment);
   let unit=classes.get(fact);if(unit===undefined){unit=classes.size;classes.set(fact,unit);}leaves.set(chunk,{shape:shape(chunk),unit});
  }
- plans.set(plan,{signature:signature(plan),leaves,pairs:new Map(),next:classes.size});
+ plans.set(plan,{signature:signature(plan),leaves,pairs:new Map(),next:classes.size,score:structuredClone(score),assessment,facts:new Map(),classes});
 }
 
 /** Derived lookup only: saved best/Done keys and the source run stay literal.
@@ -56,7 +69,10 @@ export function bindPracticePassages<T extends State>(plan:PracticePassagePlan,s
  const units=new Map<string,number>(),groups=new Map<number,Claim[]>();
  for(const chunk of all.values()){
   let unit:number|undefined;
-  if(chunk.components){const [left,right]=chunk.components.map(id=>units.get(id));if(left===undefined||right===undefined)continue;
+  if(plan.partition==='bounded-exercises-v1'){
+   if(chunk.kind==='contrast')unit=patterns.next++;
+   else {const fact=practiceSpanEvidenceKey(plan,chunk)!;unit=patterns.classes.get(fact);if(unit===undefined){unit=patterns.next++;patterns.classes.set(fact,unit);}}
+  }else if(chunk.components){const [left,right]=chunk.components.map(id=>units.get(id));if(left===undefined||right===undefined)continue;
    if(left===right)unit=left;else{const pair=JSON.stringify([left,right]);unit=patterns.pairs.get(pair);if(unit===undefined){unit=patterns.next++;patterns.pairs.set(pair,unit);}}
   }else{const leaf=patterns.leaves.get(chunk);if(leaf?.shape===shape(chunk))unit=leaf.unit;}
   if(unit===undefined)continue;units.set(chunk.id,unit);const members=groups.get(unit)??[];members.push({passage:chunk.id,pattern:chunk.pattern});groups.set(unit,members);
