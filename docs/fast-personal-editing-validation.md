@@ -23,3 +23,14 @@ FAST_EDIT_ARTIFACTS=/tmp/score-viewer-fast-personal-editing \
 The receipt retains source/frontend/fixture hashes, named host/browser/viewport, all successful and failed timings (including frame-callback arrival and correctness-verification overhead), sample counts, cold-opening time, correctness checks and screenshot names. The first changed-hand frame and its restored-hand counterpart are captured separately, alongside finger editing and recovery screens. Freshly generated public fixtures and screenshots remain in the artifact directory. At least twenty samples per class are enforced; `FAST_EDIT_SAMPLES` may increase the count. `FAST_EDIT_CASES` may select comma-separated exact case names for a bounded diagnostic run; a subset always fails the six-case acceptance gate and is labeled in the receipt.
 
 Results must be read from an actual retained receipt. This document describes the acceptance method until a successful run is recorded. Browser-frame correctness is evidence for this frontend and host, not display scanout, physical keyboard timing, native WebView timing or human musical acceptance.
+
+A historical candidate trial on qq-box (Linux, Node 26.7.0, Chromium 151.0.7922.34, 1440 × 900) used shared revision `6b2ed7e30d256118e2c1d91360271f63bc096382` with the earlier editing application base `3d59d38`. This is diagnostic evidence, not acceptance of that renderer or the current combined application. The corrected six-case receipt is `/tmp/score-viewer-fast-personal-editing-candidate-6b2ed7e-corrected/receipt.json`, SHA-256 `92057e2e99bb806bc1f4e86845c68300d4ec23ebb5fcf71cc76079b220c89ccb`, with twenty retained screenshots.
+
+| Complete measured case | Hand p95 | Finger p95 | Correctness and recovery | 100 ms gate |
+| --- | ---: | ---: | --- | --- |
+| No. 14 Conventional | 651.9 ms | 12.6 ms | Passed | Failed |
+| No. 14 Jankó | 896.2 ms | 21.0 ms | Passed | Failed |
+| Tie/page-reflow Conventional | 20.8 ms | 12.3 ms | Passed | Passed |
+| Tie/page-reflow Jankó | 19.4 ms | 13.0 ms | Passed | Passed |
+
+Both 120-bar long cases opened admitted archives but could not complete the positive samples. After correcting warmups to restore each original hand, an isolated `dense-0-2:0` transfer to RH produced the same physical beam-clearance refusal in the fresh expected projection, independent full cold preparation, and actual production key path. Both layouts retained the complete visible SVG, selected alias and saved journal byte-for-byte while showing pending recovery controls. The separate bounded refusal receipt is `/tmp/score-viewer-fast-personal-editing-candidate-6b2ed7e-long-refusal/receipt.json`, SHA-256 `237817d74a00811c3fbefe928b94bd0546ccde0eb284244dc7d4e6e131cdd5f1`. A preserved refusal is useful failure evidence; it does not satisfy the required twenty successful edits. The original positive fixture remains unchanged for the engineering repair and rerun.
