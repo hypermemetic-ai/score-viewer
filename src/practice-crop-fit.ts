@@ -12,9 +12,28 @@ export function tightenSourceCrop(svg:SVGSVGElement){
  if(!ys.length)return;const top=Math.min(...ys)-2,bottom=Math.max(...ys)+2;
  svg.setAttribute('viewBox',`${box.x} ${top} ${box.width} ${bottom-top}`);
 }
-/** One complete passage frame, fitted without independent crop scales/rows. */
-export function fitLeafPreview(root:HTMLElement){
- const svgs=[...root.querySelectorAll<SVGSVGElement>(':scope > svg, :scope > section > svg')];if(!svgs.length)return;const svg=svgs[0];
+/** Literal preview room, before scaling: all rows share this one frame. */
+export function practicePreviewRoom(root:HTMLElement){
  const logicalTop=(el:HTMLElement)=>{let top=0;for(let node:HTMLElement|null=el;node;node=node.offsetParent as HTMLElement|null)top+=node.offsetTop;return top;};
- const overview=root.closest<HTMLElement>('.practice-overview'),available=overview?Math.max(80,overview.clientHeight-(logicalTop(root)-logicalTop(overview))-12):Infinity,style=getComputedStyle(root),width=Math.max(1,root.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),boxes=svgs.map(s=>s.viewBox.baseVal),captions=[...root.querySelectorAll<HTMLElement>(':scope > section > small')].reduce((n,s)=>n+s.offsetHeight,0),gap=svgs.length>1?12*(svgs.length-1):0,scale=Math.min(width/Math.max(...boxes.map(b=>b.width)),Math.max(1,available-captions-gap)/boxes.reduce((n,b)=>n+b.height,0));root.dataset.rows=String(svgs.length);svgs.forEach((s,i)=>{s.style.width=`${boxes[i].width*scale}px`;s.style.height=`${boxes[i].height*scale}px`;});
+ const overview=root.closest<HTMLElement>('.practice-overview'),style=getComputedStyle(root);
+ return {width:Math.max(1,root.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),
+  height:overview?Math.max(80,overview.clientHeight-(logicalTop(root)-logicalTop(overview))-12):Infinity};
+}
+/** Choose visual rows from actual source-frame proportions, not section bars.
+ * This changes layout only; each row still uses the shared source crop renderer. */
+export function practicePreviewRowCount(bars:number,width:number,height:number,room:{width:number;height:number}){
+ if(bars<2||!(width>0&&height>0&&room.width>0)||!Number.isFinite(room.height))return 1;
+ // Keep ordinary frames stable; only heavily reduced source needs reflow.
+ // This is a display trigger, not a guarantee of musician readability.
+ if(Math.min(room.width/width,room.height/height)>=.6)return 1;
+ const optimum=Math.sqrt(width*room.height/(height*room.width));
+ return Math.max(1,Math.min(bars,Math.round(optimum)));
+}
+/** Complete source rows fitted at one common scale, including caption/gap room. */
+export function fitLeafPreview(root:HTMLElement){
+ const svgs=[...root.querySelectorAll<SVGSVGElement>(':scope > svg, :scope > section > svg')];if(!svgs.length)return;
+ if(svgs.length>1){root.style.flexDirection='column';root.style.alignItems='center';root.style.gap='12px';}
+ const room=practicePreviewRoom(root),boxes=svgs.map(s=>s.viewBox.baseVal),sections=[...root.querySelectorAll<HTMLElement>(':scope > section')],captions=sections.reduce((n,s)=>n+[...s.querySelectorAll<HTMLElement>(':scope > small')].reduce((m,c)=>m+c.offsetHeight,0),0);
+ const gaps=(el:HTMLElement)=>Math.max(0,el.children.length-1)*(parseFloat(getComputedStyle(el).rowGap)||0),gap=gaps(root)+sections.reduce((n,s)=>n+gaps(s),0),scale=Math.min(room.width/Math.max(...boxes.map(b=>b.width)),Math.max(1,room.height-captions-gap)/boxes.reduce((n,b)=>n+b.height,0));
+ root.dataset.rows=String(svgs.length);svgs.forEach((s,i)=>{s.style.width=`${boxes[i].width*scale}px`;s.style.height=`${boxes[i].height*scale}px`;});
 }
