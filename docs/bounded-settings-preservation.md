@@ -17,6 +17,8 @@ Target follows the accepted clock authority: an explicit `personalGoal` owns a
 chosen target, otherwise Target is a cache of the reference tempo. The migration
 does not infer a personal goal from an older cached Target. Explicit speed edits,
 goal edits and successful-loop progression retain their existing rounding rules.
+Typing a changed speed or Step validates its entered value, then rounds that
+field alone. Committing unchanged displayed text retains its original precision.
 The explicit legacy planners retain their historical preference normalization.
 
 Regression evidence uses synthetic journals with Step 5, Start 10 and full

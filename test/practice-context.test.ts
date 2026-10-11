@@ -19,7 +19,7 @@ test('fresh pitch keeps practice preferences without earned speed; retained sett
  const context:PracticeViewContext={partition:plan.partition,composites:{},selected:plan.chunks[0].id,includeManual:true,preferences:practicePreferences(old)},fresh=practiceStateForContext(plan,undefined,context);
  assert.equal(fresh.target,150);assert.equal(fresh.start,42);assert.equal(fresh.working,42);assert.equal(fresh.step,3);assert.equal(fresh.keepTempo,true);assert.equal(fresh.audioOutput,'chosen-output');assert.deepEqual(fresh.best,{});assert.deepEqual(fresh.workingByPattern,{});assert.deepEqual(fresh.groundwork,{});assert.equal(fresh.manualAttainment,undefined);
  const saved=initialPractice(plan);saved.start=17;saved.working=23;saved.keepTempo=false;
- const retained=practiceStateForContext(plan,saved,context);assert.equal(retained.start,17.1);assert.equal(retained.working,22.95);assert.equal(retained.keepTempo,false);assert.equal(retained.target,saved.target);
+ const retained=practiceStateForContext(plan,saved,context);assert.equal(retained.start,17);assert.equal(retained.working,23);assert.equal(retained.keepTempo,false);assert.equal(retained.target,saved.target);
 });
 test('crossing retained and navigation trees preserve the retained journal rather than failing activation',async()=>{
  const p=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url)),{keyboardLayout:'janko-four-row'}),plan=planPractice(p,'fixed-four-v1'),source=initialPractice(plan),target=initialPractice(plan);
