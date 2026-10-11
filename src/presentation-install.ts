@@ -57,6 +57,8 @@ export async function stagePresentationInstall(host:{write(name:string,data:Uint
   packageBytes:Uint8Array;personalBytes:Uint8Array;personalKey:string;entry:Entry;entries:Entry[];canCommit?:()=>boolean;newEntry?:boolean;
   /** The pointer write is atomic but asynchronous; lock dismissal before it. */
   onCommitStarted?:()=>void;
+  /** Guarded sidecar preparation/admission before activating the library. */
+  beforeCommit?:()=>Promise<void>;
   /** Explicit retained-edition seed; ordinary installation uses current maps. */
   personalFiles?:Record<string,string>;
   /** Offset comes from an independently admitted package, never a field draft. */
@@ -79,6 +81,8 @@ export async function stagePresentationInstall(host:{write(name:string,data:Uint
   if(originalFile){const retained=await host.read?.(originalFile);if(retained&&await hashBytes(retained)!==await hashBytes(request.transposition!.originalPackageBytes!))throw Error('The retained original archive differs; its bytes and active selection are preserved.');if(!retained)await host.write(originalFile,request.transposition!.originalPackageBytes!);}
   await host.write(file,request.packageBytes);
   await host.write(personalFile,request.personalBytes);
+  if(request.canCommit&&!request.canCommit())throw Error('Calculation is no longer active; existing score retained.');
+  await request.beforeCommit?.();
   if(request.canCommit&&!request.canCommit())throw Error('Calculation is no longer active; existing score retained.');
   request.onCommitStarted?.();
   await host.write('library.json',new TextEncoder().encode(JSON.stringify({version:1,entries})));

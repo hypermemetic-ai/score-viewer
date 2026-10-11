@@ -1,3 +1,4 @@
+import {stagePracticeEditionTransfer} from './practice-edition-install';
 import {footerFontNoticeUrl} from './annotation-ink-policy';
 import {ViewerOrientation,fitSurface,fitDialog} from './orientation';
 import{ObservedMidiSustain,isMusicalSustain}from'./midi-sustain';
@@ -300,7 +301,11 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
   original=originalPackageBytes?await readerAdmission.import(originalPackageBytes,{allowLegacyTempo:true}):undefined,
   originalPersonalFiles:Record<string,string>={};
  if(original)for(const layout of original.availablePresentations??[]){const base=await selectPresentation(original,layout),key=personalStorageName(entry.id,base),file=retainedTranspositionFile(entry,0,layout),map=file===entry.file?entry.personalFiles:entry.editionPersonalFiles?.[file??''];if(map?.[key])originalPersonalFiles[key]=map[key];}
- const practiceContext=context?await PracticeView.prepareContext(q.package,entry.id,context,checked):undefined;
+ const previousBytes=!newEntry?await host.read(entry.file):null;
+ if(!newEntry&&!previousBytes)throw Error('The prior managed score is missing; saved progress and edition retained.');
+ let previous=previousBytes?await readerAdmission.import(previousBytes,{allowLegacyTempo:true}):undefined;
+ if(previous&&q.package.keyboardLayout&&previous.availablePresentations?.includes(q.package.keyboardLayout))previous=await selectPresentation(previous,q.package.keyboardLayout);
+ let practiceContext:AdmittedPracticeContext|undefined;
  if(op)await readingCheckpoint(op);
 
  return enqueue(async()=>{
@@ -309,6 +314,13 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
   if(newEntry?!!latest:!latest||latest.file!==entry.file)throw Error('The library changed during calculation; previous files are retained.');
   const installed=await stagePresentationInstall(host,{packageBytes:q.packageBytes,personalBytes:new TextEncoder().encode(JSON.stringify(checked)),
    personalKey:personalStorageName(entry.id,q.package),entry:latest??entry,entries,newEntry,personalFiles,
+   beforeCommit:async()=>{
+    const live=()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file);
+    if(previous)await stagePracticeEditionTransfer(host,{entryId:entry.id,from:previous,to:q.package,personal:checked,canCommit:live});
+    if(!live())throw Error('Calculation is no longer active; prior practice journals retained.');
+    practiceContext=context?await PracticeView.prepareContext(q.package,entry.id,context,checked):undefined;
+    if(!live())throw Error('Calculation is no longer active; prior practice journals retained.');
+   },
    ...(entry.transposition||getScoreTransposition(q.package)!==0?{transposition:{steps:getScoreTransposition(q.package),layout:q.package.keyboardLayout??preferences.keyboardLayout,originalPackageBytes,originalLayouts:original?.availablePresentations,originalPersonalFiles}}:{}),
    canCommit:()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file)});
   entries=installed.entries;return {entry:installed.entry,personal:checked,practiceContext};
