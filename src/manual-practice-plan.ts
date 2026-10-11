@@ -4,7 +4,9 @@ import type {ScorePackage} from './package';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
 import {scorePulseGrid,sourceBarPhaseTicks} from './score-clock';
 import {registerPracticePatterns} from './practice-equivalence';
-import type {PracticeChunk,PracticePartition,PracticePassagePlan} from './practice';
+import {populatePracticeCatalog,practiceSectionId,type PracticeChunk,type PracticePartition,type PracticePassagePlan} from './practice';
+import {planPracticeSections} from './practice-boundaries';
+import {boundedPracticePolicyFingerprint} from './practice-sizing';
 
 /** A historical reading head proves its admitted appearance and clock, not a
  * sourceEventId omitted by the old MusicXML tie projection. */
@@ -51,7 +53,7 @@ function barAt(bars:readonly number[],tick:number):number {
 /** Consumes the actual strict reading result. It never substitutes seats or
  * guesses omitted source physical positions. New dual-view source contracts
  * will supply exact source-written component IDs through their own adapter. */
-export async function planManualPractice(input:ScorePackage,partition:PracticePartition='connection-boundary-v1',fallbackReference?:ReferencePerformanceTempo):Promise<ManualPracticePlan> {
+export async function planManualPractice(input:ScorePackage,partition:PracticePartition='bounded-exercises-v1',fallbackReference?:ReferencePerformanceTempo):Promise<ManualPracticePlan> {
  // Caller-owned packages may change while WebCrypto settles. Capture every
  // consumed source/admission/appearance field together, before any await, so
  // returned clocks and components have the same meaning as their digest.
@@ -60,7 +62,7 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
   throw Error('Manual instrument practice needs admitted musical reading notation.');
  validateInstrumentReadingScore(p.score);
  if(p.score.graceGroups?.length)throw Error('Timed practice needs performed timing for grace notes; the score remains available for reading.');
- if(partition!=='fixed-four-v1'&&partition!=='connection-boundary-v1')throw Error('Unsupported musical practice partition.');
+ if(partition!=='fixed-four-v1'&&partition!=='connection-boundary-v1'&&partition!=='bounded-exercises-v1')throw Error('Unsupported musical practice partition.');
  const separateReference=p.score.referencePerformanceTempo===undefined,
   reference=separateReference&&snapshot.fallbackReference!==undefined?validateReferencePerformanceTempo(snapshot.fallbackReference):requireReferencePerformanceTempo(p.score),
   bars=sourceBars(p),partId=p.score.readingPolicy!.partId,
@@ -135,8 +137,8 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
  }
  owners.sort((a,b)=>a.tick-b.tick||a.id.localeCompare(b.id));
  components.sort((a,b)=>a.tick-b.tick||a.id.localeCompare(b.id));
- const sourceMusicalRevision=await identityHash({version:'musical-manual-practice-v1',partId,partition,source:manualMusicalFacts(p)}),
-  revision=separateReference?await identityHash({version:'manual-reference-practice-v1',sourceMusicalRevision,referencePerformanceTempo:reference}):sourceMusicalRevision,
+ const sourceMusicalRevision=await identityHash({version:'musical-manual-practice-v1',partId,partition:partition==='bounded-exercises-v1'?'connection-boundary-v1':partition,source:manualMusicalFacts(p)}),
+  revision=partition==='bounded-exercises-v1'?await identityHash({version:'bounded-manual-practice-v1',sourceMusicalRevision,policyFingerprint:boundedPracticePolicyFingerprint,referencePerformanceTempo:reference}):separateReference?await identityHash({version:'manual-reference-practice-v1',sourceMusicalRevision,referencePerformanceTempo:reference}):sourceMusicalRevision,
   occurrences=p.score.writtenPresentation?.occurrences??[],weights=bars.slice(0,-1).map((_,bar)=>Math.max(1,occurrences.filter(o=>o.writtenBar===bar+1).length));
  const protectedAt=(cut:number)=>{
   const tick=bars[cut],reasons=owners.filter(owner=>owner.tick<tick&&owner.end>tick).map(owner=>`held:${owner.id}`);
@@ -145,7 +147,13 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
   return reasons;
  };
  const chunks:PracticeChunk[]=[];
- for(let first=0;first<bars.length-1;){
+ const boundaryProfile=partition==='bounded-exercises-v1'?planPracticeSections(p.score,{protectedRelations:(p.score.techniques??[]).map(r=>({id:r.id,startTick:r.fromTick,endTick:Math.min(p.score.totalTicks,r.toTick+1)}))}):undefined;
+ if(boundaryProfile)for(const section of boundaryProfile.sections){
+  const {start,end,firstBar,lastBar}=section,selected=components.filter(c=>c.tick>=start&&c.tick<end),carry=owners.filter(o=>o.tick<start&&o.end>start),
+   pattern=canonicalJson({version:'bounded-manual-passage-v1',revision,policyFingerprint:boundedPracticePolicyFingerprint,length:end-start,components:selected.map(c=>[c.ownerId??c.silenceId,c.kind,c.tick-start,c.durationTicks,c.staffId,c.voiceId]),...(carry.length?{carry:carry.map(o=>[o.id,o.tick-start,o.end-start])}:{})});
+  chunks.push({...section,id:practiceSectionId(section,bars),weight:1,kind:'section',pattern});
+ }
+ for(let first=0;!boundaryProfile&&first<bars.length-1;){
   const total=bars.length-1,nominal=Math.min(first+4,total);let cut=nominal;
   if(partition==='connection-boundary-v1'&&nominal<total){
    const candidates=[nominal,nominal-1,nominal+1].filter(c=>c>first&&c<=total&&c-first>=3&&c-first<=5);
@@ -160,8 +168,10 @@ export async function planManualPractice(input:ScorePackage,partition:PracticePa
   first=cut;
  }
  const plan:ManualPracticePlan={version:'manual-practice-plan-v1',assessment:'manual',sourceId:p.score.id,partId,partition,revision,
-  ...(separateReference?{sourceMusicalRevision}:{}),
+  ...(separateReference||partition==='bounded-exercises-v1'?{sourceMusicalRevision}:{}),
   timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),
   referencePerformanceTempo:structuredClone(reference),barTicks:bars,ticksPerBeat:p.score.ticksPerBeat,chunks,owners,components};
+ if(boundaryProfile){plan.boundaryProfile=boundaryProfile;plan.policyFingerprint=boundedPracticePolicyFingerprint;populatePracticeCatalog(plan,p.score);
+  const frozenInput={...input,...p} as ScorePackage,[fixed,connection]=await Promise.all([planManualPractice(frozenInput,'fixed-four-v1',reference),planManualPractice(frozenInput,'connection-boundary-v1',reference)]);plan.legacyPlans={'fixed-four-v1':fixed,'connection-boundary-v1':connection};}
  scorePulseGrid(plan,bars);registerPracticePatterns(plan,p.score,'manual');return plan;
 }

@@ -1,3 +1,4 @@
+import {admitPracticeContext} from '../src/practice-context';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {assigned,effectiveAssignments,effectiveAssignmentDigest,handFor,restorePersonalAssignment,personalPracticePackage} from '../src/personal-assignments';
 import {initialPersonal,readPersonal,corrected,fingerFor,personalStorageName,practiceStorageName,restoreAll} from '../src/state';
