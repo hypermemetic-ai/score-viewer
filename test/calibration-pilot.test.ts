@@ -251,3 +251,21 @@ test('all208 Janko judgments require eight saved block setups and grade4 never p
  assert.deepEqual(c.session!.observations.map(o=>o.trialId),required);
  assert.equal(files.writes,217);assert.equal(c.session!.currentTrialId,null);
 });
+
+test('same-session resume changes runtime input generation only after durable acceptance; ordinary ratings do not',async()=>{
+ const files=new MemoryPilotFiles(),observed:number[]=[],c=controller(files,state=>observed.push(state.inputGeneration));
+ assert.equal(c.inputGeneration,0);await c.start(setup());await c.prepare();
+ const generation=c.inputGeneration,id=c.session!.id;
+ await c.rateButton(0);assert.equal(c.inputGeneration,generation);
+ files.hold=true;const resume=c.resume(id);
+ assert.equal(c.inputGeneration,generation);assert.equal(c.state.inputGeneration,generation);
+ files.reject();assert.equal(await resume,false);assert.equal(c.inputGeneration,generation);
+ const accepted=c.resume(id);assert.equal(c.inputGeneration,generation);
+ files.release();assert.equal(await accepted,true);
+ assert.equal(c.session!.id,id);assert.equal(c.inputGeneration,generation+1);
+ assert.equal(observed.at(-1),generation+1);assert.equal(c.state.current.needsSetup,true);
+ const stored=JSON.parse(new TextDecoder().decode(files.bytes!));
+ assert.equal('inputGeneration' in stored,false);assert.equal('inputGeneration' in stored.sessions[0],false);
+ c.break();assert.equal(c.inputGeneration,generation+2);
+ c.reset();assert.equal(c.inputGeneration,generation+3);
+});

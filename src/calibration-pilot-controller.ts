@@ -11,7 +11,7 @@ export interface PilotControllerState {
  archive:PilotArchive;session:ExploratoryCalibrationSession|null;
  current:ReturnType<typeof exploratoryCalibrationCurrent>;
  progress:ReturnType<typeof exploratoryCalibrationProgress>|null;
- busy:boolean;error?:string;readOnly:boolean;broken:boolean;notes:string;
+ busy:boolean;error?:string;readOnly:boolean;broken:boolean;notes:string;inputGeneration:number;
 }
 export interface PilotControllerOptions {
  load:PilotLoad;files:PilotFiles;now?:()=>string;id?:()=>string;
@@ -31,6 +31,7 @@ export class PilotController {
  private stopped=false;
  private interrupted=false;
  private epoch=0;
+ private generation=0;
  private failure?:string;
  private note='';
  private flight:Promise<void>=Promise.resolve();
@@ -53,11 +54,12 @@ export class PilotController {
  get session():ExploratoryCalibrationSession|null {const s=this.active();return s?structuredClone(s):null;}
  get busy():boolean{return this.pending;}
  get error():string|undefined{return this.failure;}
+ get inputGeneration():number{return this.generation;}
  get state():PilotControllerState{return this.getState();}
  getState():PilotControllerState {
   const session=this.session,current=session?exploratoryCalibrationCurrent(session):{trial:null,block:null,needsSetup:false};
   return{archive:this.archive,session,current,progress:session?exploratoryCalibrationProgress(session):null,
-   busy:this.pending,error:this.failure,readOnly:!!this.retained.error,broken:this.interrupted,notes:this.note};
+   busy:this.pending,error:this.failure,readOnly:!!this.retained.error,broken:this.interrupted,notes:this.note,inputGeneration:this.generation};
  }
  subscribe(listener:(state:PilotControllerState)=>void):()=>void {
   if(this.stopped)return()=>{};this.listeners.add(listener);listener(this.getState());return()=>this.listeners.delete(listener);
@@ -183,7 +185,7 @@ export class PilotController {
    this.controlsHeld.add(key);return this.rating(result.grade,result.input,result.trialId);
   }catch(error){this.failure=`Pilot input refused: ${error instanceof Error?error.message:String(error)}`;this.emit();return Promise.resolve(false);}
  }
- reset():void {this.router.reset();this.midiHeld.clear();this.manualHeld.clear();this.controlsHeld.clear();}
+ reset():void {this.generation++;this.router.reset();this.midiHeld.clear();this.manualHeld.clear();this.controlsHeld.clear();}
  break():void {
   if(this.stopped)return;this.epoch++;this.interrupted=true;this.reset();this.note='';
   this.accepted.sessions=this.accepted.sessions.map(resumeExploratoryCalibrationSession);this.emit();
