@@ -84,6 +84,17 @@ test('newer generation during delayed admission cannot publish the old prepared 
  assert.equal(f.mounts.length,0);assert.equal(f.old.closed,0);assert.equal(f.old.options.personal.choices.a.hand,'LH');assert.deepEqual(f.old.state.evidence,f.evidence);
 });
 
+test('settings changed during hand-plan admission are admitted again without replacing the later choice',async()=>{
+ const f=fixture(),gate=deferred();let calls=0;
+ f.setPrepare(async(_base,_id,context)=>++calls===1?gate.promise:{state:{evidence:structuredClone(f.evidence),preferences:structuredClone(context.preferences)},plan:{hands:['RH','RH']}});
+ const changing=f.changeHand('RH');await settle();assert.equal(f.preparations.length,1);
+ f.snapshot.preferences.working=84;f.snapshot.includeManual=false;
+ gate.resolve({state:{evidence:structuredClone(f.evidence),preferences:{working:72}},plan:{hands:['RH','RH']}});await changing;
+ assert.equal(f.preparations.length,2);assert.equal(f.mounts.length,1);
+ assert.equal(f.mounts[0].context.includeManual,false);assert.equal(f.mounts[0].owner.state.preferences.working,84);
+ assert.deepEqual(f.mounts[0].owner.state.evidence,f.evidence);
+});
+
 for(const replacement of ['practice','score'] as const)test(`a ${replacement} switch during delayed admission keeps the new owner and its source untouched`,async()=>{
  const f=fixture(),gate=deferred();f.setPrepare(()=>gate.promise);const first=f.changeHand('RH');await settle();
  const other={entry:{id:'other'},package:{sourceSha256:'other-source'},personal:{choices:{}}},next={source:'other-source',state:{credit:99}};
