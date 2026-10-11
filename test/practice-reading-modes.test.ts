@@ -73,3 +73,29 @@ test('a started silent joined Reading window remains explicitly browsable with n
  const f=fixture(t);for(const c of plan.chunks.slice(0,4))f.state.best[c.pattern]=f.state.target;
  const joined=reconcilePassages(plan,f.state).all.get('1-16')!,silent={...plan,gestures:[],attacks:[]};f.view.selectPassage(joined);f.view.reading=new ReadingSession(silent,joined);await f.view.action('ready');assert.equal(f.view.readingActive(),true);assert.equal(f.view.canTurnPage,true);const before=structuredClone(f.state);await f.view.action('next');assert.equal(f.view.reading.window,1);assert.deepEqual(f.view.slots.bars,[7,8,undefined,undefined]);assert.equal(f.view.reading.matched.size,0);assert.deepEqual(f.state,before);assert.deepEqual(f.writes,[]);
 });
+
+test('Free view and the selector retain only physical contacts without score interpretation or paint',async t=>{
+ const f=fixture(t),before=structuredClone(f.state),calls:string[]=[];
+ f.view.preview.note=()=>{calls.push('match');throw Error('Passive score matcher ran');};
+ f.view.contacts={clear(){},press(){calls.push('contact');},release(){calls.push('release');},replace(){calls.push('replace');}};
+ f.view.paintVisibility=()=>calls.push('paint');f.view.connectionChanged=()=>calls.push('status');f.view.diagnostics.record=()=>calls.push('diagnostic');
+ for(const state of [{mode:'free',overview:false},{mode:'reading',overview:true},{mode:'timed',overview:true}]){
+  Object.assign(f.view,state);const attack=note(55);f.view.observe(attack);f.view.note(attack);
+  assert.equal(f.view.heldPitches.has(55),true);assert.equal(f.view.heldStreams.get(55).source,'test');assert.deepEqual(calls,[]);
+  f.view.note(note(55,{on:false}));assert.equal(f.view.heldPitches.has(55),false);assert.deepEqual(calls,[]);
+ }
+ assert.deepEqual(f.state,before);assert.equal(f.view.reading.matched.size,0);assert.deepEqual(f.writes,[]);
+});
+test('physical held notes survive explicit Free/Timed re-entry without fabricated accepted attacks',async t=>{
+ const f=fixture(t);await f.view.action('free-view');f.view.note(note(55));assert.equal(f.view.heldPitches.has(55),true);
+ await f.view.action('timed');assert.equal(f.view.heldPitches.has(55),true);assert.equal(f.view.session.matched.size,0);
+ await f.view.action('overview');f.view.note(note(60));f.view.selectPassage(plan.chunks[1]);assert.equal(f.view.heldPitches.has(60),true);
+ f.view.note(note(55,{on:false,channel:2}));assert.equal(f.view.heldPitches.has(55),true,'unrelated channel release cannot clear the real contact');
+ f.view.note(note(55,{on:false}));assert.equal(f.view.heldPitches.has(55),false);
+ f.view.clearHeldInput();assert.equal(f.view.heldPitches.size,0);assert.equal(f.view.heldStreams.size,0);
+});
+test('Options contacts remain physical only and guard-filtered events never become held input',t=>{
+ const f=fixture(t),before=structuredClone(f.state);f.view.settingsDialog={};f.view.note(note(55));assert.equal(f.view.heldPitches.has(55),true);assert.equal(f.view.reading.matched.size,0);
+ f.view.observeHeldInput(note(60,{filtered:true}));assert.equal(f.view.heldPitches.has(60),false);
+ f.view.note(note(55,{on:false}));assert.equal(f.view.heldPitches.size,0);assert.deepEqual(f.state,before);
+});

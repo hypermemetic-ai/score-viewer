@@ -82,3 +82,11 @@ identifies the exact regression and browser checkpoints separately from delivery
 The current [Speed and shortcut source validation](practice-speed-shortcuts-validation.md)
 records the integer-anchor refinement and exact keyboard/build evidence separately
 from the earlier Reading/Timed and native delivery receipts.
+
+## Passive viewing and editing
+
+The full-score reader, editor, selector and Free view do not match played notes, highlight matches, advance selection or turn pages automatically. Only section Reading/Timed and their preparation interpret notes. Free view retains physical held-key state for explicit practice re-entry without counting passive-view attacks as successful playing. MIDI reset, focus loss or connection replacement clears that state. Explicit keyboard/pedal commands, independent piano sound and Options diagnostics remain available. The former full-score Performance start and grading controls are retired; existing records remain stored.
+
+In Edit, plain Up/Down move to the horizontally nearest editable note in the previous/next whole system, across either hand. Equal horizontal distances use vertical proximity, then written source order. Empty systems are skipped; score ends keep selection in place. Page crossings reveal and focus the destination note, including a visible held-note continuation. Left/Right/Tab keep their existing chronological movement. Toolbar controls, editable fields, dialogs and binding capture keep ownership of their arrows; modified, repeated or already-held vertical keys do not move the note selection.
+
+The [passive reader and system navigation validation](passive-score-editing-validation.md) records the initial source and actual production-browser checks separately from native delivery.

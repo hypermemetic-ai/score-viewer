@@ -32,9 +32,9 @@ const calculatorEvidence=(layer:FingerLayer)=>({version:layer.version,plannerVer
 export async function calculatedHandInputs(p:ScorePackage,layer:FingerLayer,policy:PerformingHandPolicy,recipe:ScoreRenderingRecipe,
  constraints:readonly PianoAssignmentConstraint[],inkPolicy?:ViewerAnnotationInkPolicy):Promise<{inputs:HandPresentationIdentityInputs;operatorRequirements:GuardedOperatorHandRequirement[]}>{
  const source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256!),operatorRequirements:GuardedOperatorHandRequirement[]=[];
- for(const c of constraints)if(c.provenance.kind==='operator-choice'&&c.hand!==undefined)
+ for(const c of constraints)if(['operator-choice','personal-choice'].includes(c.provenance.kind)&&c.hand!==undefined)
   operatorRequirements.push({version:'operator-hand-requirement-v1',ownerId:c.ownerId,hand:c.hand,guard:{...c.guard},
-   authorityId:'viewer-operator-choice:'+await identityHash(c)});
+   authorityId:'viewer-operator-choice:'+await identityHash(c),...((c.provenance.kind as string)==='personal-choice'?{authorityClass:'personal-choice' as const}:{})});
  return{inputs:{sourceSha256:p.sourceSha256!,assignmentSha256:await identityHash(canonicalOwnerAssignments(layer)),
   handPolicyRevision:'viewer-performing-hand-policy-v1:'+policy,constraintSha256:await authorityIdentity(constraints),keyboardId:p.keyboardLayout!,
   profileSha256:layer.profileSha256 as string,calculationContextSha256:await identityHash({referencePerformanceTempo:source.referencePerformanceTempo,calculationContext:p.calculationContext,...(inkPolicy?{annotationInkPolicy:inkPolicy}:{ }),...(p.transposition?{transposition:p.transposition}:{})}),

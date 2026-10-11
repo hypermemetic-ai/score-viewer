@@ -134,7 +134,9 @@ test('complete three/four-component source ties cold-read across every page on b
   for(const [index,l]of q.r.layouts.entries())assert.deepEqual(new Set(l.tieSplitHeadIds),new Set(components.flatMap((c,i)=>
    c.startTick>=index*144&&c.startTick<(index+1)*144?[]:[i?'written-hold~c'+i:'written-hold'])));
   assert.deepEqual(cold.files['source-score.json'],original.p.files['source-score.json']);assert.deepEqual(cold.sourceScore,source);
-  assert.equal(annotationPositions(cold).size,cold.seats.length);assert.equal(q.r.lint.violations.length,0);assert.equal(q.r.lint.warnings.length,0);
+  const positions=annotationPositions(cold);assert.equal(positions.size,cold.seats.length);
+  assert.deepEqual(annotationPositions({...cold,seats:[...cold.seats].reverse()}),positions,'page-local collision placement is independent of source seat enumeration across tied aliases');
+  assert.equal(q.r.lint.violations.length,0);assert.equal(q.r.lint.warnings.length,0);
   const retained=await ensurePianoReady({packageBytes:q.bytes,layout,intent:'read-retained'});assert.equal(retained.status,'editable');assert.deepEqual(retained.packageBytes,q.bytes);
   await assert.rejects(importPackage(await repinned(cold,f=>{const r=JSON.parse(strFromU8(f['hand-presentation.json']));
    const finalSeat=seats.at(-1)!;r.annotationGeometry.seats=r.annotationGeometry.seats.filter((g:any)=>g.seatId!==finalSeat.id);

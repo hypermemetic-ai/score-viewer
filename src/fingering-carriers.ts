@@ -73,11 +73,63 @@ function stemEnvelope(stem:Stem,direction:-1|1,system:Element,em:number):number 
  return direction===-1?Math.min(...ends):Math.max(...ends);
 }
 
+type PageCarrier=readonly [string,FingerCarrier];
+const carrierPages=new Map<string,readonly PageCarrier[]>();
+const maximumCarrierPages=12,maximumCarrierKeyUnits=4_000_000;
+let carrierKeyUnits=0;
+/** Encode only plain own data, with exact type tags and signed zero. Unknown
+ * prototypes, getters, serializers and cycles retain the original traversal. */
+function carrierData(value:unknown,skipPersonal=false,seen=new Set<object>(),depth=0):string|undefined {
+ if(value===null)return 'l';if(value===undefined)return 'u';
+ if(typeof value==='string')return 's'+JSON.stringify(value);
+ if(typeof value==='boolean')return value?'b1':'b0';
+ if(typeof value==='number')return Number.isFinite(value)?'n'+(Object.is(value,-0)?'-0':String(value)):undefined;
+ if(typeof value!=='object'||depth>16||seen.has(value)||'toJSON' in value)return;
+ const array=Array.isArray(value),prototype=Object.getPrototypeOf(value);
+ if(prototype!==(array?Array.prototype:Object.prototype))return;
+ const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(value);
+ if(keys.some(k=>typeof k!=='string'||!('value' in descriptors[k])||!descriptors[k].enumerable&&!(array&&k==='length'))||
+  array&&(keys.length!==(value as unknown[]).length+1||Array.from({length:(value as unknown[]).length},(_,i)=>i).some(i=>!Object.hasOwn(descriptors,i))))return;
+ seen.add(value);const parts:string[]=[];
+ try{for(const key of keys as string[]){if(array&&key==='length'||skipPersonal&&key==='personalHand')continue;
+   const encoded=carrierData(descriptors[key].value,false,seen,depth+1);if(encoded===undefined)return;
+   parts.push(JSON.stringify(key)+':'+encoded);
+  }return (array?'a[':'o{')+parts.join(',')+(array?']':'}');
+ }finally{seen.delete(value);}
+}
+function carrierPageKey(page:number,svg:string,seats:readonly Seat[],notes:ReadonlyMap<string,ScorePackage['score']['notes'][number]>):string|undefined {
+ if(typeof svg!=='string')return;
+ const seatData=carrierData(seats);if(seatData===undefined)return;
+ const owners:string[]=[];
+ for(const seat of seats)for(const id of seat.ownerIds){const data=carrierData(notes.get(id),true);if(data===undefined)return;owners.push(JSON.stringify(id)+':'+data);}
+ const key=page+':'+JSON.stringify(svg)+':'+seatData+':'+owners.join(',');return key.length<=maximumCarrierKeyUnits?key:undefined;
+}
+const detachCarrier=(c:FingerCarrier):FingerCarrier=>({...c,stemIds:[...c.stemIds],associatedStemIds:[...c.associatedStemIds]});
+function rememberCarrierPage(key:string,page:ReadonlyMap<string,FingerCarrier>):void {
+ const entries=[...page].map(([id,c])=>{const owned=detachCarrier(c);Object.freeze(owned.stemIds);Object.freeze(owned.associatedStemIds);Object.freeze(owned);return Object.freeze([id,owned] as const);});
+ carrierPages.set(key,Object.freeze(entries));carrierKeyUnits+=key.length;
+ while(carrierPages.size>maximumCarrierPages||carrierKeyUnits>maximumCarrierKeyUnits){const oldest=carrierPages.keys().next().value!;carrierPages.delete(oldest);carrierKeyUnits-=oldest.length;}
+}
+
 /** Every package keeps its own SVG and source/contact identities. No saved
  * geometry certificate, package migration or score rendering is performed. */
-export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>):Map<string,FingerCarrier>{
+export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>,pages?:ReadonlySet<number>):Map<string,FingerCarrier>{
+ if(pages)for(const page of pages)if(!Number.isSafeInteger(page)||page<0||page>=p.pages.length)throw Error('Annotation page differs from the complete score.');
  const result=new Map<string,FingerCarrier>(),notes=new Map(p.score.notes.map(n=>[n.id,n]));
+ // Selection order and last-by-id note resolution remain the original ones.
+ // Do not inspect accessors/custom seat collections merely to establish cache reuse.
+ const seatDescriptors=Object.getOwnPropertyDescriptors(p.seats),seatKeys=Reflect.ownKeys(p.seats);
+ const plainSeats=Array.isArray(p.seats)&&Object.getPrototypeOf(p.seats)===Array.prototype&&
+  seatKeys.length===p.seats.length+1&&Array.from({length:p.seats.length},(_,i)=>i).every(i=>{
+   const descriptor=seatDescriptors[i];if(!descriptor||!('value' in descriptor))return false;
+   const s=descriptor.value;if(!s||Object.getPrototypeOf(s)!==Object.prototype)return false;
+   const own=Object.getOwnPropertyDescriptors(s);return Reflect.ownKeys(s).every(k=>typeof k==='string'&&own[k].enumerable&&'value' in own[k]);
+  });
  for(const [page,svg]of p.pages.entries()){
+  if(pages&&!pages.has(page))continue;
+  const key=plainSeats?carrierPageKey(page,svg,p.seats.filter(s=>s.page===page),notes):undefined,saved=key===undefined?undefined:carrierPages.get(key);
+  if(saved){carrierPages.delete(key!);carrierPages.set(key!,saved);for(const [id,c]of saved)result.set(id,detachCarrier(c));continue;}
+  const pageResult=new Map<string,FingerCarrier>();
   const doc=new DOMParser().parseFromString(svg,'image/svg+xml');
   const all=Array.from(doc.getElementsByTagName('*')) as unknown as Element[];
   for(const systemId of new Set(p.seats.filter(s=>s.page===page).map(s=>s.system))){
@@ -138,15 +190,17 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>):
      const direction=carriers[0].direction,edges=carriers.map(c=>stemEnvelope(c.stem,direction,system,head.seat.fontSize*4/3));
      // An aliased contact may retain several independent duration branches.
      const representative=[...carriers].sort((a,b)=>a.stem.id.localeCompare(b.stem.id))[0].stem;
-     result.set(head.seat.id,{id:carriers.map(c=>c.stem.id).sort().join('|'),x:representative.x,direction,edge:direction===-1?Math.min(...edges):Math.max(...edges),stemIds:carriers.map(c=>c.stem.id).sort(),associatedStemIds:associated.map(c=>c.stem.id).sort(),kind:'stem'});
+     pageResult.set(head.seat.id,{id:carriers.map(c=>c.stem.id).sort().join('|'),x:representative.x,direction,edge:direction===-1?Math.min(...edges):Math.max(...edges),stemIds:carriers.map(c=>c.stem.id).sort(),associatedStemIds:associated.map(c=>c.stem.id).sort(),kind:'stem'});
     }else{
      // Stemless symbols are anchored to their own source-linked head. Never
      // borrow an unrelated stem, and never refuse annotations for crowding.
      const direction=head.hand==='RH'?-1:1;
-     result.set(head.seat.id,{id:`${page}:${systemId}:head-${head.seat.id}`,x:head.column,direction,edge:direction===-1?head.box[1]:head.box[3],stemIds:[],associatedStemIds:[],kind:'head'});
+     pageResult.set(head.seat.id,{id:`${page}:${systemId}:head-${head.seat.id}`,x:head.column,direction,edge:direction===-1?head.box[1]:head.box[3],stemIds:[],associatedStemIds:[],kind:'head'});
     }
    }
   }
+  if(key!==undefined)rememberCarrierPage(key,pageResult);
+  for(const [id,c]of pageResult)result.set(id,c);
  }
  return result;
 }

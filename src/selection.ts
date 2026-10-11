@@ -16,3 +16,15 @@ export function selectionOnPage(p:Pick<ScorePackage,'score'|'seats'>,contactId:s
  const visible=p.seats.filter(seat=>seat.page===page).sort((a,b)=>Number(!!a.continuation)-Number(!!b.continuation)||(rank.get(a.contactId)??0)-(rank.get(b.contactId)??0));
  return visible.find(seat=>seat.contactId===contactId)??visible[0];
 }
+
+/** Navigate the printed systems, including visible aliases of earlier contacts.
+ * Source coordinates keep musical movement independent of screen rotation. */
+export function systemSelection(p:Pick<ScorePackage,'score'|'seats'>,current:Seat,direction:-1|1):Seat {
+ const order=editUnits(p),rank=new Map(order.map((seat,index)=>[seat.contactId,index]));
+ const systems=new Map<string,Seat[]>();
+ for(const seat of p.seats){if(!rank.has(seat.contactId))continue;const key=`${seat.page}:${seat.system}`,seats=systems.get(key)??[];seats.push(seat);systems.set(key,seats);}
+ const rows=[...systems.values()].sort((a,b)=>a[0].page-b[0].page||a[0].system-b[0].system);
+ const index=rows.findIndex(seats=>seats[0].page===current.page&&seats[0].system===current.system),target=rows[index+direction];
+ if(index<0||!target)return current;
+ return [...target].sort((a,b)=>Math.abs(a.x-current.x)-Math.abs(b.x-current.x)||Math.abs(a.baseline-current.baseline)-Math.abs(b.baseline-current.baseline)||(rank.get(a.contactId)!-rank.get(b.contactId)!)||a.id.localeCompare(b.id))[0];
+}

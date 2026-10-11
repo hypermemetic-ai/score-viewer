@@ -22,7 +22,7 @@ import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finge
 import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {PIANO_ASSIGNMENT_VERSION,validatePianoAssignments} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {validatePianoPreparationIdentity,type PianoPreparationIdentity} from './piano-preparation-identity';
-import {sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry,type PresentationWrittenHead} from '../vendor/iso-notation/src/score-presentation';
+import {validateDerivedHandPresentation,sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry,type PresentationWrittenHead} from '../vendor/iso-notation/src/score-presentation';
 import {admitCalculatedHandEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 import {admitScoreTransposition,type ScoreTransposition} from './score-transposition';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
@@ -245,7 +245,9 @@ export async function handDigest(source:QuantizedGridScore,effective:QuantizedGr
   for(const event of source.notes){const n=requirePianoEvent(event),id=`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`;groups.set(id,[...(groups.get(id)??[]),n]);}
   const attacks=[...groups.values()].sort((a,b)=>a[0].startTick-b[0].startTick||(requirePitchedEvent(a[0]).pitch.octave*12+requirePitchedEvent(a[0]).pitch.pitchClass)-(requirePitchedEvent(b[0]).pitch.octave*12+requirePitchedEvent(b[0]).pitch.pitchClass));
   return hashBytes(JSON.stringify(attacks.flatMap(a=>a.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(o=>[o.id,byId.get(o.id)]))));}
- const input=normalizeHandPlanningInput(source),requirements=compilePlanningRequirements(input);
+ const input=normalizeHandPlanningInput(source),personal=effective.performingHandPresentation?.personalRequirements;
+ if(personal?.length){validateDerivedHandPresentation(effective);input.personalHandRequirements=personal.map(q=>({ownerId:q.ownerId,hand:q.hand,guard:{...q.guard},assignmentId:q.authorityId}));}
+ const requirements=compilePlanningRequirements(input);
  for(const a of input.gestures.flatMap(g=>g.attacks)){const hands=new Set(a.owners.map(o=>byId.get(o.id)));
   if(hands.size!==1||requirements.attackHands[a.id]&&!hands.has(requirements.attackHands[a.id]))fail('Linked performing hands contradict a source instruction or physical alias');}
  return hashBytes(JSON.stringify(input.gestures.flatMap(g=>g.attacks.flatMap(a=>a.owners.map(o=>[o.id,byId.get(o.id)])))));

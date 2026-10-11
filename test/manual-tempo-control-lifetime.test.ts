@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {ManualTempoControls,refreshPracticeSpeedDisplay} from '../src/manual-tempo-control';import {TempoRepeat} from '../src/tempo-repeat';
+import {initialPersonal} from '../src/state';
 import {PracticeView} from '../src/practice-view';import {initialPractice,passed} from '../src/practice';import {speedNumber} from '../src/tempo-presentation';import {referenceFixture} from './support/reference-score';
 
 const score=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
@@ -88,7 +89,7 @@ test('the keyboard opener stays consumed through held repeats until release, whi
 
 test('a browser change during piano footer replacement cannot commit the owned draft or queue a rate',()=>{
  let view:any;const rates:number[]=[],f=fixture(root=>{
-  view=new PracticeView(root,{package:score,personal:{} as never,entryId:'test',connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back(){},settings(){},changed(){}});
+  view=new PracticeView(root,{package:score,personal:initialPersonal(score),entryId:'test',connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back(){},settings(){},changed(){}});
   view.state=initialPractice(view.plan);view.status=()=>{};view.applySetting=(next:any)=>{rates.push(next.working);Object.assign(view.state,next);view.queuedWorking=next.working;view.refreshTempoFields(root);};return view.manual;
  });
  try{
@@ -111,7 +112,7 @@ test('readonly working-field OS repeats leave the single application speed repea
 
 test('cancelling after actual loop attainment restores the current rate before the next arrow; Enter intentionally replaces it',()=>{
  let view:any;const rates:number[]=[],f=fixture(root=>{
-  view=new PracticeView(root,{package:score,personal:{} as never,entryId:'test',connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back(){},settings(){},changed(){}});
+  view=new PracticeView(root,{package:score,personal:initialPersonal(score),entryId:'test',connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back(){},settings(){},changed(){}});
   view.state=initialPractice(view.plan);view.status=()=>{};view.applySetting=(next:any)=>{rates.push(next.working);Object.assign(view.state,next);view.refreshTempoFields(root);};return view.manual;
  });
  const show=(field:any)=>{field.value=speedNumber(view.state.working,view.state.target);Object.assign(field.dataset,{practiceSetting:'working',absolute:String(view.state.working),presented:field.value});};

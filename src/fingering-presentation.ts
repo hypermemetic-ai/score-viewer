@@ -12,6 +12,7 @@ export interface AnnotationPosition {x:number;baseline:number;fontSize:number;bo
 const ns='http://www.w3.org/2000/svg';
 const attribute=(el:Element,key:string,value:string)=>{if(el.getAttribute(key)!==value)el.setAttribute(key,value);};
 const cache=new WeakMap<object,Map<string,AnnotationPosition>>();
+const pageCache=new WeakMap<object,Map<number,Map<string,AnnotationPosition>>>();
 /** Keep the entire stack in its original source column's reading space. The
  * original x wins; otherwise select the smallest cleared local displacement.
  * Candidate boundaries come from actual obstacles, not guessed text widths. */
@@ -34,18 +35,42 @@ export function affiliatedAnnotationPosition(input:{x:number;top:number;directio
 }
 /** Reserve all 1–5 outlines beyond the frozen carrier. Shared stems form one
  * pitch-ordered vertical stack; changing a finger changes only its value. */
-export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|'annotationGeometry'|'calculatedHandReceipt'>):Map<string,AnnotationPosition>{
+type AnnotationScore=Pick<ScorePackage,'seats'|'score'|'pages'|'annotationGeometry'|'calculatedHandReceipt'>;
+/** Page selection limits overlay work only: every source owner, admitted
+ * geometry identity and original page remains in the complete input package. */
+export function annotationPositions(p:AnnotationScore,pages?:readonly number[]):Map<string,AnnotationPosition>{
  const inkPolicy=annotationInkPolicyFor(p);if(inkPolicy)assertAnnotationInkPolicyReady(inkPolicy);
- const saved=cache.get(p);if(saved)return saved;
+ const selected=pages===undefined?undefined:new Set(pages);
+ if(selected)for(const page of selected)if(!Number.isSafeInteger(page)||page<0||page>=p.pages.length)throw Error('Annotation page differs from the complete score.');
+ // A page cache limits drawing work, never the admitted ownership audit. Do
+ // this for the complete package on every selected-page request, including a
+ // cache hit and an empty viewport, just as font admission stays unconditional.
+ if(selected&&p.annotationGeometry){const geometry=p.annotationGeometry,owned=new Map(geometry.seats.map(s=>[s.seatId,s])),notes=new Map(p.score.notes.map(n=>[n.id,n]));
+  if(geometry.version!=='annotation-carrier-geometry-v1'||geometry.coverage!=='owned-head-and-duration'||
+   geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length)throw Error('Calculated annotation ownership differs from the admitted presentation.');
+  for(const seat of p.seats){const g=owned.get(seat.id);if(!g||g.page!==seat.page||g.system!==seat.system||g.hand!==notes.get(seat.ownerIds[0])?.hand)throw Error('Calculated annotation seat ownership differs: '+seat.id);}
+ }
+ const saved=cache.get(p);
+ if(!selected){if(saved)return saved;const positions=computeAnnotationPositions(p);cache.set(p,positions);return positions;}
+ const seatPages=new Map(p.seats.map(s=>[s.id,s.page]));
+ if(saved)return new Map([...saved].filter(([id])=>selected.has(seatPages.get(id)!)));
+ const completed=pageCache.get(p)??new Map<number,Map<string,AnnotationPosition>>(),missing=new Set([...selected].filter(page=>!completed.has(page)));
+ if(missing.size){const positions=computeAnnotationPositions(p,missing);
+  for(const page of missing)completed.set(page,new Map([...positions].filter(([id])=>seatPages.get(id)===page)));
+  pageCache.set(p,completed);
+ }
+ return new Map([...selected].sort((a,b)=>a-b).flatMap(page=>[...(completed.get(page)??[])]));
+}
+function computeAnnotationPositions(p:AnnotationScore,selected?:ReadonlySet<number>):Map<string,AnnotationPosition>{
  const metric=[Math.min(...Object.values(digitMetrics).map(m=>m[0])),Math.min(...Object.values(digitMetrics).map(m=>m[1])),Math.max(...Object.values(digitMetrics).map(m=>m[2])),Math.max(...Object.values(digitMetrics).map(m=>m[3]))];
- const carriers=fingeringCarriers(p),notes=new Map(p.score.notes.map(n=>[n.id,n])),groups=new Map<string,Seat[]>(),positions=new Map<string,AnnotationPosition>();
+ const carriers=fingeringCarriers(p,selected),notes=new Map(p.score.notes.map(n=>[n.id,n])),groups=new Map<string,Seat[]>(),positions=new Map<string,AnnotationPosition>();
  const geometry=p.annotationGeometry,owned=new Map(geometry?.seats.map(s=>[s.seatId,s])),box=(b:{x0:number;y0:number;x1:number;y1:number}):AnnotationBox=>[b.x0,b.y0,b.x1,b.y1],
-  obstacles=geometry?p.pages.map((svg,page)=>actualPageObstacles(svg,new Map(geometry.seats.filter(s=>s.page===page).map(s=>[s.seatId,box(s.headBounds)])),annotationInkPolicyFor(p))):undefined;
+  obstacles=geometry?p.pages.map((svg,page)=>!selected||selected.has(page)?actualPageObstacles(svg,new Map(geometry.seats.filter(s=>s.page===page).map(s=>[s.seatId,box(s.headBounds)])),annotationInkPolicyFor(p)):undefined):undefined;
  if(geometry&&(geometry.version!=='annotation-carrier-geometry-v1'||geometry.coverage!=='owned-head-and-duration'||
   geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length))throw Error('Calculated annotation ownership differs from the admitted presentation.');
  const pitch=(seat:Seat)=>{const n=requirePianoEvent(notes.get(seat.ownerIds[0])!);return n.pitch.octave*12+n.pitch.pitchClass;};
- for(const seat of p.seats){const key=carriers.get(seat.id)!.id,group=groups.get(key)??[];group.push(seat);groups.set(key,group);}
- const columns=new Map<string,number[]>();
+ for(const seat of p.seats){if(selected&&!selected.has(seat.page))continue;const key=carriers.get(seat.id)!.id,group=groups.get(key)??[];group.push(seat);groups.set(key,group);}
+ const columns=new Map<string,number[]>(),occupiedByPage=new Map<number,AnnotationBox[]>();
  for(const group of groups.values()){const key=group[0].page+':'+group[0].system,x=carriers.get(group[0].id)!.x,values=columns.get(key)??[];
   if(!values.includes(x))values.push(x);columns.set(key,values);}
  for(const group of [...groups.values()].sort((a,b)=>a[0].page-b[0].page||a[0].system-b[0].system||Math.min(...a.map(s=>s.x))-Math.min(...b.map(s=>s.x))||
@@ -58,22 +83,25 @@ export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|
   }
   const heights=ordered.map(s=>(metric[3]-metric[1])*s.fontSize*ANNOTATION_SIZE_RATIO*4/3/1000),stackHeight=heights.reduce((a,b)=>a+b,0)+gap*(group.length-1);
   let top=carrier.direction===-1?carrier.edge-gap-stackHeight:carrier.edge+gap,annotationX=carrier.x;
-  if(obstacles){const page=obstacles[group[0].page],smallEm=Math.max(...group.map(s=>s.fontSize))*ANNOTATION_SIZE_RATIO*4/3,
+  if(obstacles){const page=obstacles[group[0].page]!,smallEm=Math.max(...group.map(s=>s.fontSize))*ANNOTATION_SIZE_RATIO*4/3,
    width:[number,number]=[(metric[0]-280)*smallEm/1000,(metric[2]-280)*smallEm/1000],
    fit=affiliatedAnnotationPosition({x:carrier.x,top,direction:carrier.direction,gap,height:stackHeight,
     em:Math.min(...group.map(s=>s.fontSize))*4/3,width,columns:columns.get(group[0].page+':'+group[0].system)!,page,
-    occupied:[...positions.entries()].filter(([id])=>pianoSeatPage(id)===group[0].page).map(([,p])=>p.bounds)});
+    occupied:occupiedByPage.get(group[0].page)??[]});
    if(!fit)throw Error('Calculated finger annotations cannot fit actual page ink for '+group.map(s=>s.id).join(', '));
    top=fit.top;annotationX=fit.x;
   }
   for(const [index,seat]of ordered.entries()){
    const fontSize=seat.fontSize*ANNOTATION_SIZE_RATIO,smallEm=fontSize*4/3,x=annotationX,baseline=top+metric[3]*smallEm/1000;
    const bounds:AnnotationPosition['bounds']=[x+(metric[0]-280)*smallEm/1000,top,x+(metric[2]-280)*smallEm/1000,top+heights[index]];
-   positions.set(seat.id,{x,baseline,fontSize,bounds,carrier:geometry?carrier:carriers.get(seat.id)!});top+=heights[index]+gap;
+   positions.set(seat.id,{x,baseline,fontSize,bounds,carrier:geometry?carrier:carriers.get(seat.id)!});
+   // Retain exactly the placement order used by collision checks, without
+   // rescanning all earlier annotations and their source seats for each group.
+   const occupied=occupiedByPage.get(seat.page)??[];occupied.push(bounds);occupiedByPage.set(seat.page,occupied);
+   top+=heights[index]+gap;
   }
  }
- cache.set(p,positions);return positions;
- function pianoSeatPage(id:string){return p.seats.find(s=>s.id===id)!.page;}
+ return positions;
 }
 export interface FingerPaint {visible:boolean;presentation:FingerPresentation;finger?:number;position:AnnotationPosition;pitchText?:string;label?:string;interactive?:boolean}
 /** Original seat remains the only seat identity and keeps its existing feedback/hit target. */
