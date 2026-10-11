@@ -5,16 +5,17 @@ import {PracticeClock} from '../src/practice-clock';
 import {PracticeView,practiceAudioTestAction} from '../src/practice-view';
 import {PerformanceSession,performanceAudioErrorHandler} from '../src/performance';
 import {host,practiceAudio} from '../src/host';
-import {scorePulseGrid} from '../src/score-clock';
+import {scorePulseGrid,scoreTickMs} from '../src/score-clock';
 import {practiceCountInGrid} from '../src/practice-attempt-grid';
+import {practiceTiming} from '../src/practice-timing';
 
 const until=async(predicate:()=>boolean)=>{for(let i=0;i<100&&!predicate();i++)await new Promise<void>(done=>setImmediate(done));assert.ok(predicate(),'operation did not reach its controlled boundary');};
 function nativeHarness(t:any){
  const previous={midiClock:host.midiClock,begin:practiceAudio.begin,stop:practiceAudio.stop,onError:practiceAudio.onError};
- const starts:Array<{resolve:(n:number)=>void;reject:(error:Error)=>void}>=[],listeners:Array<{handler:(message:string)=>void;active:boolean}>=[];
+ const starts:Array<{duration:number;resolve:(n:number)=>void;reject:(error:Error)=>void}>=[],listeners:Array<{handler:(message:string)=>void;active:boolean}>=[];
  let stops=0;
  host.midiClock=async()=>10000000;
- practiceAudio.begin=()=>new Promise<number>((resolve,reject)=>starts.push({resolve,reject}));
+ practiceAudio.begin=(_device,_bpm,duration)=>new Promise<number>((resolve,reject)=>starts.push({duration,resolve,reject}));
  practiceAudio.stop=async()=>{stops++;};
  practiceAudio.onError=async handler=>{const listener={handler,active:true};listeners.push(listener);return()=>{listener.active=false;};};
  t.after(()=>{host.midiClock=previous.midiClock;practiceAudio.begin=previous.begin;practiceAudio.stop=previous.stop;practiceAudio.onError=previous.onError;});
@@ -25,16 +26,20 @@ function practiceView(){
  // logic. Admission failure is covered by practice-progression-lifecycle.test.ts.
  const view=Object.create(PracticeView.prototype) as any,ready:number[]=[],messages:string[]=[];
  const plan={referencePerformanceTempo:testReference,ticksPerBeat:48,timeSignatures:[{tick:0,numerator:6,denominator:8}],barTicks:[0,144,288,432,576]};
- const session={chunk:{start:0,end:576},sourcePulseGrid:practiceCountInGrid(scorePulseGrid(plan,plan.barTicks)),startTick:0,tickMs:1,phase:'ready',ready(start:number){ready.push(start);this.phase='countin';},pause(){this.phase='paused';}};
+ // The source has no outgoing hold; its actual completion is the display end.
+ // Ready owns audio duration through completionTick, including held tails.
+ const session={chunk:{start:0,end:576},completionTick:576,sourcePulseGrid:practiceCountInGrid(scorePulseGrid(plan,plan.barTicks)),startTick:0,tickMs:1,phase:'ready',ready(start:number){ready.push(start);this.phase='countin';},pause(){this.phase='paused';}};
  Object.assign(view,{mode:'timed',previousMode:'timed',readingPaused:true,feedback:'',manual:{cancel(){}},contacts:{clear(){}},plan,session,state:{working:180,countInBars:2},options:{connected:()=>true},audioOutputs:{supported:true},startGeneration:0,disposed:false,preview:{clear(){}},app:{querySelector:()=>null}});
  view.paint=()=>{};view.paintScore=()=>{};view.paintControls=()=>{};view.paintVisibility=()=>{};view.status=(message:string)=>messages.push(message);
- return{view,session,ready,messages};
+ return{view,session,ready,messages,duration:576*scoreTickMs(plan,180)+practiceTiming(180,session.sourcePulseGrid).countInMs};
 }
 
 test('replacement rejection from an older Ready request cannot stop the newer start',async t=>{
  const native=nativeHarness(t),f=practiceView();
  const old=f.view.action('ready');await until(()=>native.starts.length===1);
+ assert.equal(native.starts[0].duration,f.duration);
  const current=f.view.action('ready');await until(()=>native.starts.length===2);
+ assert.equal(native.starts[1].duration,f.duration);
  const stops=native.stops;
  native.starts[0].reject(Error('Audio start cancelled'));await old;
  assert.equal(native.stops,stops);assert.ok(!f.messages.includes('Audio start cancelled'));
@@ -79,6 +84,7 @@ test('new subscriptions wait for native stop and cancelled listener registration
 test('an error before native begin resolves pauses practice and cannot announce readiness',async t=>{
  const native=nativeHarness(t),f=practiceView();
  const pending=f.view.action('ready');await until(()=>native.starts.length===1);
+ assert.equal(native.starts[0].duration,f.duration);
  native.listeners[0].handler('Selected output disconnected');
  native.starts[0].reject(Error('Selected output disconnected'));await pending;
  assert.equal(f.session.phase,'paused');assert.deepEqual(f.ready,[]);assert.equal(f.view.audioError,'Selected output disconnected');
