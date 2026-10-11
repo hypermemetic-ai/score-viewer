@@ -4,6 +4,7 @@ import {authoredManualPackage} from './support/manual-practice-fixture';
 import {PracticeView} from '../src/practice-view';import {ManualPracticeView} from '../src/manual-practice-view';
 import {planPractice,initialPractice,readPractice} from '../src/practice';import {planManualPractice} from '../src/manual-practice-plan';
 import {speedNumber} from '../src/tempo-presentation';
+import {tempoRateNumber} from '../src/metronome-mark';
 const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
 const manualSource=await authoredManualPackage(12);
 const plans={piano:planPractice(p),manual:await planManualPractice(manualSource)};
@@ -36,4 +37,17 @@ test('actual low-target Step typing rounds the changed input while literal reloa
  const plan={...plans.piano,referencePerformanceTempo:{...plans.piano.referencePerformanceTempo!,bpm:5}}, {view,state}=fixture('piano',plan),before=structuredClone(state);
  assert.equal(view.setting(field(state,'step','0.75')),true);assert.deepEqual(state,{...before,step:.05});
  assert.equal(readPractice({...before,step:.0375},plan).step,.0375);
+});
+
+for(const mode of ['piano','manual'] as const)for(const personal of [false,true])test(`${mode} unchanged Target preserves literal choices and ${personal?'existing':'absent'} personal goal authority`,()=>{
+ const {view,state}=fixture(mode),plan=plans[mode];
+ if(personal)Object.assign(state,readPractice({...state,target:185.123456789,personalGoal:{version:'personal-performance-goal-v1',bpm:185.123456789,beat:plan.referencePerformanceTempo!.beat}},plan));
+ const before=structuredClone(state),shown=tempoRateNumber(state.target);let refreshes=0;
+ view.applySetting=()=>assert.fail('An unchanged Target must not apply a new goal or rewrite preferences.');
+ view.refreshSettings=view.refreshFields=()=>refreshes++;
+ for(const draft of [false,true]){
+  const input={dataset:{practiceSetting:'target',absolute:String(state.target),presented:shown,...(draft?{manualDraft:String(state.target),manualDraftText:shown}:{})},value:shown};
+  assert.equal(view.setting(input),true);assert.deepEqual(state,before);
+ }
+ assert.equal(refreshes,2);
 });
