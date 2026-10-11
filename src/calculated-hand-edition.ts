@@ -105,8 +105,7 @@ export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seat
   {inputs,operatorRequirements}=await calculatedHandInputs(p,p.fingerLayer,policy,recipe,constraints,inkPolicy),owners=ownerHands(p.fingerLayer),
   identity=await createHandPresentationIdentity(inputs,owners);
  await validateHandPresentationAgainstSource(source,p.score,identity,operatorRequirements);
- const prepare=prepareCalculatedHandPresentation as (...args:[...Parameters<typeof prepareCalculatedHandPresentation>,ReadingExecution?])=>ReturnType<typeof prepareCalculatedHandPresentation>;
- const replay=await prepare(source,owners,recipe,inputs,operatorRequirements,execution),expected=receiptFor(replay,inkPolicy,p.transposition?.sha256);
+ const replay=await prepareCalculatedHandPresentation(source,owners,recipe,inputs,operatorRequirements,execution),expected=receiptFor(replay,inkPolicy,p.transposition?.sha256);
  checkReadingExecution(execution);
  if(!same(r,expected))throw Error('Calculated edition receipt differs from original-source actual paint, coverage or annotation geometry.');
  if(!same(p.score,replay.score)||p.pages.length!==replay.pages.length||p.pages.some((page,i)=>page!==replay.pages[i])||

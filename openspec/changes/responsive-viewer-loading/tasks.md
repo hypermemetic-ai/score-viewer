@@ -7,8 +7,8 @@
 
 ## 2. Cooperative shared preparation
 
-- [ ] 2.1 Implement shared cooperative rendering and personal warm with per-step source/final-ink ownership and atomic cancellation; verify synchronous/asynchronous output equivalence, mutation guards, callback scope expiry, cancellation and retry in focused ISO tests and document the supported API.
-- [ ] 2.2 Review and merge the scoped ISO change, integrate the exact merged dependency pin and forward execution through retained recipe and package admission; verify provenance, types, complete receipt rejection and cancellation controls.
+- [x] 2.1 Implement shared cooperative rendering and personal warm with per-step source/final-ink ownership and atomic cancellation; verify synchronous/asynchronous output equivalence, mutation guards, callback scope expiry, cancellation and retry in focused ISO tests and document the supported API.
+- [x] 2.2 Review and merge the scoped ISO change, integrate the exact merged dependency pin and forward execution through retained recipe and package admission; verify provenance, types, complete receipt rejection and cancellation controls.
 
 ## 3. Viewer reuse and readiness
 

@@ -9,10 +9,7 @@ import {PersonalPreparationPool,type PreparationLease,type PreparationRequest} f
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 
 type Core=ReturnType<typeof createPersonalHandProjection>;
-// The optional shape allows the viewer seam to compile against its historical
-// source pin. Once the reviewed cooperative pin lands these methods are used.
-type CooperativeCore=Core&{warmAsync?(execution?:ReadingExecution):Promise<void>;projectAsync?(owners:readonly OwnerHand[],identity:string,execution?:ReadingExecution):Promise<ReturnType<Core['project']>>};
-const preparations=new PersonalPreparationPool<CooperativeCore>();
+const preparations=new PersonalPreparationPool<Core>();
 /** Literal value identity preserves undefined, nonfinite numbers and -0 too;
  * a mutation cannot collide merely because JSON would erase its difference. */
 function literal(value:unknown):unknown {
@@ -26,7 +23,7 @@ function literal(value:unknown):unknown {
 }
 /** Each facade captures once before yielding. File bytes, rather than a mutable
  * archiveSha claim, bind the exact current archive members to the source graph. */
-async function capture(base:ScorePackage):Promise<PreparationRequest<CooperativeCore>> {
+async function capture(base:ScorePackage):Promise<PreparationRequest<Core>> {
  const snapshot=structuredClone(base),files=snapshot.files;
  const {files:ignored,...meaning}=snapshot;
  const identity=JSON.stringify(literal(meaning));
@@ -43,15 +40,15 @@ async function capture(base:ScorePackage):Promise<PreparationRequest<Cooperative
 /** A reader owns its package/wrapper/buffers and local last view. Shared cores
  * are captured, bounded and serialized; changed pages are never a paint shortcut. */
 export class PersonalPresentationSession {
- private preparation?:Promise<PreparationRequest<CooperativeCore>>;
- private lease?:PreparationLease<CooperativeCore>;
+ private preparation?:Promise<PreparationRequest<Core>>;
+ private lease?:PreparationLease<Core>;
  private lastKey?:string;
  private lastView?:ScorePackage;
  private readonly base:ScorePackage;
- private readonly pool:PersonalPreparationPool<CooperativeCore>;
+ private readonly pool:PersonalPreparationPool<Core>;
  constructor(base:ScorePackage,pool=preparations){this.base=base;this.pool=pool;}
  private prepare(){return this.preparation??=capture(this.base).catch(error=>{this.preparation=undefined;throw error;});}
- private async use<V>(action:(core:CooperativeCore,execution?:ReadingExecution)=>V|Promise<V>,execution?:ReadingExecution):Promise<V>{
+ private async use<V>(action:(core:Core,execution?:ReadingExecution)=>V|Promise<V>,execution?:ReadingExecution):Promise<V>{
   const request=await this.prepare();checkReadingExecution(execution);
   const result=await this.pool.use({...request,lease:this.lease},action,execution);this.lease=result.lease;return result.value;
  }
@@ -59,7 +56,7 @@ export class PersonalPresentationSession {
  async warm(input?:ReadingExecution):Promise<void>{
   if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  await this.use((core,e)=>e&&core.warmAsync?core.warmAsync(e):core.warm(),execution);
+  await this.use((core,e)=>e?core.warmAsync(e):core.warm(),execution);
  }
  async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
@@ -68,7 +65,7 @@ export class PersonalPresentationSession {
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
   const digest=await hashBytes(key);checkReadingExecution(execution);
-  const result=await this.use((core,e)=>e&&core.projectAsync?core.projectAsync(owners,digest,e):core.project(owners,digest),execution);
+  const result=await this.use((core,e)=>e?core.projectAsync(owners,digest,e):core.project(owners,digest),execution);
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry};
   this.lastKey=key;this.lastView=view;return view;
  }
