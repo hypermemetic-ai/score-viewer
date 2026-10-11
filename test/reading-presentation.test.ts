@@ -14,7 +14,7 @@ test('full ISO/TAB reading remains available without inventing a missing perform
 });
 test('reading and manual practice share source view identity, with owned view state and literal scenes',async()=>{
  const p=await importPackage(await prepareDualReadingPackage(authoredFrettedInput())),reading=await ReadingPresentationController.open(p),manual=await ManualReadingContext.open(p);
- assert.equal(reading.revision,manual.plan.revision);assert.equal(reading.storageName,manual.viewStorageName);
+ assert.equal(reading.revision,manual.sourceMusicalRevision);assert.notEqual(reading.revision,manual.plan.revision);assert.equal(reading.storageName,manual.viewStorageName);
  const component=manual.plan.components.find(c=>c.bar===2)!;reading.setAnchor({writtenBar:2,sourceEventId:component.id});reading.switchNotation('tab');
  manual.view.anchor=structuredClone(reading.view.anchor);manual.switchNotation('tab');assert.deepEqual(manual.viewRecord(),reading.record());
  assert.equal(reading.package.reading!.dual!.views.iso.scene,p.reading!.dual!.views.iso.scene);

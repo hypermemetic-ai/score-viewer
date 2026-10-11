@@ -139,7 +139,7 @@ test('chooser key and render each derive one fresh tree without rewriting earned
  assert.equal(browser.key('ArrowDown',state),'handled');assert.equal(calls,1);
  const previous=Object.getOwnPropertyDescriptor(globalThis,'document');Object.defineProperty(globalThis,'document',{configurable:true,value:{activeElement:undefined}});
  t.after(()=>{if(previous)Object.defineProperty(globalThis,'document',previous);else delete(globalThis as any).document;});
- const preview={querySelector:()=>null},root={style:{setProperty(){}},querySelectorAll:()=>[],querySelector:()=>preview,innerHTML:''};
+ const preview={querySelector:()=>null,querySelectorAll:()=>[]},root={style:{setProperty(){}},querySelectorAll:()=>[],querySelector:()=>preview,innerHTML:''};
  calls=0;browser.render(root as any,state,()=>{throw Error('joined passage must not request a leaf preview');});assert.equal(calls,1);
  assert.match(root.innerHTML,/Measures 1 – 8 · 100%/);assert.equal(measuredRate(state,`connected:${plan.revision}:1-8`,'1-8'),state.target);assert.equal(JSON.stringify(state),raw);
 });
