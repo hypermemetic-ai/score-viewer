@@ -52,7 +52,7 @@ The independent Git-oracle full-map check passed all six cases at baseline and t
 | `src/fingering-carriers.ts` | `ba0e0b3e28433981d97baf46b8783173d842c9b42674a79ace4f629076b53cae` |
 
 Restore and history commands now enter the same ordered personal-intent queue as
-keyboard hand/finger edits. Seven production-body regressions cover interleaved
+keyboard hand/finger edits. Ten production-body regressions cover interleaved
 commands, reversed projection completion, delayed/failed writes, retry and score
 switches. The original slow-restore/newer-hand case fails against the prior code
 and passes after the change. Modal completion is guarded by its owning dialog
