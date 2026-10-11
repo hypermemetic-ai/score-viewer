@@ -13,7 +13,7 @@
 ## 3. Personal assignment authority
 
 - [x] 3.1 Introduce compatible source-guarded personal hand/finger overlays and one effective assignment resolver; verify legacy sidecars, original facts, source aliases and stable package/storage identities.
-- [ ] 3.2 Route effective assignments into practice and explicit calculation requests, with retained assignment provenance; verify hand and finger changes preserve credited progress for the same complete exercise, current practice uses effective choices, and reset requires explicit player action.
+- [x] 3.2 Route effective assignments into practice and explicit calculation requests, with retained assignment provenance; verify hand and finger changes preserve credited progress for the same complete exercise, current practice uses effective choices, and reset requires explicit player action.
 - [x] 3.3 Document overlay persistence and recovery; verify round trips preserve archives, library, history, preferences and original assignments.
 
 ## 4. Faithful shared projection
