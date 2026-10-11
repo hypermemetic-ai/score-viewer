@@ -10,7 +10,7 @@
 
 ## 2. Stable sections and adjacent doubles
 
-- [ ] 2.1 Introduce the source-bound exercise catalog and piano/manual planner adapters, retaining original section IDs/ranges and source obligations; verify shared section decisions and genuine manual technique constraints without changing notation-package bytes.
+- [ ] 2.1 Introduce the source-bound exercise catalog and piano/manual planner adapters consuming the editing change's effective assignments, retaining original section IDs/ranges and source obligations; verify shared section decisions, assignment-aware attainment and genuine manual technique constraints without changing notation-package bytes.
 - [ ] 2.2 Replace recursive join creation with all independent adjacent-original pairs and genuine prerequisite/readiness handling; update passage/progression tests to verify A–B and B–C coexist, no larger joins appear and the catalog is defined before unlocking.
 - [ ] 2.3 Adapt original/double selection, preview and context restoration to catalog identities; verify existing start/connection-speed policy, keyboard component navigation and unavailable-range fallback with selection/context tests and document the bounded connection behavior.
 
@@ -39,4 +39,4 @@
 - [ ] 6.1 Run resource-contained focused practice/manual/migration/lifecycle checks, then configured types/build and full tests; verify no regressions in transport, source ownership, stored settings and shared control behavior, recording commands and actual outcomes.
 - [ ] 6.2 Inspect the integrated viewer on No14 and representative irregular, dense-chord, sparse/held, variable-meter and weak-structure cases; record boundary/excerpt decisions, exclusion visuals and inspection limits separately from human musical acceptance.
 - [ ] 6.3 Review protected-data preservation and all completed artifacts, synchronize main specs and archive through the parent OpenSpec workflows; verify no unchecked implementation task remains and the synced specs match the accepted delivered behavior.
-- [ ] 6.4 Complete scoped commits, pushes and the reviewed PR path, linking every worked PR to the thread and running start/end Git status checks; verify the final remote state and stop all temporary task processes. Record source/browser delivery separately from any subsequently requested native package/publication/activation evidence.
+- [ ] 6.4 Complete scoped commits, pushes, the linked reviewed PR path and authorized paired native build/publication/activation, running start/end Git status checks; verify final remote state, protected-data preservation and ordinary installed launch, stop temporary processes and distinguish source/browser/package/installed acceptance evidence.
