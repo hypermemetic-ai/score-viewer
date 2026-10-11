@@ -158,7 +158,8 @@ export function choosePracticeExcerptBoundary(profile:Pick<PracticeSectionPlanni
  const candidates=[...new Set([lower,upper,...profile.boundaries.map(b=>b.tick),...profile.onsets])].filter(t=>t>=lower&&t<=upper&&(direction==='before'?t<=anchor:t>anchor));
  const byTick=new Map(profile.boundaries.map(b=>[b.tick,b]));
  const score=(tick:number)=>{const b=byTick.get(tick),n=direction==='before'?count(profile.onsets,tick,anchor):count(profile.onsets,anchor,tick);
-  return Math.abs(n-target)/target+(b?.obligations.length?policy.weights.obligation:0)-Math.min(1,b?.strength??0)*policy.weights.excerptEvidence+(b?.kind==='bar'?0:policy.weights.excerptOnset);};
+  const obligations=b?.obligations??[],obligation=obligations.some(r=>!r.startsWith('phrase:'))?policy.weights.obligation:obligations.length?policy.weights.excerptPhrase:0;
+  return Math.abs(n-target)/target+obligation-Math.min(1,b?.strength??0)*policy.weights.excerptEvidence+(b?.kind==='bar'?0:policy.weights.excerptOnset);};
  candidates.sort((a,b)=>score(a)-score(b)||Math.abs(a-anchor)-Math.abs(b-anchor)||a-b);
  return candidates[0]??(direction==='before'?lower:upper);
 }
