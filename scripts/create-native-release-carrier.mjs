@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {cp, mkdir, readFile, rm, writeFile, chmod} from 'node:fs/promises';
 import {resolve, join} from 'node:path';
 import {pathToFileURL, fileURLToPath} from 'node:url';
-import {inventory, sha256, canonical, safePath, validateRecordedChecks, validateCarrierInputs} from './native-release-carrier/inputs.mjs';
+import {inventory, sha256, canonical, safePath, validateRecordedChecks, validateCarrierInputs, validateLockedLocalDependencies} from './native-release-carrier/inputs.mjs';
 import {unzipSync,strFromU8} from 'fflate';
 import {semanticHash,footerProbeVersion,footerMetricsSha256} from './native-release-carrier/footer-ink-receipt.mjs';
 import {validatePianoSources} from './native-release-carrier/score-viewer-piano-release.mjs';
@@ -41,7 +41,14 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
     notation:{repository:'hypermemetic-ai/iso-notation',revision:notationRevision},nativeFiles:{},
     frontend:{files:frontendFiles,digest:frontendDigest},checks:{sha256:sha256(checksBytes),size:checksBytes.length}};
   validateRecordedChecks(checkReceipt,inputs);
+  const lock=JSON.parse(git(viewerSource,['show',`${viewerRevision}:package-lock.json`]));
+  const localFiles=await validateLockedLocalDependencies(pkg,lock,path=>{
+    const record=git(viewerSource,['ls-tree',viewerRevision,'--',path]).trim();
+    if(!/^100(?:644|755) blob /.test(record)||record.split('\t')[1]!==path)throw Error('Required locked local dependency is not a tracked regular file: '+path);
+    return git(viewerSource,['show',`${viewerRevision}:${path}`],true);
+  },frontendFiles,path=>readFile(join(frontend,path)));
   const selected=git(viewerSource,['ls-tree','-r','--format=%(objectmode) %(path)',viewerRevision,'src-tauri','licenses','.cargo/config.toml','package.json','package-lock.json']).trim().split('\n').map(line=>{const space=line.indexOf(' ');return {mode:line.slice(0,space),path:safePath(line.slice(space+1))};});
+  for(const path of localFiles.keys())selected.push({mode:git(viewerSource,['ls-tree',viewerRevision,'--',path]).slice(0,6),path});
   for(const file of selected) {
     if(!['100644','100755'].includes(file.mode))throw Error(`Unsupported native input mode: ${file.path}`);
     const bytes=git(viewerSource,['show',`${viewerRevision}:${file.path}`],true);
