@@ -337,7 +337,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Clock acquisition is an activation prerequisite too. Keep the old reader,
  // selection and preferences intact until every awaited prerequisite is owned.
  let clock:number|undefined,clockError:unknown;try{clock=await host.midiClock();}catch(error){clockError=error;}check();
- const nextEditor=personalEditor(next);nextEditor.view=await nextEditor.session.project(next.personal);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ const nextEditor=personalEditor(next);await nextEditor.session.warm();check();nextEditor.view=await nextEditor.session.project(next.personal);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  readingParts.remember(next.entry,next.package);
  ++manualPracticeGeneration;pitchInput.block();practice?.close();practice=undefined;selection=undefined;selectionPitchToggle=false;
  readingPresentation=nextPresentation;readingViewError=nextViewError;
