@@ -108,3 +108,38 @@ Every exercise row SHALL support an accessible mouse and keyboard exclusion togg
 - **WHEN** a text editor, numeric edit, modal, control capture or saved authoritative binding owns the proposed shortcut
 - **THEN** exclusion does not steal that input
 - **AND** the mouse control remains available and its accessible name describes the current Include or Exclude action
+
+## MODIFIED Requirements
+
+### Requirement: Continuous consecutive notation
+Consecutive measures within each selector preview row or active practice strip SHALL form continuous horizontal notation with aligned staff lines and source-correct barlines. Explicit preview row breaks SHALL retain genuine consecutive source ranges; they SHALL NOT change the exercise or active reading order. Independent crop gaps, duplicated authored boundary ink, and horizontal scrollbars SHALL be absent. The live reading surface SHALL also keep continuous staff through spatial refills; musical notation and separators SHALL retain their source meaning.
+
+#### Scenario: Four bars across a source system or page boundary
+- **WHEN** the user selects or practises four consecutive source measures whose prepared pages span different systems or pages
+- **THEN** all four measures read as one aligned strip, including the system/page junction, with each internal separator painted once
+- **AND** note ink, existing repeat/final marks, other authored boundary ink, and cross-measure relations retain their musical meaning
+
+#### Scenario: Ordinary outer edge of a four-measure strip
+- **WHEN** the fourth displayed measure ends at an ordinary boundary
+- **THEN** the strip's outer right edge remains open without an unnecessary closing barline
+- **AND** an existing source repeat or final boundary remains visible when present at that edge
+
+#### Scenario: Consecutive measures include a rest-only bar
+- **WHEN** a displayed passage includes a measure with no note seats
+- **THEN** the real source measure and its staff, rests, and boundaries remain part of the continuous passage
+
+### Requirement: Efficient leaf selection preview
+A selected original leaf SHALL display all its source measures using available preview space efficiently. A very long sparse original exceeding the safe single-strip limit SHALL use bounded source-faithful rows with owned vertical scrolling and a common scale. An ordinary four-bar leaf SHALL show all four bars without a horizontal scrollbar or an automatic two-row fragment layout. Fitting SHALL account for complete visible musical ink and a substantial consistent left inset so the notation does not crowd the preview edge.
+
+#### Scenario: Selecting an original four-bar component
+- **WHEN** the user selects a four-bar leaf, including through a joined passage's component list
+- **THEN** its four source bars appear together with useful horizontal scale and complete duration/annotation ink
+- **AND** the first notation has clear breathing room from the preview's left edge, including after rotation or resize
+- **AND** changing the preview does not change component or joined-run attainment
+
+#### Scenario: Very long sparse original preview
+- **WHEN** a valid sparse original spans more than 64 source bars
+- **THEN** the selector displays its complete source span in rows of at most four bars with owned vertical scrolling and a common readable scale
+- **AND** row boundaries retain source identity, complete duration and annotation ink, and genuine held or tied tails
+- **AND** no unbounded source-rendering request or exercise split is introduced
+- **AND** ordinary four-bar previews retain their continuous single-strip presentation

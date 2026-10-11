@@ -31,5 +31,5 @@
 ## 6. Integrated delivery
 
 - [x] 6.1 Run contained focused checks, configured full tests and types/build; verify integrated input, notation and protected-data behavior with recorded outcomes.
-- [ ] 6.2 Synchronize and verify main specs, archive the completed change, and complete scoped commits, linked reviewed PRs and remote checks; verify no implementation task remains unchecked.
-- [ ] 6.3 Complete established paired native build, independent admission and ordinary activation preserving user data and application identity; record source, package, installed and observed acceptance separately and stop temporary processes.
+- [x] 6.2 Synchronize and verify main specs, archive the completed change, and complete scoped commits, linked reviewed PRs and remote checks; verify no implementation task remains unchecked.
+- [x] 6.3 Complete established paired native build, independent admission and ordinary activation preserving user data and application identity; record source, package, installed and observed acceptance separately and stop temporary processes.
