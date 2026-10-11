@@ -34,3 +34,27 @@ A historical candidate trial on qq-box (Linux, Node 26.7.0, Chromium 151.0.7922.
 | Tie/page-reflow Jankó | 19.4 ms | 13.0 ms | Passed | Passed |
 
 Both 120-bar long cases opened admitted archives but could not complete the positive samples. After correcting warmups to restore each original hand, an isolated `dense-0-2:0` transfer to RH produced the same physical beam-clearance refusal in the fresh expected projection, independent full cold preparation, and actual production key path. Both layouts retained the complete visible SVG, selected alias and saved journal byte-for-byte while showing pending recovery controls. The separate bounded refusal receipt is `/tmp/score-viewer-fast-personal-editing-candidate-6b2ed7e-long-refusal/receipt.json`, SHA-256 `237817d74a00811c3fbefe928b94bd0546ccde0eb284244dc7d4e6e131cdd5f1`. A preserved refusal is useful failure evidence; it does not satisfy the required twenty successful edits. The original positive fixture remains unchanged for the engineering repair and rerun.
+
+For a bounded real-client CPU investigation, build the production frontend with source maps, then run one named case with `FAST_EDIT_CPU_PROFILE=1` and `FAST_EDIT_CASES=no14-conventional-piano`. The harness warms and restores the first owner, measures its cached toggle pair, then captures the next source owner's first unseen hand transfer. Chromium CDP records the CPU samples and timeline only around the actual key. Performance marks bound the interval from real keydown to independently correct full-page frame; source maps resolve sampled minified locations. The artifacts include `.cpuprofile`, `.trace.json`, and `.profile-summary.json` with self and inclusive samples and timeline durations. Inclusive costs overlap, instrumentation adds overhead, and three samples plus one presentation cannot satisfy acceptance; the ordinary coverage/count gate deliberately fails this diagnostic run.
+
+The independent full-map parity check is `node --import tsx scripts/check-annotation-position-parity.mjs`. `ANNOTATION_PARITY_FIXTURES` selects the retained public fixtures directory and `ANNOTATION_PARITY_ARTIFACTS` selects its receipt directory. It extracts the historical annotation, SVG-clearance and carrier implementations from Git revision `3b7553f` into the artifact directory only; old production code is not checked into the application. The receipt records the original and generated oracle module hashes and current module hashes. Separately instantiated old/current modules and inputs compare complete positions, bounds, carrier IDs and associated stems for all six presentations at baseline and two isolated unseen hand transfers, using identical fonts and admission readiness.
+
+A later c92 renderer CPU diagnostic used the current editing client and profiled the same first unseen No. 14 Conventional source owner, `14-Petite-etude.ly:185:16:lower:47:1`, transferring to RH. The complete visible geometry and annotations matched the independent cold view at completion. The initial application frame took 734.7 ms, with sampled shared projection 303.2 ms and annotation placement 347.8 ms. Repeated `pianoSeatPage` linear searches accounted for 185.3 ms of self time. After application revision `57cc983` appended collision bounds by page, the frame took 561.8 ms, annotation placement fell to 149.6 ms, and the linear-search hotspot disappeared. Shared projection sampled 331.1 ms in that second run; these single instrumented runs show the client bottleneck and improvement, not a stable latency percentile or 100 ms acceptance.
+
+The post-fix trace retains its exact source maps in `/tmp/score-viewer-fast-personal-editing-candidate-c92aa49-root57cc983-cpu/source-maps`. Its receipt SHA-256 is `f7311fc6ac9e1dd7bc3b2d642da742d6fb9d9d426d868e26a9f32989041be0db`; the pre-fix diagnostic receipt is `49e20b2ab513d1de459612d3e7a3dc95d6ccb962c5645428807002159dc13393`. Remaining post-fix sampled client costs include carrier discovery 66.1 ms, SVG obstacle inventory 41.2 ms and affiliated-position search about 35 ms of self/filter work. Recursive and inclusive costs overlap and must not be added as separate totals.
+
+The independent Git-oracle full-map check passed all six cases at baseline and two isolated hand transfers (18 complete maps: 381 No. 14 aliases, 480 long-study aliases and 24 tie-study aliases per view). Its receipt is `/tmp/score-viewer-annotation-position-parity-root57cc983-c92-git-oracle/receipt.json`, SHA-256 `e19b9d4afdd0e81f20b084f72979e2e05563b30c91b89671419dc4c87552f684`. Historical source module hashes, before temporary import-path relocation, are:
+
+| Git `3b7553f` oracle | SHA-256 |
+| --- | --- |
+| `src/fingering-presentation.ts` | `fec2c534d93096a069e8289ffd51e3de7d8474c91b7bf57685db4a1d45a78794` |
+| `src/svg-annotation-clearance.ts` | `4589c9ffe9c7b24b0fafa2e898ca662e52e832927167dad1e206f2244fa0a739` |
+| `src/fingering-carriers.ts` | `ba0e0b3e28433981d97baf46b8783173d842c9b42674a79ace4f629076b53cae` |
+
+Restore and history commands now enter the same ordered personal-intent queue as
+keyboard hand/finger edits. Seven production-body regressions cover interleaved
+commands, reversed projection completion, delayed/failed writes, retry and score
+switches. The original slow-restore/newer-hand case fails against the prior code
+and passes after the change. Modal completion is guarded by its owning dialog
+and score, so closing an old edit during a pending save does not close a newer
+dialog. These checks do not establish the still-open latency target.
