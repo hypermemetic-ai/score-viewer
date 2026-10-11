@@ -9,7 +9,7 @@ export const BOUNDED_PRACTICE_POLICY=Object.freeze({
  weights:Object.freeze({section:.5,deviation:4,outside:12,tiny:12,obligation:5,
   boundaryReward:.85,maximumEvidence:3,recurrence:1.1,authored:2.5,
   rest:1.1,longNote:.35,phrase:.25,texture:.4,continuingTrunk:.1,
-  independentRecurrence:.15,excerptEvidence:.15,excerptOnset:.05}),
+  independentRecurrence:.15,excerptEvidence:.15,excerptOnset:.05,excerptPhrase:.1}),
 });
 
 export const boundedPracticePolicyFingerprint=JSON.stringify(BOUNDED_PRACTICE_POLICY);
