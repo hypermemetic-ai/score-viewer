@@ -1424,13 +1424,19 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "08c2b34c6c96f59cd78c7231965016a29808ba3d",
+  "dependencyRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
   "dependencyReview": {
-    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/360",
-    "review": "https://github.com/hypermemetic-ai/iso-notation/pull/360#issuecomment-6105990536",
-    "scope": "Reviewed fitted-rails per-bar head clearance over actual shared time fractions, exact dense warm/full-cold geometry and unchanged historical replay; 17 focused and 75 canonical tests, strict lint, build, 130-file source/type closure and exact 153-member package pass. Application browser and native acceptance are recorded separately."
+    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/364",
+    "review": "https://github.com/hypermemetic-ai/iso-notation/pull/364#pullrequestreview-5484923104",
+    "scope": "Reviewed cooperative retained rendering and personal/calculated preparation with per-step private ownership, captured inputs, cancellation at final await and overlap isolation; 87 distinct focused regressions across runs, configured types/build and exact retained No14 output. Individual steps remain indivisible. Viewer browser and native acceptance are recorded separately."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "08c2b34c6c96f59cd78c7231965016a29808ba3d",
+      "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/360",
+      "review": "https://github.com/hypermemetic-ai/iso-notation/pull/360#issuecomment-6105990536",
+      "scope": "Reviewed fitted-rails per-bar head clearance over actual shared time fractions, exact dense warm/full-cold geometry and unchanged historical replay; 17 focused and 75 canonical tests, strict lint, build, 130-file source/type closure and exact 153-member package pass. Application browser and native acceptance are recorded separately."
+    },
     {
       "revision": "e666b23973c83e6e77960b6e7a3e89649b92405d",
       "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/359",

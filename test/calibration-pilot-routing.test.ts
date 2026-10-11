@@ -59,20 +59,20 @@ test('admitted native reset clears the controller and blocks input until a fresh
  await Promise.resolve();f.scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,1);
 });
 test('actual main MIDI dispatch isolates all pilot traffic before score clocks, diagnostics and practice observers',async()=>{
- const f=fixture();await f.scope.activate();const context:any={dialog:{dataset:{kind:'calibration'}},calibrationPilot:{input:f.scope},
+ const f=fixture();await f.scope.activate();const context:any={startupReady:true,dialog:{dataset:{kind:'calibration'}},calibrationPilot:{input:f.scope},
   pitchInput:{accepts(){throw Error('score clock reached');}},midiConnection:f.state.connection,
   midiOptions:{receive(){throw Error('playing telemetry reached');}},PracticeView:class {},practice:{observeHeldInput(){throw Error('held observation reached');},observe(){throw Error('observation reached');},note(){throw Error('practice reached');}},syncControls(){throw Error('binding reached');}};
  runInNewContext(body('function onMidi(event:','function settings('),context);runInNewContext(body('function onMidiNote(','\nasync function saveSelectedChoice('),context);
  context.onMidiNote(note);context.onMidiNote({...note,generation:0});context.onMidiNote({...note,channel:90});context.onMidi({...note,controller:64,value:127});
- assert.equal(f.events.length,1);context.calibrationPilot=undefined;context.onMidiNote(note);context.onMidi({...note,controller:80,value:127});assert.equal(f.events.length,1,'loading modal still isolates notes');
+ assert.equal(f.events.length,1);context.startupReady=false;context.onMidiNote(note);context.onMidi({...note,controller:64,value:127});assert.equal(f.events.length,1,'startup retains input ownership until ready');context.startupReady=true;context.calibrationPilot=undefined;context.onMidiNote(note);context.onMidi({...note,controller:80,value:127});assert.equal(f.events.length,1,'loading modal still isolates notes');
 });
 test('actual main key listeners route raw grades before bindings and deliver guarded key-up',()=>{
- const events:any[]=[],listeners:Record<string,(event:any)=>void>={},context:any={window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
+ const events:any[]=[],listeners:Record<string,(event:any)=>void>={},context:any={startupReady:true,startupFailed:false,window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
   calibrationPilot:{input:{key(event:any,type:string){events.push({code:event.code,type});return true;}}},syncControls(){throw Error('bindings reached');},bindingOptions:undefined,practice:undefined,inputCode:(e:any)=>e.code,
   controls:{keyUp(){return false;}},input:{up(){return false;}},refreshPresentation(){}};
  runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
  let prevented=false;listeners.keydown({...key('Numpad3'),preventDefault(){prevented=true;}});listeners.keyup(key('Numpad3',{ctrlKey:true,target:{closest:()=>({})}}));
- assert.equal(prevented,true);assert.deepEqual(events,[{code:'Numpad3',type:'key-down'},{code:'Numpad3',type:'key-up'}]);
+ assert.equal(prevented,true);assert.deepEqual(events,[{code:'Numpad3',type:'key-down'},{code:'Numpad3',type:'key-up'}]);context.startupReady=false;prevented=false;listeners.keydown({...key('Digit1'),preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(events.length,2,'startup key cannot reach calibration or controls');context.startupFailed=true;prevented=false;listeners.keydown({...key('Tab'),preventDefault(){prevented=true;}});assert.equal(prevented,false,'fatal-screen actions retain native keyboard access');assert.equal(events.length,2);
 });
 
 function modalFixture(){
