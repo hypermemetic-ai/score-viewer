@@ -256,12 +256,16 @@ async function commitPersonal(target:NonNullable<typeof current>,change:(s:Perso
 /** Replace both notation and hand grouping together, retaining the exact saved
  * exercise evidence and UI context. No completion is invalidated by an edit. */
 async function refreshPersonalPractice(target:NonNullable<typeof current>,owner:PracticeView,generation:number){
- const context=owner.contextSnapshot();await owner.flush();
  const owns=()=>current===target&&practice===owner&&personalEditor(target).generation===generation;
- if(!owns())return;
- const admitted=await PracticeView.prepareContext(target.package,target.entry.id,context,target.personal);
- if(!owns())return;
- owner.close();await startPractice(context,admitted);
+ while(owns()){
+  await owner.flush();if(!owns())return;
+  const context=owner.contextSnapshot(),admitted=await PracticeView.prepareContext(target.package,target.entry.id,context,target.personal);
+  if(!owns())return;
+  // Options remain usable during admission. A later settings or navigation
+  // choice must be admitted again rather than replaced by the earlier context.
+  if(JSON.stringify(owner.contextSnapshot())!==JSON.stringify(context))continue;
+  owner.close();await startPractice(context,admitted);return;
+ }
 }
 function labelMode(){if(!current)return 'pitch';const available=fingerDisplayAvailable(current.package,current.personal,currentFingerPresentation());return effectiveLabelMode(current.personal.view,preferences.fingerBehavior,input.fingersHeld||controls.fingersHeld,available,!!selection,selectionPitchToggle);}
 function toggleLabel(){return preferences.fingerBehavior==='momentary'?(selection?'Hold pitches':'Hold fingerings'):selection?(labelMode()==='pitch'?'Show fingerings':'Show pitches'):(labelMode()==='pitch'?'Show fingerings':'Hide fingerings');}
