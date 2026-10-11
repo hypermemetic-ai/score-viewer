@@ -32,7 +32,7 @@ import {ManualReadingContext} from './manual-reading-context';
 import {planManualPractice} from './manual-practice-plan';
 import {readManualPracticeWithLegacy} from './manual-practice-state';
 import {manualReferenceStorageName,manualReferenceRecord,readManualReference} from './manual-reference-context';
-import {manualPassageScene} from './manual-passage-scene';
+import {manualPassageScene,manualPassageClipScene} from './manual-passage-scene';
 import {ReadingPresentationController} from './reading-presentation';
 import {manualReaderView,retainManualReaderView} from './manual-reader-presentation';
 import {readingNotationControl} from './reading-notation-control';
@@ -578,7 +578,7 @@ async function startManualPractice(snapshot?:PracticeViewContext){
  if(!live())return;
  selection=undefined;resetInput();practice?.close();
  const next=new ManualPracticeView(app,{context,personal:target.personal,
-  passage:(bars,notation)=>manualPassageScene(selectReadingNotation(context.package,notation),bars).svg,
+  passage:(bars,notation,clip)=>clip?manualPassageClipScene(selectReadingNotation(context.package,notation),bars,clip).svg:manualPassageScene(selectReadingNotation(context.package,notation),bars).svg,
   rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),
   workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),navigationKeys:()=>({previous:actionControlLabel(effectiveControls(),'previous'),next:actionControlLabel(effectiveControls(),'next')}),
   audioOutput:()=>preferences.audioOutput??'',save:(record,nextView)=>enqueue(async()=>{
