@@ -32,7 +32,7 @@
 - [x] 5.1 Persist per-exercise exclusion independently of pattern/completion and integrate recommendations; verify reversible exclusion never cascades, fabricates readiness or deletes attainment, including an excluded original with a still-included adjacent pair.
 - [x] 5.2 Replace all visible/library/save totals with equal weighting over the complete included catalog; update display/library tests for locked entries, measured-only versus manual-inclusive criteria, exclusion numerator/denominator changes and no-included-exercises presentation.
 - [x] 5.3 Add restrained mouse Include/Exclude and guarded X behavior with anchored excluded-row placement; verify hover/keyboard precedence, saved binding/editor/modal/capture guards, focus/scroll preservation and no unintended practice start in production keyboard/browser cases.
-- [ ] 5.4 Style exclusion with readable muted text and a fine range-label cancellation line while preserving row geometry and undecorated shared kbd; inspect ordinary/narrow, hovered/selected and reduced-motion viewer states, retain screenshots and document the user-facing exclusion distinction.
+- [x] 5.4 Style exclusion with readable muted text and a fine range-label cancellation line while preserving row geometry and undecorated shared kbd; inspect ordinary/narrow, hovered/selected and reduced-motion viewer states, retain screenshots and document the user-facing exclusion distinction.
 
 ## 6. Integration and delivery evidence
 
