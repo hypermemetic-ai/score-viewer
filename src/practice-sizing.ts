@@ -5,7 +5,7 @@ export const BOUNDED_PRACTICE_POLICY=Object.freeze({
  version:'onset-musical-boundaries-v1',onsetsPerSecond:5,targetSeconds:5,
  preferredMinSeconds:4,preferredMaxSeconds:6,cueSeconds:2.5,continuationSeconds:2.5,
  minimumPatternOnsets:12,maximumPatternOnsets:40,maximumPatternBars:8,
- maximumSourceBars:2000,maximumNotes:100000,maximumLookbackCuts:128,
+ maximumSourceBars:2000,maximumNotes:100000,maximumLookbackCuts:4000,
  weights:Object.freeze({section:.5,deviation:4,outside:12,tiny:12,obligation:5,
   boundaryReward:.85,maximumEvidence:3,recurrence:1.1,authored:2.5,
   rest:1.1,longNote:.35,phrase:.25,texture:.4,continuingTrunk:.1,

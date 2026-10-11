@@ -38,6 +38,12 @@ test('weak musical evidence follows local onset workload at different bar densit
  assert.deepEqual(counts(source(Array(8).fill(6))),[24,24]);
 });
 
+test('sparse sources keep their workload target across many empty written measures',()=>{
+ const s=source(Array.from({length:2000},(_,i)=>i%20===0?1:0)),p=planPracticeSections(s);
+ assert.equal(p.sections.length,4);assert.ok(p.sections.every(s=>s.onsetCount===25));
+ assert.equal(p.sections.at(-1)!.end,s.totalTicks);
+});
+
 test('joint partition avoids an unnecessary tiny tail',()=>{
  const p=planPracticeSections(source(Array(9).fill(6)));assert.equal(p.sections.length,2);
  assert.deepEqual(p.sections.map(s=>s.onsetCount).sort((a,b)=>a-b),[24,30]);
@@ -103,4 +109,10 @@ test('cue snapping targets half a section and respects genuine episode limits',(
  const clamped=choosePracticeExcerptBoundary(p,{anchor,lower:anchor-48,upper:anchor,direction:'before'});assert.ok(clamped>=anchor-48);
  const continuation=choosePracticeExcerptBoundary(p,{anchor,lower:anchor,upper:p.sections.at(-1)!.end,direction:'after'});assert.ok(continuation>anchor);
  assert.throws(()=>choosePracticeExcerptBoundary(p,{anchor,lower:anchor+1,upper:anchor+2,direction:'before'}),/bounds/);
+});
+
+test('excerpt-only onset cuts retain the same held obligations as ordinary bar cuts',()=>{
+ const s=source(Array(4).fill(6));s.notes[0].durationTicks=300;const p=planPracticeSections(s);
+ const onset=p.boundaries.find(b=>b.tick===120)!;assert.equal(onset.sectionCandidate,false);assert.ok(onset.obligations.some(r=>r.startsWith('held:')));
+ assert.equal(choosePracticeExcerptBoundary(p,{anchor:0,lower:0,upper:144,direction:'after'}),144);
 });

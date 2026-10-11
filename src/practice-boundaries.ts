@@ -4,7 +4,7 @@ import {BOUNDED_PRACTICE_POLICY as policy,boundedPracticePolicyFingerprint,disti
 export type PracticeSectionSource=Pick<QuantizedGridScore,'notes'|'sourceBarTicks'|'totalTicks'|'ticksPerBeat'|'timeSignatures'|'barlines'|'phrases'|'sourceSilences'>;
 export interface PracticeProtectedRelation {id:string;startTick:number;endTick:number}
 export interface PracticeBoundaryEvidence {
- tick:number;kind:'bar'|'onset'|'edge';strength:number;reasons:string[];
+ tick:number;kind:'bar'|'onset'|'edge';sectionCandidate:boolean;strength:number;reasons:string[];
  components:{recurrence:number;authored:number;rest:number;longNote:number;phrase:number;texture:number};
  obligations:string[];
 }
@@ -37,7 +37,7 @@ export function planPracticeSections(source:PracticeSectionSource,options:{prote
  // simultaneous attacks cannot be split because their tick occurs only once.
  for(let b=0;b<bars.length-1;b++)if(count(onsets,bars[b],bars[b+1])>policy.preferredMaxSeconds*policy.onsetsPerSecond)
   for(let i=lowerBound(onsets,bars[b]);i<onsets.length&&onsets[i]<bars[b+1];i++)candidates.add(onsets[i]);
- const boundaries=[...candidates].sort((a,b)=>a-b).map(tick=>({tick,kind:tick===0||tick===source.totalTicks?'edge':barSet.has(tick)?'bar':'onset',strength:0,reasons:[],
+ const boundaries=[...new Set([...candidates,...onsets])].sort((a,b)=>a-b).map(tick=>({tick,kind:tick===0||tick===source.totalTicks?'edge':barSet.has(tick)?'bar':'onset',sectionCandidate:candidates.has(tick),strength:0,reasons:[],
   components:{recurrence:0,authored:0,rest:0,longNote:0,phrase:0,texture:0},obligations:[]} as PracticeBoundaryEvidence));
  const byTick=new Map(boundaries.map(b=>[b.tick,b]));
  const add=(b:PracticeBoundaryEvidence,key:keyof PracticeBoundaryEvidence['components'],value:number,reason:string)=>{
@@ -78,7 +78,7 @@ export function planPracticeSections(source:PracticeSectionSource,options:{prote
   const texture=textureChange(onsets,grouped,before);if(texture)add(b,'texture',texture*policy.weights.texture,'sustained-pitch-texture-change');
  }
  for(const b of boundaries){b.strength=Math.min(policy.weights.maximumEvidence,Object.values(b.components).reduce((a,v)=>a+v,0));b.reasons.sort();b.obligations=[...new Set(b.obligations)].sort();}
- const cuts=partition(boundaries,onsets);
+ const cuts=partition(boundaries.filter(b=>b.sectionCandidate),onsets);
  const sections=cuts.slice(0,-1).map((start,i)=>{const end=cuts[i+1],n=count(onsets,start,end),boundary=byTick.get(end)!;
   return {start,end,firstBar:barAt(bars,start),lastBar:barAt(bars,end-1),onsetCount:n,estimatedSeconds:estimatedPracticeSeconds(n),boundaryReasons:[...boundary.reasons,...boundary.obligations.map(r=>`retained:${r}`)]};});
  return {policy,policyFingerprint:boundedPracticePolicyFingerprint,onsets,boundaries,sections};
@@ -130,7 +130,8 @@ function textureChange(onsets:readonly number[],groups:Map<number,Sound[]>,index
 }
 
 function partition(boundaries:PracticeBoundaryEvidence[],onsets:number[]):number[]{
- const costs=Array<number>(boundaries.length).fill(Infinity),previous=Array<number>(boundaries.length).fill(-1),safety=Array<number>(boundaries.length).fill(Infinity);costs[0]=0;safety[0]=0;
+ const costs=Array<number>(boundaries.length).fill(Infinity),previous=Array<number>(boundaries.length).fill(-1),safety=Array<number>(boundaries.length).fill(Infinity),
+  evidence=Array<number>(boundaries.length).fill(-Infinity),deviations=Array<number>(boundaries.length).fill(Infinity);costs[0]=0;safety[0]=0;evidence[0]=0;deviations[0]=0;
  const target=policy.targetSeconds*policy.onsetsPerSecond,min=policy.preferredMinSeconds*policy.onsetsPerSecond,max=policy.preferredMaxSeconds*policy.onsetsPerSecond;
  for(let end=1;end<boundaries.length;end++){
   const b=boundaries[end],terminal=end===boundaries.length-1;
@@ -140,8 +141,9 @@ function partition(boundaries:PracticeBoundaryEvidence[],onsets:number[]):number
    const tiny=n<min/2?policy.weights.tiny*((min/2-n)/(min/2))**2:0;
    const obligation=b.obligations.length?policy.weights.obligation:0,reward=terminal?0:policy.weights.boundaryReward*b.strength;
    const candidate=costs[start]+policy.weights.section+policy.weights.deviation*deviation**2+policy.weights.outside*outside**2+tiny+obligation-reward,
-    risk=safety[start]+Number(b.obligations.length>0);
-   if(candidate<costs[end]-1e-9||Math.abs(candidate-costs[end])<1e-9&&(risk<safety[end]||risk===safety[end]&&start<previous[end])){costs[end]=candidate;previous[end]=start;safety[end]=risk;}
+    risk=safety[start]+Number(b.obligations.length>0),support=evidence[start]+(terminal?0:b.strength),distance=deviations[start]+Math.abs(deviation);
+   const tie=risk<safety[end]||risk===safety[end]&&(support>evidence[end]+1e-9||Math.abs(support-evidence[end])<1e-9&&(distance<deviations[end]-1e-9||Math.abs(distance-deviations[end])<1e-9&&start<previous[end]));
+   if(candidate<costs[end]-1e-9||Math.abs(candidate-costs[end])<1e-9&&tie){costs[end]=candidate;previous[end]=start;safety[end]=risk;evidence[end]=support;deviations[end]=distance;}
   }
  }
  if(previous.at(-1)===-1)throw Error('No bounded musical section partition could be formed.');
