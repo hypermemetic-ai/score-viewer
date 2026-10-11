@@ -1,4 +1,5 @@
 import {personalPracticePackage} from './personal-assignments';
+import {samePracticeEditionMusic} from './practice-edition-source';
 import {planPracticeSections,type PracticeSectionPlanning} from './practice-boundaries';
 import {boundedPracticePolicyFingerprint} from './practice-sizing';
 import {createPracticeExerciseCatalog,includedExerciseTotal,type PracticeExercise,type ExerciseClip} from './practice-exercise-catalog';
@@ -8,7 +9,7 @@ import {registerPersonalPracticeIdentity,registerPersonalPracticeRangePattern,pe
 import type {PersonalState} from './state';
 import {requirePianoEvent} from './piano-event';
 import {snapPracticeSpeed,snapPracticeStep} from './tempo-presentation';
-import {registerPracticePatterns,bindPracticePassages,equivalentPracticeClaims,practiceSpanEvidenceKey,musicalSpanFact} from './practice-equivalence';
+import {registerPracticePatterns,bindPracticePassages,equivalentPracticeClaims,practiceSpanEvidenceKey,practiceExerciseEvidenceKey,musicalSpanFact} from './practice-equivalence';
 import {requirePianoCapability} from './score-capabilities';
 import {attainedRate,readManualAttainment,claimIdentity,type ManualAttainment} from './practice-attainment';
 import{MidiSoundingNotes,type MidiStream,type PracticeMidiSetup}from'./midi-sustain';
@@ -162,17 +163,21 @@ export function migratePracticeState(raw:unknown,plan:PracticePassagePlan):Pract
 /** Explicit hand/finger calculation keeps a complete same-source exercise's
  * attainment. The old edition is validated before any claim is projected. */
 export function transferPracticeEdition(from:ScorePackage,raw:unknown,to:ScorePackage,toPersonal?:PersonalState):PracticeState {
- if(!from.sourceSha256||from.sourceSha256!==to.sourceSha256||!from.keyboardLayout||from.keyboardLayout!==to.keyboardLayout)throw Error('Practice edition belongs to another source or keyboard; prior evidence retained.');
+ if(!from.sourceSha256||from.sourceSha256!==to.sourceSha256||from.sourceRevision!==to.sourceRevision||!from.keyboardLayout||from.keyboardLayout!==to.keyboardLayout)throw Error('Practice edition belongs to another source or keyboard; prior evidence retained.');
+ if(!samePracticeEditionMusic(from,to))throw Error('Practice edition changes musical source facts, pitches or clock; prior evidence retained.');
  const oldPlan=planPractice(from,practicePartition(raw)),old=readPractice(raw,oldPlan),plan=planPractice(to,'bounded-exercises-v1',toPersonal),next=initialPractice(plan);
  const full=(p:PracticePlan,score:ScorePackage['score'])=>musicalSpanFact(p,score,{id:'source',pattern:'source',start:0,end:p.barTicks.at(-1)!,firstBar:0,lastBar:p.barTicks.length-2,weight:1},'piano');
  if(full(oldPlan,from.sourceScore??from.score)!==full(plan,to.sourceScore??to.score))throw Error('Practice edition changes musical source facts; prior evidence retained.');
- const oldAll=passageHierarchy(oldPlan,old).all,newAll=passageHierarchy(plan,next).all;
+ const oldAll=passageHierarchy(oldPlan,old).all,newAll=passageHierarchy(plan,next).all,oldByEvidence=new Map([...oldAll.values()].flatMap(c=>{const evidence=practiceExerciseEvidenceKey(oldPlan,c);return evidence?[[evidence,c] as const]:[];}));
  for(const key of ['referenceBeat','target','personalGoal','working','step','tolerance','offset','keepTempo','start','connectionStart','usabilityRevision','speedRevision','countInBars','resumeCooldownSeconds','audioOutput'] as const)if(old[key]!==undefined)(next as unknown as Record<string,unknown>)[key]=structuredClone(old[key]);
- const clipKey=(c:PracticeChunk)=>JSON.stringify([c.kind==='contrast'?'contrast':'span',c.clips?.map(clip=>[clip.start,clip.end])??[[c.start,c.end]],c.episode??null]);
  for(const chunk of newAll.values()){
-  const match=[...oldAll.values()].find(c=>c.start===chunk.start&&c.end===chunk.end&&(chunk.kind==='contrast'?c.kind==='contrast'&&clipKey(c)===clipKey(chunk):c.kind!=='contrast'&&practiceSpanEvidenceKey(oldPlan,c)===practiceSpanEvidenceKey(plan,chunk)));
+  const evidence=practiceExerciseEvidenceKey(plan,chunk),match=evidence&&oldByEvidence.get(evidence);
   if(!match)continue;
-  const claims=equivalentPracticeClaims(old,{passage:match.id,pattern:match.pattern});
+  const claims=equivalentPracticeClaims(old,{passage:match.id,pattern:match.pattern}).filter(c=>{const owner=oldAll.get(c.passage);return owner&&owner.end-owner.start===match.end-match.start;});
+  // Earlier guarded personal-choice claims are literal complete-range credit,
+  // even when their historical pattern is not in the current equivalence map.
+  for(const pattern of new Set([...Object.keys(old.best),...Object.keys(old.groundwork??{})]))if(recognizesPersonalPracticeClaim(oldPlan,match,pattern))claims.push({passage:match.id,pattern});
+  for(const key of Object.keys(old.manualAttainment?.marks??{})){const [id,pattern]=claimIdentity(key);if(id===match.id&&recognizesPersonalPracticeClaim(oldPlan,match,pattern))claims.push({passage:id,pattern});}
   const rates=claims.flatMap(c=>old.best[c.pattern]===undefined?[]:[old.best[c.pattern]]);if(rates.length)next.best[chunk.pattern]=Math.max(...rates);
   const marks=claims.flatMap(c=>old.manualAttainment?.marks[JSON.stringify([c.passage,c.pattern])]??[]);if(marks.length){next.manualAttainment??={version:1,marks:{}};next.manualAttainment.marks[JSON.stringify([chunk.id,chunk.pattern])]=[...new Set(marks)];}
   if(claims.some(c=>old.groundwork?.[c.pattern])){next.groundwork??={};next.groundwork[chunk.pattern]=true;}

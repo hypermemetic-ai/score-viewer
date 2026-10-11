@@ -23,3 +23,14 @@ the new catalog, including each contrast's two actual clips. Source or keyboard
 changes refuse transfer. The former journal remains literal recovery evidence;
 it does not become a new attainment claim. Canonical archived source facts define
 boundaries and equivalence, while the current edition's hands drive practice.
+
+Installation transfers stored practice even when practice is closed. Before the
+final library pointer, it validates the complete source/keyboard and performed
+pitch/clock facts, creates the new edition journal, and admits any open practice
+context from that transferred record. An existing target journal keeps its own
+settings, local speeds and exclusions; genuine exact exercise attainment merges
+additively. Both contrast alternatives, carry facts and episode identify its
+claim, so one shared cue never merges two different disambiguation exercises.
+Each merge retains the untouched target and incoming records, including nested
+earlier edition evidence, as recovery history. Pending source/target writes and
+cancellation refuse activation. The original active journal stays untouched.

@@ -47,6 +47,19 @@ export function practiceSpanEvidenceKey(plan:PracticePassagePlan,chunk:PracticeC
  const k=JSON.stringify([chunk.start,chunk.end,chunk.firstBar,chunk.lastBar]);let fact=p.facts.get(k);if(fact===undefined){fact=musicalSpanFact(plan,p.score,chunk,p.assessment);p.facts.set(k,fact);}return fact;
 }
 
+/** Complete exercise identity for edition transfer. Contrast has two real
+ * alternatives; matching its displayed A range alone cannot establish credit. */
+export function practiceExerciseEvidenceKey(plan:PracticePassagePlan,chunk:PracticeChunk):string|undefined {
+ const p=plans.get(plan);if(!p)return;
+ if(chunk.kind!=='contrast')return JSON.stringify(['span',chunk.start,chunk.end,chunk.firstBar,chunk.lastBar,practiceSpanEvidenceKey(plan,chunk)]);
+ if(chunk.clips?.length!==2)return;
+ return JSON.stringify(['contrast',chunk.episode,chunk.clips.map(clip=>[
+  clip.start,clip.end,clip.firstBar,clip.lastBar,clip.divergenceTick,
+  clip.noteIds,clip.carryInNoteIds,clip.carryOutNoteIds,clip.tieNoteIds,
+  musicalSpanFact(plan,p.score,{id:clip.id,start:clip.start,end:clip.end,firstBar:clip.firstBar,lastBar:clip.lastBar,pattern:chunk.pattern,weight:1},p.assessment)
+ ])]);
+}
+
 /** Only the real planners derive classes, from their captured canonical source.
  * Positions and source IDs locate evidence; they do not make repeated music
  * different. Note multiplicity, hands, written clocks and source scopes do. */
