@@ -510,7 +510,11 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id);try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  const prior=await admitReading(data,op);if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);const selected=prior.availablePresentations?.includes(op.keyboard)?await selectPresentation(prior,op.keyboard):undefined,
   personal=selected?await loadPersonal(entry,selected):prior.manifest.version===3?await loadPersonal(entry,prior):undefined,{q,running}=await prepareScore(data,op.keyboard,entry.id,personal,prior,op);
- const loadedPersonal=q.personal??await loadPersonal(entry,q.package),installed=q.package.reading?.dual?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal);await readingCheckpoint(op);
+ const loadedPersonal=q.personal??await loadPersonal(entry,q.package),
+  // An admitted retained view needs no new package or personal-journal version.
+  // Byte equality also covers retained ready/editable finger layers.
+  unchangedArchive=collectionId(q.package)===entry.id&&q.packageBytes.byteLength===data.byteLength&&q.packageBytes.every((value,index)=>value===data[index]),
+  installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
  }catch(error){finishReading(op,false);throw error;}

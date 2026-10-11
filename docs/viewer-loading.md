@@ -7,3 +7,5 @@ Score opening uses the same loading component. Cancel is available during owned 
 The derived library cache and captured personal-preparation pool are separate from scores and earned practice journals. Their input bindings and retention limits are documented alongside their implementation. Cached summaries do not supply practice state, and private rendering authority is never restored from serialized cache data.
 
 Performance reports distinguish cold work, same-process reuse and a new-process restart. Cooperative scheduling allows feedback and cancellation between supported steps; it cannot preempt an individual synchronous step. The existing 100-millisecond visible-edit tuning goal and accepted editing trade-off remain separate from startup/loading measurements.
+
+An ordinary retained open preserves its existing package and personal-journal pointers when the prepared archive is byte-for-byte identical and belongs to the selected collection. Retained reading, ready and editable states all use this path; changed bytes continue through the existing validated installation path. Opening the score still admits current bytes and loads current choices.
