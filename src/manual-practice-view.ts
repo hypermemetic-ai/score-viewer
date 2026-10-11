@@ -4,11 +4,11 @@ import {ManualReadingContext} from './manual-reading-context';
 import {ManualContrastTransport} from './manual-contrast-transport';
 import {ManualPracticeSession} from './manual-practice-session';
 import {manualPassageScene} from './manual-passage-scene';
-import {practiceClipLabel} from './practice-clip';
+import {practiceClipLabel,activePracticeClip} from './practice-clip';
 import type {ExerciseClip} from './practice-exercise-catalog';
 import {ManualPracticeTransport,type ManualClock} from './manual-practice-transport';
 import {PracticeClock} from './practice-clock';
-import {PracticeBrowser,practiceMeasureRange} from './practice-browser';
+import {PracticeBrowser,practiceChunkRange} from './practice-browser';
 import {practicePreferences,type PracticeViewContext} from './practice-context';
 import {displayedPracticeAssessment,displayedPracticeTotal} from './practice-display';
 import {hasDone} from './practice-attainment';
@@ -83,7 +83,7 @@ export class ManualPracticeView {
   if(svg.localName!=='svg'||document.querySelector('parsererror'))throw Error('The admitted passage did not produce complete SVG.');svg.classList.add('practice-passage');return document;
  }
  private paintBrowser(focus=true){this.browser.render(this.app.querySelector<HTMLElement>('.practice-overview')!,this.state,(bars,clip)=>document.importNode(this.passage(bars,clip).documentElement,true) as unknown as SVGSVGElement,focus);}
- private paintScore(){const session=this.session;if(!session||this.overview)return;const bars=session.windows.bars,clip=session.chunk.clipIndex===undefined?undefined:session.chunk.clips?.[session.chunk.clipIndex],key=`${this.options.context.view.notation}:${bars.join(',')}:${clip?.id??''}`,root=this.app.querySelector<HTMLElement>('.practice-score')!;
+ private paintScore(){const session=this.session;if(!session||this.overview)return;const bars=session.windows.bars,clip=activePracticeClip(session.chunk,this.plan.barTicks),key=`${this.options.context.view.notation}:${bars.join(',')}:${clip?.id??''}`,root=this.app.querySelector<HTMLElement>('.practice-score')!;
   try{if(key!==this.rendered){const doc=this.passage(bars,clip);root.replaceChildren(document.importNode(doc.documentElement,true));
    if(clip){const carry=this.plan.owners.filter(a=>a.tick<clip.start&&a.end>clip.start);if(carry.length){const context=document.createElement('div');context.className='practice-held-origins';const label=document.createElement('p');label.textContent='Keep these earlier notes held through the count-in.';context.append(label);root.prepend(context);
     for(const owner of carry){const end=this.plan.components.find(c=>c.bar===owner.bar&&c.tick>owner.tick)?.tick??this.plan.barTicks[owner.bar+1],origin={id:`${clip.id}-carry-${owner.id}`,start:owner.tick,end,firstBar:owner.bar,lastBar:owner.bar},source=manualPassageScene(this.options.context.package,[owner.bar],origin,new Set([owner.id])).svg,svg=new DOMParser().parseFromString(source,'image/svg+xml').documentElement,wrap=document.createElement('div');wrap.className='practice-held-origin';wrap.dataset.sourceContextBar=String(owner.bar+1);wrap.append(document.importNode(svg,true));context.append(wrap);}
@@ -94,7 +94,7 @@ export class ManualPracticeView {
  private selectPassage(chunk:PracticeChunk,resetWorking=true){this.transport?.close();this.transport=undefined;this.freeView=false;this.exercise=chunk;this.browser.select(this.state,chunk.id);if(resetWorking)this.state.working=passageStartTempo(this.plan,this.state,chunk);this.options.context.selectPassage(chunk.kind==='contrast'?practiceClipChunk(chunk,0):chunk);this.overview=false;this.rendered='';this.renderError=undefined;}
  private totalLabel(){const assessment=displayedPracticeAssessment(this.plan,this.state,this.browser.includeManual);return assessment.included?`Total progress · ${practicePercent(assessment.progress??0)}%`:'No exercises included';}
  private paint(){if(this.disposed)return;const p=this.options.context.package,s=this.session,root=this.app.querySelector('.practice-header')!;
-  root.innerHTML=`<h1>${escape(p.manifest.metadata.title)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>${s.chunk.kind==='contrast'?`Contrast · ${s.chunk.clipIndex===1?'B':'A'} · ${escape(practiceClipLabel(s.chunk))}`:`Measures ${escape(practiceMeasureRange(s.chunk.id))}`}</small><small data-practice-total>${this.totalLabel()}</small>`:''}</div>`;
+  root.innerHTML=`<h1>${escape(p.manifest.metadata.title)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>${s.chunk.kind==='contrast'?`Contrast · ${s.chunk.clipIndex===1?'B':'A'} · ${escape(practiceClipLabel(s.chunk))}`:`Measure${s.chunk.firstBar===s.chunk.lastBar?'':'s'} ${escape(practiceChunkRange(s.chunk))}${activePracticeClip(s.chunk,this.plan.barTicks)?' · excerpt':''}`}</small><small data-practice-total>${this.totalLabel()}</small>`:''}</div>`;
   this.app.querySelector<HTMLElement>('.practice-overview')!.hidden=!this.overview;this.app.querySelector<HTMLElement>('.practice-stage')!.hidden=this.overview;this.app.dataset.practicePhase=this.overview?'overview':s?.phase??'ready';
   this.paintControls();if(this.overview)this.paintBrowser(!this.settingsDialog);else if(!this.renderError)this.paintScore();this.paintCue();this.status();
  }

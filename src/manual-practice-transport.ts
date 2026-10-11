@@ -20,7 +20,7 @@ export class ManualPracticeTransport {
   const generation=++this.generation;this.clearDeadline();this.armed=undefined;this.finishing=false;
   try{
    this.session.applyNextRate();const attempt=capturePracticeAttempt(this.session.state.working,this.session.sourcePulseGrid),{bpm:rate,grid}=attempt;this.pendingStartRate=rate;const
-    duration=(this.session.chunk.end-this.session.chunk.start)*scoreTickMs(this.session.plan,rate)+practiceTiming(rate,grid).countInMs,
+    duration=(this.session.completionTick-this.session.chunk.start)*scoreTickMs(this.session.plan,rate)+practiceTiming(rate,grid).countInMs,
     origin=await this.clock.begin(rate,duration,true,grid);
    if(generation!==this.generation||this.disposed)return;
    this.session.ready(origin,grid,rate);this.changed();this.prepare();
@@ -40,7 +40,7 @@ export class ManualPracticeTransport {
   const s=this.session,rate=s.nextRate(),source=s.sourcePulseGrid;
   if(this.armed?.rate===rate&&this.armed.plan.grid?.countInBars===source.countInBars)return;
   const generation=this.generation,plan=planPracticeRepeat({previousStartMs:s.startMs,phraseEndMs:s.startMs+s.durationMs,
-   previousBpm:s.bpm,nextBpm:rate,grid:source,previousGrid:s.pulseGrid,sourceBoundary:true}),duration=(s.chunk.end-s.chunk.start)*scoreTickMs(s.plan,rate)+plan.countInMs,
+   previousBpm:s.bpm,nextBpm:rate,grid:source,previousGrid:s.pulseGrid,sourceBoundary:true}),duration=(s.completionTick-s.chunk.start)*scoreTickMs(s.plan,rate)+plan.countInMs,
    armed:ArmedLoop={generation,rate,plan,promise:Promise.resolve(undefined),settled:false};
   this.armed=armed;
   armed.promise=this.clock.armRepeat(rate,duration,plan,plan.grid??s.pulseGrid).then(receipt=>{
@@ -69,7 +69,7 @@ export class ManualPracticeTransport {
   }catch(error){if(generation===this.generation&&!this.disposed)this.fail((error as Error).message);}
  }
  private async restart(plan:PracticeRepeatPlan,generation:number){
-  const s=this.session,duration=(s.chunk.end-s.chunk.start)*scoreTickMs(s.plan,plan.nextBpm)+plan.countInMs,
+  const s=this.session,duration=(s.completionTick-s.chunk.start)*scoreTickMs(s.plan,plan.nextBpm)+plan.countInMs,
    start=await this.clock.beginRepeat(plan.nextBpm,duration,plan,plan.grid);
   if(generation===this.generation&&!this.disposed)s.ready(start.countStartMs,plan.grid??s.sourcePulseGrid,plan.nextBpm);
  }
