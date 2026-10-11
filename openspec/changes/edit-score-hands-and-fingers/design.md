@@ -32,7 +32,7 @@ Add versioned source-guarded owner choices separate from immutable source/calcul
 
 Bind choices to immutable source owner facts, not transient regenerated seat/contact IDs. Coherent tied/duplicate appearances share the same selected source target; do not expand to independent similar notes. Validate merged physical aliases and grace-host relationships using explicit shared projection support rather than silently dropping source facts or pretending an unsupported map was accepted.
 
-Retain base package and storage identities; the personal overlay carries its own assignment digest. Practice claims use effective assignment content for their actual source span: preserve raw old claims and unrelated evidence, and do not relabel an old hand map's claim as current-hand attainment. Finger-only corrections preserve established progress semantics.
+Retain base package and storage identities; the personal overlay carries its own assignment digest. Hand and finger edits preserve attained practice progress for the same complete exercise. Retain the assignment provenance of historical evidence without automatically resetting, hiding or reducing its credited value. Current practice uses effective choices; a quiet earlier-choice indication can disclose provenance, and only an explicit player reset removes progress. New or different exercise ranges still require their own legitimate evidence.
 
 Alternative rejected: mutating the admitted package hand hash in place, which redirects storage and invalidates its provenance.
 

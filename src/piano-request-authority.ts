@@ -1,3 +1,4 @@
+import {readPersonalAssignments} from './personal-assignments';
 import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
@@ -27,7 +28,7 @@ export class PianoAuthorityConflict extends Error {
 export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,layout:PhysicalKeyboardId,
   active:FingerLayer|undefined,personal:PersonalState|undefined,policy:PerformingHandPolicy):PianoAssignmentConstraint[]{
   const owners=new Map(source.notes.map(n=>[n.id,n])),constraints:PianoAssignmentConstraint[]=[],
-    edited=new Set(Object.values(personal?.overrides??{}).flatMap(c=>c.ownerIds));
+    edited=new Set(Object.values(personal?.overrides??{}).flatMap(c=>c.ownerIds)),choices=readPersonalAssignments(personal?.assignments,p)?.choices??{};
   const guard=(id:string)=>{
     const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('Saved authority names a stale source owner.',[id]);
     return{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks};
@@ -38,7 +39,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     if(Object.keys(raw).some(k=>!['ownerId','guard','hand','finger','row','contact','provenance'].includes(k))||
       !object(raw.guard)||Object.keys(raw.guard).length!==3||Object.entries(expected).some(([key,v])=>raw.guard[key]!==v)||
       !object(raw.provenance)||Object.keys(raw.provenance).some(k=>!['kind','reference'].includes(k))||
-      !['operator-choice','editorial-hand-retention'].includes(raw.provenance.kind)||
+      !['operator-choice','personal-choice','editorial-hand-retention'].includes(raw.provenance.kind)||
       typeof raw.provenance.reference!=='string'||!raw.provenance.reference.trim()||
       raw.hand!==undefined&&!hand(raw.hand)||raw.finger!==undefined&&!finger(raw.finger)||
       raw.hand===undefined&&raw.finger===undefined&&raw.row===undefined&&raw.contact===undefined)
@@ -75,6 +76,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
         !hand(q.hand)||!finger(q.finger)||!attack||attack.hand!==q.hand||attack.finger!==q.finger||q.row!==undefined&&attack.row!==q.row)
         throw new PianoAuthorityConflict('Saved reviewed authority has a stale owner choice.',[q.id]);
       seen.add(q.id);
+      if(choices[q.id])continue;
       add(q.id,{hand:q.hand,...(edited.has(q.id)?{}:{finger:q.finger,...(q.row===undefined?{}:{row:q.row})})},
         'Retained explicit operator authority for '+q.id+'; original review journal stays with its edition');
     }
@@ -83,6 +85,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     if(!Array.isArray(active.operatorConstraints))throw new PianoAuthorityConflict('Saved assignment authority is incomplete.');
     for(const raw of active.operatorConstraints){
       const q=check(raw);
+      if(choices[q.ownerId])continue;
       if(q.provenance.kind==='editorial-hand-retention'){
         // Match the installed owner as well: a stale label must not unlock it.
         if(p.score.notes.find(n=>n.id===q.ownerId)?.hand!==q.hand)
@@ -93,12 +96,15 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
       if(q.hand!==undefined||q.finger!==undefined||q.row!==undefined||q.contact!==undefined)constraints.push(q);
     }
   }
-  if(policy==='retain-imported')for(const n of p.score.notes)
+  const retainedPersonal=new Set(constraints.filter(c=>(c.provenance.kind as string)==='personal-choice'&&c.hand!==undefined).map(c=>c.ownerId));
+  if(policy==='retain-imported')for(const n of p.score.notes)if(!choices[n.id]&&!retainedPersonal.has(n.id))
     constraints.push(check({ownerId:n.id,guard:guard(n.id),hand:n.hand,
       provenance:{kind:'editorial-hand-retention',reference:AUTOMATIC_HAND_RETENTION_REFERENCE}}));
-  for(const c of Object.values(personal?.overrides??{}))for(const id of c.ownerIds)
+  for(const c of Object.values(personal?.overrides??{}))for(const id of c.ownerIds)if(!choices[id])
     add(id,{hand:c.hand,finger:c.replacement,...(c.proposedRow===undefined?{}:{row:c.proposedRow}),
       ...(c.proposedContact?{contact:c.proposedContact}:{})},'Saved per-note operator choice: '+c.createdAt);
+
+  for(const c of Object.values(choices))constraints.push(check({ownerId:c.ownerId,guard:guard(c.ownerId),hand:c.hand,finger:c.finger,provenance:{kind:'personal-choice',reference:'Personal owner assignment: '+c.createdAt}}));
 
   // Detect incompatible alias/source choices before entering any solver.
   const input=normalizeHandPlanningInput(source),required=compilePlanningRequirements(input).attackHands;
@@ -106,7 +112,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     const records=constraints.filter(c=>attack.owners.some(o=>o.id===c.ownerId));
     for(const key of ['hand','finger','row','contact'] as const){
       const values=records.map(c=>c[key]).filter(v=>v!==undefined);
-      if(key==='hand'&&required[attack.id])values.push(required[attack.id]);
+      if(key==='hand'&&required[attack.id]&&!attack.owners.every(o=>records.some(c=>c.ownerId===o.id&&(c.provenance.kind as string)==='personal-choice'&&c.hand!==undefined)))values.push(required[attack.id]);
       if(values.some(v=>!same(v,values[0])))throw new PianoAuthorityConflict('Guarded owner choices contradict a source instruction or physical alias.',attack.owners.map(o=>o.id));
     }
   }

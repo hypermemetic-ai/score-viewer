@@ -2,6 +2,8 @@
 
 ## Context
 
+The separately prioritized `edit-score-hands-and-fingers` change delivers source-guarded effective personal assignments and passive viewing first. This change consumes that resolver rather than introducing another hand authority. Practice uses effective hand content for its spans, while hand and finger edits preserve credited progress for the same complete exercise. Historical claims retain their original assignment provenance; only explicit player reset removes attainment. This does not grant credit to different ranges or new contrast exercises.
+
 See `proposal.md` for motivation and the two delta specs for behavioral contracts. `src/practice.ts` and `src/manual-practice-plan.ts` currently choose nominal four-bar sections with nearby 3–5-bar alternatives. They avoid held notes and short source gestures but have no formal phrase or harmony detector. `passageHierarchy` validates a nonoverlapping recursive tree; `reconcilePassages` grows it indefinitely. Neither overlapping doubles nor distant contrast excerpts fit that representation.
 
 Visible Total in `src/practice-display.ts` weights original leaves by source duration. Assessment attacks retain each pitch, while sizing needs unique score attack ticks. Saved piano plans distinguish `fixed-four-v1` and `connection-boundary-v1`; manual plan revisions also incorporate the partition. Context restoration and journal admission rely on old hierarchy identities. These are migration responsibilities, not reasons to leave retained users on the old behavior.
@@ -99,7 +101,7 @@ Alternative rejected: switching the fresh default only, which leaves existing us
 2. Integrate both planners, transport, selector, context restoration and all summary consumers before making the policy default for existing journals.
 3. Verify migration twice, interrupted/failed-save behavior and exact protected-data preservation using representative copied journals outside managed personal data.
 4. Inspect No14, irregular three-bar exceptions, dense chords, variable meter, sustained/polyphonic and weak-structure material. Validate A/B transport and restrained exclusion visuals in the viewer.
-5. Complete the reviewed Git path. Native build/publication/activation, when requested through the established delivery lane, must bind the actual reviewed source/dependency and preserve user data. No planning receipt is a native acceptance claim.
+5. Complete the reviewed Git path and the now-authorized native build/publication/activation through the established delivery lane, binding the actual reviewed source/dependency and preserving user data. No planning receipt is a native acceptance claim.
 6. Rollback selects the previous application/policy and reads the retained legacy journal; preserve any new-policy evidence separately rather than rewriting it into incompatible legacy claims.
 
 ## Evidence and Calibration
