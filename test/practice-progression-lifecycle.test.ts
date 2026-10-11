@@ -89,14 +89,14 @@ test('Ready owns one rate and count grid across pending unlock and native arming
  assert.equal(f.session.bpm,100);assert.equal(f.session.pulseGrid.countInBars,1);assert.equal(f.session.startMs,23200);assert.equal(f.view.loopRate,100);assert.equal(f.view.startingRate,undefined);
  assert.equal(f.state.working,300);assert.equal(f.session.sourcePulseGrid.countInBars,2);
 });
-test('carry setup gates audio, checks actual contacts again after startup, and pause clears setup',async t=>{
+test('carry setup gates audio, checks actual contacts again after startup, and explicit input loss clears setup',async t=>{
  const f=fixture(t);const held={...plan.attacks[0],tick:0,end:plan.chunks[1].end+144},carryPlan={...plan,attacks:[held,...plan.attacks.filter(a=>a.id!==held.id)]};
  f.view.plan=carryPlan;f.view.session=new PracticeSession(carryPlan,plan.chunks[1],f.state,true);f.view.heldPitches=new Set();f.view.clock=undefined;f.view.audioOutputs={supported:true};
  let starts=0,resolve!:(start:number)=>void;const oldUnlock=PracticeClock.prototype.unlock,oldBegin=PracticeClock.prototype.begin;
  PracticeClock.prototype.unlock=async()=>{};PracticeClock.prototype.begin=()=>{starts++;return new Promise(done=>{resolve=done;});};t.after(()=>{PracticeClock.prototype.unlock=oldUnlock;PracticeClock.prototype.begin=oldBegin;});
  await f.view.action('ready');assert.equal(starts,0);assert.match(f.messages.at(-1)!,/earlier notes/);
  f.view.heldPitches.add(held.midi);const pending=f.view.action('ready');await until(()=>starts===1);f.view.heldPitches.clear();resolve(7600);await pending;assert.equal(f.view.session.phase,'ready');assert.equal(f.view.session.matched.size,0);
- f.view.heldPitches.add(held.midi);f.view.pause();assert.equal(f.view.heldPitches.size,0);assert.equal(f.view.session.phase,'paused');
+ f.view.heldPitches.add(held.midi);f.view.pause();assert.equal(f.view.heldPitches.has(held.midi),true);assert.equal(f.view.session.phase,'paused');f.view.clearHeldInput();assert.equal(f.view.heldPitches.size,0);
 });
 test('owned Ready reads current musical pedal positions after async startup without retaining prior attacks',async t=>{
  const f=fixture(t),held={...plan.attacks[0],tick:0,end:plan.chunks[1].end+144},carryPlan={...plan,attacks:[held,...plan.attacks.filter(a=>a.id!==held.id)]},stream={source:'public-midi',generation:7,channel:2};

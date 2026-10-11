@@ -1,6 +1,6 @@
 # Score Viewer
 
-Private repository for the TUNA score viewer: score library, reading and performance, instrument setup, editable piano fingerings and guided practice on Windows and macOS.
+Private repository for the TUNA score viewer: score library, viewing and editing, instrument setup, editable piano fingerings and guided practice on Windows and macOS.
 
 The application source has been extracted from accepted [ISO notation](https://github.com/hypermemetic-ai/iso-notation) revision `da93cf9e0359d861987fd76611b59b14b6aedb92`. Source extraction preserves the existing behavior, including the practice defects reported in [the repair handoff](docs/practice-repair-handoff.md). It does not install or publish a new application.
 
@@ -14,6 +14,8 @@ npm test
 New clones should use `git clone --recurse-submodules`. The pinned private ISO submodule requires organization access. `npm run dev` starts the optional local browser preview on port 5205; stop it when finished. Desktop development remains `npm run tauri -- dev`. Browser mode has no native MIDI input, native audio routing or desktop file dialogs.
 
 The viewer owns `src/`, `src-tauri/`, its tests and application assets. Notation, the score format, editorial tools and engraving remain ISO-owned; `vendor/iso-notation` is an explicitly temporary, full-revision source dependency for those modules and the calculator. It is not a new permanent public API. Format conversion belongs to [score-converter](https://github.com/hypermemetic-ai/score-converter); the interval-learning application belongs to [learning-app](https://github.com/hypermemetic-ai/learning-app). The fingering calculator's separate repository extraction is pending.
+
+The ordinary score viewer and editor are passive: played notes do not turn pages, move selection or highlight score matches. In Edit, Up/Down jump to the horizontally nearest note in the previous/next whole system, revealing the next page when needed; Left/Right/Tab retain chronological movement. Explicit page/pedal commands, piano sound and Options input diagnostics remain available.
 
 Current piano practice modes and controls are described in [Reading and Timed practice](docs/practice-reading-timed.md).
 
