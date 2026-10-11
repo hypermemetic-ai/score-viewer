@@ -18,10 +18,10 @@
 ## 4. Integrated performance and source delivery
 
 - [x] 4.1 Run configured viewer tests and types/build, compare production cold/warm measurements against all named baseline fixtures, inspect the real UI and record remaining blocked intervals and native limits in validation documentation.
-- [ ] 4.2 Obtain independent review of the exact shared/viewer inputs and merge the viewer through its ordinary PR path; verify source/tree/pin identities and fresh Git status without unattended changes.
+- [x] 4.2 Obtain independent review of the exact shared/viewer inputs and merge the viewer through its ordinary PR path; verify source/tree/pin identities and fresh Git status without unattended changes.
 
 ## 5. Paired native activation and closure
 
-- [ ] 5.1 Build and admit the exact paired Windows/Mac release through the existing reviewed carrier lane, verify complete downloads and publish atomically; record native checks, frontend parity and release identities.
-- [ ] 5.2 Preserve fresh closed-app user data, switch the usual laptop shortcut to the verified candidate, reopen on the same secondary screen and observe cold/warm readiness; verify the data audit, other music apps and retained recovery path.
-- [ ] 5.3 Sync and strictly validate the resulting main specification, archive the completed change through reviewed closeout, stop task-owned temporary processes and verify fresh final Git/PR status and delivery receipts.
+- [x] 5.1 Build and admit the exact paired Windows/Mac release through the existing reviewed carrier lane, verify complete downloads and publish atomically; record native checks, frontend parity and release identities.
+- [x] 5.2 Preserve fresh closed-app user data, switch the usual laptop shortcut to the verified candidate, reopen on the same secondary screen and observe cold/warm readiness; verify the data audit, other music apps and retained recovery path.
+- [x] 5.3 Sync and strictly validate the resulting main specification, archive the completed change through reviewed closeout, stop task-owned temporary processes and verify fresh final Git/PR status and delivery receipts.
