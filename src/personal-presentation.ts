@@ -12,17 +12,24 @@ export class PersonalPresentationSession {
  private lastKey?:string;
  private lastView?:ScorePackage;
  constructor(private readonly base:ScorePackage){}
+ private prepare(){
+  return this.preparation??=(async()=>{
+   const recipe=await calculatedRecipeForRequest(this.base),source=scoreWithCalculationContext(this.base.sourceScore??this.base.score,
+    this.base.calculationContext,this.base.sourceSha256??this.base.manifest.semanticSha256);
+   return createPersonalHandProjection(source,this.base.score,recipe);
+  })();
+ }
+ /** Cold admission/layout work belongs to score opening, ahead of key handling. */
+ async warm():Promise<void>{
+  if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
+  (await this.prepare()).warm();
+ }
  async project(personal:PersonalState):Promise<ScorePackage>{
   const owners:OwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
   if(owners.every(a=>this.base.score.notes.find(n=>n.id===a.id)?.hand===a.hand))return this.base;
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
-  this.preparation??=(async()=>{
-   const recipe=await calculatedRecipeForRequest(this.base),source=scoreWithCalculationContext(this.base.sourceScore??this.base.score,
-    this.base.calculationContext,this.base.sourceSha256??this.base.manifest.semanticSha256);
-   return createPersonalHandProjection(source,this.base.score,recipe);
-  })();
-  const [session,digest]=await Promise.all([this.preparation,hashBytes(key)]),result=session.project(owners,digest);
+  const [session,digest]=await Promise.all([this.prepare(),hashBytes(key)]),result=session.project(owners,digest);
   // Archive bytes, manifest, original source, receipts and fingering evidence are
   // retained verbatim. This object is a transient reading, never package admission.
   const view:ScorePackage={...this.base,score:result.score,pages:result.pages,seats:result.seats,annotationGeometry:result.annotationGeometry};
