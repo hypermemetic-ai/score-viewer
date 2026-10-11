@@ -19,9 +19,9 @@ function keyboardFixture(){
   input:new InputController(),controls:new ControlResolver(readControlBindings(undefined,{bindings:defaultBindings()})),
   current:{package:pkg,personal:{view:defaultView(),editContactId:first.contactId}},selection:first,readerFocused:true,preferences:{fingerBehavior:'toggle'},
   practice:undefined,dialog:undefined,bindingOptions:undefined,optionsNavigation:undefined,dialogNavigation:undefined,toolbarNavigation:undefined,
-  inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,PracticeView,systemSelection,viewportFit,effectiveView:(v:any)=>v,
-  syncControls(){},editSequence:{reset(){calls.push('reset');}},savePersonal(){calls.push('save');},renderPages(){calls.push('pages');},renderToolbar(){calls.push('toolbar');},focusSelection(){calls.push('focus');},
-  selectFinger(step:number){calls.push(`chronological:${step}`);},act(action:string){calls.push(`action:${action}`);},edit(){calls.push('dialog');},saveFingerDigit(){calls.push('digit');return Promise.resolve();},reveal(){},notify(){},
+  inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,PracticeView,systemSelection,viewportFit,effectiveView:(v:any)=>v,readerPackage:()=>pkg,
+  syncControls(){},editSequence:{reset(){calls.push('reset');}},savePersonal(){calls.push('save');},savePersonalQuietly(){calls.push('save');},renderPages(){calls.push('pages');},renderToolbar(){calls.push('toolbar');},focusSelection(){calls.push('focus');},
+  selectFinger(step:number){calls.push(`chronological:${step}`);},act(action:string){calls.push(`action:${action}`);},edit(){calls.push('dialog');},saveFingerDigit(){calls.push('digit');return Promise.resolve();},saveHandChoice(hand:string){calls.push(`hand:${hand}`);return Promise.resolve();},reveal(){},notify(){},
   HTMLInputElement:class {},ManualPracticeView:class {},
  };
  runInNewContext(production('function selectFingerSystem(','function exitSelection('),context);
@@ -54,6 +54,11 @@ test('production vertical arrows respect editor fields, toolbar navigation, moda
 test('production chronological editing and explicit reader page commands retain ownership',()=>{
  const edit=keyboardFixture();edit.press('ArrowRight');assert.deepEqual(edit.calls,['chronological:1']);edit.context.input.clear();edit.context.controls.clear();edit.press('Tab',{shiftKey:true});assert.deepEqual(edit.calls,['chronological:1','chronological:-1']);
  const reader=keyboardFixture();reader.context.selection=undefined;reader.press('ArrowRight');assert.deepEqual(reader.calls,['action:next']);
+});
+test('production L/R editing retains note ownership and respects inactive or modified input',()=>{
+ const f=keyboardFixture();f.press('KeyR');assert.deepEqual(f.calls,['hand:RH']);const selected=f.context.selection;
+ f.context.input.clear();f.context.controls.clear();f.press('KeyL');assert.deepEqual(f.calls,['hand:RH','hand:LH']);assert.equal(f.context.selection,selected);
+ for(const owner of ['blurred','hidden','repeat','modifier','field','modal']){const guarded=keyboardFixture();let extra:any={};if(owner==='blurred')guarded.context.readerFocused=false;if(owner==='hidden')guarded.context.document.hidden=true;if(owner==='repeat')extra.repeat=true;if(owner==='modifier')extra.ctrlKey=true;if(owner==='field')extra.target={closest:(s:string)=>s.includes('input')?{}:null};if(owner==='modal')guarded.context.dialog={dataset:{kind:'edit'}};guarded.press('KeyR',extra);assert.deepEqual(guarded.calls,[],owner);}
 });
 test('production MIDI note routing leaves the full reader/editor untouched while retaining Options diagnostics',()=>{
  const f=keyboardFixture(),received:any[]=[],event={source:'piano',generation:1,note:55,on:true};
