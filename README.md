@@ -17,7 +17,7 @@ The viewer owns `src/`, `src-tauri/`, its tests and application assets. Notation
 
 The ordinary score viewer and editor are passive: played notes do not turn pages, move selection or highlight score matches. In Edit, Up/Down jump to the horizontally nearest note in the previous/next whole system, revealing the next page when needed; Left/Right/Tab retain chronological movement. Explicit page/pedal commands, piano sound and Options input diagnostics remain available. L/R set the selected note’s performing hand and keep its finger and selection; digits set a finger and advance. Personal hand/finger edits preserve practice progress.
 
-Current piano practice modes and controls are described in [Reading and Timed practice](docs/practice-reading-timed.md).
+Practice offers bounded original sections, overlapping connections of two consecutive sections, and separate A/B contrast excerpts for similar sections. Excluding an exercise changes the displayed total while preserving its progress. Current modes and controls are described in [Reading and Timed practice](docs/practice-reading-timed.md).
 
 Common instrument reading and local MusicXML preparation are described in [instrument reading](docs/instrument-reading.md).
 
