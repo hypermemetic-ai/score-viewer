@@ -1,4 +1,4 @@
-import {fitLeafPreview} from './practice-crop-fit';
+import {fitLeafPreview,practicePreviewRoom,practicePreviewRowCount} from './practice-crop-fit';
 import {practicePercent,reconcilePassages,type PracticeChunk,type PracticePassagePlan,type PracticeState} from './practice';
 import {displayedComponentsAttained,displayedPracticeProgress,displayedPracticeTotal} from './practice-display';
 import {attainmentLabel} from './tempo-presentation';
@@ -89,7 +89,19 @@ export class PracticeBrowser {
   if(current){const preview=root.querySelector<HTMLElement>('.practice-leaf-preview')!;preview.setAttribute('aria-label',`Score preview, ${label(current)}`);
    for(const [i,clip] of (current.clips??[{id:current.id,start:current.start,end:current.end,firstBar:current.firstBar,lastBar:current.lastBar}]).entries()){
     const frame=current.kind==='contrast'?document.createElement('section'):preview;if(current.kind==='contrast'){const caption=document.createElement('small');caption.textContent=`${i===0?'A':'B'} · Measures ${clip.firstBar+1} – ${clip.lastBar+1}`;frame.append(caption);preview.append(frame);}
-    try{frame.append(passage(Array.from({length:clip.lastBar-clip.firstBar+1},(_,n)=>clip.firstBar+n),clip));}catch(error){const message=document.createElement('p');message.className='practice-render-error';message.textContent=`${label(current)}: ${(error as Error).message}`;frame.append(message);}
+    try{
+     const bars=Array.from({length:clip.lastBar-clip.firstBar+1},(_,n)=>clip.firstBar+n),whole=passage(bars,clip),box=whole.viewBox.baseVal,room=practicePreviewRoom(preview);
+     // A/B shares available height; retain each actual excerpt and its caption.
+     const count=practicePreviewRowCount(bars.length,box.width,box.height,{...room,height:room.height/(current.kind==='contrast'?current.clips!.length:1)});
+     if(count===1)frame.append(whole);
+     else{
+      if(frame!==preview)frame.style.gap='12px';
+      const length=Math.ceil(bars.length/count);
+      for(let first=0;first<bars.length;first+=length){const row=bars.slice(first,first+length),firstBar=row[0],lastBar=row.at(-1)!,rowClip={...clip,firstBar,lastBar,start:Math.max(clip.start,this.plan.barTicks[firstBar]),end:Math.min(clip.end,this.plan.barTicks[lastBar+1])},svg=passage(row,rowClip);
+       svg.dataset.practicePreviewFirstBar=String(firstBar);svg.dataset.practicePreviewLastBar=String(lastBar);svg.setAttribute('aria-label',`Source preview, measures ${firstBar+1} – ${lastBar+1}`);frame.append(svg);
+      }
+     }
+    }catch(error){const message=document.createElement('p');message.className='practice-render-error';message.textContent=`${label(current)}: ${(error as Error).message}`;frame.append(message);}
    }
   }
   fitLeafPreview(root.querySelector<HTMLElement>('.practice-leaf-preview')!);

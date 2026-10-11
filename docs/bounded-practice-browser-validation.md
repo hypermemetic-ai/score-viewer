@@ -17,8 +17,11 @@ storage and the public No14 archive with its real archive hash as filename.
 
 The best dictionaries in this particular guard run were empty. Populated
 attainment preservation and complete A/B credit are separate checks in
-`scripts/check-contrast-lifecycle.mjs`; this run does not manufacture earned
-evidence or claim another lifecycle execution.
+`scripts/check-contrast-lifecycle.mjs`; the guard script does not manufacture earned evidence. The lifecycle script
+was also rerun after the preview repair: A errors cleared the paired attempt,
+A alone earned no contrast claim, complete B earned only the owning claim,
+auto-next and keep-tempo behavior passed, populated best rates survived
+exclusion, and the manual ISO/TAB contrast retained its source clip and state.
 
 Five authored symbolic fixtures were engraved by the pinned production engine
 and mounted in the actual PracticeView. Each original section preview matched
@@ -39,18 +42,55 @@ but visually unreadable. At 480 pixels the No14 A/B preview is only 106 pixels
 wide. Containment is not a readability result. These observations motivate a
 source-faithful preview layout repair, without changing the musical exercises.
 
+The repair chooses preview rows from the literal source-frame proportions and
+available pane size. It calls the same source crop renderer for each contiguous
+bar row and fits all rows at one common scale. All twelve sparse bars remain
+present, including the final row with no note attacks. The four rows retain
+all 19 written heads and their continuation identities. Each row is roughly
+93–101 CSS pixels high. This improves inspection scale without claiming
+pianist acceptance or changing section boundaries.
+
+At 480 pixels the same two selector lists occupy the upper 30% of the browser;
+the detail pane spans the full width below them and owns vertical scrolling.
+The two No14 A/B previews remain separate, now approximately 179 × 111 pixels
+each. The 35 catalog rows, selection, exclusions, focus, numeric fields, modal
+ownership and saved binding guards passed again in the emitted application.
+The ordinary 800/1280 layout is unchanged. A separate comparison loads the exact
+prior browser/crop-fit modules from `40a926d` through read-only Vite modules:
+four cases, covering both piano layouts at both widths, have identical source
+viewBoxes, CSS geometry and all 24 source heads. It also reconstructs the sparse
+before/after screenshots and confirms complete range and head retention.
+
+The eight-bar authored manual connection was inspected in ISO and TAB at 1000
+and 480 pixels. Every expected component ink ID remains in the source preview;
+rows cover the complete clip contiguously and use a common scale. Switching
+notation changes neither score source nor attainment. These are authored
+workload examples, not evidence that the heuristics recover all musical forms.
+
 Reproduce after a configured build:
 
 ```sh
 /home/qqp/.local/bin/qq-job -- npm run build
-/home/qqp/.local/bin/qq-job -- node scripts/check-bounded-practice-guards.mjs
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-source-sections.mjs
+PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-ui-guards-after /home/qqp/.local/bin/qq-job -- node scripts/check-bounded-practice-guards.mjs
+PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-source-sections-after /home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-source-sections.mjs
+/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-preview-continuity.mjs
+PRACTICE_ARTIFACTS=/tmp/score-viewer-contrast-lifecycle-preview-after /home/qqp/.local/bin/qq-job -- node scripts/check-contrast-lifecycle.mjs
 ```
 
-The guard receipt and screenshots are under `/tmp/score-viewer-bounded-ui-guards`;
-initial receipt SHA256 is
+The configured build and 17 focused preview/browser/cache tests passed. The
+source fixture helper passed an ES2023 TypeScript check. Final inspection
+receipts and screenshots are in the directories named above. SHA256 receipts:
+
+| Inspection | Receipt SHA256 |
+| --- | --- |
+| Emitted-main guards after repair | `b3eef1daa216241b04fe54972a5613937cac62f7a6a56c8e85a4b9e319f5452a` |
+| Symbolic source and manual previews | `b38d935d7dfb58bd195071d88bb9e31d501acf39ef8c1704beab8aaa8d6083e4` |
+| Exact prior/current preview comparison | `fb5cbc8572bd85d616a03e2257fd4bd61cf2319b5325e28b1c845487eeb0c500` |
+| Contrast lifecycle after repair | `51b012c1499589e53dc153a897dc84532f5e4b33e89331e591a7e5bcbb730019` |
+
+The initial narrow screenshot remains in `/tmp/score-viewer-bounded-ui-guards`;
+its initial receipt SHA256 is
 `60ed907433e393bab3dfdfc59073a36c2f225bba5db17396d27cb0aea6d5cc55`.
-The symbolic source receipt/screenshots are under
-`/tmp/score-viewer-bounded-source-sections`; initial receipt SHA256 is
-`82ecc1f1dce3e06a8a38acc92cb57a46870796defd70f8f5be4361a931edb302`.
-Scripts close their temporary servers and browser processes in `finally`.
+The exact sparse baseline is reconstructed in the prior/current comparison,
+with the baseline module hashes recorded in that receipt. Scripts close their
+temporary servers and browser processes in `finally`.
