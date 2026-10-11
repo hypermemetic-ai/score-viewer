@@ -51,6 +51,11 @@ test('source-guarded hand-only choice works without a calculated finger layer',(
  assert.equal(effectiveAssignments(p,s)[0].hand,'RH');assert.equal(effectiveAssignments(p,s)[0].finger,undefined);
  assert.deepEqual(readPersonal(s,p),s);
 });
+test('finger lookup survives transient projected seat/action IDs through source ownership',()=>{
+ const p=fixture(),s=initialPersonal(p),projected={...p.seats[0],id:'projected-seat',actionId:'transient-action',contactId:'transient-contact'};
+ assert.equal(fingerFor(p,s,projected),3);assert.equal(fingerFor(p,corrected(p,s,p.seats[0],4),projected),4);
+ const edited=assigned(p,s,projected,{hand:'RH',finger:5});assert.equal(fingerFor(p,edited,projected),5);
+});
 test('effective practice hands isolate affected leaf/join claims and retain raw history and unrelated/finger-only claims',()=>{
  const p=fixture(),base=planPractice(p,'fixed-four-v1'),state=initialPractice(base),a=base.chunks[0],b=base.chunks[1];
  toggleDone(state,{passage:a.id,pattern:a.pattern,rate:180});toggleDone(state,{passage:b.id,pattern:b.pattern,rate:180});
