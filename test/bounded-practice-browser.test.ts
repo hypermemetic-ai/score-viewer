@@ -35,3 +35,7 @@ test('empty inclusion has no percentage and contrast range refers to both actual
  const state=initialPractice(plan);state.excluded=Object.fromEntries(chunks.map(c=>[c.id,true]));assert.deepEqual(displayedPracticeAssessment(plan,state),{included:0,progress:undefined});
  const contrast=chunks.find(c=>c.kind==='contrast')!;assert.equal(practiceChunkRange(contrast),contrast.clips!.map(c=>c.firstBar===c.lastBar?String(c.firstBar+1):`${c.firstBar+1} – ${c.lastBar+1}`).join(' / '));
 });
+
+test('recommendations retain the actual contrast or connection rather than an enclosing original',()=>{
+ const state=initialPractice(plan),browser=new PracticeBrowser(plan);for(const chunk of chunks.filter(c=>c.kind!=='section')){browser.suggest(state,chunk);assert.equal(browser.current(state)?.id,chunk.id);assert.equal(browser.component,undefined);}
+});

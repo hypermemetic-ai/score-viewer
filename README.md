@@ -15,7 +15,7 @@ New clones should use `git clone --recurse-submodules`. The pinned private ISO s
 
 The viewer owns `src/`, `src-tauri/`, its tests and application assets. Notation, the score format, editorial tools and engraving remain ISO-owned; `vendor/iso-notation` is an explicitly temporary, full-revision source dependency for those modules and the calculator. It is not a new permanent public API. Format conversion belongs to [score-converter](https://github.com/hypermemetic-ai/score-converter); the interval-learning application belongs to [learning-app](https://github.com/hypermemetic-ai/learning-app). The fingering calculator's separate repository extraction is pending.
 
-The ordinary score viewer and editor are passive: played notes do not turn pages, move selection or highlight score matches. In Edit, Up/Down jump to the horizontally nearest note in the previous/next whole system, revealing the next page when needed; Left/Right/Tab retain chronological movement. Explicit page/pedal commands, piano sound and Options input diagnostics remain available.
+The ordinary score viewer and editor are passive: played notes do not turn pages, move selection or highlight score matches. In Edit, Up/Down jump to the horizontally nearest note in the previous/next whole system, revealing the next page when needed; Left/Right/Tab retain chronological movement. Explicit page/pedal commands, piano sound and Options input diagnostics remain available. L/R set the selected note’s performing hand and keep its finger and selection; digits set a finger and advance. Personal hand/finger edits preserve practice progress.
 
 Current piano practice modes and controls are described in [Reading and Timed practice](docs/practice-reading-timed.md).
 

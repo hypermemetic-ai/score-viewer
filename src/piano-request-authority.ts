@@ -96,7 +96,8 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
       if(q.hand!==undefined||q.finger!==undefined||q.row!==undefined||q.contact!==undefined)constraints.push(q);
     }
   }
-  if(policy==='retain-imported')for(const n of p.score.notes)if(!choices[n.id])
+  const retainedPersonal=new Set(constraints.filter(c=>(c.provenance.kind as string)==='personal-choice'&&c.hand!==undefined).map(c=>c.ownerId));
+  if(policy==='retain-imported')for(const n of p.score.notes)if(!choices[n.id]&&!retainedPersonal.has(n.id))
     constraints.push(check({ownerId:n.id,guard:guard(n.id),hand:n.hand,
       provenance:{kind:'editorial-hand-retention',reference:AUTOMATIC_HAND_RETENTION_REFERENCE}}));
   for(const c of Object.values(personal?.overrides??{}))for(const id of c.ownerIds)if(!choices[id])
@@ -111,7 +112,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     const records=constraints.filter(c=>attack.owners.some(o=>o.id===c.ownerId));
     for(const key of ['hand','finger','row','contact'] as const){
       const values=records.map(c=>c[key]).filter(v=>v!==undefined);
-      if(key==='hand'&&required[attack.id]&&!attack.owners.every(o=>choices[o.id]?.hand!==undefined))values.push(required[attack.id]);
+      if(key==='hand'&&required[attack.id]&&!attack.owners.every(o=>records.some(c=>c.ownerId===o.id&&(c.provenance.kind as string)==='personal-choice'&&c.hand!==undefined)))values.push(required[attack.id]);
       if(values.some(v=>!same(v,values[0])))throw new PianoAuthorityConflict('Guarded owner choices contradict a source instruction or physical alias.',attack.owners.map(o=>o.id));
     }
   }

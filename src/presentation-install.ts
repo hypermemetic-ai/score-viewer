@@ -1,3 +1,4 @@
+import {readPersonalAssignments} from './personal-assignments';
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,type ScorePackage} from './package';
 import {personalStorageName,readPersonal,initialPersonal,installLayer,validEntryStorage,type Entry,type PersonalState} from './state';
@@ -14,7 +15,10 @@ export function personalForCalculatedEdition(s:PersonalState,from:ScorePackage,t
   if(!from.sourceSha256||from.sourceSha256!==to.sourceSha256||from.keyboardLayout!==to.keyboardLayout)
     throw new PersonalEditionConflict('Personal choices belong to another musical source or keyboard.');
   if(!to.fingerLayer)throw new PersonalEditionConflict('The new edition has no complete calculated layer.');
-  const corrections=Object.values(prior.overrides);
+  const choices=readPersonalAssignments(prior.assignments,from)?.choices??{},superseded=new Set(Object.keys(choices)),corrections=Object.values(prior.overrides).filter(c=>!c.ownerIds.some(id=>superseded.has(id)));
+  for(const c of Object.values(choices)){const n=to.score.notes.find(n=>n.id===c.ownerId),a=to.fingerLayer.attacks.find(a=>a.id===to.fingerLayer!.sourceOwnerToAttack[c.ownerId]);
+    if(!n||!isPitchedEvent(n)||n.pitch.octave*12+n.pitch.pitchClass!==c.guard.pitch||n.startTick!==c.guard.startTick||n.durationTicks!==c.guard.durationTicks||!a||c.hand!==undefined&&a.hand!==c.hand||c.finger!==undefined&&a.finger!==c.finger)throw new PersonalEditionConflict('A personal assignment was not retained by the explicit calculation.');
+  }
   if(corrections.length&&(from.profileId!==to.profileId||from.profileSha256!==to.profileSha256))
     throw new PersonalEditionConflict('Active choices need review for the changed physical profile.');
   for(const c of corrections)for(const id of c.ownerIds){
@@ -33,8 +37,9 @@ export function personalForCalculatedEdition(s:PersonalState,from:ScorePackage,t
       compatible.binding=initialPersonal(to).binding;
       return readPersonal(compatible,to);
     }
-    const fresh=initialPersonal(to);
-    return readPersonal({...fresh,view:structuredClone(prior.view),overrides:structuredClone(prior.overrides),
+    const fresh=initialPersonal(to),overrides=Object.fromEntries(Object.entries(prior.overrides).filter(([,c])=>!c.ownerIds.some(id=>superseded.has(id))));
+    if(prior.assignments){fresh.assignments=structuredClone(prior.assignments);for(const c of Object.values(fresh.assignments.choices)){const n=to.score.notes.find(n=>n.id===c.ownerId)!,a=to.fingerLayer.attacks.find(a=>a.id===to.fingerLayer!.sourceOwnerToAttack[c.ownerId])!;c.original={hand:n.hand as 'LH'|'RH',finger:a.finger};}}
+    return readPersonal({...fresh,view:structuredClone(prior.view),overrides,
       ...(prior.editContactId?{editContactId:prior.editContactId}:{})},to);
   }catch(error){throw new PersonalEditionConflict((error as Error).message);}
 }
