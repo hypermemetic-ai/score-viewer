@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {importPackage,selectPresentation,hashBytes} from '../src/package';
-import {collectionId,practiceStorageName,legacyPracticeStorageName,type Entry} from '../src/state';
+import {collectionId,practiceStorageName,legacyPracticeStorageName,personalStorageName,legacyPersonalStorageName,initialPersonal,type Entry} from '../src/state';
 import {planPractice,initialPractice,totalProgress,practicePercent,reconcilePassages} from '../src/practice';
 import {LibraryPracticeSummaries,readLibraryPracticeSummary,type LibraryPracticeReader} from '../src/library-practice-progress';
 import {displayedPracticeTotal} from '../src/practice-display';
@@ -24,7 +24,7 @@ const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>
 
 test('warm summary reuse rereads progress and changed archive bytes never borrow a prior admission',async()=>{
  const cache=new LibraryPracticeSummaries();let currentBytes=new Uint8Array(bytes),saved=structuredClone(earned),packageReads=0,recordReads=0;
- const fresh={readPackage:async()=>{packageReads++;return currentBytes;},readRecord:async()=>{recordReads++;return structuredClone(saved);}};
+ const fresh={readPackage:async()=>{packageReads++;return currentBytes;},readRecord:async(name:string)=>{if(!name.startsWith('practice-'))return null;recordReads++;return structuredClone(saved);}};
  await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);
  saved=initialPractice(plan);for(const c of plan.chunks)saved.best[c.pattern]=saved.target;
  await cache.refresh([entry],'janko-four-row',fresh,()=>true);assert.equal(cache.get(entry,'janko-four-row')!.sections,1);
@@ -63,7 +63,7 @@ test('Conventional 0 ↔ Jankó 25% preserves exact earned fraction and every pe
 
 test('library shows the same combined manual/measured total without preparation bonus or record changes',async()=>{
  const state=initialPractice(plan);for(const c of plan.chunks){state.best[c.pattern]=.4*state.target;state.groundwork??={};state.groundwork[c.pattern]=true;}
- const first=plan.chunks[0];toggleDone(state,{passage:first.id,pattern:first.pattern,rate:.7*state.target});const before=JSON.stringify(state),summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async()=>JSON.parse(before)});
+ const first=plan.chunks[0];toggleDone(state,{passage:first.id,pattern:first.pattern,rate:.7*state.target});const before=JSON.stringify(state),summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async(name:string)=>name.startsWith('practice-')?JSON.parse(before):null});
  // No14 has three literal copies of this four-bar musical unit, with weights
  // 576, 576 and 1152. Its manual rate now counts at all three locations.
  assert.ok(Math.abs(summary!.sections-(.4+.3*(576+576+1152)/13824))<1e-12);assert.equal(summary!.sections,displayedPracticeTotal(plan,state));assert.ok(Math.abs(displayedPracticeTotal(plan,state,false)-.4)<1e-12);assert.ok(totalProgress(plan,state)>summary!.sections);assert.equal(JSON.stringify(state),before);
@@ -132,16 +132,16 @@ test('legacy fallback remains restricted to the original source-bound Jankó pre
  const legacy=legacyPracticeStorageName(rr)!;assert.ok(legacy);assert.equal(legacyPracticeStorageName(cp),undefined);
  const seen:string[]=[],legacyReader={readPackage:async()=>bytes,readRecord:async(file:string)=>{seen.push(file);return file===legacy?structuredClone(earned):null;}};
  assert.equal((await readLibraryPracticeSummary(entry,'janko-four-row',legacyReader))!.sections,fraction);
- assert.deepEqual(seen,[rrFile,legacy]);seen.length=0;
+ assert.deepEqual(seen,[rrFile,legacy,personalStorageName(entry.id,rr),legacyPersonalStorageName(rr)]);seen.length=0;
  assert.equal((await readLibraryPracticeSummary(entry,'conventional-piano',legacyReader))!.sections,0);
- assert.deepEqual(seen,[cpFile]);
+ assert.deepEqual(seen,[cpFile,personalStorageName(entry.id,cp)]);
 });
 
 test('whole-piece badge still requires the full joined source run rather than completed leaves',async()=>{
  const state=initialPractice(plan);for(const c of plan.chunks)state.best[c.pattern]=state.target;
  let tree=reconcilePassages(plan,state);
  while(tree.frontier.length>1){for(const c of tree.frontier)state.best[c.pattern]=state.target;tree=reconcilePassages(plan,state);}
- const completeReader={readPackage:async()=>bytes,readRecord:async()=>structuredClone(state)};
+ const completeReader={readPackage:async()=>bytes,readRecord:async(name:string)=>name.startsWith('practice-')?structuredClone(state):null};
  assert.equal((await readLibraryPracticeSummary(entry,'janko-four-row',completeReader))!.whole,false);
  state.best[tree.frontier[0].pattern]=state.target;
  const summary=(await readLibraryPracticeSummary(entry,'janko-four-row',completeReader))!;
