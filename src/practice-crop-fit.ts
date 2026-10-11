@@ -14,7 +14,7 @@ export function tightenSourceCrop(svg:SVGSVGElement){
 }
 /** One complete passage frame, fitted without independent crop scales/rows. */
 export function fitLeafPreview(root:HTMLElement){
- const svg=root.querySelector<SVGSVGElement>(':scope > svg');if(!svg)return;
+ const svgs=[...root.querySelectorAll<SVGSVGElement>(':scope > svg, :scope > section > svg')];if(!svgs.length)return;const svg=svgs[0];
  const logicalTop=(el:HTMLElement)=>{let top=0;for(let node:HTMLElement|null=el;node;node=node.offsetParent as HTMLElement|null)top+=node.offsetTop;return top;};
- const box=svg.viewBox.baseVal,overview=root.closest<HTMLElement>('.practice-overview'),available=overview?Math.max(80,overview.clientHeight-(logicalTop(root)-logicalTop(overview))-12):Infinity,style=getComputedStyle(root),width=Math.max(1,root.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),scale=Math.min(width/box.width,available/box.height);root.dataset.rows='1';svg.style.width=`${box.width*scale}px`;svg.style.height=`${box.height*scale}px`;
+ const overview=root.closest<HTMLElement>('.practice-overview'),available=overview?Math.max(80,overview.clientHeight-(logicalTop(root)-logicalTop(overview))-12):Infinity,style=getComputedStyle(root),width=Math.max(1,root.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),boxes=svgs.map(s=>s.viewBox.baseVal),captions=[...root.querySelectorAll<HTMLElement>(':scope > section > small')].reduce((n,s)=>n+s.offsetHeight,0),gap=svgs.length>1?12*(svgs.length-1):0,scale=Math.min(width/Math.max(...boxes.map(b=>b.width)),Math.max(1,available-captions-gap)/boxes.reduce((n,b)=>n+b.height,0));root.dataset.rows=String(svgs.length);svgs.forEach((s,i)=>{s.style.width=`${boxes[i].width*scale}px`;s.style.height=`${boxes[i].height*scale}px`;});
 }

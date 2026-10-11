@@ -5,7 +5,7 @@ import {initialPersonal,readPersonal,corrected,fingerFor,personalStorageName,pra
 import {planPractice,initialPractice,readPractice,progressFor,passageHierarchy} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {pianoRequestAuthority} from '../src/piano-request-authority';
-import {admitPracticeContext} from '../src/practice-context';
+
 import {personalForCalculatedEdition} from '../src/presentation-install';
 import type {ScorePackage} from '../src/package';
 import {testReference} from './support/reference-score';
