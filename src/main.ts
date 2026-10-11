@@ -30,6 +30,7 @@ import {PracticeView} from './practice-view';
 import {ManualPracticeView} from './manual-practice-view';
 import {ManualReadingContext} from './manual-reading-context';
 import {planManualPractice} from './manual-practice-plan';
+import {readManualPracticeWithLegacy} from './manual-practice-state';
 import {manualReferenceStorageName,manualReferenceRecord,readManualReference} from './manual-reference-context';
 import {manualPassageScene} from './manual-passage-scene';
 import {ReadingPresentationController} from './reading-presentation';
@@ -529,9 +530,9 @@ async function startManualPractice(snapshot?:PracticeViewContext){
    const record=manualReferenceRecord(identity,fallback);await enqueue(async()=>{if(live())await writeJson(name,record);});if(!live())return;
   }
  }
- const plan=await planManualPractice(target.package,controller.partition,fallback);if(!live())return;
- const saved=await readJson(`practice-manual-v1-${plan.revision}.json`);if(!live())return;
- const context=await ManualReadingContext.open(target.package,saved,view,controller.partition,fallback);
+ const plan=await planManualPractice(target.package,'bounded-exercises-v1',fallback);if(!live())return;
+ const {raw:saved}=await readManualPracticeWithLegacy(plan,readJson);if(!live())return;
+ const context=await ManualReadingContext.open(target.package,saved,view,'bounded-exercises-v1',fallback);
  if(!live())return;
  selection=undefined;resetInput();practice?.close();
  const next=new ManualPracticeView(app,{context,personal:target.personal,
@@ -601,7 +602,7 @@ window.addEventListener('keydown',e=>{syncControls();if(bindingOptions?.keyDown(
  if(practice&&!dialog&&result.action&&result.action!=='toggle'&&!(uiCode==='Enter'&&!activePracticeFooter&&focused.closest('button,a,summary'))&&controlActionAllowed(result.action,{modal:!!practice.modalOpen,selecting:!!selection,practice:true,practicePaused:practice.canTurnPage,practiceDone:practice.canMarkDone,practiceModes:practice instanceof PracticeView&&practice.bindingContext.active,practiceFreeView:practice?.bindingContext.active})){if(result.action==='done'&&app.querySelector('.practice-overview:not([hidden])')){}else{e.preventDefault();void act(result.action);return;}}
  if(practice&&!dialog&&result.action==='toggle'){e.preventDefault();void act('toggle');return;}
  if(e.repeat&&current&&!dialog&&!inField&&!selection&&readerFocused&&!document.hidden&&(!practice||app.dataset.practicePhase==='paused'||practice instanceof ManualPracticeView&&practice.canTurnPage)){const action=controls.match({kind:'key',key:chord(e)})?.action;if((action==='previous'||action==='next')&&controlActionAllowed(action,{modal:!!practice?.modalOpen,selecting:false,practice:!!practice,practicePaused:practice?.canTurnPage})){e.preventDefault();void act(action);return;}}
- if(practice&&!dialog&&!inField&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!(practice.canAdjustWorking&&['ArrowLeft','ArrowRight'].includes(uiCode))&&!(e.shiftKey&&inputCode(e)==='KeyV')&&practice.key(uiCode,e.repeat||repeatedDown)){e.preventDefault();return;}
+ if(practice&&!dialog&&!inField&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&(uiCode!=='KeyX'||readerFocused&&!document.hidden&&!e.shiftKey&&!controls.matchKey(e))&&!(practice.canAdjustWorking&&['ArrowLeft','ArrowRight'].includes(uiCode))&&!(e.shiftKey&&inputCode(e)==='KeyV')&&practice.key(uiCode,e.repeat||repeatedDown)){e.preventDefault();return;}
  if(e.code==='Escape'&&!e.repeat){e.preventDefault();if(dialog)closeDialog();else if(selection)exitSelection();else if(current)void act('library');else void host.fullscreen(false);return;}
  if(dialog)return;
  if(!current&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&inputCode(e)==='KeyI'&&!e.repeat){e.preventDefault();libraryMenu.beginInstrument();return;}
