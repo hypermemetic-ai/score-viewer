@@ -2,7 +2,7 @@
 
 The [production browser benchmark](../scripts/check-fast-personal-editing.mjs) measures an actual keydown event through the first animation-frame callback containing the correct projected score. It serves the built production frontend under the application's CSP; native managed-file IPC is simulated in isolated browser storage. It reads and preserves public archive bytes and never uses the operator's managed library.
 
-Its six cases combine Conventional piano and Jankó four-row presentations with the retained public Schumann No. 14, a newly authored 120-bar independent-voice study (480 source owners), and a public complete written-tie study spanning pages. Each case includes twenty hand edits across ten successive source selections, changing each hand and changing it back, followed by twenty finger edits with ordinary chronological advance. Opening and four preparation edits are reported separately. The original target was correctly rendered p95 at most 100 milliseconds for every case and edit class. On 2026-10-10 the user accepted delivery at the achieved speed after checking the remaining promising geometry optimization; 100 milliseconds remains a tuning goal, not a release blocker. Final end-to-end measurements must still report the goal honestly and retain all correctness, coverage and recovery checks. A projection refusal is checked independently through full cold preparation and the actual production key path; its retained evidence includes the refusal reason and whether visible geometry, selection and saved journal remain unchanged. Such a refusal does not count as a successful edit sample. Missing or failed samples fail correctness acceptance. The delayed-save rapid edit reports its achieved time against the same 100-millisecond tuning goal.
+Its six cases combine Conventional piano and Jankó four-row presentations with the retained public Schumann No. 14, a newly authored 120-bar independent-voice study (480 source owners), and a public complete written-tie study spanning pages. Each case includes twenty hand edits across ten successive source selections, changing each hand and changing it back, followed by twenty finger edits with ordinary chronological advance. Opening and four preparation edits are reported separately. The original target was correctly rendered p95 at most 100 milliseconds for every case and edit class. On 2026-10-10 the user accepted delivery at the achieved speed after checking the remaining promising geometry optimization; 100 milliseconds remains a tuning goal, not a release blocker. The default runner still requires that goal; the explicit measured-speed opt-in below records the accepted trade-off without changing timing results. Final end-to-end measurements must still report the goal honestly and retain all correctness, coverage and recovery checks. A projection refusal is checked independently through full cold preparation and the actual production key path; its retained evidence includes the refusal reason and whether visible geometry, selection and saved journal remain unchanged. Such a refusal does not count as a successful edit sample. Missing or failed samples fail correctness acceptance. The delayed-save rapid edit reports its achieved time against the same 100-millisecond tuning goal.
 
 Completion requires the entire visible SVG's geometric primitives, stable paint/font attributes, original text, all visible finger values and positions, effective hands, selected source alias, page and keyboard focus to match expected output. Expected geometry for every distinct hand map comes from independent full cold shared preparation, with a fresh transient session used only to resolve source-stable alias IDs. The benchmark neither uses a changed browser scene as expected output nor accepts a changed dataset or finger caption as a substitute for engraving. Benchmark authority identities describe isolated transient operator choices; no expected scene is archived as a calculator result.
 
@@ -58,3 +58,46 @@ switches. The original slow-restore/newer-hand case fails against the prior code
 and passes after the change. Modal completion is guarded by its owning dialog
 and score, so closing an old edit during a pending save does not close a newer
 dialog. These checks do not establish the still-open latency target.
+
+
+The user accepted the achieved editing speed and made 100 milliseconds a tuning
+goal rather than a release blocker. Set `FAST_EDIT_ACCEPT_MEASURED_LATENCY=1`
+explicitly when running the complete benchmark under that decision. This flag
+changes only the benchmark verdict: it does not change the application, measured
+frame times, sample counts, original `hand.pass`/`finger.pass` timing results or
+`delayedSaveRapidPass`. The receipt adds `latencyGoal`, `correctnessCoverage`,
+`releaseAcceptance` and `acceptedTradeOff`. Acceptance still requires all six
+named cases, at least twenty correct samples in each edit class, a correct latest
+frame while saves are blocked, stale-publication suppression, ordered delayed
+writes, failure recovery, source-bound reopening and no reported errors. A
+subset, a renderer refusal, a missing sample or a recovery failure still fails,
+even with the flag. A receipt that accepts measured speed must show its timing
+goal failure plainly. This frontend verdict does not approve a source pin,
+reviewed merge, installed native application or musical acceptance.
+
+Reader overlays now compute only the viewport's visible pages, using the entire
+original package, source owners and admitted geometry. Practice and the default
+full-map API retain complete placement. Font policy is checked on every request;
+selected-page requests also audit complete seat ownership and geometry identity
+on cache hits. Exact page-local placement order, physical carrier discovery and
+collision rules remain unchanged. The parity script now compares each selected
+page, overlapping/duplicate-page requests, empty selections and subsequent
+complete calls to an independent historical COMPLETE map. Its default still
+checks all six cases at baseline and two unseen hand maps (18 views).
+`ANNOTATION_PARITY_CASES` and `ANNOTATION_PARITY_VIEWS` permit bounded diagnostic
+runs; their receipt explicitly marks incomplete scope.
+
+The scoped visible-page implementation `02c2d7b` passed 22 focused annotation,
+carrier and physical-clearance tests. The ee7 trial passed four baseline complete
+maps and twenty selected-page/spread/empty comparisons against Git `3b7553f`:
+No. 14 and the three-page, 24-alias tied study in both keyboard presentations.
+Both measured-policy tie cases also retained the old exact altered-font refusal.
+The receipt is
+`/tmp/score-viewer-visible-annotations-ee7-02c2d7b/receipt.json`, SHA-256
+`5ced622dd8d9f62a1757259800e1eaae60f5b2ebb24da7122d595ff4c7dbec5c`.
+Its five-sample warmed Node overlay timings used fresh complete inputs and are
+reported separately from browser frame timing; a concurrent source diagnostic
+means those durations are not isolated performance evidence. This bounded
+receipt does not establish final eighteen-view parity or final browser speed.
+The initial whole-project type check also exposed two pre-existing practice-gate
+fixture typing errors, subsequently fixed by the parent in `4f0f16f`.
