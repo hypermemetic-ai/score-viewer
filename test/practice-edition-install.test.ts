@@ -17,6 +17,20 @@ async function fixture(score=transferStudy()){
  return {from,to,entry,old,target,targetPlan,sourceKey:practiceStorageName(id,from),targetKey:practiceStorageName(id,to),changed,baseline};
 }
 const f=await fixture();
+test('actual edition journal writes and failed saves preserve chosen off-grid settings and literal legacy bytes',async()=>{
+ const q={...f,old:initialPractice(planPractice(f.from,'fixed-four-v1')),target:structuredClone(f.target)};
+ const values={step:5,start:10,working:26.966292134831466,connectionStart:99.123456789,tolerance:123.456789,offset:-17.123456789};
+ Object.assign(q.old,values);delete q.old.speedRevision;q.old.workingByPattern={'historical-choice':35.123456789};
+ Object.assign(q.target,values,{working:35.123456789});q.target.workingByPattern={'target-choice':67.123456789};
+ for(const existing of [false,true]){
+  const s=storage(existing,q),source=s.map.get(q.sourceKey)!,expected=existing?q.target:q.old;
+  await stagePracticeEditionTransfer(s.host,{entryId:q.entry.id,from:q.from,to:q.to});const raw=parsed(s.map.get(q.targetKey)!),state=readPractice(raw,q.targetPlan);
+  for(const key of Object.keys(values) as (keyof typeof values)[])assert.equal(state[key],expected[key],key);
+  for(const [key,value]of Object.entries(expected.workingByPattern))assert.equal(state.workingByPattern[key],value);
+  assert.deepEqual(s.map.get(q.sourceKey),source);if(!existing)assert.deepEqual(state.editionEvidence!.rawState,q.old);else assert.deepEqual(raw.editionMergeEvidence.targetRaw,q.target);
+ }
+ const failed=storage(true,q),before=new Map(failed.map);await assert.rejects(stagePracticeEditionTransfer({...failed.host,async write(){throw Error('disk failure');}},{entryId:q.entry.id,from:q.from,to:q.to}),/disk failure/);assert.deepEqual(failed.map,before);
+});
 function storage(target=true,q=f){const map=new Map<string,Uint8Array>([['library.json',bytes({version:1,entries:[q.entry]})],[q.entry.file,q.baseline.packageBytes],[q.sourceKey,bytes(q.old)],...(target?[[q.targetKey,bytes(q.target)] as const]:[])]),writes:string[]=[];return {map,writes,host:{async read(name:string){return map.get(name)??null;},async write(name:string,data:Uint8Array){writes.push(name);map.set(name,new Uint8Array(data));}}};}
 function request(beforeCommit:()=>Promise<void>,canCommit=()=>true,q=f){return {entry:q.entry,entries:[q.entry],packageBytes:q.changed.packageBytes,personalBytes:bytes(q.changed.personal),personalKey:personalStorageName(q.entry.id,q.to),beforeCommit,canCommit};}
 
