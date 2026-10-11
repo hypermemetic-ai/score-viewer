@@ -1,6 +1,6 @@
 import {DOMParser} from '@xmldom/xmldom';
 import {svgClassStyles,resolvedSvgStyle} from './svg-style';
-import {footerGlyphPoints,assertAnnotationInkPolicyReady,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
+import {footerGlyphPoints,assertAnnotationInkPolicyReady,ANNOTATION_INK_POLICY,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
 export type AnnotationBox=[number,number,number,number];
 type Matrix=[number,number,number,number,number,number];
 const unit:Matrix=[1,0,0,1,0,0];
@@ -82,13 +82,16 @@ type PageObstacles={width:number;height:number;boxes:AnnotationBox[]};
 // Bound both entry count and retained key bytes: opening other scores cannot
 // turn this into an unbounded library cache. Stored geometry is never exposed.
 const obstaclePages=new Map<string,PageObstacles>();
+const ordinaryMapGet=Map.prototype.get,ordinaryMapIterator=Map.prototype[Symbol.iterator];
 const maximumObstaclePages=12,maximumObstacleKeyUnits=4_000_000;
 let obstacleKeyUnits=0;
 function obstacleKey(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy:ViewerAnnotationInkPolicy|undefined):string|undefined{
+ if(Object.getPrototypeOf(heads)!==Map.prototype||Reflect.ownKeys(heads).length||heads.get!==ordinaryMapGet||heads[Symbol.iterator]!==ordinaryMapIterator||
+  'toJSON' in []||policy!==undefined&&policy!==ANNOTATION_INK_POLICY)return;
  const entries=[...heads];
  // Preserve the old uncached path for malformed/nonfinite caller geometry;
  // JSON's nonfinite/null and negative-zero equivalences cannot establish reuse.
- if(entries.some(([id,b])=>typeof id!=='string'||!Array.isArray(b)||b.length!==4||Reflect.ownKeys(b).length!==5||[0,1,2,3].some(i=>{const d=Object.getOwnPropertyDescriptor(b,i);return !d||!('value' in d)||typeof d.value!=='number'||!Number.isFinite(d.value);})))return;
+ if(entries.some(([id,b])=>typeof id!=='string'||!Array.isArray(b)||Object.getPrototypeOf(b)!==Array.prototype||b.length!==4||Reflect.ownKeys(b).length!==5||[0,1,2,3].some(i=>{const d=Object.getOwnPropertyDescriptor(b,i);return !d||!('value' in d)||typeof d.value!=='number'||!Number.isFinite(d.value);})))return;
  const key=JSON.stringify([svg,entries,policy??null],(_key,value)=>typeof value==='number'&&Object.is(value,-0)?['negative-zero']:value);
  return key.length<=maximumObstacleKeyUnits?key:undefined;
 }
