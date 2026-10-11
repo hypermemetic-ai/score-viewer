@@ -5,7 +5,7 @@ const legacy=/^(?:state|practice|performance)-[a-fA-F0-9]{64}\.json$/;
 const presentation=/^(?:state|practice|performance)-[a-f0-9]{64}-(?:conventional-piano|janko-four-row)-[a-f0-9]{64}-[a-f0-9]{64}\.json$/;
 const manualPractice=/^practice-manual-v1-[a-f0-9]{64}\.json$/;
 const manualView=/^manual-reading-view-v1-[a-f0-9]{64}\.json$/;
-const fixed=new Set(['library.json','preferences.json','calibration.json','calibration-pilot-v1.json','practice-error-log.json']);
+const fixed=new Set(['library.json','preferences.json','calibration.json','calibration-pilot-v1.json','practice-error-log.json','viewer-derived-cache-v1.json']);
 
 /** The existing native contract stays bounded and accepts no paths. The full
  * prepared journal identity remains its logical key and content binding. */
