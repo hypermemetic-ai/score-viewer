@@ -24,7 +24,8 @@ test('both linked presentations derive practice gestures from engraved hands and
  const p=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url))),j=await selectPresentation(p,'janko-four-row');
  const plans=[planPractice(p),planPractice(j)];
  for(const [index,q]of [p,j].entries())for(const note of q.score.notes){const g=plans[index].gestures.find(g=>g.id===plans[index].ownerGroup.get(note.id));assert.equal(g?.hand,note.hand);assert.ok(g?.owners.includes(note.id));}
- assert.notEqual(plans[0].chunks[2].pattern,plans[1].chunks[2].pattern);assert.notEqual(practiceStorageName(p.sourceRevision!,p),practiceStorageName(j.sourceRevision!,j));
+ // Musical claims stay source-bound; keyboard-specific journals still isolate attainment.
+ assert.equal(plans[0].chunks[2].pattern,plans[1].chunks[2].pattern);assert.notEqual(practiceStorageName(p.sourceRevision!,p),practiceStorageName(j.sourceRevision!,j));
  const saved=initialPractice(plans[1]);saved.best[plans[1].chunks[0].pattern]=180;
  const clean=initialPractice(plans[0]);assert.equal(totalProgress(plans[0],clean),0);assert.ok(totalProgress(plans[1],saved)>0);assert.equal(Object.keys(clean.best).length,0);
 });
