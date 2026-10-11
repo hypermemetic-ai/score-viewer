@@ -56,15 +56,14 @@ test('finger lookup survives transient projected seat/action IDs through source 
  assert.equal(fingerFor(p,s,projected),3);assert.equal(fingerFor(p,corrected(p,s,p.seats[0],4),projected),4);
  const edited=assigned(p,s,projected,{hand:'RH',finger:5});assert.equal(fingerFor(p,edited,projected),5);
 });
-test('effective practice hands isolate affected leaf/join claims and retain raw history and unrelated/finger-only claims',()=>{
+test('personal hands update practice gestures while retaining leaf/join credit and literal evidence',()=>{
  const p=fixture(),base=planPractice(p,'fixed-four-v1'),state=initialPractice(base),a=base.chunks[0],b=base.chunks[1];
  toggleDone(state,{passage:a.id,pattern:a.pattern,rate:180});toggleDone(state,{passage:b.id,pattern:b.pattern,rate:180});
  state.composites={'1-8':['1-4','5-8']};const oldJoin=passageHierarchy(base,state).all.get('1-8')!;state.best[oldJoin.pattern]=180;
  const raw=JSON.stringify(state),personal=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),effective=planPractice(p,'fixed-four-v1',personal),loaded=readPractice(JSON.parse(raw),effective);
- assert.equal(effective.ownerGroup.get('owner-0'),'0:RH');assert.equal(progressFor(effective.chunks[0],loaded),0);assert.equal(progressFor(effective.chunks[1],loaded),1);
- assert.equal(progressFor(passageHierarchy(effective,loaded).all.get('1-8')!,loaded),0);assert.deepEqual(loaded.best,state.best);assert.deepEqual(loaded.manualAttainment,state.manualAttainment);
- toggleDone(loaded,{passage:effective.chunks[0].id,pattern:effective.chunks[0].pattern,rate:180});
- const reverted=readPractice(JSON.parse(JSON.stringify(loaded)),base);assert.equal(progressFor(a,reverted),1);assert.equal(Object.keys(reverted.manualAttainment!.marks).length,3);
+ assert.equal(effective.ownerGroup.get('owner-0'),'0:RH');assert.equal(effective.chunks[0].pattern,a.pattern);assert.equal(progressFor(effective.chunks[0],loaded),1);assert.equal(progressFor(effective.chunks[1],loaded),1);
+ assert.equal(progressFor(passageHierarchy(effective,loaded).all.get('1-8')!,loaded),1);assert.deepEqual(loaded.best,state.best);assert.deepEqual(loaded.manualAttainment,state.manualAttainment);
+ const reverted=readPractice(JSON.parse(JSON.stringify(loaded)),base);assert.equal(progressFor(a,reverted),1);assert.equal(Object.keys(reverted.manualAttainment!.marks).length,2);
  const fingerOnly=assigned(p,initialPersonal(p),p.seats[0],{finger:4});assert.deepEqual(planPractice(p,'fixed-four-v1',fingerOnly).chunks,base.chunks);
 });
 test('explicit calculation authority receives personal hand/finger instead of superseded base layer choice',()=>{
@@ -92,5 +91,5 @@ test('materialized edition carries effective choices and retains superseded lega
 test('practice context admission resolves current personal hands while preserving the retained settings and claims',()=>{
  const p=fixture(),old=admitPracticeContext(p,undefined),a=old.plan.chunks[0];old.state.best[a.pattern]=90;
  const personal=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),next=admitPracticeContext(p,old.state,undefined,personal);
- assert.equal(next.plan.ownerGroup.get('owner-0'),'0:RH');assert.equal(progressFor(next.plan.chunks[0],next.state),0);assert.equal(next.state.best[a.pattern],90);assert.equal(next.state.start,old.state.start);
+ assert.equal(next.plan.ownerGroup.get('owner-0'),'0:RH');assert.equal(next.plan.chunks[0].pattern,a.pattern);assert.equal(progressFor(next.plan.chunks[0],next.state),progressFor(a,old.state));assert.equal(next.state.best[a.pattern],90);assert.equal(next.state.start,old.state.start);
 });

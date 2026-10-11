@@ -11,13 +11,11 @@ export function registerPersonalPracticeIdentity(plan:PracticePassagePlan,origin
  contexts.set(plan,{original:facts(original),effective:facts(effective),patterns:new Map(chunks.map(c=>[c.id,c.pattern]))});
  for(const chunk of plan.chunks)chunk.pattern=personalPracticePattern(plan,chunk.start,chunk.end,contexts.get(plan)!.patterns.get(chunk.id)!);
 }
-/** Only hand content within the actual played/carry span changes claim meaning. */
-export function personalPracticePattern(plan:PracticePassagePlan,start:number,end:number,base:string):string {
- const c=contexts.get(plan);if(!c)return base;
- const original=span(c.original,start,end),effective=span(c.effective,start,end);
- return JSON.stringify(original)===JSON.stringify(effective)?base:prefix+JSON.stringify({base,hands:effective});
+/** Personal choices change current gestures, never the exercise's earned credit. */
+export function personalPracticePattern(_plan:PracticePassagePlan,_start:number,_end:number,base:string):string {
+ return base;
 }
-/** Retain prior map claims as literal history without binding them to the current map. */
+/** Retain guarded earlier-choice records without rewriting their provenance. */
 export function recognizesPersonalPracticeClaim(plan:PracticePassagePlan,chunk:PracticeChunk,pattern:string):boolean {
  const c=contexts.get(plan),base=chunk.components?`connected:${plan.revision}:${chunk.id}`:c?.patterns.get(chunk.id)??chunk.pattern;
  if(pattern===chunk.pattern||pattern===base)return true;
