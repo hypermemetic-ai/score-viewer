@@ -37,6 +37,18 @@ test('cached boxes are detached and exact SVG and ordered head changes cannot in
  assert.ok(Object.is(actualPageObstacles(page,signed).boxes[0][0],-0),'negative zero is an exact cache dependency');
 });
 
+test('custom map lookup and inherited array serialization cannot borrow a native cache entry',()=>{
+ const page=svg(primitive),plain=heads();actualPageObstacles(page,plain);
+ class MissingLookup extends Map<string,AnnotationBox>{override get(_id:string):AnnotationBox|undefined{return undefined;}}
+ assert.throws(()=>actualPageObstacles(page,new MissingLookup(plain)),/ownership missing/);
+ const overridden=heads();overridden.get=()=>undefined;
+ assert.throws(()=>actualPageObstacles(page,overridden),/ownership missing/);
+ class DifferentLookup extends Map<string,AnnotationBox>{override get(id:string){return id==='first'?[11,22,33,44] as AnnotationBox:super.get(id);}}
+ const custom=new DifferentLookup(plain);assert.deepEqual(actualPageObstacles(page,custom),originalObstacles(page,custom));
+ const b=[9,10,11,12] as AnnotationBox;Object.setPrototypeOf(b,Object.assign(Object.create(Array.prototype),{toJSON:()=>plain.get('first')}));
+ const unusual=heads();unusual.set('first',b);assert.deepEqual(actualPageObstacles(page,unusual),originalObstacles(page,unusual));
+});
+
 test('bounded eviction retains complete independent inventories and does not cache failed geometry',()=>{
  const first=svg(primitive),map=heads(),expected=originalObstacles(first,map);actualPageObstacles(first,map);
  for(let i=0;i<25;i++){const p=svg(primitive+`<circle cx="${100+i}" cy="200" r="10"/>`);assert.deepEqual(actualPageObstacles(p,map),originalObstacles(p,map));}
