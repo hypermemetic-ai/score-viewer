@@ -12,7 +12,14 @@ hovered and selected exclusions, stable 35-row catalog order, preservation of
 the existing best dictionary, modified-X guards, Options and numeric draft
 guards, binding capture, assigning Options to X, positive Options opening
 instead of exclusion, saved-X reload, and active Timed Speed editing through S.
-Keyboard hints had no text decoration. The inspector uses only authored browser
+Keyboard hints had no text decoration. Each viewport also retains a screenshot
+with both exclusions active: the first row is hovered and the second selected,
+with the original order and earned evidence preserved. The range has a separate
+one-pixel `::after` strike line; range text and every keyboard hint retain
+`text-decoration: none`. These screenshots are
+`production-1280-excluded-rows.png`, `production-800-excluded-rows.png` and
+`production-480-excluded-rows.png` in the final guard artifact directory.
+The inspector uses only authored browser
 storage and the public No14 archive with its real archive hash as filename.
 
 The best dictionaries in this particular guard run were empty. Populated
@@ -85,7 +92,7 @@ receipts and screenshots are in the directories named above. SHA256 receipts:
 
 | Inspection | Receipt SHA256 |
 | --- | --- |
-| Emitted-main guards after repair | `b3eef1daa216241b04fe54972a5613937cac62f7a6a56c8e85a4b9e319f5452a` |
+| Emitted-main guards after repair | `6942647287be4f4bcaf3b4913893650ca392c53cb7dfc9b07c6b4b434990a409` |
 | Symbolic source and manual previews | `8dd002cf4d89d902ab4087c2206c8e27f7e5a2a4c7a4b2aec63b3ea28765b7af` |
 | Exact prior/current preview comparison | `fb5cbc8572bd85d616a03e2257fd4bd61cf2319b5325e28b1c845487eeb0c500` |
 | Contrast lifecycle after repair | `51b012c1499589e53dc153a897dc84532f5e4b33e89331e591a7e5bcbb730019` |
