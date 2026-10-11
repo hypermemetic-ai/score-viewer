@@ -172,3 +172,12 @@ physical playing acceptance or an editing-latency result.
 ```sh
 /home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-sparse-manual-preview.mjs
 ```
+
+
+## Final integrated verification
+
+The frozen application `7326f5c21375f6a417b157d1f0d3b4c57fa61801` with reviewed source `08c2b34c6c96f59cd78c7231965016a29808ba3d` passes all 953 configured tests (zero failed/skipped/cancelled) and types/build. Logs: `/tmp/score-viewer-combined-final-7326f5c-08c2b34-tests.log` (SHA-256 `430e4125ffd148536369622c1bf09353f3e4594d9590761d28167e7b9b432a96`) and `/tmp/score-viewer-combined-final-7326f5c-08c2b34-build.log` (`15ec0e875aa46e94fcab983dc557125292e4f67950cecec83b74a65ac4e2268c`).
+
+Four unchanged final inspectors pass: three contrast lifecycle cases, three emitted-frontend guards at 1280/800/480 with reduced motion, four preview continuity cases, and five source/manual section cases. Their aggregate is `/tmp/score-viewer-frozen-7326f5c-08c2b34-inspection-receipt.json`, SHA-256 `4ed7ef2a57173110ddfa5a1d71d48ada9d0c0186dcfadb17bd9bfaf2e5ec722a`. All 19 emitted files exactly match frozen frontend digest `b98331354bb9bd0d032b9186828c90ca28d9b7b8e9fb36e3605deecdbdbb6257`. Actual excluded rows remain readable at 480 pixels, anchored in place with restrained cancellation lines and explicit exclusion status; shared kbd remains undecorated.
+
+Final hand/finger, full-map/page-cache and off-grid Restore/Undo evidence is recorded in [fast personal editing validation](fast-personal-editing-validation.md). It preserves exact existing settings and credited work, with no automatic fingering/hand progress reset. Independent review approves the implementation and source preservation. These browser and source checks are separate from native package/installed acceptance and human judgments about optimal musical segmentation. Native activation remains pending until its actual delivery record exists.
