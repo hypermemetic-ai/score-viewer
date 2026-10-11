@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import {createServer as createViteServer} from 'vite';
+import {durationFixture} from '../test/support/practice-rendering-fixture.ts';
+import {authoredFrettedInput} from '../test/support/fretted-dual-fixture.ts';
+import {parseMusicXml} from '../vendor/iso-notation/src/import/musicxml/parse.ts';
+import {projectMusicXml} from '../vendor/iso-notation/src/import/musicxml/project.ts';
+import {prepareDualReadingPackage} from '../src/dual-reading-package.ts';
+const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs');
+const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-bounded-held-origins';await mkdir(output,{recursive:true});
+const receipt={cases:[],limits:['Actual production manual ISO/TAB views and authored literal tied source; no installed/native/physical acceptance.']};
+let vite,browser;const server=createServer((req,res)=>{if(req.url==='/__held'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><main id="app"></main><script type="module">import "/src/style.css";</script>');return;}vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});});
+try{
+ const input=authoredFrettedInput(),xml=await readFile(new URL('../vendor/iso-notation/test/fixtures/fretted-source-four-bars.musicxml',import.meta.url),'utf8'),first=xml.match(/<measure\b[\s\S]*?<\/measure>/)[0],attributes=first.match(/<attributes>[\s\S]*?<\/attributes>/)[0].replace('<beats>4</beats>','<beats>6</beats>').replace('<beat-type>4</beat-type>','<beat-type>8</beat-type>'),notes=first.match(/<note>[\s\S]*?<\/note>/g).slice(0,6).map(n=>n.replace(/<beam\b[\s\S]*?<\/beam>/g,''));
+ const tied=(note,type)=>note.replace('<voice>',`<tie type="${type}"/><voice>`).replace('<notations>',`<notations><tied type="${type}"/>`);
+ const body=Array.from({length:18},(_,i)=>{const bar=[...notes];if(i<17)bar[5]=tied(notes[5],'start');if(i>0)bar[0]=tied(notes[5],'stop');return `<measure number="${i+1}">${i?'':attributes}${bar.join('')}${(i+1)%4===0?'<barline location="right"><bar-style>light-light</bar-style></barline>':''}</measure>`;}).join('');
+ input.score=projectMusicXml(parseMusicXml(xml.slice(0,xml.indexOf('<measure'))+body+'</part></score-partwise>','authored-held-origins.musicxml',{frettedSource:'retain-v1'}),{id:'authored-held-origins',readingPolicy:input.score.readingPolicy}).score;input.score.referencePerformanceTempo=authoredFrettedInput().score.referencePerformanceTempo;
+ const bytes=await prepareDualReadingPackage({...input,options:{...input.options,pageWidth:2600,measuresPerSystem:18}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root:resolve('.'),server:{middlewareMode:true,hmr:false},appType:'custom'});browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM??'/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome'});
+ const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port+'/__held');
+ receipt.cases=await page.evaluate(async encoded=>{
+  const [{ManualPracticeView},{ManualReadingContext},{manualPassageScene},{importPackage},{initialPersonal},{practiceCatalogChunks},{activePracticeClip}]=await Promise.all([import('/src/manual-practice-view.ts'),import('/src/manual-reading-context.ts'),import('/src/manual-passage-scene.ts'),import('/src/package.ts'),import('/src/state.ts'),import('/src/practice.ts'),import('/src/practice-clip.ts')]);
+  const p=await importPackage(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))),before=JSON.stringify(p.score),context=await ManualReadingContext.open(p),view=new ManualPracticeView(document.querySelector('#app'),{context,personal:initialPersonal(p),passage:bars=>manualPassageScene(context.package,bars).svg,save:async()=>{},back:()=>{},settings:()=>{},changed:()=>{}});await view.mount();cancelAnimationFrame(view.raf);const plan=view.plan,cases=[];
+  for(const notation of ['iso','tab']){context.switchNotation(notation);view.paint();
+   for(const chunk of practiceCatalogChunks(plan).filter(c=>c.kind!=='contrast'&&plan.owners.some(o=>o.tick<c.start&&o.end>c.start))){
+    if(activePracticeClip(chunk,plan.barTicks))throw Error('Fixture must exercise actual whole-bar path');await view.action('passage:'+chunk.id);await new Promise(r=>requestAnimationFrame(r));if(view.renderError)throw Error(view.renderError);
+    const carry=plan.owners.filter(o=>o.tick<chunk.start&&o.end>chunk.start),scene=context.package.reading.dual.views[notation].scene,wrappers=[...document.querySelectorAll('.practice-held-origin')];if(wrappers.length!==carry.length)throw Error('Whole-bar incoming owners have no exact preparation cue');
+    const retained=[];for(const [i,owner]of carry.entries()){const source=scene.components.filter(c=>c.ownerIds.includes(owner.id)&&c.tick===owner.tick),seen=new Set([...wrappers[i].querySelectorAll('[data-manual-source-ink]')].map(n=>n.dataset.manualSourceInk));if(!source.length||source.some(c=>c.inkIds.some(id=>!seen.has(id))))throw Error('Cue omitted literal earlier owner');const foreign=scene.components.filter(c=>!c.ownerIds.includes(owner.id)).flatMap(c=>c.inkIds).filter(id=>!source.flatMap(c=>c.inkIds).includes(id));if(foreign.some(id=>seen.has(id)))throw Error('Cue includes foreign/new attacks');retained.push({id:owner.id,tick:owner.tick,end:owner.end});}
+    const body=document.querySelector('.practice-score>svg'),expected=scene.components.filter(c=>view.session.windows.bars.includes(c.writtenBar)).flatMap(c=>c.inkIds),seen=new Set([...body.querySelectorAll('[data-manual-source-ink]')].map(n=>n.dataset.manualSourceInk));if(expected.some(id=>!seen.has(id)))throw Error('Ordinary body range lost source ink');if(body.hasAttribute('data-practice-clip'))throw Error('Whole-bar display was expanded or replaced by a fabricated clip');
+    if('events'in view.session||'matched'in view.session)throw Error('Manual preparation manufactured an attack assessment');cases.push({notation,kind:chunk.kind,id:chunk.id,start:chunk.start,end:chunk.end,completion:view.session.completionTick,retainedOwners:retained,bodyRangeUnchanged:true,foreignCueAttacksAbsent:true});
+   }
+  }
+  if(!cases.some(c=>c.kind==='connection')||!cases.some(c=>c.kind==='section')||JSON.stringify(p.score)!==before)throw Error('No actual incoming exercise or source changed '+JSON.stringify({chunks:plan.chunks.map(c=>[c.start,c.end]),held:plan.owners.filter(o=>o.end-o.tick>24).map(o=>[o.tick,o.end])}));window.inspectedView=view;return cases;
+ },Buffer.from(bytes).toString('base64'));assert.deepEqual(errors,[]);await page.screenshot({path:output+'/manual-tab-held-origin.png'});await page.evaluate(()=>inspectedView.close());
+ receipt.pianoCue=await page.evaluate(async p=>{
+  const [{PracticeView},{initialPersonal},{PracticeSession},{heldTieCues}]=await Promise.all([import('/src/practice-view.ts'),import('/src/state.ts'),import('/src/practice.ts'),import('/src/practice-refill-passage.ts')]);
+  const before=JSON.stringify(p.score),view=new PracticeView(document.querySelector('#app'),{package:p,personal:initialPersonal(p),entryId:'c'.repeat(64),connected:()=>true,source:()=>'',connect:async()=>{},disconnect:async()=>{},back:()=>{},settings:()=>{},changed:()=>{}});await view.mount();cancelAnimationFrame(view.raf);view.selectPassage(view.plan.chunks[0]);if(!view.prepareRefillStart())throw Error(view.renderError);
+  // Isolate the existing production cue method on an actual four-bar source
+  // range. Ordinary planner/complete-credit admission is tested separately.
+  const plan=view.plan,chunk={...plan.chunks[0],start:0,end:768,firstBar:0,lastBar:3},session=new PracticeSession(plan,chunk,view.state,true);session.ready(0);for(const attack of session.events)if(session.note(attack.midi,session.startMs+attack.tick*session.tickMs)!=='accepted')throw Error('Source attack rejected');session.update(session.startMs+769*session.tickMs);
+  const placements=view.refill.layout.placements,current=placements.find(p=>p.bar===3);if(!current)throw Error('Actual source final display bar not resident');
+  const cues=(s= session,retired=new Set([0]),placement=current)=>heldTieCues(p,plan,s,retired,placement,view.projected,[...view.sourceCrops.values()],view.sourceTrack,placements);
+  const live=cues().filter(q=>q.path.getAttribute('data-practice-cue-owner')==='long-held-owner');if(!live.length||live.some(q=>q.path.getAttribute('data-practice-cue-end')!=='1200'))throw Error('Actual held continuation disappeared at bounded display edge');
+  if(session.events.some(a=>a.tick>=768))throw Error('Held tail manufactured later attacks');const saved=plan.partition;plan.partition='fixed-four-v1';if(cues().some(q=>q.path.getAttribute('data-practice-cue-owner')==='long-held-owner'))throw Error('Legacy intermediate lifetime changed');plan.partition=saved;
+  if(cues(session,new Set()).length)throw Error('Reset retained a retired-owner cue');session.elapsedTick=1200;if(cues().some(q=>q.path.getAttribute('data-practice-cue-owner')==='long-held-owner'))throw Error('Cue survived genuine source release');if(JSON.stringify(p.score)!==before)throw Error('Cue changed source');view.close();return {displayEnd:768,sourceEnd:1200,visibleTick:769,cueCount:live.length,actualDomMethod:true,laterAttacksAbsent:true,expiredAtSourceRelease:true,legacyUnchanged:true,resetRemovesCue:true,sourceUnchanged:true};
+ },durationFixture('hollow-stem',true,'traced',false,true,4));await page.close();receipt.status='passed';console.log(JSON.stringify(receipt));
+}catch(error){receipt.status='failed';receipt.error=error.stack;throw error;}
+finally{await writeFile(output+'/receipt.json',JSON.stringify(receipt,null,2));await browser?.close();await vite?.close();if(server.listening)await new Promise(r=>server.close(r));}

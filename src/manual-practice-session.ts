@@ -35,9 +35,9 @@ export class ManualPracticeSession {
     admitted.firstBar!==chunk.firstBar||admitted.lastBar!==chunk.lastBar||admitted.start!==chunk.start||admitted.end!==chunk.end)
    throw Error('Manual practice context differs from its musical source.');
   const excerpt=chunk.clipIndex!==undefined||!plan.barTicks.includes(chunk.start)||!plan.barTicks.includes(chunk.end);
-  this.claims=options.claims??new PracticeDone();this.completionTick=!excerpt?chunk.end:Math.max(chunk.end,...plan.owners.filter(a=>a.tick<chunk.end&&a.end>chunk.start).map(a=>a.end));
+  this.claims=options.claims??new PracticeDone();this.completionTick=plan.partition==='bounded-exercises-v1'||excerpt?Math.max(chunk.end,...plan.owners.filter(a=>a.tick<chunk.end&&a.end>chunk.start).map(a=>a.end)):chunk.end;
   this.elapsedTick=chunk.start;this.loopRate=state.working;
-  this.sourceGrid=!excerpt?scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end):scoreExcerptPulseGrid(plan,plan.barTicks,chunk.start,this.completionTick);this.attemptGrid=this.sourcePulseGrid;
+  this.sourceGrid=!excerpt&&this.completionTick===chunk.end?scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end):scoreExcerptPulseGrid(plan,plan.barTicks,chunk.start,this.completionTick);this.attemptGrid=this.sourcePulseGrid;
   this.windows=new ManualPracticeWindows(plan,chunk);
  }
  get pulseGrid(){return this.attemptGrid;}
