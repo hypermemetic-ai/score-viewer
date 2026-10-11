@@ -218,7 +218,11 @@ export class PracticeView {
   if(result==='next'){this.mountContrastClip(1);await this.startContrast(true);return;}
   this.doneClaims.completed({passage:owner.id,pattern:owner.pattern,rate:this.loopRate});const requested=this.queuedWorking;this.queuedWorking=undefined;this.state.working=this.loopRate;
   if(session.measured)passed(owner,this.state);else this.state.working=this.nextWorkingRate(this.doneClaims.nextRate(this.loopRate,this.state.keepTempo));if(requested!==undefined)this.state.working=requested;
-  this.stopClock();this.paintControls();const generation=this.startGeneration;if(await this.save()&&!this.disposed&&!this.overview&&generation===this.startGeneration&&session===this.session&&session.phase==='complete')await this.startContrast();
+  const next=session.measured?nextPracticePassage(this.plan,this.state,owner):owner;
+  this.stopClock();this.paintControls();const generation=this.startGeneration;if(!await this.save()||this.disposed||this.overview||generation!==this.startGeneration||session!==this.session||session.phase!=='complete')return;
+  if(!next){this.overview=true;this.paint();return;}
+  if(next.id!==owner.id){this.selectPassage(next);return;}
+  await this.startContrast();
  }
  private paintContrastScore(stage:HTMLElement,area:HTMLElement){
   const session=this.session!,clip=session.chunk.clips![session.chunk.clipIndex!];const context=area.querySelector<HTMLElement>('.practice-held-context')!;context.replaceChildren();context.hidden=!session.carryIn.length;
