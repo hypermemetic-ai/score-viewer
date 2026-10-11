@@ -56,7 +56,9 @@ async function addConverter(f) {
   const identity=await readFile(new URL('../vendor/score-converter/source-package-identity.json',import.meta.url));
   await file(f.viewer,'package.json',await readFile(new URL('../package.json',import.meta.url)));
   await file(f.viewer,'package-lock.json',await readFile(new URL('../package-lock.json',import.meta.url)));
-  await file(f.viewer,path,archive);
+  const pkg=JSON.parse(await readFile(join(f.viewer,'package.json'),'utf8')),lock=JSON.parse(await readFile(join(f.viewer,'package-lock.json'),'utf8'));
+  for(const dependencyPath of lockedLocalDependencies(pkg,lock).keys())
+    await file(f.viewer,dependencyPath,await readFile(new URL('../'+dependencyPath,import.meta.url)));
   await file(f.viewer,'scripts/native-release-carrier/score-viewer-converter-release.mjs',await readFile(new URL('../scripts/native-release-carrier/score-viewer-converter-release.mjs',import.meta.url)));
   for(const name of ['SOURCE-NOTICE.txt','NOTICE.txt','guitar-pro.worker.js.LEGAL.txt'])await file(f.frontend,'converter/gp/'+name,'exact fixture '+name+'\n');
   await file(f.frontend,'converter/gp/source-package.tgz',archive);
@@ -432,6 +434,12 @@ test('clean carrier retains the actual locked converter tarball required by npm 
  const {inputs}=await validateCarrierInputs(f.iso);
  assert.deepEqual(inputs.nativeFiles[path],{sha256:sha256(archive),size:archive.length});
  assert.deepEqual(await readFile(join(f.iso,'score-viewer',path)),archive);
+ const pkg=JSON.parse(await readFile(join(f.viewer,'package.json'),'utf8')),sourceLock=JSON.parse(await readFile(join(f.viewer,'package-lock.json'),'utf8'));
+ for(const dependencyPath of lockedLocalDependencies(pkg,sourceLock).keys()){
+  const bytes=await readFile(join(f.viewer,dependencyPath));
+  assert.deepEqual(inputs.nativeFiles[dependencyPath],{sha256:sha256(bytes),size:bytes.length});
+  assert.deepEqual(await readFile(join(f.iso,'score-viewer',dependencyPath)),bytes);
+ }
  assert.deepEqual(inputs.nativeFiles['package-lock.json'],{sha256:sha256(await readFile(join(f.viewer,'package-lock.json'))),size:(await readFile(join(f.viewer,'package-lock.json'))).length});
  const lock=JSON.parse(await readFile(join(f.iso,'score-viewer/package-lock.json')));
  assert.equal(lock.packages['node_modules/score-converter-proof'].integrity,'sha512-'+createHash('sha512').update(archive).digest('base64'));
