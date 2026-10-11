@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
-import {PracticeBrowser,practiceChunkRange} from '../src/practice-browser';
+import {PracticeBrowser,practiceChunkRange,practicePreviewSourceRows} from '../src/practice-browser';
 import {initialPractice,planPractice,practiceCatalogChunks} from '../src/practice';
 import {displayedPracticeAssessment,displayedPracticeProgress,displayedPracticeTotal} from '../src/practice-display';
 const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(p),chunks=practiceCatalogChunks(plan);
@@ -38,4 +38,14 @@ test('empty inclusion has no percentage and contrast range refers to both actual
 
 test('recommendations retain the actual contrast or connection rather than an enclosing original',()=>{
  const state=initialPractice(plan),browser=new PracticeBrowser(plan);for(const chunk of chunks.filter(c=>c.kind!=='section')){browser.suggest(state,chunk);assert.equal(browser.current(state)?.id,chunk.id);assert.equal(browser.component,undefined);}
+});
+
+test('sparse source previews partition before rendering without losing empty bars or partial endpoints',()=>{
+ const bars=Array.from({length:501},(_,i)=>i*192),clip={id:'sparse-original',start:24,end:500*192-24,firstBar:0,lastBar:499};
+ const rows=practicePreviewSourceRows(clip,bars,4),calls=rows.map(row=>({bars:Array.from({length:row.lastBar-row.firstBar+1},(_,i)=>row.firstBar+i),row}));
+ assert.equal(calls.length,125);assert.ok(calls.every(call=>call.bars.length<=4));
+ assert.deepEqual(calls.flatMap(call=>call.bars),Array.from({length:500},(_,i)=>i));
+ assert.equal(rows[0].start,clip.start);assert.equal(rows.at(-1)!.end,clip.end);
+ assert.ok(rows.every((row,i)=>!i||rows[i-1].end===row.start));assert.ok(rows.every(row=>row.id===clip.id));
+ assert.throws(()=>practicePreviewSourceRows(clip,bars,65),/row bound/);
 });

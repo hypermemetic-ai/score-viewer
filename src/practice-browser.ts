@@ -8,6 +8,15 @@ import {toggleExerciseExclusion} from './practice-exercise-catalog';
 import type {ExerciseClip} from './practice-exercise-catalog';
 
 export const practiceMeasureRange=(id:string)=>id.replace('-', ' – ');
+/** Partition only presentation. No source renderer receives an unbounded span. */
+export function practicePreviewSourceRows(clip:ExerciseClip,bars:readonly number[],maximumBars:number):ExerciseClip[]{
+ if(!Number.isSafeInteger(maximumBars)||maximumBars<1||maximumBars>64)throw Error('Invalid source preview row bound.');
+ const rows:ExerciseClip[]=[];
+ for(let first=clip.firstBar;first<=clip.lastBar;first+=maximumBars){const last=Math.min(clip.lastBar,first+maximumBars-1);
+  rows.push({...clip,firstBar:first,lastBar:last,start:Math.max(clip.start,bars[first]),end:Math.min(clip.end,bars[last+1])});
+ }
+ return rows;
+}
 type PassageTree=ReturnType<typeof reconcilePassages>;
 const escape=(value:string)=>value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 export function practiceChunkRange(chunk:PracticeChunk|undefined):string {
@@ -86,18 +95,20 @@ export class PracticeBrowser {
   };
   const groups=[['section','Sections'],['connection','Connections'],['contrast','Contrasts']] as const;
   root.innerHTML=`<div class="practice-overall"><span>Total progress · <strong>${total}</strong></span><label><input type="checkbox" data-practice-display="manual" ${this.includeManual?'checked':''}> Include manual</label></div><div class="practice-browser"><div class="practice-chunks practice-catalog" aria-label="Practice exercises">${groups.map(([kind,title])=>{const entries=rows.filter(c=>c.kind===kind);return entries.length?`<section aria-label="${title}"><p class="practice-catalog-label">${title}</p>${entries.map(c=>row(c)).join('')}</section>`:'';}).join('')}</div><div class="practice-components practice-chunks" aria-label="Original sections">${components.map(c=>row(c,true)).join('')}</div><aside class="practice-passage-detail" aria-label="Selected exercise"><p>${current?escape(label(current)):''} · ${current?practicePercent(this.progress(current,state)):0}%</p>${current?`<div class="practice-exercise-actions"><button class="practice-start" data-practice="passage:${escape(current.id)}" ${this.available(state,current)?'':'disabled'}>Practice ${current.kind==='contrast'?'this contrast':current.kind==='connection'?'this connection':'these measures'} <kbd>Enter</kbd></button><button class="practice-exclude-toggle" data-practice="${state.excluded?.[current.id]?'include':'exclude'}:${escape(current.id)}" aria-pressed="${!!state.excluded?.[current.id]}">${state.excluded?.[current.id]?'Include in total':'Exclude from total'} <kbd>X</kbd></button></div>`:''}<div class="practice-leaf-preview${current?.kind==='contrast'?' practice-contrast-preview':''}"></div></aside></div>`;
-  if(current){const preview=root.querySelector<HTMLElement>('.practice-leaf-preview')!;preview.setAttribute('aria-label',`Score preview, ${label(current)}`);
+  if(current){const preview=root.querySelector<HTMLElement>('.practice-leaf-preview')!;preview.setAttribute('aria-label',`Score preview, ${label(current)}`);preview.dataset.practiceScrollPreview=String((current.clips??[current]).some(clip=>clip.lastBar-clip.firstBar+1>64));
    for(const [i,clip] of (current.clips??[{id:current.id,start:current.start,end:current.end,firstBar:current.firstBar,lastBar:current.lastBar}]).entries()){
     const frame=current.kind==='contrast'?document.createElement('section'):preview;if(current.kind==='contrast'){const caption=document.createElement('small');caption.textContent=`${i===0?'A':'B'} · Measures ${clip.firstBar+1} – ${clip.lastBar+1}`;frame.append(caption);preview.append(frame);}
     try{
-     const bars=Array.from({length:clip.lastBar-clip.firstBar+1},(_,n)=>clip.firstBar+n),whole=passage(bars,clip),box=whole.viewBox.baseVal,room=practicePreviewRoom(preview);
+     const bars=Array.from({length:clip.lastBar-clip.firstBar+1},(_,n)=>clip.firstBar+n),whole=bars.length<=64?passage(bars,clip):undefined,box=whole?.viewBox.baseVal,room=practicePreviewRoom(preview);
      // A/B shares available height; retain each actual excerpt and its caption.
-     const count=practicePreviewRowCount(bars.length,box.width,box.height,{...room,height:room.height/(current.kind==='contrast'?current.clips!.length:1)});
-     if(count===1)frame.append(whole);
+     // Long sparse sections are valid. Split before asking the source renderer
+     // for geometry; its retained 64-bar admission guard must never be bypassed.
+     const count=box?practicePreviewRowCount(bars.length,box.width,box.height,{...room,height:room.height/(current.kind==='contrast'?current.clips!.length:1)}):Math.ceil(bars.length/4);
+     if(count===1)frame.append(whole!);
      else{
       if(frame!==preview)frame.style.gap='12px';
       const length=Math.ceil(bars.length/count);
-      for(let first=0;first<bars.length;first+=length){const row=bars.slice(first,first+length),firstBar=row[0],lastBar=row.at(-1)!,rowClip={...clip,firstBar,lastBar,start:Math.max(clip.start,this.plan.barTicks[firstBar]),end:Math.min(clip.end,this.plan.barTicks[lastBar+1])},svg=passage(row,rowClip);
+      for(const rowClip of practicePreviewSourceRows(clip,this.plan.barTicks,length)){const {firstBar,lastBar}=rowClip,row=Array.from({length:lastBar-firstBar+1},(_,n)=>firstBar+n),svg=passage(row,rowClip);
        svg.dataset.practicePreviewFirstBar=String(firstBar);svg.dataset.practicePreviewLastBar=String(lastBar);svg.setAttribute('aria-label',`Source preview, measures ${firstBar+1} – ${lastBar+1}`);frame.append(svg);
       }
      }

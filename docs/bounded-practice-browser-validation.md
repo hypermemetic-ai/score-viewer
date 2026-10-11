@@ -132,3 +132,43 @@ The retained selected/hovered screenshots are
 `production-480-excluded-rows.png` in that artifact directory.
 The final receipt SHA256 is
 `a40b6bf3bac63890026f8a8418799e866a791c392388110c193c6bfd89d70e52`.
+
+## Sparse previews beyond the source renderer bound
+
+A subsequent final-source inspection uses reviewed ISO source
+`e666b23973c83e6e77960b6e7a3e89649b92405d`. A sparse original can legitimately
+span more than 64 source bars. The previous preview requested the entire section
+before deciding its presentation rows; the manual source renderer correctly
+refused that oversized request. The repair partitions such previews before any
+renderer call, into contiguous rows of at most four source bars. This is a
+display partition, not a change to the practice sections. The source renderer's
+64-bar guard remains intact, including every empty bar and partial endpoint.
+
+Only previews containing a clip of more than 64 bars use an owned vertical
+scroll viewport. Every row retains one common width-based scale, without
+shrinking all rows to fit the available height. Normal previews retain their
+existing fit. There is no horizontal overflow, and changing selection rebuilds
+the preview so the long-preview styles do not carry into ordinary exercises.
+
+`scripts/inspect-sparse-manual-preview.mjs` prepares an authored 66-bar source
+with 22 distinct onsets through the actual dual-reading pipeline, then mounts
+ManualPracticeView in ISO and TAB at 1000 and 480 pixels. All four cases pass:
+17 contiguous rows cover the complete 0–12672 tick source interval, every source
+component's ink remains present, renderer calls never exceed four bars, and
+every row is reachable by scrolling at the same approximately 1:1 scale.
+The source and attainment remain unchanged. Retained first/final-row
+screenshots are in `/tmp/score-viewer-sparse-manual-preview-e666`; the receipt
+SHA256 is
+`a0e4599140c62626c56265fa3c7c94dc3d1d1d0eba4d7316262b673e879e1513`.
+
+The configured final-source build and 29 focused browser/preview/cache tests
+pass. Restoring the previous browser implementation makes this same actual
+inspection fail at its first oversized renderer call. A separate 500-bar
+partition test checks complete empty-bar coverage, partial endpoint clipping,
+stable clip identity and bounded calls without engraving a giant fixture.
+This establishes source/browser correctness, not installed native acceptance,
+physical playing acceptance or an editing-latency result.
+
+```sh
+/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-sparse-manual-preview.mjs
+```
