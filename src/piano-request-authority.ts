@@ -96,7 +96,8 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
       if(q.hand!==undefined||q.finger!==undefined||q.row!==undefined||q.contact!==undefined)constraints.push(q);
     }
   }
-  if(policy==='retain-imported')for(const n of p.score.notes)if(!choices[n.id])
+  const retainedPersonal=new Set(constraints.filter(c=>(c.provenance.kind as string)==='personal-choice'&&c.hand!==undefined).map(c=>c.ownerId));
+  if(policy==='retain-imported')for(const n of p.score.notes)if(!choices[n.id]&&!retainedPersonal.has(n.id))
     constraints.push(check({ownerId:n.id,guard:guard(n.id),hand:n.hand,
       provenance:{kind:'editorial-hand-retention',reference:AUTOMATIC_HAND_RETENTION_REFERENCE}}));
   for(const c of Object.values(personal?.overrides??{}))for(const id of c.ownerIds)if(!choices[id])
