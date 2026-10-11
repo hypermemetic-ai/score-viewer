@@ -298,8 +298,8 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
 function render(){if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;renderPages();renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();}
 function renderPages(){
  if(practice||!current)return;
- const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(s.view),mode=labelMode(),positions=annotationPositions(p),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
- transformSurface(surface,v.rotation);const fit=viewportFit(innerWidth,innerHeight,v,p.pages.length),pages:HTMLElement[]=[];
+ const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(s.view),mode=labelMode(),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
+ transformSurface(surface,v.rotation);const fit=viewportFit(innerWidth,innerHeight,v,p.pages.length),positions=annotationPositions(p,fit.pages),pages:HTMLElement[]=[];
  for(const index of fit.pages){
   const cached=readerPages.get(p,index),page=cached.element;page.dataset.fingers=String(mode==='finger');
   for(const {seat,text} of cached.seats){
