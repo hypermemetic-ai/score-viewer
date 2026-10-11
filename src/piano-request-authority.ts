@@ -111,7 +111,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     const records=constraints.filter(c=>attack.owners.some(o=>o.id===c.ownerId));
     for(const key of ['hand','finger','row','contact'] as const){
       const values=records.map(c=>c[key]).filter(v=>v!==undefined);
-      if(key==='hand'&&required[attack.id]&&!attack.owners.every(o=>choices[o.id]?.hand!==undefined))values.push(required[attack.id]);
+      if(key==='hand'&&required[attack.id]&&!attack.owners.every(o=>records.some(c=>c.ownerId===o.id&&(c.provenance.kind as string)==='personal-choice'&&c.hand!==undefined)))values.push(required[attack.id]);
       if(values.some(v=>!same(v,values[0])))throw new PianoAuthorityConflict('Guarded owner choices contradict a source instruction or physical alias.',attack.owners.map(o=>o.id));
     }
   }

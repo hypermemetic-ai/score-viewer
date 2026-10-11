@@ -74,6 +74,13 @@ test('explicit calculation authority receives personal hand/finger instead of su
  const original=structuredClone(p),constraints=pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,personal,'retain-imported');
  assert.equal(constraints.filter(c=>c.ownerId===n.id).length,1);assert.equal(constraints.find(c=>c.ownerId===n.id)!.hand,'RH');assert.equal(constraints.find(c=>c.ownerId===n.id)!.finger,5);assert.deepEqual(p,original);
 });
+test('materialized personal precedence remains recoverable without its optional edit overlay, legacy authority stays strict',()=>{
+ const p=fixture(),n=p.score.notes[0],guard={pitch:48,startTick:n.startTick,durationTicks:n.durationTicks};
+ (p.score as any).sourceHandRequirements=[{version:'source-hand-requirement-v1',ownerId:n.id,guard,hand:'LH',provenance:{kind:'source-instruction',reference:'Authored LH'}}];
+ p.fingerLayer!.operatorConstraints=[{ownerId:n.id,guard,hand:'RH',finger:3,provenance:{kind:'personal-choice',reference:'Explicit personal edit'}} as any];
+ assert.equal(pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,undefined,'calculate')[0].hand,'RH');
+ (p.fingerLayer!.operatorConstraints as any[])[0].provenance.kind='operator-choice';assert.throws(()=>pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,undefined,'calculate'),/source instruction/);
+});
 test('materialized edition carries effective choices and retains superseded legacy evidence with the prior edition',()=>{
  const from=fixture(),legacy=corrected(from,initialPersonal(from),from.seats[0],5),s=assigned(from,legacy,from.seats[0],{hand:'RH'}),before=structuredClone(s),to=structuredClone(from);
  to.manifest.revision='e'.repeat(64);to.effectiveHandSha256='f'.repeat(64);to.score.notes[0].hand='RH';to.fingerLayer!.attacks[0].hand='RH';to.fingerLayer!.attacks[0].finger=5;
