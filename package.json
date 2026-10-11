@@ -8,10 +8,11 @@
     "dev": "vite --host 0.0.0.0 --port 5205 --strictPort",
     "tauri": "tauri",
     "test": "node --import tsx --test --test-concurrency=2 test/*.test.ts",
-    "prebuild": "node scripts/check-source-pin.mjs",
-    "pretest": "node scripts/check-source-pin.mjs"
+    "prebuild": "node scripts/check-source-pin.mjs && node scripts/check-calculator-pin.mjs",
+    "pretest": "node scripts/check-source-pin.mjs && node scripts/check-calculator-pin.mjs"
   },
   "dependencies": {
+    "@hypermemetic-ai/fingering-calculator": "file:vendor/fingering-calculator/fingering-calculator-e325912d00efaef887738f4fb0f94a2495d58577.tgz",
     "@tauri-apps/api": "^2.10.1",
     "@xmldom/xmldom": "^0.9.8",
     "fflate": "^0.8.2",
