@@ -101,3 +101,21 @@ means those durations are not isolated performance evidence. This bounded
 receipt does not establish final eighteen-view parity or final browser speed.
 The initial whole-project type check also exposed two pre-existing practice-gate
 fixture typing errors, subsequently fixed by the parent in `4f0f16f`.
+
+
+## Completed production-frame benchmark
+
+The complete run on application `7326f5c21375f6a417b157d1f0d3b4c57fa61801` and reviewed notation `08c2b34c6c96f59cd78c7231965016a29808ba3d` passes all six cases: twenty correct hand edits and twenty correct finger edits per case (240 total), coherent latest frames with blocked saves, ordered writes, stale-publication suppression, failure recovery and source-bound reopening. The host is qq-box, Linux, Node 26.7.0, Chromium 151.0.7922.34, at 1440 × 900.
+
+| Case | Hand median / p95 (ms) | Finger median / p95 (ms) |
+| --- | ---: | ---: |
+| tie-page-reflow-conventional-piano | 6.9 / 15.4 | 11.7 / 12.4 |
+| tie-page-reflow-janko-four-row | 9.7 / 16.4 | 12.0 / 12.4 |
+| long-dense-120-bars-conventional-piano | 7.7 / 269.1 | 9.3 / 11.1 |
+| long-dense-120-bars-janko-four-row | 9.4 / 285.6 | 10.2 / 11.2 |
+| no14-conventional-piano | 16.9 / 302.0 | 11.8 / 14.7 |
+| no14-janko-four-row | 18.9 / 315.9 | 11.6 / 14.7 |
+
+The 100 ms goal remains unmet for dense/No14 hand changes and delayed rapid frames. The explicit user-accepted measured-speed policy admits this complete correctness result without changing the original timing booleans. The receipt is `/tmp/score-viewer-fast-personal-editing-final-7326f5c-08c2b34/receipt.json`, SHA-256 `b0f97eba2f46ddba8106788b0d9e0aecedaabb8ebbf49eb1dcae0088cb4e9fbd`, with 36 screenshots and no reported errors. This is production-frontend evidence with simulated native IPC, not native WebView timing, display scanout, physical MIDI, audible playback or human musical acceptance.
+
+The earlier complete e666 run correctly refused the second-bar dense hand change because unchanged neighboring noteheads overlapped. Its immutable failed receipt is `/tmp/score-viewer-fast-personal-editing-final-d8b0576-e666/receipt.json`, SHA-256 `9c4ad3b474ac6bac917018a08643953bead36ac773a30c347d7394e1ec408041`. Reviewed source PR360 reserves existing physical head clearance at actual shared time fractions under `fitted-rails-v1`, preserving historical recipes and strict audits. The exact original archive and formerly failed owner pass warm/full-cold regression; the final browser run completes that same owner in both presentations. Dense page/system counts and the complete No14 fresh plan remain unchanged.

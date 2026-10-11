@@ -25,7 +25,7 @@
 
 - [x] 5.1 Add L/R selected-note hand editing with finger retention and stable selection; preserve digit advance and input guards, verifying rapid hand/finger sequences and source target reservation.
 - [x] 5.2 Publish validated edit intent without blocking on disk, serialize saves and guard stale projections/edition changes; verify delayed/failed saves, visible errors and recoverable pending intent.
-- [ ] 5.3 Measure correctly rendered key-to-frame latency on named warm No14, dense/long and reflow/tie benchmarks in both presentations; report achieved median/p95 against the 100-millisecond tuning goal, complete the promising geometry optimization check, and document the user-accepted delivery trade-off, samples, host, viewport and limitations.
+- [x] 5.3 Measure correctly rendered key-to-frame latency on named warm No14, dense/long and reflow/tie benchmarks in both presentations; report achieved median/p95 against the 100-millisecond tuning goal, complete the promising geometry optimization check, and document the user-accepted delivery trade-off, samples, host, viewport and limitations.
 - [x] 5.4 Document hand/finger controls and independently inspect faithful live notation, page crossing and passive input in the actual Viewer; retain visual evidence and state inspection limits.
 
 ## 6. Integrated delivery
