@@ -102,9 +102,33 @@ test('actual modal loading callbacks do not mount after close or replacement',as
  const f=modalFixture();const opening=f.context.calibrate();f.context.closeDialog(false);await opening;assert.equal(f.controllers.length,0);assert.equal(f.views.length,0);
  await f.context.calibrate();assert.equal(f.reads,2);assert.equal(f.controllers.length,1);
 });
+test('a rejected old pilot load cannot dispose device controls owned by replacement Options',async()=>{
+ const f=modalFixture();let reject!:(error:Error)=>void;f.context.host.read=()=>new Promise((_resolve:any,r:any)=>{reject=r;});
+ const opening=f.context.calibrate();await Promise.resolve();f.context.closeDialog(false);
+ const replacement={dataset:{kind:'options'},innerHTML:'replacement options'},devices={disposed:false,dispose(){this.disposed=true;}};
+ f.context.dialog=replacement;f.context.midiOptions=devices;reject(Error('old load rejected'));await opening;
+ assert.equal(f.context.dialog,replacement);assert.equal(replacement.innerHTML,'replacement options');assert.equal(f.context.midiOptions,devices);assert.equal(devices.disposed,false);assert.equal(f.controllers.length,0);
+});
 test('actual main watches same-session input generations without refreshing the floor on ordinary ratings',async()=>{
  const f=modalFixture();await f.context.calibrate();await Promise.resolve();const scope=f.context.calibrationPilot.input;
  scope.midi(note);assert.equal(f.events.length,1);f.setClock(200);f.controllers[0].break();scope.midi(note);assert.equal(f.events.length,1,'same ID break must block old floor synchronously');
  await Promise.resolve();scope.midi(note);assert.equal(f.events.length,1);scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);
  f.setClock(300);for(const listener of f.controllers[0].listeners)listener(f.controllers[0].state);scope.midi({...note,timestamp_micros:220});assert.equal(f.events.length,3,'ordinary rating publication must retain the established floor');
+});
+test('actual focus loss and hidden document break setup and require fresh MIDI activation',async()=>{
+ const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}}});await f.context.calibrate();await Promise.resolve();
+ runInNewContext(body('function gainFocus(','function transformSurface('),f.context);const scope=f.context.calibrationPilot.input;
+ scope.midi(note);assert.equal(f.events.length,1);f.setClock(200);f.context.loseFocus();assert.equal(f.context.readerFocused,false);scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,1);
+ assert.ok(f.controllers[0].state.inputGeneration>0);f.context.gainFocus();await Promise.resolve();scope.midi(note);assert.equal(f.events.length,1);scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);
+ f.context.document.hidden=true;f.context.loseFocus();f.setClock(300);f.context.gainFocus();await Promise.resolve();scope.midi({...note,timestamp_micros:310});assert.equal(f.events.length,2);
+ f.context.document.hidden=false;f.context.gainFocus();await Promise.resolve();scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);scope.midi({...note,timestamp_micros:310});assert.equal(f.events.length,3);
+});
+test('actual reconnect resets transient input and binds the fresh floor to new source and generation',async()=>{
+ const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}},midiTransition:0});
+ f.context.host.midiDisconnect=async()=>{};f.context.host.midiConnect=async(source:string)=>{assert.equal(source,'new piano');return 3;};
+ await f.context.calibrate();await Promise.resolve();runInNewContext(body('async function connectMidi(','function options('),f.context);const scope=f.context.calibrationPilot.input;
+ f.setClock(200);await f.context.connectMidi('new piano');await Promise.resolve();assert.ok(f.controllers[0].state.inputGeneration>0);
+ scope.midi({...note,timestamp_micros:210});scope.midi({...note,source:'new piano',generation:2,timestamp_micros:210});scope.midi({...note,source:'new piano',generation:3,timestamp_micros:110});assert.equal(f.events.length,0);
+ scope.midi({...note,source:'new piano',generation:3,timestamp_micros:210});assert.equal(f.events.length,1);
+ await f.context.disconnectMidi();scope.midi({...note,source:'new piano',generation:3,timestamp_micros:310});assert.equal(f.events.length,1);assert.equal(f.context.midiConnection,undefined);
 });
