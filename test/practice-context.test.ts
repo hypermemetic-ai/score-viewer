@@ -27,9 +27,9 @@ test('crossing retained and navigation trees preserve the retained journal rathe
  for(const chunk of plan.chunks.slice(1,3))target.best[chunk.pattern]=target.target;
  reconcilePassages(plan,source);reconcilePassages(plan,target);assert.ok(source.composites!['1-8']);assert.ok(target.composites!['5-12']);
  const before=structuredClone(target),context:PracticeViewContext={partition:plan.partition,composites:source.composites!,selected:'1-8',passage:'1-8',includeManual:true,preferences:practicePreferences(source)},admitted=admitPracticeContext(p,target,context);
- assert.deepEqual(target,before);assert.deepEqual(admitted.state,readPractice(before,plan));assert.equal(reconcilePassages(plan,admitted.state).all.has('1-8'),false);assert.equal(reconcilePassages(plan,admitted.state).all.has('5-12'),true);
+ assert.deepEqual(target,before);assert.equal(admitted.plan.partition,'bounded-exercises-v1');assert.deepEqual(admitted.state.legacy!.state,before);assert.equal(admitted.state.composites,undefined);assert.equal(reconcilePassages(admitted.plan,admitted.state).all.has('1-8'),false);
  assert.throws(()=>admitPracticeContext(p,{...target,revision:'0'.repeat(64)},context),/saved evidence retained/);
- assert.throws(()=>admitPracticeContext(p,target,{...context,composites:{'1-8':['unknown','5-8']}}),/saved evidence retained/);
+ assert.deepEqual(admitPracticeContext(p,target,{...context,composites:{'1-8':['unknown','5-8']}}).state.legacy!.state,before);
 });
 test('pending MIDI from an old pitch context is rejected while fresh input remains available',()=>{
  const epoch=new PitchInputEpoch();assert.equal(epoch.accepts({timestamp_micros:5}),true);epoch.block();assert.equal(epoch.accepts({timestamp_micros:1000}),false);epoch.reset(1000);assert.equal(epoch.accepts({timestamp_micros:999}),false);assert.equal(epoch.accepts({timestamp_micros:1000}),true);assert.equal(epoch.accepts({timestamp_micros:1001}),true);assert.equal(epoch.accepts({}),false);assert.throws(()=>epoch.reset(NaN),/clock/);
