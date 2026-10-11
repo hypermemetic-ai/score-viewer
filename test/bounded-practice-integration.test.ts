@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
-import {planPractice,initialPractice,readPractice,passageHierarchy,practiceCatalogChunks,practiceClipChunk,totalProgress,progressFor} from '../src/practice';
+import {planPractice,initialPractice,readPractice,passageHierarchy,practiceCatalogChunks,practiceClipChunk,totalProgress,progressFor,PracticeSession} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {toggleExerciseExclusion} from '../src/practice-exercise-catalog';
 const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
@@ -37,4 +37,23 @@ for(const partition of ['fixed-four-v1','connection-boundary-v1'] as const)test(
  assert.deepEqual(readPractice(structuredClone(next),plan),next);
  const broken=structuredClone(old);broken.composites={'1-12':['1-4','9-12']};assert.throws(()=>readPractice(broken,plan),/adjacent/);
  assert.throws(()=>readPractice({...next,policyFingerprint:'unknown-policy'},plan),/policy/);
+});
+test('guarded earlier hand-choice evidence survives current assignment choices without rewriting its original key',()=>{
+ const oldPlan=plan.legacyPlans!['fixed-four-v1']!,old=initialPractice(oldPlan),chunk=oldPlan.chunks[0];
+ const hands=p.score.notes.filter(n=>n.startTick<chunk.end&&n.startTick+n.durationTicks>chunk.start&&'pitch' in n).map(n=>[n.id,'pitch' in n?n.pitch.octave*12+n.pitch.pitchClass:0,n.startTick,n.durationTicks,n.hand==='LH'?'RH':'LH']).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+ const key='personal-hands-v1:'+JSON.stringify({base:chunk.pattern,hands});old.best[key]=90;old.groundwork={[key]:true};toggleDone(old,{passage:chunk.id,pattern:key,rate:180});
+ const loaded=readPractice(old,oldPlan);assert.equal(progressFor(chunk,loaded),1);assert.deepEqual(loaded.best,old.best);
+ const migrated=readPractice(old,plan);assert.equal(progressFor(plan.chunks[0],migrated),1);assert.equal(migrated.best[plan.chunks[0].pattern],90);assert.deepEqual(migrated.legacy!.state,old);
+ const forged=structuredClone(old);const wrong='personal-hands-v1:'+JSON.stringify({base:chunk.pattern,hands:hands.slice(1)});forged.manualAttainment={version:1,marks:{[JSON.stringify([chunk.id,wrong])]:[180]}};assert.throws(()=>readPractice(forged,plan),/Self-reported passage differs/);
+});
+test('new piano claim identities retain authored articulation and phrase facts rather than attack-only coincidences',()=>{
+ const changed=structuredClone(p),note=changed.score.notes.find(n=>n.startTick>=plan.chunks[4].start&&n.startTick<plan.chunks[4].end)!;note.articulation='staccato';
+ const current=planPractice(changed);assert.notEqual(current.chunks[0].pattern,current.chunks[4].pattern);
+ const state=initialPractice(current);state.best[current.chunks[0].pattern]=state.target;assert.equal(progressFor(current.chunks[4],state),0);
+});
+
+test('contrast sessions reject unselected and invented continuous source spans before starting a clock',()=>{
+ const state=initialPractice(plan),owner=practiceCatalogChunks(plan).find(c=>c.kind==='contrast')!;
+ assert.throws(()=>new PracticeSession(plan,owner,state,true),/owning source clip/);
+ const clip=practiceClipChunk(owner,0);assert.throws(()=>new PracticeSession(plan,{...clip,end:owner.clips![1].end},state,true),/owning source clip/);
 });

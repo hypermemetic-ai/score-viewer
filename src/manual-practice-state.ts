@@ -23,6 +23,13 @@ export function readManualPractice(raw:unknown,plan:ManualPracticePlan):Practice
   const state=readPractice(record.state,plan);state.legacy!.record=structuredClone(record);return state;
  }
  const state=readPractice(record.state,plan);
+ if(state.legacy){const legacy=plan.legacyPlans?.[state.legacy.partition] as ManualPracticePlan|undefined;
+  if(!legacy)throw Error('Manual recovery planner differs; saved evidence retained.');
+  const recovery=state.legacy.record;
+  if(recovery!==undefined){const old=recovery as ManualPracticeRecord;readManualPractice(old,legacy);
+   if(JSON.stringify(old.state)!==JSON.stringify(state.legacy.state))throw Error('Manual recovery record differs; saved evidence retained.');
+  }else if(Object.keys(state.legacy.state.best).length||Object.values(state.legacy.state.groundwork??{}).some(Boolean))throw Error('Manual recovery cannot carry piano-measured evidence; saved data retained.');
+ }
  if(Object.keys(state.best).length||Object.values(state.groundwork??{}).some(Boolean))
   throw Error('Manual practice cannot carry piano-measured evidence; saved data retained.');
  return state;

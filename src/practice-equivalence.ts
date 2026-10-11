@@ -1,8 +1,9 @@
+import {recognizesPersonalPracticeClaim} from './personal-practice-identity';
 import type {ScorePackage} from './package';
 import type {PracticeChunk,PracticePassagePlan} from './practice';
 
 type Claim=Readonly<{passage:string;pattern:string}>;
-type State={revision?:string;referenceBeat?:{numerator:number;denominator:number}};
+type State={revision?:string;referenceBeat?:{numerator:number;denominator:number};best?:Record<string,number>;groundwork?:Record<string,boolean>;manualAttainment?:{marks:Record<string,number[]>}};
 interface Patterns {signature:string;leaves:Map<PracticeChunk,{shape:string;unit:number}>;pairs:Map<string,number>;next:number;score:ScorePackage['score'];assessment:'piano'|'manual';facts:Map<string,string>;classes:Map<string,number>}
 const plans=new WeakMap<PracticePassagePlan,Patterns>(),states=new WeakMap<object,Map<string,readonly Claim[]>>();
 const key=(claim:Claim)=>JSON.stringify([claim.passage,claim.pattern]);
@@ -14,7 +15,7 @@ const signature=(plan:PracticePassagePlan)=>{
 const sorted=(values:unknown[])=>values.map(v=>JSON.stringify(v)).sort();
 
 
-function musicalSpanFact(plan:PracticePassagePlan,score:ScorePackage['score'],chunk:PracticeChunk,assessment:'piano'|'manual'):string {
+export function musicalSpanFact(plan:PracticePassagePlan,score:ScorePackage['score'],chunk:PracticeChunk,assessment:'piano'|'manual'):string {
  const chains=new Map((score.tieChains??[]).map(c=>[c.noteId,c]));
  const start=chunk.start,end=chunk.end,inRange=(tick:number,duration=0)=>tick<end&&(tick>=start||tick+duration>start),
    meter=(tick:number)=>[...score.timeSignatures].reverse().find(m=>m.tick<=tick),
@@ -75,7 +76,11 @@ export function bindPracticePassages<T extends State>(plan:PracticePassagePlan,s
   }else if(chunk.components){const [left,right]=chunk.components.map(id=>units.get(id));if(left===undefined||right===undefined)continue;
    if(left===right)unit=left;else{const pair=JSON.stringify([left,right]);unit=patterns.pairs.get(pair);if(unit===undefined){unit=patterns.next++;patterns.pairs.set(pair,unit);}}
   }else{const leaf=patterns.leaves.get(chunk);if(leaf?.shape===shape(chunk))unit=leaf.unit;}
-  if(unit===undefined)continue;units.set(chunk.id,unit);const members=groups.get(unit)??[];members.push({passage:chunk.id,pattern:chunk.pattern});groups.set(unit,members);
+  if(unit===undefined)continue;units.set(chunk.id,unit);const members=groups.get(unit)??[];members.push({passage:chunk.id,pattern:chunk.pattern});
+  // Guarded earlier hand-choice keys retain literal provenance and attainment.
+  const saved=new Set([...Object.keys(state.best??{}),...Object.keys(state.groundwork??{}),...Object.keys(state.manualAttainment?.marks??{}).flatMap(key=>{try{const claim=JSON.parse(key);return Array.isArray(claim)&&claim[0]===chunk.id&&typeof claim[1]==='string'?[claim[1]]:[];}catch{return [];}})]);
+  for(const pattern of saved)if(pattern!==chunk.pattern&&recognizesPersonalPracticeClaim(plan,chunk,pattern))members.push({passage:chunk.id,pattern});
+  groups.set(unit,members);
  }
  const lookup=new Map<string,readonly Claim[]>();for(const members of groups.values()){const owned=Object.freeze(members.map(member=>Object.freeze(member)));for(const member of owned)lookup.set(key(member),owned);}
  states.set(state,lookup);return state;

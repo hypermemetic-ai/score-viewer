@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
 import {planPractice,initialPractice,readPractice,setPracticeGoal,progressFor,totalProgress,passed,PracticeSession,GroundworkSession,reconcilePassages,passageHierarchy,passageComponents,passageStartTempo,nextPracticePassage,practicePercent,wholePracticeProgress} from '../src/practice';
-const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg);
+const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg,'connection-boundary-v1');
 const earn=(s:ReturnType<typeof initialPractice>,index:number,bpm=s.target)=>{s.best[plan.chunks[index].pattern]=bpm;};
 test('mastered adjacent leaves select independent1–8 before9–12; source and constituents survive',()=>{
  const before=JSON.stringify(pkg.score),s=initialPractice(plan);earn(s,0);earn(s,1);const joined=nextPracticePassage(plan,s,plan.chunks[1])!;
