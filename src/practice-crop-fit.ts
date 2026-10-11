@@ -34,6 +34,12 @@ export function fitLeafPreview(root:HTMLElement){
  const svgs=[...root.querySelectorAll<SVGSVGElement>(':scope > svg, :scope > section > svg')];if(!svgs.length)return;
  if(svgs.length>1){root.style.flexDirection='column';root.style.alignItems='center';root.style.gap='12px';}
  const room=practicePreviewRoom(root),boxes=svgs.map(s=>s.viewBox.baseVal),sections=[...root.querySelectorAll<HTMLElement>(':scope > section')],captions=sections.reduce((n,s)=>n+[...s.querySelectorAll<HTMLElement>(':scope > small')].reduce((m,c)=>m+c.offsetHeight,0),0);
+ if(root.dataset.practiceScrollPreview==='true'){
+  // Preserve source-scale ink in the bounded preview's own scroll viewport.
+  root.style.maxHeight=`${room.height}px`;root.style.overflowY='auto';root.style.overflowX='hidden';root.style.justifyContent='flex-start';root.style.scrollbarGutter='stable';
+  const width=practicePreviewRoom(root).width,scale=Math.min(1,width/Math.max(...boxes.map(b=>b.width)));
+  sections.forEach(section=>section.style.flex='none');root.dataset.rows=String(svgs.length);svgs.forEach((s,i)=>{s.style.flex='none';s.style.width=`${boxes[i].width*scale}px`;s.style.height=`${boxes[i].height*scale}px`;});return;
+ }
  const gaps=(el:HTMLElement)=>Math.max(0,el.children.length-1)*(parseFloat(getComputedStyle(el).rowGap)||0),gap=gaps(root)+sections.reduce((n,s)=>n+gaps(s),0),scale=Math.min(room.width/Math.max(...boxes.map(b=>b.width)),Math.max(1,room.height-captions-gap)/boxes.reduce((n,b)=>n+b.height,0));
  root.dataset.rows=String(svgs.length);svgs.forEach((s,i)=>{s.style.width=`${boxes[i].width*scale}px`;s.style.height=`${boxes[i].height*scale}px`;});
 }
