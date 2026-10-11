@@ -36,10 +36,10 @@ test('Performance percentages scale the score reference without changing exact t
  assert.equal(JSON.stringify(reference),before);assert.deepEqual(reference.beat,{numerator:3,denominator:8});
 });
 
-test('the low-target default stays editable and exact direct increases survive presentation',()=>{
+test('the low-target default stays editable and bounded literal reads retain direct values',()=>{
  const slow={...plan,referencePerformanceTempo:{...plan.referencePerformanceTempo!,bpm:5}},state=initialPractice(slow);
  assert.equal(speedNumber(state.step,state.target),'2');assert.equal(adjustProgression(state.step,state.target,-1),.075);assert.equal(adjustProgression(state.step,state.target,1),.125);
- const typed=speedEdit('0.75',state.step,state.target);assert.equal(typed,.0375);assert.equal(readPractice({...state,step:typed},slow).step,.05);
+ const typed=speedEdit('0.75',state.step,state.target);assert.equal(typed,.0375);assert.equal(readPractice({...state,step:typed},slow).step,.0375);
 });
 
 test('tempo rate edits count the source duration per minute and preserve untouched exact values',()=>{
