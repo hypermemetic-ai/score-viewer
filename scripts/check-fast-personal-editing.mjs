@@ -7,7 +7,8 @@ import {resolve,join,extname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {hostname} from 'node:os';
 import {execFileSync} from 'node:child_process';
-import {importPackage,selectPresentation} from '../src/package.ts';
+import {importPackage,selectPresentation,archivePackage} from '../src/package.ts';
+import {publishPreparedNative} from '../src/publication.ts';
 import {collectionId,initialPersonal,personalStorageName,fingerFor} from '../src/state.ts';
 import {physicalManagedName} from '../src/managed-file-storage.ts';
 import {assigned,handFor,effectiveAssignments} from '../src/personal-assignments.ts';
@@ -27,6 +28,7 @@ report.frontend=[];for(const m of (await readFile(join(root,'index.html'),'utf8'
 const csp=JSON.parse(await readFile('src-tauri/tauri.conf.json','utf8')).app.security.csp;
 const server=createServer(async(req,res)=>{try{const path=resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));if(path!==root&&!path.startsWith(root+'/'))throw Error('outside');res.setHeader('Content-Security-Policy',csp);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.otf':'font/otf','.ttf':'font/ttf'}[extname(path)]??'application/octet-stream'));res.end(await readFile(path===root?join(root,'index.html'):path));}catch{res.writeHead(404);res.end();}});
 function longDenseSource(){const s=denseStudy(),original=structuredClone(s),bars=120;s.id='warm-edit-long-120';s.title='120-bar public independent-voice edit benchmark';s.totalTicks=bars*144;s.sourceBarTicks=Array.from({length:bars+1},(_,i)=>i*144);s.notes=[];s.sourceSilences=[];for(let block=0;block<bars/8;block++){const shift=block*original.totalTicks;for(const n of original.notes)s.notes.push({...structuredClone(n),id:n.id+':'+block,startTick:n.startTick+shift,sourceBeam:n.sourceBeam?{...n.sourceBeam,group:n.sourceBeam.group+':'+block}:undefined});for(const silence of original.sourceSilences)s.sourceSilences.push({...silence,startTick:silence.startTick+shift,bar:silence.bar+block*8});}s.barlines=s.sourceBarTicks.map((tick,i)=>({tick,barNumber:i+1,type:i===bars?'final':'regular'}));return s;}
+async function sourcePresentation(base,keyboard){const p=base.p,published=await publishPreparedNative({source:p.files[p.manifest.sourceScore],metadata:p.manifest.metadata,engineVersion:p.renderingRecipe.engineId,createdAt:'2026-10-11',font:{name:p.manifest.font,bytes:p.files[p.manifest.font]},notices:Object.fromEntries(p.manifest.notices.map(name=>[name,p.files[name]])),presentations:[{layoutId:keyboard,seats:p.seats,pages:p.pages}]});const m=structuredClone(published.package.manifest),files={...published.package.files};delete files['manifest.json'];files['rendering-recipe.json']=p.files[p.manifest.renderingRecipe];m.renderingRecipe='rendering-recipe.json';m.presentations[keyboard].renderingRecipe=m.renderingRecipe;m.files[m.renderingRecipe]=sha(files[m.renderingRecipe]);const bytes=archivePackage(m,files);return {bytes,p:await importPackage(bytes)};}
 function selectedView(p,old){return p.seats.find(s=>s.page===old.page&&s.ownerIds.some(id=>old.ownerIds.includes(id)))??p.seats.find(s=>s.ownerIds.some(id=>old.ownerIds.includes(id)));}
 function scene(base,p,personal,selected,live=p){const positions=annotationPositions(p),seats=p.seats.filter(s=>s.page===selected.page);return {page:selected.page,selected:selected.id,svg:p.pages[selected.page],labels:seats.flatMap(seat=>{const finger=fingerFor(base,personal,seat),position=positions.get(seat.id),alias=live.seats.find(s=>s.page===seat.page&&s.system===seat.system&&!!s.continuation===!!seat.continuation&&s.x===seat.x&&s.baseline===seat.baseline&&s.ownerIds.join('|')===seat.ownerIds.join('|'));assert.ok(alias,'Cold head must have one corresponding transient source alias with matching geometry');return finger===undefined?[]:[{id:alias.id,hand:handFor(base,personal,seat.ownerIds[0]),finger:String(finger),x:String(position.x),y:String(position.baseline),size:position.fontSize+'pt'}];})};}
 async function independentColdView(base,personal){
@@ -42,7 +44,7 @@ try{
  for(const keyboard of ['conventional-piano','janko-four-row']){
   fixtures.push({name:'no14-'+keyboard,keyboard,bytes:no14Bytes,p:await selectPresentation(no14,keyboard)});
   for(const [name,source,base,owner] of [['long-dense-120-bars',long,longBase,'dense-0-0:0'],['tie-page-reflow',tie,tieBase,'written-hold']]){
-   const hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?'RH':n.hand])),generated=await calculatedStudy(base.p,keyboard,hands);fixtures.push({name:name+'-'+keyboard,keyboard,...generated,owner});await writeFile(join(out,name+'-'+keyboard+'.isoscore'),generated.bytes);
+   const hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?'RH':n.hand])),generated=name.startsWith('long-')?await sourcePresentation(base,keyboard):await calculatedStudy(base.p,keyboard,hands);fixtures.push({name:name+'-'+keyboard,keyboard,...generated,owner});await writeFile(join(out,name+'-'+keyboard+'.isoscore'),generated.bytes);
   }
  }
  await new Promise(r=>server.listen(0,'127.0.0.1',r));browser=await chromium.launch({headless:true,...(process.env.PRACTICE_CHROMIUM?{executablePath:process.env.PRACTICE_CHROMIUM}:{})});report.chromium=browser.version();
