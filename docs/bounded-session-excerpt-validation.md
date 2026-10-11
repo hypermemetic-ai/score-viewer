@@ -6,9 +6,11 @@ which rejected their endpoints. Reading also selected all gestures in the source
 bar, and active views displayed complete bars and internal exercise identifiers.
 
 Ordinary originals and adjacent doubles now use the existing explicitly
-source-linked excerpt clock when either endpoint lies inside a source bar.
-Whole-bar exercises retain their strict ordinary clock. A source owner sounding
-past an internal display cut remains an obligation until its literal release;
+source-linked excerpt clock when either endpoint lies inside a source bar or a
+bounded exercise has a genuine held-source obligation beyond its display end.
+Whole-bar exercises without an outgoing obligation, and legacy whole-bar
+partitions, retain their strict ordinary clock. A source owner sounding
+past a bounded display cut remains an obligation until its literal release;
 the clock includes that tail, while displayed and graded new attacks remain in
 `[start,end)`. Initial and prepared repeat audio durations include the same tail.
 Earlier owners remain separate held preparation and never become new Reading
@@ -65,3 +67,54 @@ the preceding successful ISO inspection of the same source fixture. These are au
 source-browser observations. They are not installed application acceptance,
 physical pianist performance, native timing acceptance or a judgment that the
 extreme dense fixture is comfortable to read.
+
+## Whole-bar held-source repair
+
+The final review also found the same early-release defect at ordinary barline
+cuts. Current bounded originals and adjacent doubles now complete only after
+every genuine overlapping source owner reaches its release. A shorter explicit
+piano completion override is rejected. Their actual displayed and graded source
+ranges stay fixed: a held tail adds neither later attacks nor later source bars.
+Legacy whole-bar clocks keep their original admission behavior.
+
+The active manual view now shows the isolated earlier-owner preparation cue for
+whole-bar incoming holds as well as partial excerpts. Existing piano slot
+retirement already respects unresolved obligations. A retained piano tie cue in
+the final display bar now survives through the genuine source-held tail;
+intermediate bars and legacy partitions retain their existing cue expiry.
+
+The new session regressions use actual bounded planners. A section displaying
+ticks `0..576` retains its independent held owner through `1008`; an adjacent
+double displaying `0..1152` retains its owner through `1584`. They exercise full
+piano performances, early-release rejection, incoming preparation without a new
+attack, manual completion/Done, repeat audio duration, and unchanged legacy
+clocks. Reading keeps its intentional junction windows for connections and does
+not acquire a timing assessment.
+
+The production browser inspector checks six actual incoming originals and
+connections across ISO/TAB using literal XML written ties. It proves the source
+owner IDs/releases and isolated cue ink, rejects unrelated cue attacks, and
+preserves ordinary body ink/ranges. Its separate piano check runs the actual
+DOM continuation method on production-engraved source geometry: a cue remains
+at tick `769` after display end `768`, expires at genuine owner release `1200`,
+and disappears after reset. That method check isolates a four-bar source range;
+it is not an additional claim about the planner's section selection.
+
+Restoring the old piano constructor fails the new `1008` completion expectation
+at `576`. Restoring the old final-bar cue expiry fails the actual DOM check at
+`769`. Temporary negative-control changes were restored before final checks.
+The final focused rerun passed all 73 tests. The configured build passed on trial notation candidate
+`6b2ed7e30d256118e2c1d91360271f63bc096382`. Final-source combined verification,
+native timing and installed application acceptance remain separate gates.
+
+```sh
+/home/qqp/.local/bin/qq-job -- node --import tsx --test --test-concurrency=1 test/bounded-held-tail.test.ts
+/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-held-origins.mjs
+```
+
+The inspector closes its temporary Vite server and Chromium in `finally` and
+writes the receipt, retained TAB screenshot and negative-control logs to
+`/tmp/score-viewer-bounded-held-origins`.
+
+Final held-source browser receipt SHA-256:
+`f519a8d4a3b5965b9629ed246290b560d993b82e4089e69af83a4044224be858`.
