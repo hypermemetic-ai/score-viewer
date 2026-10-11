@@ -45,7 +45,7 @@ export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|
   geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length))throw Error('Calculated annotation ownership differs from the admitted presentation.');
  const pitch=(seat:Seat)=>{const n=requirePianoEvent(notes.get(seat.ownerIds[0])!);return n.pitch.octave*12+n.pitch.pitchClass;};
  for(const seat of p.seats){const key=carriers.get(seat.id)!.id,group=groups.get(key)??[];group.push(seat);groups.set(key,group);}
- const columns=new Map<string,number[]>();
+ const columns=new Map<string,number[]>(),occupiedByPage=new Map<number,AnnotationBox[]>();
  for(const group of groups.values()){const key=group[0].page+':'+group[0].system,x=carriers.get(group[0].id)!.x,values=columns.get(key)??[];
   if(!values.includes(x))values.push(x);columns.set(key,values);}
  for(const group of [...groups.values()].sort((a,b)=>a[0].page-b[0].page||a[0].system-b[0].system||Math.min(...a.map(s=>s.x))-Math.min(...b.map(s=>s.x))||
@@ -62,18 +62,21 @@ export function annotationPositions(p:Pick<ScorePackage,'seats'|'score'|'pages'|
    width:[number,number]=[(metric[0]-280)*smallEm/1000,(metric[2]-280)*smallEm/1000],
    fit=affiliatedAnnotationPosition({x:carrier.x,top,direction:carrier.direction,gap,height:stackHeight,
     em:Math.min(...group.map(s=>s.fontSize))*4/3,width,columns:columns.get(group[0].page+':'+group[0].system)!,page,
-    occupied:[...positions.entries()].filter(([id])=>pianoSeatPage(id)===group[0].page).map(([,p])=>p.bounds)});
+    occupied:occupiedByPage.get(group[0].page)??[]});
    if(!fit)throw Error('Calculated finger annotations cannot fit actual page ink for '+group.map(s=>s.id).join(', '));
    top=fit.top;annotationX=fit.x;
   }
   for(const [index,seat]of ordered.entries()){
    const fontSize=seat.fontSize*ANNOTATION_SIZE_RATIO,smallEm=fontSize*4/3,x=annotationX,baseline=top+metric[3]*smallEm/1000;
    const bounds:AnnotationPosition['bounds']=[x+(metric[0]-280)*smallEm/1000,top,x+(metric[2]-280)*smallEm/1000,top+heights[index]];
-   positions.set(seat.id,{x,baseline,fontSize,bounds,carrier:geometry?carrier:carriers.get(seat.id)!});top+=heights[index]+gap;
+   positions.set(seat.id,{x,baseline,fontSize,bounds,carrier:geometry?carrier:carriers.get(seat.id)!});
+   // Retain exactly the placement order used by collision checks, without
+   // rescanning all earlier annotations and their source seats for each group.
+   const occupied=occupiedByPage.get(seat.page)??[];occupied.push(bounds);occupiedByPage.set(seat.page,occupied);
+   top+=heights[index]+gap;
   }
  }
  cache.set(p,positions);return positions;
- function pianoSeatPage(id:string){return p.seats.find(s=>s.id===id)!.page;}
 }
 export interface FingerPaint {visible:boolean;presentation:FingerPresentation;finger?:number;position:AnnotationPosition;pitchText?:string;label?:string;interactive?:boolean}
 /** Original seat remains the only seat identity and keeps its existing feedback/hit target. */
