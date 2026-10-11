@@ -103,3 +103,31 @@ test('finishing an old generic command after a score switch cannot paint or move
  projection.resolve({...f.target.package,choiceSnapshot:f.target.personal});await old;await f.editor.queue.flush();
  assert.equal(f.context.current,other);assert.equal(f.context.selection,otherSeat);assert.equal(f.frames.length,0);assert.equal(f.written.length,1);assert.equal(f.disk.calculatedVersion,1);assert.equal((other.personal as any).calculatedVersion,undefined);
 });
+
+function dialogFixture(){
+ const f=fixture(),projection=deferred();f.setProject(()=>projection.promise);let submit!:(e:any)=>Promise<void>,restore!:()=>Promise<void>;const field={value:'3',select(){}},error={textContent:''};
+ const opened={querySelector(selector:string){if(selector==='input')return field;if(selector==='form')return {addEventListener(_type:string,handler:any){submit=handler;}};if(selector==='[data-action=restore-one]')return {addEventListener(_type:string,handler:any){restore=handler;}};if(selector==='.error')return error;return undefined;}};
+ Object.assign(f.context,{editSequence:{reset(){}},labelMode:()=> 'finger',savePersonalQuietly(){},fingerFor:()=>1,button:()=>'',restorePersonalAssignment:(_p:any,s:any)=>s,showDialog(){f.context.dialog=opened;return opened;},closeDialog(){f.context.dialog=undefined;}});
+ runInNewContext(body('async function edit(','\nfunction onMidi('),f.context);
+ return {...f,projection,opened,submit:()=>submit({preventDefault(){}}),restore:()=>restore()};
+}
+
+test('a delayed finger-dialog submission never closes a subsequently opened dialog',async()=>{
+ const f=dialogFixture();await f.context.edit(f.seats[0]);const saving=f.submit(),replacementDialog={id:'new-options-dialog'};
+ f.context.closeDialog();f.context.dialog=replacementDialog;f.projection.resolve({...f.target.package,choiceSnapshot:f.target.personal});await saving;
+ assert.equal(f.context.dialog,replacementDialog);assert.equal(f.target.personal.choices['note-0'].finger,3);
+});
+
+test('a delayed finger-dialog submission never repaints or closes the new score after switching editions',async()=>{
+ const f=dialogFixture();await f.context.edit(f.seats[0]);const saving=f.submit(),other={personal:{view:{page:0}},package:{sourceSha256:'other'}},newDialog={id:'new-score-dialog'};
+ f.context.closeDialog();f.context.current=other;f.context.selection={id:'other-seat'};f.context.dialog=newDialog;
+ f.projection.resolve({...f.target.package,choiceSnapshot:f.target.personal});await saving;
+ assert.equal(f.context.dialog,newDialog);assert.equal(f.context.current,other);assert.equal(f.frames.length,0);
+});
+
+test('restore failure after Escape retains pending choices and handles its rejection without disturbing a new dialog',async()=>{
+ const f=dialogFixture();f.setWrite(async()=>{throw Error('restore storage unavailable');});await f.context.edit(f.seats[0]);
+ const restoring=f.restore(),newDialog={id:'new-options-dialog'};f.context.closeDialog();f.context.dialog=newDialog;
+ f.projection.resolve({...f.target.package,choiceSnapshot:f.target.personal});await restoring;
+ assert.equal(f.context.dialog,newDialog);assert.equal(f.editor.queue.recovery.length,1);assert.match(f.editor.queue.error.message,/restore storage unavailable/);assert.ok(f.errors.length);
+});
