@@ -25,7 +25,7 @@
 
 - [x] 4.1 Implement old-plan validation and a recoverable legacy-envelope migration to the new policy; verify fixed-four/connection-boundary journals, manual revision lookup, exact protected settings and raw measured/manual/groundwork/composite preservation with copied fixtures.
 - [x] 4.2 Project only exactly matching complete exercise claims and preserve strict equivalence provenance; verify old long runs do not grant smaller-range or contrast credit, repeated migration is idempotent and new contrast entries start unearned.
-- [ ] 4.3 Integrate migration with ordered saves and transposition/layout context restore; verify interrupted/failed saves retain the last valid record and old raw evidence remains recoverable without changing personal library/fingering/source identities. Document rollback/recovery behavior.
+- [x] 4.3 Integrate migration with ordered saves and transposition/layout context restore; verify interrupted/failed saves retain the last valid record and old raw evidence remains recoverable without changing personal library/fingering/source identities. Document rollback/recovery behavior.
 
 ## 5. Surgical exclusion and truthful totals
 
