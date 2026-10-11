@@ -1,3 +1,4 @@
+import {practiceClipCompletionTick,practiceClipPlan} from './practice-clip';
 import {personalPracticePackage} from './personal-assignments';
 import {samePracticeEditionMusic} from './practice-edition-source';
 import {planPracticeSections,type PracticeSectionPlanning} from './practice-boundaries';
@@ -15,7 +16,7 @@ import {attainedRate,readManualAttainment,claimIdentity,type ManualAttainment} f
 import{MidiSoundingNotes,type MidiStream,type PracticeMidiSetup}from'./midi-sustain';
 import type{MidiCC}from'./midi';
 import type {ScorePackage} from './package';
-import {scoreTickMs,scorePulseGrid,sourceBarPhaseTicks,type PracticePulseGrid} from './score-clock';
+import {scoreTickMs,scorePulseGrid,scoreExcerptPulseGrid,sourceBarPhaseTicks,type PracticePulseGrid} from './score-clock';
 import type {TimeSignatureOverlay} from '../vendor/iso-notation/src/model/types';
 import {practiceTiming} from './practice-timing';
 import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
@@ -254,7 +255,7 @@ export function resetProgress(chunk:PracticeChunk,s:PracticeState){for(const cla
 /** Untimed source-ordered solo / adjacent-pair preparation. MIDI cannot identify physical fingers. */
 export class GroundworkSession {
  readonly steps:Array<{groups:string[];events:PracticeAttack[]}>;index=0;matched=new Set<string>();failure?:PracticeAttack;complete=false;
- constructor(plan:PracticePlan,chunk:PracticeChunk){const windows=chunk.joins?.map(bar=>[bar,bar+1])??[[chunk.firstBar,chunk.lastBar]],sequences:string[][]=[];for(const [first,last]of windows){const groups=plan.gestures.filter(g=>g.bar>=first&&g.bar<=last).sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));groups.forEach((g,i)=>{sequences.push([g.id]);if(i)sequences.push([groups[i-1].id,g.id]);});}this.steps=sequences.map(ids=>({groups:ids,events:plan.attacks.filter(a=>a.groups.some(g=>ids.includes(g)))}));this.complete=this.steps.length===0;}
+ constructor(plan:PracticePlan,chunk:PracticeChunk){plan=practiceClipPlan(plan,chunk,false);const windows=chunk.joins?.map(bar=>[bar,bar+1])??[[chunk.firstBar,chunk.lastBar]],sequences:string[][]=[];for(const [first,last]of windows){const groups=plan.gestures.filter(g=>g.bar>=first&&g.bar<=last).sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));groups.forEach((g,i)=>{sequences.push([g.id]);if(i)sequences.push([groups[i-1].id,g.id]);});}this.steps=sequences.map(ids=>({groups:ids,events:plan.attacks.filter(a=>a.groups.some(g=>ids.includes(g)))}));this.complete=this.steps.length===0;}
  confirm(){this.index++;this.restart();this.complete=this.index>=this.steps.length;}
  get current(){return this.steps[Math.min(this.index,this.steps.length-1)];}
  restart(){this.matched.clear();this.failure=undefined;}
@@ -305,7 +306,7 @@ export class PracticeSession {
  private sourceGrid:PracticePulseGrid;private attemptGrid:PracticePulseGrid;private attemptRate:number;
  get sourcePulseGrid(){return practiceCountInGrid(this.sourceGrid,(this.state as PracticeState & {countInBars?:number}).countInBars??2);}
  get pulseGrid(){return this.attemptGrid;}
- constructor(readonly plan:PracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState,public measured:boolean,sourceGrid?:PracticePulseGrid,readonly completionTick=chunk.end){if(chunk.kind==='contrast'){const owner=plan.catalog?.find(c=>c.id===chunk.id&&c.kind==='contrast'),clip=owner?.clips[chunk.clipIndex??-1];if(!owner||owner.pattern!==chunk.pattern||!clip||['start','end','firstBar','lastBar'].some(key=>clip[key as keyof ExerciseClip]!==chunk[key as keyof PracticeChunk]))throw Error('Contrast session must use one actual owning source clip.');}if(!Number.isFinite(completionTick)||completionTick<chunk.end||completionTick>plan.barTicks.at(-1)!)throw Error('Practice completion tail differs from its source obligation.');this.startTick=chunk.start;this.attemptRate=state.working;this.sourceGrid=sourceGrid??scorePulseGrid(plan,plan.barTicks,chunk.start,chunk.end);this.attemptGrid=this.sourcePulseGrid;}
+ constructor(readonly plan:PracticePlan,readonly chunk:PracticeChunk,readonly state:PracticeState,public measured:boolean,sourceGrid?:PracticePulseGrid,readonly completionTick=plan.barTicks.includes(chunk.start)&&plan.barTicks.includes(chunk.end)?chunk.end:practiceClipCompletionTick(plan,chunk)){if(chunk.kind==='contrast'){const owner=plan.catalog?.find(c=>c.id===chunk.id&&c.kind==='contrast'),clip=owner?.clips[chunk.clipIndex??-1];if(!owner||owner.pattern!==chunk.pattern||!clip||['start','end','firstBar','lastBar'].some(key=>clip[key as keyof ExerciseClip]!==chunk[key as keyof PracticeChunk]))throw Error('Contrast session must use one actual owning source clip.');}if(!Number.isFinite(completionTick)||completionTick<chunk.end||completionTick>plan.barTicks.at(-1)!)throw Error('Practice completion tail differs from its source obligation.');this.startTick=chunk.start;this.attemptRate=state.working;this.sourceGrid=sourceGrid??(plan.barTicks.includes(chunk.start)&&plan.barTicks.includes(chunk.end)&&completionTick===chunk.end?scorePulseGrid(plan,plan.barTicks,chunk.start,completionTick):scoreExcerptPulseGrid(plan,plan.barTicks,chunk.start,completionTick));this.attemptGrid=this.sourcePulseGrid;}
  get bpm(){return this.attemptRate;}
  get tickMs(){return scoreTickMs(this.plan,this.attemptRate);}
  get events(){return this.plan.attacks.filter(a=>a.tick>=this.startTick&&a.tick<this.chunk.end);}
