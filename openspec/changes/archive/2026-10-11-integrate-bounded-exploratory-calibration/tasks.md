@@ -26,6 +26,6 @@
 
 ## 5. Reviewed delivery
 
-- [ ] 5.1 Independently review and fix the complete integration, synchronize/verify the new main spec and archive the completed change; verify strict OpenSpec validation and the final source diff.
-- [ ] 5.2 Commit/push scoped changes and complete the established reviewed viewer PR path; verify merged source identity and thread PR links with fresh Git status.
-- [ ] 5.3 Complete ordinary paired native packaging/publication and authorized activation with fresh preservation checks; verify actual artifact/source identities, managed-data preservation and native visible calibration behavior, reporting untested physical/human limits.
+- [x] 5.1 Independently review and fix the complete integration, synchronize/verify the new main spec and archive the completed change; verify strict OpenSpec validation and the final source diff.
+- [x] 5.2 Commit/push scoped changes and complete the established reviewed viewer PR path; verify merged source identity and thread PR links with fresh Git status.
+- [x] 5.3 Complete ordinary paired native packaging/publication and authorized activation with fresh preservation checks; verify actual artifact/source identities, managed-data preservation and native visible calibration behavior, reporting untested physical/human limits.
