@@ -64,7 +64,9 @@ before/after screenshots and confirms complete range and head retention.
 The eight-bar authored manual connection was inspected in ISO and TAB at 1000
 and 480 pixels. Every expected component ink ID remains in the source preview;
 rows cover the complete clip contiguously and use a common scale. Switching
-notation changes neither score source nor attainment. These are authored
+notation changes neither score source nor attainment. At480 pixels the entire
+manual detail heading lies at14–173.6px inside its14–466px pane, with no
+horizontal overflow. These are authored
 workload examples, not evidence that the heuristics recover all musical forms.
 
 Reproduce after a configured build:
@@ -84,7 +86,7 @@ receipts and screenshots are in the directories named above. SHA256 receipts:
 | Inspection | Receipt SHA256 |
 | --- | --- |
 | Emitted-main guards after repair | `b3eef1daa216241b04fe54972a5613937cac62f7a6a56c8e85a4b9e319f5452a` |
-| Symbolic source and manual previews | `b38d935d7dfb58bd195071d88bb9e31d501acf39ef8c1704beab8aaa8d6083e4` |
+| Symbolic source and manual previews | `8dd002cf4d89d902ab4087c2206c8e27f7e5a2a4c7a4b2aec63b3ea28765b7af` |
 | Exact prior/current preview comparison | `fb5cbc8572bd85d616a03e2257fd4bd61cf2319b5325e28b1c845487eeb0c500` |
 | Contrast lifecycle after repair | `51b012c1499589e53dc153a897dc84532f5e4b33e89331e591a7e5bcbb730019` |
 
