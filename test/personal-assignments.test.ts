@@ -4,6 +4,8 @@ import {initialPersonal,readPersonal,corrected,fingerFor,personalStorageName,pra
 import {planPractice,initialPractice,readPractice,progressFor,passageHierarchy} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {pianoRequestAuthority} from '../src/piano-request-authority';
+import {admitPracticeContext} from '../src/practice-context';
+import {personalForCalculatedEdition} from '../src/presentation-install';
 import type {ScorePackage} from '../src/package';
 import {testReference} from './support/reference-score';
 
@@ -66,4 +68,17 @@ test('explicit calculation authority receives personal hand/finger instead of su
  p.fingerLayer!.operatorConstraints=[{ownerId:n.id,guard,hand:'LH',finger:3,provenance:{kind:'operator-choice',reference:'Previous immutable choice'}}];
  const original=structuredClone(p),constraints=pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,personal,'retain-imported');
  assert.equal(constraints.filter(c=>c.ownerId===n.id).length,1);assert.equal(constraints.find(c=>c.ownerId===n.id)!.hand,'RH');assert.equal(constraints.find(c=>c.ownerId===n.id)!.finger,5);assert.deepEqual(p,original);
+});
+test('materialized edition carries effective choices and retains superseded legacy evidence with the prior edition',()=>{
+ const from=fixture(),legacy=corrected(from,initialPersonal(from),from.seats[0],5),s=assigned(from,legacy,from.seats[0],{hand:'RH'}),before=structuredClone(s),to=structuredClone(from);
+ to.manifest.revision='e'.repeat(64);to.effectiveHandSha256='f'.repeat(64);to.score.notes[0].hand='RH';to.fingerLayer!.attacks[0].hand='RH';to.fingerLayer!.attacks[0].finger=5;
+ const next=personalForCalculatedEdition(s,from,to);
+ assert.equal(handFor(to,next,'owner-0'),'RH');assert.equal(fingerFor(to,next,to.seats[0]),5);assert.deepEqual(next.overrides,{});assert.deepEqual(s,before);
+ assert.equal(s.overrides[from.seats[0].contactId].hand,'LH');assert.deepEqual(readPersonal(next,to),next);
+ to.fingerLayer!.attacks[0].finger=4;assert.throws(()=>personalForCalculatedEdition(s,from,to),/personal assignment was not retained/);
+});
+test('practice context admission resolves current personal hands while preserving the retained settings and claims',()=>{
+ const p=fixture(),old=admitPracticeContext(p,undefined),a=old.plan.chunks[0];old.state.best[a.pattern]=90;
+ const personal=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),next=admitPracticeContext(p,old.state,undefined,personal);
+ assert.equal(next.plan.ownerGroup.get('owner-0'),'0:RH');assert.equal(progressFor(next.plan.chunks[0],next.state),0);assert.equal(next.state.best[a.pattern],90);assert.equal(next.state.start,old.state.start);
 });
