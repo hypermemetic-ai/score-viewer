@@ -13,11 +13,11 @@
 ## 3. Viewer reuse and readiness
 
 - [x] 3.1 Implement bounded exact personal-preparation core reuse with independent current package wrappers and personal assignments; verify compatible reopen, changed input rejection, eviction, concurrent requests, failure and canceled-warm cleanup, and document retention limits.
-- [ ] 3.2 Consolidate startup and score-opening feedback into one accessible loading surface, awaiting complete library and enabled-audio readiness and prioritizing foreground work; verify early visible feedback, actual phases/counts, errors, cancellation, supersession and unchanged keyboard/MIDI ownership in the built viewer.
+- [x] 3.2 Consolidate startup and score-opening feedback into one accessible loading surface, awaiting complete library and enabled-audio readiness and prioritizing foreground work; verify early visible feedback, actual phases/counts, errors, cancellation, supersession and unchanged keyboard/MIDI ownership in the built viewer.
 
 ## 4. Integrated performance and source delivery
 
-- [ ] 4.1 Run configured viewer tests and types/build, compare production cold/warm measurements against all named baseline fixtures, inspect the real UI and record remaining blocked intervals and native limits in validation documentation.
+- [x] 4.1 Run configured viewer tests and types/build, compare production cold/warm measurements against all named baseline fixtures, inspect the real UI and record remaining blocked intervals and native limits in validation documentation.
 - [ ] 4.2 Obtain independent review of the exact shared/viewer inputs and merge the viewer through its ordinary PR path; verify source/tree/pin identities and fresh Git status without unattended changes.
 
 ## 5. Paired native activation and closure
