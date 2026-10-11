@@ -111,3 +111,18 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 .personal-edit-status{position:fixed;z-index:30;left:50%;bottom:5rem;transform:translateX(-50%);display:flex;align-items:center;gap:.65rem;max-width:min(90vw,48rem);padding:.75rem 1rem;border:1px solid #c9b8a4;border-radius:.6rem;background:#fffaf2;color:#594a3d;box-shadow:0 3px 16px #00000012;font-size:.85rem}
 .personal-edit-status button{white-space:nowrap}
 @media(max-width:700px){.personal-edit-status{flex-wrap:wrap}.personal-edit-status span{flex-basis:100%}}
+
+/* Exclusion changes assessment membership without moving or erasing the row. */
+.practice-catalog-label{margin:14px 6px 4px;color:#8d9695;font-size:11px;letter-spacing:.06em}
+.practice-catalog section:first-child .practice-catalog-label{margin-top:0}
+.practice-browser .practice-chunks .practice-excluded{color:#7e8987}
+.practice-excluded .practice-range{position:relative}
+.practice-excluded .practice-range::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;border-top:1px solid #a2b6b06b;transform:rotate(-6deg);pointer-events:none}
+.practice-browser .practice-range small{display:block;font-size:11px;color:#8e9694}
+.practice-exercise-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px}
+.practice-exclude-toggle{padding:8px 0;color:#96a39f;font-size:13px}
+.practice-exclude-toggle[aria-pressed=true]{color:#bac7c2}
+.practice-contrast-preview{flex-direction:column;align-items:center;gap:12px}
+.practice-contrast-preview>section{display:flex;flex-direction:column;align-items:center;min-width:0;max-width:100%}
+.practice-contrast-preview>section>small{align-self:flex-start;color:#65706b;font-size:12px;line-height:18px}
+.practice-contrast-preview>section>svg{display:block;max-width:100%;flex:none}
