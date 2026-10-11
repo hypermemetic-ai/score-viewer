@@ -118,3 +118,29 @@ writes the receipt, retained TAB screenshot and negative-control logs to
 
 Final held-source browser receipt SHA-256:
 `f519a8d4a3b5965b9629ed246290b560d993b82e4089e69af83a4044224be858`.
+
+## Final-source visible preparation check
+
+Rechecking source `e666b23973c83e6e77960b6e7a3e89649b92405d` revealed that the
+manual preparation cue was present in the DOM but squeezed out beside the
+full-width score. It now occupies the existing separate held-context area above
+the ordinary source body. The body fit accounts for the context and shared gap;
+render failure clears the context. Source ranges, ownership, clocks and credit
+are unchanged, including the existing legacy whole-bar behavior.
+
+The enhanced inspector requires a visible, contained earlier-note SVG and a
+contained source body. All six actual ISO/TAB original/connection cases passed,
+with each preparation SVG measuring `180 × 100` pixels at the inspected desktop
+viewport. The retained screenshot now visibly includes the preparation label
+and original note. The piano final-bar continuation method and all 23 active
+excerpt cases also passed on the final source. Twenty-three focused manual and
+held-session tests and the configured build passed.
+
+Receipts and screenshots are retained in
+`/tmp/score-viewer-bounded-visible-held-e666` and
+`/tmp/score-viewer-bounded-visible-excerpts-e666`. These are source-browser
+observations, not installed/native or physical piano acceptance. The separate
+generic two-voice seven-bar written-tie fixture still refuses admission on this
+source because the geometry audit cannot find its stated heads across source
+systems. That audit was preserved; this refusal is recorded in
+`/tmp/score-viewer-bounded-held-origins-e666/generic-seven-bar-tie.json`.
