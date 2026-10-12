@@ -7,24 +7,23 @@ Collect a bounded, setup-controlled set of physical-contact effort judgments wit
 ## Requirements
 
 ### Requirement: Canonical bounded collection
-The viewer SHALL use its existing instrument selection and prescribe the exploratory protocol for one selected hand and central reference location. Jankó SHALL contain 208 judgments in eight blocks; conventional SHALL contain 52 per explicitly selected reference pitch, with at most two references. Missing required target keys SHALL prevent starting.
+The viewer SHALL inherit the selected instrument and collect one pooled set of central-reference judgments. Jankó SHALL contain 208 judgments in eight blocks; conventional SHALL contain 52 at a standard central reference. Performing-hand selection SHALL choose a physically equivalent realization and record the hand used without requiring a second set. Missing required keys SHALL prevent starting.
 
 #### Scenario: Start either instrument
-- **WHEN** the player chooses a hand and valid reference pitch on the selected instrument
-- **THEN** the viewer shows the exact canonical count, finger pairs, mirrored usual-side roles and physical-copy coverage before starting
-- **AND** a second hand requires a separate session
+- **WHEN** the player begins on the selected instrument
+- **THEN** progress counts each canonical target once and changing performing hand displays an equivalent physical target without creating another collection
 
 #### Scenario: Reference near an edge
-- **WHEN** the selected instrument lacks a required target within thirteen decimal semitone steps on either side
+- **WHEN** a physical target cannot be represented within available keys
 - **THEN** collection cannot start and identifies incomplete coverage without assigning unavailable grades
 
 ### Requirement: Physical contact display
-The viewer SHALL identify the actual anchor and tested finger, pitches, rows and levels on usable physical surfaces, with surrounding keys and correct colors. Horizontal-center guidance SHALL permit front-to-back contact choice without inventing a measured strike point. The viewer SHALL distinguish finger adjustment from whole-hand swivelling with a visual example before collection.
+The viewer SHALL use one stable keyboard illustration with connected Jankó levels, one line per boundary, correct conventional key shapes and colors, highlighted contacts and direct finger names. Note notation SHALL follow saved application choice independently from color choices. The physical action and all five descriptions SHALL be visible together on the approved black URW Gothic layout.
 
 #### Scenario: Jankó and conventional guidance
 - **WHEN** a target is displayed
-- **THEN** anchor and active finger indicators identify their physical keys, Jankó rows run near-to-far with both levels, and conventional white-key rear narrowing is respected
-- **AND** changing Jankó colors changes no trial identity or evidence
+- **THEN** the player sees exactly which finger presses each physical key and level, with neighboring keys at a stable scale
+- **AND** changing naming or colors changes no target identity or saved evidence
 
 ### Requirement: Fixed setup and block acknowledgment
 The viewer SHALL keep “Keep your wrist in place. Keep your hand pointing the same way.” visible next to rating controls. Every new block and resumed session SHALL require acknowledgment of the displayed relaxed fixed setup before accepting ratings; the pending block SHALL display its first target.
@@ -34,11 +33,11 @@ The viewer SHALL keep “Keep your wrist in place. Keep your hand pointing the s
 - **THEN** previous judgments and current target remain available but new ratings are gated until the setup is acknowledged and saved
 
 ### Requirement: Five reported effort grades
-The viewer SHALL show the protocol's five ordinal grade meanings and short combined-pressing then held-anchor tapping task. Grades 0–3 SHALL attest both patterns; grade 4 SHALL permit an unavailable realization without performed patterns. Untested and uncertain SHALL remain unknown, and grade 4 SHALL not prune later tests.
+New collection SHALL prescribe “Press both keys together, then alternate.” with a genuine alternating trill and a distinct protocol identity. It SHALL ask “How much effort does that take?” and retain the five approved natural fit, easy adjustment, comfortable effort, barely possible and unavailable descriptions. Grades 0–3 SHALL attest both tasks; grade 4 SHALL not require them. Historical held-anchor records SHALL retain their original protocol.
 
 #### Scenario: Report a grade
-- **WHEN** the player enters a grade under an acknowledged setup
-- **THEN** the saved observation contains that trial's fixed-setup association and reported pattern evidence, without inferred pose, contact-depth coordinates or anatomical costs
+- **WHEN** a player rates an acknowledged new trial
+- **THEN** saved evidence identifies combined pressing and alternating trill, with no inferred pose, anatomy or old held-anchor attestation
 
 ### Requirement: Concurrent rating inputs and edge protection
 Digit0–4 and Numpad0–4 SHALL accept ratings during collection whether MIDI is connected or not. MIDI SHALL accept any complete eligible C–G♯ block outside the whole current tested span, mapping C/D/E/F♯/G♯ to grades 0/1/2/3/4. Held controls, repeats and simultaneous chords SHALL not grade later targets.
@@ -74,9 +73,9 @@ The viewer SHALL show measured and remaining required judgments and block progre
 - **THEN** original evidence remains, the last unretracted judgment is effective, and completion counts unique rated targets only
 
 ### Requirement: Separate resumable evidence and complete export
-The viewer SHALL persist exploratory sessions separately from legacy span calibration, fingering calculations and personal score data. It SHALL retain sessions across instrument changes and resume through fresh setup gating. Export SHALL contain the complete versioned session, plan, provenance and histories. Invalid or unsupported stored bytes SHALL remain recoverable without silent replacement.
+The viewer SHALL persist the new alternating effort collection separately from historical pilot sessions, legacy span calibration, fingertip readings and personal score data. It SHALL offer Continue, Change a rating and Export without history or dimension menus. Reopening and hand changes SHALL require fresh setup acknowledgment. Invalid bytes SHALL remain recoverable and protected from replacement.
 
 #### Scenario: Resume or invalid data
-- **WHEN** the player reopens a saved session or storage contains unsupported data
-- **THEN** valid evidence resumes with setup pending, while invalid bytes are retained for export and protected from overwrite
+- **WHEN** the player reopens calibration
+- **THEN** the instrument collection resumes with setup pending and complete evidence remains exportable, including retained historical records under their original protocol
 - **AND** existing legacy calibration and calculated or personal fingerings remain unchanged

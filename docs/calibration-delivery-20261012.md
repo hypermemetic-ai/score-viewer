@@ -1,0 +1,18 @@
+# Calibration native delivery
+
+The reviewed calibration interface was merged in [Viewer PR87](https://github.com/hypermemetic-ai/score-viewer/pull/87), source revision `489189ba1cdf3d530e46e2824a06b9b550a04a74`. Its approved selector, typography, corrected key model, separate Percent/Millimeters methods and requested text deletion are in both native packages. Source validation is recorded in [calibration validation](calibration-validation-20261012.md).
+
+The independently reviewed [temporary carrier PR366](https://github.com/hypermemetic-ai/iso-notation/pull/366) binds carrier `0aa8d1684ee6cc94a3efeb1251b30cd163abc249`, Viewer tree `76bf4220caaf03c7aad30120796d564e16613f08`, notation pin `b3fb5faa4297f92500f53513cdfee8496ab14d93` and the 20-file frozen frontend. Workflow 38207207351 passed Windows, universal Mac and pair assembly. Independent recipient validation proved all 21 embedded assets in Windows x64 and both Mac slices, with source/native/check/notice inventories and original native gates intact. The carrier branch is retained for delivery and is closed without merging over ISO's legacy application tree.
+
+| Packet | Bytes | SHA256 |
+| --- | ---: | --- |
+| Windows.zip | 8,880,844 | `f0917f7b8279ab969ed12e43aebd1298c469a4e1524f016ba3350448a5a8bc9a` |
+| Mac.zip | 30,414,439 | `3d912f2f7d6afc11c36ddde378862b77d1eed5c57db23308b822b17be9833ec4` |
+
+Both HTTP downloads matched the verified pair. The release command's first local verification lacked its `fflate` dependency; exact locked dependencies were installed in the task carrier, and the completed native artifact was reused and verified without another build. Native workflow elapsed time was 811 seconds; Windows 733 seconds, Mac 309 seconds and pair assembly 29 seconds. Runtime worker cache context remains in the recipient receipts.
+
+Windows activation freshly verified `DESKTOP-7LVJ0U3`, Lenovo 20WM005DUS, unlocked qqp/session1. The existing viewer was normally closed. The reviewed streaming preserver copied and verified all 833 current managed files, 485 original package files and the usual shortcut into a new additive backup. The new package was installed at `C:\Users\qqp\ISO Score Viewer\0.1.0-viewer489189ba-carrier0aa8d168-verified`. Installer and shortcut activation independently rechecked every managed file before launch. Native identity remains `dev.qqp.iso-score-viewer`, ISO Score Viewer, version 0.1.0; original package, data backup and original shortcut remain available.
+
+The actual new Windows executable was launched and placed on the original secondary display at `[-3840,0,0,2160]`. The retained library showed No14 and 34% progress; Hands Options and calibration Options were observed in the installed viewer. No readings, grades, naming/color changes, musical edits or physical music inputs were intentionally performed. The operator requested cessation during inspection; all desktop interaction stopped and the app was left open. A final closed inventory audit and native measurement/save exercises were not performed. Preservation claims bind the completed prelaunch installation/activation checks, rather than an unobserved postinspection audit. The operator may continue using the app and creating their own calibration records.
+
+Package/native checks do not establish physical MIDI/audio/pedal, human musical acceptance or a user-installed Mac GUI. Measurements remain raw evidence and do not fit personalized costs. Existing personal-editing latency acceptance was carried forward with unchanged editing paths; no new calibration timing acceptance or achieved 100 ms editing target is claimed. Private review, installation, preservation, served-download and screenshot receipts remain outside Git and recipient packets.
