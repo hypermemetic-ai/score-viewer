@@ -56,25 +56,29 @@ test('left-hand contacts keep their real lower-pitch direction and physical keyb
 
 test('camera focus owns only view controls, retains the camera across scene updates, and cleans up listeners',async()=>{
  const geometry=await createStretchGeometry([59,71]),first:StretchKeyboardScene={geometry,contacts:[sameRowContact(geometry,1,61,1),sameRowContact(geometry,2,65,1)]};
- const previousDocument=globalThis.document;
+ const previousDocument=globalThis.document,previousObserver=globalThis.ResizeObserver;
+ let observerCallback:()=>void=()=>{},observed:unknown=null,disconnected=0;
  class Element extends EventTarget {
-  tagName:string;children:Element[]=[];parent:Element|null=null;attributes:Record<string,string>={};innerHTML='';textContent='';className='';listeners=0;classList={add:()=>{}};
+  tagName:string;children:Element[]=[];parent:Element|null=null;attributes:Record<string,string>={};innerHTML='';textContent='';className='';listeners=0;classList={add:()=>{}};width=696;height=250;
   constructor(tagName:string){super();this.tagName=tagName;}
   append(...elements:Element[]){for(const element of elements){this.children.push(element);element.parent=this;}}
   setAttribute(name:string,value:string){this.attributes[name]=value;}getAttribute(name:string){return this.attributes[name]??null;}removeAttribute(name:string){delete this.attributes[name];}
   focus(){(globalThis.document as any).activeElement=this;}setPointerCapture(){}hasPointerCapture(){return false;}releasePointerCapture(){}
+  getBoundingClientRect(){return {width:this.width,height:this.height};}
   remove(){if(this.parent)this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null;}
   override addEventListener(type:string,listener:any,options?:any){this.listeners++;super.addEventListener(type,listener,options);}
   override removeEventListener(type:string,listener:any,options?:any){this.listeners--;super.removeEventListener(type,listener,options);}
  }
  try{
-  Object.assign(globalThis,{document:{activeElement:null,createElement:(tag:string)=>new Element(tag),createElementNS:(_:string,tag:string)=>new Element(tag)}});
+  Object.assign(globalThis,{document:{activeElement:null,createElement:(tag:string)=>new Element(tag),createElementNS:(_:string,tag:string)=>new Element(tag)},ResizeObserver:class{constructor(callback:()=>void){observerCallback=callback;}observe(target:unknown){observed=target;}disconnect(){disconnected++;}}});
   const container=new Element('div'),view=mountStretchKeyboard(container as unknown as HTMLElement,first),root=container.children[0],svg=root.children[0],hints=root.children[1];
   const key=(value:string)=>{const event=new Event('keydown',{cancelable:true});Object.assign(event,{key:value,altKey:false,ctrlKey:false,metaKey:false,shiftKey:false});svg.dispatchEvent(event);return event;};
   assert.equal(svg.getAttribute('data-camera-elevation'),'36');assert.equal(svg.getAttribute('data-camera-azimuth'),'5');
+  assert.equal(svg.getAttribute('viewBox'),'0 0 696 250');assert.equal(observed,svg);
   assert.equal(view.ready,true);assert.equal(view.error,null);
   assert.equal(key('ArrowRight').defaultPrevented,true);assert.equal(key('ArrowUp').defaultPrevented,true);assert.equal(key('+').defaultPrevented,true);
   const camera=['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name));assert.deepEqual(camera.slice(0,2),['41','10']);
+  svg.width=430;svg.height=220;observerCallback();assert.equal(svg.getAttribute('viewBox'),'0 0 430 220');assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera);
   assert.equal(key('2').defaultPrevented,false);assert.equal(key('Enter').defaultPrevented,false,'rating and task navigation retain their keys');
   view.update({geometry,contacts:[sameRowContact(geometry,1,69,1),sameRowContact(geometry,2,61,1)]});
   assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera);assert.ok(svg.getAttribute('aria-label')!.includes('Thumb on 9'));
@@ -83,9 +87,27 @@ test('camera focus owns only view controls, retains the camera across scene upda
   view.update({geometry:unavailable,contacts:first.contacts});assert.equal(view.ready,false);assert.match(view.error!,/not mapped/);assert.equal(svg.innerHTML,'');assert.ok(root.getAttribute('data-model-error'));
   view.update(first);assert.equal(view.ready,true);assert.equal(view.error,null);
   assert.equal(key('Home').defaultPrevented,true);assert.equal(svg.getAttribute('data-camera-elevation'),'36');assert.equal(svg.getAttribute('data-camera-zoom'),'1');
-  view.dispose();view.dispose();assert.equal(view.ready,false);assert.equal(container.children.length,0);assert.equal(svg.listeners,0);assert.equal(hints.listeners,0);
+  view.dispose();view.dispose();assert.equal(view.ready,false);assert.equal(container.children.length,0);assert.equal(svg.listeners,0);assert.equal(hints.listeners,0);assert.equal(disconnected,1);
+  const retiredMarkup=svg.innerHTML;svg.width=500;observerCallback();assert.equal(svg.innerHTML,retiredMarkup,'an already queued resize cannot redraw the disposed model');
   view.update(first);assert.equal(container.children.length,0);
- }finally{globalThis.document=previousDocument;}
+ }finally{Object.assign(globalThis,{document:previousDocument,ResizeObserver:previousObserver});}
+});
+
+test('compact viewports keep finger labels and ruler numbers inside the canvas without shrinking text units',async()=>{
+ const geometry=await createStretchGeometry([55,79]),scene:StretchKeyboardScene={geometry,contacts:[surfaceContact(geometry,1,'key-61-row-1','resting-contact'),surfaceContact(geometry,2,'key-60-row-2','resting-contact')],windows:[{surfaceId:'key-61-row-1',axisStartMm:0,axisEndMm:59.8,label:'Thumb'},{surfaceId:'key-60-row-2',axisStartMm:34,axisEndMm:93.75,fraction:1,label:'Index'}]};
+ const original=structuredClone(scene);
+ for(const viewport of [{width:696,height:250},{width:430,height:220},{width:300,height:250}]){
+  const doc=new DOMParser().parseFromString(stretchKeyboardSvg(scene,STRETCH_KEYBOARD_DEFAULT_CAMERA,{},viewport),'image/svg+xml');
+  assert.equal(doc.documentElement!.getAttribute('viewBox'),`0 0 ${viewport.width} ${viewport.height}`);
+  const labels=Array.from(doc.getElementsByTagName('g')).filter(group=>group.hasAttribute('data-contact-surface'));
+  assert.equal(labels.length,2);
+  for(const label of labels){const rectangle=label.getElementsByTagName('rect')[0],x=Number(rectangle.getAttribute('x')),y=Number(rectangle.getAttribute('y'));assert.ok(x>=0&&x+Number(rectangle.getAttribute('width'))<=viewport.width);assert.ok(y>=0&&y+Number(rectangle.getAttribute('height'))<=viewport.height);}
+  const rulers=Array.from(doc.getElementsByTagName('g')).filter(group=>group.hasAttribute('data-measurement-labels'));
+  assert.equal(rulers.length,2);
+  for(const ruler of rulers){const ticks=Array.from(ruler.getElementsByTagName('text'));assert.deepEqual(ticks.map(tick=>tick.textContent).sort(),['0','100','50']);const ys=ticks.map(tick=>Number(tick.getAttribute('y'))).sort((a,b)=>a-b);assert.ok(ys[1]-ys[0]>=18&&ys[2]-ys[1]>=18);for(const tick of ticks)assert.ok(Number(tick.getAttribute('x'))>=30&&Number(tick.getAttribute('x'))<=viewport.width-30&&Number(tick.getAttribute('y'))>=30&&Number(tick.getAttribute('y'))<=viewport.height-12);}
+  assert.equal(Array.from(doc.getElementsByTagName('text')).filter(text=>text.getAttribute('class')==='stretch-ruler-label').length,0,'contact labels already identify both windows');
+ }
+ assert.deepEqual(scene,original);
 });
 
 test('painter occlusion matches an independent ray-depth check across front, side and underside views',async()=>{

@@ -9,11 +9,12 @@ export interface StretchKeyboardScene {
 }
 export interface StretchKeyboardCamera {elevation:number;azimuth:number;zoom:number}
 export interface StretchKeyboardOptions {colors?:'five-seven'|'classic'}
+export interface StretchKeyboardViewport {width:number;height:number}
 export const STRETCH_KEYBOARD_DEFAULT_CAMERA:Readonly<StretchKeyboardCamera>=Object.freeze({elevation:36,azimuth:5,zoom:1});
 export interface StretchKeyboardFace {
  actuatorId:string;surfaceId?:string;kind:'body'|'playable';points:StretchPoint[];color:string;
 }
-const ns='http://www.w3.org/2000/svg',width=960,height=540;
+const ns='http://www.w3.org/2000/svg',defaultViewport:StretchKeyboardViewport={width:960,height:540};
 const fingerNames=['','Thumb','Index','Middle','Ring','Pinky'];
 const fingerColors=['','#e8bb77','#76cce2','#b9d592','#d9a6d2','#aabdf1'];
 const escaped=(text:string)=>text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
@@ -183,48 +184,61 @@ export function stretchKeyboardPaintOrder(scene:StretchKeyboardScene,camera:Stre
   return [{...face,points:item.points}];
  });
 }
-function keyboardDrawing(scene:StretchKeyboardScene,camera:StretchKeyboardCamera,options:StretchKeyboardOptions):Drawing {
+function keyboardDrawing(scene:StretchKeyboardScene,camera:StretchKeyboardCamera,options:StretchKeyboardOptions,viewport:StretchKeyboardViewport=defaultViewport):Drawing {
+ const {width,height}=viewport;
+ if(!Number.isFinite(width)||!Number.isFinite(height)||width<80||height<80)throw Error('The keyboard model needs a visible viewport.');
  const faces=stretchKeyboardFaces(scene,options),allPoints=faces.flatMap(face=>face.points);
  if(!allPoints.length)throw Error('The admitted keyboard has no visible keys.');
  const minimum=[0,1,2].map(axis=>Math.min(...allPoints.map(point=>point[axis]))),maximum=[0,1,2].map(axis=>Math.max(...allPoints.map(point=>point[axis])));
  const center=minimum.map((value,i)=>(value+maximum[i])/2) as unknown as StretchPoint;
  const projected=allPoints.map(point=>projectStretchPoint(point,camera,center));
  const xmin=Math.min(...projected.map(p=>p[0])),xmax=Math.max(...projected.map(p=>p[0])),ymin=Math.min(...projected.map(p=>p[1])),ymax=Math.max(...projected.map(p=>p[1]));
- // Fit the complete active span with neighbours; preserve the user's relative zoom on target changes.
- const scale=Math.min((width-140)/Math.max(1,xmax-xmin),(height-140)/Math.max(1,ymax-ymin))*camera.zoom;
- const screen=(point:StretchPoint)=>{const p=projectStretchPoint(point,camera,center);return [width/2+(p[0]-(xmin+xmax)/2)*scale,height/2+(p[1]-(ymin+ymax)/2)*scale,p[2]];};
+ // ViewBox units are actual CSS pixels in the mounted view: text remains readable as its box resizes.
+ const labelColumns=Math.max(1,Math.floor((width-16)/160)),labelRows=Math.ceil(scene.contacts.length/labelColumns);
+ const labelHeader=labelRows?labelRows*32+6:6,paddingX=scene.windows?.length?42:18,paddingTop=labelHeader+8,paddingBottom=25;
+ const availableHeight=Math.max(24,height-paddingTop-paddingBottom);
+ const scale=Math.min(Math.max(24,width-2*paddingX)/Math.max(1,xmax-xmin),availableHeight/Math.max(1,ymax-ymin))*camera.zoom;
+ const modelCenterY=paddingTop+availableHeight/2;
+ const screen=(point:StretchPoint)=>{const p=projectStretchPoint(point,camera,center);return [width/2+(p[0]-(xmin+xmax)/2)*scale,modelCenterY+(p[1]-(ymin+ymax)/2)*scale,p[2]];};
  const basis=cameraBasis(camera),primitives:Primitive[]=faces.map(face=>({points:face.points,face})),labels:string[]=[];
+ const modelLeft=width/2-(xmax-xmin)*scale/2,modelRight=width/2+(xmax-xmin)*scale/2;
  const line=(a:StretchPoint,b:StretchPoint,attributes:string)=>{
   primitives.push({points:[a,b],attributes});
  };
- for(const window of scene.windows??[]){
-  const points=stretchMeasurementWindowPoints(scene,window),ticks=points.ticks.map(screen);
-  line(points.edgeStart,points.edgeEnd,'stroke="#efe8d9" stroke-width="1.5" data-measurement-bracket="true"');
-  ticks.forEach((tick,i)=>labels.push(`<text x="${(tick[0]+10).toFixed(2)}" y="${(tick[1]+4).toFixed(2)}" class="stretch-ruler-tick">${i*50}</text>`));
-  points.ticks.forEach(point=>line([point[0]-.9,point[1],point[2]],[point[0]+.9,point[1],point[2]],'stroke="#efe8d9" stroke-width="1.5"'));
-  if(window.label){const at=ticks[1];labels.push(`<text x="${(at[0]+36).toFixed(2)}" y="${(at[1]+4).toFixed(2)}" class="stretch-ruler-label">${escaped(window.label)}</text>`);}
+ const windows=(scene.windows??[]).map(window=>({window,points:stretchMeasurementWindowPoints(scene,window)})).sort((a,b)=>screen(a.points.edgeStart)[0]-screen(b.points.edgeStart)[0]);
+ for(let windowIndex=0;windowIndex<windows.length;windowIndex++){
+  const {window,points}=windows[windowIndex],ticks=points.ticks.map(screen);
+  const contact=scene.contacts.find(item=>item.location.surfaceId===window.surfaceId),color=contact?fingerColors[contact.finger]:'#efe8d9';
+  const side=windows.length===1||windowIndex%2===1?'right':'left';
+  const column=side==='left'?Math.max(36,modelLeft-12):Math.min(width-36,modelRight+12);
+  const tickOrder=ticks.map((point,i)=>({point,i,y:Math.max(labelHeader+18,Math.min(height-16,point[1]+4))})).sort((a,b)=>a.y-b.y);
+  for(let i=1;i<tickOrder.length;i++)tickOrder[i].y=Math.max(tickOrder[i].y,tickOrder[i-1].y+18);
+  const excess=Math.max(0,tickOrder.at(-1)!.y-(height-16));if(excess)for(const tick of tickOrder)tick.y-=excess;
+  line(points.edgeStart,points.edgeEnd,`stroke="${color}" stroke-width="1.5" data-measurement-bracket="true"`);
+  points.ticks.forEach(point=>line([point[0]-.9,point[1],point[2]],[point[0]+.9,point[1],point[2]],`stroke="${color}" stroke-width="1.5"`));
+  const tickLabels=tickOrder.map(({point,i,y})=>`<line x1="${point[0].toFixed(2)}" y1="${point[1].toFixed(2)}" x2="${(column+(side==='left'?4:-4)).toFixed(2)}" y2="${(y-4).toFixed(2)}" stroke="${color}" stroke-width=".8" opacity=".65"/><text x="${column.toFixed(2)}" y="${y.toFixed(2)}" class="stretch-ruler-tick" text-anchor="${side==='left'?'end':'start'}" style="fill:${color}">${i*50}</text>`).join('');
+  labels.push(`<g data-measurement-labels="${escaped(window.surfaceId)}" aria-label="${escaped(window.label??'Measurement window')}">${tickLabels}</g>`);
+  if(window.label&&!contact){const tick=tickOrder[1];labels.push(`<text x="${column.toFixed(2)}" y="${Math.min(height-16,tick.y+18).toFixed(2)}" class="stretch-ruler-label" text-anchor="${side==='left'?'end':'start'}">${escaped(window.label)}</text>`);}
   if(points.marker){
    line([points.marker[0]-4.5,points.marker[1],points.marker[2]],[points.marker[0]+4.5,points.marker[1],points.marker[2]],'stroke="#f7f0dd" stroke-width="2.2" stroke-dasharray="3 2" data-window-fraction="'+escaped(String(window.fraction))+'"');
   }
  }
- const labelPositions:{x:number;y:number}[]=[];
- const fitLabel=(point:number[])=>{
-  let x=Math.max(100,Math.min(width-100,point[0])),y=Math.max(26,Math.min(height-32,point[1]));
-  // Readable screen labels remain attached by a leader; they are not measured strike points.
-  while(labelPositions.some(existing=>Math.abs(existing.x-x)<155&&Math.abs(existing.y-y)<36))y-=36;
-  if(y<24)y=24+labelPositions.length*36;
-  labelPositions.push({x,y});return {x,y};
- };
- for(const contact of scene.contacts){
-  const surface=stretchSurface(scene.geometry,contact.location.surfaceId),point=surfaceLocalPoint(surface,.5,.35),projectedPoint=screen(posedPoint(scene,surface.actuatorId,point));
-  const position=fitLabel([projectedPoint[0],projectedPoint[1]-48]);
+ const contactLabels=scene.contacts.map(contact=>{const surface=stretchSurface(scene.geometry,contact.location.surfaceId),point=surfaceLocalPoint(surface,.5,.35);return {contact,surface,projectedPoint:screen(posedPoint(scene,surface.actuatorId,point))};}).sort((a,b)=>a.projectedPoint[0]-b.projectedPoint[0]);
+ for(let i=0;i<contactLabels.length;i++){
+  const {contact,surface,projectedPoint}=contactLabels[i],row=Math.floor(i/labelColumns),inRow=Math.min(labelColumns,contactLabels.length-row*labelColumns);
+  // Separate screen annotations from physical points; a label is never a measured strike point.
+  const position={x:width*(i%labelColumns+.5)/inRow,y:22+row*32};
   const text=`${fingerNames[contact.finger]} · ${'0123456789AB'[contact.midiPitch%12]} · row ${contact.row}`;
   labels.push(`<g class="stretch-contact-label" data-contact-surface="${escaped(surface.id)}"><line x1="${projectedPoint[0].toFixed(2)}" y1="${projectedPoint[1].toFixed(2)}" x2="${position.x.toFixed(2)}" y2="${(position.y+7).toFixed(2)}" stroke="${fingerColors[contact.finger]}" stroke-width="1"/><rect x="${(position.x-79).toFixed(2)}" y="${(position.y-19).toFixed(2)}" width="158" height="28" rx="4" fill="#15181ce8"/><text x="${position.x.toFixed(2)}" y="${position.y.toFixed(2)}" text-anchor="middle" fill="${fingerColors[contact.finger]}">${escaped(text)}</text></g>`);
  }
  // Pitch identities stay attached to actual x positions; LH changes contacts, never the keyboard.
+ const pitchPositions:{x:number;y:number}[]=[];
  if(camera.elevation>0&&basis.towardViewer[1]<0)for(const actuator of visibleActuators(scene)){
   const front=stretchActuatorBody(scene.geometry,actuator.id).top[0],point=screen(posedPoint(scene,actuator.id,front));
-  labels.push(`<text x="${point[0].toFixed(2)}" y="${(point[1]+20).toFixed(2)}" class="stretch-pitch-label" text-anchor="middle" data-pitch-label="${actuator.midiPitch}">${'0123456789AB'[actuator.midiPitch%12]}</text>`);
+  const position={x:point[0],y:Math.min(height-6,point[1]+19)};
+  if(position.x<8||position.x>width-8||pitchPositions.some(other=>Math.abs(other.x-position.x)<13&&Math.abs(other.y-position.y)<16))continue;
+  pitchPositions.push(position);
+  labels.push(`<text x="${position.x.toFixed(2)}" y="${position.y.toFixed(2)}" class="stretch-pitch-label" text-anchor="middle" data-pitch-label="${actuator.midiPitch}">${'0123456789AB'[actuator.midiPitch%12]}</text>`);
  }
  const nodes:string[]=[];
  let group:{face:StretchKeyboardFace;paths:string[]}|null=null;
@@ -246,23 +260,26 @@ function keyboardDrawing(scene:StretchKeyboardScene,camera:StretchKeyboardCamera
 }
 
 /** Pure SVG representation for bounded visual inspection and physical scene checks. */
-export function stretchKeyboardSvg(scene:StretchKeyboardScene,camera:StretchKeyboardCamera=STRETCH_KEYBOARD_DEFAULT_CAMERA,options:StretchKeyboardOptions={}):string {
- const drawing=keyboardDrawing(scene,camera,options);
+export function stretchKeyboardSvg(scene:StretchKeyboardScene,camera:StretchKeyboardCamera=STRETCH_KEYBOARD_DEFAULT_CAMERA,options:StretchKeyboardOptions={},viewport:StretchKeyboardViewport=defaultViewport):string {
+ const drawing=keyboardDrawing(scene,camera,options,viewport),{width,height}=viewport;
  return `<svg xmlns="${ns}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escaped(drawing.label)}">${drawing.inner}</svg>`;
 }
 
 export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchKeyboardScene,options:StretchKeyboardOptions={}):{readonly ready:boolean;readonly error:string|null;update(scene:StretchKeyboardScene,options?:StretchKeyboardOptions):void;dispose():void} {
- let scene=initialScene,settings={...options},camera={...STRETCH_KEYBOARD_DEFAULT_CAMERA},disposed=false,ready=false,error:string|null=null,drag:{id:number;x:number;y:number}|null=null;
+ let scene=initialScene,settings={...options},camera={...STRETCH_KEYBOARD_DEFAULT_CAMERA},viewport={...defaultViewport},disposed=false,ready=false,error:string|null=null,drag:{id:number;x:number;y:number}|null=null;
  const root=document.createElement('div');root.className='stretch-keyboard-model';
- const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('tabindex','0');svg.setAttribute('role','img');svg.classList.add('stretch-keyboard-canvas');
+ const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${viewport.width} ${viewport.height}`);svg.setAttribute('tabindex','0');svg.setAttribute('role','img');svg.classList.add('stretch-keyboard-canvas');
  const hints=document.createElement('div');hints.className='stretch-camera-controls';
  hints.innerHTML='<span>Drag to rotate · Scroll to zoom</span><div><button type="button" data-camera="keyboard">Rotate with keys</button><button type="button" data-camera="zoom-out" aria-label="Zoom keyboard out">−</button><button type="button" data-camera="zoom-in" aria-label="Zoom keyboard in">+</button><button type="button" data-camera="reset">Reset view</button></div>';
  const keyboardHint=document.createElement('p');keyboardHint.className='stretch-camera-keyboard-hint';keyboardHint.textContent='When the model is focused: arrows rotate, +/− zoom, Home resets.';
  root.append(svg,hints,keyboardHint);container.append(root);
  const render=()=>{
   if(disposed)return;
+  const rectangle=svg.getBoundingClientRect?.();
+  if(rectangle&&rectangle.width>=80&&rectangle.height>=80)viewport={width:Math.round(rectangle.width),height:Math.round(rectangle.height)};
+  svg.setAttribute('viewBox',`0 0 ${viewport.width} ${viewport.height}`);
   ready=false;error=null;
-  try{const drawing=keyboardDrawing(scene,camera,settings);svg.innerHTML=drawing.inner;svg.setAttribute('aria-label',`${drawing.label}. Arrow keys rotate; plus and minus zoom; Home resets the view.`);root.removeAttribute('data-model-error');ready=true;}
+  try{const drawing=keyboardDrawing(scene,camera,settings,viewport);svg.innerHTML=drawing.inner;svg.setAttribute('aria-label',`${drawing.label}. Arrow keys rotate; plus and minus zoom; Home resets the view.`);root.removeAttribute('data-model-error');ready=true;}
   catch(cause){svg.innerHTML='';error=cause instanceof Error?cause.message:'Keyboard geometry unavailable.';svg.setAttribute('aria-label',error);root.setAttribute('data-model-error',error);}
   svg.setAttribute('data-camera-elevation',String(camera.elevation));svg.setAttribute('data-camera-azimuth',String(camera.azimuth));svg.setAttribute('data-camera-zoom',String(camera.zoom));
  };
@@ -283,6 +300,12 @@ export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchK
  };
  const click=(event:MouseEvent)=>{const target=(event.target as Element).closest<HTMLElement>('[data-camera]');if(!target)return;if(target.dataset.camera==='keyboard')svg.focus({preventScroll:true});else if(target.dataset.camera==='zoom-in')zoom(1.15);else if(target.dataset.camera==='zoom-out')zoom(1/1.15);else reset();};
  svg.addEventListener('pointerdown',down);svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);svg.addEventListener('lostpointercapture',lost);svg.addEventListener('wheel',wheel,{passive:false});svg.addEventListener('keydown',key);hints.addEventListener('click',click);
+ const resizeObserver=typeof ResizeObserver==='undefined'?null:new ResizeObserver(()=>{
+  if(disposed)return;
+  const rectangle=svg.getBoundingClientRect();
+  if(rectangle.width>=80&&rectangle.height>=80&&(Math.round(rectangle.width)!==viewport.width||Math.round(rectangle.height)!==viewport.height))render();
+ });
+ resizeObserver?.observe(svg);
  render();
- return {get ready(){return ready&&!disposed;},get error(){return error;},update(next,nextOptions){if(disposed)return;scene=next;if(nextOptions)settings={...settings,...nextOptions};render();},dispose(){if(disposed)return;disposed=true;ready=false;if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.removeEventListener('pointerdown',down);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);svg.removeEventListener('lostpointercapture',lost);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',key);hints.removeEventListener('click',click);root.remove();}};
+ return {get ready(){return ready&&!disposed;},get error(){return error;},update(next,nextOptions){if(disposed)return;scene=next;if(nextOptions)settings={...settings,...nextOptions};render();},dispose(){if(disposed)return;disposed=true;ready=false;resizeObserver?.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.removeEventListener('pointerdown',down);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);svg.removeEventListener('lostpointercapture',lost);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',key);hints.removeEventListener('click',click);root.remove();}};
 }
