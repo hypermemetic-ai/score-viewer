@@ -10,6 +10,8 @@ The left-aligned Calibrate command opens calibration from Options → Fingerings
 
 The global setting uses the additive `notationSystem` preference. Existing `calibrationNoteNames` bytes remain retained with other preferences; they do not enable an unavailable global notation system. No saved reading, effort grade, score or fingering is converted by this interface change. Native delivery of an earlier revision is separate from this source preview.
 
+Calibration Options uses the same system font, normal-weight title and inset panel treatment as rating review. Its existing notation, key-color, span and input controls retain their behavior and return route.
+
 ## Calibration menu
 
 Back occupies the bottom left and Options the bottom right of the active screen or dialog throughout the application. Existing task controls remain between them. Library has only Options; Options pages have only Back. Reader navigation remains in its hideable toolbar, without reducing the score viewport. Calibration uses a persistent footer; fingertip content scrolls independently of its footer. A focused navigation button owns Enter, keypad Enter and Space, so activating Back or Options cannot also begin a trial, save a reading or mark practice Done.
