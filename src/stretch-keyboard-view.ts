@@ -271,7 +271,7 @@ export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchK
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${viewport.width} ${viewport.height}`);svg.setAttribute('tabindex','0');svg.setAttribute('role','img');svg.classList.add('stretch-keyboard-canvas');
  const hints=document.createElement('div');hints.className='stretch-camera-controls';
  hints.innerHTML='<span>Drag to rotate · Scroll to zoom</span><div><button type="button" data-camera="keyboard" aria-pressed="false">Keyboard rotation: Off</button><button type="button" data-camera="zoom-out" aria-label="Zoom keyboard out">−</button><button type="button" data-camera="zoom-in" aria-label="Zoom keyboard in">+</button><button type="button" data-camera="reset">Reset</button></div>';
- const keyboardHint=document.createElement('p');keyboardHint.className='stretch-camera-keyboard-hint';keyboardHint.textContent='Arrows rotate · +/− zoom · Home resets · Esc returns to the screen';keyboardHint.hidden=true;
+ const keyboardHint=document.createElement('p');keyboardHint.className='stretch-camera-keyboard-hint';keyboardHint.innerHTML='<kbd>← ↑ ↓ →</kbd> rotate · <kbd>+ / −</kbd> zoom · <kbd>Home</kbd> resets · <kbd>Esc</kbd> returns to the screen';keyboardHint.hidden=true;
  root.append(svg,hints,keyboardHint);container.append(root);
  const render=()=>{
   if(disposed)return;

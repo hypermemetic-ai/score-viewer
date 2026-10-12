@@ -16,3 +16,5 @@
 @media(max-width:600px){.stretch-camera-controls{font-size:12px;padding:0 4px}.stretch-camera-controls button{padding:4px 7px}}
 
 @media(max-width:700px){.stretch-camera-controls{padding:0 4px;justify-content:center}.stretch-camera-controls>span{display:none}.stretch-camera-controls>div{justify-content:center}.stretch-camera-keyboard-hint{font-size:12px;margin:5px 0 0;line-height:1.4}}
+
+.stretch-camera-keyboard-hint kbd{font:inherit;font-size:inherit;margin:0;text-decoration:none!important}

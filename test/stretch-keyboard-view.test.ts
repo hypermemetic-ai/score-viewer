@@ -80,6 +80,7 @@ test('camera focus owns only view controls, retains the camera across scene upda
   assert.equal(svg.getAttribute('data-camera-elevation'),'36');assert.equal(svg.getAttribute('data-camera-azimuth'),'5');
   assert.equal(svg.getAttribute('viewBox'),'0 0 696 250');assert.equal(observed,svg);
   assert.equal(view.ready,true);assert.equal(view.error,null);
+  const hint=root.children[2];assert.ok(hint.innerHTML.includes('<kbd>← ↑ ↓ →</kbd>'));assert.ok(hint.innerHTML.includes('<kbd>+ / −</kbd>'));assert.ok(hint.innerHTML.includes('<kbd>Home</kbd>'));assert.ok(hint.innerHTML.includes('<kbd>Esc</kbd>'));
   const toggle=hints.querySelector('[data-camera=keyboard]')!;hints.clickTarget=toggle;const toggleRotation=()=>hints.dispatchEvent(new Event('click'));
   assert.equal(view.keyboardRotation,false);assert.equal(toggle.getAttribute('aria-pressed'),'false');assert.equal(key('ArrowRight').defaultPrevented,false,'off-state leaves pair navigation available');
   toggleRotation();assert.equal(view.keyboardRotation,true);assert.equal(toggle.getAttribute('aria-pressed'),'true');assert.equal(toggle.textContent,'Keyboard rotation: On');assert.equal((globalThis.document as any).activeElement,svg);
