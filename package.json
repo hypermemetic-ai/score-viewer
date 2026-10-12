@@ -12,7 +12,7 @@
     "pretest": "node scripts/check-source-pin.mjs && node scripts/check-calculator-pin.mjs"
   },
   "dependencies": {
-    "@hypermemetic-ai/fingering-calculator": "file:vendor/fingering-calculator/fingering-calculator-e325912d00efaef887738f4fb0f94a2495d58577.tgz",
+    "@hypermemetic-ai/fingering-calculator": "file:vendor/fingering-calculator/fingering-calculator-06cb1575327f592e0ee8469a4f083355c199bdf6.tgz",
     "@tauri-apps/api": "^2.10.1",
     "@xmldom/xmldom": "^0.9.8",
     "fflate": "^0.8.2",
