@@ -7,9 +7,20 @@
 .calibration-dialog kbd,.calibration-dialog button kbd{display:inline-block;text-decoration:none!important;font-family:inherit;font-size:15px;margin-left:14px;color:inherit}
 .calibration-shell-header{display:flex;align-items:center;justify-content:space-between;gap:30px;font-size:22px;min-height:44px}
 .calibration-shell-body{padding-top:45px}.calibration-shell-body[data-page=trial],.calibration-shell-body[data-page=setup]{padding-top:18px}
-.calibration-home-progress{font-size:60px!important;font-weight:700!important;margin:45px 0 22px!important}
-.calibration-menu{display:flex;align-items:flex-start;flex-direction:column;gap:20px;margin-top:35px}.calibration-menu [data-command=continue]{font-size:27px;font-weight:700}
-.calibration-home-options{margin-top:75px}.calibration-task{text-align:center;font-size:25px;line-height:1.4}
+.calibration-dialog.calibration-home{--viewer-dialog-max:760px;width:760px;height:auto;padding:28px 36px}
+.calibration-home .calibration-shell-body{padding-top:24px}
+.calibration-home-progress{display:flex;align-items:baseline;justify-content:space-between;gap:20px;font-size:20px!important;color:#aaa;padding-bottom:16px;border-bottom:1px solid #333}
+.calibration-home-progress span:last-child{font-size:27px;color:#fff;font-variant-numeric:tabular-nums}
+.calibration-menu{display:grid;gap:4px;margin-top:16px}
+.calibration-menu button{display:flex;align-items:center;text-align:left;width:100%;padding:12px 16px;min-height:50px;gap:16px;border:1px solid transparent;background:transparent;color:inherit;text-decoration:none}
+.calibration-menu button:focus,.calibration-menu button:hover:not(:disabled){background:#202020;border-color:#555;outline:none}
+.calibration-menu button:disabled{color:#666}
+.calibration-menu button kbd{margin-left:auto}
+.calibration-menu [data-command=continue]{font-size:22px;font-weight:700}
+.calibration-menu-count{font-size:17px;color:#aaa;font-variant-numeric:tabular-nums}
+.calibration-home-hint{display:flex;gap:28px;color:#aaa;font-size:15px!important;margin-top:22px!important}
+.calibration-home-hint kbd{margin-left:0!important}
+.calibration-task{text-align:center;font-size:25px;line-height:1.4}
 .calibration-contact-diagram{display:block;width:100%;height:390px;margin:18px 0 0;overflow:visible;font-family:inherit}
 .calibration-fixed-cue{text-align:center;font-size:18px;line-height:1.5;margin:5px 0 26px!important}
 .calibration-ratings{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:32px;margin-top:24px}
@@ -41,6 +52,7 @@
 .calibration-setup-guidance{font-size:18px;line-height:1.5;max-width:950px;margin:15px auto!important;text-align:center}
 @media(max-width:1000px){.calibration-dialog{padding:25px 32px}.calibration-ratings{gap:18px}.calibration-grade-label{gap:10px;white-space:normal}.calibration-contact-diagram{height:330px}.calibration-grade-description{margin-top:25px}}
 @media(max-width:700px){.calibration-dialog{padding:20px;max-height:96vh}.calibration-contact-diagram{height:240px}.calibration-ratings{grid-template-columns:1fr;gap:18px}.calibration-ratings button{display:grid;grid-template-columns:190px 1fr;gap:12px}.calibration-grade-description{margin:0}.calibration-options-field{grid-template-columns:1fr;gap:12px}.calibration-fixed-cue{margin-bottom:18px!important}.calibration-page-footer{margin-top:25px}}
+@media(max-width:700px){.calibration-dialog.calibration-home{padding:20px}.calibration-home .calibration-shell-header{flex-wrap:nowrap}.calibration-menu button{padding:10px 12px;gap:10px}}
 @media(max-height:850px) and (min-width:701px){.calibration-contact-diagram{height:280px}}
 @media(max-height:720px) and (min-width:701px){.calibration-contact-diagram{height:210px}.calibration-grade-description{margin-top:28px}}
 .calibration-trial-heading,.calibration-trial-navigation{display:flex;align-items:center;gap:24px}.calibration-trial-heading{font-size:22px}.calibration-trial-heading button,.calibration-trial-navigation button{font-size:17px}.calibration-trial-navigation{font-size:17px;gap:16px;color:#bbb}.calibration-trial-navigation kbd{margin-left:8px!important}

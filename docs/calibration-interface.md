@@ -9,3 +9,7 @@ URW Gothic Book supplies the accepted regular text alongside the existing Demi f
 The left-aligned Calibrate command opens calibration from Options → Fingerings and returns to that section on Back. The former Hands section is replaced by the global Notation section. ISO is currently the available notation system; Traditional is visibly unavailable until regular sheet music is supported. Calibration Options reflects the same global restriction, while physical key colors remain independent.
 
 The global setting uses the additive `notationSystem` preference. Existing `calibrationNoteNames` bytes remain retained with other preferences; they do not enable an unavailable global notation system. No saved reading, effort grade, score or fingering is converted by this interface change. Native delivery of an earlier revision is separate from this source preview.
+
+## Calibration menu
+
+The main menu uses a compact panel with aligned command rows and a labeled effort count. Continue has initial focus. Arrow keys select enabled commands, Enter opens the selected command, and F, R, E and O directly open fingertip readings, rating review, export and Options. Disabled commands remain unavailable by shortcut. Menu navigation uses the shared Options navigator only on the main page; measurement selectors and rating input retain their existing keyboard behavior. Focus returns to the chosen menu command when leaving a subpage, including after starting or resuming effort work.
