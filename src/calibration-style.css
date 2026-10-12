@@ -27,6 +27,12 @@
 .calibration-options .calibration-options-description{font-size:16px;margin:8px 0 24px!important}
 .calibration-options h3{font-size:20px}
 .calibration-options button,.calibration-options select{font-size:18px}
+.calibration-options .options-picker{border:1px solid #666;padding:8px 12px;min-height:44px}
+.calibration-options .calibration-options-field,.calibration-options .option-setting,.calibration-options .option-fields{position:relative}
+.calibration-options .option-setting{grid-template-columns:200px minmax(0,1fr);gap:24px}
+.calibration-options .options-popover{top:100%;left:0;right:0;min-width:0;max-width:none}
+.calibration-options .calibration-options-field>.options-popover{left:224px}
+.calibration-options .calibration-home-hint{flex-wrap:wrap;gap:12px}
 .calibration-dialog.calibration-placement,.calibration-dialog.calibration-rating{font-family:system-ui,sans-serif}
 .calibration-placement .calibration-contact-diagram,.calibration-rating .calibration-contact-diagram{margin-top:0}
 .calibration-placement-instructions,.calibration-trial-instructions{display:grid;gap:12px;width:100%;max-width:900px;margin:18px auto 0;padding:0;list-style:none;text-align:left;font-size:18px;font-weight:400;line-height:1.5}
@@ -89,4 +95,4 @@
 @media(max-width:700px){.calibration-trial-prompt{gap:20px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.calibration-trial-prompt .calibration-contact-diagram{height:210px}}
 @media(max-width:700px){.calibration-review .calibration-review-browser{grid-template-columns:minmax(0,160px) minmax(0,1fr);gap:12px}.calibration-review-browser .practice-chunks button{font-size:16px}}
 @media(max-width:440px){.calibration-review .calibration-review-browser{grid-template-columns:minmax(0,115px) minmax(0,1fr)}.calibration-review-browser .calibration-review-entries button{grid-template-columns:minmax(0,1fr)}.calibration-review-result{text-align:left}}
-@media(max-width:700px){.calibration-options .calibration-options-field{grid-template-columns:minmax(0,1fr);gap:8px}}
+@media(max-width:700px){.calibration-options .calibration-options-field,.calibration-options .option-setting{grid-template-columns:minmax(0,1fr);gap:8px}.calibration-options .calibration-options-field>.options-popover{left:0}}

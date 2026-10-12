@@ -26,6 +26,8 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  let measuring:ReturnType<typeof mountFingertipCalibration>|undefined;
  let homeNavigation:OptionsNavigation|undefined,homeCommand='continue',homeBusy=false;
  let reviewNavigation:OptionsNavigation|undefined,reviewRows:CalibrationReviewRow[]=[];
+ let settingsNavigation:OptionsNavigation|undefined,settingsFocus='calibration-notation-system';
+ const settingsKey=(target:HTMLElement|null)=>target?.dataset.optionsKey??target?.dataset.command??(target?.hasAttribute('data-midi-connect')?'calibration-midi-connect':undefined);
  const reviewBrowser=new CalibrationReviewBrowser();
  let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
  const pageInput=new CalibrationPageInput();
@@ -62,6 +64,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    if(dialog.contains(focused)&&focused?.dataset.reviewGroup)reviewBrowser.selectGroup(focused.dataset.reviewGroup,reviewRows);
    reviewNavigation.dispose();reviewNavigation=undefined;
   }
+  if(settingsNavigation){const focused=document.activeElement as HTMLElement|null;if(dialog.contains(focused))settingsFocus=settingsKey(focused)??settingsFocus;settingsNavigation.dispose();settingsNavigation=undefined;}
   const state=effort.state,saved=collection(),progress=saved?effortProgress(saved):null,total=options.instrument==='janko-four-row'?208:52;
   if(page==='trial'&&state.current.needsSetup)page='setup';
   if((page==='trial'||page==='setup')&&!state.current.trial)page='main';
@@ -80,7 +83,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    body.innerHTML=`<p class="calibration-home-progress"><span>Effort ratings</span><span>${progress?.measured??0} / ${total}</span></p><nav class="calibration-menu" aria-label="Calibration">${command('continue',progress?.status==='complete'?'Review ratings':'Continue',undefined,busy||state.readOnly)}${command('review','Change a rating','R',!progress?.measured||busy)}${command('measurements',`Fingertip readings <span class="calibration-menu-count">${readings} / 4</span>`,'F',busy)}${command('export','Export','E')}</nav>`;
   }else if(page==='options'){
    header.innerHTML='<h2>Options</h2>';
-   body.innerHTML=`<label class="calibration-options-field">Notation system<select data-calibration-names><option value="iso"${options.noteNames()==='iso'?' selected':''}>ISO</option><option value="traditional" disabled>Traditional · not available yet</option></select></label><p class="calibration-options-description">This is the global notation choice.</p>${options.instrument==='janko-four-row'?`<label class="calibration-options-field">Key colors<select data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard. Note names stay as selected above.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
+   body.innerHTML=`<label class="calibration-options-field" data-options-row>Notation system<select id="calibration-notation-system" aria-label="Notation system" data-calibration-names><option value="iso"${options.noteNames()==='iso'?' selected':''}>ISO</option><option value="traditional" disabled>Traditional · not available yet</option></select></label><p class="calibration-options-description">This is the global notation choice.</p>${options.instrument==='janko-four-row'?`<label class="calibration-options-field" data-options-row>Key colors<select id="calibration-key-colors" aria-label="Key colors" data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard. Note names stay as selected above.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
    body.append(midiContainer);
   }else if(page==='measurements'){
    header.innerHTML='';body.innerHTML='';if(!measurementOpened){fingertips.setHand(hand);measurementOpened=true;}
@@ -103,9 +106,9 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
     : `<div class="calibration-trial-prompt">${diagram}<ul class="calibration-trial-instructions"><li>Press both keys together, then alternate.</li><li>${cue}</li></ul></div>`;
    body.innerHTML=`${content}${page==='setup'?'':`<h3 class="calibration-rating-question">How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
-  footer.innerHTML=`${command('back','Back','Esc')}${page==='main'||page==='review'?`<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span>${page==='review'?'<span><kbd>← →</kbd> Groups / ratings</span>':''}<span><kbd>Enter</kbd> Open</span></p>`:''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
+  footer.innerHTML=`${command('back','Back','Esc')}${['main','review','options'].includes(page)?`<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span>${page==='review'?'<span><kbd>← →</kbd> Groups / ratings</span>':page==='options'?'<span><kbd>← →</kbd> Navigate</span>':''}<span><kbd>Enter</kbd> Open</span></p>`:''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
   arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-command=back]'),footer.querySelector<HTMLButtonElement>('[data-command=options]'));
-  footer.toggleAttribute('data-options-row',page==='review');
+  footer.toggleAttribute('data-options-row',page==='review'||page==='options');
   const error=notice||state.error;
   if(error){const p=document.createElement('p');p.className='calibration-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
   if(page==='main'){
@@ -115,6 +118,10 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   }else if(page==='review'){
    reviewNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});
    if(!busy&&!state.readOnly&&reviewRows.length)reviewBrowser.focus(body.querySelector<HTMLElement>('.calibration-review-browser')!);else footer.querySelector<HTMLButtonElement>('[data-command=back]')?.focus();
+  }else if(page==='options'){
+   settingsNavigation=new OptionsNavigation(dialog,target=>{settingsFocus=settingsKey(target??null)??settingsFocus;},()=>false,{focusOnPrepare:false});
+   const restored=[...dialog.querySelectorAll<HTMLElement>('button,input,select')].find(el=>settingsKey(el)===settingsFocus&&!el.closest('[hidden]')&&!(el as HTMLButtonElement).disabled);
+   (restored??dialog.querySelector<HTMLElement>('[data-options-key="calibration-notation-system"]'))?.focus({preventScroll:true});
   }
  }
  const click=(event:Event)=>{
@@ -162,6 +169,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
     }
    }
    if(page==='review'&&!event.shiftKey&&reviewNavigation?.keyDown(event))return true;
+   if(page==='options'&&settingsNavigation?.keyDown(event))return true;
    if(event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.repeat)return false;
    if((event.target as HTMLElement|null)?.closest('input,select,textarea,[contenteditable=true]'))return false;
    if(event.code==='Escape'){back();return true;}
@@ -182,6 +190,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   setMidiConnected(value:boolean){midiConnected=value;},
   break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
   async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
-  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();reviewNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating','calibration-review','calibration-options');},
+  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();reviewNavigation?.dispose();settingsNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating','calibration-review','calibration-options');},
  };
 }
