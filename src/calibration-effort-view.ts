@@ -22,19 +22,18 @@ const cue='Keep your wrist in place. Keep your hand pointing the same way.';
 const command=(name:string,label:string,key?:string,disabled=false)=>`<button type="button" data-command="${name}"${disabled?' disabled':''}>${label}${key?` <kbd>${key}</kbd>`:''}</button>`;
 /** Player-facing pages; retained legacy evidence and queued persistence remain host-owned. */
 export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,fingertips:FingertipController,options:CalibrationViewOptions){
- let page:Page='main',returnPage:Page='main',stopped=false,midiConnected=false,notice='',measurementOpened=false;
+ let page:Page='main',returnPage:Page='main',stopped=false,notice='',measurementOpened=false;
  let measuring:ReturnType<typeof mountFingertipCalibration>|undefined;
  let homeNavigation:OptionsNavigation|undefined,homeCommand='continue',homeBusy=false;
  let reviewNavigation:OptionsNavigation|undefined,reviewRows:CalibrationReviewRow[]=[];
  let settingsNavigation:OptionsNavigation|undefined,settingsFocus='';
- const settingsKey=(target:HTMLElement|null)=>target?.dataset.optionsKey??target?.dataset.command??(target?.hasAttribute('data-midi-connect')?'calibration-midi-connect':undefined);
+ const settingsKey=(target:HTMLElement|null)=>target?.dataset.optionsKey??target?.dataset.command;
  const reviewBrowser=new CalibrationReviewBrowser();
  let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
  const pageInput=new CalibrationPageInput();
  dialog.classList.add('calibration-dialog');
  dialog.innerHTML='<header class="calibration-shell-header"></header><main class="calibration-shell-body"></main><footer class="calibration-shell-footer"></footer>';
- const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,footer=dialog.querySelector<HTMLElement>('footer')!,midiContainer=document.createElement('div');
- midiContainer.className='calibration-midi-panel';
+ const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,footer=dialog.querySelector<HTMLElement>('footer')!;
  const collection=()=>effort.state.archive.collections.find(c=>c.instrument===options.instrument);
  const pageBreak=()=>{effort.break();fingertips.break();};
  function transition(next:Page){
@@ -74,17 +73,13 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   dialog.classList.toggle('calibration-review',page==='review');
   dialog.classList.toggle('calibration-options',page==='options');
   body.dataset.page=page;footer.hidden=page==='measurements';
-  // Keep device controls connected while their asynchronous mount runs on the menu.
-  // Move the same panel out before replacing page content, preserving its listeners.
-  dialog.append(midiContainer);midiContainer.hidden=page!=='options';
   const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
   if(page==='main'){
    header.innerHTML='<h2>Calibration</h2>';
    body.innerHTML=`<p class="calibration-home-progress"><span>Effort ratings</span><span>${progress?.measured??0} / ${total}</span></p><nav class="calibration-menu" aria-label="Calibration">${command('continue',progress?.status==='complete'?'Review ratings':'Continue',undefined,busy||state.readOnly)}${command('review','Change a rating','R',!progress?.measured||busy)}${command('measurements',`Fingertip readings <span class="calibration-menu-count">${readings} / 4</span>`,'F',busy)}${command('export','Export','E')}</nav>`;
   }else if(page==='options'){
    header.innerHTML='<h2>Options</h2>';
-   body.innerHTML=`${options.instrument==='janko-four-row'?`<label class="calibration-options-field" data-options-row>Key colors<select id="calibration-key-colors" aria-label="Key colors" data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
-   body.append(midiContainer);
+   body.innerHTML=`${options.instrument==='janko-four-row'?`<label class="calibration-options-field" data-options-row>Key colors<select id="calibration-key-colors" aria-label="Key colors" data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard.</p>`:''}${options.openLegacy?command('span','Finger span'):""}`;
   }else if(page==='measurements'){
    header.innerHTML='';body.innerHTML='';if(!measurementOpened){fingertips.setHand(hand);measurementOpened=true;}
    measuring=mountFingertipCalibration(body,fingertips,{instrument:options.instrument,noteNames:options.noteNames,back:()=>transition('main'),options:openOptions,keyColors:options.colors});
@@ -149,7 +144,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  dialog.addEventListener('click',click);dialog.addEventListener('change',change);
  const unsubscribe=effort.subscribe(()=>render());
  return {
-  midiContainer,
   get acceptsRatings(){return !stopped&&page==='trial'&&!effort.state.current.needsSetup&&!effort.state.broken;},
   key(event:KeyboardEvent,type:'key-down'|'key-up'='key-down'):boolean {
    if(stopped)return false;
@@ -181,12 +175,11 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    if(page==='trial'&&['ArrowLeft','ArrowRight'].includes(event.code)){void moveTarget(event.code==='ArrowLeft'?-1:1);return true;}
    return false;
   },
-  input(event:CalibrationInputEvent,connected:boolean):Promise<boolean>{
-   midiConnected=connected;
+  input(event:CalibrationInputEvent):Promise<boolean>{
+   if(event.kind!=='manual')return Promise.resolve(false);
    const admitted=pageInput.admit(event,page==='trial'&&!effort.state.current.needsSetup&&!effort.state.broken);
-   return admitted?effort.input(admitted,midiConnected):Promise.resolve(false);
+   return admitted?effort.input(admitted,false):Promise.resolve(false);
   },
-  setMidiConnected(value:boolean){midiConnected=value;},
   break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
   async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
   dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();reviewNavigation?.dispose();settingsNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating','calibration-review','calibration-options');},

@@ -59,13 +59,15 @@ test('admitted native reset clears the controller and blocks input until a fresh
  clock=200;f.scope.cc({...note,controller:121,value:0});assert.equal(f.state.breaks,1);f.scope.midi(note);assert.equal(f.events.length,0);
  await Promise.resolve();f.scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,1);
 });
-test('actual main MIDI dispatch isolates all pilot traffic before score clocks, diagnostics and practice observers',async()=>{
- const f=fixture();await f.scope.activate();const context:any={startupReady:true,dialog:{dataset:{kind:'calibration'}},calibrationPilot:{input:f.scope},
-  pitchInput:{accepts(){throw Error('score clock reached');}},midiConnection:f.state.connection,
-  midiOptions:{receive(){throw Error('playing telemetry reached');}},PracticeView:class {},practice:{observeHeldInput(){throw Error('held observation reached');},observe(){throw Error('observation reached');},note(){throw Error('practice reached');}},syncControls(){throw Error('binding reached');}};
+test('actual main ignores calibration MIDI before rating commands, score clocks and practice observers',()=>{
+ const context:any={startupReady:true,dialog:{dataset:{kind:'calibration'}},calibrationPilot:{input:{midi(){throw Error('MIDI rating reached');},cc(){throw Error('MIDI reset reached');}}},
+  pitchInput:{accepts(){throw Error('score clock reached');}},midiConnection:{source:'piano',generation:2},
+  midiOptions:{receive(){throw Error('playing telemetry reached');}},syncControls(){throw Error('binding reached');}};
  runInNewContext(body('function onMidi(event:','function settings('),context);runInNewContext(body('function onMidiNote(','\nasync function saveSelectedChoice('),context);
- context.onMidiNote(note);context.onMidiNote({...note,generation:0});context.onMidiNote({...note,channel:90});context.onMidi({...note,controller:64,value:127});
- assert.equal(f.events.length,1);context.startupReady=false;context.onMidiNote(note);context.onMidi({...note,controller:64,value:127});assert.equal(f.events.length,1,'startup retains input ownership until ready');context.startupReady=true;context.calibrationPilot=undefined;context.onMidiNote(note);context.onMidi({...note,controller:80,value:127});assert.equal(f.events.length,1,'loading modal still isolates notes');
+ for(const input of [note,{...note,generation:0},{...note,channel:90},{...note,on:false}])context.onMidiNote(input);
+ for(const controller of [64,80,121])context.onMidi({...note,controller,value:127});
+ context.startupReady=false;context.onMidiNote(note);context.onMidi({...note,controller:64,value:127});
+ context.startupReady=true;context.calibrationPilot=undefined;context.onMidiNote(note);context.onMidi({...note,controller:80,value:127});
 });
 test('actual main key listeners route raw grades before bindings and deliver guarded key-up',()=>{
  const events:any[]=[],listeners:Record<string,(event:any)=>void>={},context:any={startupReady:true,startupFailed:false,window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
@@ -90,7 +92,7 @@ test('measurement navigation precedes dialog navigation and field digits cannot 
 });
 
 function modalFixture(){
- let stored=0,reads=0,clock=100,releaseWrite:(()=>void)|undefined;const controllers:any[]=[],views:any[]=[],events:any[]=[];
+ let stored=0,reads=0,releaseWrite:(()=>void)|undefined;const controllers:any[]=[],views:any[]=[],events:any[]=[];
  class Controller {
   readonly loaded:number;state={archive:{activeCollectionId:'same-collection'},inputGeneration:0};listeners=new Set<(state:any)=>void>();disposed=false;
   constructor(readonly options:any){this.loaded=options.load.value;controllers.push(this);}
@@ -100,26 +102,25 @@ function modalFixture(){
   dispose(){this.disposed=true;this.break();}
   save(value:number){return this.options.files.write('calibration-effort-v2.json',new Uint8Array([value]));}
  }
- class Panel {async mount(){}dispose(){}cancelListening(){}}
  class Fingertips {dispose(){}exportArchive(){return '{}';}}
- const context:any={EffortController:Controller,FingertipController:Fingertips,PilotInputScope,MidiOptionsPanel:Panel,
+ const context:any={EffortController:Controller,FingertipController:Fingertips,PilotInputScope,MidiOptionsPanel:class {constructor(){throw Error('Calibration device panel mounted');}},
   calibrationGeneration:0,calibrationPilot:undefined,dialog:undefined,dialogBack:undefined,
   preferences:{keyboardLayout:'janko-four-row'},readerFocused:true,document:{hidden:false},midiConnection:{source:'piano',generation:2},
   orientation:{rotation:0},fitDialog(){},connectMidi(){},disconnectMidi(){},notify(){},resetInput(){},input:{capture:undefined},
   app:{querySelector:()=>undefined},librarySummaryPaintPending:false,current:undefined,practice:undefined,selection:undefined,
-  host:{async read(){reads++;return stored;},async write(_name:string,bytes:Uint8Array){await new Promise<void>(r=>{releaseWrite=r;});stored=bytes[0];},async midiClock(){return clock;},async midiSources(){return{supported:false,sources:[]};},async exportFeedback(){}},
+  host:{async read(){reads++;return stored;},async write(_name:string,bytes:Uint8Array){await new Promise<void>(r=>{releaseWrite=r;});stored=bytes[0];},async midiClock(){throw Error('Native clock reached');},async midiSources(){throw Error('Native sources reached');},async exportFeedback(){}},
   loadEffort:async(files:any)=>({value:await files.read('calibration-effort-v2.json')}),
   loadFingertips:async(files:any)=>({value:await files.read('calibration-fingertips-v1.json')}),
   loadPilot:async(host:any)=>({value:await host.read('calibration-pilot-v1.json')}),
   saveCalibrationNoteNames(){},saveNotationSystem(){},saveCalibrationColors(){},
-  mountCalibrationView(_dialog:any,controller:any,_fingertips:any,hooks:any){const view={controller,hooks,disposed:false,acceptsRatings:true,key(){return false;},input:(event:any)=>controller.input(event),break:()=>controller.break(),midiContainer:{querySelector:()=>undefined},setMidiConnected(){},dispose(){this.disposed=true;}};views.push(view);return view;},
+  mountCalibrationView(_dialog:any,controller:any,_fingertips:any,hooks:any){const view={controller,hooks,disposed:false,acceptsRatings:true,key(){return false;},input:(event:any)=>controller.input(event),break:()=>controller.break(),dispose(){this.disposed=true;}};views.push(view);return view;},
   showDialog(_html:string,kind:string){context.closeDialog(false);return context.dialog={dataset:{kind},close(){},remove(){},innerHTML:''};},
  };
  for(const key of ['job','readingOperation','practiceOptionsCleanup','transposeControls','optionsNavigation','dialogNavigation','bindingOptions','midiOptions','audioOptions','pianoOptions','practiceFocusReturn','focusReturn'])context[key]=undefined;
  runInNewContext(body('let persist=Promise.resolve();','const esc='),context);
  runInNewContext(body('function closeDialog(','function showDialog('),context);
  runInNewContext(body('async function calibrate(','function calibrateLegacy('),context);
- return{context,controllers,views,events,get reads(){return reads;},setClock(value:number){clock=value;},release(){assert.ok(releaseWrite);releaseWrite();}};
+ return{context,controllers,views,events,get reads(){return reads;},release(){assert.ok(releaseWrite);releaseWrite();}};
 }
 test('actual modal close disposes subscriptions and fresh reopen waits for the prior accepted write',async()=>{
  const f=modalFixture();await f.context.calibrate();assert.equal(f.reads,3);assert.equal(f.controllers[0].loaded,0);
@@ -138,26 +139,32 @@ test('a rejected old pilot load cannot dispose device controls owned by replacem
  f.context.dialog=replacement;f.context.midiOptions=devices;reject(Error('old load rejected'));await opening;
  assert.equal(f.context.dialog,replacement);assert.equal(replacement.innerHTML,'replacement options');assert.equal(f.context.midiOptions,devices);assert.equal(devices.disposed,false);assert.equal(f.controllers.length,0);
 });
-test('actual main watches same-session input generations without refreshing the floor on ordinary ratings',async()=>{
- const f=modalFixture();await f.context.calibrate();await Promise.resolve();const scope=f.context.calibrationPilot.input;
- scope.midi(note);assert.equal(f.events.length,1);f.setClock(200);f.controllers[0].break();scope.midi(note);assert.equal(f.events.length,1,'same ID break must block old floor synchronously');
- await Promise.resolve();scope.midi(note);assert.equal(f.events.length,1);scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);
- f.setClock(300);for(const listener of f.controllers[0].listeners)listener(f.controllers[0].state);scope.midi({...note,timestamp_micros:220});assert.equal(f.events.length,3,'ordinary rating publication must retain the established floor');
+test('actual calibration ignores an already connected piano without native discovery or clock activation',async()=>{
+ const f=modalFixture();await f.context.calibrate();const scope=f.context.calibrationPilot.input;
+ scope.midi(note);scope.cc({...note,controller:121,value:0});assert.equal(f.events.length,0);
+ assert.equal(scope.key(key('Digit2'),'key-down'),true);assert.equal(scope.key(key('Digit2'),'key-up'),true);
+ assert.deepEqual(f.events.map(e=>({kind:e.kind,type:e.type,code:e.code})),[
+  {kind:'manual',type:'key-down',code:'Digit2'},{kind:'manual',type:'key-up',code:'Digit2'}]);
+ f.controllers[0].break();await Promise.resolve();scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);
 });
-test('actual focus loss and hidden document break setup and require fresh MIDI activation',async()=>{
- const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}}});await f.context.calibrate();await Promise.resolve();
+test('actual focus loss and hidden document break setup and guard keyboard ratings',async()=>{
+ const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}}});await f.context.calibrate();
  runInNewContext(body('function gainFocus(','function transformSurface('),f.context);const scope=f.context.calibrationPilot.input;
- scope.midi(note);assert.equal(f.events.length,1);f.setClock(200);f.context.loseFocus();assert.equal(f.context.readerFocused,false);scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,1);
- assert.ok(f.controllers[0].state.inputGeneration>0);f.context.gainFocus();await Promise.resolve();scope.midi(note);assert.equal(f.events.length,1);scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);
- f.context.document.hidden=true;f.context.loseFocus();f.setClock(300);f.context.gainFocus();await Promise.resolve();scope.midi({...note,timestamp_micros:310});assert.equal(f.events.length,2);
- f.context.document.hidden=false;f.context.gainFocus();await Promise.resolve();scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);scope.midi({...note,timestamp_micros:310});assert.equal(f.events.length,3);
+ scope.key(key('Digit1'),'key-down');assert.equal(f.events.length,1);
+ f.context.loseFocus();assert.equal(f.context.readerFocused,false);assert.ok(f.controllers[0].state.inputGeneration>0);
+ assert.equal(scope.key(key('Digit1'),'key-down'),false);assert.equal(scope.key(key('Digit1'),'key-up'),true);
+ f.context.gainFocus();assert.equal(scope.key(key('Digit3'),'key-down'),true);
+ f.context.document.hidden=true;f.context.loseFocus();f.context.gainFocus();assert.equal(scope.key(key('Digit3'),'key-down'),false);
+ f.context.document.hidden=false;f.context.gainFocus();assert.equal(scope.key(key('Digit4'),'key-down'),true);
+ assert.deepEqual(f.events.map(e=>e.code),['Digit1','Digit1','Digit3','Digit4']);
 });
-test('actual reconnect resets transient input and binds the fresh floor to new source and generation',async()=>{
+test('global piano reconnect does not enable calibration MIDI ratings or reset its manual setup',async()=>{
  const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}},midiTransition:0});
  f.context.host.midiDisconnect=async()=>{};f.context.host.midiConnect=async(source:string)=>{assert.equal(source,'new piano');return 3;};
- await f.context.calibrate();await Promise.resolve();runInNewContext(body('async function connectMidi(','function options('),f.context);const scope=f.context.calibrationPilot.input;
- f.setClock(200);await f.context.connectMidi('new piano');await Promise.resolve();assert.ok(f.controllers[0].state.inputGeneration>0);
- scope.midi({...note,timestamp_micros:210});scope.midi({...note,source:'new piano',generation:2,timestamp_micros:210});scope.midi({...note,source:'new piano',generation:3,timestamp_micros:110});assert.equal(f.events.length,0);
- scope.midi({...note,source:'new piano',generation:3,timestamp_micros:210});assert.equal(f.events.length,1);
- await f.context.disconnectMidi();scope.midi({...note,source:'new piano',generation:3,timestamp_micros:310});assert.equal(f.events.length,1);assert.equal(f.context.midiConnection,undefined);
+ await f.context.calibrate();runInNewContext(body('async function connectMidi(','function options('),f.context);const scope=f.context.calibrationPilot.input;
+ await f.context.connectMidi('new piano');assert.equal(f.controllers[0].state.inputGeneration,0);
+ scope.midi({...note,source:'new piano',generation:3,timestamp_micros:210});assert.equal(f.events.length,0);
+ assert.equal(scope.key(key('Numpad4'),'key-down'),true);assert.equal(f.events.length,1);
+ await f.context.disconnectMidi();assert.equal(f.context.midiConnection,undefined);assert.equal(f.controllers[0].state.inputGeneration,0);
+ scope.midi({...note,source:'new piano',generation:3,timestamp_micros:310});assert.equal(f.events.length,1);
 });

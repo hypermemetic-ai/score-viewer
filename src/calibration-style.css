@@ -70,7 +70,6 @@
 .calibration-dialog select{max-width:100%;width:100%;background:#000;border:1px solid #666;padding:8px;color:#fff}
 .calibration-options-description{font-size:18px;color:#aaa;line-height:1.5;max-width:850px;margin:10px 0 40px!important}
 .calibration-notice{color:#ccc;font-size:18px;line-height:1.5;margin-top:20px!important}.calibration-notice:empty{display:none}
-.calibration-midi-panel{margin-top:30px}.calibration-midi-panel [data-midi-activity]{display:none}
 .calibration-dialog:focus{outline:none}
 .calibration-shell-header:empty{display:none}
 .calibration-shell-body:has(.fingertips){padding-top:0}
