@@ -22,6 +22,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  let page:Page='main',returnPage:Page='main',stopped=false,midiConnected=false,notice='',measurementOpened=false;
  let measuring:ReturnType<typeof mountFingertipCalibration>|undefined;
  let homeNavigation:OptionsNavigation|undefined,homeCommand='continue',homeBusy=false;
+ let reviewNavigation:OptionsNavigation|undefined,reviewTarget='';
  let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
  const pageInput=new CalibrationPageInput();
  dialog.classList.add('calibration-dialog');
@@ -50,6 +51,11 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    if(!homeBusy&&dialog.contains(focused)&&focused?.dataset.command)homeCommand=focused.dataset.command;
    homeNavigation.dispose();homeNavigation=undefined;
   }
+  if(reviewNavigation){
+   const focused=document.activeElement as HTMLElement|null;
+   if(dialog.contains(focused)&&focused?.dataset.review)reviewTarget=focused.dataset.review;
+   reviewNavigation.dispose();reviewNavigation=undefined;
+  }
   const state=effort.state,saved=collection(),progress=saved?effortProgress(saved):null,total=options.instrument==='janko-four-row'?208:52;
   if(page==='trial'&&state.current.needsSetup)page='setup';
   if((page==='trial'||page==='setup')&&!state.current.trial)page='main';
@@ -76,7 +82,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    body.innerHTML=`<p class="calibration-options-description">Choose a pair to rate it again.</p><div class="calibration-review-list">${saved?plan.trials.map(t=>{
     const work=effortWorkAt(saved,t.id);if(work.status!=='measured')return '';
     const names=[...t.anchors,...t.active].map(p=>finger[p.finger]).join(' · '),grade=EFFORT_GRADES[work.grade];
-    return `<button type="button" data-review="${esc(t.id)}">${names} · ${t.distanceSemitoneSteps} steps · ${grade.label}</button>`;
+    return `<button type="button" data-review="${esc(t.id)}"${busy||state.readOnly?' disabled':''}>${names} · ${t.distanceSemitoneSteps} steps · ${grade.label}</button>`;
    }).join(''):''}</div>`;
   }else{
    const trial=state.current.trial!,session=state.session!;
@@ -89,14 +95,18 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
     : `<div class="calibration-trial-prompt">${diagram}<ul class="calibration-trial-instructions"><li>Press both keys together, then alternate.</li><li>${cue}</li></ul></div>`;
    body.innerHTML=`${content}${page==='setup'?'':`<h3 class="calibration-rating-question">How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
-  footer.innerHTML=`${command('back','Back','Esc')}${page==='main'?'<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>':''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
+  footer.innerHTML=`${command('back','Back','Esc')}${page==='main'||page==='review'?'<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>':''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
   arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-command=back]'),footer.querySelector<HTMLButtonElement>('[data-command=options]'));
+  footer.toggleAttribute('data-options-row',page==='review');
   const error=notice||state.error;
   if(error){const p=document.createElement('p');p.className='calibration-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
   if(page==='main'){
    homeBusy=busy;
    homeNavigation=new OptionsNavigation(dialog,target=>{if(target?.dataset.command)homeCommand=target.dataset.command;},()=>false,{horizontal:true,focusOnPrepare:false});
    (dialog.querySelector<HTMLButtonElement>(`[data-command="${homeCommand}"]:not(:disabled)`)??body.querySelector<HTMLButtonElement>('button:not(:disabled)'))?.focus();
+  }else if(page==='review'){
+   reviewNavigation=new OptionsNavigation(dialog,target=>{if(target?.dataset.review)reviewTarget=target.dataset.review;},()=>false,{focusOnPrepare:false});
+   ([...body.querySelectorAll<HTMLButtonElement>('[data-review]:not(:disabled)')].find(b=>b.dataset.review===reviewTarget)??body.querySelector<HTMLButtonElement>('[data-review]:not(:disabled)')??footer.querySelector<HTMLButtonElement>('[data-command=back]'))?.focus();
   }
  }
  const click=(event:Event)=>{
@@ -131,6 +141,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    if(page==='measurements')return measuring?.key(event,type)??false;
    if(type==='key-up')return false;
    if(page==='main'&&!event.shiftKey&&homeNavigation?.keyDown(event))return true;
+   if(page==='review'&&!event.shiftKey&&reviewNavigation?.keyDown(event))return true;
    if(event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.repeat)return false;
    if((event.target as HTMLElement|null)?.closest('input,select,textarea,[contenteditable=true]'))return false;
    if(event.code==='Escape'){back();return true;}
@@ -151,6 +162,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   setMidiConnected(value:boolean){midiConnected=value;},
   break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
   async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
-  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating','calibration-review');},
+  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();reviewNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating','calibration-review');},
  };
 }
