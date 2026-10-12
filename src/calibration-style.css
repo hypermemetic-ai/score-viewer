@@ -11,7 +11,7 @@
 .calibration-home .calibration-shell-body{padding-top:24px}
 .calibration-dialog.calibration-placement{font-family:system-ui,sans-serif}
 .calibration-placement .calibration-contact-diagram{margin-top:0}
-.calibration-placement .calibration-task{margin-top:18px}
+.calibration-placement-instructions{display:grid;gap:12px;margin:18px 0 0;padding-left:24px;text-align:left;font-size:18px;font-weight:400;line-height:1.5}
 .calibration-home-progress{display:flex;align-items:baseline;justify-content:space-between;gap:20px;font-size:20px!important;color:#aaa;padding-bottom:16px;border-bottom:1px solid #333}
 .calibration-home-progress span:last-child{font-size:27px;color:#fff;font-variant-numeric:tabular-nums}
 .calibration-menu{display:grid;gap:4px;margin-top:16px}
@@ -52,7 +52,6 @@
 .calibration-dialog .fingertips{gap:16px}
 .calibration-dialog .fingertips .art svg{max-height:calc(var(--viewer-logical-height, 100vh) - 390px)}
 .calibration-dialog .fingertips [data-reference-label]{white-space:nowrap}
-.calibration-setup-guidance{font-size:18px;line-height:1.5;max-width:950px;margin:15px auto!important;text-align:center}
 @media(max-width:1000px){.calibration-dialog{padding:25px 32px}.calibration-ratings{gap:18px}.calibration-grade-label{gap:10px;white-space:normal}.calibration-contact-diagram{height:330px}.calibration-grade-description{margin-top:25px}}
 @media(max-width:700px){.calibration-dialog{padding:20px;max-height:96vh}.calibration-contact-diagram{height:240px}.calibration-ratings{grid-template-columns:1fr;gap:18px}.calibration-ratings button{display:grid;grid-template-columns:190px 1fr;gap:12px}.calibration-grade-description{margin:0}.calibration-options-field{grid-template-columns:1fr;gap:12px}.calibration-fixed-cue{margin-bottom:18px!important}.calibration-page-footer{margin-top:25px}}
 @media(max-width:700px){.calibration-dialog.calibration-home{padding:20px}.calibration-home .calibration-shell-header{flex-wrap:nowrap}.calibration-menu button{padding:10px 12px;gap:10px}}
