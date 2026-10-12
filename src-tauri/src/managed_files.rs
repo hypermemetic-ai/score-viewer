@@ -11,7 +11,7 @@ fn digest(value: &str, lowercase_only: bool) -> bool {
 
 pub fn valid_managed_name(name: &str) -> bool {
     if name.len() > MAX_MANAGED_NAME_BYTES { return false; }
-    if matches!(name, "library.json" | "preferences.json" | "calibration.json" | "calibration-pilot-v1.json" | "practice-error-log.json" | "viewer-derived-cache-v1.json") {
+    if matches!(name, "library.json" | "preferences.json" | "calibration.json" | "calibration-pilot-v1.json" | "calibration-effort-v2.json" | "calibration-fingertips-v1.json" | "practice-error-log.json" | "viewer-derived-cache-v1.json") {
         return true;
     }
     if let Some(hash) = name.strip_prefix("package-").and_then(|s|s.strip_suffix(".isoscore")) {
@@ -51,12 +51,14 @@ mod tests {
 
     #[test]
     fn fixed_files_are_exact_and_other_json_is_not_managed() {
-        for name in ["library.json", "preferences.json", "calibration.json", "calibration-pilot-v1.json", "practice-error-log.json", "viewer-derived-cache-v1.json"] {
+        for name in ["library.json", "preferences.json", "calibration.json", "calibration-pilot-v1.json", "calibration-effort-v2.json", "calibration-fingertips-v1.json", "practice-error-log.json", "viewer-derived-cache-v1.json"] {
             assert!(valid_managed_name(name));
         }
         for name in ["library.pending", "Library.json", "notes.json", "library.json.backup", "calibration-pilot.json", "calibration-pilot-v2.json",
             "viewer-derived-cache.json", "viewer-derived-cache-v2.json", "Viewer-derived-cache-v1.json", "viewer-derived-cache-v1.json.backup", "../viewer-derived-cache-v1.json",
-            "Calibration-pilot-v1.json", "calibration-pilot-v1.json.backup", "../calibration-pilot-v1.json"] {
+            "Calibration-pilot-v1.json", "calibration-pilot-v1.json.backup", "../calibration-pilot-v1.json",
+            "calibration-effort-v1.json", "Calibration-effort-v2.json", "calibration-effort-v2.json.backup", "../calibration-effort-v2.json",
+            "calibration-fingertips-v2.json", "Calibration-fingertips-v1.json", "calibration-fingertips-v1.json.backup", "../calibration-fingertips-v1.json"] {
             assert!(!valid_managed_name(name));
         }
     }

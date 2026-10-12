@@ -1,0 +1,131 @@
+import type {CalibrationColorLayout,CalibrationInputEvent,CalibrationGrade} from '@hypermemetic-ai/fingering-calculator';
+import type {EffortController} from './calibration-effort-controller';
+import {createEffortPlan,effortProgress,effortWorkAt,effortSetupInstruction,EFFORT_GRADES,type EffortInstrument,type EffortHand} from './calibration-effort';
+import type {FingertipController} from './calibration-fingertips-controller';
+import {mountFingertipCalibration} from './calibration-fingertips-view';
+import {calibrationEscape as esc,calibrationFingerNames as finger,renderCalibrationTrial,type CalibrationNoteNames} from './calibration-trial-renderer';
+import {CalibrationPageInput} from './calibration-page-input';
+import './calibration-style.css';
+
+export interface CalibrationViewOptions {
+ instrument:EffortInstrument;noteNames:()=>CalibrationNoteNames;saveNoteNames:(choice:CalibrationNoteNames)=>Promise<void>;
+ colors?:()=>CalibrationColorLayout;saveColors?:(choice:CalibrationColorLayout)=>Promise<void>;
+ close:()=>void;exportJson:()=>Promise<void>;openLegacy?:()=>void;
+}
+type Page='main'|'setup'|'trial'|'options'|'measurements'|'review';
+const cue='Keep your wrist in place. Keep your hand pointing the same way.';
+const command=(name:string,label:string,key?:string,disabled=false)=>`<button type="button" data-command="${name}"${disabled?' disabled':''}>${label}${key?` <kbd>${key}</kbd>`:''}</button>`;
+/** Player-facing pages; retained legacy evidence and queued persistence remain host-owned. */
+export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,fingertips:FingertipController,options:CalibrationViewOptions){
+ let page:Page='main',returnPage:Page='main',stopped=false,midiConnected=false,notice='',measurementOpened=false;
+ let measuring:ReturnType<typeof mountFingertipCalibration>|undefined;
+ let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
+ const pageInput=new CalibrationPageInput();
+ dialog.classList.add('calibration-dialog');
+ dialog.innerHTML='<header class="calibration-shell-header"></header><main class="calibration-shell-body"></main>';
+ const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,midiContainer=document.createElement('div');
+ midiContainer.className='calibration-midi-panel';
+ const collection=()=>effort.state.archive.collections.find(c=>c.instrument===options.instrument);
+ const pageBreak=()=>{effort.break();fingertips.break();};
+ function transition(next:Page){
+  measuring?.break();measuring?.dispose();measuring=undefined;
+  page=next;notice='';pageBreak();render();
+ }
+ async function perform(work:()=>Promise<unknown>){try{await work();}catch(error){notice=error instanceof Error?error.message:String(error);render();}}
+ async function continueWork(){
+  const saved=collection(),ok=saved?await effort.resume(options.instrument):await effort.start({instrument:options.instrument,hand});
+  if(ok){page=effort.state.current.needsSetup?'setup':'trial';render();}
+ }
+ async function moveTarget(delta:number){const state=effort.state,at=state.session?.trials.findIndex(t=>t.id===state.current.trial?.id)??-1,target=state.session?.trials[at+delta];if(target)await effort.navigate(target.id);}
+ function openOptions(){returnPage=page;transition('options');}
+ function back(){if(page==='main')options.close();else if(page==='options')transition(returnPage);else transition('main');}
+ function render(){
+  if(stopped)return;
+  if(page==='measurements'&&measuring)return;
+  const state=effort.state,saved=collection(),progress=saved?effortProgress(saved):null,total=options.instrument==='janko-four-row'?208:52;
+  if(page==='trial'&&state.current.needsSetup)page='setup';
+  if((page==='trial'||page==='setup')&&!state.current.trial)page='main';
+  const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
+  if(page==='main'){
+   header.innerHTML=`<h2>Calibration</h2>${command('back','Back','Esc')}`;
+   body.innerHTML=`<p class="calibration-home-progress">${progress?.measured??0} / ${total}</p><nav class="calibration-menu">${command('continue',progress?.status==='complete'?'Review ratings':'Continue','Enter',busy||state.readOnly)}${command('review','Change a rating','R',!progress?.measured||busy)}${command('measurements',`Fingertip readings · ${readings} / 4`,undefined,busy)}${command('export','Export','E')}</nav><div class="calibration-home-options">${command('options','Options','O')}</div>`;
+  }else if(page==='options'){
+   header.innerHTML=`<h2>Options</h2>${command('back','Back','Esc')}`;
+   body.innerHTML=`<label class="calibration-options-field">Note names<select data-calibration-names><option value="iso"${options.noteNames()==='iso'?' selected':''}>ISO</option><option value="traditional"${options.noteNames()==='traditional'?' selected':''}>Traditional</option></select></label><p class="calibration-options-description">Choose the names shown on keys. This leaves their colors unchanged.</p>${options.instrument==='janko-four-row'?`<label class="calibration-options-field">Key colors<select data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard. Note names stay as selected above.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
+   body.append(midiContainer);
+  }else if(page==='measurements'){
+   header.innerHTML='';body.innerHTML='';if(!measurementOpened){fingertips.setHand(hand);measurementOpened=true;}
+   measuring=mountFingertipCalibration(body,fingertips,{instrument:options.instrument,noteNames:options.noteNames,back:()=>transition('main'),options:openOptions,keyColors:options.colors});
+   return;
+  }else if(page==='review'){
+   header.innerHTML=`<h2>Change a rating</h2>${command('back','Back','Esc')}`;
+   const plan=createEffortPlan(options.instrument,saved?.performingHand??hand);
+   body.innerHTML=`<p class="calibration-options-description">Choose a pair to rate it again.</p><div class="calibration-review-list">${saved?plan.trials.map(t=>{
+    const work=effortWorkAt(saved,t.id);if(work.status!=='measured')return '';
+    const names=[...t.anchors,...t.active].map(p=>finger[p.finger]).join(' · '),grade=EFFORT_GRADES[work.grade];
+    return `<button type="button" data-review="${esc(t.id)}">${names} · ${t.distanceSemitoneSteps} steps · ${grade.label}</button>`;
+   }).join(''):''}</div>`;
+  }else{
+   const trial=state.current.trial!,session=state.session!;
+   hand=session.performingHand;
+   header.innerHTML=page==='setup'?`<div class="calibration-hand-choice">${command('left','Left hand',undefined,busy)}${command('right','Right hand',undefined,busy)}</div>${command('options','Options','O')}`:`<div class="calibration-trial-heading">${command('back','Back','Esc')}<span>${hand==='LH'?'Left':'Right'} hand</span></div><nav class="calibration-trial-navigation">${command('previous','Previous','←',busy||session.trials[0].id===trial.id)}<span>${session.trials.findIndex(t=>t.id===trial.id)+1} / ${session.trials.length}</span>${command('next','Next','→',busy||session.trials.at(-1)!.id===trial.id)}</nav>${command('options','Options','O')}`;
+   if(page==='setup')header.querySelector(`[data-command=${hand==='LH'?'left':'right'}]`)?.setAttribute('aria-pressed','true');
+   body.innerHTML=`<p class="calibration-task">${page==='setup'?'Place your fingers on the highlighted keys.':'Press both keys together, then alternate.'}</p>${renderCalibrationTrial(session.plan.keyboard,trial,options.noteNames(),options.colors?.()??'five-seven')}${page==='setup'?`<p class="calibration-setup-guidance">${esc(effortSetupInstruction(trial).replace(cue,'').trim())}</p>`:''}<p class="calibration-fixed-cue">${cue}</p>${page==='setup'?`<footer class="calibration-page-footer">${command('back','Back','Esc')}${command('begin','Begin','Enter',busy||state.readOnly)}</footer>`:`<h3>How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
+  }
+  body.dataset.page=page;
+  const error=notice||state.error;
+  if(error){const p=document.createElement('p');p.className='calibration-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
+ }
+ const click=(event:Event)=>{
+  const target=(event.target as HTMLElement).closest<HTMLElement>('[data-command],[data-grade],[data-review]');if(!target||target.hasAttribute('disabled'))return;
+  if(target.dataset.grade!==undefined&&page==='trial'){void effort.rateButton(Number(target.dataset.grade) as CalibrationGrade);return;}
+  if(target.dataset.review){void perform(async()=>{if(await effort.resume(options.instrument)&&await effort.navigate(target.dataset.review!)){page=effort.state.current.needsSetup?'setup':'trial';render();}});return;}
+  switch(target.dataset.command){
+   case 'back':back();break;
+   case 'continue':if(collection()&&effortProgress(collection()!).status==='complete')transition('review');else void perform(continueWork);break;
+   case 'review':transition('review');break;
+   case 'measurements':transition('measurements');break;
+   case 'options':openOptions();break;
+   case 'export':void perform(options.exportJson);break;
+   case 'span':options.openLegacy?.();break;
+   case 'left':case 'right':{hand=target.dataset.command==='left'?'LH':'RH';void perform(()=>effort.setPerformingHand(hand));break;}
+   case 'previous':case 'next':void moveTarget(target.dataset.command==='previous'?-1:1);break;
+   case 'begin':void perform(async()=>{if(await effort.prepare()){page='trial';render();}});break;
+  }
+ };
+ const change=(event:Event)=>{
+  const target=event.target as HTMLSelectElement;
+  if(target.matches('[data-calibration-names]'))void perform(()=>options.saveNoteNames(target.value as CalibrationNoteNames));
+  if(target.matches('[data-calibration-colors]'))void perform(()=>options.saveColors?.(target.value as CalibrationColorLayout)??Promise.resolve());
+ };
+ dialog.addEventListener('click',click);dialog.addEventListener('change',change);
+ const unsubscribe=effort.subscribe(()=>render());
+ return {
+  midiContainer,
+  get acceptsRatings(){return !stopped&&page==='trial'&&!effort.state.current.needsSetup&&!effort.state.broken;},
+  key(event:KeyboardEvent,type:'key-down'|'key-up'='key-down'):boolean {
+   if(stopped)return false;
+   if(page==='measurements')return measuring?.key(event,type)??false;
+   if(type==='key-up')return false;
+   if(event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.repeat)return false;
+   if((event.target as HTMLElement|null)?.closest('input,select,textarea,[contenteditable=true]'))return false;
+   if(event.code==='Escape'){back();return true;}
+   if(event.code==='KeyO'){if(page==='options')back();else openOptions();return true;}
+   if(page==='main'&&['Enter','NumpadEnter'].includes(event.code)){void perform(continueWork);return true;}
+   if(page==='setup'&&['Enter','NumpadEnter'].includes(event.code)){void perform(async()=>{if(await effort.prepare()){page='trial';render();}});return true;}
+   if(page==='trial'&&['ArrowLeft','ArrowRight'].includes(event.code)){void moveTarget(event.code==='ArrowLeft'?-1:1);return true;}
+   if(page==='main'&&event.code==='KeyR'){transition('review');return true;}
+   if(page==='main'&&event.code==='KeyE'){void perform(options.exportJson);return true;}
+   return false;
+  },
+  input(event:CalibrationInputEvent,connected:boolean):Promise<boolean>{
+   midiConnected=connected;
+   const admitted=pageInput.admit(event,page==='trial'&&!effort.state.current.needsSetup&&!effort.state.broken);
+   return admitted?effort.input(admitted,midiConnected):Promise.resolve(false);
+  },
+  setMidiConnected(value:boolean){midiConnected=value;},
+  break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
+  async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
+  dispose(){if(stopped)return;stopped=true;pageInput.clear();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog');},
+ };
+}

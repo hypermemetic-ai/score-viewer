@@ -1,0 +1,58 @@
+{
+  "version": "accepted-fingertip-illustration-v1",
+  "sourceThread": "8be23644-84ff-4fe1-acc6-914c28bd94bc",
+  "sourceArtifact": "finger-measurements-final-draft.html",
+  "sourceSha256": "778dea449b6bd048c702642665ba44e20d8568afa23f6fadcf84626e1d95fc51",
+  "camera": {
+    "elevationDegrees": 36,
+    "azimuthDegrees": 5
+  },
+  "tipThickness": 12.5,
+  "frontPlane": 0,
+  "evenTipsHeight": -15,
+  "oddTipsHeight": 0,
+  "status": "User-approved schematic presentation; dimensions and non-thumb example contacts are illustrative, not calculator geometry or physical calibration.",
+  "thumbPlacement": {
+    "thumbMidi": 61,
+    "indexMidi": 64,
+    "thumbBandEntry": 25.90368272,
+    "thumbWall": 65,
+    "indexEntry": 65,
+    "indexWall": 100
+  },
+  "otherPairs": {
+    "firstMidi": 60,
+    "secondMidi": 62,
+    "entry": 65,
+    "wall": 100
+  },
+  "region": "Four unfilled corner brackets on native colored surfaces",
+  "leftHand": {
+    "mapping": "actualMidi = 124 - canonicalMidi",
+    "visualPitchOrder": [
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66
+    ],
+    "thumbIndexActualMidi": [
+      63,
+      60
+    ],
+    "otherPairsActualMidi": [
+      64,
+      62
+    ],
+    "preserves": [
+      "even/odd physical levels",
+      "five-seven colors",
+      "classic colors",
+      "readable text"
+    ],
+    "presentation": "Reflect schematic shapes, relabel every contact/key and derive instructions from the same actual placements; does not infer physical millimeters."
+  }
+}
