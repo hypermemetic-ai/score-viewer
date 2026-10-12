@@ -3,8 +3,8 @@ import {createHash} from 'node:crypto';
 import {resolve,join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 
-export const calculatorRevision='e325912d00efaef887738f4fb0f94a2495d58577';
-const calculatorTree='09a8501a13f1764b12aa85588459cdc9872977f1';
+export const calculatorRevision='06cb1575327f592e0ee8469a4f083355c199bdf6';
+const calculatorTree='dfc3ba8fd40f1708f70e6d266320fd4bcc9ad3b3';
 const packageName='@hypermemetic-ai/fingering-calculator';
 const archivePath=`vendor/fingering-calculator/fingering-calculator-${calculatorRevision}.tgz`;
 const digest=(bytes,algorithm='sha256')=>createHash(algorithm).update(bytes).digest(algorithm==='sha512'?'base64':'hex');
@@ -13,7 +13,7 @@ function requireValue(value,message){if(!value)throw Error(`Calculator pin: ${me
 export async function verifyCalculatorPin(root=fileURLToPath(new URL('../',import.meta.url))){
  const identity=JSON.parse(await readFile(join(root,'vendor/fingering-calculator/source-package-identity.json'),'utf8'));
  requireValue(identity.version==='viewer-calculator-package-v1'&&identity.sourceRevision===calculatorRevision&&identity.sourceTree===calculatorTree&&
-  identity.reviewedPullRequest===27&&identity.packageName===packageName&&identity.packageVersion==='0.1.0','reviewed source identity differs');
+  identity.reviewedPullRequest===32&&identity.packageName===packageName&&identity.packageVersion==='0.1.0','reviewed source identity differs');
  requireValue(identity.archive.path===archivePath,'archive path differs');
  requireValue((await lstat(join(root,archivePath))).isFile(),'archive must be a regular file');
  const archive=await readFile(join(root,archivePath));
@@ -33,7 +33,7 @@ export async function verifyCalculatorPin(root=fileURLToPath(new URL('../',impor
  }
  await walk(installed);
  const expected=Object.keys(identity.members).sort();
- requireValue(expected.length===70&&JSON.stringify(members.sort())===JSON.stringify(expected),'installed package inventory differs');
+ requireValue(expected.length===81&&JSON.stringify(members.sort())===JSON.stringify(expected),'installed package inventory differs');
  for(const path of expected){
   requireValue(!path.startsWith('/')&&!path.split('/').some(p=>p==='..'),'unsafe member identity');
   const bytes=await readFile(join(installed,path)),wanted=identity.members[path];

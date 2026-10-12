@@ -1,21 +1,17 @@
 {
   "version": "viewer-calculator-package-v1",
   "repository": "https://github.com/hypermemetic-ai/fingering-calculator",
-  "reviewedPullRequest": 27,
-  "sourceRevision": "e325912d00efaef887738f4fb0f94a2495d58577",
-  "sourceTree": "09a8501a13f1764b12aa85588459cdc9872977f1",
+  "reviewedPullRequest": 32,
+  "sourceRevision": "06cb1575327f592e0ee8469a4f083355c199bdf6",
+  "sourceTree": "dfc3ba8fd40f1708f70e6d266320fd4bcc9ad3b3",
   "packageName": "@hypermemetic-ai/fingering-calculator",
   "packageVersion": "0.1.0",
   "archive": {
-    "path": "vendor/fingering-calculator/fingering-calculator-e325912d00efaef887738f4fb0f94a2495d58577.tgz",
-    "bytes": 112815,
-    "sha256": "1a04e079f4d3870efed1925ac03b27bb99b7d4a9794fa7afe6d9202082181d62"
+    "path": "vendor/fingering-calculator/fingering-calculator-06cb1575327f592e0ee8469a4f083355c199bdf6.tgz",
+    "bytes": 150183,
+    "sha256": "cd76b062c052de3608accdc3216a3205e32059a6e22c0c13489cca0c380d8be5"
   },
   "members": {
-    "README.md": {
-      "bytes": 3651,
-      "sha256": "6f5b24fdd2006ef108529e0cbde9d791bb24f064a5e0a8e394208429adf884be"
-    },
     "dist/calibration-geometry.d.ts": {
       "bytes": 3982,
       "sha256": "881b3d364896bb8cca47a6631e939f404c62b0d66e2ea319ae849f4a8253351d"
@@ -48,6 +44,14 @@
       "bytes": 9073,
       "sha256": "081271ded3164e0019cea7c87134789703b561cf0c6d4869f735281479de1cbf"
     },
+    "dist/effective-curl-refinement-contract.d.ts": {
+      "bytes": 3810,
+      "sha256": "d56d8cce02bfb6bb8187ac324ff81b676456bfcfdf9df39f418136b35233c28a"
+    },
+    "dist/effective-curl-refinement-contract.js": {
+      "bytes": 1173,
+      "sha256": "e2fef260aa09d1feb440eaaadf546f9cf92dd934bab7eb47b2edcf56dc5f737c"
+    },
     "dist/exploratory-calibration.d.ts": {
       "bytes": 10479,
       "sha256": "1ba66bf65ab2673f2e51a9153cb5ba3940c0c4ebbed84aa2ce60c46be0386f1f"
@@ -57,12 +61,12 @@
       "sha256": "ec14b1fb2f5ef670a7d082f625b7fb79e0ee7c4e873eb8156fa407573aae26d8"
     },
     "dist/index.d.ts": {
-      "bytes": 15842,
-      "sha256": "d1fc18f98b7140834d0d16d3a24dc89ccbcf73eb350802ee53ad3050c36c3e26"
+      "bytes": 17250,
+      "sha256": "c9015a31b705cfff81721e727f044f51160abe2c172beb9d0fc9ca3a6f49d033"
     },
     "dist/index.js": {
-      "bytes": 4904,
-      "sha256": "f6a9cd45393a393e672902101d049d6c34ede5d59ca88c935d2aa658cffc352b"
+      "bytes": 5420,
+      "sha256": "284a1ec846ddd813e14834d2c9c19a7a5d3033645113b3bcc7489d4931a452bc"
     },
     "dist/internal/conventional-finger-layer-legacy.d.ts": {
       "bytes": 3327,
@@ -272,25 +276,65 @@
       "bytes": 11,
       "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
     },
+    "dist/stretch-calibration-contract.d.ts": {
+      "bytes": 11172,
+      "sha256": "8bd762e03668b5bf18f8dad688d5da418a05bbae489f4f45e0e5df59bf091f5f"
+    },
+    "dist/stretch-calibration-contract.js": {
+      "bytes": 2112,
+      "sha256": "5a5549e8090a116c267c33d835a1a77a0385e3726fb4c287ee6f825a600f9ebb"
+    },
+    "dist/stretch-calibration-profile.d.ts": {
+      "bytes": 6949,
+      "sha256": "dd2648b0edd59a056646f4b92a80f5a4dd62f14720dd8e75859fb55f0559929f"
+    },
+    "dist/stretch-calibration-profile.js": {
+      "bytes": 10166,
+      "sha256": "57407b9c7118e31f60ad23ae3595443b4b84d4fa5fcb36feeeb4396301469a7e"
+    },
     "docs/api.md": {
-      "bytes": 8368,
-      "sha256": "fb2ab1d6e9a986e9c82a0cf974e6ad6f012b2fe095a2f63ac4d0a9cc753a421f"
+      "bytes": 9094,
+      "sha256": "4b0d07424690f7720719d90e09480d92fa5116771173a1d4fc249073a5f966c4"
+    },
+    "docs/calibration-contract.md": {
+      "bytes": 27700,
+      "sha256": "549cf6d4ae6a424872c90c025cfdad081ead6c502dc674fa0bf84ced9b495b6c"
+    },
+    "docs/calibration-keyboard-profile-v2.json": {
+      "bytes": 7117,
+      "sha256": "e2735fd708579f22d79edee9293056b88c9f30741202f7be852ea4a684c52e8f"
     },
     "docs/calibration-pilot.md": {
-      "bytes": 16504,
-      "sha256": "7b1bb06bd0bf9e8052d65db3d29e3726359acbdf7f23ec41cad187bdb3ca7bb8"
+      "bytes": 16792,
+      "sha256": "ff41bae3ccaf9f0d091b08fb3702c0e7917ac9c5f808c15b5380f8a800b93f8b"
     },
     "docs/calibration.md": {
-      "bytes": 12378,
-      "sha256": "f5af992357a9ba37a86848bc7f48d02cbc1e3071cb70184bdbd6d6d3d1e0ef85"
+      "bytes": 12607,
+      "sha256": "45e7d0cec4eece10b42a29229b1e2b9978455c0f56262355af38f03a5e1e2c20"
+    },
+    "docs/hand-model-design.md": {
+      "bytes": 12898,
+      "sha256": "73a4b7e1a8c874a7ec9bcb8fa3b95b9187d0d36833e9cf3565c184d982619dd8"
+    },
+    "docs/playing-philosophy.md": {
+      "bytes": 26615,
+      "sha256": "14016103bd954f85259a544948211ab114a8e806601a0efeae9e139463df9b0a"
+    },
+    "docs/route-cost-design.md": {
+      "bytes": 13653,
+      "sha256": "8110ee2a9db6e8f72290e20cb9387c7cbc6dfd330ea16cd525c8ec08a6951197"
     },
     "docs/source-provenance.json": {
       "bytes": 7847,
       "sha256": "65bfd5a7584c4c75ba3cc55a8305604c201755b9c28760e1232600095c17ee37"
     },
     "package.json": {
-      "bytes": 992,
-      "sha256": "adfb17c250592cd5de6ea65e98910461fd9eae47c235c30b282e049cf065c95a"
+      "bytes": 1262,
+      "sha256": "0a0fda9374d9339e9db6b099be33acb236d04a3d9b58f8cd8dd9efee045ca49f"
+    },
+    "README.md": {
+      "bytes": 5079,
+      "sha256": "628fb629fefbdd8e86e0706bb4594275a13161bea2f9dad003a83130b63a1543"
     }
   }
 }
