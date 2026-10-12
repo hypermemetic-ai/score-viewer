@@ -2,9 +2,9 @@
 
 ## 1. Versioned evidence
 
-- [ ] 1.1 Implement new alternating-effort collection, canonical target templates and physically verified hand pooling; verify bounded 208/52 counts, reflected contact shapes, append-only correction/retraction and unchanged legacy bytes in tests.
-- [ ] 1.2 Implement additive fingertip evidence, validation and durable controller with independent drafts and provenance; verify signed decimals, method/reference isolation, read-only retention, slow/failed saves and reopen behavior in tests.
-- [ ] 1.3 Document new raw protocol and measurement boundaries, including historical data preservation; verify documentation matches exported archive identities.
+- [x] 1.1 Implement new alternating-effort collection, canonical target templates and physically verified hand pooling; verify bounded 208/52 counts, reflected contact shapes, append-only correction/retraction and unchanged legacy bytes in tests.
+- [x] 1.2 Implement additive fingertip evidence, validation and durable controller with independent drafts and provenance; verify signed decimals, method/reference isolation, read-only retention, slow/failed saves and reopen behavior in tests.
+- [x] 1.3 Document new raw protocol and measurement boundaries, including historical data preservation; verify documentation matches exported archive identities.
 
 ## 2. Approved presentation
 
