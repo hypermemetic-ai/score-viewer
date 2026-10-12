@@ -116,9 +116,9 @@ export class StretchController {
  }
  prepareBaseline(input:StretchBaseline={},notes?:string):Promise<boolean>{return this.mutation(a=>{
   const s=this.require(a),c=s.cursor,sw=s.plan.pairSweeps.find(v=>v.id===c?.slotId);if(c?.phase!=='progressive-pairs'||!sw)throw Error('Select a pair sweep.');
-  if(effectivePairReports(s).some(e=>e.sweepId===sw.id))throw Error('The rated sweep arrangement is fixed; select an existing target to recheck it.');
+  if(s.entries.some(e=>e.kind==='pair-stretch'&&e.sweepId===sw.id&&e.grade<5))throw Error('The reachable sweep arrangement is fixed; select an existing target to recheck it.');
   const old=c.trialId?s.pairTrials.find(t=>t.id===c.trialId):s.pairTrials.find(t=>t.sweepId===sw.id);
-  const firstReport=s.entries.find(e=>e.kind==='pair-stretch');
+  const firstReport=s.entries.find(e=>e.kind==='pair-stretch'&&e.grade<5);
   const inherited=firstReport?.kind==='pair-stretch'?s.pairTrials.find(t=>t.id===firstReport.trialId):s.pairTrials[0];
   const row=input.row??(old?.contacts[0].row as 1|2|undefined)??(inherited?.contacts[0].row as 1|2|undefined)??1;
   const anchor=input.anchorMidiPitch??old?.contacts[0].midiPitch??(inherited?.contacts[0].row===row?inherited.contacts[0].midiPitch:undefined);
@@ -133,21 +133,21 @@ export class StretchController {
   this.prepared=true;this.interrupted=false;this.failure=undefined;this.emit();return Promise.resolve(this.prepared);
  }
  private ready():boolean{return !this.stopped&&!this.pending&&!this.retained.error&&!this.interrupted&&this.prepared;}
- private terminal(s:StretchCalibrationSession,sweepId:string,reason:PairSweepTerminal['reason'],unavailableId:string|null=null,notes?:string):void {
-  s.entries.push({kind:'pair-sweep-terminal',...this.stamp(notes),sweepId,reason,lastReachableObservationId:this.lastReachable(s,sweepId)?.id??null,firstUnavailableObservationId:unavailableId});
+ private terminal(s:StretchCalibrationSession,sweepId:string,reason:PairSweepTerminal['reason'],unavailableId:string|null=null,notes?:string,reachableId?:string):void {
+  s.entries.push({kind:'pair-sweep-terminal',...this.stamp(notes),sweepId,reason,lastReachableObservationId:reachableId??this.lastReachable(s,sweepId)?.id??null,firstUnavailableObservationId:unavailableId});
  }
  rate(grade:StretchGrade,input:StretchRatingInput={kind:'screen'},expectedTrialId?:string,notes?:string):Promise<boolean>{
   if(!this.ready()||input.kind==='screen'&&this.held.size>0)return Promise.resolve(false);
   const selected=this.state.current.trial;if(!selected||expectedTrialId!==undefined&&expectedTrialId!==selected.id)return Promise.resolve(false);
   const prior=this.active()!,isRevision=effectivePairReports(prior).some(e=>e.trialId===selected.id);
-  const hasBaseline=effectivePairReports(prior).some(e=>e.sweepId===selected.sweepId&&e.grade<5&&e.trialId!==selected.id&&prior.pairTrials.find(t=>t.id===e.trialId)!.distanceSemitoneSteps<selected.distanceSemitoneSteps);
-  if(grade===5&&!hasBaseline){this.failure='Find a reachable starting span before rating outward stretch. Widen the starting span if this one is too close.';this.emit();return Promise.resolve(false);}
+  const baseline=effectivePairReports(prior).filter(e=>e.sweepId===selected.sweepId&&e.grade<5&&e.trialId!==selected.id&&prior.pairTrials.find(t=>t.id===e.trialId)!.distanceSemitoneSteps<selected.distanceSemitoneSteps)
+   .sort((a,b)=>prior.pairTrials.find(t=>t.id===a.trialId)!.distanceSemitoneSteps-prior.pairTrials.find(t=>t.id===b.trialId)!.distanceSemitoneSteps).at(-1);
   let continuing=false;
   return this.mutation(a=>{const s=this.require(a),t=s.pairTrials.find(v=>v.id===selected.id);if(s.cursor?.trialId!==selected.id||!t)throw Error('The displayed trial changed.');
    const e:PairStretchObservation=grade===5?{kind:'pair-stretch',...this.stamp(notes??this.baselineNotes),trialId:t.id,sweepId:t.sweepId,grade,input:copy(input),realization:null}:{kind:'pair-stretch',...this.stamp(notes??this.baselineNotes),trialId:t.id,sweepId:t.sweepId,grade,input:copy(input),realization:{id:this.id(),contacts:copy(t.contacts)}};
    s.entries.push(e);
+   if(grade===5){if(baseline){this.terminal(s,t.sweepId,'first-unavailable',e.id,undefined,baseline.id);this.nextCursor(s);}return;}
    if(isRevision&&['recorded','omitted'].includes(stretchSlotStatus(s,'progressive-pairs',t.sweepId))){this.nextCursor(s);return;}
-   if(grade===5){this.terminal(s,t.sweepId,'first-unavailable',e.id);this.nextCursor(s);return;}
    const next=this.target(s,t.sweepId,t.distanceSemitoneSteps+2,t.contacts[0].row as 1|2,t.contacts[0].midiPitch,false);
    if(next){s.cursor={phase:'progressive-pairs',slotId:t.sweepId,trialId:next.id};continuing=true;}
    else{this.terminal(s,t.sweepId,'coverage-edge');this.nextCursor(s);}
