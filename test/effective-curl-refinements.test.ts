@@ -75,7 +75,7 @@ test('archive preserves separate hands and players, checks global identities and
 test('saving another hand preserves existing companion evidence and all four non-thumb fingers',async()=>{
  const files=new Files(),prior=document();prior.assumptions=[assumption()];prior.entries=[measurement()];let i=0;const c=new CurlController({files,load:{value:archive(prior)},playerId:'other-player',hand:'LH',id:()=>`left-${++i}`,now:()=>timestamp});
  for(const f of [2,3,4,5] as const){c.selectFinger(f);assert.equal(c.state.draft.length,'');c.edit({length:String(40+f)});assert.equal(await c.save(),true);}
- const load=await loadCurl(files);assert.deepEqual(curlDocument(load.value,'player','RH'),prior);assert.deepEqual(curlDocument(load.value,'other-player','LH')!.entries.map(e=>e.kind==='effective-curl-length'?e.finger:null),[2,3,4,5]);assert.equal(JSON.parse(new TextDecoder().decode(files.bytes)).documents.length,2);
+ const load=await loadCurl(files);assert.deepEqual(curlDocument(load.value,'player','RH'),prior);assert.deepEqual(curlDocument(load.value,'other-player','LH')!.entries.map(e=>e.kind==='effective-curl-length'?e.finger:null),[2,3,4,5]);assert.equal(JSON.parse(new TextDecoder().decode(files.bytes)).documents.length,2);const exported=JSON.parse(c.exportDocument());assert.equal(exported.version,'effective-curl-refinements-v1');assert.equal(exported.playerId,'other-player');assert.equal(exported.hand,'LH');assert.equal(exported.entries.length,4);assert.equal(exported.documents,undefined);
 });
 
 test('malformed, unknown-version and invalid UTF-8 bytes stay read-only and export byte-exact',async()=>{
