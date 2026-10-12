@@ -232,3 +232,17 @@ test('a failed first-unavailable save retains the displayed target and permits a
  memory.files.write=async()=>{throw Error('disk unavailable');};assert.equal(await c.rate(5),false);assert.deepEqual(c.session,before);assert.equal(c.state.current.needsSetup,false);
  memory.files.write=original;assert.equal(await c.rate(5),true);assert.equal(effectivePairReports(c.session!).length,1);assert.equal(c.session!.entries.some(e=>e.kind==='pair-sweep-terminal'),false);assert.equal(c.state.current.needsSetup,true);
 });
+
+test('an unavailable terminal cannot reuse a startup failure before its baseline or from another arrangement',async()=>{
+ for(const row of [1,2] as const){
+  const {c}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline({spanSteps:6});await c.prepare();await c.rate(5);
+  const unavailable=c.session!.entries.find(e=>e.kind==='pair-stretch')!;
+  await c.prepareBaseline({spanSteps:4,row,anchorMidiPitch:row===1?61:60});await c.prepare();await c.rate(0);await validateStretchArchive(c.archive);
+  const reachable=effectivePairReports(c.session!).find(e=>e.grade===0)!;
+  const forged=structuredClone(c.archive),s=forged.sessions[0];
+  // Earlier timestamps cannot turn a later ledger report into the observed baseline.
+  s.entries.find(e=>e.id===unavailable.id)!.recordedAt='2026-10-13T12:00:00Z';s.entries.find(e=>e.id===reachable.id)!.recordedAt='2026-10-12T12:00:00Z';
+  s.entries.push({kind:'pair-sweep-terminal',id:`forged-startup-terminal-row-${row}`,recordedAt:'2026-10-14T12:00:00Z',sweepId:reachable.sweepId,reason:'first-unavailable',lastReachableObservationId:reachable.id,firstUnavailableObservationId:unavailable.id});
+  await assert.rejects(()=>validateStretchArchive(forged),/same row and anchor|before the unavailable/);
+ }
+});
