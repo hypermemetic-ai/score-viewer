@@ -71,6 +71,9 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   dialog.classList.toggle('calibration-review',page==='review');
   dialog.classList.toggle('calibration-options',page==='options');
   body.dataset.page=page;footer.hidden=page==='measurements';
+  // Keep device controls connected while their asynchronous mount runs on the menu.
+  // Move the same panel out before replacing page content, preserving its listeners.
+  dialog.append(midiContainer);midiContainer.hidden=page!=='options';
   const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
   if(page==='main'){
    header.innerHTML='<h2>Calibration</h2>';

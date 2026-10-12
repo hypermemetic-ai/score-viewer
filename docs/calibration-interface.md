@@ -10,7 +10,7 @@ The left-aligned Calibrate command opens calibration from Options → Fingerings
 
 The global setting uses the additive `notationSystem` preference. Existing `calibrationNoteNames` bytes remain retained with other preferences; they do not enable an unavailable global notation system. No saved reading, effort grade, score or fingering is converted by this interface change. Native delivery of an earlier revision is separate from this source preview.
 
-Calibration Options uses the same system font, normal-weight title and inset panel treatment as rating review. Its existing notation, key-color, span and input controls retain their behavior and return route.
+Calibration Options uses the same system font, normal-weight title and inset panel treatment as rating review. Its existing notation, key-color, span and input controls retain their behavior and return route. The device panel remains connected and hidden on other calibration pages so asynchronous input discovery can finish; opening Options moves the same mounted controls into its body.
 
 ## Calibration menu
 
