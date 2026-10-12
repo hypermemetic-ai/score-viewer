@@ -1,3 +1,6 @@
+.curl-calibration-dialog{--viewer-dialog-max:1100px;display:flex;flex-direction:column;width:1100px;max-width:94vw;height:820px;max-height:94vh;padding:26px 34px;background:#000;border:0;overflow:hidden}
+.curl-calibration-dialog>.effective-curl{flex:1}
+.curl-calibration-dialog *{scrollbar-width:none}.curl-calibration-dialog *::-webkit-scrollbar{display:none;width:0;height:0}
 .effective-curl{display:flex;flex-direction:column;height:100%;min-height:0;gap:18px;font-family:Arial,Helvetica,sans-serif;color:#eeeae0}
 .effective-curl h1,.effective-curl h2,.effective-curl p{margin:0;font:inherit;line-height:1.45}
 .effective-curl h1{font-size:26px}.effective-curl h2{font-size:23px}.effective-curl header p,.curl-introduction,.curl-group-label,.curl-optional,.curl-estimate-basis,.curl-endpoints,.curl-navigation-hint{color:#aaa59d}
@@ -16,5 +19,5 @@
 .curl-entry-frame input{font-size:25px;outline:none!important;border:0;padding:0}.curl-entry-frame span{font-size:18px;color:#aaa59d}.curl-optional{font-size:14px}.curl-endpoints{font-size:15px!important}.curl-notes input{display:block;margin-top:8px;padding:10px 12px;border:1px solid #aaa59d;outline:none}.curl-notes input:focus{border-color:#76cce2}
 .curl-personal-actions{display:flex;gap:30px;flex-wrap:wrap}.curl-personal-actions [data-curl-retract]{color:#aaa59d}.curl-message{font-size:16px!important;color:#ebbf78;min-height:24px}
 .effective-curl footer{margin-top:16px;flex:none}.curl-navigation-hint{font-size:15px!important}.effective-curl kbd{font:inherit;font-size:.85em;margin-left:8px;text-decoration:none!important;display:inline-block}.effective-curl [hidden]{display:none!important}
-@media(max-width:760px){.curl-body{grid-template-columns:150px minmax(0,1fr);gap:22px}.curl-numbers{grid-template-columns:minmax(0,1fr);gap:16px}.curl-fingers button{padding:10px}.curl-fingers button span:last-child{font-size:13px}.curl-personal-actions{gap:12px 22px}}
+@media(max-width:760px){.curl-calibration-dialog{padding:20px 24px}.curl-body{grid-template-columns:150px minmax(0,1fr);gap:22px}.curl-numbers{grid-template-columns:minmax(0,1fr);gap:16px}.curl-fingers button{padding:10px}.curl-fingers button span:last-child{font-size:13px}.curl-personal-actions{gap:12px 22px}}
 @media(max-width:500px){.curl-body{grid-template-columns:minmax(0,1fr);gap:24px}.curl-fingers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.curl-group-label{grid-column:1/-1}.curl-fingers button{padding:8px 6px}.curl-fingers button span:first-child{font-size:16px}.curl-fingers button span:last-child{font-size:12px}.effective-curl header{gap:6px}.effective-curl h1{font-size:24px}}
