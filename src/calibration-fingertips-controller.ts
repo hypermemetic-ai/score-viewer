@@ -21,7 +21,7 @@ export class FingertipController {
  async saveAndNext():Promise<boolean>{
   if(this.busy||this.stopped||this.retained.error)return false;
   const s=this.state,value=parseFingertip(s.raw,s.method);
-  if(!s.reference||value===undefined){this.error=!s.reference?'Choose the primary finger.':s.method==='percent'?'Enter a number of 100% or less. Negative numbers are allowed.':'Enter a nonnegative number of millimeters.';this.emit();return false;}
+  if(!s.reference||value===undefined){this.error=!s.reference?'Choose the primary finger.':s.method==='percent'?'Enter a number no greater than 100%.':'Enter zero or more millimeters.';this.emit();return false;}
   const candidate=structuredClone(this.accepted);candidate.readings.push({id:(this.options.id??(()=>crypto.randomUUID()))(),recordedAt:(this.options.now??(()=>new Date().toISOString()))(),instrument:s.instrument,hand:s.hand,pair:s.pair,method:s.method,reference:s.reference,value,raw:s.raw,illustration:FINGERTIP_ILLUSTRATION,protocol:'extended-fingertip-reach-v1'});
   this.busy=true;this.error=undefined;const epoch=this.epoch;let settle!:()=>void;this.flight=new Promise<void>(r=>{settle=r;});this.emit();
   try{await this.options.files.write(FINGERTIPS_FILE,fingertipBytes(candidate));this.accepted=candidate;if(!this.stopped&&epoch===this.epoch){this.pair=Math.min(3,this.pair+1);this.saved=true;}return true;}
