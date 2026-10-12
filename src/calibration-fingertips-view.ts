@@ -9,7 +9,7 @@ export function mountFingertipCalibration(container:HTMLElement,controller:Finge
  const render=(s:FingertipState)=>{
   const names=FINGERTIP_PAIRS[s.pair],percent=s.method==='percent',other=names[s.reference==='first'?1:0];
   get('.pair-count').textContent=`Pair ${s.pair+1} of 4`;get('h1').textContent=names.join(' + ');hand.value=s.hand;
-  get('.instructions').innerHTML=percent?`${fingertipPlacementInstruction(s.pair,s.hand,options.noteNames())}<br>${s.pair===0?'Keep both flat. Slide forward until one fingertip touches the wall.':'Use the near copies. Keep both flat and slide until a fingertip meets the wall.'}`:'Keep both fingers straight, flat and parallel.<br>Use a ruler to measure the difference between their fingertips.';
+  get('.instructions').innerHTML=percent?`${fingertipPlacementInstruction(s.pair,s.hand,options.noteNames())}<br>${s.pair===0?'Keep both flat. Slide forward until one fingertip touches the wall.':'Keep both flat and slide until a fingertip meets the wall.'}`:'Keep both fingers straight, flat and parallel.<br>Use a ruler to measure the difference between their fingertips.';
   root.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(b=>{b.hidden=s.instrument==='conventional-piano'&&b.dataset.method==='percent';b.setAttribute('aria-pressed',String(b.dataset.method===s.method));b.disabled=s.busy;});
   get('h2').textContent=percent?(s.reference==='both'?'Both reach their walls.':s.reference?`How far does your ${other.toLowerCase()}${other==='Thumb'?'':' finger'} reach?`:'Which finger touches the wall?'):'Difference in fingertip reach';
   const focused=document.activeElement===entry,start=entry.selectionStart,end=entry.selectionEnd;
