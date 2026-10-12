@@ -179,3 +179,22 @@ test('failed target rendering gates the next rating until contacts are reproduce
  assert.equal(await c.rate(1),true);assert.equal(c.state.current.needsSetup,true);assert.equal(c.state.resumeRequired,true);assert.equal(await c.rate(2),false);assert.match(c.state.error!,/screen update failed/);
  off();assert.equal(await c.prepare(),true);assert.equal(await c.rate(2),true);
 });
+
+test('a later reach omission makes derived differences unknown until replacement or retraction',async()=>{
+ const {c}=await collector();await reach(c);const slot=c.session!.plan.relativeReachSlots[0],original=c.session!.entries[0];
+ await c.navigate({phase:'relative-fingertip-reach',slotId:slot.id});assert.equal(await c.skip(),true);
+ assert.equal(relativeDifferenceMm(c.session!,1,2),null);assert.equal(relativeDifferenceMm(c.session!,1,5),null);
+ assert.equal(relativeDifferenceMm(c.session!,2,5),-16);assert.equal(recommendedSpanSteps(c.session!,[1,2]),2);assert.ok(c.session!.entries.some(e=>e.id===original.id));
+ const omission=c.session!.entries.filter(e=>e.kind==='omission').at(-1)!;assert.equal(await c.retract(omission.id,'restore reading'),true);assert.equal(relativeDifferenceMm(c.session!,1,2),40);
+ await c.navigate({phase:'relative-fingertip-reach',slotId:slot.id});await c.skip();await c.navigate({phase:'relative-fingertip-reach',slotId:slot.id});await c.saveReach({kind:'signed-mm',differenceMm:20,method:'new ruler reading'});
+ assert.equal(relativeDifferenceMm(c.session!,1,2),20);
+});
+
+test('new sweeps and restored collections inherit the first recorded row and anchor',async()=>{
+ const {c,geometry,memory}=await collector();const provenance=c.session!.plan.provenance;
+ assert.equal(await c.createCollection({geometry,provenance:{...provenance,setupId:'row-two-setup'},row:2,anchorMidiPitch:60}),true);await reach(c,[0,0,0,0]);
+ await c.prepareBaseline();assert.equal(c.state.current.trial!.contacts[0].row,2);assert.equal(c.state.current.trial!.contacts[0].midiPitch,60);await c.prepare();await c.rate(3);await c.markMaximum();
+ await c.prepareBaseline();assert.equal(c.state.current.trial!.contacts[0].row,2);assert.equal(c.state.current.trial!.contacts[0].midiPitch,60);await c.prepare();await c.rate(0);await c.markMaximum();
+ const loaded=await loadStretch(memory.files),resumed=new StretchController({load:loaded,files:memory.files});await resumed.prepareBaseline();
+ assert.equal(resumed.state.current.trial!.contacts[0].row,2);assert.equal(resumed.state.current.trial!.contacts[0].midiPitch,60);
+});

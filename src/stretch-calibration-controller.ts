@@ -118,8 +118,11 @@ export class StretchController {
   const s=this.require(a),c=s.cursor,sw=s.plan.pairSweeps.find(v=>v.id===c?.slotId);if(c?.phase!=='progressive-pairs'||!sw)throw Error('Select a pair sweep.');
   if(effectivePairReports(s).some(e=>e.sweepId===sw.id))throw Error('The rated sweep arrangement is fixed; select an existing target to recheck it.');
   const old=c.trialId?s.pairTrials.find(t=>t.id===c.trialId):s.pairTrials.find(t=>t.sweepId===sw.id);
-  const row=input.row??(old?.contacts[0].row as 1|2|undefined)??1;
-  const t=this.target(s,sw.id,input.spanSteps??recommendedSpanSteps(s,sw.pair),row,input.anchorMidiPitch??old?.contacts[0].midiPitch)!;c.trialId=t.id;
+  const firstReport=s.entries.find(e=>e.kind==='pair-stretch');
+  const inherited=firstReport?.kind==='pair-stretch'?s.pairTrials.find(t=>t.id===firstReport.trialId):s.pairTrials[0];
+  const row=input.row??(old?.contacts[0].row as 1|2|undefined)??(inherited?.contacts[0].row as 1|2|undefined)??1;
+  const anchor=input.anchorMidiPitch??old?.contacts[0].midiPitch??(inherited?.contacts[0].row===row?inherited.contacts[0].midiPitch:undefined);
+  const t=this.target(s,sw.id,input.spanSteps??recommendedSpanSteps(s,sw.pair),row,anchor)!;c.trialId=t.id;
   // Setup notes are retained with the eventual actual report, not fabricated as an observation.
  },()=>{this.baselineNotes=notes;this.prepared=false;this.interrupted=false;});}
  private baselineNotes?:string;
