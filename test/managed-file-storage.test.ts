@@ -28,7 +28,7 @@ test('only prepared keys get bounded native aliases; every full identity compone
   assert.equal(validPhysicalManagedName(name),false);assert.equal(await physicalManagedName(alias),alias);aliases.add(alias);
  }
  assert.equal(aliases.size,8);
- for(const name of ['library.json','preferences.json','calibration.json','practice-error-log.json',`package-${'A'.repeat(64)}.isoscore`,
+ for(const name of ['library.json','preferences.json','calibration.json','stretch-calibration-v1.json','effective-curl-refinements-v1.json','practice-error-log.json',`package-${'A'.repeat(64)}.isoscore`,
   `state-version-${'a'.repeat(64)}.json`,`state-${'A'.repeat(64)}.json`,key().replace(`-${'d'.repeat(64)}.json`,'.json')])assert.equal(await physicalManagedName(name),name);
 });
 
@@ -36,7 +36,7 @@ test('unsafe or unknown prepared-name forms refuse before either backend is call
  let io=0;const storage=managedFileStorage({async read(){io++;return null;},async write(){io++;}},async()=>{io++;return null;});
  for(const name of ['../library.json','C:\\library.json',key()+'\n',key()+'\0',key()+'x',key().replace('.json','-extra.json'),
   key().replace('conventional-piano','piano'),key().replace('state-','notes-'),key().replace('a'.repeat(64),'A'.repeat(64)),
-  key().replace('b'.repeat(64),'b'.repeat(63)),'CON','arbitrary.json',`state-version-${'A'.repeat(64)}.json`]){
+  key().replace('b'.repeat(64),'b'.repeat(63)),'CON','arbitrary.json','stretch-calibration-v2.json','Stretch-calibration-v1.json','stretch-calibration-v1.json.backup','../effective-curl-refinements-v1.json',`state-version-${'A'.repeat(64)}.json`]){
   await assert.rejects(()=>storage.read(name),/Invalid managed file identity/);await assert.rejects(()=>storage.write(name,encode({})),/Invalid managed file identity/);
  }
  assert.equal(io,0);

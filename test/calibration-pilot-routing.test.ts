@@ -70,16 +70,16 @@ test('actual main ignores calibration MIDI before rating commands, score clocks 
  context.startupReady=true;context.calibrationPilot=undefined;context.onMidiNote(note);context.onMidi({...note,controller:80,value:127});
 });
 test('actual main key listeners route raw grades before bindings and deliver guarded key-up',()=>{
- const events:any[]=[],listeners:Record<string,(event:any)=>void>={},context:any={startupReady:true,startupFailed:false,window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
-  calibrationPilot:{view:{acceptsRatings:true,key(){return false;}},input:{key(event:any,type:string){events.push({code:event.code,type});return true;}}},syncControls(){throw Error('bindings reached');},bindingOptions:undefined,practice:undefined,inputCode:(e:any)=>e.code,
+ const events:any[]=[],listeners:Record<string,(event:any)=>void>={},context:any={startupReady:true,startupFailed:false,curlCalibration:undefined,readerFocused:true,document:{hidden:false},window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
+  calibrationPilot:{view:{acceptsRatings:true,key(){return false;}},controller:{inputKey(event:any){events.push({code:event.code,type:event.type});return true;}}},syncControls(){throw Error('bindings reached');},bindingOptions:undefined,practice:undefined,inputCode:(e:any)=>e.code,
   controls:{keyUp(){return false;}},input:{up(){return false;}},refreshPresentation(){}};
  context.applicationNavigationKey=applicationNavigationKey;runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
  let prevented=false;listeners.keydown({...key('Numpad3'),preventDefault(){prevented=true;}});listeners.keyup(key('Numpad3',{ctrlKey:true,target:{closest:()=>({})}}));
- assert.equal(prevented,true);assert.deepEqual(events,[{code:'Numpad3',type:'key-down'},{code:'Numpad3',type:'key-up'}]);context.startupReady=false;prevented=false;listeners.keydown({...key('Digit1'),preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(events.length,2,'startup key cannot reach calibration or controls');context.startupFailed=true;prevented=false;listeners.keydown({...key('Tab'),preventDefault(){prevented=true;}});assert.equal(prevented,false,'fatal-screen actions retain native keyboard access');assert.equal(events.length,2);
+ assert.equal(prevented,true);assert.deepEqual(events,[{code:'Numpad3',type:'keydown'},{code:'Numpad3',type:'keyup'}]);context.startupReady=false;prevented=false;listeners.keydown({...key('Digit1'),preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(events.length,2,'startup key cannot reach calibration or controls');context.startupFailed=true;prevented=false;listeners.keydown({...key('Tab'),preventDefault(){prevented=true;}});assert.equal(prevented,false,'fatal-screen actions retain native keyboard access');assert.equal(events.length,2);
 });
 
 test('measurement navigation precedes dialog navigation and field digits cannot reach rating routing',()=>{
- const listeners:Record<string,(event:any)=>void>={},seen:string[]=[],context:any={startupReady:true,startupFailed:false,
+ const listeners:Record<string,(event:any)=>void>={},seen:string[]=[],context:any={startupReady:true,startupFailed:false,curlCalibration:undefined,readerFocused:true,document:{hidden:false},
   window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
   calibrationPilot:{view:{acceptsRatings:false,key(event:any){seen.push(event.code);return event.code==='ArrowRight';}},
    input:{key(){throw Error('measurement reached effort rating');}}},
@@ -92,79 +92,54 @@ test('measurement navigation precedes dialog navigation and field digits cannot 
 });
 
 function modalFixture(){
- let stored=0,reads=0,releaseWrite:(()=>void)|undefined;const controllers:any[]=[],views:any[]=[],events:any[]=[];
+ let stored=0,reads=0,releaseWrite:(()=>void)|undefined;const controllers:any[]=[],views:any[]=[];
  class Controller {
-  readonly loaded:number;state={archive:{activeCollectionId:'same-collection'},inputGeneration:0};listeners=new Set<(state:any)=>void>();disposed=false;
-  constructor(readonly options:any){this.loaded=options.load.value;controllers.push(this);}
-  subscribe(fn:(state:any)=>void){this.listeners.add(fn);fn(this.state);return()=>this.listeners.delete(fn);}
-  input(event:any){events.push(event);return Promise.resolve(true);}
-  break(){this.state.inputGeneration++;for(const fn of this.listeners)fn(this.state);}
-  dispose(){this.disposed=true;this.break();}
-  save(value:number){return this.options.files.write('calibration-effort-v2.json',new Uint8Array([value]));}
+  disposed=false;readonly loaded:number;
+  flight=Promise.resolve();
+  constructor(readonly options:any){this.loaded=options.load.value.storedValue;controllers.push(this);}
+  dispose(){this.disposed=true;}flush(){return this.flight;}inputKey(){return true;}
+  save(value:number,validation=Promise.resolve()){return this.flight=(async()=>{await validation;await this.options.files.write('stretch-calibration-v1.json',new Uint8Array([value]));})();}
  }
- class Fingertips {dispose(){}exportArchive(){return '{}';}}
- const context:any={EffortController:Controller,FingertipController:Fingertips,PilotInputScope,MidiOptionsPanel:class {constructor(){throw Error('Calibration device panel mounted');}},
-  calibrationGeneration:0,calibrationPilot:undefined,dialog:undefined,dialogBack:undefined,
-  preferences:{keyboardLayout:'janko-four-row'},readerFocused:true,document:{hidden:false},midiConnection:{source:'piano',generation:2},
-  orientation:{rotation:0},fitDialog(){},connectMidi(){},disconnectMidi(){},notify(){},resetInput(){},input:{capture:undefined},
+ const context:any={StretchController:Controller,calibrationGeneration:0,calibrationPilot:undefined,curlCalibration:undefined,curlBack:undefined,dialog:undefined,dialogBack:undefined,
+  preferences:{keyboardLayout:'janko-four-row'},crypto:{randomUUID:()=> 'test-player-id'},esc:(s:string)=>s,button:()=>'',orientation:{rotation:0},fitDialog(){},input:{capture:undefined},resetInput(){},notify(){},
   app:{querySelector:()=>undefined},librarySummaryPaintPending:false,current:undefined,practice:undefined,selection:undefined,
-  host:{async read(){reads++;return stored;},async write(_name:string,bytes:Uint8Array){await new Promise<void>(r=>{releaseWrite=r;});stored=bytes[0];},async midiClock(){throw Error('Native clock reached');},async midiSources(){throw Error('Native sources reached');},async exportFeedback(){}},
-  loadEffort:async(files:any)=>({value:await files.read('calibration-effort-v2.json')}),
-  loadFingertips:async(files:any)=>({value:await files.read('calibration-fingertips-v1.json')}),
-  loadPilot:async(host:any)=>({value:await host.read('calibration-pilot-v1.json')}),
-  saveCalibrationNoteNames(){},saveNotationSystem(){},saveCalibrationColors(){},
-  mountCalibrationView(_dialog:any,controller:any,_fingertips:any,hooks:any){const view={controller,hooks,disposed:false,acceptsRatings:true,key(){return false;},input:(event:any)=>controller.input(event),break:()=>controller.break(),dispose(){this.disposed=true;}};views.push(view);return view;},
-  showDialog(_html:string,kind:string){context.closeDialog(false);return context.dialog={dataset:{kind},close(){},remove(){},innerHTML:''};},
+  host:{async read(){reads++;return stored;},async write(_name:string,bytes:Uint8Array){await new Promise<void>(r=>{releaseWrite=r;});stored=bytes[0];}},
+  loadStretch:async(files:any)=>({value:{sessions:[],storedValue:await files.read('stretch-calibration-v1.json')}}),saveCalibrationColors(){},
+  mountStretchCalibrationView(_dialog:any,controller:any,hooks:any){const view={controller,hooks,disposed:false,acceptsRatings:true,key(){return false;},break(){},dispose(){this.disposed=true;}};views.push(view);return view;},
+  showDialog(_html:string,kind:string){context.closeDialog(false);return context.dialog={dataset:{kind},close(){},remove(){},innerHTML:''};}
  };
  for(const key of ['job','readingOperation','practiceOptionsCleanup','transposeControls','optionsNavigation','dialogNavigation','bindingOptions','midiOptions','audioOptions','pianoOptions','practiceFocusReturn','focusReturn'])context[key]=undefined;
+ runInNewContext(body('let calibrationDrain:','let transposeControls:'),context);
  runInNewContext(body('let persist=Promise.resolve();','const esc='),context);
  runInNewContext(body('function closeDialog(','function showDialog('),context);
  runInNewContext(body('async function calibrate(','function calibrateLegacy('),context);
- return{context,controllers,views,events,get reads(){return reads;},release(){assert.ok(releaseWrite);releaseWrite();}};
+ return{context,controllers,views,get reads(){return reads;},release(){assert.ok(releaseWrite);releaseWrite();}};
 }
-test('actual modal close disposes subscriptions and fresh reopen waits for the prior accepted write',async()=>{
- const f=modalFixture();await f.context.calibrate();assert.equal(f.reads,3);assert.equal(f.controllers[0].loaded,0);
- const writing=f.controllers[0].save(7);await Promise.resolve();f.context.closeDialog(false);assert.equal(f.controllers[0].disposed,true);assert.equal(f.views[0].disposed,true);assert.equal(f.controllers[0].listeners.size,0);
- const reopening=f.context.calibrate();await Promise.resolve();await Promise.resolve();assert.equal(f.reads,3,'new disk load must not overtake queued save');assert.equal(f.controllers.length,1);
- f.release();await writing;await reopening;assert.equal(f.reads,6);assert.equal(f.controllers[1].loaded,7);assert.equal(f.views[1].hooks.instrument,'janko-four-row');
+test('actual stretch modal close disposes its owners and reopen waits for accepted writes',async()=>{
+ const f=modalFixture();await f.context.calibrate();assert.equal(f.reads,1);assert.equal(f.controllers[0].loaded,0);
+ const writing=f.controllers[0].save(7);await new Promise(r=>setImmediate(r));f.context.closeDialog(false);assert.equal(f.controllers[0].disposed,true);assert.equal(f.views[0].disposed,true);
+ const reopening=f.context.calibrate();await Promise.resolve();await Promise.resolve();assert.equal(f.reads,1);assert.equal(f.controllers.length,1);
+ f.release();await writing;await reopening;assert.equal(f.reads,2);assert.equal(f.controllers[1].loaded,7);assert.equal(f.views[1].hooks.instrument,'janko-four-row');
 });
-test('actual modal loading callbacks do not mount after close or replacement',async()=>{
- const f=modalFixture();const opening=f.context.calibrate();f.context.closeDialog(false);await opening;assert.equal(f.controllers.length,0);assert.equal(f.views.length,0);
- await f.context.calibrate();assert.equal(f.reads,6);assert.equal(f.controllers.length,1);
+test('reopen waits for a retired save still validating before it enters the host write queue',async()=>{
+ const f=modalFixture();await f.context.calibrate();let validated!:()=>void;
+ const writing=f.controllers[0].save(9,new Promise<void>(r=>{validated=r;}));
+ f.context.closeDialog(false);const reopening=f.context.calibrate();await new Promise(r=>setImmediate(r));
+ assert.equal(f.reads,1,'no stale archive load while retired validation is pending');
+ validated();await new Promise(r=>setImmediate(r));assert.equal(f.reads,1,'retired durable write still precedes reopen');
+ f.release();await writing;await reopening;assert.equal(f.controllers[1].loaded,9);
 });
-test('a rejected old pilot load cannot dispose device controls owned by replacement Options',async()=>{
- const f=modalFixture();let reject!:(error:Error)=>void;f.context.loadEffort=()=>new Promise((_resolve:any,r:any)=>{reject=r;});
- const opening=f.context.calibrate();await Promise.resolve();f.context.closeDialog(false);
+test('reopen also drains a retired optional curl editor before loading calibration evidence',async()=>{
+ const f=modalFixture();await f.context.calibrate();let finish!:()=>void;let disposed=false;
+ f.context.curlCalibration={flush:()=>new Promise<void>(r=>{finish=r;}),dispose(){disposed=true;}};
+ f.context.closeDialog(false);const reopening=f.context.calibrate();await new Promise(r=>setImmediate(r));
+ assert.equal(disposed,true);assert.equal(f.reads,1);finish();await reopening;assert.equal(f.reads,2);
+});
+test('actual stretch modal loading cannot mount after close or dispose replacement global Options',async()=>{
+ const f=modalFixture();const opening=f.context.calibrate();f.context.closeDialog(false);await opening;assert.equal(f.controllers.length,0);
+ let reject!:(error:Error)=>void;f.context.loadStretch=()=>new Promise((_resolve:any,r:any)=>{reject=r;});
+ const pending=f.context.calibrate();await new Promise(r=>setImmediate(r));f.context.closeDialog(false);
  const replacement={dataset:{kind:'options'},innerHTML:'replacement options'},devices={disposed:false,dispose(){this.disposed=true;}};
- f.context.dialog=replacement;f.context.midiOptions=devices;reject(Error('old load rejected'));await opening;
- assert.equal(f.context.dialog,replacement);assert.equal(replacement.innerHTML,'replacement options');assert.equal(f.context.midiOptions,devices);assert.equal(devices.disposed,false);assert.equal(f.controllers.length,0);
-});
-test('actual calibration ignores an already connected piano without native discovery or clock activation',async()=>{
- const f=modalFixture();await f.context.calibrate();const scope=f.context.calibrationPilot.input;
- scope.midi(note);scope.cc({...note,controller:121,value:0});assert.equal(f.events.length,0);
- assert.equal(scope.key(key('Digit2'),'key-down'),true);assert.equal(scope.key(key('Digit2'),'key-up'),true);
- assert.deepEqual(f.events.map(e=>({kind:e.kind,type:e.type,code:e.code})),[
-  {kind:'manual',type:'key-down',code:'Digit2'},{kind:'manual',type:'key-up',code:'Digit2'}]);
- f.controllers[0].break();await Promise.resolve();scope.midi({...note,timestamp_micros:210});assert.equal(f.events.length,2);
-});
-test('actual focus loss and hidden document break setup and guard keyboard ratings',async()=>{
- const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}}});await f.context.calibrate();
- runInNewContext(body('function gainFocus(','function transformSurface('),f.context);const scope=f.context.calibrationPilot.input;
- scope.key(key('Digit1'),'key-down');assert.equal(f.events.length,1);
- f.context.loseFocus();assert.equal(f.context.readerFocused,false);assert.ok(f.controllers[0].state.inputGeneration>0);
- assert.equal(scope.key(key('Digit1'),'key-down'),false);assert.equal(scope.key(key('Digit1'),'key-up'),true);
- f.context.gainFocus();assert.equal(scope.key(key('Digit3'),'key-down'),true);
- f.context.document.hidden=true;f.context.loseFocus();f.context.gainFocus();assert.equal(scope.key(key('Digit3'),'key-down'),false);
- f.context.document.hidden=false;f.context.gainFocus();assert.equal(scope.key(key('Digit4'),'key-down'),true);
- assert.deepEqual(f.events.map(e=>e.code),['Digit1','Digit1','Digit3','Digit4']);
-});
-test('global piano reconnect does not enable calibration MIDI ratings or reset its manual setup',async()=>{
- const f=modalFixture();Object.assign(f.context,{PracticeView:class {},musicalSustain:{clear(){}},midiTransition:0});
- f.context.host.midiDisconnect=async()=>{};f.context.host.midiConnect=async(source:string)=>{assert.equal(source,'new piano');return 3;};
- await f.context.calibrate();runInNewContext(body('async function connectMidi(','function options('),f.context);const scope=f.context.calibrationPilot.input;
- await f.context.connectMidi('new piano');assert.equal(f.controllers[0].state.inputGeneration,0);
- scope.midi({...note,source:'new piano',generation:3,timestamp_micros:210});assert.equal(f.events.length,0);
- assert.equal(scope.key(key('Numpad4'),'key-down'),true);assert.equal(f.events.length,1);
- await f.context.disconnectMidi();assert.equal(f.context.midiConnection,undefined);assert.equal(f.controllers[0].state.inputGeneration,0);
- scope.midi({...note,source:'new piano',generation:3,timestamp_micros:310});assert.equal(f.events.length,1);
+ f.context.dialog=replacement;f.context.midiOptions=devices;reject(Error('old load rejected'));await pending;
+ assert.equal(f.context.dialog,replacement);assert.equal(replacement.innerHTML,'replacement options');assert.equal(devices.disposed,false);
 });
