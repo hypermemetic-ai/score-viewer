@@ -15,4 +15,4 @@
 
 ## 4. Review and delivery
 - [x] 4.1 Pass configured build/full tests and independent integrated source review; retain evidence and sync accepted specs.
-- [ ] 4.2 Land scoped reviewed PR changes and deliver/activate the exact native frontend through the established preservation lane; verify source/package/installed identities, archive the completed change and report actual inspection limits.
+- [x] 4.2 Land scoped reviewed PR changes and deliver/activate the exact native frontend through the established preservation lane; verify source/package/installed identities, archive the completed change and report actual inspection limits.
