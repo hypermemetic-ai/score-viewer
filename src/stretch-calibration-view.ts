@@ -157,7 +157,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  }
  function renderPair(session:StretchCalibrationSession){
   const state=controller.state,{trial,pairSweep:sweep,needsSetup}=state.current;if(!sweep)return;
-  const reports=effectivePairReports(session).filter(e=>e.sweepId===sweep.id),reachable=reports.filter(e=>e.grade<5),canAdjust=!reachable.length;
+  const reports=effectivePairReports(session).filter(e=>e.sweepId===sweep.id),canAdjust=!session.entries.some(e=>e.kind==='pair-stretch'&&e.sweepId===sweep.id&&e.grade<5);
   pairCursors.set(`${session.id}:${sweep.id}`,trial?.id??null);
   const old=trial??session.pairTrials.find(t=>t.sweepId===sweep.id),firstReport=session.entries.find(e=>e.kind==='pair-stretch'&&e.grade<5),inherited=firstReport?.kind==='pair-stretch'?session.pairTrials.find(t=>t.id===firstReport.trialId):session.pairTrials[0];
   const row=old?.contacts[0].row??inherited?.contacts[0].row??1,span=trial?.distanceSemitoneSteps??recommendedSpanSteps(session,sweep.pair),desired=session.plan.geometry.originMidiPitch+session.plan.provenance.referenceLocation.xMm/13.75;
@@ -179,11 +179,13 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   pairCursors.set(`${session.id}:${current.slotId}`,current.trial?.id??null);
   const generation=++navigationGeneration;pairNavigating=true;
   try{
-   const reports=effectivePairReports(session).filter(e=>e.sweepId===target.id),ratedIds=new Set(reports.map(e=>e.trialId)),trials=session.pairTrials.filter(t=>t.sweepId===target.id);
-   const widestReported=Math.max(0,...reports.map(e=>session.pairTrials.find(t=>t.id===e.trialId)?.distanceSemitoneSteps??0));
-   const nextUnrated=trials.filter(t=>!ratedIds.has(t.id)&&t.distanceSemitoneSteps>widestReported).sort((a,b)=>b.distanceSemitoneSteps-a.distanceSemitoneSteps)[0];
-   const defaultTrial=reports.length?(nextUnrated??trials.find(t=>t.id===reports.at(-1)?.trialId)):trials.at(-1);
-   const key=`${session.id}:${target.id}`,trialId=pairCursors.has(key)?pairCursors.get(key)!:defaultTrial?.id??null;
+   const reports=effectivePairReports(session).filter(e=>e.sweepId===target.id),ratedIds=new Set(reports.map(e=>e.trialId));
+   const firstReachable=session.entries.find(e=>e.kind==='pair-stretch'&&e.sweepId===target.id&&e.grade<5),frozen=firstReachable?.kind==='pair-stretch'?session.pairTrials.find(t=>t.id===firstReachable.trialId)?.contacts[0]:undefined;
+   const trials=session.pairTrials.filter(t=>t.sweepId===target.id&&(!frozen||t.contacts[0].row===frozen.row&&t.contacts[0].midiPitch===frozen.midiPitch));
+   const nextUnrated=trials.filter(t=>!ratedIds.has(t.id)).at(-1);
+   const latestRated=[...reports].reverse().map(e=>trials.find(t=>t.id===e.trialId)).find(Boolean),defaultTrial=nextUnrated??latestRated??trials.at(-1);
+   const key=`${session.id}:${target.id}`,cached=pairCursors.get(key),hasCached=pairCursors.has(key)&&(cached===null||trials.some(t=>t.id===cached));
+   const trialId=hasCached?cached!:defaultTrial?.id??null;
    await controller.navigate({phase:'progressive-pairs',slotId:target.id,trialId});
    if(!stopped&&!suspended&&page==='work'&&generation===navigationGeneration)focusKey='';
   }finally{pairNavigating=false;}
@@ -359,7 +361,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    if(type==='key-up'){heldActivations.delete(event.code);heldPairNavigation.delete(event.code);if(gradeCode)void controller.inputKey({type:'keyup',code:event.code});return gradeCode&&page==='work'&&controller.state.current.phase==='progressive-pairs';}
    const editable=(event.target as HTMLElement|null)?.closest('input,textarea,select,[contenteditable=true]');
    if(page==='work'&&!navigation?.picking&&keyboard?.key(event))return true;
-   if(page==='work'&&controller.state.current.phase==='progressive-pairs'&&!editable&&!navigation?.picking&&!(event.target as HTMLElement|null)?.closest('[data-camera]')&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&['ArrowLeft','ArrowRight'].includes(event.code)){const blocked=event.repeat||heldPairNavigation.size>0;heldPairNavigation.add(event.code);if(!blocked&&!busy())void perform(()=>movePair(event.code==='ArrowLeft'?-1:1));return true;}
+   if(page==='work'&&controller.state.current.phase==='progressive-pairs'&&!editable&&!navigation?.picking&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&['ArrowLeft','ArrowRight'].includes(event.code)){const blocked=event.repeat||heldPairNavigation.size>0;heldPairNavigation.add(event.code);if(!blocked&&!busy())void perform(()=>movePair(event.code==='ArrowLeft'?-1:1));return true;}
    if(['Enter','Space'].includes(actionCode(event))&&!editable&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(event.repeat||heldActivations.has(event.code))return true;heldActivations.add(event.code);}
    if(gradeCode&&!editable&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&page==='work'&&controller.state.current.phase==='progressive-pairs'){
     if(!controller.state.current.needsSetup&&!controller.state.resumeRequired&&pairIllustrationVisible())void controller.inputKey({type:'keydown',code:event.code,repeat:event.repeat});return true;

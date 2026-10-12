@@ -159,3 +159,46 @@ test('the pair screen keeps unavailable available and lets an unavailable-only s
   assert.ok(footerButtons.some(button=>button.getAttribute('data-stretch-command')==='previous-pair'));assert.ok(footerButtons.some(button=>button.getAttribute('data-stretch-command')==='next-pair'));
  }finally{f.dispose();}
 });
+
+for(const reachableAfterNarrowing of [false,true])test(`uncached pair recovery retains the narrowed ${reachableAfterNarrowing?'outward candidate':'unanswered target'} after an unavailable wider start`,async()=>{
+ const f=await fixture();
+ try{
+  assert.equal(await f.controller.prepareBaseline({spanSteps:8}),true);assert.equal(await f.controller.prepare(),true);assert.equal(await f.controller.rate(5),true);
+  assert.equal(await f.controller.prepareBaseline({spanSteps:4}),true);
+  if(reachableAfterNarrowing){assert.equal(await f.controller.prepare(),true);assert.equal(await f.controller.rate(1),true);}
+  const selected=f.controller.state.current.trial!.id,expectedSpan=reachableAfterNarrowing?6:4,session=f.controller.state.session!;
+  await f.controller.navigate({phase:'progressive-pairs',slotId:session.plan.pairSweeps[1].id});
+  const context={controller:f.controller,page:'work',navigationGeneration:0,stopped:false,suspended:false,pairNavigating:false,focusKey:'',pairCursors:new Map(),effectivePairReports,busy:()=>f.controller.state.busy};
+  const move=runInNewContext(moveHandler,context) as (delta:number)=>Promise<void>;
+  await move(-1);assert.equal(f.controller.state.current.trial!.id,selected);assert.equal(f.controller.state.current.trial!.distanceSemitoneSteps,expectedSpan);
+  assert.equal(f.controller.state.session!.entries.some(e=>e.kind==='omission'),false,'recovery does not convert unanswered contacts into omissions');
+ }finally{f.dispose();}
+});
+
+test('off-mode camera button focus still lets left/right navigate finger pairs',()=>{
+ const visited:number[]=[],context={stopped:false,suspended:false,page:'work',heldActivations:new Set(),heldPairNavigation:new Set(),
+  controller:{state:{current:{phase:'progressive-pairs'}},inputKey(){return Promise.resolve(false);}},navigation:{picking:false,keyDown(){throw Error('pair arrows must claim the event before ordinary button navigation');}},keyboard:{key(){return false;}},
+  busy:()=>false,perform(action:()=>Promise<void>){void action();},async movePair(delta:number){visited.push(delta);}};
+ const key=runInNewContext(keyHandler,context) as (event:KeyboardEvent,type?:string)=>boolean;
+ const button={closest(selector:string){return selector==='[data-camera]'?button:null;}};
+ const event={code:'ArrowRight',key:'ArrowRight',repeat:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,target:button} as unknown as KeyboardEvent;
+ assert.equal(key(event),true);assert.deepEqual(visited,[1]);
+});
+
+test('withdrawn reachable evidence keeps the original arrangement frozen without offering failing adjustments',async()=>{
+ const f=await fixture();
+ try{
+  assert.equal(await f.controller.prepareBaseline({spanSteps:4}),true);assert.equal(await f.controller.prepare(),true);assert.equal(await f.controller.rate(1),true);
+  const report=f.controller.state.session!.entries.find(e=>e.kind==='pair-stretch')!;assert.equal(await f.controller.retract(report.id,'Authored correction'),true);
+  assert.equal(await f.controller.prepareBaseline({spanSteps:6}),false,'the controller intentionally retains its raw-history arrangement lock');
+  const body={innerHTML:''},context={controller:f.controller,body,pairCursors:new Map(),effectivePairReports,recommendedSpanSteps,surfaceContact,STRETCH_CALIBRATION_GRADES,
+   busy:()=>false,scene(){},art:{hidden:true},keyboard:{ready:true},baselinePreviewReady:false,visibleTrialId:null,
+   list(points:string[]){return `<ul>${points.map(point=>`<li>${point}</li>`).join('')}</ul>`;},esc:(value:string)=>value,
+   gradeDescriptions:['Relaxed','Little','Moderate','Large','Reachable','Unavailable']};
+  const commandStart=source.indexOf('const command='),commandEnd=source.indexOf('const list=',commandStart),pairStart=source.indexOf(' function renderPair('),pairEnd=source.indexOf(' function pairFooter(',pairStart);
+  const render=runInNewContext(stripTypeScriptTypes(source.slice(commandStart,commandEnd)+source.slice(pairStart,pairEnd)+'renderPair'),context) as (session:NonNullable<typeof f.controller.state.session>)=>void;
+  render(f.controller.state.session!);const doc=new DOMParser().parseFromString(`<div>${body.innerHTML}</div>`,'text/html');
+  const commands=Array.from(doc.getElementsByTagName('button')).map(button=>button.getAttribute('data-stretch-command'));
+  assert.equal(commands.includes('narrower'),false);assert.equal(commands.includes('wider'),false);
+ }finally{f.dispose();}
+});
