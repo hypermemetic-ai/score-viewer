@@ -69,3 +69,16 @@ test('pair confirmation cannot prepare a target whose illustration was not rende
   assert.equal(f.controller.state.current.needsSetup,true);assert.equal(await f.controller.rate(1),false);
  }finally{f.dispose();}
 });
+
+test('a fresh reading focuses its numeric field rather than an unkeyed camera control',()=>{
+ const focused:string[]=[],control=(id:string)=>({id,dataset:{},disabled:false,tabIndex:0,closest(){return null;},focus(){focused.push(id||'camera');}});
+ const camera=control(''),field=control('stretch-percent');
+ const context={focusKey:'',footer:{querySelector(){return null;}},dialog:{querySelectorAll(){return[camera,field];},querySelector(){return field;}}};
+ const keyStart=source.indexOf('const controlKey='),keyEnd=source.indexOf('function transition(',keyStart),focusStart=source.indexOf('function safeFocus('),focusEnd=source.indexOf('function render(',focusStart);
+ assert.ok(keyStart>=0&&keyEnd>keyStart&&focusStart>=0&&focusEnd>focusStart);
+ runInNewContext(stripTypeScriptTypes(source.slice(keyStart,keyEnd)+source.slice(focusStart,focusEnd)+'safeFocus();'),{...context});
+ assert.deepEqual(focused,['stretch-percent']);
+ context.focusKey='stretch-percent';focused.length=0;
+ runInNewContext(stripTypeScriptTypes(source.slice(keyStart,keyEnd)+source.slice(focusStart,focusEnd)+'safeFocus();'),{...context});
+ assert.deepEqual(focused,['stretch-percent'],'an existing named field also restores correctly');
+});
