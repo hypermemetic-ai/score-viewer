@@ -1,3 +1,4 @@
+import {arrangeBottomNavigation} from './application-navigation';
 import type {CalibrationColorLayout,CalibrationInputEvent,CalibrationGrade} from '@hypermemetic-ai/fingering-calculator';
 import type {EffortController} from './calibration-effort-controller';
 import {createEffortPlan,effortProgress,effortWorkAt,effortSetupInstruction,EFFORT_PLACEMENT_INSTRUCTION,EFFORT_GRADES,type EffortInstrument,type EffortHand} from './calibration-effort';
@@ -24,8 +25,8 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
  const pageInput=new CalibrationPageInput();
  dialog.classList.add('calibration-dialog');
- dialog.innerHTML='<header class="calibration-shell-header"></header><main class="calibration-shell-body"></main>';
- const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,midiContainer=document.createElement('div');
+ dialog.innerHTML='<header class="calibration-shell-header"></header><main class="calibration-shell-body"></main><footer class="calibration-shell-footer"></footer>';
+ const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,footer=dialog.querySelector<HTMLElement>('footer')!,midiContainer=document.createElement('div');
  midiContainer.className='calibration-midi-panel';
  const collection=()=>effort.state.archive.collections.find(c=>c.instrument===options.instrument);
  const pageBreak=()=>{effort.break();fingertips.break();};
@@ -54,13 +55,13 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   if((page==='trial'||page==='setup')&&!state.current.trial)page='main';
   dialog.classList.toggle('calibration-home',page==='main');
   dialog.classList.toggle('calibration-placement',page==='setup');
-  body.dataset.page=page;
+  body.dataset.page=page;footer.hidden=page==='measurements';
   const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
   if(page==='main'){
-   header.innerHTML=`<h2>Calibration</h2>${command('back','Back','Esc')}`;
-   body.innerHTML=`<p class="calibration-home-progress"><span>Effort ratings</span><span>${progress?.measured??0} / ${total}</span></p><nav class="calibration-menu" aria-label="Calibration">${command('continue',progress?.status==='complete'?'Review ratings':'Continue',undefined,busy||state.readOnly)}${command('review','Change a rating','R',!progress?.measured||busy)}${command('measurements',`Fingertip readings <span class="calibration-menu-count">${readings} / 4</span>`,'F',busy)}${command('export','Export','E')}${command('options','Options','O')}</nav><p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>`;
+   header.innerHTML='<h2>Calibration</h2>';
+   body.innerHTML=`<p class="calibration-home-progress"><span>Effort ratings</span><span>${progress?.measured??0} / ${total}</span></p><nav class="calibration-menu" aria-label="Calibration">${command('continue',progress?.status==='complete'?'Review ratings':'Continue',undefined,busy||state.readOnly)}${command('review','Change a rating','R',!progress?.measured||busy)}${command('measurements',`Fingertip readings <span class="calibration-menu-count">${readings} / 4</span>`,'F',busy)}${command('export','Export','E')}</nav>`;
   }else if(page==='options'){
-   header.innerHTML=`<h2>Options</h2>${command('back','Back','Esc')}`;
+   header.innerHTML='<h2>Options</h2>';
    body.innerHTML=`<label class="calibration-options-field">Notation system<select data-calibration-names><option value="iso"${options.noteNames()==='iso'?' selected':''}>ISO</option><option value="traditional" disabled>Traditional · not available yet</option></select></label><p class="calibration-options-description">This is the global notation choice.</p>${options.instrument==='janko-four-row'?`<label class="calibration-options-field">Key colors<select data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard. Note names stay as selected above.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
    body.append(midiContainer);
   }else if(page==='measurements'){
@@ -68,7 +69,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    measuring=mountFingertipCalibration(body,fingertips,{instrument:options.instrument,noteNames:options.noteNames,back:()=>transition('main'),options:openOptions,keyColors:options.colors});
    return;
   }else if(page==='review'){
-   header.innerHTML=`<h2>Change a rating</h2>${command('back','Back','Esc')}`;
+   header.innerHTML='<h2>Change a rating</h2>';
    const plan=createEffortPlan(options.instrument,saved?.performingHand??hand);
    body.innerHTML=`<p class="calibration-options-description">Choose a pair to rate it again.</p><div class="calibration-review-list">${saved?plan.trials.map(t=>{
     const work=effortWorkAt(saved,t.id);if(work.status!=='measured')return '';
@@ -78,14 +79,16 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   }else{
    const trial=state.current.trial!,session=state.session!;
    hand=session.performingHand;
-   header.innerHTML=page==='setup'?`<div class="calibration-hand-choice">${command('left','Left hand',undefined,busy)}${command('right','Right hand',undefined,busy)}</div>${command('options','Options','O')}`:`<div class="calibration-trial-heading">${command('back','Back','Esc')}<span>${hand==='LH'?'Left':'Right'} hand</span></div><nav class="calibration-trial-navigation">${command('previous','Previous','←',busy||session.trials[0].id===trial.id)}<span>${session.trials.findIndex(t=>t.id===trial.id)+1} / ${session.trials.length}</span>${command('next','Next','→',busy||session.trials.at(-1)!.id===trial.id)}</nav>${command('options','Options','O')}`;
+   header.innerHTML=page==='setup'?`<div class="calibration-hand-choice">${command('left','Left hand',undefined,busy)}${command('right','Right hand',undefined,busy)}</div>`:`<div class="calibration-trial-heading"><span>${hand==='LH'?'Left':'Right'} hand</span></div><nav class="calibration-trial-navigation">${command('previous','Previous','←',busy||session.trials[0].id===trial.id)}<span>${session.trials.findIndex(t=>t.id===trial.id)+1} / ${session.trials.length}</span>${command('next','Next','→',busy||session.trials.at(-1)!.id===trial.id)}</nav>`;
    if(page==='setup')header.querySelector(`[data-command=${hand==='LH'?'left':'right'}]`)?.setAttribute('aria-pressed','true');
    const diagram=renderCalibrationTrial(session.plan.keyboard,trial,options.noteNames(),options.colors?.()??'five-seven');
    const content=page==='setup'
     ? `${diagram}<ul class="calibration-placement-instructions"><li>${EFFORT_PLACEMENT_INSTRUCTION}</li><li>${esc(effortSetupInstruction(trial).replace(EFFORT_PLACEMENT_INSTRUCTION,'').replace(cue,'').trim())}</li><li>${cue}</li></ul>`
     : `<p class="calibration-task">Press both keys together, then alternate.</p>${diagram}<p class="calibration-fixed-cue">${cue}</p>`;
-   body.innerHTML=`${content}${page==='setup'?`<footer class="calibration-page-footer">${command('back','Back','Esc')}${command('begin','Begin','Enter',busy||state.readOnly)}</footer>`:`<h3>How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
+   body.innerHTML=`${content}${page==='setup'?'':`<h3>How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
+  footer.innerHTML=`${command('back','Back','Esc')}${page==='main'?'<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>':''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
+  arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-command=back]'),footer.querySelector<HTMLButtonElement>('[data-command=options]'));
   const error=notice||state.error;
   if(error){const p=document.createElement('p');p.className='calibration-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
   if(page==='main'){

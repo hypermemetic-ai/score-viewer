@@ -12,6 +12,10 @@ The global setting uses the additive `notationSystem` preference. Existing `cali
 
 ## Calibration menu
 
+Back occupies the bottom left and Options the bottom right of the active screen or dialog throughout the application. Existing task controls remain between them. Library has only Options; Options pages have only Back. Reader navigation remains in its hideable toolbar, without reducing the score viewport. Calibration uses a persistent footer; fingertip content scrolls independently of its footer. A focused navigation button owns Enter, keypad Enter and Space, so activating Back or Options cannot also begin a trial, save a reading or mark practice Done.
+
+Scrolling never displays a stock scrollbar. The shared application/dialog styling hides native bars while retaining wheel, touch and keyboard scrolling. The existing thin Options position marker remains available for overflowing settings panels.
+
 The main menu uses a compact panel with aligned command rows and a labeled effort count. Its title, controls, counts and keyboard hints use the application's system font. Continue has initial focus. Arrow keys select enabled commands, Enter opens the selected command, and F, R, E and O directly open fingertip readings, rating review, export and Options. Disabled commands remain unavailable by shortcut. Menu navigation uses the shared Options navigator only on the main page; measurement selectors and rating input retain their existing keyboard behavior. Focus returns to the chosen menu command when leaving a subpage, including after starting or resuming effort work.
 
 ## Placement setup

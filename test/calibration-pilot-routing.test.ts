@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {PilotInputScope} from '../src/calibration-pilot-input';
+import {applicationNavigationKey} from '../src/application-navigation';
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const body=(start:string,end:string)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a);return stripTypeScriptTypes(source.slice(a,b));};
 const note={source:'piano',generation:2,channel:16,note:24,velocity:80,on:true,timestamp_micros:110,driver_micros:90};
@@ -70,7 +71,7 @@ test('actual main key listeners route raw grades before bindings and deliver gua
  const events:any[]=[],listeners:Record<string,(event:any)=>void>={},context:any={startupReady:true,startupFailed:false,window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
   calibrationPilot:{view:{acceptsRatings:true,key(){return false;}},input:{key(event:any,type:string){events.push({code:event.code,type});return true;}}},syncControls(){throw Error('bindings reached');},bindingOptions:undefined,practice:undefined,inputCode:(e:any)=>e.code,
   controls:{keyUp(){return false;}},input:{up(){return false;}},refreshPresentation(){}};
- runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
+ context.applicationNavigationKey=applicationNavigationKey;runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
  let prevented=false;listeners.keydown({...key('Numpad3'),preventDefault(){prevented=true;}});listeners.keyup(key('Numpad3',{ctrlKey:true,target:{closest:()=>({})}}));
  assert.equal(prevented,true);assert.deepEqual(events,[{code:'Numpad3',type:'key-down'},{code:'Numpad3',type:'key-up'}]);context.startupReady=false;prevented=false;listeners.keydown({...key('Digit1'),preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(events.length,2,'startup key cannot reach calibration or controls');context.startupFailed=true;prevented=false;listeners.keydown({...key('Tab'),preventDefault(){prevented=true;}});assert.equal(prevented,false,'fatal-screen actions retain native keyboard access');assert.equal(events.length,2);
 });
@@ -82,7 +83,7 @@ test('measurement navigation precedes dialog navigation and field digits cannot 
    input:{key(){throw Error('measurement reached effort rating');}}},
   syncControls(){},bindingOptions:undefined,dialog:{dataset:{kind:'calibration'}},
   controls:{keyDown(){}},dialogNavigation:{keyDown(){return false;}}};
- runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
+ context.applicationNavigationKey=applicationNavigationKey;runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
  let prevented=false;listeners.keydown({...key('ArrowRight'),preventDefault(){prevented=true;}});assert.equal(prevented,true);
  prevented=false;listeners.keydown({...key('Digit2',{target:{closest:()=>({})}}),preventDefault(){prevented=true;}});
  assert.equal(prevented,false,'the numeric field keeps native digit entry');assert.deepEqual(seen,['ArrowRight','Digit2']);
@@ -110,7 +111,7 @@ function modalFixture(){
   loadEffort:async(files:any)=>({value:await files.read('calibration-effort-v2.json')}),
   loadFingertips:async(files:any)=>({value:await files.read('calibration-fingertips-v1.json')}),
   loadPilot:async(host:any)=>({value:await host.read('calibration-pilot-v1.json')}),
-  saveCalibrationNoteNames(){},saveCalibrationColors(){},
+  saveCalibrationNoteNames(){},saveNotationSystem(){},saveCalibrationColors(){},
   mountCalibrationView(_dialog:any,controller:any,_fingertips:any,hooks:any){const view={controller,hooks,disposed:false,acceptsRatings:true,key(){return false;},input:(event:any)=>controller.input(event),break:()=>controller.break(),midiContainer:{querySelector:()=>undefined},setMidiConnected(){},dispose(){this.disposed=true;}};views.push(view);return view;},
   showDialog(_html:string,kind:string){context.closeDialog(false);return context.dialog={dataset:{kind},close(){},remove(){},innerHTML:''};},
  };
