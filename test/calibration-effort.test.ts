@@ -78,11 +78,29 @@ test('setup acknowledges the exact displayed instructions with actual fingers fo
     assert.ok(instruction.includes(`Keep your ${names[trial.anchors[0].finger]} in the same spot`));
     assert.ok(instruction.includes(`Let your ${names[trial.active[0].finger]} bend, extend or spread`));
     assert.ok(instruction.endsWith(EFFORT_PROTOCOL.cue));assert.doesNotMatch(instruction,/reference finger|other finger|\{|\}/);
+    assert.match(instruction,/most comfortable position anywhere on the highlighted keys/);assert.doesNotMatch(instruction,/center|depth/);
     for(const trialId of block.trialIds){const target=c.session!.trials.find(t=>t.id===trialId)!;assert.equal(effortSetupInstruction(target),instruction);}
     const forged=c.archive;forged.collections[0].setups.at(-1)!.attestedInstruction='Unshown setup instruction';
     assert.throws(()=>validateEffortArchive(forged),/Invalid effort setup attestation/);
    }
   }
+ }
+});
+
+test('Earlier setup wording remains exact when reopening and adding a comfortable-position acknowledgment',async()=>{
+ for(const kind of ['conventional-piano','janko-four-row'] as const)for(const performingHand of ['RH','LH'] as const){
+  const files=new Files(),c=controller(files);await c.start({instrument:kind,hand:performingHand});await c.prepare();await c.rateButton(1);
+  const archive=c.archive;
+  archive.collections[0].setups[0].attestedInstruction=archive.collections[0].setups[0].attestedInstruction.replace('Choose the most comfortable position anywhere on the highlighted keys.','Choose a relaxed position. Aim at the center of each key, at a depth that feels natural.');
+  const bytes=new TextEncoder().encode(JSON.stringify(archive)),before=structuredClone(archive);
+  files.data.set(EFFORT_FILE,bytes);const writes=files.writes,loaded=await loadEffort(files);
+  assert.equal(loaded.error,undefined);assert.deepEqual(loaded.value,before);assert.deepEqual(files.data.get(EFFORT_FILE),bytes);assert.equal(files.writes,writes);
+  const reopened=new EffortController({files,load:loaded,now:()=>new Date(Date.UTC(2026,9,12)).toISOString()});
+  await reopened.resume(kind);await reopened.prepare();
+  assert.deepEqual(reopened.archive.collections[0].setups[0],before.collections[0].setups[0]);
+  assert.deepEqual(reopened.archive.collections[0].observations,before.collections[0].observations);
+  assert.match(reopened.archive.collections[0].setups.at(-1)!.attestedInstruction,/most comfortable position anywhere/);
+  assert.doesNotThrow(()=>validateEffortArchive(reopened.archive));
  }
 });
 

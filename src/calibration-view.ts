@@ -1,3 +1,4 @@
+import {arrangeDialogNavigation} from './application-navigation';
 import {type SpanCalibrationObservation} from '../vendor/iso-notation/src/model/isomorphic-span-calibration';
 import {addObservation, calibrationDetails, copyRow, pitchText, UNASSIGNED_SPAN_REPORTS, type ViewerCalibration} from './calibration';
 
@@ -79,6 +80,7 @@ export function mountCalibration(dialog: HTMLDialogElement, initial: ViewerCalib
  dialog.querySelector('.calibration-observations')!.addEventListener('click',async event=>{const control=(event.target as HTMLElement).closest<HTMLButtonElement>('[data-calibration-withdraw]');if(!control||loadError)return;control.disabled=true;try{value=await hooks.save({...value,record:{...value.record,observations:value.record.observations.map(q=>q.id===control.dataset.calibrationWithdraw?{...q,excluded:!q.excluded}:q)}});await summary();status.textContent='Evidence updated; original observations retained. Current fingerings unchanged.';}catch(error){status.textContent=(error as Error).message;control.disabled=false;}});
  dialog.querySelector('[data-calibration-export]')!.addEventListener('click',()=>{void hooks.export().catch(error=>status.textContent=error.message);});
  dialog.querySelector('[data-calibration-close]')!.addEventListener('click',hooks.close);
+ arrangeDialogNavigation(dialog,dialog.querySelector<HTMLButtonElement>('[data-calibration-close]'));
  void summary().catch(error=>status.textContent=error.message);
  field<HTMLSelectElement>('hand').focus();
 }

@@ -1,3 +1,4 @@
+import {arrangeBottomNavigation} from './application-navigation';
 import './calibration-fingertips-style.css';
 import {FINGERTIP_PAIRS,type FingertipHand,type FingertipInstrument,type FingertipMethod,type FingertipReference} from './calibration-fingertips';
 import {FingertipController,type FingertipState} from './calibration-fingertips-controller';
@@ -29,6 +30,7 @@ export function mountFingertipCalibration(container:HTMLElement,controller:Finge
  root.querySelectorAll<HTMLButtonElement>('[data-method]').forEach(b=>b.onclick=()=>controller.selectMethod(b.dataset.method as FingertipMethod));
  get<HTMLButtonElement>('[data-options]').hidden=!options.options;get<HTMLButtonElement>('[data-options]').onclick=()=>{controller.break();options.options?.();};
  const back=()=>{controller.break();options.back();};get<HTMLButtonElement>('[data-back]').onclick=back;get<HTMLButtonElement>('[data-previous]').onclick=()=>controller.move(-1);get<HTMLButtonElement>('[data-next]').onclick=()=>controller.move(1);get<HTMLButtonElement>('[data-save]').onclick=()=>void controller.saveAndNext();
+ arrangeBottomNavigation(get<HTMLElement>('footer'),get<HTMLButtonElement>('[data-back]'),options.options?get<HTMLButtonElement>('[data-options]'):null);
  const held=new Set<string>();let disposed=false;
  return {
   key(event:KeyboardEvent,type?:'key-down'|'key-up'):boolean {

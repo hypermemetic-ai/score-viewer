@@ -4,6 +4,7 @@ export interface NavigationMode {horizontal?:boolean;focusOnPrepare?:boolean;sec
 export class OptionsNavigation {
  private observer:MutationObserver;private popup?:HTMLElement;private picker?:HTMLSelectElement;private index=0;private active?:HTMLElement;private disposed=false;private interacted=false;
  private selectObservers:MutationObserver[]=[];private resize?:ResizeObserver;private search='';private searchTime=0;
+ private selectCleanups:(()=>void)[]=[];
  constructor(private root:HTMLElement,private beforeActivate:(target?:HTMLElement)=>void,private ownsKeys:()=>boolean,private mode:NavigationMode={}){
   root.dataset.navigationOwned='';this.observer=new MutationObserver(()=>this.prepare());this.observer.observe(root,{childList:true,subtree:true});this.prepare();root.addEventListener('click',this.click,true);root.addEventListener('focusin',this.focus);root.addEventListener('scroll',this.positionMarker,true);if(typeof ResizeObserver!=='undefined'){this.resize=new ResizeObserver(this.positionMarker);this.resize.observe(root);}
  }
@@ -15,11 +16,12 @@ export class OptionsNavigation {
  private prepare(){
   if(this.disposed)return;
   for(const select of this.root.querySelectorAll<HTMLSelectElement>('select:not([data-options-native])')){
-   const hadFocus=document.activeElement===select;select.dataset.optionsNative='';select.hidden=true;const button=document.createElement('button');button.type='button';button.className='options-picker';button.dataset.optionsPicker='';button.dataset.optionsKey=select.id||select.name||select.dataset.option||(select.hasAttribute('data-keyboard')?'keyboard':select.getAttribute('aria-label')??'');
+   const hadFocus=document.activeElement===select,wasHidden=select.hidden;select.dataset.optionsNative='';select.hidden=true;const button=document.createElement('button');button.type='button';button.className='options-picker';button.dataset.optionsPicker='';button.dataset.optionsKey=select.id||select.name||select.dataset.option||(select.hasAttribute('data-keyboard')?'keyboard':select.getAttribute('aria-label')??'');
    if(select.dataset.optionsSize==='content')button.dataset.optionsSize='content';
    button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');select.after(button);
    const paint=()=>{button.textContent=select.selectedOptions[0]?.textContent??'Choose';button.disabled=select.disabled;button.setAttribute('aria-label',select.getAttribute('aria-label')??select.closest('label')?.textContent?.trim()??'Choose');};
    select.addEventListener('change',paint);select.addEventListener('options-selection',paint);button.onclick=()=>this.open(select,button);const watch=new MutationObserver(paint);watch.observe(select,{attributes:true,childList:true,subtree:true});this.selectObservers.push(watch);paint();if(hadFocus)button.focus();
+   this.selectCleanups.push(()=>{select.removeEventListener('change',paint);select.removeEventListener('options-selection',paint);delete select.dataset.optionsNative;select.hidden=wasHidden;button.onclick=null;button.remove();});
   }
   this.positionMarker();if(!this.active?.isConnected){this.active=this.selected()??this.controls()[0];if(this.active&&this.mode.focusOnPrepare!==false&&!this.popup&&!this.ownsKeys()&&!this.interacted)this.active.focus();}
  }
@@ -76,5 +78,5 @@ export class OptionsNavigation {
   return true;
  }
  private tab(backwards:boolean){const controls=this.controls(),index=controls.indexOf(document.activeElement as HTMLElement);if(controls.length)controls[(index+(backwards?-1:1)+controls.length)%controls.length]?.focus();}
- dispose(){this.disposed=true;this.cancelPicker(false);this.observer.disconnect();this.resize?.disconnect();this.root.removeEventListener('scroll',this.positionMarker,true);this.selectObservers.forEach(o=>o.disconnect());this.root.removeEventListener('click',this.click,true);this.root.removeEventListener('focusin',this.focus);delete this.root.dataset.navigationOwned;}
+ dispose(){if(this.disposed)return;this.disposed=true;this.cancelPicker(false);this.observer.disconnect();this.resize?.disconnect();this.root.removeEventListener('scroll',this.positionMarker,true);this.selectObservers.forEach(o=>o.disconnect());this.selectCleanups.forEach(cleanup=>cleanup());this.selectCleanups=[];this.root.removeEventListener('click',this.click,true);this.root.removeEventListener('focusin',this.focus);delete this.root.dataset.navigationOwned;}
 }

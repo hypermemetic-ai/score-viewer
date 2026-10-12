@@ -9,6 +9,7 @@ import {systemSelection} from '../src/selection';
 import {defaultView,viewportFit} from '../src/state';
 import {PracticeView} from '../src/practice-view';
 import {isMusicalSustain} from '../src/midi-sustain';
+import {arrangeBottomNavigation,applicationNavigationKey} from '../src/application-navigation';
 import {importPackage} from '../src/package';
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const production=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
@@ -18,8 +19,8 @@ function keyboardFixture(){
   window:{addEventListener(_type:string,handler:any){key=handler;}},document:{hidden:false,activeElement:null},innerWidth:1280,innerHeight:720,
   input:new InputController(),controls:new ControlResolver(readControlBindings(undefined,{bindings:defaultBindings()})),
   current:{package:pkg,personal:{view:defaultView(),editContactId:first.contactId}},selection:first,readerFocused:true,preferences:{fingerBehavior:'toggle'},
-  practice:undefined,dialog:undefined,bindingOptions:undefined,optionsNavigation:undefined,dialogNavigation:undefined,toolbarNavigation:undefined,
-  inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,PracticeView,systemSelection,viewportFit,effectiveView:(v:any)=>v,readerPackage:()=>pkg,
+  practice:undefined,dialog:undefined,curlCalibration:undefined,bindingOptions:undefined,optionsNavigation:undefined,dialogNavigation:undefined,toolbarNavigation:undefined,
+  inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,PracticeView,systemSelection,viewportFit,arrangeBottomNavigation,applicationNavigationKey,effectiveView:(v:any)=>v,readerPackage:()=>pkg,
   syncControls(){},editSequence:{reset(){calls.push('reset');}},savePersonal(){calls.push('save');},savePersonalQuietly(){calls.push('save');},renderPages(){calls.push('pages');},renderToolbar(){calls.push('toolbar');},focusSelection(){calls.push('focus');},
   selectFinger(step:number){calls.push(`chronological:${step}`);},act(action:string){calls.push(`action:${action}`);},edit(){calls.push('dialog');},saveFingerDigit(){calls.push('digit');return Promise.resolve();},saveHandChoice(hand:string){calls.push(`hand:${hand}`);return Promise.resolve();},reveal(){},notify(){},
   HTMLInputElement:class {},ManualPracticeView:class {},
