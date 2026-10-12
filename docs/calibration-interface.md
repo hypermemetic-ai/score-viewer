@@ -13,3 +13,9 @@ The global setting uses the additive `notationSystem` preference. Existing `cali
 ## Calibration menu
 
 The main menu uses a compact panel with aligned command rows and a labeled effort count. Its title, controls, counts and keyboard hints use the application's system font. Continue has initial focus. Arrow keys select enabled commands, Enter opens the selected command, and F, R, E and O directly open fingertip readings, rating review, export and Options. Disabled commands remain unavailable by shortcut. Menu navigation uses the shared Options navigator only on the main page; measurement selectors and rating input retain their existing keyboard behavior. Focus returns to the chosen menu command when leaving a subpage, including after starting or resuming effort work.
+
+## Placement setup
+
+The placement instruction asks the player to choose the most comfortable position anywhere on the highlighted keys. Highlights fill the full displayed face of the assigned Jankó level and stop at its boundary; the other physical copy stays unhighlighted. Conventional targets include their full front and rear outlines with black-key cutouts. Target bodies remain visible even at the widest tested distance. This display change preserves sampled key identities and the nominal geometry recorded in existing evidence.
+
+On placement setup, URW Gothic remains on the instruction heading and finger indicators. Controls, guidance, note labels and keyboard hints use the system font. New setup acknowledgments retain the displayed comfortable-position wording. Exact earlier center/depth instructions are admitted as historical text without rewriting them or their associated reports.

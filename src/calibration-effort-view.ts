@@ -1,6 +1,6 @@
 import type {CalibrationColorLayout,CalibrationInputEvent,CalibrationGrade} from '@hypermemetic-ai/fingering-calculator';
 import type {EffortController} from './calibration-effort-controller';
-import {createEffortPlan,effortProgress,effortWorkAt,effortSetupInstruction,EFFORT_GRADES,type EffortInstrument,type EffortHand} from './calibration-effort';
+import {createEffortPlan,effortProgress,effortWorkAt,effortSetupInstruction,EFFORT_PLACEMENT_INSTRUCTION,EFFORT_GRADES,type EffortInstrument,type EffortHand} from './calibration-effort';
 import type {FingertipController} from './calibration-fingertips-controller';
 import {mountFingertipCalibration} from './calibration-fingertips-view';
 import {calibrationEscape as esc,calibrationFingerNames as finger,renderCalibrationTrial,type CalibrationNoteNames} from './calibration-trial-renderer';
@@ -53,6 +53,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   if(page==='trial'&&state.current.needsSetup)page='setup';
   if((page==='trial'||page==='setup')&&!state.current.trial)page='main';
   dialog.classList.toggle('calibration-home',page==='main');
+  dialog.classList.toggle('calibration-placement',page==='setup');
   body.dataset.page=page;
   const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
   if(page==='main'){
@@ -79,7 +80,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    hand=session.performingHand;
    header.innerHTML=page==='setup'?`<div class="calibration-hand-choice">${command('left','Left hand',undefined,busy)}${command('right','Right hand',undefined,busy)}</div>${command('options','Options','O')}`:`<div class="calibration-trial-heading">${command('back','Back','Esc')}<span>${hand==='LH'?'Left':'Right'} hand</span></div><nav class="calibration-trial-navigation">${command('previous','Previous','←',busy||session.trials[0].id===trial.id)}<span>${session.trials.findIndex(t=>t.id===trial.id)+1} / ${session.trials.length}</span>${command('next','Next','→',busy||session.trials.at(-1)!.id===trial.id)}</nav>${command('options','Options','O')}`;
    if(page==='setup')header.querySelector(`[data-command=${hand==='LH'?'left':'right'}]`)?.setAttribute('aria-pressed','true');
-   body.innerHTML=`<p class="calibration-task">${page==='setup'?'Place your fingers on the highlighted keys.':'Press both keys together, then alternate.'}</p>${renderCalibrationTrial(session.plan.keyboard,trial,options.noteNames(),options.colors?.()??'five-seven')}${page==='setup'?`<p class="calibration-setup-guidance">${esc(effortSetupInstruction(trial).replace(cue,'').trim())}</p>`:''}<p class="calibration-fixed-cue">${cue}</p>${page==='setup'?`<footer class="calibration-page-footer">${command('back','Back','Esc')}${command('begin','Begin','Enter',busy||state.readOnly)}</footer>`:`<h3>How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
+   body.innerHTML=`<p class="calibration-task">${page==='setup'?EFFORT_PLACEMENT_INSTRUCTION:'Press both keys together, then alternate.'}</p>${renderCalibrationTrial(session.plan.keyboard,trial,options.noteNames(),options.colors?.()??'five-seven')}${page==='setup'?`<p class="calibration-setup-guidance">${esc(effortSetupInstruction(trial).replace(EFFORT_PLACEMENT_INSTRUCTION,'').replace(cue,'').trim())}</p>`:''}<p class="calibration-fixed-cue">${cue}</p>${page==='setup'?`<footer class="calibration-page-footer">${command('back','Back','Esc')}${command('begin','Begin','Enter',busy||state.readOnly)}</footer>`:`<h3>How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
   const error=notice||state.error;
   if(error){const p=document.createElement('p');p.className='calibration-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
@@ -141,6 +142,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   setMidiConnected(value:boolean){midiConnected=value;},
   break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
   async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
-  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home');},
+  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement');},
  };
 }
