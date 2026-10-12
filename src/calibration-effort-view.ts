@@ -56,6 +56,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   dialog.classList.toggle('calibration-home',page==='main');
   dialog.classList.toggle('calibration-placement',page==='setup');
   dialog.classList.toggle('calibration-rating',page==='trial');
+  dialog.classList.toggle('calibration-review',page==='review');
   body.dataset.page=page;footer.hidden=page==='measurements';
   const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
   if(page==='main'){
@@ -150,6 +151,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   setMidiConnected(value:boolean){midiConnected=value;},
   break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
   async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
-  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating');},
+  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating','calibration-review');},
  };
 }

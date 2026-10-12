@@ -9,6 +9,12 @@
 .calibration-shell-body{padding-top:45px}.calibration-shell-body[data-page=trial],.calibration-shell-body[data-page=setup]{padding-top:18px}
 .calibration-dialog.calibration-home{--viewer-dialog-max:760px;width:760px;height:auto;padding:28px 36px;font-family:system-ui,sans-serif}
 .calibration-home .calibration-shell-body{padding-top:24px}
+.calibration-dialog.calibration-review{--viewer-dialog-max:960px;width:960px;height:auto;font-family:system-ui,sans-serif}
+.calibration-review .calibration-shell-header h2{font-size:24px;font-weight:400}
+.calibration-review .calibration-shell-body{padding-top:20px}
+.calibration-review .calibration-options-description{margin:0!important}
+.calibration-review .calibration-review-list{margin:16px 0 0}
+.calibration-review .calibration-review-list button{font-size:18px}
 .calibration-dialog.calibration-placement,.calibration-dialog.calibration-rating{font-family:system-ui,sans-serif}
 .calibration-placement .calibration-contact-diagram,.calibration-rating .calibration-contact-diagram{margin-top:0}
 .calibration-placement-instructions,.calibration-trial-instructions{display:grid;gap:12px;width:100%;max-width:900px;margin:18px auto 0;padding:0;list-style:none;text-align:left;font-size:18px;font-weight:400;line-height:1.5}
