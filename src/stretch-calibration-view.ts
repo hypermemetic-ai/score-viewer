@@ -137,7 +137,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   footer.dataset.optionsRow='';
   const error=notice||state.error;if(error){const p=dialog.ownerDocument.createElement('p');p.className='stretch-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
   navigation=new OptionsNavigation(dialog,el=>{focusKey=controlKey(el??null)||focusKey;},()=>false,{focusOnPrepare:false,horizontal:page==='home'});
-  if(page==='review'&&reviewRows.length&&!disabled)browser.focus(body.querySelector<HTMLElement>('.stretch-review-browser')!);else safeFocus();
+  if(!state.busy&&!creating){if(page==='review'&&reviewRows.length&&!disabled)browser.focus(body.querySelector<HTMLElement>('.stretch-review-browser')!);else safeFocus();}
  }
  function renderCreate(){
   const pitches=Array.from({length:128},(_,p)=>p),pitchOptions=(value:string,range=pitches)=>`<option value="">Choose a key</option>${range.map(p=>`<option value="${p}"${String(p)===value?' selected':''}>${stretchPitchLabel(p)} · MIDI ${p}</option>`).join('')}`;
@@ -287,7 +287,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    case 'mm':rememberReachDraft();reachMethod='mm';restoreReachChoice();render();break;
    case 'save-reach':void perform(saveReach);break;
    case 'reproduce':void perform(()=>controller.prepare());break;
-   case 'begin-pair':void perform(async()=>{if(!controller.state.current.trial){if(!await controller.prepareBaseline())return;}await controller.prepare();});break;
+   case 'begin-pair':{const generation=navigationGeneration;void perform(async()=>{if(!controller.state.current.trial){if(!await controller.prepareBaseline())return;}if(stopped||suspended||page!=='work'||generation!==navigationGeneration||controller.state.current.phase!=='progressive-pairs'||!pairIllustrationVisible())return;await controller.prepare();});break;}
    case 'narrower':case 'wider':void perform(()=>controller.adjustSpan(target.dataset.stretchCommand==='wider'?2:-2));break;
    case 'maximum':void perform(()=>controller.markMaximum());break;
    case 'stop-sweep':void perform(()=>controller.stopSweep());break;
