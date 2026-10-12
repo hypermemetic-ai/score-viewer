@@ -246,3 +246,17 @@ test('an unavailable terminal cannot reuse a startup failure before its baseline
   await assert.rejects(()=>validateStretchArchive(forged),/same row and anchor|before the unavailable/);
  }
 });
+
+test('retracting an endpoint reopens an unanswered target on the frozen reachable arrangement',async()=>{
+ const {c}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline({spanSteps:8,row:1,anchorMidiPitch:61});await c.prepare();await c.rate(5);
+ const startup=effectivePairReports(c.session!)[0];await c.prepareBaseline({spanSteps:4,row:2,anchorMidiPitch:60});await c.prepare();await c.rate(0);
+ const reachable=effectivePairReports(c.session!).find(e=>e.grade===0)!,endpointTrial=c.state.current.trial!;await c.rate(5);
+ const withdrawn=effectivePairReports(c.session!).find(e=>e.trialId===endpointTrial.id)!;assert.equal(await c.retract(withdrawn.id,'recheck outward endpoint'),true);
+ assert.equal(c.state.current.trial!.id,endpointTrial.id);assert.equal(c.state.current.trial!.distanceSemitoneSteps,6);assert.equal(c.state.current.trial!.contacts[0].row,2);assert.equal(c.state.current.trial!.contacts[0].midiPitch,60);
+ assert.equal(c.state.current.needsSetup,true);assert.equal(await c.prepare(),true);assert.equal(await c.rate(5),true);
+ const replacement=effectivePairReports(c.session!).find(e=>e.trialId===endpointTrial.id)!,terminal=c.session!.entries.filter(e=>e.kind==='pair-sweep-terminal').at(-1)!;
+ assert.notEqual(replacement.id,withdrawn.id);assert.equal(terminal.lastReachableObservationId,reachable.id);assert.equal(terminal.firstUnavailableObservationId,replacement.id);assert.equal(c.state.progress!.sweeps.unavailable,1);
+ assert.equal(c.session!.pairTrials.length,3);assert.ok(c.session!.entries.some(e=>e.id===startup.id));assert.ok(c.session!.entries.some(e=>e.id===withdrawn.id));
+ assert.equal(await c.retract(terminal.id,'recheck terminal declaration'),true);assert.equal(c.state.current.trial!.id,endpointTrial.id);assert.equal(c.state.current.trial!.contacts[0].row,2);
+ await c.prepare();assert.equal(await c.rate(5),true);assert.equal(c.session!.pairTrials.length,3);
+});
