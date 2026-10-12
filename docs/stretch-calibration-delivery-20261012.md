@@ -16,7 +16,7 @@ The accepted solid RR/Jankó models have uniform tip thickness, depressed actuat
 - Actual production Chromium inspection covered 17 synthetic cases: signed readings and drafts, baseline/outward pair ratings, held/chord/repeat protection, terminal corrections, linked triples, nested curl saving, hand/setup separation, grouped keyboard navigation, malformed archive retention and byte-verified exports. The final rebuilt focus case and malformed export were checked after the final focus correction.
 - Independent integrated source review, carrier review and final native-pair review passed. Pending writes from retired calibration owners are drained before reopening/export/exit; nested curl retains the suspended core editor's drafts.
 
-Private logs, source/browser review receipts and raw screenshots remain under `/home/qqp/.local/state/stretch-calibration-20261012/`, outside Git and recipient packages. The source check receipt is pinned by SHA256 `5b56e6440aee3383973bbda996bcc4f8a685caba832b6c63c24e2603f6923259`.
+Private logs, source/browser review receipts and native screenshots remain under `/home/qqp/.local/state/stretch-calibration-20261012/`, outside Git and recipient packages. Browser screenshots are referenced by the browser receipt in T3's userdata; temporary export downloads were byte-verified during inspection and removed during cleanup. The source check receipt is pinned by SHA256 `5b56e6440aee3383973bbda996bcc4f8a685caba832b6c63c24e2603f6923259`.
 
 ## Native pair and installed identity
 
