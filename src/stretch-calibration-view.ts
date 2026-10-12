@@ -1,4 +1,4 @@
-import {STRETCH_CALIBRATION_GRADES,type StretchCalibrationSession,type StretchCalibrationContact,type StretchCalibrationGeometry,type RelativeFingertipReachObservation,type PairStretchObservation,type StretchCalibrationEntry,type StretchGrade,type ReachableStretchGrade} from '@hypermemetic-ai/fingering-calculator';
+import {STRETCH_CALIBRATION_GRADES,type StretchCalibrationSession,type StretchCalibrationContact,type StretchCalibrationGeometry,type RelativeFingertipReachObservation,type PairStretchObservation,type StretchCalibrationEntry,type StretchGrade} from '@hypermemetic-ai/fingering-calculator';
 import {arrangeBottomNavigation} from './application-navigation';
 import {OptionsNavigation} from './options-navigation';
 import {actionCode} from './input';
@@ -311,8 +311,8 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
     if(name){footer.querySelector<HTMLButtonElement>(`[data-stretch-command=${name}]:not(:disabled)`)?.click();return true;}
    }
    if(navigation?.keyDown(event))return true;
+   if(event.code==='Escape'&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(!event.repeat)back();return true;}
    if(event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||editable||event.repeat)return false;
-   if(event.code==='Escape'){back();return true;}
    if(event.code==='KeyO'){if(page==='options')back();else openOptions();return true;}
    if(page==='home'){const name=({KeyN:'new',KeyR:'review',KeyE:'export'} as Record<string,string>)[event.code];if(name){body.querySelector<HTMLButtonElement>(`[data-stretch-command=${name}]:not(:disabled)`)?.click();return true;}}
    return false;
