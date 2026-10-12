@@ -85,7 +85,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    const diagram=renderCalibrationTrial(session.plan.keyboard,trial,options.noteNames(),options.colors?.()??'five-seven');
    const content=page==='setup'
     ? `${diagram}<ul class="calibration-placement-instructions"><li>${EFFORT_PLACEMENT_INSTRUCTION}</li><li>${esc(effortSetupInstruction(trial).replace(EFFORT_PLACEMENT_INSTRUCTION,'').replace(cue,'').trim())}</li><li>${cue}</li></ul>`
-    : `${diagram}<ul class="calibration-trial-instructions"><li>Press both keys together, then alternate.</li><li>${cue}</li></ul>`;
+    : `<div class="calibration-trial-prompt">${diagram}<ul class="calibration-trial-instructions"><li>Press both keys together, then alternate.</li><li>${cue}</li></ul></div>`;
    body.innerHTML=`${content}${page==='setup'?'':`<h3 class="calibration-rating-question">How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
   footer.innerHTML=`${command('back','Back','Esc')}${page==='main'?'<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>':''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
