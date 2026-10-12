@@ -27,5 +27,32 @@
     "wall": 100
   },
   "region": "Four unfilled corner brackets on native colored surfaces",
-  "leftHand": "Horizontal reflection of schematic with independently readable labels"
+  "leftHand": {
+    "mapping": "actualMidi = 124 - canonicalMidi",
+    "visualPitchOrder": [
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66
+    ],
+    "thumbIndexActualMidi": [
+      63,
+      60
+    ],
+    "otherPairsActualMidi": [
+      64,
+      62
+    ],
+    "preserves": [
+      "even/odd physical levels",
+      "five-seven colors",
+      "classic colors",
+      "readable text"
+    ],
+    "presentation": "Reflect schematic shapes, relabel every contact/key and derive instructions from the same actual placements; does not infer physical millimeters."
+  }
 }
