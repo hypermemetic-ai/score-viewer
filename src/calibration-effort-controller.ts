@@ -1,6 +1,6 @@
 import {createCalibrationInputRouter,calibrationMidiGrade,type CalibrationInputEvent,type CalibrationGrade,type CalibrationRatingInput} from '@hypermemetic-ai/fingering-calculator';
 import {EFFORT_FILE,EFFORT_PROTOCOL,validateEffortArchive,effortBytes,exportEffort,newEffortCollection,effortSession,
- effortCurrent,effortProgress,navigateEffort,recordEffort,type EffortArchive,type EffortLoad,type EffortFiles,
+ effortCurrent,effortProgress,navigateEffort,recordEffort,effortSetupInstruction,type EffortArchive,type EffortLoad,type EffortFiles,
  type EffortCollection,type EffortInstrument,type EffortHand,type EffortSession} from './calibration-effort';
 
 export interface EffortControllerState {
@@ -85,9 +85,9 @@ export class EffortController {
  }
  prepare(notes?:string):Promise<boolean> {
   return this.mutate(archive=>{const c=this.requireCollection(archive),current=effortCurrent(c);
-   if(!current.block)throw Error('There is no current setup to acknowledge.');
+   if(!current.block||!current.trial)throw Error('There is no current setup to acknowledge.');
    c.setups.push({blockId:current.block.id,performingHand:c.performingHand,recordedAt:this.now(),protocolVersion:EFFORT_PROTOCOL.version,
-    attestedInstruction:EFFORT_PROTOCOL.setup,...(notes===undefined?{}:{notes})});c.preparedSetupIndex=c.setups.length-1;return this.update(archive,c);},'prepare');
+    attestedInstruction:effortSetupInstruction(current.trial),...(notes===undefined?{}:{notes})});c.preparedSetupIndex=c.setups.length-1;return this.update(archive,c);},'prepare');
  }
  setup(notes?:string):Promise<boolean>{return this.prepare(notes);}
  setPerformingHand(performingHand:EffortHand):Promise<boolean> {

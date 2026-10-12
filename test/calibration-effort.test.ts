@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {calibrationKeyColor,type CalibrationKey} from '@hypermemetic-ai/fingering-calculator';
-import {EFFORT_FILE,EFFORT_PROTOCOL,createEffortPlan,initialEffortArchive,effortWorkAt,validateEffortArchive,loadEffort,exportEffort,
+import {EFFORT_FILE,EFFORT_PROTOCOL,createEffortPlan,initialEffortArchive,effortWorkAt,effortSetupInstruction,validateEffortArchive,loadEffort,exportEffort,
  type EffortFiles,type EffortInstrument,type EffortArchive} from '../src/calibration-effort';
 import {EffortController} from '../src/calibration-effort-controller';
 
@@ -63,6 +63,27 @@ test('one pooled collection per instrument retains actual hand and never touches
  const raw=files.data.get(EFFORT_FILE)!,writes=files.writes,reopened=new EffortController({files,load:await loadEffort(files)});
  assert.equal(reopened.state.current.needsSetup,true);assert.equal(reopened.state.progress!.measured,2);assert.equal(files.writes,writes);assert.deepEqual(files.data.get(EFFORT_FILE),raw);
  assert.deepEqual(JSON.parse(reopened.export()).collections[0].observations,c.archive.collections[0].observations);
+});
+
+test('setup acknowledges the exact displayed instructions with actual fingers for every block and hand',async()=>{
+ for(const kind of ['conventional-piano','janko-four-row'] as const){
+  const files=new Files(),c=controller(files);await c.start(kind);
+  for(const performingHand of ['RH','LH'] as const){
+   await c.setPerformingHand(performingHand);
+   for(const block of c.session!.plan.blocks){
+    await c.navigate(block.trialIds[0]);const trial=c.state.current.trial!,instruction=effortSetupInstruction(trial);
+    assert.equal(await c.prepare(),true);const setup=c.collection!.setups.at(-1)!;
+    assert.equal(setup.attestedInstruction,instruction);assert.equal(setup.performingHand,performingHand);
+    const names={1:'thumb',2:'index',3:'middle',4:'ring',5:'pinky'};
+    assert.ok(instruction.includes(`Keep your ${names[trial.anchors[0].finger]} in the same spot`));
+    assert.ok(instruction.includes(`Let your ${names[trial.active[0].finger]} bend, extend or spread`));
+    assert.ok(instruction.endsWith(EFFORT_PROTOCOL.cue));assert.doesNotMatch(instruction,/reference finger|other finger|\{|\}/);
+    for(const trialId of block.trialIds){const target=c.session!.trials.find(t=>t.id===trialId)!;assert.equal(effortSetupInstruction(target),instruction);}
+    const forged=c.archive;forged.collections[0].setups.at(-1)!.attestedInstruction='Unshown setup instruction';
+    assert.throws(()=>validateEffortArchive(forged),/Invalid effort setup attestation/);
+   }
+  }
+ }
 });
 
 test('strict admission refuses forged hand contacts, old task reports, chronology, duplicates and control mismatches',async()=>{

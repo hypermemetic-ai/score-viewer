@@ -9,7 +9,7 @@ export const EFFORT_PROTOCOL={version:'viewer-combined-alternating-effort-v2',
  cue:'Keep your wrist in place. Keep your hand pointing the same way.',
  task:{patterns:['combined','trill'],anchorBehavior:'participate-in-trill',pace:{kind:'self-selected'}},
  patterns:{combined:'Press both keys together.',trill:'Alternate the two fingers, releasing each key between its turns.'},
- setup:'Choose a relaxed hand position. Keep your wrist in place and your hand pointing the same way. Keep the reference finger at its original contact point between targets. Let the other finger bend, extend or spread. Aim at the horizontal center of the usable key surface at the depth you choose.',
+ setup:'Choose a relaxed position. Aim at the center of each key, at a depth that feels natural. Keep your {referenceFinger} in the same spot between exercises. Let your {otherFinger} bend, extend or spread. Keep your wrist in place. Keep your hand pointing the same way.',
 } as const;
 export const EFFORT_GRADES=[
  {grade:0,label:'Natural fit',description:'Your relaxed fingers already fit these keys.'},
@@ -75,6 +75,14 @@ const timestamp=(v:unknown):string=>{const s=text(v,'recorded time');if(!Number.
 const hand=(v:unknown):EffortHand=>v==='RH'||v==='LH'?v:fail('Invalid performing hand.');
 const instrument=(v:unknown):EffortInstrument=>instruments.includes(v as EffortInstrument)?v as EffortInstrument:fail('Invalid effort instrument.');
 const index=(v:unknown,length:number):number=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<length?Number(v):fail('Invalid history index.');
+
+/** The displayed setup and stored acknowledgment share the actual finger names for this block. */
+export function effortSetupInstruction(trial:Pick<CalibrationTrial,'anchors'|'active'>):string {
+ const names:Record<number,string>={1:'thumb',2:'index',3:'middle',4:'ring',5:'pinky'};
+ const reference=names[trial.anchors[0]?.finger],other=names[trial.active[0]?.finger];
+ if(!reference||!other)fail('Missing setup finger contacts.');
+ return EFFORT_PROTOCOL.setup.replace('{referenceFinger}',reference).replace('{otherFinger}',other);
+}
 
 /** Verify every patch, including asymmetric conventional rear cutouts, under horizontal reflection. */
 function mirrorEquivalent(right:CalibrationKey,left:CalibrationKey,xSum:number):boolean {
@@ -180,8 +188,9 @@ export function validateEffortArchive(value:unknown):EffortArchive {
   if(!Array.isArray(c.setups)||!Array.isArray(c.observations)||!Array.isArray(c.retractions))fail('Invalid effort history.');
   let lastSetupTime=-Infinity;for(const rawSetup of c.setups){
    const s=object(rawSetup,['blockId','performingHand','recordedAt','protocolVersion','attestedInstruction'],'effort setup',['notes']);
-   if(!plan.blocks.some(b=>b.id===s.blockId)||s.protocolVersion!==EFFORT_PROTOCOL.version||s.attestedInstruction!==EFFORT_PROTOCOL.setup)fail('Invalid effort setup attestation.');
-   hand(s.performingHand);timestamp(s.recordedAt);if(Date.parse(s.recordedAt as string)<lastSetupTime)fail('Setup history is out of order.');
+   const setupPlan=effortPlan(kind,hand(s.performingHand)),setupTrial=setupPlan.trials.find(t=>t.blockId===s.blockId);
+   if(!setupTrial||s.protocolVersion!==EFFORT_PROTOCOL.version||s.attestedInstruction!==effortSetupInstruction(setupTrial))fail('Invalid effort setup attestation.');
+   timestamp(s.recordedAt);if(Date.parse(s.recordedAt as string)<lastSetupTime)fail('Setup history is out of order.');
    lastSetupTime=Date.parse(s.recordedAt as string);if('notes'in s&&typeof s.notes!=='string')fail('Invalid setup notes.');
   }
   if(c.preparedSetupIndex!==null){const s=c.setups[index(c.preparedSetupIndex,c.setups.length)] as EffortSetup;
