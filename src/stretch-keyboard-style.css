@@ -1,16 +1,18 @@
 .stretch-keyboard-model{position:relative;display:flex;flex-direction:column;width:100%;height:100%;min-width:0;min-height:0;font-family:Arial,Helvetica,sans-serif;color:#d8d4cb}
 .stretch-keyboard-canvas{display:block;flex:1 1 0;min-height:0;width:100%;height:0;outline:none;touch-action:none;cursor:grab;overflow:hidden}
 .stretch-keyboard-canvas:active{cursor:grabbing}
-.stretch-keyboard-canvas:focus-visible{outline:1px solid #8b9398;outline-offset:2px;border-radius:4px}
+.stretch-keyboard-canvas:focus-visible{outline:1px solid #8b9398;outline-offset:2px;border-radius:0}
 .stretch-camera-controls{display:flex;flex:0 0 auto;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;width:100%;max-width:700px;box-sizing:border-box;margin:0 auto;padding:0 12px;font-size:13px;color:#a7a9aa}
-.stretch-camera-controls>div{display:flex;gap:6px;align-items:center}
-.stretch-camera-controls button{border:1px solid #505458;border-radius:4px;padding:4px 10px;background:#24272b;color:#dcd8ce;font:inherit;cursor:pointer}
-.stretch-camera-controls button:hover{background:#31363b}
+.stretch-camera-controls>div{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.stretch-camera-controls button{border:1px solid #505458;border-radius:0;padding:4px 8px;min-height:32px;background:transparent;color:#dcd8ce;font:inherit;cursor:pointer}
+.stretch-camera-controls button:hover,.stretch-camera-controls button[aria-pressed=true]{background:#24272b;border-color:#9b9b9b}
 .stretch-camera-controls button:focus-visible{outline:1px solid #e8bb77;outline-offset:2px}
-.stretch-camera-keyboard-hint{flex:0 0 auto;font:12px Arial,Helvetica,sans-serif;color:#92989a;text-align:center;margin:6px 12px 0;visibility:hidden;min-height:14px}
-.stretch-keyboard-model:focus-within .stretch-camera-keyboard-hint{visibility:visible}
+.stretch-camera-keyboard-hint{flex:0 0 auto;font:12px Arial,Helvetica,sans-serif;color:#92989a;text-align:center;margin:6px 12px 0;min-height:14px}
+.stretch-camera-keyboard-hint[hidden]{display:none}
 .stretch-contact-label text{font:15px Arial,Helvetica,sans-serif}
 .stretch-pitch-label{font:13px Arial,Helvetica,sans-serif;fill:#b2b7b9;paint-order:stroke;stroke:#15181c;stroke-width:3px;stroke-linejoin:round}
 .stretch-ruler-tick,.stretch-ruler-label{font:13px Arial,Helvetica,sans-serif;fill:#f0e9da;paint-order:stroke;stroke:#15181c;stroke-width:3px;stroke-linejoin:round}
 .stretch-keyboard-model[data-model-error]::after{content:attr(data-model-error);display:block;padding:24px;text-align:center;color:#e8bb77}
 @media(max-width:600px){.stretch-camera-controls{font-size:12px;padding:0 4px}.stretch-camera-controls button{padding:4px 7px}}
+
+@media(max-width:700px){.stretch-camera-controls{padding:0 4px;justify-content:center}.stretch-camera-controls>span{display:none}.stretch-camera-controls>div{justify-content:center}.stretch-camera-keyboard-hint{font-size:12px;margin:5px 0 0;line-height:1.4}}

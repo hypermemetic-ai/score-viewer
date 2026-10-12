@@ -59,10 +59,10 @@ export function stretchReviewRows(session:StretchCalibrationSession):{rows:Calib
 
 /** New static collection; historical protocols and their wire files remain host-owned. */
 export function mountStretchCalibrationView(dialog:HTMLElement,controller:StretchController,options:StretchCalibrationViewOptions){
- let page:Page='home',returnPage:Page='home',stopped=false,suspended=false,creating=false,navigationGeneration=0,notice='',navigation:OptionsNavigation|undefined;
+ let page:Page='home',returnPage:Page='home',stopped=false,suspended=false,creating=false,pairNavigating=false,navigationGeneration=0,notice='',navigation:OptionsNavigation|undefined;
  let focusKey='',lastSlot='',reachMethod:'percentage'|'mm'='percentage',primary=1,primaryPercentage='100',percentage='',millimeters='',sourceId='',thirdSurfaceId='';
  let pendingAttempts:StretchCalibrationContact[]=[],detailTarget:ReviewTarget|undefined,reviewRows:CalibrationReviewRow[]=[],reviewTargets=new Map<string,ReviewTarget>();
- const browser=new CalibrationReviewBrowser(),heldActivations=new Set<string>();
+ const browser=new CalibrationReviewBrowser(),heldActivations=new Set<string>(),heldPairNavigation=new Set<string>(),pairCursors=new Map<string,string|null>();
  let keyboard:ReturnType<typeof mountStretchKeyboard>|undefined,visibleTrialId:string|null=null,baselinePreviewReady=false,renderRecovery=false;
  type ReachDraft={method:'percentage'|'mm';primary:number;primaryPercentage:string;percentage:string;millimeters:string};
  const reachDrafts=new Map<string,ReachDraft>(),reachPreferences=new Map<string,{method:'percentage'|'mm';primary:number}>();
@@ -72,14 +72,14 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  dialog.innerHTML='<header class="stretch-header"></header><main class="stretch-body"></main><footer class="stretch-footer"></footer>';
  const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,footer=dialog.querySelector<HTMLElement>('footer')!;
  const field=(label:string,contents:string)=>`<label class="stretch-field" data-options-row><span>${label}</span>${contents}</label>`;
- const busy=()=>controller.state.busy||controller.state.readOnly||creating;
+ const busy=()=>controller.state.busy||controller.state.readOnly||creating||pairNavigating;
  const pairIllustrationVisible=()=>!!keyboard?.ready&&visibleTrialId===controller.state.current.trial?.id&&art.isConnected&&!art.hidden&&!art.closest('[hidden]')&&art.getClientRects().length>0;
  const controlKey=(el:HTMLElement|null)=>el?.dataset.optionsKey??el?.dataset.stretchCommand??el?.dataset.grade??el?.id??'';
  function transition(next:Page){navigationGeneration++;controller.break();page=next;notice='';render();}
  function back(){if(page==='home')options.onClose();else if(page==='options')transition(returnPage);else if(page==='detail')transition('review');else transition('home');}
  function openOptions(){returnPage=page;transition('options');}
  async function perform(action:()=>Promise<unknown>|unknown){try{await action();}catch(error){notice=error instanceof Error?error.message:String(error);}render();}
- function scene(scene:StretchKeyboardScene){const holder=body.querySelector<HTMLElement>('[data-stretch-art]');if(!holder)return;holder.append(art);if(keyboard)keyboard.update(scene,{colors:options.colors?.()??'five-seven'});else keyboard=mountStretchKeyboard(art,scene,{colors:options.colors?.()??'five-seven'});if(!keyboard.ready)throw Error(keyboard.error??'The keyboard illustration could not be displayed.');}
+ function scene(scene:StretchKeyboardScene){const holder=body.querySelector<HTMLElement>('[data-stretch-art]');if(!holder)return;holder.append(art);if(keyboard)keyboard.update(scene,{colors:options.colors?.()??'five-seven'});else keyboard=mountStretchKeyboard(art,scene,{colors:options.colors?.()??'five-seven',onKeyboardRotationExit:()=>{focusKey='';safeFocus();}});if(!keyboard.ready)throw Error(keyboard.error??'The keyboard illustration could not be displayed.');}
  function windowFor(session:StretchCalibrationSession){
   const trial=session.pairTrials[0],row=trial?.contacts[0].row??Number(setup.row),surfaces=session.plan.geometry.surfaces.filter(s=>s.row===row),ref=session.plan.provenance.referenceLocation.xMm;
   const ordered=[...surfaces].sort((a,b)=>Math.abs((a.xMinMm+a.xMaxMm)/2-ref)-Math.abs((b.xMinMm+b.xMaxMm)/2-ref));
@@ -95,7 +95,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  }
  function selectedThird(session:StretchCalibrationSession,source:PairStretchObservation){const candidates=thirdCandidates(session,source);return candidates.find(s=>s.id===thirdSurfaceId)??candidates[0];}
  function currentThirdContact(){const session=controller.state.session,source=selectedSource(),slot=controller.state.current.tripleSlot;if(!session||!source||!slot)return;const surface=selectedThird(session,source);return surface?surfaceContact(session.plan.geometry,slot.movingFinger,surface.id,'depressed'):undefined;}
- function safeFocus(){const confirmation=footer.querySelector<HTMLElement>('[data-stretch-command=reproduce]:not(:disabled),[data-stretch-command=begin-pair]:not(:disabled)');if(confirmation){confirmation.focus({preventScroll:true});return;}const controls=[...dialog.querySelectorAll<HTMLElement>('button,input,select,textarea')].filter(el=>!el.closest('[hidden]')&&!(el as HTMLButtonElement).disabled&&el.tabIndex>=0);const target=(focusKey?controls.find(el=>controlKey(el)===focusKey):undefined)??dialog.querySelector<HTMLElement>('[data-primary-action]:not(:disabled)')??controls[0];target?.focus({preventScroll:true});}
+ function safeFocus(){if(keyboard?.keyboardRotation&&!art.hidden){keyboard.focusCanvas();return;}const confirmation=footer.querySelector<HTMLElement>('[data-stretch-command=reproduce]:not(:disabled),[data-stretch-command=begin-pair]:not(:disabled)');if(confirmation){confirmation.focus({preventScroll:true});return;}const controls=[...dialog.querySelectorAll<HTMLElement>('button,input,select,textarea')].filter(el=>!el.closest('[hidden]')&&!(el as HTMLButtonElement).disabled&&el.tabIndex>=0);const target=(focusKey?controls.find(el=>controlKey(el)===focusKey):undefined)??dialog.querySelector<HTMLElement>('[data-primary-action]:not(:disabled)')??controls[0];target?.focus({preventScroll:true});}
  function render(){
   if(stopped||suspended||renderRecovery)return;visibleTrialId=null;baselinePreviewReady=false;
   try{renderContent();}
@@ -111,8 +111,8 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   const state=controller.state,session=state.session,current=state.current,progress=session?stretchProgress(session):null;
   const slotKey=session&&current.slotId?`${session.id}:${current.slotId}`:'';
   if(slotKey!==lastSlot){rememberReachDraft();lastSlot=slotKey;initializeReachDraft(session);sourceId='';thirdSurfaceId='';pendingAttempts=[];focusKey='';}
-  dialog.dataset.stretchPage=page;const disabled=busy();
-  header.innerHTML=`<h2>${page==='home'?'Calibration':page==='create'?'New hand collection':page==='options'?'Options':page==='review'?'Review calibration':page==='detail'?'Recorded evidence':current.phase?phaseLabel[current.phase]:'Calibration'}</h2>${session&&page!=='create'&&page!=='home'?`<span class="stretch-header-detail">${session.plan.provenance.hand==='LH'?'Left':'Right'} hand · ${stretchPitchLabel(session.plan.geometry.admittedMidiRange[0])}–${stretchPitchLabel(session.plan.geometry.admittedMidiRange[1])}</span>`:''}`;
+  dialog.dataset.stretchPage=page;dialog.dataset.stretchPhase=page==='work'?(current.phase??''):'';const disabled=busy();
+  header.innerHTML=`<h2>${page==='home'?'Calibration':page==='create'?'New hand collection':page==='options'?'Options':page==='review'?'Review calibration':page==='detail'?'Recorded evidence':current.phase?phaseLabel[current.phase]:'Calibration'}</h2>${session&&page!=='create'&&page!=='home'?`<span class="stretch-header-detail">${session.plan.provenance.hand==='LH'?'Left':'Right'} hand${current.phase==='progressive-pairs'?'':` · ${stretchPitchLabel(session.plan.geometry.admittedMidiRange[0])}–${stretchPitchLabel(session.plan.geometry.admittedMidiRange[1])}`}</span>`:''}`;
   body.innerHTML='';
   if(options.instrument==='conventional'&&page==='home'){
    body.innerHTML=`<div class="stretch-home"><p>The new calibration uses the Jankó keyboard model.</p><p class="stretch-help">Choose Jankó in instrument setup to start a collection. Previous calibration evidence remains available.</p><div class="stretch-menu">${options.openLegacy?command('legacy','Finger span'):''}${command('export','Export collection','E',!session&&!state.readOnly)}${options.onExportAll?command('export-all','Export all evidence'):''}</div></div>`;
@@ -132,12 +132,12 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    else renderTriple(session);
   }else body.innerHTML='<p class="stretch-help">Choose or create a hand collection to continue.</p>';
   const work=current.phase&&page==='work',resume=work&&(state.resumeRequired||current.needsSetup)&&current.phase!=='progressive-pairs';
-  footer.innerHTML=`${command('back','Back','Esc')}${page==='home'||page==='review'||page==='options'?'<p><kbd>↑↓</kbd> Select · <kbd>Enter</kbd> Open</p>':''}${page==='create'?command('create','Start collection','Enter',disabled):''}${resume?command('reproduce','I have reproduced the contacts','Enter',disabled):''}${page==='work'&&current.phase==='relative-fingertip-reach'&&!resume?command('save-reach','Save reading','Enter',disabled):''}${page==='work'&&current.phase==='progressive-pairs'&&current.needsSetup?command('begin-pair','This starting span is comfortable','Enter',disabled||!baselinePreviewReady):''}${page==='work'&&!current.phase?command('review','Review collection'):''}${work?command('skip','Skip this slot',undefined,disabled):''}${page==='detail'?command('edit','Recheck or replace',undefined,disabled):''}${page==='options'?'':command('options','Options','O')}`;
+  footer.innerHTML=`${command('back','Back','Esc')}${page==='home'||page==='review'||page==='options'?'<p><kbd>↑↓</kbd> Select · <kbd>Enter</kbd> Open</p>':''}${page==='create'?command('create','Start collection','Enter',disabled):''}${resume?command('reproduce','I have reproduced the contacts','Enter',disabled):''}${page==='work'&&current.phase==='relative-fingertip-reach'&&!resume?command('save-reach','Save reading','Enter',disabled):''}${page==='work'&&current.phase==='progressive-pairs'&&current.needsSetup?command('begin-pair','Rate this contact','Enter',disabled||!baselinePreviewReady):''}${page==='work'&&!current.phase?command('review','Review collection'):''}${work&&current.phase!=='progressive-pairs'?command('skip','Skip this slot',undefined,disabled):''}${work&&current.phase==='progressive-pairs'&&session?pairFooter(session):''}${page==='detail'?command('edit','Recheck or replace',undefined,disabled):''}${page==='options'?'':command('options','Options','O')}`;
   arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-stretch-command=back]'),footer.querySelector<HTMLButtonElement>('[data-stretch-command=options]'));
   footer.dataset.optionsRow='';
   const error=notice||state.error;if(error){const p=dialog.ownerDocument.createElement('p');p.className='stretch-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
   navigation=new OptionsNavigation(dialog,el=>{focusKey=controlKey(el??null)||focusKey;},()=>false,{focusOnPrepare:false,horizontal:page==='home'});
-  if(!state.busy&&!creating){if(page==='review'&&reviewRows.length&&!disabled)browser.focus(body.querySelector<HTMLElement>('.stretch-review-browser')!);else safeFocus();}
+  if(!state.busy&&!creating&&!pairNavigating){if(page==='review'&&reviewRows.length&&!disabled)browser.focus(body.querySelector<HTMLElement>('.stretch-review-browser')!);else safeFocus();}
  }
  function renderCreate(){
   const pitches=Array.from({length:128},(_,p)=>p),pitchOptions=(value:string,range=pitches)=>`<option value="">Choose a key</option>${range.map(p=>`<option value="${p}"${String(p)===value?' selected':''}>${stretchPitchLabel(p)} · MIDI ${p}</option>`).join('')}`;
@@ -157,17 +157,36 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  }
  function renderPair(session:StretchCalibrationSession){
   const state=controller.state,{trial,pairSweep:sweep,needsSetup}=state.current;if(!sweep)return;
-  const reports=effectivePairReports(session).filter(e=>e.sweepId===sweep.id),reachable=reports.filter(e=>e.grade<5),canAdjust=!reports.length;
-  const old=trial??session.pairTrials.find(t=>t.sweepId===sweep.id),firstReport=session.entries.find(e=>e.kind==='pair-stretch'),inherited=firstReport?.kind==='pair-stretch'?session.pairTrials.find(t=>t.id===firstReport.trialId):session.pairTrials[0];
+  const reports=effectivePairReports(session).filter(e=>e.sweepId===sweep.id),reachable=reports.filter(e=>e.grade<5),canAdjust=!reachable.length;
+  pairCursors.set(`${session.id}:${sweep.id}`,trial?.id??null);
+  const old=trial??session.pairTrials.find(t=>t.sweepId===sweep.id),firstReport=session.entries.find(e=>e.kind==='pair-stretch'&&e.grade<5),inherited=firstReport?.kind==='pair-stretch'?session.pairTrials.find(t=>t.id===firstReport.trialId):session.pairTrials[0];
   const row=old?.contacts[0].row??inherited?.contacts[0].row??1,span=trial?.distanceSemitoneSteps??recommendedSpanSteps(session,sweep.pair),desired=session.plan.geometry.originMidiPitch+session.plan.provenance.referenceLocation.xMm/13.75;
   const reference=[...session.plan.geometry.surfaces].filter(s=>s.row===row).sort((a,b)=>Math.abs(a.midiPitch-desired)-Math.abs(b.midiPitch-desired))[0]?.midiPitch;
   const anchor=old?.contacts[0].midiPitch??(inherited?.contacts[0].row===row?inherited.contacts[0].midiPitch:reference),outer=Number(anchor)+(session.plan.provenance.hand==='RH'?span:-span);
-  const lastReachable=[...reachable].sort((a,b)=>(session.pairTrials.find(t=>t.id===b.trialId)?.distanceSemitoneSteps??0)-(session.pairTrials.find(t=>t.id===a.trialId)?.distanceSemitoneSteps??0))[0],lastReachableTrial=lastReachable?session.pairTrials.find(t=>t.id===lastReachable.trialId):undefined;
   const previewSurfaces=sweep.pair.map((_,i)=>session.plan.geometry.surfaces.find(s=>s.midiPitch===(i?outer:anchor)&&s.row===row));
   const previewContacts=trial?.contacts??(previewSurfaces.every(Boolean)?sweep.pair.map((f,i)=>surfaceContact(session.plan.geometry,f,previewSurfaces[i]!.id,'depressed')):[]);
-  const diff=relativeDifferenceMm(session,...sweep.pair);
-  body.innerHTML=`<div class="stretch-prompt"><div data-stretch-art></div>${list(['Keep both fingers flat. Rotate and reposition your hand freely to line the fingertips up parallel to the keyboard.','Depress both highlighted keys wherever most comfortable on the playable areas.','Make one short, static contact and rate the stretch.'])}</div><p class="stretch-contact-summary">${pairLabel(sweep.pair)} · ${stretchStepsLabel(span)} steps · ${(span*13.75).toFixed(1)} mm · row ${row}${trial?`<br>${trial.contacts.map(contactLabel).map(esc).join(' · ')}`:''}</p>${needsSetup||state.resumeRequired?`<div class="stretch-baseline"><p>${reports.length?'Reproduce these same key contacts before continuing.':'Find a comfortably reachable starting span before rating.'}</p><p class="stretch-help">${diff===null?'The initial candidate uses the smallest same-parity span because no mapped reach difference is available.':`Initial candidate uses the measured reach difference, ${Math.abs(diff).toFixed(1)} mm.`} If the candidate is cramped, widen it. Smaller candidates remain untested.</p>${canAdjust?`<div class="stretch-baseline-fields" data-options-row>${command('narrower','Narrower','−',busy()||span<=2)}<span>${stretchStepsLabel(span)} steps</span>${command('wider','Wider','+',busy())}</div>`:''}</div>`:`<h3 class="stretch-question">How much stretch does that take?</h3><div class="stretch-ratings" data-options-row>${STRETCH_CALIBRATION_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${g.grade===0?' data-primary-action':''} data-trial-id="${esc(trial?.id??'')}"${busy()||g.grade===5&&!reachable.length?' disabled':''}><kbd>${g.grade}</kbd><span>${esc(g.label)}</span><small>${gradeDescriptions[g.grade]}</small></button>`).join('')}</div><div class="stretch-baseline"><div class="stretch-action-row" data-options-row>${command('maximum','Mark my maximum',undefined,busy()||!reachable.length)}${command('stop-sweep','Stop this sweep',undefined,busy())}<p class="stretch-help">${lastReachableTrial?`Uses your last reachable rating: ${stretchStepsLabel(lastReachableTrial.distanceSemitoneSteps)} steps (${(lastReachableTrial.distanceSemitoneSteps*13.75).toFixed(1)} mm). `:''}A stop records where you stopped; later spans remain untested.</p></div></div>`}`;
+  body.innerHTML=`<div class="stretch-prompt"><div data-stretch-art></div>${list(['Keep both fingers flat. Rotate and reposition your hand freely to line the fingertips up parallel to the keyboard.','Depress both highlighted keys wherever most comfortable on the playable areas.','Make static contact and rate the stretch.'])}</div>${needsSetup||state.resumeRequired?`<div class="stretch-baseline"><p>${canAdjust&&reports.length?'That contact was recorded as unavailable. Choose another contact to test.':reports.length?'Reproduce these same key contacts before rating.':'Start with the suggested contact.'}</p><p class="stretch-help">${canAdjust?'If the contact is too close or unavailable, adjust the separation. Untested contacts stay unmeasured.':'Keep the same fingertip spots you used for this contact.'}</p>${canAdjust?`<div class="stretch-baseline-fields" data-options-row>${command('narrower','Narrower','−',busy()||span<=2)}${command('wider','Wider','+',busy())}</div>`:''}</div>`:`<h3 class="stretch-question">How much stretch does that take?</h3><div class="stretch-ratings" data-options-row>${STRETCH_CALIBRATION_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${g.grade===0?' data-primary-action':''} data-trial-id="${esc(trial?.id??'')}"${busy()?' disabled':''}><kbd>${g.grade}</kbd><span>${esc(g.label)}</span><small>${gradeDescriptions[g.grade]}</small></button>`).join('')}</div>`}`;
   scene({geometry:session.plan.geometry,contacts:previewContacts});art.hidden=false;baselinePreviewReady=previewContacts.length===2&&!!keyboard?.ready;if(trial&&keyboard?.ready)visibleTrialId=trial.id;
+ }
+ function pairFooter(session:StretchCalibrationSession){
+  const current=controller.state.current,index=session.plan.pairSweeps.findIndex(s=>s.id===current.slotId),reports=effectivePairReports(session).filter(e=>e.sweepId===current.slotId),reachable=reports.some(e=>e.grade<5);
+  return `<div class="stretch-pair-navigation" data-options-row>${command('previous-pair','Previous pair','←',busy()||index<=0)}<span class="stretch-pair-position">${index+1} / 10</span>${command('next-pair','Next pair','→',busy()||index>=session.plan.pairSweeps.length-1)}</div>${!current.needsSetup&&!controller.state.resumeRequired?`<div class="stretch-pair-actions" data-options-row>${command('maximum','Mark my maximum',undefined,busy()||!reachable)}${command('stop-sweep','Stop this sweep',undefined,busy())}</div>`:''}`;
+ }
+ async function movePair(delta:number){
+  if(stopped||suspended||page!=='work'||pairNavigating||busy())return;
+  const state=controller.state,session=state.session,current=state.current;if(!session||current.phase!=='progressive-pairs')return;
+  const index=session.plan.pairSweeps.findIndex(s=>s.id===current.slotId),target=session.plan.pairSweeps[index+delta];if(!target)return;
+  pairCursors.set(`${session.id}:${current.slotId}`,current.trial?.id??null);
+  const generation=++navigationGeneration;pairNavigating=true;
+  try{
+   const reports=effectivePairReports(session).filter(e=>e.sweepId===target.id),ratedIds=new Set(reports.map(e=>e.trialId)),trials=session.pairTrials.filter(t=>t.sweepId===target.id);
+   const widestReported=Math.max(0,...reports.map(e=>session.pairTrials.find(t=>t.id===e.trialId)?.distanceSemitoneSteps??0));
+   const nextUnrated=trials.filter(t=>!ratedIds.has(t.id)&&t.distanceSemitoneSteps>widestReported).sort((a,b)=>b.distanceSemitoneSteps-a.distanceSemitoneSteps)[0];
+   const defaultTrial=reports.length?(nextUnrated??trials.find(t=>t.id===reports.at(-1)?.trialId)):trials.at(-1);
+   const key=`${session.id}:${target.id}`,trialId=pairCursors.has(key)?pairCursors.get(key)!:defaultTrial?.id??null;
+   await controller.navigate({phase:'progressive-pairs',slotId:target.id,trialId});
+   if(!stopped&&!suspended&&page==='work'&&generation===navigationGeneration)focusKey='';
+  }finally{pairNavigating=false;}
  }
  function renderTriple(session:StretchCalibrationSession){
   const state=controller.state,slot=state.current.tripleSlot;if(!slot)return;
@@ -291,7 +310,8 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    case 'narrower':case 'wider':void perform(()=>controller.adjustSpan(target.dataset.stretchCommand==='wider'?2:-2));break;
    case 'maximum':void perform(()=>controller.markMaximum());break;
    case 'stop-sweep':void perform(()=>controller.stopSweep());break;
-   case 'skip':void perform(()=>controller.skip());break;
+   case 'skip':if(controller.state.current.phase!=='progressive-pairs')void perform(()=>controller.skip());break;
+   case 'previous-pair':case 'next-pair':void perform(()=>movePair(target.dataset.stretchCommand==='previous-pair'?-1:1));break;
    case 'edit':if(detailTarget)void perform(()=>enterTarget(detailTarget!));break;
    case 'recheck-anchor':{const slot=controller.state.current.tripleSlot;if(slot)void perform(()=>enterTarget({phase:'progressive-pairs',slotId:slot.anchorSweepId}));break;}
    case 'no-anchor':void perform(()=>controller.skip('no-rated-anchor'));break;
@@ -336,8 +356,10 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   key(event:KeyboardEvent,type:'key-down'|'key-up'='key-down'):boolean {
    if(stopped||suspended)return false;
    const gradeCode=/^(Digit|Numpad)[0-5]$/.test(event.code);
-   if(type==='key-up'){heldActivations.delete(event.code);if(gradeCode)void controller.inputKey({type:'keyup',code:event.code});return gradeCode&&page==='work'&&controller.state.current.phase==='progressive-pairs';}
+   if(type==='key-up'){heldActivations.delete(event.code);heldPairNavigation.delete(event.code);if(gradeCode)void controller.inputKey({type:'keyup',code:event.code});return gradeCode&&page==='work'&&controller.state.current.phase==='progressive-pairs';}
    const editable=(event.target as HTMLElement|null)?.closest('input,textarea,select,[contenteditable=true]');
+   if(page==='work'&&!navigation?.picking&&keyboard?.key(event))return true;
+   if(page==='work'&&controller.state.current.phase==='progressive-pairs'&&!editable&&!navigation?.picking&&!(event.target as HTMLElement|null)?.closest('[data-camera]')&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&['ArrowLeft','ArrowRight'].includes(event.code)){const blocked=event.repeat||heldPairNavigation.size>0;heldPairNavigation.add(event.code);if(!blocked&&!busy())void perform(()=>movePair(event.code==='ArrowLeft'?-1:1));return true;}
    if(['Enter','Space'].includes(actionCode(event))&&!editable&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(event.repeat||heldActivations.has(event.code))return true;heldActivations.add(event.code);}
    if(gradeCode&&!editable&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&page==='work'&&controller.state.current.phase==='progressive-pairs'){
     if(!controller.state.current.needsSetup&&!controller.state.resumeRequired&&pairIllustrationVisible())void controller.inputKey({type:'keydown',code:event.code,repeat:event.repeat});return true;
@@ -361,10 +383,10 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    if(page==='home'){const name=({KeyN:'new',KeyR:'review',KeyE:'export'} as Record<string,string>)[event.code];if(name){body.querySelector<HTMLButtonElement>(`[data-stretch-command=${name}]:not(:disabled)`)?.click();return true;}}
    return false;
   },
-  suspend(){if(stopped||suspended)return;const active=dialog.ownerDocument.activeElement as HTMLElement|null;if(active&&dialog.contains(active)){focusKey=controlKey(active)||focusKey;if(active.matches('input,textarea'))rememberInput(active as HTMLInputElement);}rememberReachDraft();navigationGeneration++;suspended=true;visibleTrialId=null;heldActivations.clear();navigation?.dispose();navigation=undefined;controller.break();},
+  suspend(){if(stopped||suspended)return;const active=dialog.ownerDocument.activeElement as HTMLElement|null;if(active&&dialog.contains(active)){focusKey=controlKey(active)||focusKey;if(active.matches('input,textarea'))rememberInput(active as HTMLInputElement);}rememberReachDraft();navigationGeneration++;suspended=true;visibleTrialId=null;heldActivations.clear();heldPairNavigation.clear();navigation?.dispose();navigation=undefined;controller.break();},
   resume(){if(stopped||!suspended)return;suspended=false;render();},
-  break(){heldActivations.clear();if(!stopped)controller.break();},
+  break(){heldActivations.clear();heldPairNavigation.clear();if(!stopped)controller.break();},
   flush(){return controller.flush();},
-  dispose(){if(stopped)return;stopped=true;heldActivations.clear();navigation?.dispose();keyboard?.dispose();controller.break();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.removeEventListener('input',input);dialog.classList.remove('stretch-calibration');delete dialog.dataset.stretchPage;art.remove();},
+  dispose(){if(stopped)return;stopped=true;heldActivations.clear();heldPairNavigation.clear();navigation?.dispose();keyboard?.dispose();controller.break();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.removeEventListener('input',input);dialog.classList.remove('stretch-calibration');delete dialog.dataset.stretchPage;delete dialog.dataset.stretchPhase;art.remove();},
  };
 }

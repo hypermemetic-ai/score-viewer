@@ -59,9 +59,12 @@ test('camera focus owns only view controls, retains the camera across scene upda
  const previousDocument=globalThis.document,previousObserver=globalThis.ResizeObserver;
  let observerCallback:()=>void=()=>{},observed:unknown=null,disconnected=0;
  class Element extends EventTarget {
-  tagName:string;children:Element[]=[];parent:Element|null=null;attributes:Record<string,string>={};innerHTML='';textContent='';className='';listeners=0;classList={add:()=>{}};width=696;height=250;
+  tagName:string;dataset:Record<string,string>={};keyboardButton?:Element;clickTarget?:Element;children:Element[]=[];parent:Element|null=null;attributes:Record<string,string>={};innerHTML='';textContent='';className='';listeners=0;classList={add:()=>{}};width=696;height=250;
   constructor(tagName:string){super();this.tagName=tagName;}
   append(...elements:Element[]){for(const element of elements){this.children.push(element);element.parent=this;}}
+  querySelector(selector:string){if(selector==='[data-camera=keyboard]'){if(!this.keyboardButton){this.keyboardButton=new Element('button');this.keyboardButton.dataset.camera='keyboard';this.keyboardButton.setAttribute('aria-pressed','false');}return this.keyboardButton;}return null;}
+  closest(selector:string){return selector==='[data-camera]'?(this.dataset.camera?this:this.clickTarget??null):null;}
+  toggleAttribute(name:string,on:boolean){if(on)this.setAttribute(name,'');else this.removeAttribute(name);}
   setAttribute(name:string,value:string){this.attributes[name]=value;}getAttribute(name:string){return this.attributes[name]??null;}removeAttribute(name:string){delete this.attributes[name];}
   focus(){(globalThis.document as any).activeElement=this;}setPointerCapture(){}hasPointerCapture(){return false;}releasePointerCapture(){}
   getBoundingClientRect(){return {width:this.width,height:this.height};}
@@ -71,21 +74,28 @@ test('camera focus owns only view controls, retains the camera across scene upda
  }
  try{
   Object.assign(globalThis,{document:{activeElement:null,createElement:(tag:string)=>new Element(tag),createElementNS:(_:string,tag:string)=>new Element(tag)},ResizeObserver:class{constructor(callback:()=>void){observerCallback=callback;}observe(target:unknown){observed=target;}disconnect(){disconnected++;}}});
-  const container=new Element('div'),view=mountStretchKeyboard(container as unknown as HTMLElement,first),root=container.children[0],svg=root.children[0],hints=root.children[1];
+  let exits=0;const screen=new Element('button');
+  const container=new Element('div'),view=mountStretchKeyboard(container as unknown as HTMLElement,first,{onKeyboardRotationExit(){exits++;screen.focus();}}),root=container.children[0],svg=root.children[0],hints=root.children[1];
   const key=(value:string)=>{const event=new Event('keydown',{cancelable:true});Object.assign(event,{key:value,altKey:false,ctrlKey:false,metaKey:false,shiftKey:false});svg.dispatchEvent(event);return event;};
   assert.equal(svg.getAttribute('data-camera-elevation'),'36');assert.equal(svg.getAttribute('data-camera-azimuth'),'5');
   assert.equal(svg.getAttribute('viewBox'),'0 0 696 250');assert.equal(observed,svg);
   assert.equal(view.ready,true);assert.equal(view.error,null);
+  const toggle=hints.querySelector('[data-camera=keyboard]')!;hints.clickTarget=toggle;const toggleRotation=()=>hints.dispatchEvent(new Event('click'));
+  assert.equal(view.keyboardRotation,false);assert.equal(toggle.getAttribute('aria-pressed'),'false');assert.equal(key('ArrowRight').defaultPrevented,false,'off-state leaves pair navigation available');
+  toggleRotation();assert.equal(view.keyboardRotation,true);assert.equal(toggle.getAttribute('aria-pressed'),'true');assert.equal(toggle.textContent,'Keyboard rotation: On');assert.equal((globalThis.document as any).activeElement,svg);
   assert.equal(key('ArrowRight').defaultPrevented,true);assert.equal(key('ArrowUp').defaultPrevented,true);assert.equal(key('+').defaultPrevented,true);
   const camera=['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name));assert.deepEqual(camera.slice(0,2),['41','10']);
   svg.width=430;svg.height=220;observerCallback();assert.equal(svg.getAttribute('viewBox'),'0 0 430 220');assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera);
   assert.equal(key('2').defaultPrevented,false);assert.equal(key('Enter').defaultPrevented,false,'rating and task navigation retain their keys');
   view.update({geometry,contacts:[sameRowContact(geometry,1,69,1),sameRowContact(geometry,2,61,1)]});
-  assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera);assert.ok(svg.getAttribute('aria-label')!.includes('Thumb on 9'));
+  assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera);assert.ok(svg.getAttribute('aria-label')!.includes('Thumb on 9'));assert.equal(view.keyboardRotation,true,'rating renders preserve explicit rotation mode');
   view.update(first,{colors:'classic'});assert.equal(view.ready,true);assert.ok(svg.innerHTML.includes('#dedbd3'));assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera);
   const unavailable=structuredClone(geometry);unavailable.actuators.find(a=>a.id==='key-61')!.pressedMotion={kind:'unknown'};
   view.update({geometry:unavailable,contacts:first.contacts});assert.equal(view.ready,false);assert.match(view.error!,/not mapped/);assert.equal(svg.innerHTML,'');assert.ok(root.getAttribute('data-model-error'));
   view.update(first);assert.equal(view.ready,true);assert.equal(view.error,null);
+  const escaped=key('Escape');assert.equal(escaped.defaultPrevented,true);assert.equal(view.keyboardRotation,false);assert.equal(toggle.getAttribute('aria-pressed'),'false');assert.equal((globalThis.document as any).activeElement,screen);assert.equal(exits,1);assert.equal(key('ArrowRight').defaultPrevented,false);
+  toggleRotation();assert.equal(view.keyboardRotation,true);const editableKey=new Event('keydown',{cancelable:true});Object.assign(editableKey,{key:'ArrowRight',altKey:false,ctrlKey:false,metaKey:false});Object.defineProperty(editableKey,'target',{value:{closest(){return {};}}});assert.equal(view.key(editableKey as unknown as KeyboardEvent),false,'entry fields keep their native editing keys');
+  toggleRotation();assert.equal(view.keyboardRotation,false);assert.equal(exits,2);toggleRotation();
   assert.equal(key('Home').defaultPrevented,true);assert.equal(svg.getAttribute('data-camera-elevation'),'36');assert.equal(svg.getAttribute('data-camera-zoom'),'1');
   view.dispose();view.dispose();assert.equal(view.ready,false);assert.equal(container.children.length,0);assert.equal(svg.listeners,0);assert.equal(hints.listeners,0);assert.equal(disconnected,1);
   const retiredMarkup=svg.innerHTML;svg.width=500;observerCallback();assert.equal(svg.innerHTML,retiredMarkup,'an already queued resize cannot redraw the disposed model');
