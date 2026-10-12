@@ -13,8 +13,13 @@
 .calibration-review .calibration-shell-header h2{font-size:24px;font-weight:400}
 .calibration-review .calibration-shell-body{padding-top:20px}
 .calibration-review .calibration-options-description{margin:0!important}
-.calibration-review .calibration-review-list{margin:16px 0 0}
-.calibration-review .calibration-review-list button{font-size:18px}
+.calibration-review .calibration-review-browser{grid-template-columns:minmax(0,200px) minmax(0,1fr);align-items:stretch;gap:18px;margin-top:18px;height:min(420px,max(160px,calc(var(--review-list-rows) * 76px)),max(120px,calc(var(--viewer-logical-height,100vh) - 300px)))}
+.calibration-review-browser .practice-chunks{overscroll-behavior:contain}
+.calibration-review-browser .practice-chunks button{font-size:18px;padding:10px 8px;flex:none}
+.calibration-review-browser .practice-chunks button>span{white-space:normal}
+.calibration-review-browser .practice-chunks button>small{font-size:14px;line-height:1.45;color:#999}
+.calibration-review-result,.calibration-review-count{font-size:14px;color:#aaa;text-align:right}
+.calibration-review .calibration-home-hint{flex-wrap:wrap;gap:12px}
 .calibration-dialog.calibration-placement,.calibration-dialog.calibration-rating{font-family:system-ui,sans-serif}
 .calibration-placement .calibration-contact-diagram,.calibration-rating .calibration-contact-diagram{margin-top:0}
 .calibration-placement-instructions,.calibration-trial-instructions{display:grid;gap:12px;width:100%;max-width:900px;margin:18px auto 0;padding:0;list-style:none;text-align:left;font-size:18px;font-weight:400;line-height:1.5}
@@ -51,7 +56,6 @@
 .calibration-options-field{display:grid;grid-template-columns:250px minmax(200px,400px);align-items:center;gap:28px;font-size:22px;margin:35px 0}
 .calibration-dialog select{max-width:100%;width:100%;background:#000;border:1px solid #666;padding:8px;color:#fff}
 .calibration-options-description{font-size:18px;color:#aaa;line-height:1.5;max-width:850px;margin:10px 0 40px!important}
-.calibration-review-list{display:grid;gap:8px;margin:25px 0}.calibration-review-list button{text-align:left;border-bottom:1px solid #222;font-size:20px}
 .calibration-notice{color:#ccc;font-size:18px;line-height:1.5;margin-top:20px!important}.calibration-notice:empty{display:none}
 .calibration-midi-panel{margin-top:30px}.calibration-midi-panel [data-midi-activity]{display:none}
 .calibration-dialog:focus{outline:none}
@@ -76,3 +80,5 @@
 @media(max-width:900px){.calibration-shell-header{flex-wrap:wrap;gap:10px}.calibration-trial-heading{gap:16px}.calibration-trial-navigation{gap:10px}}
 @media(max-width:700px){.calibration-rating .calibration-grade-description{margin-top:0}}
 @media(max-width:700px){.calibration-trial-prompt{gap:20px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.calibration-trial-prompt .calibration-contact-diagram{height:210px}}
+@media(max-width:700px){.calibration-review .calibration-review-browser{grid-template-columns:minmax(0,160px) minmax(0,1fr);gap:12px}.calibration-review-browser .practice-chunks button{font-size:16px}}
+@media(max-width:440px){.calibration-review .calibration-review-browser{grid-template-columns:minmax(0,115px) minmax(0,1fr)}.calibration-review-browser .calibration-review-entries button{grid-template-columns:minmax(0,1fr)}.calibration-review-result{text-align:left}}

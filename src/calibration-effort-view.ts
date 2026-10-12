@@ -1,10 +1,13 @@
 import {arrangeBottomNavigation} from './application-navigation';
+import {actionCode} from './input';
+import {CalibrationReviewBrowser,type CalibrationReviewRow} from './calibration-review-browser';
+import {effortReviewRows} from './calibration-effort-review';
 import type {CalibrationColorLayout,CalibrationInputEvent,CalibrationGrade} from '@hypermemetic-ai/fingering-calculator';
 import type {EffortController} from './calibration-effort-controller';
-import {createEffortPlan,effortProgress,effortWorkAt,effortSetupInstruction,EFFORT_PLACEMENT_INSTRUCTION,EFFORT_GRADES,type EffortInstrument,type EffortHand} from './calibration-effort';
+import {createEffortPlan,effortProgress,effortSetupInstruction,EFFORT_PLACEMENT_INSTRUCTION,EFFORT_GRADES,type EffortInstrument,type EffortHand} from './calibration-effort';
 import type {FingertipController} from './calibration-fingertips-controller';
 import {mountFingertipCalibration} from './calibration-fingertips-view';
-import {calibrationEscape as esc,calibrationFingerNames as finger,renderCalibrationTrial,type CalibrationNoteNames} from './calibration-trial-renderer';
+import {calibrationEscape as esc,renderCalibrationTrial,type CalibrationNoteNames} from './calibration-trial-renderer';
 import {CalibrationPageInput} from './calibration-page-input';
 import {OptionsNavigation} from './options-navigation';
 import './calibration-style.css';
@@ -22,7 +25,8 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  let page:Page='main',returnPage:Page='main',stopped=false,midiConnected=false,notice='',measurementOpened=false;
  let measuring:ReturnType<typeof mountFingertipCalibration>|undefined;
  let homeNavigation:OptionsNavigation|undefined,homeCommand='continue',homeBusy=false;
- let reviewNavigation:OptionsNavigation|undefined,reviewTarget='';
+ let reviewNavigation:OptionsNavigation|undefined,reviewRows:CalibrationReviewRow[]=[];
+ const reviewBrowser=new CalibrationReviewBrowser();
  let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
  const pageInput=new CalibrationPageInput();
  dialog.classList.add('calibration-dialog');
@@ -53,7 +57,9 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   }
   if(reviewNavigation){
    const focused=document.activeElement as HTMLElement|null;
-   if(dialog.contains(focused)&&focused?.dataset.review)reviewTarget=focused.dataset.review;
+   const root=body.querySelector<HTMLElement>('.calibration-review-browser');if(root)reviewBrowser.capture(root);
+   if(dialog.contains(focused)&&focused?.dataset.review)reviewBrowser.selectRating(focused.dataset.review,reviewRows);
+   if(dialog.contains(focused)&&focused?.dataset.reviewGroup)reviewBrowser.selectGroup(focused.dataset.reviewGroup,reviewRows);
    reviewNavigation.dispose();reviewNavigation=undefined;
   }
   const state=effort.state,saved=collection(),progress=saved?effortProgress(saved):null,total=options.instrument==='janko-four-row'?208:52;
@@ -79,11 +85,9 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   }else if(page==='review'){
    header.innerHTML='<h2>Change a rating</h2>';
    const plan=createEffortPlan(options.instrument,saved?.performingHand??hand);
-   body.innerHTML=`<p class="calibration-options-description">Choose a pair to rate it again.</p><div class="calibration-review-list">${saved?plan.trials.map(t=>{
-    const work=effortWorkAt(saved,t.id);if(work.status!=='measured')return '';
-    const names=[...t.anchors,...t.active].map(p=>finger[p.finger]).join(' · '),grade=EFFORT_GRADES[work.grade];
-    return `<button type="button" data-review="${esc(t.id)}"${busy||state.readOnly?' disabled':''}>${names} · ${t.distanceSemitoneSteps} steps · ${grade.label}</button>`;
-   }).join(''):''}</div>`;
+   reviewRows=saved?effortReviewRows(plan,saved,options.noteNames()):[];
+   body.innerHTML='<p class="calibration-options-description">Choose a group, then a rating to change.</p><div class="practice-browser calibration-review-browser"></div>';
+   reviewBrowser.render(body.querySelector<HTMLElement>('.calibration-review-browser')!,reviewRows,busy||state.readOnly);
   }else{
    const trial=state.current.trial!,session=state.session!;
    hand=session.performingHand;
@@ -95,7 +99,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
     : `<div class="calibration-trial-prompt">${diagram}<ul class="calibration-trial-instructions"><li>Press both keys together, then alternate.</li><li>${cue}</li></ul></div>`;
    body.innerHTML=`${content}${page==='setup'?'':`<h3 class="calibration-rating-question">How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
-  footer.innerHTML=`${command('back','Back','Esc')}${page==='main'||page==='review'?'<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>':''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
+  footer.innerHTML=`${command('back','Back','Esc')}${page==='main'||page==='review'?`<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span>${page==='review'?'<span><kbd>← →</kbd> Groups / ratings</span>':''}<span><kbd>Enter</kbd> Open</span></p>`:''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
   arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-command=back]'),footer.querySelector<HTMLButtonElement>('[data-command=options]'));
   footer.toggleAttribute('data-options-row',page==='review');
   const error=notice||state.error;
@@ -105,14 +109,15 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    homeNavigation=new OptionsNavigation(dialog,target=>{if(target?.dataset.command)homeCommand=target.dataset.command;},()=>false,{horizontal:true,focusOnPrepare:false});
    (dialog.querySelector<HTMLButtonElement>(`[data-command="${homeCommand}"]:not(:disabled)`)??body.querySelector<HTMLButtonElement>('button:not(:disabled)'))?.focus();
   }else if(page==='review'){
-   reviewNavigation=new OptionsNavigation(dialog,target=>{if(target?.dataset.review)reviewTarget=target.dataset.review;},()=>false,{focusOnPrepare:false});
-   ([...body.querySelectorAll<HTMLButtonElement>('[data-review]:not(:disabled)')].find(b=>b.dataset.review===reviewTarget)??body.querySelector<HTMLButtonElement>('[data-review]:not(:disabled)')??footer.querySelector<HTMLButtonElement>('[data-command=back]'))?.focus();
+   reviewNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});
+   if(!busy&&!state.readOnly&&reviewRows.length)reviewBrowser.focus(body.querySelector<HTMLElement>('.calibration-review-browser')!);else footer.querySelector<HTMLButtonElement>('[data-command=back]')?.focus();
   }
  }
  const click=(event:Event)=>{
-  const target=(event.target as HTMLElement).closest<HTMLElement>('[data-command],[data-grade],[data-review]');if(!target||target.hasAttribute('disabled'))return;
+  const target=(event.target as HTMLElement).closest<HTMLElement>('[data-command],[data-grade],[data-review],[data-review-group]');if(!target||target.hasAttribute('disabled'))return;
+  if(target.dataset.reviewGroup){reviewBrowser.selectGroup(target.dataset.reviewGroup,reviewRows);reviewBrowser.render(body.querySelector<HTMLElement>('.calibration-review-browser')!,reviewRows,effort.state.busy||effort.state.readOnly,true);return;}
   if(target.dataset.grade!==undefined&&page==='trial'){void effort.rateButton(Number(target.dataset.grade) as CalibrationGrade);return;}
-  if(target.dataset.review){void perform(async()=>{if(await effort.resume(options.instrument)&&await effort.navigate(target.dataset.review!)){page=effort.state.current.needsSetup?'setup':'trial';render();}});return;}
+  if(target.dataset.review){reviewBrowser.selectRating(target.dataset.review,reviewRows);void perform(async()=>{if(await effort.resume(options.instrument)&&await effort.navigate(target.dataset.review!)){page=effort.state.current.needsSetup?'setup':'trial';render();}});return;}
   switch(target.dataset.command){
    case 'back':back();break;
    case 'continue':if(collection()&&effortProgress(collection()!).status==='complete')transition('review');else void perform(continueWork);break;
@@ -141,6 +146,17 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    if(page==='measurements')return measuring?.key(event,type)??false;
    if(type==='key-up')return false;
    if(page==='main'&&!event.shiftKey&&homeNavigation?.keyDown(event))return true;
+   if(page==='review'&&!event.shiftKey&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&(event.target as HTMLElement|null)?.closest('[data-review-group],[data-review]')){
+    const focused=event.target as HTMLElement,code=actionCode(event)==='Space'?'Enter':actionCode(event);
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter'].includes(code)){
+     if(effort.state.busy||effort.state.readOnly||event.repeat&&code==='Enter')return true;
+     if(focused.dataset.reviewGroup)reviewBrowser.selectGroup(focused.dataset.reviewGroup,reviewRows);else if(focused.dataset.review)reviewBrowser.selectRating(focused.dataset.review,reviewRows);
+     const result=reviewBrowser.key(code,reviewRows);
+     if(result==='open'){const id=reviewBrowser.current(reviewRows)?.id;[...body.querySelectorAll<HTMLButtonElement>('[data-review]')].find(b=>b.dataset.review===id)?.click();}
+     else if(result==='handled')reviewBrowser.render(body.querySelector<HTMLElement>('.calibration-review-browser')!,reviewRows,false,true);
+     if(result)return true;
+    }
+   }
    if(page==='review'&&!event.shiftKey&&reviewNavigation?.keyDown(event))return true;
    if(event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.repeat)return false;
    if((event.target as HTMLElement|null)?.closest('input,select,textarea,[contenteditable=true]'))return false;
