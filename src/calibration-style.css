@@ -14,7 +14,8 @@
 .calibration-placement-instructions,.calibration-trial-instructions{display:grid;gap:12px;width:100%;max-width:900px;margin:18px auto 0;padding:0;list-style:none;text-align:left;font-size:18px;font-weight:400;line-height:1.5}
 .calibration-placement-instructions li,.calibration-trial-instructions li{position:relative;padding-left:22px}
 .calibration-placement-instructions li::before,.calibration-trial-instructions li::before{content:"";position:absolute;left:0;top:.75em;width:10px;height:1px;background:currentColor}
-.calibration-trial-prompt{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:center;gap:32px;max-width:1000px;margin:0 auto}
+.calibration-trial-prompt{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:center;gap:32px;max-width:1128px;margin:0 auto}
+.calibration-trial-prompt .calibration-contact-diagram{height:290px}
 .calibration-trial-prompt .calibration-trial-instructions{margin:0}
 .calibration-home-progress{display:flex;align-items:baseline;justify-content:space-between;gap:20px;font-size:20px!important;color:#aaa;padding-bottom:16px;border-bottom:1px solid #333}
 .calibration-home-progress span:last-child{font-size:27px;color:#fff;font-variant-numeric:tabular-nums}
