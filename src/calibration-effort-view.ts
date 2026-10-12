@@ -13,7 +13,7 @@ import {OptionsNavigation} from './options-navigation';
 import './calibration-style.css';
 
 export interface CalibrationViewOptions {
- instrument:EffortInstrument;noteNames:()=>CalibrationNoteNames;saveNoteNames:(choice:CalibrationNoteNames)=>Promise<void>;
+ instrument:EffortInstrument;noteNames:()=>CalibrationNoteNames;
  colors?:()=>CalibrationColorLayout;saveColors?:(choice:CalibrationColorLayout)=>Promise<void>;
  close:()=>void;exportJson:()=>Promise<void>;openLegacy?:()=>void;
 }
@@ -26,7 +26,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  let measuring:ReturnType<typeof mountFingertipCalibration>|undefined;
  let homeNavigation:OptionsNavigation|undefined,homeCommand='continue',homeBusy=false;
  let reviewNavigation:OptionsNavigation|undefined,reviewRows:CalibrationReviewRow[]=[];
- let settingsNavigation:OptionsNavigation|undefined,settingsFocus='calibration-notation-system';
+ let settingsNavigation:OptionsNavigation|undefined,settingsFocus='';
  const settingsKey=(target:HTMLElement|null)=>target?.dataset.optionsKey??target?.dataset.command??(target?.hasAttribute('data-midi-connect')?'calibration-midi-connect':undefined);
  const reviewBrowser=new CalibrationReviewBrowser();
  let hand:EffortHand=effort.state.archive.collections.find(c=>c.instrument===options.instrument)?.performingHand??'RH';
@@ -83,7 +83,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    body.innerHTML=`<p class="calibration-home-progress"><span>Effort ratings</span><span>${progress?.measured??0} / ${total}</span></p><nav class="calibration-menu" aria-label="Calibration">${command('continue',progress?.status==='complete'?'Review ratings':'Continue',undefined,busy||state.readOnly)}${command('review','Change a rating','R',!progress?.measured||busy)}${command('measurements',`Fingertip readings <span class="calibration-menu-count">${readings} / 4</span>`,'F',busy)}${command('export','Export','E')}</nav>`;
   }else if(page==='options'){
    header.innerHTML='<h2>Options</h2>';
-   body.innerHTML=`<label class="calibration-options-field" data-options-row>Notation system<select id="calibration-notation-system" aria-label="Notation system" data-calibration-names><option value="iso"${options.noteNames()==='iso'?' selected':''}>ISO</option><option value="traditional" disabled>Traditional · not available yet</option></select></label><p class="calibration-options-description">This is the global notation choice.</p>${options.instrument==='janko-four-row'?`<label class="calibration-options-field" data-options-row>Key colors<select id="calibration-key-colors" aria-label="Key colors" data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard. Note names stay as selected above.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
+   body.innerHTML=`${options.instrument==='janko-four-row'?`<label class="calibration-options-field" data-options-row>Key colors<select id="calibration-key-colors" aria-label="Key colors" data-calibration-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select></label><p class="calibration-options-description">Choose the physical key colors that match your keyboard.</p>`:''}${options.openLegacy?command('span','Finger span'):""}<h3>Piano input</h3><p class="calibration-options-description">Optional. You can also choose a rating with keys 0–4.</p>`;
    body.append(midiContainer);
   }else if(page==='measurements'){
    header.innerHTML='';body.innerHTML='';if(!measurementOpened){fingertips.setHand(hand);measurementOpened=true;}
@@ -120,8 +120,8 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    if(!busy&&!state.readOnly&&reviewRows.length)reviewBrowser.focus(body.querySelector<HTMLElement>('.calibration-review-browser')!);else footer.querySelector<HTMLButtonElement>('[data-command=back]')?.focus();
   }else if(page==='options'){
    settingsNavigation=new OptionsNavigation(dialog,target=>{settingsFocus=settingsKey(target??null)??settingsFocus;},()=>false,{focusOnPrepare:false});
-   const restored=[...dialog.querySelectorAll<HTMLElement>('button,input,select')].find(el=>settingsKey(el)===settingsFocus&&!el.closest('[hidden]')&&!(el as HTMLButtonElement).disabled);
-   (restored??dialog.querySelector<HTMLElement>('[data-options-key="calibration-notation-system"]'))?.focus({preventScroll:true});
+   const controls=[...dialog.querySelectorAll<HTMLElement>('button,input,select')].filter(el=>!el.closest('[hidden]')&&!(el as HTMLButtonElement).disabled);
+   (controls.find(el=>settingsKey(el)===settingsFocus)??controls[0])?.focus({preventScroll:true});
   }
  }
  const click=(event:Event)=>{
@@ -144,7 +144,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
  };
  const change=(event:Event)=>{
   const target=event.target as HTMLSelectElement;
-  if(target.matches('[data-calibration-names]'))void perform(()=>options.saveNoteNames(target.value as CalibrationNoteNames));
   if(target.matches('[data-calibration-colors]'))void perform(()=>options.saveColors?.(target.value as CalibrationColorLayout)??Promise.resolve());
  };
  dialog.addEventListener('click',click);dialog.addEventListener('change',change);

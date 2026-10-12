@@ -688,7 +688,7 @@ async function calibrate(back?:()=>void){
   const controller=created=new EffortController({load,files}),
    fingertips=createdFingertips=new FingertipController({load:fingertipLoad,files:fingertipFiles,instrument:preferences.keyboardLayout}),
    view=mountCalibrationView(d,controller,fingertips,{instrument:preferences.keyboardLayout,close:closeDialog,
-    noteNames:()=> 'iso',saveNoteNames:saveNotationSystem,
+    noteNames:()=> 'iso',
     colors:()=>preferences.calibrationColors==='classic'?'classic':'five-seven',saveColors:saveCalibrationColors,
     openLegacy:()=>{const parent=dialogBack;calibrateLegacy();dialogBack=()=>{void calibrate(parent);};},
     exportJson:async()=>{await host.exportFeedback(JSON.stringify({version:'viewer-hand-calibration-export-v2',
