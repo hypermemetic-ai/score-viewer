@@ -55,6 +55,7 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   if((page==='trial'||page==='setup')&&!state.current.trial)page='main';
   dialog.classList.toggle('calibration-home',page==='main');
   dialog.classList.toggle('calibration-placement',page==='setup');
+  dialog.classList.toggle('calibration-rating',page==='trial');
   body.dataset.page=page;footer.hidden=page==='measurements';
   const busy=state.busy,readings=new Set(fingertips.state.archive.readings.filter(r=>r.instrument===options.instrument).map(r=>r.pair)).size;
   if(page==='main'){
@@ -84,8 +85,8 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
    const diagram=renderCalibrationTrial(session.plan.keyboard,trial,options.noteNames(),options.colors?.()??'five-seven');
    const content=page==='setup'
     ? `${diagram}<ul class="calibration-placement-instructions"><li>${EFFORT_PLACEMENT_INSTRUCTION}</li><li>${esc(effortSetupInstruction(trial).replace(EFFORT_PLACEMENT_INSTRUCTION,'').replace(cue,'').trim())}</li><li>${cue}</li></ul>`
-    : `<p class="calibration-task">Press both keys together, then alternate.</p>${diagram}<p class="calibration-fixed-cue">${cue}</p>`;
-   body.innerHTML=`${content}${page==='setup'?'':`<h3>How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
+    : `${diagram}<ul class="calibration-trial-instructions"><li>Press both keys together, then alternate.</li><li>${cue}</li></ul>`;
+   body.innerHTML=`${content}${page==='setup'?'':`<h3 class="calibration-rating-question">How much effort does that take?</h3><div class="calibration-ratings">${EFFORT_GRADES.map(g=>`<button type="button" data-grade="${g.grade}"${busy||state.readOnly||state.broken?' disabled':''}><span class="calibration-grade-label"><kbd>${g.grade}</kbd><span>${g.label}</span></span><span class="calibration-grade-description">${g.description}</span></button>`).join('')}</div>`}`;
   }
   footer.innerHTML=`${command('back','Back','Esc')}${page==='main'?'<p class="calibration-home-hint"><span><kbd>↑↓</kbd> Select</span><span><kbd>Enter</kbd> Open</span></p>':''}${page==='setup'?command('begin','Begin','Enter',busy||state.readOnly):''}${page==='options'?'':command('options','Options','O')}`;
   arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-command=back]'),footer.querySelector<HTMLButtonElement>('[data-command=options]'));
@@ -149,6 +150,6 @@ export function mountCalibrationView(dialog:HTMLElement,effort:EffortController,
   setMidiConnected(value:boolean){midiConnected=value;},
   break(){if(stopped)return;pageInput.clear();pageBreak();if(page==='trial')page='setup';render();},
   async flush(){await Promise.all([effort.flush(),fingertips.flush()]);},
-  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement');},
+  dispose(){if(stopped)return;stopped=true;pageInput.clear();homeNavigation?.dispose();measuring?.break();measuring?.dispose();pageBreak();unsubscribe();dialog.removeEventListener('click',click);dialog.removeEventListener('change',change);dialog.classList.remove('calibration-dialog','calibration-home','calibration-placement','calibration-rating');},
  };
 }
