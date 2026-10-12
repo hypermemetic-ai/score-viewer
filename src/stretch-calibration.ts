@@ -150,8 +150,9 @@ export function effectiveSweepTerminals(s:StretchCalibrationSession):PairSweepTe
 export function relativeDifferenceMm(s:StretchCalibrationSession,first:number,second:number):number|null {
  let sum=0,frame:string|undefined;
  for(let f=first;f<second;f++){
-  const readings=effectiveEntries(s).filter((e):e is RelativeFingertipReachObservation=>e.kind==='relative-fingertip-reach'&&e.pair[0]===f);
-  const e=readings.at(-1);if(!e||frame!==undefined&&frame!==e.referenceFrameId)return null;frame=e.referenceFrameId;
+  const slot=s.plan.relativeReachSlots.find(slot=>slot.pair[0]===f);
+  const e=slot?latestSlotOutcome(s,'relative-fingertip-reach',slot.id):undefined;
+  if(e?.kind!=='relative-fingertip-reach'||frame!==undefined&&frame!==e.referenceFrameId)return null;frame=e.referenceFrameId;
   const r=e.reading;if(r.kind==='signed-mm')sum+=r.differenceMm;
   else{if(r.axisStartMm===null||r.axisEndMm===null)return null;sum+=(r.secondFraction-r.firstFraction)*(r.axisEndMm-r.axisStartMm);}
  }
