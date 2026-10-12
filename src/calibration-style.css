@@ -1,5 +1,5 @@
 @font-face{font-family:"URW Gothic";src:url("./URWGothic-Book.otf") format("opentype");font-weight:400;font-display:swap}
-.calibration-dialog{background:#000;color:#fff;border:0;width:1400px;max-width:96vw;height:900px;max-height:94vh;padding:30px 60px;font-family:"URW Gothic",sans-serif;font-weight:400;overflow:auto}
+.calibration-dialog{--viewer-dialog-max:1400px;background:#000;color:#fff;border:0;width:1400px;max-width:96vw;height:900px;max-height:94vh;padding:30px 60px;font-family:"URW Gothic",sans-serif;font-weight:400;overflow:auto}
 .calibration-dialog h2,.calibration-dialog h3,.calibration-dialog p{font-family:inherit;margin:0;font-weight:400}
 .calibration-dialog h2{font-size:35px;font-weight:700}.calibration-dialog h3{font-size:29px}
 .calibration-dialog button,.calibration-dialog select{font-family:inherit;font-size:20px;border-radius:0}
@@ -25,6 +25,15 @@
 .calibration-review-list{display:grid;gap:8px;margin:25px 0}.calibration-review-list button{text-align:left;border-bottom:1px solid #222;font-size:20px}
 .calibration-notice{color:#ccc;font-size:18px;line-height:1.5;margin-top:20px!important}.calibration-notice:empty{display:none}
 .calibration-midi-panel{margin-top:30px}.calibration-midi-panel [data-midi-activity]{display:none}
+.calibration-dialog:focus{outline:none}
+.calibration-shell-header:empty{display:none}
+.calibration-shell-body:has(.fingertips){padding-top:0}
+.calibration-dialog .fingertips h2{font-size:29px;font-weight:400;line-height:1.35;margin:0 0 16px}
+.calibration-dialog .fingertips .panel{padding-top:0}
+.calibration-dialog .fingertips .methods{margin-bottom:16px}
+.calibration-dialog .fingertips .reference{margin-top:16px}
+.calibration-dialog .fingertips .help{font-size:20px;margin-top:16px}
+.calibration-dialog .fingertips .message:empty{min-height:0;margin:0}
 @media(max-width:1000px){.calibration-dialog{padding:25px 32px}.calibration-ratings{gap:18px}.calibration-grade-label{gap:10px;white-space:normal}.calibration-contact-diagram{height:330px}.calibration-grade-description{margin-top:25px}}
 @media(max-width:700px){.calibration-dialog{padding:20px;max-height:96vh}.calibration-contact-diagram{height:240px}.calibration-ratings{grid-template-columns:1fr;gap:18px}.calibration-ratings button{display:grid;grid-template-columns:190px 1fr;gap:12px}.calibration-grade-description{margin:0}.calibration-options-field{grid-template-columns:1fr;gap:12px}.calibration-fixed-cue{margin-bottom:18px!important}.calibration-page-footer{margin-top:25px}}
 @media(max-height:850px) and (min-width:701px){.calibration-contact-diagram{height:280px}}

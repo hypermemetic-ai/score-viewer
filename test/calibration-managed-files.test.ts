@@ -6,7 +6,7 @@ import {managedFileStorage,physicalManagedName,validPhysicalManagedName} from '.
 test('new calibration evidence has exact additive managed names in both hosts',async()=>{
  const native=readFileSync(new URL('../src-tauri/src/managed_files.rs',import.meta.url),'utf8');
  const accepted=['calibration-effort-v2.json','calibration-fingertips-v1.json'];
- const retained=new Map([['calibration-pilot-v1.json',new Uint8Array([1,2,3])],['calibration.json',new Uint8Array([4,5,6])]]);
+ const retained=new Map<string,Uint8Array>([['calibration-pilot-v1.json',new Uint8Array([1,2,3])],['calibration.json',new Uint8Array([4,5,6])]]);
  const storage=managedFileStorage({read:async name=>retained.get(name)??null,write:async(name,bytes)=>{retained.set(name,bytes);}});
  for(const name of accepted){
   assert.equal(validPhysicalManagedName(name),true);assert.equal(await physicalManagedName(name),name);
