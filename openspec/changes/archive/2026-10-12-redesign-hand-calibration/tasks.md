@@ -18,5 +18,5 @@
 
 ## 4. Verification and delivery
 
-- [ ] 4.1 Run source test/build checks, observe the production viewer, resolve independent review findings and land a scoped reviewed PR; record actual validation receipts and reconcile linked PRs.
-- [ ] 4.2 Sync and archive the verified change, build the paired native release through its reviewed carrier, deliver the usable build preserving application identity/data, and record native inspection limits and delivery evidence.
+- [x] 4.1 Run source test/build checks, observe the production viewer, resolve independent review findings and land a scoped reviewed PR; record actual validation receipts and reconcile linked PRs.
+- [x] 4.2 Sync and archive the verified change, build the paired native release through its reviewed carrier, deliver the usable build preserving application identity/data, and record native inspection limits and delivery evidence.
