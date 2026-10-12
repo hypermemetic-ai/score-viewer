@@ -89,7 +89,16 @@ export class StretchController {
   const done=(phase:StretchCursor['phase'],id:string)=>['recorded','omitted'].includes(stretchSlotStatus(s,phase,id));
   const r=s.plan.relativeReachSlots.find(v=>!done('relative-fingertip-reach',v.id));if(r){s.cursor={phase:'relative-fingertip-reach',slotId:r.id,trialId:null};return;}
   const sw=s.plan.pairSweeps.find(v=>!done('progressive-pairs',v.id));if(sw){
-   const reports=effectivePairReports(s).filter(v=>v.sweepId===sw.id).sort((a,b)=>s.pairTrials.find(t=>t.id===a.trialId)!.distanceSemitoneSteps-s.pairTrials.find(t=>t.id===b.trialId)!.distanceSemitoneSteps),last=reports.at(-1),old=last?s.pairTrials.find(t=>t.id===last.trialId):undefined;
+   const effective=effectivePairReports(s).filter(v=>v.sweepId===sw.id);
+   const firstReachable=s.entries.find(e=>e.kind==='pair-stretch'&&e.sweepId===sw.id&&e.grade<5);
+   const frozen=firstReachable?.kind==='pair-stretch'?s.pairTrials.find(t=>t.id===firstReachable.trialId)?.contacts[0]:undefined;
+   if(frozen){
+    const trials=s.pairTrials.filter(t=>t.sweepId===sw.id&&t.contacts[0].row===frozen.row&&t.contacts[0].midiPitch===frozen.midiPitch);
+    const ratedIds=new Set(effective.map(e=>e.trialId)),unanswered=trials.filter(t=>!ratedIds.has(t.id)).at(-1);
+    const latestRated=[...effective].reverse().map(e=>trials.find(t=>t.id===e.trialId)).find(Boolean),trial=unanswered??latestRated??trials.at(-1);
+    s.cursor={phase:'progressive-pairs',slotId:sw.id,trialId:trial?.id??null};return;
+   }
+   const reports=effective.sort((a,b)=>s.pairTrials.find(t=>t.id===a.trialId)!.distanceSemitoneSteps-s.pairTrials.find(t=>t.id===b.trialId)!.distanceSemitoneSteps),last=reports.at(-1),old=last?s.pairTrials.find(t=>t.id===last.trialId):undefined;
    const trial=last?.grade===5?old:old?this.target(s,sw.id,old.distanceSemitoneSteps+2,old.contacts[0].row as 1|2,old.contacts[0].midiPitch,false):undefined;
    s.cursor={phase:'progressive-pairs',slotId:sw.id,trialId:trial?.id??null};return;
   }
