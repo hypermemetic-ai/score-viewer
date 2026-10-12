@@ -34,6 +34,8 @@
 .calibration-dialog .fingertips .reference{margin-top:16px}
 .calibration-dialog .fingertips .help{font-size:20px;margin-top:16px}
 .calibration-dialog .fingertips .message:empty{min-height:0;margin:0}
+.calibration-dialog .fingertips .message{min-height:0}
+.calibration-dialog .fingertips .art svg{max-height:calc(var(--viewer-logical-height, 100vh) - 390px)}
 @media(max-width:1000px){.calibration-dialog{padding:25px 32px}.calibration-ratings{gap:18px}.calibration-grade-label{gap:10px;white-space:normal}.calibration-contact-diagram{height:330px}.calibration-grade-description{margin-top:25px}}
 @media(max-width:700px){.calibration-dialog{padding:20px;max-height:96vh}.calibration-contact-diagram{height:240px}.calibration-ratings{grid-template-columns:1fr;gap:18px}.calibration-ratings button{display:grid;grid-template-columns:190px 1fr;gap:12px}.calibration-grade-description{margin:0}.calibration-options-field{grid-template-columns:1fr;gap:12px}.calibration-fixed-cue{margin-bottom:18px!important}.calibration-page-footer{margin-top:25px}}
 @media(max-height:850px) and (min-width:701px){.calibration-contact-diagram{height:280px}}

@@ -37,6 +37,7 @@ export function mountFingertipCalibration(container:HTMLElement,controller:Finge
    if(disposed||event.shiftKey||event.altKey||event.ctrlKey||event.metaKey)return false;
    if(!command)return false;
    if(event.type!=='keydown')return false;
+   if((event.target as HTMLElement|null)?.closest('select')&&['enter','o'].includes(key))return false;
    if(key==='o'&&document.activeElement===entry)return false;
    event.preventDefault();if(event.repeat||held.has(key))return true;held.add(key);
    if(key==='escape')back();else if(key==='arrowleft')controller.move(-1);else if(key==='arrowright')controller.move(1);else if(key==='enter')void controller.saveAndNext();else if(key==='o'&&options.options){controller.break();options.options();}return true;
