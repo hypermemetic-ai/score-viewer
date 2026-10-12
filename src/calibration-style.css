@@ -7,7 +7,8 @@
 .calibration-dialog kbd,.calibration-dialog button kbd{display:inline-block;text-decoration:none!important;font-family:inherit;font-size:15px;margin-left:14px;color:inherit}
 .calibration-shell-header{display:flex;align-items:center;justify-content:space-between;gap:30px;font-size:22px;min-height:44px}
 .calibration-shell-body{padding-top:45px}.calibration-shell-body[data-page=trial],.calibration-shell-body[data-page=setup]{padding-top:18px}
-.calibration-dialog.calibration-home{--viewer-dialog-max:760px;width:760px;height:auto;padding:28px 36px}
+.calibration-dialog.calibration-home{--viewer-dialog-max:760px;width:760px;height:auto;padding:28px 36px;font-family:system-ui,sans-serif}
+.calibration-home h2{font-family:"URW Gothic",system-ui,sans-serif}
 .calibration-home .calibration-shell-body{padding-top:24px}
 .calibration-home-progress{display:flex;align-items:baseline;justify-content:space-between;gap:20px;font-size:20px!important;color:#aaa;padding-bottom:16px;border-bottom:1px solid #333}
 .calibration-home-progress span:last-child{font-size:27px;color:#fff;font-variant-numeric:tabular-nums}
