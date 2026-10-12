@@ -87,6 +87,7 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 .options-redesigned .options-panels [data-options-panel]>h3,.options-panels .options-section-title,.options-panels .score-options-heading{min-height:44px;margin:0 0 20px;display:flex;align-items:center}
 .options-panels .options-section-title{gap:12px;flex-wrap:wrap}
 .options-panels .options-practice,.options-panels .score-options,.options-panels .options-bindings,.options-panels .options-fingering,.options-panels .piano-options{border:0;margin:0;padding:0}
+.options-panels .options-fingering .calibration-entry{justify-content:flex-start}
 .options-panels .options-practice h3,.options-panels .options-fingering h3,.options-panels .piano-options h3{min-height:44px;margin:0 0 20px;display:flex;align-items:center}
 .options-redesigned .options-panels .options-setup{gap:22px}
 .options-redesigned .options-panels .option-setting{margin:14px 0;grid-template-columns:145px minmax(0,1fr)}
