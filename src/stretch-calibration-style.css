@@ -41,3 +41,5 @@
 .stretch-footer .stretch-pair-navigation button{font-size:15px;padding:8px 6px;white-space:nowrap}
 .stretch-calibration[data-stretch-phase=progressive-pairs] .stretch-footer{padding-top:12px}
 @media(max-width:700px){.stretch-calibration[data-stretch-phase=progressive-pairs] .stretch-art{height:260px}.stretch-footer .stretch-pair-navigation{gap:8px}.stretch-footer .stretch-pair-actions{gap:12px}.stretch-footer .stretch-pair-actions button{font-size:15px;padding:8px 6px}}
+
+.stretch-hand-choices button:first-child{font-size:17px}
