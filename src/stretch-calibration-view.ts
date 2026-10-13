@@ -1,4 +1,4 @@
-import {STRETCH_CALIBRATION_GRADES,type StretchCalibrationSession,type StretchCalibrationContact,type StretchCalibrationGeometry,type RelativeFingertipReachObservation,type PairStretchObservation,type StretchCalibrationEntry,type StretchGrade} from '@hypermemetic-ai/fingering-calculator';
+import {STRETCH_CALIBRATION_GRADES,type StretchCalibrationSession,type StretchCalibrationContact,type RelativeFingertipReachObservation,type PairStretchObservation,type StretchCalibrationEntry,type StretchGrade} from '@hypermemetic-ai/fingering-calculator';
 import {arrangeBottomNavigation} from './application-navigation';
 import {OptionsNavigation} from './options-navigation';
 import {actionCode} from './input';
@@ -6,7 +6,8 @@ import {CalibrationReviewBrowser,type CalibrationReviewRow} from './calibration-
 import {calibrationEscape as esc} from './calibration-trial-renderer';
 import {effectiveEntries,effectivePairReports,recommendedSpanSteps,relativeDifferenceMm,stretchProgress,tripleApplicability,latestSlotOutcome,stretchSlotStatus,type StretchPhase} from './stretch-calibration';
 import type {StretchController} from './stretch-calibration-controller';
-import {createStretchGeometry,surfaceContact} from './stretch-calibration-geometry';
+import {surfaceContact} from './stretch-calibration-geometry';
+import {createDefaultStretchSetup,isNominalStretchSetup} from './stretch-calibration-setup';
 import {mountStretchKeyboard,type StretchKeyboardScene} from './stretch-keyboard-view';
 import './stretch-calibration-style.css';
 import './stretch-keyboard-style.css';
@@ -19,13 +20,12 @@ export interface StretchCalibrationViewOptions {
  instrument?:'janko-four-row'|'conventional';playerId:string;
  colors?:()=>Colors;saveColors?:(choice:Colors)=>Promise<void>;
  onClose:()=>void;onExport?:(json:string,filename:string)=>Promise<void>;onExportBytes?:(bytes:Uint8Array,filename:string)=>Promise<void>;onExportAll?:()=>Promise<void>;
- openLegacy?:()=>void;openCurl?:(session:StretchCalibrationSession,back:()=>void)=>Promise<void>|void;
- makeGeometry?:(range:readonly [number,number])=>StretchCalibrationGeometry|Promise<StretchCalibrationGeometry>;
+ openCurl?:(session:StretchCalibrationSession,back:()=>void)=>Promise<void>|void;
 }
 const fingers=['','Thumb','Index','Middle','Ring','Pinky'];
 const phaseLabel:Record<StretchPhase,string>={'relative-fingertip-reach':'Fingertip readings','progressive-pairs':'Pair sweeps','conditional-triples':'Conditional triples'};
 const gradeDescriptions=['Relaxed, or too little stretch to distinguish.','A small, noticeable stretch.','Clearly stretched, with room remaining.','Approaching the usable limit.','Reachable, with no useful margin.','Cannot reach this displayed contact.'];
-const command=(name:string,label:string,key?:string,disabled=false)=>`<button type="button" data-stretch-command="${esc(name)}"${['create','save-reach','begin-pair','reproduce'].includes(name)?' data-primary-action':''}${disabled?' disabled':''}>${label}${key?` <kbd>${esc(key)}</kbd>`:''}</button>`;
+const command=(name:string,label:string,key?:string,disabled=false)=>`<button type="button" data-stretch-command="${esc(name)}"${['start-right','save-reach','begin-pair','reproduce'].includes(name)?' data-primary-action':''}${disabled?' disabled':''}>${label}${key?` <kbd>${esc(key)}</kbd>`:''}</button>`;
 const list=(points:string[])=>`<ul class="stretch-instructions">${points.map(p=>`<li>${p}</li>`).join('')}</ul>`;
 const number=(value:string)=>value.trim()===''?null:Number.isFinite(Number(value))?Number(value):null;
 export const stretchPitchLabel=(pitch:number)=>`${'0123456789AB'[pitch%12]}${Math.floor(pitch/12)-1}`;
@@ -33,7 +33,8 @@ export const stretchStepsLabel=(steps:number)=>steps.toString(12).toUpperCase();
 const pairLabel=(pair:readonly number[])=>pair.map(f=>fingers[f]).join(' + ');
 const contactLabel=(contact:StretchCalibrationContact)=>`${fingers[contact.finger]}: ${stretchPitchLabel(contact.midiPitch)}, row ${contact.row}`;
 const sameSlot=(entry:StretchCalibrationEntry,target:ReviewTarget,session:StretchCalibrationSession):boolean=>'slotId'in entry?entry.slotId===target.slotId:'sweepId'in entry?entry.sweepId===target.slotId:entry.kind==='retraction'&&session.entries.some(e=>e.id===entry.entryId&&sameSlot(e,target,session));
-const terminalLabel=(reason:string)=>({'maximum-reachable':'Maximum marked','first-unavailable':'First unavailable','operator-stop':'Stopped by player','coverage-edge':'Keyboard edge'} as Record<string,string>)[reason]??reason;
+const coverageLabel=(session:StretchCalibrationSession)=>isNominalStretchSetup(session.plan)?'Test window edge':'Keyboard edge';
+const terminalLabel=(reason:string,session?:StretchCalibrationSession)=>reason==='coverage-edge'&&session?coverageLabel(session):({'maximum-reachable':'Maximum marked','first-unavailable':'First unavailable','operator-stop':'Stopped by player','coverage-edge':'Keyboard edge'} as Record<string,string>)[reason]??reason;
 const omissionLabel=(reason:string)=>({'operator-skip':'Skipped','no-rated-anchor':'No grade-3 anchor','outside-collection-window':'Outside keyboard range','basis-withdrawn':'Source withdrawn'} as Record<string,string>)[reason]??reason;
 
 /** Each slot stays visible, including unknown, omitted and dependent evidence. */
@@ -47,12 +48,12 @@ export function stretchReviewRows(session:StretchCalibrationSession):{rows:Calib
  }
  for(const sweep of session.plan.pairSweeps){
   const outcome=latestSlotOutcome(session,'progressive-pairs',sweep.id),status=stretchSlotStatus(session,'progressive-pairs',sweep.id),reports=effectivePairReports(session).filter(e=>e.sweepId===sweep.id);
-  add(sweep.id,{phase:'progressive-pairs',slotId:sweep.id},pairLabel(sweep.pair),`${reports.length} current ${reports.length===1?'judgment':'judgments'}`,outcome?.kind==='omission'?omissionLabel(outcome.reason):status==='needs-review'?'Needs review':outcome?.kind==='pair-sweep-terminal'?terminalLabel(outcome.reason):reports.length?'In progress':'Unmeasured');
+  add(sweep.id,{phase:'progressive-pairs',slotId:sweep.id},pairLabel(sweep.pair),`${reports.length} current ${reports.length===1?'judgment':'judgments'}`,outcome?.kind==='omission'?omissionLabel(outcome.reason):status==='needs-review'?'Needs review':outcome?.kind==='pair-sweep-terminal'?terminalLabel(outcome.reason,session):reports.length?'In progress':'Unmeasured');
  }
  for(const slot of session.plan.tripleSlots){
   const outcome=latestSlotOutcome(session,'conditional-triples',slot.id),report=outcome&&(outcome.kind==='conditional-triple-boundary'||outcome.kind==='conditional-triple-unavailable')?outcome:undefined;
   const applicability=report?tripleApplicability(session,report):'current';
-  add(slot.id,{phase:'conditional-triples',slotId:slot.id},pairLabel(slot.triple),applicability==='current'?'Fixed grade-3 pair + outward third finger':`${applicability==='basis-revised'?'Source rating revised':'Source rating withdrawn'} · needs review`,outcome?.kind==='omission'?omissionLabel(outcome.reason):report?.kind==='conditional-triple-boundary'?report.termination==='coverage-edge'?'Keyboard edge':'Usable limit':report?.kind==='conditional-triple-unavailable'?'No usable contact':'Unmeasured');
+  add(slot.id,{phase:'conditional-triples',slotId:slot.id},pairLabel(slot.triple),applicability==='current'?'Fixed grade-3 pair + outward third finger':`${applicability==='basis-revised'?'Source rating revised':'Source rating withdrawn'} · needs review`,outcome?.kind==='omission'?omissionLabel(outcome.reason):report?.kind==='conditional-triple-boundary'?report.termination==='coverage-edge'?coverageLabel(session):'Usable limit':report?.kind==='conditional-triple-unavailable'?'No usable contact':'Unmeasured');
  }
  return {rows,targets};
 }
@@ -67,7 +68,6 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  type ReachDraft={method:'percentage'|'mm';primary:number;primaryPercentage:string;percentage:string;millimeters:string};
  const reachDrafts=new Map<string,ReachDraft>(),reachPreferences=new Map<string,{method:'percentage'|'mm';primary:number}>();
  const art=dialog.ownerDocument.createElement('div');art.className='stretch-art';
- const setup={hand:'RH' as Hand,low:'',high:'',row:'1',central:'',midline:'',seating:''};
  dialog.classList.add('stretch-calibration');
  dialog.innerHTML='<header class="stretch-header"></header><main class="stretch-body"></main><footer class="stretch-footer"></footer>';
  const header=dialog.querySelector<HTMLElement>('header')!,body=dialog.querySelector<HTMLElement>('main')!,footer=dialog.querySelector<HTMLElement>('footer')!;
@@ -81,7 +81,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  async function perform(action:()=>Promise<unknown>|unknown){try{await action();}catch(error){notice=error instanceof Error?error.message:String(error);}render();}
  function scene(scene:StretchKeyboardScene){const holder=body.querySelector<HTMLElement>('[data-stretch-art]');if(!holder)return;holder.append(art);if(keyboard)keyboard.update(scene,{colors:options.colors?.()??'five-seven'});else keyboard=mountStretchKeyboard(art,scene,{colors:options.colors?.()??'five-seven',onKeyboardRotationExit:()=>{focusKey='';safeFocus();}});if(!keyboard.ready)throw Error(keyboard.error??'The keyboard illustration could not be displayed.');}
  function windowFor(session:StretchCalibrationSession){
-  const trial=session.pairTrials[0],row=trial?.contacts[0].row??Number(setup.row),surfaces=session.plan.geometry.surfaces.filter(s=>s.row===row),ref=session.plan.provenance.referenceLocation.xMm;
+  const trial=session.pairTrials[0],row=trial?.contacts[0].row??1,surfaces=session.plan.geometry.surfaces.filter(s=>s.row===row),ref=session.plan.provenance.referenceLocation.xMm;
   const ordered=[...surfaces].sort((a,b)=>Math.abs((a.xMinMm+a.xMaxMm)/2-ref)-Math.abs((b.xMinMm+b.xMaxMm)/2-ref));
   const first=ordered[0],second=ordered.find(s=>s.actuatorId!==first?.actuatorId);
   return first&&second?{first,second,axisStartMm:first.depthMinMm,axisEndMm:first.depthMaxMm,row}:null;
@@ -112,16 +112,16 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   const slotKey=session&&current.slotId?`${session.id}:${current.slotId}`:'';
   if(slotKey!==lastSlot){rememberReachDraft();lastSlot=slotKey;initializeReachDraft(session);sourceId='';thirdSurfaceId='';pendingAttempts=[];focusKey='';}
   dialog.dataset.stretchPage=page;dialog.dataset.stretchPhase=page==='work'?(current.phase??''):'';const disabled=busy();
-  header.innerHTML=`<h2>${page==='home'?'Calibration':page==='create'?'New hand collection':page==='options'?'Options':page==='review'?'Review calibration':page==='detail'?'Recorded evidence':current.phase?phaseLabel[current.phase]:'Calibration'}</h2>${session&&page!=='create'&&page!=='home'?`<span class="stretch-header-detail">${session.plan.provenance.hand==='LH'?'Left':'Right'} hand${current.phase==='progressive-pairs'?'':` · ${stretchPitchLabel(session.plan.geometry.admittedMidiRange[0])}–${stretchPitchLabel(session.plan.geometry.admittedMidiRange[1])}`}</span>`:''}`;
+  header.innerHTML=`<h2>${page==='home'?'Calibration':page==='create'?'New hand collection':page==='options'?'Options':page==='review'?'Review calibration':page==='detail'?'Recorded evidence':current.phase?phaseLabel[current.phase]:'Calibration'}</h2>${session&&page!=='create'&&page!=='home'?`<span class="stretch-header-detail">${session.plan.provenance.hand==='LH'?'Left':'Right'} hand${current.phase==='progressive-pairs'?'':` · ${isNominalStretchSetup(session.plan)?'Test window ':''}${stretchPitchLabel(session.plan.geometry.admittedMidiRange[0])}–${stretchPitchLabel(session.plan.geometry.admittedMidiRange[1])}`}</span>`:''}`;
   body.innerHTML='';
   if(options.instrument==='conventional'&&page==='home'){
-   body.innerHTML=`<div class="stretch-home"><p>The new calibration uses the Jankó keyboard model.</p><p class="stretch-help">Choose Jankó in instrument setup to start a collection. Previous calibration evidence remains available.</p><div class="stretch-menu">${options.openLegacy?command('legacy','Finger span'):''}${command('export','Export collection','E',!session&&!state.readOnly)}${options.onExportAll?command('export-all','Export all evidence'):''}</div></div>`;
+   body.innerHTML=`<div class="stretch-home"><p>The new calibration uses the Jankó keyboard model.</p><p class="stretch-help">Choose Jankó in instrument setup to start a collection. Previous calibration evidence remains available.</p><div class="stretch-menu">${command('export','Export collection','E',!session&&!state.readOnly)}${options.onExportAll?command('export-all','Export all evidence'):''}</div></div>`;
   }else if(page==='home'){
-   const sessions=state.archive.sessions,choices=sessions.map((s,i)=>`<option value="${esc(s.id)}"${s.id===session?.id?' selected':''}>${s.plan.provenance.hand==='LH'?'Left':'Right'} hand · ${esc(s.plan.provenance.seatingReference)}${sessions.filter(v=>v.plan.provenance.hand===s.plan.provenance.hand).length>1?` · collection ${i+1}`:''}</option>`).join('');
+   const sessions=state.archive.sessions,choices=sessions.map((s,i)=>`<option value="${esc(s.id)}"${s.id===session?.id?' selected':''}>${s.plan.provenance.hand==='LH'?'Left':'Right'} hand${isNominalStretchSetup(s.plan)?'':` · ${esc(s.plan.provenance.seatingReference)}`}${sessions.filter(v=>v.plan.provenance.hand===s.plan.provenance.hand).length>1?` · collection ${i+1}`:''}</option>`).join('');
    body.innerHTML=`<div class="stretch-home">${sessions.length?field('Collection',`<select id="stretch-collection" aria-label="Hand collection" data-stretch-collection>${choices}</select>`):'<p>Collect your comfortable reach and static stretch, one hand at a time.</p>'}<div class="stretch-home-progress"><p><span>Fingertip readings</span><strong>${progress?.readings.completed??0} / 4</strong></p><p><span>Pair sweeps</span><strong>${progress?.sweeps.completed??0} / 10</strong></p><p><span>Conditional triples</span><strong>${progress?.triples.completed??0} / 10</strong></p></div><p class="stretch-home-count">${progress?.judgments??0} actual pair judgments${progress&&(progress.readings.omitted+progress.sweeps.omitted+progress.triples.omitted)?` · ${progress.readings.omitted+progress.sweeps.omitted+progress.triples.omitted} omitted slots`:''}${progress?.sweeps.needsReview?` · ${progress.sweeps.needsReview} pair sweeps need review`:''}${progress?.triples.needsReview?` · ${progress.triples.needsReview} triples need review`:''}</p><nav class="stretch-menu" aria-label="Calibration">${command('continue',progress?.complete?'Review collection':'Continue',undefined,!session||disabled)}${command('new','New hand collection','N',disabled)}${command('review','Review and correct','R',!session)}${command('export','Export collection','E',!session&&!state.readOnly)}${options.onExportAll?command('export-all','Export all evidence'):''}</nav>${state.readOnly?'<p class="stretch-help">Saved calibration could not be admitted. The original file is retained; collection is unavailable until it can be reviewed.</p>':''}</div>`;
   }else if(page==='create')renderCreate();
   else if(page==='options'){
-   body.innerHTML=`<div class="stretch-options">${field('Key colors',`<select id="stretch-key-colors" aria-label="Key colors" data-stretch-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select>`)}<p class="stretch-help">Match the physical colors of your keyboard.</p><div class="stretch-menu">${options.openCurl?command('curl','Optional curl refinement',undefined,!session||disabled):''}${options.openLegacy?command('legacy','Finger span'):''}</div><p class="stretch-help">Curl refinement stores optional ruler readings separately from this collection.</p></div>`;
+   body.innerHTML=`<div class="stretch-options">${field('Key colors',`<select id="stretch-key-colors" aria-label="Key colors" data-stretch-colors><option value="five-seven"${(options.colors?.()??'five-seven')==='five-seven'?' selected':''}>0–4 black, 5–B white</option><option value="classic"${options.colors?.()==='classic'?' selected':''}>Traditional black and white</option></select>`)}<p class="stretch-help">Match the physical colors of your keyboard.</p><div class="stretch-menu">${options.openCurl?command('curl','Optional curl refinement',undefined,!session||disabled):''}</div><p class="stretch-help">Curl refinement stores optional ruler readings separately from this collection.</p></div>`;
   }else if(page==='review'&&session){
    ({rows:reviewRows,targets:reviewTargets}=stretchReviewRows(session));body.innerHTML='<p class="stretch-help">Choose a phase, then a reading or finger group. Original reports remain in the history when corrected.</p><div class="practice-browser stretch-review-browser"></div>';browser.render(body.querySelector<HTMLElement>('.stretch-review-browser')!,reviewRows,disabled);
   }else if(page==='detail'&&session&&detailTarget)renderDetail(session,detailTarget);
@@ -131,18 +131,16 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    else if(current.phase==='progressive-pairs')renderPair(session);
    else renderTriple(session);
   }else body.innerHTML='<p class="stretch-help">Choose or create a hand collection to continue.</p>';
-  const work=current.phase&&page==='work',resume=work&&(state.resumeRequired||current.needsSetup)&&current.phase!=='progressive-pairs';
-  footer.innerHTML=`${command('back','Back','Esc')}${page==='home'||page==='review'||page==='options'?'<p><kbd>↑↓</kbd> Select · <kbd>Enter</kbd> Open</p>':''}${page==='create'?command('create','Start collection','Enter',disabled):''}${resume?command('reproduce','I have reproduced the contacts','Enter',disabled):''}${page==='work'&&current.phase==='relative-fingertip-reach'&&!resume?command('save-reach','Save reading','Enter',disabled):''}${page==='work'&&current.phase==='progressive-pairs'&&current.needsSetup?command('begin-pair','Rate this contact','Enter',disabled||!baselinePreviewReady):''}${page==='work'&&!current.phase?command('review','Review collection'):''}${work&&current.phase!=='progressive-pairs'?command('skip','Skip this slot',undefined,disabled):''}${work&&current.phase==='progressive-pairs'&&session?pairFooter(session):''}${page==='detail'?command('edit','Recheck or replace',undefined,disabled):''}${page==='options'?'':command('options','Options','O')}`;
+  const work=current.phase&&page==='work',resume=work&&(state.resumeRequired||current.needsSetup)&&current.phase==='conditional-triples';
+  footer.innerHTML=`${command('back','Back','Esc')}${page==='create'?'<p><kbd>↑↓</kbd> Select · <kbd>Enter</kbd> Begin</p>':page==='home'||page==='review'||page==='options'?'<p><kbd>↑↓</kbd> Select · <kbd>Enter</kbd> Open</p>':''}${resume?command('reproduce','I have reproduced the contacts','Enter',disabled):''}${page==='work'&&current.phase==='relative-fingertip-reach'&&!resume?command('save-reach','Save reading','Enter',disabled):''}${page==='work'&&current.phase==='progressive-pairs'&&current.needsSetup?command('begin-pair','Rate this contact','Enter',disabled||!baselinePreviewReady):''}${page==='work'&&!current.phase?command('review','Review collection'):''}${work&&current.phase!=='progressive-pairs'?command('skip','Skip this slot',undefined,disabled):''}${work&&current.phase==='progressive-pairs'&&session?pairFooter(session):''}${page==='detail'?command('edit','Recheck or replace',undefined,disabled):''}${page==='options'?'':command('options','Options','O')}`;
   arrangeBottomNavigation(footer,footer.querySelector<HTMLButtonElement>('[data-stretch-command=back]'),footer.querySelector<HTMLButtonElement>('[data-stretch-command=options]'));
   footer.dataset.optionsRow='';
   const error=notice||state.error;if(error){const p=dialog.ownerDocument.createElement('p');p.className='stretch-notice';p.setAttribute('role','alert');p.textContent=error;body.append(p);}
-  navigation=new OptionsNavigation(dialog,el=>{focusKey=controlKey(el??null)||focusKey;},()=>false,{focusOnPrepare:false,horizontal:page==='home'});
+  navigation=new OptionsNavigation(dialog,el=>{focusKey=controlKey(el??null)||focusKey;},()=>false,{focusOnPrepare:false,horizontal:page==='home'||page==='create'});
   if(!state.busy&&!creating&&!pairNavigating){if(page==='review'&&reviewRows.length&&!disabled)browser.focus(body.querySelector<HTMLElement>('.stretch-review-browser')!);else safeFocus();}
  }
  function renderCreate(){
-  const pitches=Array.from({length:128},(_,p)=>p),pitchOptions=(value:string,range=pitches)=>`<option value="">Choose a key</option>${range.map(p=>`<option value="${p}"${String(p)===value?' selected':''}>${stretchPitchLabel(p)} · MIDI ${p}</option>`).join('')}`;
-  const lo=number(setup.low),hi=number(setup.high),row=Number(setup.row),range=lo!==null&&hi!==null&&lo<=hi?pitches.filter(p=>p>=lo&&p<=hi&&p%2===row%2):[];
-  body.innerHTML=`<div class="stretch-form"><p class="stretch-help">Declare the keyboard you will actually use. Each hand keeps its own collection and setup.</p>${field('Hand',`<select id="stretch-setup-hand" data-setup="hand" aria-label="Hand"><option value="RH"${setup.hand==='RH'?' selected':''}>Right hand</option><option value="LH"${setup.hand==='LH'?' selected':''}>Left hand</option></select>`)}${field('Lowest key',`<select id="stretch-setup-low" data-setup="low" aria-label="Lowest physical key">${pitchOptions(setup.low)}</select>`)}${field('Highest key',`<select id="stretch-setup-high" data-setup="high" aria-label="Highest physical key">${pitchOptions(setup.high)}</select>`)}<p class="stretch-help">The endpoints are inclusive. Pitch names use the app's ISO notation; MIDI numbers help identify the physical keys.</p>${field('Pair row',`<select id="stretch-setup-row" data-setup="row" aria-label="Shared row for pair tests"><option value="1"${setup.row==='1'?' selected':''}>Row 1 · odd-parity keys</option><option value="2"${setup.row==='2'?' selected':''}>Row 2 · even-parity keys</option></select>`)}${field('Central reference key',`<select id="stretch-setup-central" data-setup="central" aria-label="Central reference key"${range.length?'':' disabled'}>${pitchOptions(setup.central,range)}</select>`)}<p class="stretch-help">Choose a central key on the selected row. Pair spans extend toward the pinky side from this reference.</p>${field('Body midline offset (mm)',`<input id="stretch-setup-midline" data-setup="midline" type="number" step="any" value="${esc(setup.midline)}" placeholder="0 if centered on the reference key" aria-label="Body midline offset in millimeters">`)}<p class="stretch-help">Measure left/right from the central reference key: positive toward higher pitches, negative toward lower pitches.</p>${field('Seating reference',`<input id="stretch-setup-seating" data-setup="seating" type="text" value="${esc(setup.seating)}" placeholder="A position you can reproduce" aria-label="Seating reference">`)}<p class="stretch-help">For example, describe where the bench and your body sit relative to the reference key.</p></div>`;
+  body.innerHTML=`<div class="stretch-home"><p>Choose the hand to measure.</p><nav class="stretch-menu stretch-hand-choices" aria-label="Hand to measure">${command('start-right','Right hand','R',busy())}${command('start-left','Left hand','L',busy())}</nav></div>`;
  }
  function renderReach(session:StretchCalibrationSession){
   const slot=controller.state.current.relativeSlot;if(!slot)return;
@@ -196,7 +194,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   if(!source){body.innerHTML=`<div class="stretch-detail"><p>${pairLabel(slot.triple)}</p><p class="stretch-help">The ${pairLabel(slot.triple.slice(0,2))} pair has no current grade-3 report. This slot needs that exact recorded pair; grade 2 or 4 cannot substitute.</p><div class="stretch-action-row">${command('recheck-anchor','Recheck the source pair',undefined,busy())}${command('no-anchor','Record no grade-3 anchor',undefined,busy())}</div></div>`;return;}
   sourceId=source.id;const candidates=thirdCandidates(session,source),surface=selectedThird(session,source),moving=currentThirdContact();if(surface)thirdSurfaceId=surface.id;
   const edge=candidates.length?Math[session.plan.provenance.hand==='RH'?'max':'min'](...candidates.map(s=>s.midiPitch)):null,atEdge=surface?.midiPitch===edge;
-  body.innerHTML=`<div class="stretch-prompt"><div data-stretch-art></div>${list([`Reproduce the recorded ${pairLabel(slot.triple.slice(0,2))} pair and its exact fingertip contact points.`,`Keep those two points fixed and both keys depressed. Move ${fingers[slot.movingFinger].toLowerCase()} outward on the pinky side.`,`Search the declared playable surfaces for the furthest usable third contact. Keep one common hand position; do not slide either anchor.`])}</div><div class="stretch-triple-controls">${field('Recorded grade-3 pair',`<select id="stretch-triple-source" data-stretch-source aria-label="Grade-3 source pair">${sources.map(s=>{const trial=session.pairTrials.find(t=>t.id===s.trialId)!;return `<option value="${esc(s.id)}"${s.id===sourceId?' selected':''}>${stretchStepsLabel(trial.distanceSemitoneSteps)} steps · ${trial.contacts.map(c=>`${stretchPitchLabel(c.midiPitch)} row ${c.row}`).join(' / ')}</option>`;}).join('')}</select>`)}<p class="stretch-help">The widest recorded grade-3 pair is suggested. Use the same fingertip spots you used when rating that pair.</p>${surface?field(`${fingers[slot.movingFinger]} contact`,`<select id="stretch-third-surface" data-stretch-third aria-label="Third finger key and row">${candidates.map(s=>`<option value="${esc(s.id)}"${s.id===surface.id?' selected':''}>${stretchPitchLabel(s.midiPitch)} · row ${s.row}</option>`).join('')}</select>`):'<p class="stretch-help">No outward surface is inside the admitted keyboard range.</p>'}<p class="stretch-help">Search includes all ${new Set(slot.searchSurfaceIds.map(id=>session.plan.geometry.surfaces.find(s=>s.id===id)?.row)).size} declared rows. Choose the actual key and row for your endpoint.</p><div class="stretch-action-row" data-options-row>${command('triple-limit','Save furthest usable contact',undefined,busy()||!moving||state.resumeRequired||state.current.needsSetup)}${command('triple-edge','At the keyboard edge',undefined,busy()||!moving||!atEdge||state.resumeRequired||state.current.needsSetup)}${command('attempt','Record this attempted contact',undefined,busy()||!moving||state.resumeRequired||state.current.needsSetup)}${command('triple-unavailable','No usable outward contact',undefined,busy()||!pendingAttempts.length||state.resumeRequired||state.current.needsSetup)}</div><p class="stretch-help">${pendingAttempts.length?`${pendingAttempts.length} attempted ${pendingAttempts.length===1?'contact':'contacts'} recorded for this test. `:''}A keyboard edge is a coverage limit. Saving an endpoint does not assign a stretch grade to the triple.</p></div>`;
+  body.innerHTML=`<div class="stretch-prompt"><div data-stretch-art></div>${list([`Reproduce the recorded ${pairLabel(slot.triple.slice(0,2))} pair and its exact fingertip contact points.`,`Keep those two points fixed and both keys depressed. Move ${fingers[slot.movingFinger].toLowerCase()} outward on the pinky side.`,`Search the declared playable surfaces for the furthest usable third contact. Keep one common hand position; do not slide either anchor.`])}</div><div class="stretch-triple-controls">${field('Recorded grade-3 pair',`<select id="stretch-triple-source" data-stretch-source aria-label="Grade-3 source pair">${sources.map(s=>{const trial=session.pairTrials.find(t=>t.id===s.trialId)!;return `<option value="${esc(s.id)}"${s.id===sourceId?' selected':''}>${stretchStepsLabel(trial.distanceSemitoneSteps)} steps · ${trial.contacts.map(c=>`${stretchPitchLabel(c.midiPitch)} row ${c.row}`).join(' / ')}</option>`;}).join('')}</select>`)}<p class="stretch-help">The widest recorded grade-3 pair is suggested. Use the same fingertip spots you used when rating that pair.</p>${surface?field(`${fingers[slot.movingFinger]} contact`,`<select id="stretch-third-surface" data-stretch-third aria-label="Third finger key and row">${candidates.map(s=>`<option value="${esc(s.id)}"${s.id===surface.id?' selected':''}>${stretchPitchLabel(s.midiPitch)} · row ${s.row}</option>`).join('')}</select>`):'<p class="stretch-help">No outward surface is inside this collection’s test window.</p>'}<p class="stretch-help">Search includes all ${new Set(slot.searchSurfaceIds.map(id=>session.plan.geometry.surfaces.find(s=>s.id===id)?.row)).size} declared rows. Choose the actual key and row for your endpoint.</p><div class="stretch-action-row" data-options-row>${command('triple-limit','Save furthest usable contact',undefined,busy()||!moving||state.resumeRequired||state.current.needsSetup)}${command('triple-edge',coverageLabel(session),undefined,busy()||!moving||!atEdge||state.resumeRequired||state.current.needsSetup)}${command('attempt','Record this attempted contact',undefined,busy()||!moving||state.resumeRequired||state.current.needsSetup)}${command('triple-unavailable','No usable outward contact',undefined,busy()||!pendingAttempts.length||state.resumeRequired||state.current.needsSetup)}</div><p class="stretch-help">${pendingAttempts.length?`${pendingAttempts.length} attempted ${pendingAttempts.length===1?'contact':'contacts'} recorded for this test. `:''}An edge limits the area tested. Saving an endpoint does not assign a stretch grade to the triple.</p></div>`;
   scene({geometry:session.plan.geometry,contacts:[...(source.realization?.contacts??[]),...(moving?[moving]:[])]});art.hidden=false;
  }
  function renderDetail(session:StretchCalibrationSession,target:ReviewTarget){
@@ -206,8 +204,8 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    let label:string=e.kind;
    if(e.kind==='relative-fingertip-reach')label=e.reading.kind==='signed-mm'?`${e.reading.differenceMm} mm`:`${e.reading.firstFraction*100}% / ${e.reading.secondFraction*100}%`;
    else if(e.kind==='pair-stretch'){const trial=session.pairTrials.find(t=>t.id===e.trialId)!;label=`${stretchStepsLabel(trial.distanceSemitoneSteps)} steps · ${e.grade} · ${STRETCH_CALIBRATION_GRADES[e.grade].label}`;}
-   else if(e.kind==='pair-sweep-terminal')label=terminalLabel(e.reason);
-   else if(e.kind==='conditional-triple-boundary')label=`${contactLabel(e.boundaryContact)} · ${e.termination==='coverage-edge'?'Keyboard edge':'Usable limit'} · ${tripleApplicability(session,e)}`;
+   else if(e.kind==='pair-sweep-terminal')label=terminalLabel(e.reason,session);
+   else if(e.kind==='conditional-triple-boundary')label=`${contactLabel(e.boundaryContact)} · ${e.termination==='coverage-edge'?coverageLabel(session):'Usable limit'} · ${tripleApplicability(session,e)}`;
    else if(e.kind==='conditional-triple-unavailable')label=`No usable outward contact · ${tripleApplicability(session,e)}`;
    else if(e.kind==='omission')label=omissionLabel(e.reason);
    else if(e.kind==='retraction')label=`Withdrawal: ${e.reason}`;
@@ -236,25 +234,18 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   rememberReachDraft();
  }
  function rememberInput(target:HTMLInputElement|HTMLSelectElement){
-  if(target.dataset.setup){const name=target.dataset.setup as keyof typeof setup;if(name==='hand')setup.hand=target.value as Hand;else setup[name]=target.value;}
   if(target.hasAttribute('data-stretch-primary-percent'))primaryPercentage=target.value;
   if(target.hasAttribute('data-stretch-percent'))percentage=target.value;
   if(target.hasAttribute('data-stretch-mm'))millimeters=target.value;
   if(target.matches('[data-stretch-primary-percent],[data-stretch-percent],[data-stretch-mm]'))rememberReachDraft();
  }
- async function create(){
-  if(creating)return;
-  const generation=navigationGeneration,form={...setup};creating=true;render();
+ async function create(hand:Hand){
+  if(creating||busy()||page!=='create')return;
+  const generation=navigationGeneration;creating=true;render();
   try{
-   const low=number(form.low),high=number(form.high),central=number(form.central),midline=number(form.midline),row=Number(form.row) as 1|2;
-   if(low===null||high===null||!Number.isInteger(low)||!Number.isInteger(high)||low<0||high>127||low>=high)throw Error('Choose the lowest and highest physical keys on your keyboard.');
-   if(central===null||!Number.isInteger(central)||central<low||central>high||central%2!==row%2)throw Error('Choose a central reference key on the selected pair row.');
-   if(midline===null)throw Error('Enter your body midline offset. Enter 0 if it is centered on the reference key.');
-   if(!form.seating.trim())throw Error('Describe a seating position you can reproduce.');
-   if(!options.playerId.trim())throw Error('A player identity is required for the collection.');
-   const geometry=await (options.makeGeometry??createStretchGeometry)([low,high]),xMm=(central-geometry.originMidiPitch)*13.75,id=crypto.randomUUID();
+   const input=await createDefaultStretchSetup({playerId:options.playerId,hand,instrument:options.instrument==='conventional'?'conventional-piano':'janko-four-row'});
    if(stopped)return;
-   const ok=await controller.createCollection({geometry,row,anchorMidiPitch:central,referenceFrameId:`${id}:row-${row}:forward-depth`,provenance:{playerId:options.playerId,hand:form.hand,setupId:id,bodyMidlineXmm:xMm+midline,seatingReference:form.seating.trim(),referenceLocation:{id:`${id}:central-key-${central}`,kind:'operator-selected-central',xMm}}});
+   const ok=await controller.createCollection(input);
    if(ok&&!stopped&&!suspended&&page==='create'&&generation===navigationGeneration){page='work';notice='';focusKey='';}
   }finally{creating=false;}
  }
@@ -298,11 +289,10 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    case 'options':openOptions();break;
    case 'new':transition('create');break;
    case 'continue':if(controller.state.progress?.complete)transition('review');else{navigationGeneration++;page='work';notice='';render();}break;
-   case 'create':void perform(create);break;
+   case 'start-right':case 'start-left':void perform(()=>create(target.dataset.stretchCommand==='start-left'?'LH':'RH'));break;
    case 'review':transition('review');break;
    case 'export':void perform(exportCollection);break;
    case 'export-all':void perform(()=>options.onExportAll?.());break;
-   case 'legacy':options.openLegacy?.();break;
    case 'curl':{const session=controller.state.session;if(session)void perform(()=>options.openCurl?.(session,()=>{page='options';render();}));break;}
    case 'percentage':rememberReachDraft();reachMethod='percentage';restoreReachChoice();render();break;
    case 'mm':rememberReachDraft();reachMethod='mm';restoreReachChoice();render();break;
@@ -325,16 +315,6 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  const change=(event:Event)=>{
   if(stopped||suspended)return;
   const target=event.target as HTMLInputElement|HTMLSelectElement;rememberInput(target);
-  if(target.dataset.setup){
-   if(['low','high','row'].includes(target.dataset.setup)){
-    const low=number(setup.low),high=number(setup.high),central=number(setup.central),row=Number(setup.row);
-    if(low!==null&&high!==null&&low<=high&&(central===null||central<low||central>high||central%2!==row%2)){
-     const midpoint=Math.floor((low+high)/2),candidate=midpoint%2===row%2?midpoint:midpoint+1;setup.central=candidate<=high?String(candidate):'';
-    }
-    render();
-   }
-   return;
-  }
   if(target.hasAttribute('data-stretch-collection'))void perform(()=>controller.selectCollection(target.value));
   if(target.hasAttribute('data-stretch-colors'))void perform(()=>options.saveColors?.(target.value as Colors));
   if(target.hasAttribute('data-stretch-primary')){rememberReachDraft();const previous=primary;primary=Number(target.value);if(primary!==previous){[primaryPercentage,percentage]=[percentage,primaryPercentage];millimeters=number(millimeters)!==null?String(-number(millimeters)!):'';restoreReachChoice();}render();}
@@ -362,7 +342,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    const editable=(event.target as HTMLElement|null)?.closest('input,textarea,select,[contenteditable=true]');
    if(page==='work'&&!navigation?.picking&&keyboard?.key(event))return true;
    if(page==='work'&&controller.state.current.phase==='progressive-pairs'&&!editable&&!navigation?.picking&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&['ArrowLeft','ArrowRight'].includes(event.code)){const blocked=event.repeat||heldPairNavigation.size>0;heldPairNavigation.add(event.code);if(!blocked&&!busy())void perform(()=>movePair(event.code==='ArrowLeft'?-1:1));return true;}
-   if(['Enter','Space'].includes(actionCode(event))&&!editable&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(event.repeat||heldActivations.has(event.code))return true;heldActivations.add(event.code);}
+   if(['Enter','Space'].includes(actionCode(event))&&(!editable||actionCode(event)==='Enter')&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(event.repeat||heldActivations.has(event.code))return true;heldActivations.add(event.code);}
    if(gradeCode&&!editable&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.shiftKey&&page==='work'&&controller.state.current.phase==='progressive-pairs'){
     if(!controller.state.current.needsSetup&&!controller.state.resumeRequired&&pairIllustrationVisible())void controller.inputKey({type:'keydown',code:event.code,repeat:event.repeat});return true;
    }
@@ -374,14 +354,17 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
      const result=browser.key(code,reviewRows);if(result==='open'){const id=browser.current(reviewRows)?.id;[...body.querySelectorAll<HTMLButtonElement>('[data-review]')].find(b=>b.dataset.review===id)?.click();}else if(result==='handled')browser.render(body.querySelector<HTMLElement>('.stretch-review-browser')!,reviewRows,false,true);if(result)return true;
     }
    }
-   if(!event.ctrlKey&&!event.altKey&&!event.metaKey&&!event.repeat&&actionCode(event)==='Enter'&&editable){
-    const name=page==='create'?'create':page==='work'&&controller.state.current.phase==='relative-fingertip-reach'?'save-reach':undefined;
-    if(name){footer.querySelector<HTMLButtonElement>(`[data-stretch-command=${name}]:not(:disabled)`)?.click();return true;}
+   if(!event.ctrlKey&&!event.altKey&&!event.metaKey&&actionCode(event)==='Enter'&&editable){
+    const action=[...footer.querySelectorAll<HTMLButtonElement>('[data-primary-action]:not(:disabled)')].find(button=>!button.closest('[hidden]')&&button.getClientRects().length>0);
+    if(action){action.click();return true;}
    }
+   const handChoice=(event.target as HTMLElement|null)?.closest<HTMLButtonElement>('[data-stretch-command=start-right],[data-stretch-command=start-left]');
+   if(page==='create'&&handChoice&&['Enter','Space'].includes(actionCode(event))&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(!handChoice.disabled)handChoice.click();return true;}
    if(navigation?.keyDown(event))return true;
    if(event.code==='Escape'&&!event.ctrlKey&&!event.altKey&&!event.metaKey){if(!event.repeat)back();return true;}
    if(event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||editable||event.repeat)return false;
    if(event.code==='KeyO'){if(page==='options')back();else openOptions();return true;}
+   if(page==='create'&&['KeyR','KeyL'].includes(event.code)){if(heldActivations.has(event.code))return true;heldActivations.add(event.code);body.querySelector<HTMLButtonElement>(`[data-stretch-command=${event.code==='KeyL'?'start-left':'start-right'}]:not(:disabled)`)?.click();return true;}
    if(page==='home'){const name=({KeyN:'new',KeyR:'review',KeyE:'export'} as Record<string,string>)[event.code];if(name){body.querySelector<HTMLButtonElement>(`[data-stretch-command=${name}]:not(:disabled)`)?.click();return true;}}
    return false;
   },
