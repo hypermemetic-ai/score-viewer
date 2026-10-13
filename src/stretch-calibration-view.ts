@@ -246,6 +246,7 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    const input=await createDefaultStretchSetup({playerId:options.playerId,hand,instrument:options.instrument==='conventional'?'conventional-piano':'janko-four-row'});
    if(stopped)return;
    const ok=await controller.createCollection(input);
+   if(ok)keyboard?.endKeyboardRotation();
    if(ok&&!stopped&&!suspended&&page==='create'&&generation===navigationGeneration){page='work';notice='';focusKey='';}
   }finally{creating=false;}
  }
