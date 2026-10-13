@@ -102,7 +102,7 @@ export function stretchKeyboardFaces(scene:StretchKeyboardScene,options:StretchK
  return faces;
 }
 
-export interface StretchWindowPoints {ticks:readonly StretchPoint[];marker:StretchPoint|null;edgeStart:StretchPoint;edgeEnd:StretchPoint}
+export interface StretchWindowPoints {ticks:readonly StretchPoint[];marker:StretchPoint|null;edgeStart:StretchPoint;edgeEnd:StretchPoint;cornerBrackets:readonly (readonly StretchPoint[])[]}
 /** Window endpoint coordinates are independent of the view and exclude the tongue by construction. */
 export function stretchMeasurementWindowPoints(scene:StretchKeyboardScene,window:StretchMeasurementWindow):StretchWindowPoints {
  const surface=stretchSurface(scene.geometry,window.surfaceId);
@@ -113,7 +113,13 @@ export function stretchMeasurementWindowPoints(scene:StretchKeyboardScene,window
   const p=surfaceLocalPoint(surface,edge?1.2:.5,v);
   return posedPoint(scene,surface.actuatorId,[p[0],p[1],p[2]+.7]);
  };
- return {ticks:[at(0,true),at(.5,true),at(1,true)],marker:window.fraction===undefined?null:at(window.fraction),edgeStart:at(0,true),edgeEnd:at(1,true)};
+ const across=Math.min(.25,2/(surface.xMaxMm-surface.xMinMm)),along=Math.min(.25,4/(window.axisEndMm-window.axisStartMm));
+ // These unfilled corners mark the reading band; the contact highlight still covers the entire playable terrace.
+ const cornerBrackets=[[[across,0],[0,0],[0,along]],[[1-across,0],[1,0],[1,along]],[[across,1],[0,1],[0,1-along]],[[1-across,1],[1,1],[1,1-along]]].map(corner=>corner.map(([u,fraction])=>{
+  const depth=window.axisStartMm+fraction*(window.axisEndMm-window.axisStartMm),v=(depth-surface.depthMinMm)/(surface.depthMaxMm-surface.depthMinMm),p=surfaceLocalPoint(surface,u,v);
+  return posedPoint(scene,surface.actuatorId,[p[0],p[1],p[2]+.16]);
+ }));
+ return {ticks:[at(0,true),at(.5,true),at(1,true)],marker:window.fraction===undefined?null:at(window.fraction),edgeStart:at(0,true),edgeEnd:at(1,true),cornerBrackets};
 }
 
 interface Drawing {inner:string;label:string}
@@ -209,6 +215,10 @@ function keyboardDrawing(scene:StretchKeyboardScene,camera:StretchKeyboardCamera
  for(let windowIndex=0;windowIndex<windows.length;windowIndex++){
   const {window,points}=windows[windowIndex],ticks=points.ticks.map(screen);
   const contact=scene.contacts.find(item=>item.location.surfaceId===window.surfaceId),color=contact?fingerColors[contact.finger]:'#efe8d9';
+  points.cornerBrackets.forEach((corner,index)=>{
+   const attributes=`stroke="${contact?'#202328':'#f7f0dd'}" stroke-width="1.7" stroke-linecap="square" fill="none" data-measurement-window-corner="${escaped(window.surfaceId)}:${index}"`;
+   line(corner[0],corner[1],attributes);line(corner[1],corner[2],attributes);
+  });
   const side=windows.length===1||windowIndex%2===1?'right':'left';
   const column=side==='left'?Math.max(36,modelLeft-12):Math.min(width-36,modelRight+12);
   const tickOrder=ticks.map((point,i)=>({point,i,y:Math.max(labelHeader+18,Math.min(height-16,point[1]+4))})).sort((a,b)=>a.y-b.y);
@@ -265,7 +275,7 @@ export function stretchKeyboardSvg(scene:StretchKeyboardScene,camera:StretchKeyb
  return `<svg xmlns="${ns}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escaped(drawing.label)}">${drawing.inner}</svg>`;
 }
 
-export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchKeyboardScene,options:StretchKeyboardOptions={}):{readonly ready:boolean;readonly error:string|null;readonly keyboardRotation:boolean;key(event:KeyboardEvent):boolean;focusCanvas():void;update(scene:StretchKeyboardScene,options?:StretchKeyboardOptions):void;dispose():void} {
+export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchKeyboardScene,options:StretchKeyboardOptions={}):{readonly ready:boolean;readonly error:string|null;readonly keyboardRotation:boolean;key(event:KeyboardEvent):boolean;focusCanvas():void;endKeyboardRotation():void;update(scene:StretchKeyboardScene,options?:StretchKeyboardOptions):void;dispose():void} {
  let scene=initialScene,settings={...options},camera={...STRETCH_KEYBOARD_DEFAULT_CAMERA},viewport={...defaultViewport},disposed=false,ready=false,keyboardRotation=false,error:string|null=null,drag:{id:number;x:number;y:number}|null=null;
  const root=document.createElement('div');root.className='stretch-keyboard-model';
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${viewport.width} ${viewport.height}`);svg.setAttribute('tabindex','0');svg.setAttribute('role','img');svg.classList.add('stretch-keyboard-canvas');
@@ -291,7 +301,7 @@ export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchK
  const up=(event:PointerEvent)=>{if(drag?.id!==event.pointerId)return;drag=null;if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);};
  const lost=()=>{drag=null;};
  const wheel=(event:WheelEvent)=>{event.preventDefault();zoom(Math.exp(-Math.max(-120,Math.min(120,event.deltaY))*.003));};
- const setKeyboardRotation=(enabled:boolean)=>{keyboardRotation=enabled;const button=hints.querySelector<HTMLButtonElement>('[data-camera=keyboard]');button?.setAttribute('aria-pressed',String(enabled));if(button)button.textContent=`Keyboard rotation: ${enabled?'On':'Off'}`;keyboardHint.hidden=!enabled;root.toggleAttribute('data-keyboard-rotation',enabled);if(enabled)svg.focus({preventScroll:true});else settings.onKeyboardRotationExit?.();};
+ const setKeyboardRotation=(enabled:boolean,restoreFocus=true)=>{keyboardRotation=enabled;const button=hints.querySelector<HTMLButtonElement>('[data-camera=keyboard]');button?.setAttribute('aria-pressed',String(enabled));if(button)button.textContent=`Keyboard rotation: ${enabled?'On':'Off'}`;keyboardHint.hidden=!enabled;root.toggleAttribute('data-keyboard-rotation',enabled);if(enabled)svg.focus({preventScroll:true});else if(restoreFocus)settings.onKeyboardRotationExit?.();};
  const cameraKey=(event:KeyboardEvent):boolean=>{
   if(!keyboardRotation||disposed||event.altKey||event.ctrlKey||event.metaKey)return false;
   if((event.target as Element|null)?.closest?.('input,select,textarea,[contenteditable=true],[data-options-popup]'))return false;
@@ -312,5 +322,5 @@ export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchK
  });
  resizeObserver?.observe(svg);
  render();
- return {get ready(){return ready&&!disposed;},get error(){return error;},get keyboardRotation(){return keyboardRotation&&!disposed;},key:cameraKey,focusCanvas(){if(!disposed)svg.focus({preventScroll:true});},update(next,nextOptions){if(disposed)return;scene=next;if(nextOptions)settings={...settings,...nextOptions};render();},dispose(){if(disposed)return;disposed=true;ready=false;keyboardRotation=false;resizeObserver?.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.removeEventListener('pointerdown',down);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);svg.removeEventListener('lostpointercapture',lost);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',key);hints.removeEventListener('click',click);root.remove();}};
+ return {get ready(){return ready&&!disposed;},get error(){return error;},get keyboardRotation(){return keyboardRotation&&!disposed;},key:cameraKey,focusCanvas(){if(!disposed)svg.focus({preventScroll:true});},endKeyboardRotation(){if(!disposed&&keyboardRotation)setKeyboardRotation(false,false);},update(next,nextOptions){if(disposed)return;scene=next;if(nextOptions)settings={...settings,...nextOptions};render();},dispose(){if(disposed)return;disposed=true;ready=false;keyboardRotation=false;resizeObserver?.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.removeEventListener('pointerdown',down);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);svg.removeEventListener('lostpointercapture',lost);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',key);hints.removeEventListener('click',click);root.remove();}};
 }

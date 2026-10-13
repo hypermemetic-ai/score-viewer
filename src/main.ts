@@ -689,7 +689,7 @@ async function calibrate(back?:()=>void){
   if(dialog!==d||generation!==calibrationGeneration)return;
   const controller=created=new StretchController({load,files}),view=mountStretchCalibrationView(d,controller,{
    instrument:preferences.keyboardLayout==='janko-four-row'?'janko-four-row':'conventional',playerId:load.value.sessions[0]?.plan.provenance.playerId??crypto.randomUUID(),colors:()=>preferences.calibrationColors==='classic'?'classic':'five-seven',saveColors:saveCalibrationColors,
-   onClose:closeDialog,openLegacy:()=>{const parent=dialogBack;calibrateLegacy();dialogBack=()=>{void calibrate(parent);};},
+   onClose:closeDialog,
    onExportBytes:async(bytes,filename)=>{
     await calibrationDrain;
     const [curl,historical,retained]=await enqueue(()=>Promise.all([loadCurl(files),retainedCalibrationEvidence(files),retainedCalibrationBytes(bytes)]));

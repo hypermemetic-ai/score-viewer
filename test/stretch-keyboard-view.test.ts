@@ -44,6 +44,37 @@ test('measurement rulers are anchored to the playable depth axis and retain nega
  assert.throws(()=>stretchMeasurementWindowPoints(scene,{surfaceId:'key-60-row-2',axisStartMm:0,axisEndMm:93.75}),/within one playable terrace/,'tongue cannot become a measurement window');
 });
 
+test('length-reading corners follow the distinct physical landmark bands without narrowing playable highlights',async()=>{
+ const geometry=await createStretchGeometry([59,66]),scene:StretchKeyboardScene={geometry,contacts:[surfaceContact(geometry,1,'key-61-row-1','resting-contact'),surfaceContact(geometry,2,'key-64-row-2','resting-contact')],windows:[{surfaceId:'key-61-row-1',axisStartMm:34,axisEndMm:59.8,fraction:-.2,label:'Thumb'},{surfaceId:'key-64-row-2',axisStartMm:66,axisEndMm:93.75,fraction:1,label:'Index'}]};
+ const original=structuredClone(scene),bands=scene.windows!.map(window=>stretchMeasurementWindowPoints(scene,window));
+ for(let i=0;i<scene.windows!.length;i++){
+  const window=scene.windows![i],band=bands[i],surface=geometry.surfaces.find(surface=>surface.id===window.surfaceId)!;
+  assert.equal(band.cornerBrackets.length,4);assert.ok(band.cornerBrackets.every(corner=>corner.length===3));
+  const points=band.cornerBrackets.flat();
+  assert.equal(Math.min(...points.map(point=>point[0])),surface.xMinMm);assert.equal(Math.max(...points.map(point=>point[0])),surface.xMaxMm);
+  assert.equal(Math.min(...points.map(point=>point[1])),window.axisStartMm);assert.equal(Math.max(...points.map(point=>point[1])),window.axisEndMm);
+  assert.ok(points.every(point=>Math.abs(point[2]-(surface.heightAtNearMm+(point[1]-surface.depthMinMm)/(surface.depthMaxMm-surface.depthMinMm)*(surface.heightAtFarMm-surface.heightAtNearMm)+.16))<1e-10),'corners follow the resting sloping surface');
+  assert.ok(window.axisStartMm>surface.depthMinMm,'the local start line excludes the front of the terrace');
+  const highlights=stretchKeyboardFaces(scene).filter(face=>face.surfaceId===surface.id).flatMap(face=>face.points);
+  assert.equal(Math.min(...highlights.map(point=>point[1])),surface.depthMinMm);assert.equal(Math.max(...highlights.map(point=>point[1])),surface.depthMaxMm);
+ }
+ assert.ok(bands[0].marker![1]<34,'a negative reading moves only the marker before its local starting line');
+ for(const camera of [STRETCH_KEYBOARD_DEFAULT_CAMERA,{elevation:14,azimuth:64,zoom:1},{elevation:50,azimuth:-52,zoom:1}]){
+  const doc=new DOMParser().parseFromString(stretchKeyboardSvg(scene,camera),'image/svg+xml'),corners=Array.from(doc.getElementsByTagName('line')).filter(line=>line.hasAttribute('data-measurement-window-corner'));
+  for(const window of scene.windows!)for(let index=0;index<4;index++){
+   const pieces=corners.filter(line=>line.getAttribute('data-measurement-window-corner')===`${window.surfaceId}:${index}`);
+   assert.ok(pieces.length>=2,'both arms remain attached to each physical corner after rotation');assert.ok(pieces.every(line=>line.getAttribute('fill')==='none'&&line.getAttribute('stroke')==='#202328'));
+  }
+  assert.deepEqual(scene.windows!.map(window=>stretchMeasurementWindowPoints(scene,window)),bands);
+ }
+ assert.deepEqual(scene,original,'rotating the marked reading bands does not change physical evidence');
+ const comparable:StretchKeyboardScene={geometry,contacts:[surfaceContact(geometry,2,'key-60-row-2','resting-contact'),surfaceContact(geometry,3,'key-62-row-2','resting-contact')]};
+ for(const surfaceId of ['key-60-row-2','key-62-row-2']){
+  const points=stretchMeasurementWindowPoints(comparable,{surfaceId,axisStartMm:66,axisEndMm:93.75}).cornerBrackets.flat();
+  assert.equal(Math.min(...points.map(point=>point[1])),66);assert.equal(Math.max(...points.map(point=>point[1])),93.75);
+ }
+});
+
 test('left-hand contacts keep their real lower-pitch direction and physical keyboard labels',async()=>{
  const geometry=await createStretchGeometry([50,80]),right={geometry,contacts:[sameRowContact(geometry,1,61,1),sameRowContact(geometry,2,69,1)]},left={geometry,contacts:[sameRowContact(geometry,1,69,1),sameRowContact(geometry,2,61,1)]};
  const rh=new DOMParser().parseFromString(stretchKeyboardSvg(right),'image/svg+xml'),lh=new DOMParser().parseFromString(stretchKeyboardSvg(left),'image/svg+xml');
@@ -97,6 +128,7 @@ test('camera focus owns only view controls, retains the camera across scene upda
   const escaped=key('Escape');assert.equal(escaped.defaultPrevented,true);assert.equal(view.keyboardRotation,false);assert.equal(toggle.getAttribute('aria-pressed'),'false');assert.equal((globalThis.document as any).activeElement,screen);assert.equal(exits,1);assert.equal(key('ArrowRight').defaultPrevented,false);
   toggleRotation();assert.equal(view.keyboardRotation,true);const editableKey=new Event('keydown',{cancelable:true});Object.assign(editableKey,{key:'ArrowRight',altKey:false,ctrlKey:false,metaKey:false});Object.defineProperty(editableKey,'target',{value:{closest(){return {};}}});assert.equal(view.key(editableKey as unknown as KeyboardEvent),false,'entry fields keep their native editing keys');
   toggleRotation();assert.equal(view.keyboardRotation,false);assert.equal(exits,2);toggleRotation();
+  view.endKeyboardRotation();assert.equal(view.keyboardRotation,false);assert.equal(toggle.getAttribute('aria-pressed'),'false');assert.equal(exits,2,'a new collection boundary does not restore focus to its old screen');assert.deepEqual(['elevation','azimuth','zoom'].map(name=>svg.getAttribute('data-camera-'+name)),camera,'ending keyboard ownership preserves the camera orientation');toggleRotation();
   assert.equal(key('Home').defaultPrevented,true);assert.equal(svg.getAttribute('data-camera-elevation'),'36');assert.equal(svg.getAttribute('data-camera-zoom'),'1');
   view.dispose();view.dispose();assert.equal(view.ready,false);assert.equal(container.children.length,0);assert.equal(svg.listeners,0);assert.equal(hints.listeners,0);assert.equal(disconnected,1);
   const retiredMarkup=svg.innerHTML;svg.width=500;observerCallback();assert.equal(svg.innerHTML,retiredMarkup,'an already queued resize cannot redraw the disposed model');

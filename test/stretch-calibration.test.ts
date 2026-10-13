@@ -37,6 +37,17 @@ test('four common-frame readings retain percentages and sign; hand collections r
  assert.equal(await c.selectCollection(first.id),true);assert.equal(c.state.resumeRequired,true);
 });
 
+test('earlier whole-terrace readings retain raw evidence but do not infer the corrected length difference',async()=>{
+ const {c,memory}=await collector();
+ try{
+  assert.equal(await c.saveReach({kind:'window-fractions',windowId:'old-frame:row-1:depth-window',firstFraction:.5,secondFraction:1,axisStartMm:0,axisEndMm:59.8,windowReference:'old geometry; depth away from player; row 1 near/far physical terrace edges'},'{"rawOtherPercentage":"50","rawPrimaryPercentage":"100"}'),true);
+  const before=c.export();
+  assert.equal(relativeDifferenceMm(c.session!,1,2),null);assert.equal(recommendedSpanSteps(c.session!,[1,2]),2);
+  assert.equal(c.export(),before,'derivation does not rewrite or withdraw earlier observations');
+  const admitted=await loadStretch(memory.files);assert.ok(!admitted.error);assert.equal(relativeDifferenceMm(admitted.value.sessions[0],1,2),null);
+ }finally{c.dispose();}
+});
+
 test('malformed UTF-8 preserves every byte and blocks all writes',async()=>{
  const bytes=new Uint8Array([0xff,0,0x7b,0x7d]);let writes=0;
  const files:StretchFiles={async read(){return bytes;},async write(){writes++;}};
