@@ -4,9 +4,10 @@ import {OptionsNavigation} from './options-navigation';
 import {actionCode} from './input';
 import {CalibrationReviewBrowser,type CalibrationReviewRow} from './calibration-review-browser';
 import {calibrationEscape as esc} from './calibration-trial-renderer';
-import {effectiveEntries,effectivePairReports,recommendedSpanSteps,relativeDifferenceMm,stretchProgress,tripleApplicability,latestSlotOutcome,stretchSlotStatus,type StretchPhase} from './stretch-calibration';
+import {effectiveEntries,effectivePairReports,recommendedSpanSteps,relativeDifferenceMm,usesSupersededFingertipWindow,stretchProgress,tripleApplicability,latestSlotOutcome,stretchSlotStatus,type StretchPhase} from './stretch-calibration';
 import type {StretchController} from './stretch-calibration-controller';
 import {surfaceContact} from './stretch-calibration-geometry';
+import {stretchFingertipMapping,encodeStretchFingertipPercentages,decodeStretchFingertipPercentages,stretchFingertipDifferenceMm} from './stretch-fingertip-landmarks';
 import {createDefaultStretchSetup,isNominalStretchSetup} from './stretch-calibration-setup';
 import {mountStretchKeyboard,type StretchKeyboardScene} from './stretch-keyboard-view';
 import './stretch-calibration-style.css';
@@ -44,7 +45,7 @@ export function stretchReviewRows(session:StretchCalibrationSession):{rows:Calib
  for(const slot of session.plan.relativeReachSlots){
   const outcome=latestSlotOutcome(session,'relative-fingertip-reach',slot.id),reading=outcome?.kind==='relative-fingertip-reach'?outcome:undefined;
   const value=reading?relativeDifferenceMm(session,...slot.pair):null;
-  add(slot.id,{phase:'relative-fingertip-reach',slotId:slot.id},pairLabel(slot.pair),reading?.reading.kind==='window-fractions'?'Percentage · physical key window':reading?'Direct millimeters':'Straight, flat fingers',outcome?.kind==='omission'?omissionLabel(outcome.reason):reading?value===null?'Unmapped':`${value.toFixed(1)} mm`:'Unmeasured');
+  add(slot.id,{phase:'relative-fingertip-reach',slotId:slot.id},pairLabel(slot.pair),reading&&usesSupersededFingertipWindow(reading.reading)?'Earlier terrace landmarks · recheck':reading?.reading.kind==='window-fractions'?'Percentage · physical key window':reading?'Direct millimeters':'Straight, flat fingers',outcome?.kind==='omission'?omissionLabel(outcome.reason):reading?value===null?'Unmapped':`${value.toFixed(1)} mm`:'Unmeasured');
  }
  for(const sweep of session.plan.pairSweeps){
   const outcome=latestSlotOutcome(session,'progressive-pairs',sweep.id),status=stretchSlotStatus(session,'progressive-pairs',sweep.id),reports=effectivePairReports(session).filter(e=>e.sweepId===sweep.id);
@@ -81,10 +82,19 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  async function perform(action:()=>Promise<unknown>|unknown){try{await action();}catch(error){notice=error instanceof Error?error.message:String(error);}render();}
  function scene(scene:StretchKeyboardScene){const holder=body.querySelector<HTMLElement>('[data-stretch-art]');if(!holder)return;holder.append(art);if(keyboard)keyboard.update(scene,{colors:options.colors?.()??'five-seven'});else keyboard=mountStretchKeyboard(art,scene,{colors:options.colors?.()??'five-seven',onKeyboardRotationExit:()=>{focusKey='';safeFocus();}});if(!keyboard.ready)throw Error(keyboard.error??'The keyboard illustration could not be displayed.');}
  function windowFor(session:StretchCalibrationSession){
-  const trial=session.pairTrials[0],row=trial?.contacts[0].row??1,surfaces=session.plan.geometry.surfaces.filter(s=>s.row===row),ref=session.plan.provenance.referenceLocation.xMm;
-  const ordered=[...surfaces].sort((a,b)=>Math.abs((a.xMinMm+a.xMaxMm)/2-ref)-Math.abs((b.xMinMm+b.xMaxMm)/2-ref));
-  const first=ordered[0],second=ordered.find(s=>s.actuatorId!==first?.actuatorId);
-  return first&&second?{first,second,axisStartMm:first.depthMinMm,axisEndMm:first.depthMaxMm,row}:null;
+  const slot=controller.state.current.relativeSlot;
+  return slot?stretchFingertipMapping(session.plan.geometry,session.plan.provenance.hand,slot.pair):null;
+ }
+ function reachScene(session:StretchCalibrationSession,mapping:NonNullable<ReturnType<typeof windowFor>>,first:number|null,second:number|null):StretchKeyboardScene {
+  const pair=controller.state.current.relativeSlot!.pair,windows=[mapping.first,mapping.second];
+  return {geometry:session.plan.geometry,contacts:windows.map((window,i)=>surfaceContact(session.plan.geometry,pair[i],window.surface.id,'resting-contact')),windows:reachMethod==='mm'?[]:windows.map((window,i)=>({surfaceId:window.surface.id,axisStartMm:window.axisStartMm,axisEndMm:window.axisEndMm,...((i?second:first)!==null?{fraction:(i?second:first)!/100}:{}),label:fingers[pair[i]]}))};
+ }
+ function readingDifference(session:StretchCalibrationSession):number|null {
+  const slot=controller.state.current.relativeSlot;if(!slot)return null;
+  const sign=primary===slot.pair[0]?1:-1,value=number(millimeters);
+  if(reachMethod==='mm')return value===null?null:value*sign;
+  const mapping=windowFor(session),a=number(primaryPercentage),b=number(percentage);
+  return mapping&&a!==null&&b!==null?stretchFingertipDifferenceMm(mapping,sign===1?a:b,sign===1?b:a):null;
  }
  function currentSources(){const sources=controller.tripleSources();const session=controller.state.session;return [...sources].sort((a,b)=>(session?.pairTrials.find(t=>t.id===b.trialId)?.distanceSemitoneSteps??0)-(session?.pairTrials.find(t=>t.id===a.trialId)?.distanceSemitoneSteps??0));}
  function selectedSource(){const sources=currentSources();return sources.find(s=>s.id===sourceId)??sources[0];}
@@ -144,13 +154,14 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
  }
  function renderReach(session:StretchCalibrationSession){
   const slot=controller.state.current.relativeSlot;if(!slot)return;
-  const mapping=windowFor(session),pair=slot.pair,secondary=pair.find(f=>f!==primary)??pair[1],fraction=number(percentage),difference=number(millimeters),dir=primary===pair[0]?1:-1;
-  body.innerHTML=`<div class="stretch-prompt"><div data-stretch-art></div>${list(['Keep both fingers straight and flat, pointing away from you.','Read each fingertip against the highlighted window: 0% at the near edge, 100% at the far edge.','Keep the same hand position while reading both tips. Record how far forward each fingertip reaches.'])}</div><div class="stretch-reading"><div class="stretch-methods" data-options-row>${command('percentage','Percentage',undefined,busy())}${command('mm','Direct millimeters',undefined,busy())}</div>${field('Primary finger',`<select id="stretch-primary" data-stretch-primary aria-label="Primary finger">${pair.map(f=>`<option value="${f}"${f===primary?' selected':''}>${fingers[f]}</option>`).join('')}</select>`)}${reachMethod==='percentage'?`<div class="stretch-reading-fields">${field(`${fingers[primary]} tip (%)`,`<input id="stretch-primary-percent" data-stretch-primary-percent type="number" step="any" value="${esc(primaryPercentage)}" aria-label="${fingers[primary]} fingertip percentage">`)}${field(`${fingers[secondary]} tip (%)`,`<input id="stretch-percent" data-stretch-percent data-primary-action type="number" step="any" value="${esc(percentage)}" aria-label="${fingers[secondary]} fingertip percentage">`)}</div><p class="stretch-help">0% is the near edge; 100% is the far edge. Keep the hand in the same position while reading both tips. Negative percentages are accepted.</p>`:field(`${fingers[secondary]} beyond ${fingers[primary]} (mm)`,`<input id="stretch-mm" data-stretch-mm data-primary-action type="number" step="any" value="${esc(millimeters)}" aria-label="Signed forward reach difference in millimeters">`)}<p class="stretch-reading-output" data-stretch-reading-output>${reachMethod==='percentage'&&mapping&&fraction!==null&&number(primaryPercentage)!==null?`${((fraction-number(primaryPercentage)!)/100*(mapping.axisEndMm-mapping.axisStartMm)*dir).toFixed(1)} mm · ${fingers[pair[1]]} minus ${fingers[pair[0]]}`:reachMethod==='mm'&&difference!==null?`${(difference*dir).toFixed(1)} mm · ${fingers[pair[1]]} minus ${fingers[pair[0]]}`:'Enter a reading to see its signed reach difference.'}</p></div>`;
+  const mapping=windowFor(session),pair=slot.pair,secondary=pair.find(f=>f!==primary)??pair[1],value=readingDifference(session);
+  const placement=mapping?[mapping.first,mapping.second].map((window,i)=>`${fingers[pair[i]]} on ${'0123456789AB'[window.surface.midiPitch%12]}’s ${window.surface.row===1?'lowest':'lower main'} level`).join('; ')+'.':'';
+  const points=['Keep both fingers straight and flat, pointing along the keys.',`${placement} Slide your hand forward until ${fingers[primary].toLowerCase()} reaches its rear wall.`,reachMethod==='percentage'?'Read each tip in its outlined gap: 0% lines up with the neighboring keys’ next level; 100% is the wall at the back of its own gap.':'Measure how far the other fingertip extends beyond the primary fingertip, in millimeters.'];
+  body.innerHTML=`<div class="stretch-prompt"><div data-stretch-art></div>${list(points)}</div><div class="stretch-reading"><div class="stretch-methods" data-options-row>${command('percentage','Percentage',undefined,busy())}${command('mm','Direct millimeters',undefined,busy())}</div>${field('Primary finger',pair[0]===1?'<span>Index</span>':`<select id="stretch-primary" data-stretch-primary aria-label="Primary finger">${pair.map(f=>`<option value="${f}"${f===primary?' selected':''}>${fingers[f]}</option>`).join('')}</select>`)}${reachMethod==='percentage'?`<div class="stretch-reading-fields">${field(`${fingers[primary]} tip (%)`,`<input id="stretch-primary-percent" data-stretch-primary-percent type="number" step="any" value="${esc(primaryPercentage)}" aria-label="${fingers[primary]} fingertip percentage">`)}${field(`${fingers[secondary]} tip (%)`,`<input id="stretch-percent" data-stretch-percent data-primary-action type="number" step="any" value="${esc(percentage)}" aria-label="${fingers[secondary]} fingertip percentage">`)}</div><p class="stretch-help">Keep the same hand position for both readings. A negative percentage means the tip falls before its 0% line.</p>`:field(`${fingers[secondary]} beyond ${fingers[primary]} (mm)`,`<input id="stretch-mm" data-stretch-mm data-primary-action type="number" step="any" value="${esc(millimeters)}" aria-label="Signed forward reach difference in millimeters">`)}<p class="stretch-reading-output" data-stretch-reading-output>${value===null?'Enter a reading to see its signed reach difference.':`${value.toFixed(1)} mm · ${fingers[pair[1]]} minus ${fingers[pair[0]]}`}</p></div>`;
   body.querySelector(`[data-stretch-command=${reachMethod}]`)?.setAttribute('aria-pressed','true');
   if(mapping){
-   const contacts=pair.map((f,i)=>surfaceContact(session.plan.geometry,f,i?mapping.second.id:mapping.first.id,'resting-contact'));
-   const firstFraction=primary===pair[0]?number(primaryPercentage):fraction,secondFraction=primary===pair[0]?fraction:number(primaryPercentage);
-   scene({geometry:session.plan.geometry,contacts,windows:[{surfaceId:mapping.first.id,axisStartMm:mapping.axisStartMm,axisEndMm:mapping.axisEndMm,...(firstFraction!==null?{fraction:firstFraction/100}:{}),label:fingers[pair[0]]},{surfaceId:mapping.second.id,axisStartMm:mapping.axisStartMm,axisEndMm:mapping.axisEndMm,...(secondFraction!==null?{fraction:secondFraction/100}:{}),label:fingers[pair[1]]}]});art.hidden=false;
+   const a=number(primaryPercentage),b=number(percentage),first=primary===pair[0]?a:b,second=primary===pair[0]?b:a;
+   scene(reachScene(session,mapping,first,second));art.hidden=false;
   }
  }
  function renderPair(session:StretchCalibrationSession){
@@ -225,11 +236,13 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   const slot=controller.state.current.relativeSlot;primary=slot?.pair[0]===1?slot.pair[1]:slot?.pair[0]??1;if(!session||!slot)return;
   const preference=reachPreferences.get(lastSlot);if(preference){reachMethod=preference.method;primary=preference.primary;restoreReachChoice();return;}
   const outcome=latestSlotOutcome(session,'relative-fingertip-reach',slot.id),saved=outcome?.kind==='relative-fingertip-reach'?outcome:undefined;
+  if(saved&&usesSupersededFingertipWindow(saved.reading)){notice='This earlier reading used different landmarks. Enter a fresh reading against the outlined gaps; the original evidence is retained.';rememberReachDraft();return;}
   if(saved){let raw:Record<string,unknown>|undefined;try{const value=JSON.parse(saved.notes??'null');if(value&&typeof value==='object')raw=value;}catch{}
-   if(raw&&slot.pair.includes(Number(raw.primaryFinger) as typeof slot.pair[number]))primary=Number(raw.primaryFinger);
+   if(slot.pair[0]!==1&&raw&&slot.pair.includes(Number(raw.primaryFinger) as typeof slot.pair[number]))primary=Number(raw.primaryFinger);
+   const samePrimary=raw?.primaryFinger===primary;
    reachMethod=saved.reading.kind==='signed-mm'?'mm':'percentage';const sign=primary===slot.pair[0]?1:-1;
-   if(saved.reading.kind==='signed-mm')millimeters=typeof raw?.rawMillimeters==='string'?raw.rawMillimeters:String(saved.reading.differenceMm*sign);
-   else {primaryPercentage=typeof raw?.rawPrimaryPercentage==='string'?raw.rawPrimaryPercentage:String((sign===1?saved.reading.firstFraction:saved.reading.secondFraction)*100);percentage=typeof raw?.rawOtherPercentage==='string'?raw.rawOtherPercentage:String((sign===1?saved.reading.secondFraction:saved.reading.firstFraction)*100);}
+   if(saved.reading.kind==='signed-mm')millimeters=samePrimary&&typeof raw?.rawMillimeters==='string'?raw.rawMillimeters:String(saved.reading.differenceMm*sign);
+   else {const mapping=windowFor(session),local=mapping&&saved.reading.windowId.endsWith(mapping.windowId)&&saved.reading.axisStartMm===mapping.axisStartMm&&saved.reading.axisEndMm===mapping.axisEndMm?decodeStretchFingertipPercentages(mapping,saved.reading.firstFraction,saved.reading.secondFraction):{firstPercent:saved.reading.firstFraction*100,secondPercent:saved.reading.secondFraction*100};primaryPercentage=samePrimary&&typeof raw?.rawPrimaryPercentage==='string'?raw.rawPrimaryPercentage:String(sign===1?local.firstPercent:local.secondPercent);percentage=samePrimary&&typeof raw?.rawOtherPercentage==='string'?raw.rawOtherPercentage:String(sign===1?local.secondPercent:local.firstPercent);}
   }
   rememberReachDraft();
  }
@@ -258,10 +271,11 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
    const value=number(millimeters);if(value===null)throw Error('Enter the signed forward reach difference in millimeters.');
    reading={kind:'signed-mm',differenceMm:value*sign,method:'operator-direct-relative-forward-reach-mm'};
   }else{
-   const primaryValue=number(primaryPercentage),other=number(percentage),mapping=windowFor(session);if(primaryValue===null||other===null)throw Error('Enter both fingertip percentages. Negative values are accepted.');if(!mapping)throw Error('The selected row has no complete mapped measurement window.');
-   reading={kind:'window-fractions',windowId:`${slot.referenceFrameId}:row-${mapping.row}:depth-window`,firstFraction:(sign===1?primaryValue:other)/100,secondFraction:(sign===1?other:primaryValue)/100,axisStartMm:mapping.axisStartMm,axisEndMm:mapping.axisEndMm,windowReference:`${session.plan.geometry.geometryId}; ${session.plan.geometry.profileSha256}; depth away from player; row ${mapping.row} near/far physical terrace edges`};
+   const primaryValue=number(primaryPercentage),other=number(percentage),mapping=windowFor(session);if(primaryValue===null||other===null)throw Error('Enter both fingertip percentages. Negative values are accepted.');if(!mapping)throw Error('The accepted fingertip landmarks are outside this collection’s keyboard window.');
+   reading={kind:'window-fractions',windowId:`${slot.referenceFrameId}:${mapping.windowId}`,...encodeStretchFingertipPercentages(mapping,sign===1?primaryValue:other,sign===1?other:primaryValue),axisStartMm:mapping.axisStartMm,axisEndMm:mapping.axisEndMm,windowReference:mapping.windowReference};
   }
-  await controller.saveReach(reading,JSON.stringify({entryMethod:reachMethod,primaryFinger:primary,...(reachMethod==='percentage'?{rawPrimaryPercentage:primaryPercentage,rawOtherPercentage:percentage}:{rawMillimeters:millimeters})}));
+  const mapping=windowFor(session);
+  await controller.saveReach(reading,JSON.stringify({entryMethod:reachMethod,primaryFinger:primary,measurementProtocol:'straight-flat-fingertip-landmarks-v1',...(reachMethod==='percentage'?{rawPrimaryPercentage:primaryPercentage,rawOtherPercentage:percentage,localWindows:mapping?[mapping.first,mapping.second].map((window,i)=>({finger:slot.pair[i],surfaceId:window.surface.id,midiPitch:window.surface.midiPitch,row:window.surface.row,axisStartMm:window.axisStartMm,axisEndMm:window.axisEndMm})):[]}:{rawMillimeters:millimeters})}));
  }
  async function enterTarget(target:ReviewTarget){
   const session=controller.state.session;if(!session)return;const generation=navigationGeneration,fromPage=page;
@@ -327,10 +341,9 @@ export function mountStretchCalibrationView(dialog:HTMLElement,controller:Stretc
   const target=event.target as HTMLInputElement;rememberInput(target);
   if(!target.matches('[data-stretch-primary-percent],[data-stretch-percent],[data-stretch-mm]'))return;
   const session=controller.state.session,slot=controller.state.current.relativeSlot,output=body.querySelector<HTMLElement>('[data-stretch-reading-output]');if(!session||!slot)return;
-  const mapping=windowFor(session),primaryValue=number(primaryPercentage),other=number(percentage),mm=number(millimeters),sign=primary===slot.pair[0]?1:-1;
-  const value=reachMethod==='mm'?mm===null?null:mm*sign:mapping&&primaryValue!==null&&other!==null?(other-primaryValue)/100*(mapping.axisEndMm-mapping.axisStartMm)*sign:null;
+  const mapping=windowFor(session),primaryValue=number(primaryPercentage),other=number(percentage),sign=primary===slot.pair[0]?1:-1,value=readingDifference(session);
   if(output)output.textContent=value===null?'Enter a reading to see its signed reach difference.':`${value.toFixed(1)} mm · ${fingers[slot.pair[1]]} minus ${fingers[slot.pair[0]]}`;
-  if(mapping&&keyboard){const first=sign===1?primaryValue:other,second=sign===1?other:primaryValue;keyboard.update({geometry:session.plan.geometry,contacts:slot.pair.map((f,i)=>surfaceContact(session.plan.geometry,f,i?mapping.second.id:mapping.first.id,'resting-contact')),windows:[{surfaceId:mapping.first.id,axisStartMm:mapping.axisStartMm,axisEndMm:mapping.axisEndMm,...(first!==null?{fraction:first/100}:{}),label:fingers[slot.pair[0]]},{surfaceId:mapping.second.id,axisStartMm:mapping.axisStartMm,axisEndMm:mapping.axisEndMm,...(second!==null?{fraction:second/100}:{}),label:fingers[slot.pair[1]]}]});}
+  if(mapping&&keyboard)keyboard.update(reachScene(session,mapping,sign===1?primaryValue:other,sign===1?other:primaryValue));
  };
  dialog.addEventListener('click',click);dialog.addEventListener('change',change);dialog.addEventListener('input',input);
  const unsubscribe=controller.subscribe(()=>render());

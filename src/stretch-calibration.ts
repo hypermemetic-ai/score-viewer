@@ -147,13 +147,17 @@ export function sweepTerminal(s:StretchCalibrationSession,sweepId:string):PairSw
 export function effectiveSweepTerminals(s:StretchCalibrationSession):PairSweepTerminal[] {
  return s.plan.pairSweeps.map(sw=>sweepTerminal(s,sw.id)).filter((e):e is PairSweepTerminal=>e!==null);
 }
+/** This viewer's earlier whole-terrace guide did not implement the accepted length-reading landmarks. Retain its evidence for explicit rechecking. */
+export function usesSupersededFingertipWindow(reading:RelativeFingertipReachObservation['reading']):boolean {
+ return reading.kind==='window-fractions'&&/:row-[1-4]:depth-window$/.test(reading.windowId)&&reading.windowReference.includes('near/far physical terrace edges');
+}
 export function relativeDifferenceMm(s:StretchCalibrationSession,first:number,second:number):number|null {
  let sum=0,frame:string|undefined;
  for(let f=first;f<second;f++){
   const slot=s.plan.relativeReachSlots.find(slot=>slot.pair[0]===f);
   const e=slot?latestSlotOutcome(s,'relative-fingertip-reach',slot.id):undefined;
   if(e?.kind!=='relative-fingertip-reach'||frame!==undefined&&frame!==e.referenceFrameId)return null;frame=e.referenceFrameId;
-  const r=e.reading;if(r.kind==='signed-mm')sum+=r.differenceMm;
+  const r=e.reading;if(usesSupersededFingertipWindow(r))return null;if(r.kind==='signed-mm')sum+=r.differenceMm;
   else{if(r.axisStartMm===null||r.axisEndMm===null)return null;sum+=(r.secondFraction-r.firstFraction)*(r.axisEndMm-r.axisStartMm);}
  }
  return sum;

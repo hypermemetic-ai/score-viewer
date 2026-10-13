@@ -5,8 +5,9 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {DOMParser} from '@xmldom/xmldom';
 import {StretchController} from '../src/stretch-calibration-controller';
-import {initialStretchArchive} from '../src/stretch-calibration';
+import {initialStretchArchive,latestSlotOutcome,usesSupersededFingertipWindow} from '../src/stretch-calibration';
 import {createDefaultStretchSetup,isNominalStretchSetup} from '../src/stretch-calibration-setup';
+import {stretchFingertipMapping,encodeStretchFingertipPercentages,stretchFingertipDifferenceMm} from '../src/stretch-fingertip-landmarks';
 
 const source=readFileSync(new URL('../src/stretch-calibration-view.ts',import.meta.url),'utf8');
 const between=(start:string,end:string)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a,`${start} must be present`);return source.slice(a,b);};
@@ -31,6 +32,7 @@ async function keyboardFixture(){
   options:{playerId:'authored-player',instrument:'janko-four-row'},reachMethod:'percentage',primary:2,primaryPercentage:'100',percentage:'50',millimeters:'',
   actionCode:(event:KeyboardEvent)=>event.code==='NumpadEnter'?'Enter':event.code,
   number:(value:string)=>value.trim()===''?null:Number.isFinite(Number(value))?Number(value):null,
+  stretchFingertipMapping,encodeStretchFingertipPercentages,stretchFingertipDifferenceMm,
   async createDefaultStretchSetup(input:Parameters<typeof createDefaultStretchSetup>[0]){helperCalls++;return createDefaultStretchSetup({...input,setupId:`authored-default-${helperCalls}`});},
   busy(){return controller.state.busy||context.creating;},
   render(){context.art.hidden=context.page!=='work';if(!context.creating&&!controller.state.busy)api.safeFocus();},
@@ -60,7 +62,42 @@ for(const choice of ['KeyR','KeyL','Enter','NumpadEnter'])test(`New N then ${cho
   assert.equal(f.controller.state.current.relativeSlot!.pair[0],2);assert.ok(f.bytes);
   f.key('Enter',f.field,true);f.key('Enter',f.field);await f.wait();
   assert.equal(f.controller.state.session!.entries.filter(entry=>entry.kind==='relative-fingertip-reach').length,1,'held Enter cannot rate a subsequent slot');
-  const reading=f.controller.state.session!.entries[0];assert.equal(reading.kind,'relative-fingertip-reach');if(reading.kind==='relative-fingertip-reach')assert.equal(reading.reading.kind,'window-fractions');
+  const reading=f.controller.state.session!.entries[0];assert.equal(reading.kind,'relative-fingertip-reach');
+  if(reading.kind==='relative-fingertip-reach'){
+   assert.equal(reading.reading.kind,'window-fractions');
+   if(reading.reading.kind==='window-fractions'){
+    assert.equal(reading.reading.axisStartMm,34);assert.equal(reading.reading.axisEndMm,93.75);
+    assert.ok(Math.abs((reading.reading.secondFraction-reading.reading.firstFraction)*59.75-46.85)<1e-9,'local thumb50/index100 uses staggered physical depths');
+   }
+   const raw=JSON.parse(reading.notes!);assert.equal(raw.rawOtherPercentage,'50');assert.equal(raw.rawPrimaryPercentage,'100');assert.equal(raw.primaryFinger,2);
+   assert.deepEqual(raw.localWindows.map((window:any)=>[window.midiPitch,window.row,window.axisStartMm,window.axisEndMm]),choice==='KeyL'?[[63,1,34,59.8],[60,2,66,93.75]]:[[61,1,34,59.8],[64,2,66,93.75]]);
+  }
+ }finally{f.dispose();}
+});
+
+test('changing a comparable pair’s primary finger preserves its physical axes and second-minus-first sign',async()=>{
+ const f=await keyboardFixture();
+ try{
+  f.key('KeyN');f.key('KeyR');await f.wait();f.key('KeyR',f.field,false,'key-up');
+  f.key('Enter',f.field);await f.wait();f.key('Enter',f.field,false,'key-up');
+  f.context.primary=3;f.context.primaryPercentage='100';f.context.percentage='50';
+  f.key('Enter',f.field);await f.wait();
+  const reading=f.controller.state.session!.entries[1];assert.equal(reading.kind,'relative-fingertip-reach');
+  if(reading.kind==='relative-fingertip-reach'&&reading.reading.kind==='window-fractions')assert.ok(Math.abs((reading.reading.secondFraction-reading.reading.firstFraction)*27.75-13.875)<1e-9);
+ }finally{f.dispose();}
+});
+
+test('rechecking an earlier terrace reading leaves a fresh draft and preserves the original evidence',async()=>{
+ const f=await keyboardFixture();
+ try{
+  f.key('KeyN');f.key('KeyR');await f.wait();
+  const slot=f.controller.state.current.relativeSlot!;
+  await f.controller.saveReach({kind:'window-fractions',windowId:`${slot.referenceFrameId}:row-1:depth-window`,firstFraction:.5,secondFraction:1,axisStartMm:0,axisEndMm:59.8,windowReference:'old row 1 near/far physical terrace edges'},'{"primaryFinger":2,"rawPrimaryPercentage":"100","rawOtherPercentage":"50"}');
+  await f.controller.navigate({phase:'relative-fingertip-reach',slotId:slot.id});
+  const before=f.controller.export(),context:any={controller:f.controller,reachPreferences:new Map(),lastSlot:slot.id,notice:'',latestSlotOutcome,usesSupersededFingertipWindow,rememberReachDraft(){}};
+  runInNewContext(stripTypeScriptTypes(between(' function initializeReachDraft(',' function rememberInput(')+'initializeReachDraft(controller.state.session);'),context);
+  assert.equal(context.percentage,'');assert.equal(context.primaryPercentage,'100');assert.equal(context.primary,2);assert.match(context.notice,/fresh reading/);
+  assert.equal(f.controller.export(),before);
  }finally{f.dispose();}
 });
 
