@@ -91,6 +91,29 @@ test('measurement navigation precedes dialog navigation and field digits cannot 
  assert.equal(prevented,false,'the numeric field keeps native digit entry');assert.deepEqual(seen,['ArrowRight','Digit2']);
 });
 
+test('active calibration owns camera keys even when focus is on shared footer controls',()=>{
+ const listeners:Record<string,(event:any)=>void>={},seen:string[]=[],context:any={startupReady:true,startupFailed:false,curlCalibration:undefined,readerFocused:true,document:{hidden:false},
+  window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
+  calibrationPilot:{view:{acceptsRatings:false,key(event:any){seen.push(`calibration:${event.code}`);return ['ArrowRight','Escape'].includes(event.code);}}},
+  applicationNavigationKey(){seen.push('footer');return true;},syncControls(){throw Error('bindings reached');}};
+ runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
+ let prevented=0;for(const code of ['ArrowRight','Escape'])listeners.keydown({...key(code,{target:{closest:()=>null}}),preventDefault(){prevented++;}});
+ assert.equal(prevented,2);assert.deepEqual(seen,['calibration:ArrowRight','calibration:Escape']);
+ listeners.keydown({...key('ArrowLeft'),preventDefault(){prevented++;}});
+ assert.deepEqual(seen,['calibration:ArrowRight','calibration:Escape','calibration:ArrowLeft','footer'],'unclaimed keys still reach shared footer navigation');
+});
+
+test('nested curl and ordinary screens retain their shared navigation priority',()=>{
+ const listeners:Record<string,(event:any)=>void>={},seen:string[]=[],context:any={startupReady:true,startupFailed:false,
+  window:{addEventListener(type:string,fn:any){listeners[type]=fn;}},
+  calibrationPilot:{view:{key(){throw Error('suspended core captured curl input');}}},
+  curlCalibration:{key(){seen.push('curl');return true;}},applicationNavigationKey(){seen.push('footer');return false;},syncControls(){throw Error('bindings reached');}};
+ runInNewContext(body("window.addEventListener('keyup'",'\n\nfunction onMidiNote('),context);
+ listeners.keydown({...key('ArrowRight'),preventDefault(){}});assert.deepEqual(seen,['footer','curl']);
+ context.curlCalibration=undefined;context.calibrationPilot=undefined;context.applicationNavigationKey=()=>{seen.push('ordinary-footer');return true;};
+ listeners.keydown({...key('ArrowLeft'),preventDefault(){}});assert.equal(seen.at(-1),'ordinary-footer');
+});
+
 function modalFixture(){
  let stored=0,reads=0,releaseWrite:(()=>void)|undefined;const controllers:any[]=[],views:any[]=[];
  class Controller {

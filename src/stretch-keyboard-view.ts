@@ -8,7 +8,7 @@ export interface StretchKeyboardScene {
  geometry:StretchCalibrationGeometry;contacts:readonly StretchCalibrationContact[];windows?:readonly StretchMeasurementWindow[];
 }
 export interface StretchKeyboardCamera {elevation:number;azimuth:number;zoom:number}
-export interface StretchKeyboardOptions {colors?:'five-seven'|'classic'}
+export interface StretchKeyboardOptions {colors?:'five-seven'|'classic';onKeyboardRotationExit?:()=>void}
 export interface StretchKeyboardViewport {width:number;height:number}
 export const STRETCH_KEYBOARD_DEFAULT_CAMERA:Readonly<StretchKeyboardCamera>=Object.freeze({elevation:36,azimuth:5,zoom:1});
 export interface StretchKeyboardFace {
@@ -265,13 +265,13 @@ export function stretchKeyboardSvg(scene:StretchKeyboardScene,camera:StretchKeyb
  return `<svg xmlns="${ns}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escaped(drawing.label)}">${drawing.inner}</svg>`;
 }
 
-export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchKeyboardScene,options:StretchKeyboardOptions={}):{readonly ready:boolean;readonly error:string|null;update(scene:StretchKeyboardScene,options?:StretchKeyboardOptions):void;dispose():void} {
- let scene=initialScene,settings={...options},camera={...STRETCH_KEYBOARD_DEFAULT_CAMERA},viewport={...defaultViewport},disposed=false,ready=false,error:string|null=null,drag:{id:number;x:number;y:number}|null=null;
+export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchKeyboardScene,options:StretchKeyboardOptions={}):{readonly ready:boolean;readonly error:string|null;readonly keyboardRotation:boolean;key(event:KeyboardEvent):boolean;focusCanvas():void;update(scene:StretchKeyboardScene,options?:StretchKeyboardOptions):void;dispose():void} {
+ let scene=initialScene,settings={...options},camera={...STRETCH_KEYBOARD_DEFAULT_CAMERA},viewport={...defaultViewport},disposed=false,ready=false,keyboardRotation=false,error:string|null=null,drag:{id:number;x:number;y:number}|null=null;
  const root=document.createElement('div');root.className='stretch-keyboard-model';
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${viewport.width} ${viewport.height}`);svg.setAttribute('tabindex','0');svg.setAttribute('role','img');svg.classList.add('stretch-keyboard-canvas');
  const hints=document.createElement('div');hints.className='stretch-camera-controls';
- hints.innerHTML='<span>Drag to rotate · Scroll to zoom</span><div><button type="button" data-camera="keyboard">Rotate with keys</button><button type="button" data-camera="zoom-out" aria-label="Zoom keyboard out">−</button><button type="button" data-camera="zoom-in" aria-label="Zoom keyboard in">+</button><button type="button" data-camera="reset">Reset view</button></div>';
- const keyboardHint=document.createElement('p');keyboardHint.className='stretch-camera-keyboard-hint';keyboardHint.textContent='When the model is focused: arrows rotate, +/− zoom, Home resets.';
+ hints.innerHTML='<span>Drag to rotate · Scroll to zoom</span><div><button type="button" data-camera="keyboard" aria-pressed="false">Keyboard rotation: Off</button><button type="button" data-camera="zoom-out" aria-label="Zoom keyboard out">−</button><button type="button" data-camera="zoom-in" aria-label="Zoom keyboard in">+</button><button type="button" data-camera="reset">Reset</button></div>';
+ const keyboardHint=document.createElement('p');keyboardHint.className='stretch-camera-keyboard-hint';keyboardHint.innerHTML='<kbd>← ↑ ↓ →</kbd> rotate · <kbd>+ / −</kbd> zoom · <kbd>Home</kbd> resets · <kbd>Esc</kbd> returns to the screen';keyboardHint.hidden=true;
  root.append(svg,hints,keyboardHint);container.append(root);
  const render=()=>{
   if(disposed)return;
@@ -291,14 +291,19 @@ export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchK
  const up=(event:PointerEvent)=>{if(drag?.id!==event.pointerId)return;drag=null;if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);};
  const lost=()=>{drag=null;};
  const wheel=(event:WheelEvent)=>{event.preventDefault();zoom(Math.exp(-Math.max(-120,Math.min(120,event.deltaY))*.003));};
- const key=(event:KeyboardEvent)=>{
-  if(event.target!==svg||event.altKey||event.ctrlKey||event.metaKey)return;
+ const setKeyboardRotation=(enabled:boolean)=>{keyboardRotation=enabled;const button=hints.querySelector<HTMLButtonElement>('[data-camera=keyboard]');button?.setAttribute('aria-pressed',String(enabled));if(button)button.textContent=`Keyboard rotation: ${enabled?'On':'Off'}`;keyboardHint.hidden=!enabled;root.toggleAttribute('data-keyboard-rotation',enabled);if(enabled)svg.focus({preventScroll:true});else settings.onKeyboardRotationExit?.();};
+ const cameraKey=(event:KeyboardEvent):boolean=>{
+  if(!keyboardRotation||disposed||event.altKey||event.ctrlKey||event.metaKey)return false;
+  if((event.target as Element|null)?.closest?.('input,select,textarea,[contenteditable=true],[data-options-popup]'))return false;
+  const code=event.code||event.key;
+  if(code==='Escape'){if(!event.repeat)setKeyboardRotation(false);event.preventDefault();event.stopPropagation();return true;}
   const amount=event.shiftKey?1:5;
-  if(event.key==='ArrowLeft')rotate(-amount,0);else if(event.key==='ArrowRight')rotate(amount,0);else if(event.key==='ArrowUp')rotate(0,amount);else if(event.key==='ArrowDown')rotate(0,-amount);
-  else if(event.key==='+'||event.key==='=')zoom(1.1);else if(event.key==='-'||event.key==='_')zoom(1/1.1);else if(event.key==='Home')reset();else return;
-  event.preventDefault();event.stopPropagation();
+  if(code==='ArrowLeft')rotate(-amount,0);else if(code==='ArrowRight')rotate(amount,0);else if(code==='ArrowUp')rotate(0,amount);else if(code==='ArrowDown')rotate(0,-amount);
+  else if(event.key==='+'||event.key==='='||code==='NumpadAdd')zoom(1.1);else if(event.key==='-'||event.key==='_'||code==='NumpadSubtract')zoom(1/1.1);else if(code==='Home')reset();else return false;
+  event.preventDefault();event.stopPropagation();return true;
  };
- const click=(event:MouseEvent)=>{const target=(event.target as Element).closest<HTMLElement>('[data-camera]');if(!target)return;if(target.dataset.camera==='keyboard')svg.focus({preventScroll:true});else if(target.dataset.camera==='zoom-in')zoom(1.15);else if(target.dataset.camera==='zoom-out')zoom(1/1.15);else reset();};
+ const key=(event:KeyboardEvent)=>{if(event.target===svg)cameraKey(event);};
+ const click=(event:MouseEvent)=>{const target=(event.target as Element).closest<HTMLElement>('[data-camera]');if(!target)return;if(target.dataset.camera==='keyboard')setKeyboardRotation(!keyboardRotation);else if(target.dataset.camera==='zoom-in')zoom(1.15);else if(target.dataset.camera==='zoom-out')zoom(1/1.15);else reset();};
  svg.addEventListener('pointerdown',down);svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);svg.addEventListener('lostpointercapture',lost);svg.addEventListener('wheel',wheel,{passive:false});svg.addEventListener('keydown',key);hints.addEventListener('click',click);
  const resizeObserver=typeof ResizeObserver==='undefined'?null:new ResizeObserver(()=>{
   if(disposed)return;
@@ -307,5 +312,5 @@ export function mountStretchKeyboard(container:HTMLElement,initialScene:StretchK
  });
  resizeObserver?.observe(svg);
  render();
- return {get ready(){return ready&&!disposed;},get error(){return error;},update(next,nextOptions){if(disposed)return;scene=next;if(nextOptions)settings={...settings,...nextOptions};render();},dispose(){if(disposed)return;disposed=true;ready=false;resizeObserver?.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.removeEventListener('pointerdown',down);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);svg.removeEventListener('lostpointercapture',lost);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',key);hints.removeEventListener('click',click);root.remove();}};
+ return {get ready(){return ready&&!disposed;},get error(){return error;},get keyboardRotation(){return keyboardRotation&&!disposed;},key:cameraKey,focusCanvas(){if(!disposed)svg.focus({preventScroll:true});},update(next,nextOptions){if(disposed)return;scene=next;if(nextOptions)settings={...settings,...nextOptions};render();},dispose(){if(disposed)return;disposed=true;ready=false;keyboardRotation=false;resizeObserver?.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.removeEventListener('pointerdown',down);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);svg.removeEventListener('pointercancel',up);svg.removeEventListener('lostpointercapture',lost);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',key);hints.removeEventListener('click',click);root.remove();}};
 }

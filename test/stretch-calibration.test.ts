@@ -52,15 +52,15 @@ test('partially mapped measurement windows remain valid raw evidence without inv
  assert.equal(relativeDifferenceMm(c.session!,1,2),null);assert.equal(recommendedSpanSteps(c.session!,[1,2]),2);
 });
 
-test('outward baseline excludes too-close unavailability; grade 4 continues and maximum leaves unknowns',async()=>{
+test('an unavailable start stays open; grade 4 continues and maximum leaves unknowns',async()=>{
  const {c}=await collector();await reach(c);
  assert.equal(await c.prepareBaseline(),true);assert.equal(c.state.current.trial!.distanceSemitoneSteps,4);assert.equal(await c.prepare(),true);
- assert.equal(await c.rate(5),false);assert.equal(c.session!.entries.filter(e=>e.kind==='pair-stretch').length,0);
+ assert.equal(await c.rate(5),true);assert.equal(c.session!.entries.filter(e=>e.kind==='pair-stretch').length,1);assert.equal(c.session!.entries.filter(e=>e.kind==='pair-sweep-terminal').length,0);assert.equal(c.state.current.needsSetup,true);
  assert.equal(await c.adjustSpan(2),true);assert.equal(await c.prepare(),true);assert.equal(await c.rate(4),true);
  assert.equal(c.state.current.trial!.distanceSemitoneSteps,8);assert.equal(c.session!.entries.filter(e=>e.kind==='pair-sweep-terminal').length,0);
  assert.equal(await c.markMaximum(),true);
  const terminal=c.session!.entries.find(e=>e.kind==='pair-sweep-terminal')!;assert.equal(terminal.reason,'maximum-reachable');assert.equal(terminal.firstUnavailableObservationId,null);
- assert.equal(effectivePairReports(c.session!).length,1);assert.equal(c.state.progress!.sweeps.maximum,1);assert.equal(c.state.current.trial,null);
+ assert.equal(effectivePairReports(c.session!).length,2);assert.equal(c.state.progress!.sweeps.maximum,1);assert.equal(c.state.current.trial,null);
 });
 
 test('first unavailable report ends only the outward sweep and has exact observed references',async()=>{
@@ -128,7 +128,7 @@ test('admission rejects geometry, contact, scale, input and forward-reference co
   a=>{a.sessions[0].entries.push({kind:'retraction',id:'future-ret',recordedAt:'2026-10-12T12:00:00Z',entryId:'future',reason:'invalid'});},
   a=>{a.sessions[0].plan.geometry.surfaces[0].depthMinMm=0;},
   a=>{a.sessions[0].plan.geometry.snapshotSha256='0'.repeat(64);},
-  a=>{const e=a.sessions[0].entries.find(e=>e.kind==='pair-stretch')!;if(e.kind==='pair-stretch'){e.grade=5;e.realization=null;}},
+  a=>{const e=a.sessions[0].entries.find(e=>e.kind==='pair-stretch')!;if(e.kind==='pair-stretch')e.grade=5;},
   a=>{const e=a.sessions[0].entries.find(e=>e.kind==='pair-stretch')!;a.sessions[0].entries.push({kind:'pair-sweep-terminal',id:'forged-edge',recordedAt:'2026-10-12T12:00:00Z',sweepId:'sweepId'in e?e.sweepId:'',reason:'coverage-edge',lastReachableObservationId:e.id,firstUnavailableObservationId:null});},
  ];
  for(const change of corruptions){const bad=structuredClone(good);change(bad);await assert.rejects(()=>validateStretchArchive(bad));}
@@ -197,4 +197,66 @@ test('new sweeps and restored collections inherit the first recorded row and anc
  await c.prepareBaseline();assert.equal(c.state.current.trial!.contacts[0].row,2);assert.equal(c.state.current.trial!.contacts[0].midiPitch,60);await c.prepare();await c.rate(0);await c.markMaximum();
  const loaded=await loadStretch(memory.files),resumed=new StretchController({load:loaded,files:memory.files});await resumed.prepareBaseline();
  assert.equal(resumed.state.current.trial!.contacts[0].row,2);assert.equal(resumed.state.current.trial!.contacts[0].midiPitch,60);
+});
+
+test('first grade 5 is durable evidence without a terminal, and resume can choose a new starting contact',async()=>{
+ const {c,memory}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline();await c.prepare();const firstTrial=c.state.current.trial!,sweepId=firstTrial.sweepId;
+ assert.equal(await c.rate(5,{kind:'screen'},firstTrial.id),true);
+ const firstReport=c.session!.entries.find(e=>e.kind==='pair-stretch')!;assert.equal(firstReport.grade,5);assert.equal(firstReport.realization,null);assert.equal(firstReport.trialId,firstTrial.id);
+ assert.equal(c.state.current.trial!.id,firstTrial.id);assert.equal(c.state.current.needsSetup,true);assert.equal(c.state.progress!.sweeps.completed,0);assert.equal(c.state.canMarkMaximum,false);
+ assert.equal(c.session!.entries.some(e=>e.kind==='pair-sweep-terminal'||e.kind==='omission'),false);assert.equal(await c.rate(5),false);assert.equal(await c.markMaximum(),false);
+ await validateStretchArchive(c.archive);
+ const forged=structuredClone(c.archive);forged.sessions[0].entries.push({kind:'pair-sweep-terminal',id:'invented-unavailable-terminal',recordedAt:'2026-10-12T12:00:00Z',sweepId,reason:'first-unavailable',lastReachableObservationId:null,firstUnavailableObservationId:firstReport.id});await assert.rejects(()=>validateStretchArchive(forged),/reachable baseline/);
+ const loaded=await loadStretch(memory.files),resumed=new StretchController({load:loaded,files:memory.files});assert.equal(resumed.state.resumeRequired,true);assert.equal(await resumed.rate(5),false);
+ assert.equal(await resumed.prepareBaseline({spanSteps:4,row:2,anchorMidiPitch:60}),true);await resumed.prepare();assert.equal(await resumed.rate(0),true);
+ assert.equal(resumed.state.current.trial!.distanceSemitoneSteps,6);assert.equal(await resumed.rate(5),true);
+ const reports=effectivePairReports(resumed.session!),terminal=resumed.session!.entries.find(e=>e.kind==='pair-sweep-terminal')!;
+ assert.equal(reports.length,3);assert.equal(reports[0].id,firstReport.id);assert.equal(terminal.reason,'first-unavailable');assert.equal(terminal.lastReachableObservationId,reports[1].id);assert.equal(terminal.firstUnavailableObservationId,reports[2].id);
+ assert.equal(resumed.session!.pairTrials.length,3);assert.equal(resumed.state.progress!.sweeps.unavailable,1);
+ await resumed.navigate({phase:'progressive-pairs',slotId:sweepId,trialId:reports[1].trialId});assert.equal(await resumed.prepareBaseline({spanSteps:8}),false);
+});
+
+test('pending and held grade-5 keys cannot repeat a starting judgment or rate its replacement',async()=>{
+ const {c,memory}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline();await c.prepare();const original=memory.files.write;
+ let resolve!:()=>void;const gate=new Promise<void>(done=>{resolve=done;});memory.files.write=async(name,bytes)=>{await gate;await original(name,bytes);};
+ const first=c.inputKey({type:'keydown',code:'Digit5'});assert.equal(c.state.busy,true);assert.equal(effectivePairReports(c.session!).length,0);
+ assert.equal(await c.inputKey({type:'keydown',code:'Digit5',repeat:true}),false);assert.equal(await c.inputKey({type:'keydown',code:'Numpad5'}),false);
+ resolve();assert.equal(await first,true);assert.equal(c.state.current.needsSetup,true);assert.equal(effectivePairReports(c.session!).length,1);
+ assert.equal(await c.adjustSpan(2),true);await c.prepare();assert.equal(await c.inputKey({type:'keydown',code:'Digit5',repeat:true}),false);assert.equal(await c.rate(5),false);
+ await c.inputKey({type:'keyup',code:'Digit5'});assert.equal(await c.inputKey({type:'keydown',code:'Digit5'}),false);await c.inputKey({type:'keyup',code:'Digit5'});await c.inputKey({type:'keyup',code:'Numpad5'});
+ assert.equal(await c.inputKey({type:'keydown',code:'Numpad5'}),true);assert.equal(effectivePairReports(c.session!).length,2);assert.equal(c.session!.entries.some(e=>e.kind==='pair-sweep-terminal'),false);
+});
+
+test('a failed first-unavailable save retains the displayed target and permits an honest retry',async()=>{
+ const {c,memory}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline();await c.prepare();const before=c.session!,original=memory.files.write;
+ memory.files.write=async()=>{throw Error('disk unavailable');};assert.equal(await c.rate(5),false);assert.deepEqual(c.session,before);assert.equal(c.state.current.needsSetup,false);
+ memory.files.write=original;assert.equal(await c.rate(5),true);assert.equal(effectivePairReports(c.session!).length,1);assert.equal(c.session!.entries.some(e=>e.kind==='pair-sweep-terminal'),false);assert.equal(c.state.current.needsSetup,true);
+});
+
+test('an unavailable terminal cannot reuse a startup failure before its baseline or from another arrangement',async()=>{
+ for(const row of [1,2] as const){
+  const {c}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline({spanSteps:6});await c.prepare();await c.rate(5);
+  const unavailable=c.session!.entries.find(e=>e.kind==='pair-stretch')!;
+  await c.prepareBaseline({spanSteps:4,row,anchorMidiPitch:row===1?61:60});await c.prepare();await c.rate(0);await validateStretchArchive(c.archive);
+  const reachable=effectivePairReports(c.session!).find(e=>e.grade===0)!;
+  const forged=structuredClone(c.archive),s=forged.sessions[0];
+  // Earlier timestamps cannot turn a later ledger report into the observed baseline.
+  s.entries.find(e=>e.id===unavailable.id)!.recordedAt='2026-10-13T12:00:00Z';s.entries.find(e=>e.id===reachable.id)!.recordedAt='2026-10-12T12:00:00Z';
+  s.entries.push({kind:'pair-sweep-terminal',id:`forged-startup-terminal-row-${row}`,recordedAt:'2026-10-14T12:00:00Z',sweepId:reachable.sweepId,reason:'first-unavailable',lastReachableObservationId:reachable.id,firstUnavailableObservationId:unavailable.id});
+  await assert.rejects(()=>validateStretchArchive(forged),/same row and anchor|before the unavailable/);
+ }
+});
+
+test('retracting an endpoint reopens an unanswered target on the frozen reachable arrangement',async()=>{
+ const {c}=await collector();await reach(c,[0,0,0,0]);await c.prepareBaseline({spanSteps:8,row:1,anchorMidiPitch:61});await c.prepare();await c.rate(5);
+ const startup=effectivePairReports(c.session!)[0];await c.prepareBaseline({spanSteps:4,row:2,anchorMidiPitch:60});await c.prepare();await c.rate(0);
+ const reachable=effectivePairReports(c.session!).find(e=>e.grade===0)!,endpointTrial=c.state.current.trial!;await c.rate(5);
+ const withdrawn=effectivePairReports(c.session!).find(e=>e.trialId===endpointTrial.id)!;assert.equal(await c.retract(withdrawn.id,'recheck outward endpoint'),true);
+ assert.equal(c.state.current.trial!.id,endpointTrial.id);assert.equal(c.state.current.trial!.distanceSemitoneSteps,6);assert.equal(c.state.current.trial!.contacts[0].row,2);assert.equal(c.state.current.trial!.contacts[0].midiPitch,60);
+ assert.equal(c.state.current.needsSetup,true);assert.equal(await c.prepare(),true);assert.equal(await c.rate(5),true);
+ const replacement=effectivePairReports(c.session!).find(e=>e.trialId===endpointTrial.id)!,terminal=c.session!.entries.filter(e=>e.kind==='pair-sweep-terminal').at(-1)!;
+ assert.notEqual(replacement.id,withdrawn.id);assert.equal(terminal.lastReachableObservationId,reachable.id);assert.equal(terminal.firstUnavailableObservationId,replacement.id);assert.equal(c.state.progress!.sweeps.unavailable,1);
+ assert.equal(c.session!.pairTrials.length,3);assert.ok(c.session!.entries.some(e=>e.id===startup.id));assert.ok(c.session!.entries.some(e=>e.id===withdrawn.id));
+ assert.equal(await c.retract(terminal.id,'recheck terminal declaration'),true);assert.equal(c.state.current.trial!.id,endpointTrial.id);assert.equal(c.state.current.trial!.contacts[0].row,2);
+ await c.prepare();assert.equal(await c.rate(5),true);assert.equal(c.session!.pairTrials.length,3);
 });
