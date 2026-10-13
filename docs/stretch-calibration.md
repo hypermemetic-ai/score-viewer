@@ -2,7 +2,11 @@
 
 Calibrate under Options → Fingerings opens the contract-based collection. The new collection uses the accepted regularized RR/Jankó profile and the calculator's root-exported `stretch-calibration-protocol-v1` / `stretch-calibration-session-v1` wire format. Conventional instrument selection identifies that a new Jankó collection requires selecting Jankó; historical evidence remains exportable. No conventional geometry is fabricated from the Jankó seed.
 
-Each measured hand and central seating setup has a separate collection. Declare the physical lowest/highest keys, central reference and body/seating reference. Progress counts four relative fingertip readings, ten adaptive pair sweeps and ten conditional triple slots, with omissions and actual judgments separately visible. There is no fixed remaining pair-judgment count.
+Start a New hand collection with N, then choose Right hand with R or Left hand with L; Enter starts the focused hand. The first fingertip reading opens immediately with numeric focus. Each hand keeps a separate collection. No keyboard endpoints, row, central key, body offset or seating description is required.
+
+The app proposes a nominal central protocol frame on row 1 with MIDI key 61 and a symmetric test window 37–85. Retained geometry and provenance explicitly state that body/seating position and physical keyboard endpoints were not measured. The numeric origin is a coordinate convention. A test-window edge records limited collection coverage, not a verified hardware endpoint or an unavailable untested contact. Existing collections retain their original setup.
+
+Progress counts four relative fingertip readings, ten adaptive pair sweeps and ten conditional triple slots, with omissions and actual judgments separately visible. There is no fixed remaining pair-judgment count. The old thumb–pinky collection editor is absent from current entry and Options; historical evidence remains in Export all evidence.
 
 Percentage is the default reach method; direct millimeters and editable primary-finger selection remain available. Both percentages refer to one physical forward window and retain its endpoints, fractions and reference frame. Signed second-minus-first differences sum across adjacent readings. Negative entries are accepted. These are relative effective reaches, never inferred bone lengths. Raw entries and their selected method/reference are retained as documented JSON in entry notes. Camera rotation changes only projection and never changes the measurement window.
 
