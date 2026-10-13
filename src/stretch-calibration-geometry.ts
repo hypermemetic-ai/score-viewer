@@ -40,7 +40,7 @@ function formForPitch(pitch:number){
  return form;
 }
 
-/** An explicit operator range is mandatory; the profile origin is only a coordinate origin. */
+/** A collection range is explicit; its provenance distinguishes verified hardware from a nominal test window. */
 export async function createStretchGeometry(range:readonly [number,number]):Promise<StretchCalibrationGeometry> {
  if(!Array.isArray(range)||range.length!==2||!range.every(p=>Number.isInteger(p)&&p>=0&&p<=127)||range[0]>range[1])throw Error('Choose a valid admitted MIDI range before creating calibration geometry.');
  const actuators:StretchCalibrationActuator[]=[],surfaces:StretchCalibrationSurface[]=[];
