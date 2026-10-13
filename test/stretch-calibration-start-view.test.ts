@@ -33,17 +33,17 @@ async function keyboardFixture(){
   number:(value:string)=>value.trim()===''?null:Number.isFinite(Number(value))?Number(value):null,
   async createDefaultStretchSetup(input:Parameters<typeof createDefaultStretchSetup>[0]){helperCalls++;return createDefaultStretchSetup({...input,setupId:`authored-default-${helperCalls}`});},
   busy(){return controller.state.busy||context.creating;},
-  render(){if(!context.creating&&!controller.state.busy)api.safeFocus();},
+  render(){context.art.hidden=context.page!=='work';if(!context.creating&&!controller.state.busy)api.safeFocus();},
   body:{querySelector(selector:string){if(controller.state.busy||context.creating)return null;if(selector.includes('=new]'))return{click(){api.transition('create');}};if(selector.includes('=start-right]'))return right;if(selector.includes('=start-left]'))return left;return null;}},
   footer:{querySelector(){return null;},querySelectorAll(){return context.page==='work'?[save]:[];}},
   dialog:{querySelectorAll(){return context.page==='work'?[camera,field,save]:[right,left];},querySelector(){return context.page==='work'?field:right;}}
  };
- const production=between('const controlKey=',' function back(')+between(' async function perform(',' function scene(')+between(' function windowFor(',' function currentSources(')+between(' function safeFocus(',' function render(')+createCode+reachCode;
- const instrumented=`${production}\nconst rawPerform=perform; perform=(action)=>{flight=rawPerform(action);return flight;};\nfunction start(hand){const target={dataset:{stretchCommand:hand==='LH'?'start-left':'start-right'}};switch(target.dataset.stretchCommand){${startCase}}}\n({key:({${keyCode}}).key,start,saveReach,perform,safeFocus,transition})`;
+ const production=between('const controlKey=',' function openOptions(')+between(' async function perform(',' function scene(')+between(' function windowFor(',' function currentSources(')+between(' function safeFocus(',' function render(')+createCode+reachCode;
+ const instrumented=`${production}\nconst rawPerform=perform; perform=(action)=>{flight=rawPerform(action);return flight;};\nfunction start(hand){const target={dataset:{stretchCommand:hand==='LH'?'start-left':'start-right'}};switch(target.dataset.stretchCommand){${startCase}}}\n({key:({${keyCode}}).key,start,saveReach,perform,safeFocus,transition,back})`;
  context.flight=flight;Object.defineProperty(context,'flight',{get(){return flight;},set(value){flight=value;},configurable:true});
  api=runInNewContext(stripTypeScriptTypes(instrumented),context);
  const key=(code:string,target:any=right,repeat=false,type='key-down')=>api.key({code,key:code,repeat,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,target},type);
- return{controller,context,focus,field,right,left,key,get calls(){return helperCalls;},wait:()=>flight,get bytes(){return bytes;},dispose(){controller.dispose();}};
+ return{controller,context,focus,field,right,left,key,back:()=>api.back(),get calls(){return helperCalls;},wait:()=>flight,get bytes(){return bytes;},dispose(){controller.dispose();}};
 }
 
 for(const choice of ['KeyR','KeyL','Enter','NumpadEnter'])test(`New N then ${choice} starts the chosen hand and Enter saves the visible first reading`,async()=>{
@@ -95,4 +95,19 @@ test('automatic coverage is labeled a test-window edge and existing manual cover
  const label=runInNewContext(stripTypeScriptTypes(between('const coverageLabel=','const omissionLabel=')+'coverageLabel'),{isNominalStretchSetup}) as (session:any)=>string;
  assert.equal(label({plan:{provenance:nominal.provenance}}),'Test window edge');
  assert.equal(label({plan:{provenance:{...nominal.provenance,seatingReference:'Operator declared bench position'}}}),'Keyboard edge');
+});
+
+for(const hand of ['KeyR','KeyL'])test(`new ${hand} collection leaves previous keyboard rotation and gives its first reading numeric focus`,async()=>{
+ const f=await keyboardFixture();
+ try{
+  f.key('KeyN');f.key('KeyR');await f.wait();f.key('KeyR',f.field,false,'key-up');
+  let exits=0;
+  f.context.keyboard={keyboardRotation:true,key(){return false;},focusCanvas(){f.focus.push('camera');},endKeyboardRotation(){this.keyboardRotation=false;exits++;}};
+  f.context.render();assert.equal(f.focus.at(-1),'camera','the old collection really owns keyboard rotation before Back');
+  f.back();assert.equal(f.context.page,'home');assert.equal(f.context.keyboard.keyboardRotation,true);
+  f.key('KeyN');f.key(hand);await f.wait();
+  assert.equal(f.context.page,'work');assert.equal(f.context.keyboard.keyboardRotation,false);assert.equal(exits,1);
+  assert.equal(f.focus.at(-1),'numeric');
+  assert.equal(f.controller.state.session!.entries.length,0,'starting another hand makes no physical observation');
+ }finally{f.dispose();}
 });
