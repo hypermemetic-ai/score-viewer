@@ -102,7 +102,7 @@ export function stretchKeyboardFaces(scene:StretchKeyboardScene,options:StretchK
  return faces;
 }
 
-export interface StretchWindowPoints {ticks:readonly StretchPoint[];marker:StretchPoint|null;edgeStart:StretchPoint;edgeEnd:StretchPoint}
+export interface StretchWindowPoints {ticks:readonly StretchPoint[];marker:StretchPoint|null;edgeStart:StretchPoint;edgeEnd:StretchPoint;cornerBrackets:readonly (readonly StretchPoint[])[]}
 /** Window endpoint coordinates are independent of the view and exclude the tongue by construction. */
 export function stretchMeasurementWindowPoints(scene:StretchKeyboardScene,window:StretchMeasurementWindow):StretchWindowPoints {
  const surface=stretchSurface(scene.geometry,window.surfaceId);
@@ -113,7 +113,13 @@ export function stretchMeasurementWindowPoints(scene:StretchKeyboardScene,window
   const p=surfaceLocalPoint(surface,edge?1.2:.5,v);
   return posedPoint(scene,surface.actuatorId,[p[0],p[1],p[2]+.7]);
  };
- return {ticks:[at(0,true),at(.5,true),at(1,true)],marker:window.fraction===undefined?null:at(window.fraction),edgeStart:at(0,true),edgeEnd:at(1,true)};
+ const across=Math.min(.25,2/(surface.xMaxMm-surface.xMinMm)),along=Math.min(.25,4/(window.axisEndMm-window.axisStartMm));
+ // These unfilled corners mark the reading band; the contact highlight still covers the entire playable terrace.
+ const cornerBrackets=[[[across,0],[0,0],[0,along]],[[1-across,0],[1,0],[1,along]],[[across,1],[0,1],[0,1-along]],[[1-across,1],[1,1],[1,1-along]]].map(corner=>corner.map(([u,fraction])=>{
+  const depth=window.axisStartMm+fraction*(window.axisEndMm-window.axisStartMm),v=(depth-surface.depthMinMm)/(surface.depthMaxMm-surface.depthMinMm),p=surfaceLocalPoint(surface,u,v);
+  return posedPoint(scene,surface.actuatorId,[p[0],p[1],p[2]+.16]);
+ }));
+ return {ticks:[at(0,true),at(.5,true),at(1,true)],marker:window.fraction===undefined?null:at(window.fraction),edgeStart:at(0,true),edgeEnd:at(1,true),cornerBrackets};
 }
 
 interface Drawing {inner:string;label:string}
@@ -209,6 +215,10 @@ function keyboardDrawing(scene:StretchKeyboardScene,camera:StretchKeyboardCamera
  for(let windowIndex=0;windowIndex<windows.length;windowIndex++){
   const {window,points}=windows[windowIndex],ticks=points.ticks.map(screen);
   const contact=scene.contacts.find(item=>item.location.surfaceId===window.surfaceId),color=contact?fingerColors[contact.finger]:'#efe8d9';
+  points.cornerBrackets.forEach((corner,index)=>{
+   const attributes=`stroke="${contact?'#202328':'#f7f0dd'}" stroke-width="1.7" stroke-linecap="square" fill="none" data-measurement-window-corner="${escaped(window.surfaceId)}:${index}"`;
+   line(corner[0],corner[1],attributes);line(corner[1],corner[2],attributes);
+  });
   const side=windows.length===1||windowIndex%2===1?'right':'left';
   const column=side==='left'?Math.max(36,modelLeft-12):Math.min(width-36,modelRight+12);
   const tickOrder=ticks.map((point,i)=>({point,i,y:Math.max(labelHeader+18,Math.min(height-16,point[1]+4))})).sort((a,b)=>a.y-b.y);
