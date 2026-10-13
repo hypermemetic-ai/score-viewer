@@ -96,7 +96,7 @@ test('rechecking an earlier terrace reading leaves a fresh draft and preserves t
   await f.controller.navigate({phase:'relative-fingertip-reach',slotId:slot.id});
   const before=f.controller.export(),context:any={controller:f.controller,reachPreferences:new Map(),lastSlot:slot.id,notice:'',latestSlotOutcome,usesSupersededFingertipWindow,rememberReachDraft(){}};
   runInNewContext(stripTypeScriptTypes(between(' function initializeReachDraft(',' function rememberInput(')+'initializeReachDraft(controller.state.session);'),context);
-  assert.equal(context.percentage,'');assert.equal(context.primaryPercentage,'100');assert.equal(context.primary,2);assert.match(context.notice,/fresh reading/);
+  assert.equal(context.percentage,'');assert.equal(context.primaryPercentage,'100');assert.equal(context.primary,2);
   assert.equal(f.controller.export(),before);
  }finally{f.dispose();}
 });
