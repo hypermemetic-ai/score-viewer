@@ -7,5 +7,5 @@
 
 ## 2. Review and delivery
 
-- [ ] 2.1 Integrate independent source review, configured tests/build and main spec sync; verify actual built interaction/layout and scoped PR merge.
-- [ ] 2.2 Deliver and activate the exact native frontend through the established preservation lane; verify package/installed identities and saved data, record bounded inspection and archive this change.
+- [x] 2.1 Integrate independent source review, configured tests/build and main spec sync; verify actual built interaction/layout and scoped PR merge.
+- [x] 2.2 Deliver and activate the exact native frontend through the established preservation lane; verify package/installed identities and saved data, record bounded inspection and archive this change.
