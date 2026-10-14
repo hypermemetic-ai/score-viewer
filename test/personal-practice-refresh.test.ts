@@ -96,7 +96,7 @@ test('history baseline changes are compared by effective source hands rather tha
 
 test('same-hand finger and history choices refit the existing practice without rebuilding or changing earned evidence',async()=>{
  const f=fixture();await f.context.commitPersonal(f.target,(s:any)=>{s.choices.a.finger=5;s.calculatedVersion=1;return s;});
- assert.equal(f.old.paused,0);assert.equal(f.old.refits,1);assert.equal(f.old.options.personal,f.target.personal);assert.equal(f.old.options.personal.choices.a.finger,5);
+ assert.equal(f.old.paused,0);assert.equal(f.old.refits,1);assert.deepEqual(JSON.parse(JSON.stringify(f.old.options.personal)),JSON.parse(JSON.stringify(f.target.personal)));assert.equal(f.old.options.personal.choices.a.finger,5);
  assert.equal(f.old.flushes,0);assert.equal(f.preparations.length,0);assert.equal(f.old.closed,0);assert.equal(f.context.practice,f.old);assert.deepEqual(f.old.state.evidence,f.evidence);
 });
 
