@@ -9,14 +9,14 @@ const source=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../sr
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
 async function fixture(){
- const disk=deferred(),written:any[]=[],frames:any[]=[],messages:string[]=[],target={entry:{id:'piece'},package:p,personal:initialPersonal(p)},units=editUnits(p),data=new Map<string,string>();
+ const disk=deferred(),written:any[]=[],frames:any[]=[],messages:string[]=[],target={entry:{id:'piece',importedAt:'2026-01-01T00:00:00.000Z'},package:p,personal:initialPersonal(p)},units=editUnits(p),data=new Map<string,string>();
  let lock=Promise.resolve();const base=browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},{request(_name,run){const next=lock.then(run);lock=next.then(()=>{},()=>{});return next;}});
  let active=false,broken=false;
  const store:AssistanceStore={read:id=>base.read(id),commit:async input=>{
   if(active){await disk.promise;if(broken)throw Error('disk unavailable');}
   const result=await base.commit(input);if(active&&result.status==='committed'&&input.changes[personalMemoryDocument])written.push(structuredClone(result.snapshot.documents[personalStorageName(target.entry.id,p)]));return result;
  }};
- const memoryInput=(owner:any)=>({entryId:owner.entry.id,p:owner.package,personal:rawMemoryPersonal(owner.personal)});
+ const memoryInput=(owner:any)=>({entryId:owner.entry.id,importedAt:owner.entry.importedAt,p:owner.package,personal:rawMemoryPersonal(owner.personal)});
  const personalMemory=new PersonalMemorySession(store,{scanLibrary:async()=>[memoryInput(target)]});await personalMemory.initialize();active=true;
  const context:any={structuredClone,crypto,current:target,selection:units[0],assigned,readPersonal,editUnits,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   PersonalPresentationSession:class{async project(personal:any){return {...p,projection:personal.assignments};}},personalStorageName,personalMemory,memoryInput,rawMemoryPersonal,

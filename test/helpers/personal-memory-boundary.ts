@@ -10,7 +10,7 @@ export function personalMemoryBoundary(context:any,read:()=>any,write:(value:any
  });
  const update=(change:(latest:any)=>any)=>{const id=++serial;operations.set(id,change);return queue.accept(id).saved;};
  const session={
-  get error(){return queue.error;},get recovery(){return queue.recovery;},resolve(){return {byOwner:{}};},
+  get error(){return queue.error;},get recovery(){return queue.recovery;},resolve(){return {byOwner:{}};},personalFor(){return structuredClone(read());},
   accept(input:any,action:any){
    if(queue.error)throw queue.error;
    const ownerId=action.kind==='finger'?action.edit.ownerId:action.ownerId;
