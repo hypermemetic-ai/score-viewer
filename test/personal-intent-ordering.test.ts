@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
+import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 
 // Run the actual application intent and persistence functions. Geometry and
 // storage are bounded fakes so their independently delayed completions can be
@@ -33,10 +34,11 @@ function fixture(){
   renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},practice:undefined,
   paintPersonalSaveError(_owner:any,error:Error){errors.push(error);},notify(message:string){messages.push(message);},
   loadPersonalJournal:async()=>structuredClone(disk),host:{},rebindPersonalPresentation:(s:any)=>s};
+ const navigationWrites:any[]=[];personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await write(s);else{disk=structuredClone(s);navigationWrites.push(structuredClone(s));}});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('async function commitPersonal(','\nfunction labelMode('),context);
  runInNewContext(body('async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
- return {context,target,seats,written,frames,errors,messages,get disk(){return disk;},get editor(){return context.personalEditor(target);},
+ return {context,target,seats,written,navigationWrites,frames,errors,messages,get disk(){return disk;},get editor(){return context.personalEditor(target);},
   setWrite(fn:(s:any)=>any){write=fn;},setProject(fn:(s:any)=>Promise<any>){project=fn;},writeDefault(s:any){disk=structuredClone(s);written.push(structuredClone(s));}};
 }
 
@@ -86,13 +88,13 @@ test('generic write failure retains both ordered intents and stops editing until
  const rejected=assert.rejects(first,/disk unavailable/);await f.context.saveHandChoice('RH');await rejected;await assert.rejects(f.editor.queue.flush(),/disk unavailable/);
  assert.equal(f.target.personal.choices['note-0'].hand,'RH');assert.equal(f.editor.queue.recovery.length,2);assert.ok(f.errors.length);
  const retained=JSON.stringify(f.target.personal);await assert.rejects(f.context.saveFingerDigit(3),/disk unavailable/);await assert.rejects(f.context.commitPersonal(f.target,(s:any)=>({...s,calculatedVersion:2})),/disk unavailable/);assert.equal(JSON.stringify(f.target.personal),retained);
- broken=false;await f.editor.queue.retry();assert.deepEqual(f.written.map(s=>s.choices['note-0'].hand),['LH','RH']);assert.equal(f.disk.calculatedVersion,1);assert.equal(f.editor.queue.recovery.length,0);
+ broken=false;await f.context.personalMemory.retry();await f.editor.queue.retry();assert.deepEqual(f.written.map(s=>s.choices['note-0'].hand),['LH','RH']);assert.equal(f.disk.calculatedVersion,1);assert.equal(f.editor.queue.recovery.length,0);
 });
 
-test('a generic projection failure preserves accepted state and later queued choices without writing an unrenderable snapshot',async()=>{
+test('a generic projection failure preserves accepted state and later queued choices while retaining durable intent for projection recovery',async()=>{
  const f=fixture();let broken=true;f.setProject(async s=>{if(broken)throw Error('projection unavailable');return {...f.target.package,choiceSnapshot:s};});
  await assert.rejects(f.context.commitPersonal(f.target,(s:any)=>({...s,calculatedVersion:1})),/projection unavailable/);await assert.rejects(f.editor.queue.flush(),/projection unavailable/);
- assert.equal((f.target.personal as any).calculatedVersion,1);assert.equal(f.editor.queue.recovery.length,1);assert.equal(f.written.length,0);
+ assert.equal((f.target.personal as any).calculatedVersion,1);assert.equal(f.editor.queue.recovery.length,1);assert.equal(f.written.length,1);assert.equal(f.navigationWrites.length,0);assert.equal(f.disk.calculatedVersion,1);
  broken=false;for(const {sequence,snapshot} of f.editor.queue.recovery)f.editor.projections.set(sequence,f.editor.session.project(snapshot));await f.editor.queue.retry();assert.equal(f.disk.calculatedVersion,1);
 });
 
@@ -129,5 +131,5 @@ test('restore failure after Escape retains pending choices and handles its rejec
  const f=dialogFixture();f.setWrite(async()=>{throw Error('restore storage unavailable');});await f.context.edit(f.seats[0]);
  const restoring=f.restore(),newDialog={id:'new-options-dialog'};f.context.closeDialog();f.context.dialog=newDialog;
  f.projection.resolve({...f.target.package,choiceSnapshot:f.target.personal});await restoring;
- assert.equal(f.context.dialog,newDialog);assert.equal(f.editor.queue.recovery.length,1);assert.match(f.editor.queue.error.message,/restore storage unavailable/);assert.ok(f.errors.length);
+ assert.equal(f.context.dialog,newDialog);await assert.rejects(f.editor.queue.flush(),/restore storage unavailable/);assert.equal(f.editor.queue.recovery.length,1);assert.match(f.editor.queue.error.message,/restore storage unavailable/);assert.ok(f.errors.length);
 });
