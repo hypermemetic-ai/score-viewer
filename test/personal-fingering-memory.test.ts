@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {importPersonalMemoryScore,captureMemoryFingerEdit,createPersonalFingeringMemory,projectPersonalMemoryScore,bootstrapPersonalFingeringMemory,resolvePersonalFingeringMemory,editPersonalFingeringMemory,promotePersonalFingeringReference,deletePersonalFingeringEntry,registerMemoryScore,consolidatePersonalFingeringMemory,readPersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
+import {preservePersonalMemoryHandChange,snapshotPersonalMemoryLocals,restorePersonalMemoryLocals,importPersonalMemoryScore,captureMemoryFingerEdit,createPersonalFingeringMemory,projectPersonalMemoryScore,bootstrapPersonalFingeringMemory,resolvePersonalFingeringMemory,editPersonalFingeringMemory,promotePersonalFingeringReference,deletePersonalFingeringEntry,registerMemoryScore,consolidatePersonalFingeringMemory,readPersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
 import type {ScorePackage} from '../src/package';import {initialPersonal} from '../src/state';
+import {assigned} from '../src/personal-assignments';
 import {measureMemoryKey} from '@hypermemetic-ai/fingering-editor-assistance';
 
 function fixture(entryId='piece',accompaniments=[48,48,50,50]):MemoryScoreInput {
@@ -98,4 +99,48 @@ test('invalid legacy dates stay unknown and deterministic rather than claiming a
 test('captured source guard refuses a hand partition change and forged receipt cannot bypass migration',()=>{
  const input=choose(fixture(),'b0n1',2),doc=bootstrapPersonalFingeringMemory([input]),captured=captureMemoryFingerEdit(doc,input,{ownerId:'b0n1',finger:3,decisionId:'guarded',authoredAt:'2024-01-01'});input.personal.assignments!.choices.b0n1.hand='LH';assert.throws(()=>editPersonalFingeringMemory(doc,input,captured),/partition changed/);
  const corrupt=structuredClone(doc);corrupt.receipts.fake={id:'fake',completed:true} as any;assert.throws(()=>readPersonalFingeringMemory(corrupt),/receipt/);
+});
+test('hand repartition preserves inherited fingers throughout the affected bar without authoring new decisions',()=>{
+ const before=choose(choose(fixture(),'b0n1',2),'b0n2',4),doc=bootstrapPersonalFingeringMemory([before]);
+ const after={...before,personal:assigned(before.p,before.personal,before.p.seats.find(s=>s.ownerIds.includes('b2n1'))!,{hand:'LH'})};
+ const preserved=preservePersonalMemoryHandChange(doc,before,after,'b2n1'),old=resolvePersonalFingeringMemory(doc,before.entryId,before.p,before.personal),next=resolvePersonalFingeringMemory(preserved,after.entryId,after.p,after.personal);
+ assert.equal(finger(preserved,after,'b2n1'),2);assert.equal(finger(preserved,after,'b2n2'),4);assert.equal(next.byOwner.b2n1.hand,'LH');assert.equal(after.personal.assignments!.choices.b2n1.intent?.finger,undefined);
+ assert.equal(next.byOwner.b2n1.finger?.decision?.decisionId,old.byOwner.b2n1.finger?.decision?.decisionId);assert.equal(next.byOwner.b2n2.finger?.decision?.decisionId,old.byOwner.b2n2.finger?.decision?.decisionId);
+});
+test('local snapshot restore resumes current shared knowledge and restores prior local dispositions only',()=>{
+ const a=choose(choose(fixture('a',[48]),'b0n1',2),'b0n2',4),b=fixture('b',[48]);let doc=bootstrapPersonalFingeringMemory([a,b]);doc=edit(doc,b,'b0n1',3).document;const snapshot=snapshotPersonalMemoryLocals(doc,b);
+ doc=edit(doc,b,'b0n1',null).document;doc=edit(doc,b,'b0n2',null).document;doc=edit(doc,a,'b0n2',5).document;doc=restorePersonalMemoryLocals(doc,b,snapshot);
+ assert.equal(finger(doc,b,'b0n1'),3);assert.equal(finger(doc,b,'b0n2'),5);assert.equal(finger(doc,a,'b0n1'),2);
+ const after={...b,personal:assigned(b.p,b.personal,b.p.seats[1],{hand:'LH'})};assert.throws(()=>restorePersonalMemoryLocals(doc,after,snapshot),/partition differs/);
+});
+test('calculated restoration masks display without erasing personal knowledge or changing new-edit classification',()=>{
+ const input=choose(fixture(),'b0n1',2);input.p.fingerLayer={attacks:[{id:'a',finger:1,owners:[{id:'b1n1'}]}],sourceOwnerToAttack:{b1n1:'a'}} as any;let doc=bootstrapPersonalFingeringMemory([input]);(input.personal as any).calculatedOwners={b1n1:true};
+ const resolved=resolvePersonalFingeringMemory(doc,'piece',input.p,input.personal);assert.equal(finger(doc,input,'b1n1'),1);assert.equal(resolved.byOwner.b1n1.calculated,true);assert.equal(resolved.byOwner.b1n1.personal,false);assert.equal(resolved.byOwner.b1n1.finger?.value,2);
+ const captured=captureMemoryFingerEdit(doc,input,{ownerId:'b1n1',finger:4,decisionId:'after-restore',authoredAt:'2025-01-01'});assert.equal(captured.captured?.operation,'local');delete (input.personal as any).calculatedOwners;doc=editPersonalFingeringMemory(doc,input,captured).document;assert.equal(finger(doc,input,'b1n1'),4);assert.equal(finger(doc,input,'b0n1'),2);
+});
+test('same-entry distinct profile histories retain independent choices and deterministic references',()=>{
+ const a=choose(fixture('same',[48]),'b0n1',2),b=choose(fixture('same',[48]),'b0n1',3,'2021-01-01');b.p.profileSha256='second-profile';
+ const doc=bootstrapPersonalFingeringMemory([a,b]);assert.deepEqual(doc,bootstrapPersonalFingeringMemory([b,a]));assert.equal(Object.keys(doc.occurrences).length,6);assert.equal(finger(doc,a,'b0n1'),2);assert.equal(finger(doc,b,'b0n1'),3);
+ const updated=registerMemoryScore(doc,a);assert.equal(finger(updated,b,'b0n1'),3);assert.equal(Object.keys(updated.occurrences).length,6);
+});
+test('source updates follow shared lineage across consolidated whole projections while later independent exceptions survive',async()=>{
+ const input=choose(choose(fixture(),'b0n1',2),'b2n1',3,'2021-01-01'),initial=bootstrapPersonalFingeringMemory([input]),consolidated=await consolidatePersonalFingeringMemory(initial,[input],['piece'],'link');
+ const clean={...input,personal:consolidated.personalByEntry.piece};let doc=edit(consolidated.document,clean,'b0n1',5).document;for(let b=0;b<4;b++)assert.equal(finger(doc,clean,`b${b}n1`),5);
+ doc=edit(doc,clean,'b3n1',3).document;doc=promotePersonalFingeringReference(doc,clean,'b3n1');doc=edit(doc,clean,'b0n1',4).document;assert.equal(finger(doc,clean,'b0n1'),4);assert.equal(finger(doc,clean,'b2n1'),3);assert.equal(finger(doc,clean,'b3n1'),3);const future=fixture('other-context',[52]);assert.equal(finger(doc,future,'b0n1'),3);
+});
+test('retired projection mapping retains linked shared updates for a future rematch',async()=>{
+ const a=choose(fixture('a',[48]),'b0n1',2),b=choose(fixture('b',[50]),'b0n1',3,'2021-01-01'),consolidated=await consolidatePersonalFingeringMemory(bootstrapPersonalFingeringMemory([a,b]),[a,b],['a','b'],'retired');
+ const clean={...a,personal:consolidated.personalByEntry.a};let doc=deletePersonalFingeringEntry(consolidated.document,'b');doc=edit(doc,clean,'b0n1',5).document;const future=fixture('future',[50]);doc=registerMemoryScore(doc,future);assert.equal(finger(doc,future,'b0n1'),5);
+});
+test('historical physical aliases with duplicate legacy decision IDs elect one coherent lineage',()=>{
+ const input=fixture('a',[48]),n=structuredClone(input.p.score.notes[1]);n.id='alias';input.p.score.notes.push(n);input.p.seats[1].ownerIds.push(n.id);choose(input,'b0n1',2);choose(input,'alias',2,'2021-01-01');
+ const doc=bootstrapPersonalFingeringMemory([input]),resolved=resolvePersonalFingeringMemory(doc,'a',input.p,input.personal);assert.equal(finger(doc,input,'alias'),2);assert.equal(resolved.byOwner.b0n1.finger?.decision?.decisionId,resolved.byOwner.alias.finger?.decision?.decisionId);
+});
+test('known field dates precede undated records even when another field and import age are earlier',()=>{
+ const unknown=choose(fixture('unknown',[48]),'b0n2',3,'2000-01-01'),known=choose(fixture('known',[48]),'b0n1',2,'2020-01-01');unknown.importedAt='1999-01-01';unknown.personal.overrides.old={ownerIds:['b0n1'],replacement:4,createdAt:'invalid'} as any;
+ const doc=bootstrapPersonalFingeringMemory([unknown,known]),copy=fixture('copy',[48]);assert.equal(finger(doc,copy,'b0n1'),2);assert.equal(finger(doc,unknown,'b0n1'),4);assert.equal(resolvePersonalFingeringMemory(doc,'copy',copy.p,copy.personal).byOwner.b0n1.finger?.decision?.authoredAt,Date.parse('2020-01-01'));
+});
+test('consolidation retains authored source ahead of earlier-import empty copies',async()=>{
+ const input=choose(fixture(),'b2n1',2,'2021-01-01');input.importedAt='2000-01-01';const result=await consolidatePersonalFingeringMemory(bootstrapPersonalFingeringMemory([input]),[input],['piece'],'reference'),clean={...input,personal:result.personalByEntry.piece};
+ const source=resolvePersonalFingeringMemory(result.document,'piece',clean.p,clean.personal).byOwner.b3n1.reference;assert.equal(source?.writtenBar,3);
 });
