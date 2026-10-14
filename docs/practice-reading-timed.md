@@ -48,6 +48,13 @@ remain their existing choices. Working speed moves in half-percent steps. Done
 appears only in disconnected Timed practice and keeps its existing reversible,
 exact-loop eligibility and independent manual/observed evidence.
 
+Practice stays on the selected exercise until you choose another or leave.
+Successful Timed loops repeat with the usual speed increase, including when
+replaying a previously completed section. Reaching target speed keeps the same
+exercise active; newly available connections wait in the selector. Contrasts
+cycle A, B, then A again. If a repeat cannot start on time, Resume starts a fresh
+count-in for the same selection.
+
 Reading, Timed, Start/Resume, applicable Done and Speed form one compact centered
 primary footer group. Speed sits beside the transport rather than at the far right. Mode selection
 stops the current transport; Space explicitly starts or resumes the selected

@@ -63,8 +63,8 @@ test('a changed desired rate projects only captured actual achievement and queue
  f.play('terminal-a',400);f.play('terminal-b',400);f.session.update(f.clock.now());f.view.completeTimedTrial(f.session);assert.equal(f.session.bpm,120);assert.equal(f.session.pulseGrid.countInBars,2);assert.equal(f.state.working,150);assert.equal(f.view.queuedWorking,150);assert.equal(f.state.best[f.session.chunk.pattern],90);
 });
 
-test('terminal prediction cannot arm a different source passage when the projected goal is complete',async t=>{
- const f=await fixture(t);f.play('opening');f.play('penultimate');f.view.loopRate=f.state.target;f.view.queuedWorking=90;assert.equal(f.view.predictedRepeatRate(f.session),undefined);f.view.prepareRepeat();assert.equal(f.arms.length,0);assert.deepEqual(f.state.best,{});
+test('terminal prediction at the goal prepares the same passage at its queued rate',async t=>{
+ const f=await fixture(t);f.play('opening');f.play('penultimate');f.view.loopRate=f.state.target;f.view.queuedWorking=90;assert.equal(f.view.predictedRepeatRate(f.session),90);f.view.prepareRepeat();await f.view.repeatPreparation.settled;assert.equal(f.arms.length,1);assert.equal(f.view.repeatPreparation.session,f.session);assert.equal(f.view.repeatPreparation.rate,90);assert.deepEqual(f.state.best,{});
 });
 
 test('the scheduled score-entry guard stops unresolved grading before any late achievement',async t=>{
