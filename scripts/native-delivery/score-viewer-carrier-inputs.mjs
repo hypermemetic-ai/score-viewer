@@ -133,15 +133,15 @@ export async function validatePianoNativeChecks(receipt, prepared, files) {
     validateFooterRuntimeReceipt(JSON.parse(Buffer.from(proof).toString('utf8')),inputs,sourceIdentity(inputs,await readFile(join(prepared,'source-inputs.json'))));
   }
 }
-export async function validateCarrierInputs(source, {expectedViewerRevision, expectedNotationRevision} = {}) {
-  const bytes = await readFile(join(source, 'delivery-input', 'inputs.json')), inputs = JSON.parse(bytes);
+export async function validateCarrierInputs(source, {expectedViewerRevision, expectedNotationRevision, inputDirectory = join(source, 'delivery-input')} = {}) {
+  const bytes = await readFile(join(inputDirectory, 'inputs.json')), inputs = JSON.parse(bytes);
   if (inputs.schema !== 1 || inputs.viewer?.repository !== 'hypermemetic-ai/score-viewer' || !revision(inputs.viewer.revision) || !revision(inputs.viewer.tree) || !Number.isFinite(Date.parse(inputs.viewer.timestamp)) || inputs.notation?.repository !== 'hypermemetic-ai/iso-notation' || !revision(inputs.notation.revision)) fail('Invalid reviewed carrier inputs');
   if (expectedViewerRevision && inputs.viewer.revision !== expectedViewerRevision) fail('Viewer revision differs');
   if (expectedNotationRevision && inputs.notation.revision !== expectedNotationRevision) fail('Notation revision differs');
   validatePins(inputs.nativeFiles);
   validatePins(inputs.frontend?.files);
   if (inputs.frontend.digest !== sha256(canonical(inputs.frontend.files))) fail('Frozen frontend digest differs');
-  if (canonical(await inventory(join(source, 'delivery-input', 'frontend'))) !== canonical(inputs.frontend.files)) fail('Frozen frontend inventory differs');
+  if (canonical(await inventory(join(inputDirectory, 'frontend'))) !== canonical(inputs.frontend.files)) fail('Frozen frontend inventory differs');
   const native = await inventory(join(source, 'src-tauri'));
   const expectedNative = Object.fromEntries(Object.entries(inputs.nativeFiles).filter(([path]) => path.startsWith('src-tauri/')).map(([path, pin]) => [path.slice(10), pin]));
   if (canonical(native) !== canonical(expectedNative)) fail('Native source inventory differs');
@@ -155,7 +155,7 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
       if (stat.isSymbolicLink() || (i === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) fail(`Locked local dependency must be a regular source file: ${path}`);
     }
     return readFile(join(source, path));
-  }, inputs.frontend.files, path => readFile(join(source, 'delivery-input', 'frontend', path)));
+  }, inputs.frontend.files, path => readFile(join(inputDirectory, 'frontend', path)));
   for (const [path, pin] of Object.entries(inputs.nativeFiles)) {
     if (!/^(?:src-tauri\/|licenses\/|\.cargo\/config\.toml$|package(?:-lock)?\.json$)/.test(path) && !localFiles.has(path)) fail(`Unexpected native source path: ${path}`);
     const file = await readFile(join(source, path));
@@ -175,7 +175,7 @@ export async function validateCarrierInputs(source, {expectedViewerRevision, exp
     if(p?.path!=='scripts/native-delivery/score-viewer-converter-release.mjs'||!hash(p.sha256)||!Number.isSafeInteger(p.size)||p.size<1)fail('Source-bound converter notice helper missing');
     const b=await readFile(join(source,p.path));if(b.length!==p.size||sha256(b)!==p.sha256)fail('Converter notice helper differs');
   }
-  const checksBytes = await readFile(join(source, 'delivery-input', 'checks.json'));
+  const checksBytes = await readFile(join(inputDirectory, 'checks.json'));
   if (!hash(inputs.checks?.sha256) || sha256(checksBytes) !== inputs.checks.sha256 || checksBytes.length !== inputs.checks.size) fail('Reviewed check receipt differs');
   const checks = JSON.parse(checksBytes);
   validateRecordedChecks(checks, inputs);

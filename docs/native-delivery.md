@@ -17,6 +17,18 @@ node scripts/native-delivery/release-score-viewer.mjs \
 
 Publication still requires the complete verified Windows/Mac pair and preserves immutable releases and the atomic current pointer. Migrating an existing ISO-carrier publication additionally requires `--migrate-from-iso-carrier <exact-current-carrier-SHA>`. This verifies the old pair behind the current pointer and its exact download hashes, then requires the new application revision to descend from its recorded viewer revision. It does not compare unrelated Git histories or silently bypass ordering. Subsequent viewer deliveries use ordinary delivery-commit ancestry again. Installation and preservation of the user's current display/session/data remain a separate activation step.
 
+## Freezing a new application revision
+
+After committing and reviewing an application change, build that exact clean source and prepare a new source-check receipt with its viewer revision, notation revision, frontend digest and the actual test/build/browser/review evidence. A receipt may explain a retained baseline plus targeted regressions; do not relabel old evidence as newly executed checks.
+
+```sh
+node scripts/native-delivery/freeze-inputs.mjs \
+  <clean-app-checkout> <reviewed-app-SHA> \
+  <new-built-frontend> <new-source-checks.json> <new-sealed-output>
+```
+
+The output directory must be new and separate from the source and frontend. The command reads the application commit directly, derives its native files and locked tarballs, validates the frozen converter closure, and binds the exact footer policy, metrics, fixture and viewer-owned helper bytes. It verifies the complete staged seal against the original checkout and leaves that checkout unchanged. Replace `delivery-input/` with the resulting directory in a later reviewed delivery commit. That delivery commit identifies the workflow checkout; the seal continues to identify the application commit it actually builds.
+
 ## Historical ISO carrier procedure
 
 

@@ -1,25 +1,46 @@
 {
   "schema": 1,
-  "viewerRevision": "e105b5eac0887bb544d79723cdfea1c3f625fe92",
+  "viewerRevision": "974ebc5dd3f5d9d5788a4129a3343d21e310af62",
   "notationRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
-  "frontendDigest": "0194e9bdc52f976372ff17ff0c7d691ae2e8ed36d446dfa2692ff8ff7eea1257",
+  "frontendDigest": "3f62b1cb5cee0a1ddf6d3376e3b19d85acda3e2c5f1e46e53cc546b8295a2a14",
   "checks": {
     "tests": {
       "status": "passed",
-      "configuredCount": 1129,
-      "additionalSourceReturnTests": 5,
-      "testedImplementation": "d040ce0",
-      "finalSourceDifferences": "Only documentation, task receipts and five separately passing tests; all emitted application/native/package inputs identical. Native follow-up changes only cfg(test) helper naming and the local dual-context test runner, verified by reproduced failure and ten passing tests.",
-      "logs": [
-        "/tmp/viewer-final-suite-3.log"
-      ],
-      "nativeStorageTests": 10
+      "baseline": {
+        "configuredCount": 1129,
+        "sourceRevision": "e105b5eac0887bb544d79723cdfea1c3f625fe92"
+      },
+      "changedScope": "Only matching JS/Rust logical assistance name bounds changed from230 to4096. No key/data/physical-file migration.",
+      "focusedJavaScript": 33,
+      "nativeStorageStandalone": 6,
+      "nativeStorageNested": 6,
+      "independentIndexedDB": 9,
+      "independentSessionStartup": 19,
+      "independentNativeHelper": 8,
+      "actualClosedLibrary": {
+        "libraryEntries": 3,
+        "presentations": 4,
+        "originalFiles": 118,
+        "logicalKeyLengths": [
+          285,
+          289,
+          224,
+          220
+        ],
+        "consolidation": "passed",
+        "reopen": "passed",
+        "idempotence": "passed",
+        "allOriginalBytesUnchanged": true,
+        "privateReportSha256": "9e397e186d90b761cdf256d02e6cd897ffac9a88282570f9fc05db77ba9d78c1"
+      }
     },
     "build": {
       "status": "passed",
-      "log": "/tmp/viewer-final-build-3.log",
-      "builtImplementation": "d040ce0",
-      "finalSourceInputsIdentical": "Frontend and application runtime inputs identical; Rust cfg(test) helper path repaired and validated in both module contexts."
+      "builtCommit": "555755526feb0e456c4a1b3b74e8a81a1225245b",
+      "builtTree": "ebea1b5994249c3b964a7d1d5a80fc24941f6829",
+      "reviewedMergeTreeIdentical": true,
+      "configured": "TypeScript + source pin validation + Vite",
+      "frontendDigest": "3f62b1cb5cee0a1ddf6d3376e3b19d85acda3e2c5f1e46e53cc546b8295a2a14"
     },
     "browserInspection": {
       "status": "passed",
@@ -34,23 +55,16 @@
         "medianMs": 164,
         "p95Ms": 235
       },
-      "limits": "Controlled preview and private local snapshot; cross-score and deletion succession automated; no live Windows installation or physical MIDI/audio acceptance."
+      "limits": "Controlled preview and private local snapshot; cross-score and deletion succession automated; no live Windows installation or physical MIDI/audio acceptance.",
+      "scope": "Retained production UI inspection from e105b; no rendering/navigation changes. New browser storage bound tested through actual IndexedDB backend. Actual whole-library production startup/consolidation separately exercised on complete closed Windows snapshot in isolated Node host; not claimed as new native or DOM inspection."
     },
     "independentReview": {
       "status": "passed",
-      "reviewers": [
-        "review_application",
-        "review_memory"
-      ],
-      "performanceStorageRecheck": true,
-      "sourceReturnTestsReviewedByParent": true,
-      "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/98",
-      "nativeTestRepair": {
-        "status": "passed",
-        "commit": "7f83208b7da99a330262c9f88da5f2629ed8e400",
-        "checks": 10,
-        "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/99"
-      }
+      "reviewer": "review_application",
+      "fixCommit": "555755526feb0e456c4a1b3b74e8a81a1225245b",
+      "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/102",
+      "resealUtility": "a9ceb083c440017f2af395b5d2c2cab626e3a0a5",
+      "resealTests": 9
     }
   }
 }

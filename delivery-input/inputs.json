@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "e105b5eac0887bb544d79723cdfea1c3f625fe92",
-    "tree": "ade9d6e9ecace0d8c3bfebae7afa3f1dd52839fc",
-    "timestamp": "2026-10-14T04:10:59.000Z"
+    "revision": "974ebc5dd3f5d9d5788a4129a3343d21e310af62",
+    "tree": "ebea1b5994249c3b964a7d1d5a80fc24941f6829",
+    "timestamp": "2026-10-14T05:52:20.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
@@ -205,8 +205,8 @@
       "size": 1059
     },
     "src-tauri/src/assistance_store.rs": {
-      "sha256": "d4ebb6c6234f392c13626d258dd7b2d878f7e2e84c503d9d15c056f4a2a159f3",
-      "size": 10027
+      "sha256": "7cd7f0ff7aa75ef4326bdf58fc20d5d21c8b064a0be5a7776e379d507eb7032f",
+      "size": 11527
     },
     "src-tauri/src/audio_buffer_lease.rs": {
       "sha256": "e702a199a23055cceb77d46c4a2d455c0b2e14a88fd37d4f1023e1345c701a01",
@@ -7623,9 +7623,9 @@
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-BRgm4aKE.js": {
-        "sha256": "6aa00d4449eb5919c98412f7f0fb32d4f453593121cbcfce311ab2f0f9550c14",
-        "size": 599728
+      "assets/index-BxnugaOR.js": {
+        "sha256": "d4af7da15cdfca19562a181245750330d245de92e77ae73ec2acd25980367bdb",
+        "size": 599729
       },
       "assets/index-CBPmQiGv.css": {
         "sha256": "7f611354dfbc49462ddd04ab9308d45efa225073a375fcd82d6cbee5a91983e0",
@@ -7684,15 +7684,19 @@
         "size": 327
       },
       "index.html": {
-        "sha256": "1d7eb71b0910a7e3b2fa87a748a1c84c114ae02a30c0c821de6c6c7f0ecc7640",
+        "sha256": "12b3fc9b3c8f03636f70bdcd70247a043fb575e5645de8014a8e55ff56692bd6",
         "size": 728
+      },
+      "review/schumann-no14-conventional-20261006.isoscore": {
+        "sha256": "2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d",
+        "size": 423909
       }
     },
-    "digest": "0194e9bdc52f976372ff17ff0c7d691ae2e8ed36d446dfa2692ff8ff7eea1257"
+    "digest": "3f62b1cb5cee0a1ddf6d3376e3b19d85acda3e2c5f1e46e53cc546b8295a2a14"
   },
   "checks": {
-    "sha256": "39fb50128de01aa0a5d69b0afe46d0483972f794efd6de20d560dceba45014d4",
-    "size": 2137
+    "sha256": "fd6142cbd8dde196da221f0ac4dc2c83179f157aa73947a427cc0bceb8d448a0",
+    "size": 2780
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v1",
@@ -7724,10 +7728,5 @@
     "path": "scripts/native-delivery/score-viewer-converter-release.mjs",
     "sha256": "9140acf7ee434da2588fb1a1fc34904373598153637d490f91ca61b43ea23316",
     "size": 2741
-  },
-  "deliveryLayout": {
-    "version": 1,
-    "repository": "hypermemetic-ai/score-viewer",
-    "previousInputsSha256": "ce95ed9aa9d8fe471f3405ac0315fa64892e3da9838e98089179606873c73f2b"
   }
 }
