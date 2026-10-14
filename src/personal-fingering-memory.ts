@@ -1,6 +1,6 @@
 import {
  createMeasureFingeringMemory,validateMeasureFingeringMemory,measureMemoryKey,projectMeasureMemoryHand,
- resolveMeasureMemory,applyMeasureMemoryEdits,importMeasureMemoryHistory,promoteMeasureMemoryReference,transferMeasureMemoryReference,
+ resolveMeasureMemory,resolveMeasureMemoryBatch,applyMeasureMemoryEdits,importMeasureMemoryHistory,promoteMeasureMemoryReference,transferMeasureMemoryReference,
  type MeasureFingeringMemory,type MeasureMemoryOccurrence,type MeasureOwnerEdit,type MeasureHistoricalRecord,
  type MeasureMemoryDiagnostic,type ResolvedMeasureField,type MeasureFieldDecision,
 } from '@hypermemetic-ai/fingering-editor-assistance';
@@ -35,7 +35,7 @@ export interface ConsolidationReceipt {
  chosen:Array<{entryId:string;ownerId:string;finger:number;decision:MeasureFieldDecision}>;
  replaced:Array<{entryId:string;ownerId:string;before:number;after:number;previous:unknown;decision:MeasureFieldDecision}>;
 }
-const identity=(o:MeasureMemoryOccurrence)=>JSON.stringify([o.keyboardId,o.occurrenceId,o.scope??'whole']);
+const identity=(o:Pick<MeasureMemoryOccurrence,'keyboardId'|'occurrenceId'|'scope'>)=>JSON.stringify([o.keyboardId,o.occurrenceId,o.scope??'whole']);
 const source=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
 const presentationId=(i:MemoryScoreInput)=>JSON.stringify([i.entryId,i.p.keyboardLayout??i.p.manifest.keyboardLayout??'janko-four-row',i.p.profileSha256??i.p.manifest.profileSha256??i.p.profileId??i.p.manifest.profileId??`legacy:${source(i.p)}`,i.p.effectiveHandSha256??i.p.manifest.effectiveHandSha256??null,i.p.preparationIdentity?i.p.manifest.revision:null]);
 const inputKey=(i:MemoryScoreInput)=>JSON.stringify([presentationId(i),source(i.p),i.p.preparationIdentity?i.p.manifest.revision:null]);
@@ -73,15 +73,19 @@ export function projectPersonalMemoryScore(input:MemoryScoreInput):PersonalMemor
 }
 
 export function registerMemoryScore(document:PersonalFingeringMemory,input:MemoryScoreInput):PersonalFingeringMemory {
- const next=structuredClone(document),records=projectPersonalMemoryScore(input),currentKeys=new Set(records.map(r=>identity(r.occurrence)));
+ return registerMemoryScoreRecords(document,input,projectPersonalMemoryScore(input));
+}
+function registerMemoryScoreRecords(document:PersonalFingeringMemory,input:MemoryScoreInput,records:PersonalMemoryOccurrence[]):PersonalFingeringMemory {
+ const next=structuredClone(document),currentKeys=new Set(records.map(r=>identity(r.occurrence)));
  for(const [id,r]of Object.entries(next.occurrences))if(r.presentationId===presentationId(input)&&!currentKeys.has(id)){(next.retiredOccurrences??={})[id]=r;delete next.occurrences[id];}
  for(const r of records){const old=document.occurrences[identity(r.occurrence)];if(old){r.registeredAt=Math.min(r.registeredAt,old.registeredAt);if(old.authoredAt!==undefined)r.authoredAt=Math.min(r.authoredAt??unknownAge,old.authoredAt);r.ageKnown=r.ageKnown||old.ageKnown;}
   next.occurrences[identity(r.occurrence)]=r;if(next.retiredOccurrences)delete next.retiredOccurrences[identity(r.occurrence)];next.keyboards[r.occurrence.keyboardId]??=createMeasureFingeringMemory({playerId:next.playerId,keyboardId:r.occurrence.keyboardId});}
  repairReferences(next);if(JSON.stringify(next)!==JSON.stringify(document))next.revision++;return next;
 }
 function repairReferences(document:PersonalFingeringMemory):PersonalFingeringMemory {
+ const patterns=new Map<string,PersonalMemoryOccurrence[]>();for(const r of Object.values(document.occurrences)){const key=JSON.stringify([r.occurrence.keyboardId,measureMemoryKey(r.occurrence)]);patterns.set(key,[...(patterns.get(key)??[]),r]);}
  for(const [keyboard,memory]of Object.entries(document.keyboards)){
-  let m=memory;for(const d of memory.defaults){const active=Object.values(document.occurrences).filter(r=>r.occurrence.keyboardId===keyboard&&measureMemoryKey(r.occurrence)===d.measureKey);
+  let m=memory;for(const d of memory.defaults){const active=patterns.get(JSON.stringify([keyboard,d.measureKey]))??[];
    const present=active.some(r=>r.occurrence.occurrenceId===d.origin.occurrenceId&&r.occurrence.scope===d.origin.scope&&r.occurrence.sourceRevision===d.origin.sourceRevision);
    if(!present&&(active.length>0||d.referenceAvailable!==false)||d.referenceAvailable===false&&active.length>0)m=transferMeasureMemoryReference(m,d.measureKey,active,m.revision);
   }document.keyboards[keyboard]=m;
@@ -136,16 +140,35 @@ export function importPersonalMemoryScore(document:PersonalFingeringMemory,input
 }
 
 export function resolvePersonalFingeringMemory(document:PersonalFingeringMemory,entryId:string,p:ScorePackage,personal:PersonalState):MemoryResolution {
- const input={entryId,p,personal},records=projectPersonalMemoryScore(input),assignments=effectiveAssignments(p,personal),byOwner:Record<string,MemoryOwnerResolution>={},diagnostics:MeasureMemoryDiagnostic[]=[];
+ return resolveMemoryRecords(document,{entryId,p,personal},projectPersonalMemoryScore({entryId,p,personal}));
+}
+/** Edit classification needs only the selected written bar. Resolve its complete
+ * scopes with the same precedence and diagnostics used by the full display. */
+function resolveMemoryRecords(document:PersonalFingeringMemory,input:MemoryScoreInput,records:PersonalMemoryOccurrence[]):MemoryResolution {
+ const {p,personal}=input,owners=new Set(records.flatMap(r=>r.ownerIds)),assignments=effectiveAssignments(p,personal).filter(a=>owners.has(a.id)),byOwner:Record<string,MemoryOwnerResolution>={},diagnostics:MeasureMemoryDiagnostic[]=[];
  if(!document.indexed)fail('complete initial library index required');
+ const resolvedScopes=new Map<string,ReturnType<typeof resolveMeasureMemory>>(),sharedScopes=new Map<string,ReturnType<typeof resolveMeasureMemory>>();
+ for(const keyboard of new Set(records.map(r=>r.occurrence.keyboardId))){const m=document.keyboards[keyboard];if(!m)continue;
+  const selected=records.filter(r=>r.occurrence.keyboardId===keyboard),localScopes=new Set(m.locals.filter(l=>l.annotations.some(a=>Object.hasOwn(a.fields,'finger'))).map(l=>identity({...l,keyboardId:keyboard}))),probes=selected.filter(r=>localScopes.has(identity(r.occurrence)));
+  const results=resolveMeasureMemoryBatch(m,[...selected.map(r=>({occurrence:r.occurrence})),...probes.map(r=>({occurrence:{...r.occurrence,occurrenceId:JSON.stringify(['shared-reference-probe',r.occurrence.occurrenceId])}}))]);
+  selected.forEach((r,i)=>resolvedScopes.set(identity(r.occurrence),results[i]));
+  probes.forEach((r,i)=>sharedScopes.set(identity(r.occurrence),results[selected.length+i]));
+ }
+ const byBar=new Map<number,PersonalMemoryOccurrence[]>();for(const r of records)byBar.set(r.writtenBar,[...(byBar.get(r.writtenBar)??[]),r]);
+ const references=new Map(Object.values(document.occurrences).map(r=>[JSON.stringify([identity(r.occurrence),r.occurrence.sourceRevision]),r]));
  for(const a of assignments)byOwner[a.id]={hand:a.hand,personal:false};
  for(const whole of records.filter(r=>!r.occurrence.scope)){
   const m=document.keyboards[whole.occurrence.keyboardId];if(!m)continue;
-  const resolve=(r:PersonalMemoryOccurrence)=>{const result=resolveMeasureMemory(m,r.occurrence);diagnostics.push(...result.diagnostics);return new Map(result.annotations.map(a=>[a.ownerId,a]));};
-  const full=resolve(whole),hands=records.filter(r=>r.writtenBar===whole.writtenBar&&r.occurrence.scope).map(resolve);
+  const resolve=(r:PersonalMemoryOccurrence)=>{const result=resolvedScopes.get(identity(r.occurrence))!;diagnostics.push(...result.diagnostics);return new Map(result.annotations.map(a=>[a.ownerId,a]));};
+  const handRecords=byBar.get(whole.writtenBar)!.filter(r=>r.occurrence.scope),full=resolve(whole),hands=handRecords.map(resolve);
+  const shared=(r:PersonalMemoryOccurrence,id:string)=>{
+   const actual=resolvedScopes.get(identity(r.occurrence))!;if(actual.diagnostics.some(d=>d.code==='stale-occurrence'))return;
+   const value=(sharedScopes.get(identity(r.occurrence))??actual).annotations.find(a=>a.ownerId===id)?.finger;return value?.provenance==='local'?undefined:value;
+  };
   for(const id of whole.ownerIds){const f=full.get(id)?.finger,h=hands.map(x=>x.get(id)?.finger).find(Boolean);
    const finger=f?.provenance==='local'?f:h?.provenance==='local'?h:f??h;if(!finger)continue;
-   const reference=finger.origin?Object.values(document.occurrences).find(r=>r.occurrence.keyboardId===whole.occurrence.keyboardId&&r.occurrence.occurrenceId===finger.origin!.occurrenceId&&r.occurrence.scope===finger.origin!.scope&&r.occurrence.sourceRevision===finger.origin!.sourceRevision):undefined;
+   const sharedField=finger.provenance==='local'?(shared(whole,id)??handRecords.map(r=>shared(r,id)).find(Boolean)):finger;
+   const reference=sharedField?.origin?references.get(JSON.stringify([identity({...sharedField.origin,keyboardId:whole.occurrence.keyboardId}),sharedField.origin.sourceRevision])):undefined;
    byOwner[id]={...byOwner[id],finger,personal:true,...(reference?{reference}:{})};
   }
  }
@@ -153,7 +176,7 @@ export function resolvePersonalFingeringMemory(document:PersonalFingeringMemory,
   const saved=personal.assignments?.choices[a.id],legacy=Object.values(personal.overrides).find(c=>c.ownerIds.includes(a.id));
   // Preserve uncertain old choices in place. They are not donor evidence, and
   // only the explicitly authorized consolidation removes this local protection.
-  if(saved?.finger!==undefined&&!saved.intent?.finger&&legacy?.replacement!==saved.finger&&byOwner[a.id].finger?.provenance!=='local')byOwner[a.id]={hand:a.hand,personal:true,finger:{value:saved.finger as 1|2|3|4|5,provenance:'local'}};
+  if(saved?.finger!==undefined&&!saved.intent?.finger&&legacy?.replacement!==saved.finger&&byOwner[a.id].finger?.provenance!=='local')byOwner[a.id]={...byOwner[a.id],personal:true,finger:{value:saved.finger as 1|2|3|4|5,provenance:'local'}};
   const f=byOwner[a.id].finger;if(f){if(f.value===null)delete a.finger;else a.finger=f.value;}
   if((personal as PersonalState&{calculatedOwners?:Record<string,true>}).calculatedOwners?.[a.id]){const layer=personal.layer??p.fingerLayer,calculated=layer?.attacks.find(n=>n.id===layer.sourceOwnerToAttack[a.id])?.finger;byOwner[a.id]={...byOwner[a.id],personal:false,calculated:true};if(calculated===undefined)delete a.finger;else a.finger=calculated;}
  }
@@ -164,15 +187,16 @@ export interface MemoryFingerEdit {ownerId:string;finger:1|2|3|4|5|null|'inherit
  captured?:{sourceRevision:string;presentationId:string;scopeKeys:string[];operation:'add'|'shared'|'local'|'reset';reference?:string};
 }
 export function captureMemoryFingerEdit(document:PersonalFingeringMemory,input:MemoryScoreInput,edit:MemoryFingerEdit):MemoryFingerEdit {
- const resolved=resolvePersonalFingeringMemory(document,input.entryId,input.p,input.personal).byOwner[edit.ownerId];if(!resolved)fail('unknown edit owner');
- const records=projectPersonalMemoryScore(input).filter(r=>r.ownerIds.includes(edit.ownerId)),whole=records.find(r=>!r.occurrence.scope)!;
+ const all=projectPersonalMemoryScore(input),whole=all.find(r=>!r.occurrence.scope&&r.ownerIds.includes(edit.ownerId));if(!whole)fail('unknown edit owner');
+ const resolved=resolveMemoryRecords(document,input,all.filter(r=>r.writtenBar===whole.writtenBar)).byOwner[edit.ownerId],records=all.filter(r=>r.ownerIds.includes(edit.ownerId));
  const reference=resolved.reference?.presentationId===whole.presentationId&&resolved.reference.writtenBar===whole.writtenBar;
  return{...edit,captured:{sourceRevision:source(input.p),presentationId:presentationId(input),scopeKeys:records.map(r=>measureMemoryKey(r.occurrence)).sort(),operation:edit.finger==='inherit'?'reset':!resolved.finger?'add':resolved.finger.provenance!=='local'&&reference?'shared':'local',...(resolved.finger?.origin?{reference:JSON.stringify(resolved.finger.origin)}:{})}};
 }
 export function editPersonalFingeringMemory(document:PersonalFingeringMemory,input:MemoryScoreInput,edit:MemoryFingerEdit):{document:PersonalFingeringMemory;operation:'none'|'add'|'shared'|'local'|'reset';diagnostics:MeasureMemoryDiagnostic[]} {
- let next=registerMemoryScore(document,input);const resolved=resolvePersonalFingeringMemory(next,input.entryId,input.p,input.personal).byOwner[edit.ownerId];if(!resolved)fail('unknown edit owner');
+ const all=projectPersonalMemoryScore(input),whole=all.find(r=>!r.occurrence.scope&&r.ownerIds.includes(edit.ownerId));if(!whole)fail('unknown edit owner');
+ let next=registerMemoryScoreRecords(document,input,all);const resolved=resolveMemoryRecords(next,input,all.filter(r=>r.writtenBar===whole.writtenBar)).byOwner[edit.ownerId];
  if(edit.finger!=='inherit'&&resolved.finger?.value===edit.finger)return{document,operation:'none',diagnostics:[]};
- const records=projectPersonalMemoryScore(input).filter(r=>r.ownerIds.includes(edit.ownerId)),whole=records.find(r=>!r.occurrence.scope)!;
+ const records=all.filter(r=>r.ownerIds.includes(edit.ownerId));
  const local=resolved.finger?.provenance==='local',reference=resolved.reference?.presentationId===whole.presentationId&&resolved.reference.writtenBar===whole.writtenBar;
  let operation:'add'|'shared'|'local'|'reset'=edit.finger==='inherit'?'reset':!resolved.finger?'add':!local&&reference?'shared':'local';
  if(edit.captured){

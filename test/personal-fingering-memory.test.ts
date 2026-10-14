@@ -180,3 +180,18 @@ test('new authorship immediately orders succession without changing custody or c
  doc=deletePersonalFingeringEntry(doc,source.entryId);assert.equal(resolvePersonalFingeringMemory(doc,future.entryId,future.p,future.personal).byOwner.b0n1.reference?.entryId,'first');
  assert.equal(finger(doc,first,'b0n1'),3);assert.equal(finger(doc,second,'b0n1'),undefined);assert.equal(finger(doc,future,'b0n1'),2);
 });
+test('batched score resolution retains stale-source diagnostics and validates unrelated stored fields',()=>{
+ const input=fixture(),memory=edit(bootstrapPersonalFingeringMemory([input]),input,'b0n1',2).document;
+ (input.p.score.notes[1] as any).pitch.pitchClass=1;
+ const resolved=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal);
+ assert.ok(resolved.diagnostics.some(d=>d.code==='stale-occurrence'&&d.ownerIds.includes('b0n1')));
+ assert.equal(resolved.byOwner.b0n1.finger,undefined);
+ const corrupt=structuredClone(memory);corrupt.keyboards['janko-four-row'].defaults[0].annotations[0].fields.finger=9 as any;
+ assert.throws(()=>resolvePersonalFingeringMemory(corrupt,input.entryId,input.p,input.personal));
+});
+test('local variations and suppression retain the underlying shared source while keeping their own donor',()=>{
+ const input=choose(fixture(),'b0n1',2);let memory=bootstrapPersonalFingeringMemory([input]);
+ memory=edit(memory,input,'b3n1',4).document;let selected=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal).byOwner.b3n1;
+ assert.equal(selected.finger?.provenance,'local');assert.equal(selected.finger?.decision?.decisionId,'edit:b3n1:4');assert.equal(selected.reference?.writtenBar,1);
+ memory=edit(memory,input,'b3n1',null).document;selected=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal).byOwner.b3n1;assert.equal(selected.finger?.value,null);assert.equal(selected.reference?.writtenBar,1);
+});
