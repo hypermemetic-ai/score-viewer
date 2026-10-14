@@ -69,3 +69,17 @@ test('indexed corruption, invalid JSON input, and unsupported legacy migration f
  const locks=new Locks();await browserAssistanceStore(old,locks).commit({expectedRevision:0,changes:{memory:{finger:3}}});const migration=indexedDBAssistanceStore(new IDBFactory(),old);t.after(()=>migration.close());await assert.rejects(migration.read(),/requires browser Web Locks/);
  const unavailable=indexedDBAssistanceStore(undefined,legacy());await assert.rejects(unavailable.read(),/does not support durable/);
 });
+
+test('prepared personal keys survive legacy migration, indexed reopening and history without identity changes',async t=>{
+ const key=(layout:string)=>`state-${'a'.repeat(64)}-${layout}-${'b'.repeat(64)}-${'c'.repeat(64)}-${'d'.repeat(64)}.json`;
+ const janko=key('janko-four-row'),conventional=key('conventional-piano');assert.equal(janko.length,285);assert.equal(conventional.length,289);
+ const old=legacy(),locks=new Locks(),previous=browserAssistanceStore(old,locks);
+ const first=await previous.commit({expectedRevision:0,changes:{[janko]:{finger:2},[conventional]:{finger:3}}});
+ const original=new Map(old.data),factory=new IDBFactory(),store=indexedDBAssistanceStore(factory,old,locks);t.after(()=>store.close());
+ assert.equal((await store.read()).id,first.snapshot.id);assert.deepEqual((await store.read()).documents[janko],{finger:2});
+ await store.commit({expectedRevision:1,changes:{[janko]:{finger:4},['e'.repeat(4096)]:{boundary:true}}});store.close();
+ const reopened=indexedDBAssistanceStore(factory,old,locks);t.after(()=>reopened.close());
+ assert.deepEqual((await reopened.read()).documents[janko],{finger:4});assert.deepEqual((await reopened.read()).documents[conventional],{finger:3});assert.deepEqual((await reopened.read(first.snapshot.id!)).documents[janko],{finger:2});assert.deepEqual(old.data,original);
+ for(const invalid of ['e'.repeat(4097),'bad\\name','bad:name',''])await assert.rejects(reopened.commit({expectedRevision:2,changes:{[invalid]:{bad:true}}}),/document name/);
+ assert.equal((await reopened.read()).revision,2);assert.ok([...old.data.keys()].filter(k=>k.includes('/objects/')).every(k=>/\/objects\/[a-f0-9]{64}$/.test(k)));
+});

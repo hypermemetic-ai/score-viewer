@@ -49,6 +49,15 @@ test('bootstrap rejects changing legacy input before activating any partial inde
  const store=storage(),s=new PersonalMemorySession(store,{scanLibrary:async()=>[fixture()],validateInputs:async()=>false});await assert.rejects(s.initialize(),/changed during indexing/);
  assert.equal((await store.read()).revision,0);
 });
+test('opening an ordinary score indexes prepared companion identities longer than a physical filename',async()=>{
+ const selected=fixture('selected'),prepared=fixture('a'.repeat(64));
+ Object.assign(prepared.p,{manifest:{...prepared.p.manifest,version:2,revision:'d'.repeat(64)},sourceRevision:'a'.repeat(64),profileId:'fixture-profile',profileSha256:'b'.repeat(64),effectiveHandSha256:'c'.repeat(64),preparationIdentity:{version:1}});
+ prepared.personal=initialPersonal(prepared.p);
+ const key=personalStorageName(prepared.entryId,prepared.p);assert.equal(key.length,285);
+ const store=storage(),s=session(store,[selected,prepared]);await s.initialize();await load(s,selected);
+ const saved=await store.read();assert.ok(saved.documents[key]);assert.deepEqual(saved.documents[key],prepared.personal);
+ const reopened=session(store,[selected,prepared]);await reopened.initialize();assert.deepEqual(await load(reopened,prepared),prepared.personal);assert.ok((await store.read()).documents[key]);
+});
 test('newly imported score registers custody and saved differences without reimporting stale authored source values on reload',async()=>{
  const input=choose(fixture('first'),'b0n1',2),store=storage(),s=session(store,[input]);await s.initialize();
  const added=choose(fixture('new'),'b0n1',3,'2021-01-01');await load(s,added);assert.equal(finger(s,added,'b0n1'),3);assert.ok(Object.values(s.memory.occurrences).some(r=>r.entryId==='new'));

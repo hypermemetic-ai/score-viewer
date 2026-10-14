@@ -18,7 +18,10 @@ const prefix='iso-viewer-assistance-v1/';
 const maxBytes=100_000_000;
 const empty=():AssistanceSnapshot=>({version:1,revision:0,id:null,previous:null,refs:{},documents:{}});
 const validId=(id:unknown):id is string=>typeof id==='string'&&/^[a-f0-9]{64}$/.test(id);
-function validName(name:string):boolean {return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,229}$/.test(name);}
+// Logical map keys include complete prepared-edition identities (285/289
+// characters today). Physical object names remain fixed SHA256 IDs. Keep this
+// bound in sync with assistance_store.rs; no existing identity is shortened.
+function validName(name:string):boolean {return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,4095}$/.test(name);}
 function serialized(value:unknown):string {
  const seen=new Set<object>();
  const visit=(v:unknown):void=>{
