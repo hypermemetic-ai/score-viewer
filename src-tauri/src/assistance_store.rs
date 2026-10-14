@@ -21,7 +21,9 @@ pub struct CommitResult {status:&'static str, snapshot:Snapshot}
 fn empty()->Snapshot {Snapshot{manifest:Manifest{version:1,revision:0,previous:None,refs:BTreeMap::new()},id:None,documents:BTreeMap::new()}}
 fn hash(bytes:&[u8])->String {format!("{:x}",Sha256::digest(bytes))}
 fn valid_id(id:&str)->bool {id.len()==64&&id.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b))}
-fn valid_name(name:&str)->bool { !name.is_empty()&&name.len()<=230&&name.as_bytes()[0].is_ascii_alphanumeric()&&name.bytes().all(|b|b.is_ascii_alphanumeric()||b"._/-".contains(&b)) }
+// Logical keys retain full prepared-edition identities; files still use only
+// SHA256 IDs. Match the 4096 ASCII-character bound in durable-assistance-store.ts.
+fn valid_name(name:&str)->bool { !name.is_empty()&&name.len()<=4096&&name.as_bytes()[0].is_ascii_alphanumeric()&&name.bytes().all(|b|b.is_ascii_alphanumeric()||b"._/-".contains(&b)) }
 fn bounded_read(path:&Path)->Result<Vec<u8>,String> {
  let mut bytes=Vec::new();File::open(path).map_err(|e|e.to_string())?.take(MAX_BYTES+1).read_to_end(&mut bytes).map_err(|e|e.to_string())?;
  if bytes.len() as u64>MAX_BYTES{return Err("Assistance document too large".into())}Ok(bytes)
@@ -136,4 +138,18 @@ mod tests {
  }
  #[test]
  fn corrupt_objects_fail_closed(){let p=dir("corrupt");let first=commit(&p,input(0,json!({"memory":{"finger":2}}))).unwrap();let id=&first.snapshot.manifest.refs["memory"];fs::write(p.join(format!("{id}.json")),b"{}").unwrap();assert!(read(&p,None).is_err());assert!(commit(&p,input(1,json!({"memory":{}}))).is_err());fs::remove_dir_all(p).unwrap();}
+ #[test]
+ fn prepared_personal_keys_reopen_without_shortening_and_keep_bounded_names(){
+  let p=dir("long-personal-keys");
+  let key=|layout:&str|format!("state-{}-{layout}-{}-{}-{}.json","a".repeat(64),"b".repeat(64),"c".repeat(64),"d".repeat(64));
+  let janko=key("janko-four-row");let conventional=key("conventional-piano");assert_eq!(janko.len(),285);assert_eq!(conventional.len(),289);
+  let first=commit(&p,input(0,json!({janko.clone():{"finger":2},conventional.clone():{"finger":3}}))).unwrap();
+  let id=first.snapshot.id.unwrap();let loaded=read(&p,None).unwrap();assert_eq!(loaded.documents[&janko]["finger"],2);assert_eq!(loaded.documents[&conventional]["finger"],3);
+  commit(&p,input(1,json!({janko.clone():{"finger":4},"e".repeat(4096):{"boundary":true}}))).unwrap();
+  assert_eq!(read(&p,Some(&id)).unwrap().documents[&janko]["finger"],2);assert_eq!(read(&p,None).unwrap().documents[&janko]["finger"],4);
+  for invalid in ["e".repeat(4097),"bad\\name".into(),"bad:name".into(),"".into()] {assert!(commit(&p,input(2,json!({invalid:{"bad":true}}))).is_err());}
+  assert_eq!(read(&p,None).unwrap().manifest.revision,2);
+  for entry in fs::read_dir(&p).unwrap(){let name=entry.unwrap().file_name().into_string().unwrap();if let Some(id)=name.strip_suffix(".json"){assert!(valid_id(id));}}
+  fs::remove_dir_all(p).unwrap();
+ }
 }
