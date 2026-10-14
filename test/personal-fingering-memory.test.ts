@@ -144,3 +144,16 @@ test('consolidation retains authored source ahead of earlier-import empty copies
  const input=choose(fixture(),'b2n1',2,'2021-01-01');input.importedAt='2000-01-01';const result=await consolidatePersonalFingeringMemory(bootstrapPersonalFingeringMemory([input]),[input],['piece'],'reference'),clean={...input,personal:result.personalByEntry.piece};
  const source=resolvePersonalFingeringMemory(result.document,'piece',clean.p,clean.personal).byOwner.b3n1.reference;assert.equal(source?.writtenBar,3);
 });
+
+test('consolidating one piece preserves an unrelated promoted reference and its complete shared record',async()=>{
+ const older=choose(fixture('older',[48]),'b0n1',2,'2020-01-01'),promoted=choose(fixture('promoted',[48]),'b0n1',3,'2021-01-01'),target=fixture('target',[51]);
+ for(const note of target.p.score.notes)if(note.eventKind==='pitched')note.pitch.octave++;
+ choose(target,'b0n1',4,'2022-01-01');
+ let doc=bootstrapPersonalFingeringMemory([older,promoted,target]);doc=promotePersonalFingeringReference(doc,promoted,'b0n1');
+ const patternKeys=new Set(projectPersonalMemoryScore(older).filter(r=>r.ownerIds.includes('b0n1')).map(r=>measureMemoryKey(r.occurrence)));
+ const unrelated=doc.keyboards['janko-four-row'].defaults.filter(d=>patternKeys.has(d.measureKey));
+ assert.equal(resolvePersonalFingeringMemory(doc,older.entryId,older.p,older.personal).byOwner.b0n1.reference?.entryId,'promoted');
+ const result=await consolidatePersonalFingeringMemory(doc,[older,promoted,target],['target'],'scoped-consolidation');
+ assert.deepEqual(result.document.keyboards['janko-four-row'].defaults.filter(d=>patternKeys.has(d.measureKey)),unrelated);
+ assert.equal(resolvePersonalFingeringMemory(result.document,older.entryId,older.p,older.personal).byOwner.b0n1.reference?.entryId,'promoted');
+});
