@@ -77,7 +77,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
         throw new PianoAuthorityConflict('Saved reviewed authority has a stale owner choice.',[q.id]);
       seen.add(q.id);
       const personalChoice=choices[q.id];
-      const retained={...(personalChoice?.hand===undefined?{hand:q.hand}:{}),...(personalChoice?.finger!==undefined||edited.has(q.id)?{}:{finger:q.finger,...(q.row===undefined?{}:{row:q.row})})};
+      const retained={...(personalChoice?.hand===undefined?{hand:q.hand as 'LH'|'RH'}:{}),...(personalChoice?.finger!==undefined||edited.has(q.id)?{}:{finger:q.finger,...(q.row===undefined?{}:{row:q.row})})};
       if(Object.keys(retained).length)add(q.id,retained,
         'Retained explicit operator authority for '+q.id+'; original review journal stays with its edition');
     }
