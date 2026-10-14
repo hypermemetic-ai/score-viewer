@@ -252,7 +252,7 @@ export function restorePersonalMemoryLocals(document:PersonalFingeringMemory,inp
 export function promotePersonalFingeringReference(document:PersonalFingeringMemory,input:MemoryScoreInput,ownerId:string):PersonalFingeringMemory {
  const next=registerMemoryScore(document,input),resolved=resolvePersonalFingeringMemory(next,input.entryId,input.p,input.personal),records=projectPersonalMemoryScore(input),selected=records.find(r=>!r.occurrence.scope&&r.ownerIds.includes(ownerId));if(!selected)fail('unknown reference owner');
  for(const r of records.filter(r=>r.writtenBar===selected.writtenBar)){
-  const edits:MeasureOwnerEdit[]=r.ownerIds.flatMap(id=>{const f=resolved.byOwner[id].finger;return f?[{ownerId:id,patch:{finger:f.value},...(f.decision?{decisions:{finger:f.decision}}:{})}]:[];});
+  const edits:MeasureOwnerEdit[]=r.ownerIds.flatMap(id=>{const choice=resolved.byOwner[id],f=choice.finger;return choice.personal&&!choice.calculated&&f?[{ownerId:id,patch:{finger:f.value},...(f.decision?{decisions:{finger:f.decision}}:{})}]:[];});
   if(!edits.length)continue;const m=next.keyboards[r.occurrence.keyboardId];next.keyboards[r.occurrence.keyboardId]=promoteMeasureMemoryReference(m,r.occurrence,edits,m.revision).memory;
  }next.revision++;return next;
 }

@@ -157,3 +157,12 @@ test('consolidating one piece preserves an unrelated promoted reference and its 
  assert.deepEqual(result.document.keyboards['janko-four-row'].defaults.filter(d=>patternKeys.has(d.measureKey)),unrelated);
  assert.equal(resolvePersonalFingeringMemory(result.document,older.entryId,older.p,older.personal).byOwner.b0n1.reference?.entryId,'promoted');
 });
+
+test('promoting another field excludes calculated dispositions and preserves their hidden local evidence',()=>{
+ const input=choose(choose(fixture('piece',[48,48]),'b0n1',2),'b0n2',4);let doc=bootstrapPersonalFingeringMemory([input]);
+ doc=edit(doc,input,'b1n1',3).document;input.personal.calculatedOwners={b1n1:true};
+ const before=resolvePersonalFingeringMemory(doc,input.entryId,input.p,input.personal);assert.equal(before.byOwner.b1n1.personal,false);assert.equal(before.byOwner.b1n1.calculated,true);assert.equal(finger(doc,input,'b1n1'),undefined);
+ doc=promotePersonalFingeringReference(doc,input,'b1n2');assert.equal(finger(doc,input,'b0n1'),2);assert.equal(finger(doc,input,'b1n1'),undefined);
+ assert.equal(resolvePersonalFingeringMemory(doc,input.entryId,input.p,input.personal).byOwner.b0n2.reference?.writtenBar,2);
+ delete input.personal.calculatedOwners;assert.equal(finger(doc,input,'b1n1'),3);assert.equal(resolvePersonalFingeringMemory(doc,input.entryId,input.p,input.personal).byOwner.b1n1.finger?.provenance,'local');
+});
