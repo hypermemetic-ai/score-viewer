@@ -1,4 +1,24 @@
-# Native delivery from the extracted viewer
+# Native delivery from the viewer
+
+Native builds now run in this public repository using `.github/workflows/build-score-viewer-native.yml`. The dispatch-only workflow checks out one exact reviewed viewer delivery commit without submodules, installs its locked public and vendored npm dependencies with lifecycle scripts disabled, and builds the root `src-tauri/` on Windows and Mac. It needs no private ISO checkout or repository-access secret.
+
+`delivery-input/` seals the previously reviewed application build: `inputs.json` inventories the original native source, locked dependencies, frontend and checks; `checks.json` binds source tests/build/browser inspection/independent review; `frontend/` holds the exact emitted payload. Native preparation verifies these before adding a delivery identity and generating embedded-payload probes. The application revision in `sourceInputs.viewerRevision` remains distinct from the newer delivery/workflow commit in `sourceRevision`. The notation revision remains provenance for the frozen application and is never fetched by these workers.
+
+The native worker and verification closure lives in `scripts/native-delivery/`. It carries the existing Windows tests/static runtime admission, universal Mac tests/MIDI/audio/signature/resource/deployment/DMG/native launch gates, actual footer WebKit check, both-architecture embedded payload proof, source/notices and independent pair verification. Root-native sources are not copied into a second application tree. The temporary historical ISO carrier generator below remains for reproducing old receipts, not for current builds.
+
+For this transition, `node scripts/native-delivery/adapt-sealed-inputs.mjs <viewer-root>` explicitly rebases the old sealed helper paths to their viewer-owned locations, records the original input hash, and verifies all retained native, frontend and check pins. It rolls back the manifest on failure. Review and commit the adapted manifest before dispatch.
+
+```sh
+node scripts/native-delivery/release-score-viewer.mjs \
+  --repository hypermemetic-ai/score-viewer \
+  --ref main --revision <reviewed-delivery-SHA> \
+  --output <existing-paired-download-directory>
+```
+
+Publication still requires the complete verified Windows/Mac pair and preserves immutable releases and the atomic current pointer. Migrating an existing ISO-carrier publication additionally requires `--migrate-from-iso-carrier <exact-current-carrier-SHA>`. This verifies the old pair behind the current pointer and its exact download hashes, then requires the new application revision to descend from its recorded viewer revision. It does not compare unrelated Git histories or silently bypass ordering. Subsequent viewer deliveries use ordinary delivery-commit ancestry again. Installation and preservation of the user's current display/session/data remain a separate activation step.
+
+## Historical ISO carrier procedure
+
 
 The application remains owned by this repository. The existing authenticated paired Windows/Mac workers live in ISO. Their unchanged workflow expects `score-viewer/package.json`, `score-viewer/src-tauri/` and ISO release scripts; it cannot build this repository merely by dispatching a viewer revision.
 

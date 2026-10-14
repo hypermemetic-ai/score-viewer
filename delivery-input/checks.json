@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "viewerRevision": "e105b5eac0887bb544d79723cdfea1c3f625fe92",
+  "notationRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
+  "frontendDigest": "0194e9bdc52f976372ff17ff0c7d691ae2e8ed36d446dfa2692ff8ff7eea1257",
+  "checks": {
+    "tests": {
+      "status": "passed",
+      "configuredCount": 1129,
+      "additionalSourceReturnTests": 5,
+      "testedImplementation": "d040ce0",
+      "finalSourceDifferences": "Only documentation, task receipts and five separately passing tests; all emitted application/native/package inputs identical. Native follow-up changes only cfg(test) helper naming and the local dual-context test runner, verified by reproduced failure and ten passing tests.",
+      "logs": [
+        "/tmp/viewer-final-suite-3.log"
+      ],
+      "nativeStorageTests": 10
+    },
+    "build": {
+      "status": "passed",
+      "log": "/tmp/viewer-final-build-3.log",
+      "builtImplementation": "d040ce0",
+      "finalSourceInputsIdentical": "Frontend and application runtime inputs identical; Rust cfg(test) helper path repaired and validated in both module contexts."
+    },
+    "browserInspection": {
+      "status": "passed",
+      "evidence": "docs/practice-fingering-validation-20261014.md",
+      "browser": "Chromium154 Linux",
+      "viewport": [
+        1280,
+        800
+      ],
+      "warmEdit": {
+        "samples": 13,
+        "medianMs": 164,
+        "p95Ms": 235
+      },
+      "limits": "Controlled preview and private local snapshot; cross-score and deletion succession automated; no live Windows installation or physical MIDI/audio acceptance."
+    },
+    "independentReview": {
+      "status": "passed",
+      "reviewers": [
+        "review_application",
+        "review_memory"
+      ],
+      "performanceStorageRecheck": true,
+      "sourceReturnTestsReviewedByParent": true,
+      "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/98",
+      "nativeTestRepair": {
+        "status": "passed",
+        "commit": "7f83208b7da99a330262c9f88da5f2629ed8e400",
+        "checks": 10,
+        "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/99"
+      }
+    }
+  }
+}
