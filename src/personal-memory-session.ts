@@ -154,7 +154,7 @@ export class PersonalMemorySession {
   const input={entryId:entry.id,importedAt:entry.importedAt,p,personal};this.remember([input]);
   const known=(snapshot:AssistanceSnapshot,candidate:MemoryScoreInput)=>{
    const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);
-   return projectPersonalMemoryScore(candidate).every(wanted=>Object.values(memory.occurrences).some(actual=>JSON.stringify(actual.occurrence)===JSON.stringify(wanted.occurrence)));
+   return projectPersonalMemoryScore(candidate).every(wanted=>Object.values(memory.occurrences).some(actual=>canonicalJson(actual.occurrence)===canonicalJson(wanted.occurrence)));
   };
   if(!known(current,input)){
    await this.schedule(async()=>{

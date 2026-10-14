@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "6e8867baeb7187e9c3398822b2e65208b31c9ac1",
-    "tree": "0b38ab13b0bd290168c948074165f5d7586aea28",
-    "timestamp": "2026-10-14T06:11:32.000Z"
+    "revision": "bfd999fd12fd227f82b94c014f6f33163381099d",
+    "tree": "91dc7682aee601742062efde4feee7b17f12fb96",
+    "timestamp": "2026-10-14T06:20:51.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
@@ -7627,9 +7627,9 @@
         "sha256": "7f611354dfbc49462ddd04ab9308d45efa225073a375fcd82d6cbee5a91983e0",
         "size": 44852
       },
-      "assets/index-UyVmAyL6.js": {
-        "sha256": "f0137826c6988206914f8f824e66e8f0c47f1152413a429b53663c13125f01b2",
-        "size": 599705
+      "assets/index-CNce-XlG.js": {
+        "sha256": "c14ca574a4ffbc7518ea2f790c151d2c5f424b7ca7b77ab02d6a04d7a85a08ba",
+        "size": 599681
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7684,7 +7684,7 @@
         "size": 327
       },
       "index.html": {
-        "sha256": "a2e9ffab9f7cc75124be15813f03256d4b382e37db7f4256a830c3010b3c6aa2",
+        "sha256": "4dfad397674652d5bd9efe4b34a7808a28d76b2846a932d0310b8c81f758c79c",
         "size": 728
       },
       "review/schumann-no14-conventional-20261006.isoscore": {
@@ -7692,11 +7692,11 @@
         "size": 423909
       }
     },
-    "digest": "4fb8d9dbd0c4433ad2b8e5ffa7523e8835c464ac25b940bdc649b9d69e79ebae"
+    "digest": "c3900f2fc28170c2a42bb88052a8b2d98ab30b5fea206a4dc55d7d4447296f5c"
   },
   "checks": {
-    "sha256": "52aa022b197a95c935fd0442a1ca1d955614e1284b4664aea0bd5cfff9a8e346",
-    "size": 1917
+    "sha256": "74fff554ed51a5a7b088460c81dd7f92f23bbbb7656697d18ec2731a0ffce2bd",
+    "size": 2059
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v1",
