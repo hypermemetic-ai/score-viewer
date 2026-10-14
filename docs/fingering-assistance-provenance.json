@@ -1,10 +1,15 @@
 {
   "version": 1,
   "repository": "hypermemetic-ai/fingering-calculator",
-  "revision": "1980e3d45eb44f0b24c6a68230773cdb732cb6e8",
+  "revision": "8383992ce296230f0f94fb44a7534d153e1eb93a",
   "package": "@hypermemetic-ai/fingering-editor-assistance",
   "artifact": "vendor/fingering-editor-assistance/hypermemetic-ai-fingering-editor-assistance-0.1.0.tgz",
-  "sha256": "368c19654a3236b33ba0426d1243e642d322986defbbb4eb8dccea3f808d6e52",
-  "reviews": [37, 38, 39],
+  "sha256": "54ca107d5d31ff04571630bfb4cdfe7d9d8efcb54d73a84defdc19d8cdc8c220",
+  "reviews": [
+    37,
+    38,
+    39,
+    40
+  ],
   "scope": "Personal measure memory and physical-contact travel advice. Existing notation and solver pins remain separately owned."
 }
