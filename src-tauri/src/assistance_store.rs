@@ -124,9 +124,12 @@ mod tests {
  #[test]
  fn separate_processes_share_the_compare_and_swap_lock(){
   let p=dir("processes");let exe=std::env::current_exe().unwrap();
+  // libtest names omit the crate prefix but retain the containing modules.
+  // This file is a crate in the standalone check and a module in the app.
+  let helper=concat!(module_path!(),"::process_commit_helper").split_once("::").expect("test module must include a crate prefix").1;
   let mut children=Vec::new();
-  for _ in 0..2 {children.push(std::process::Command::new(&exe).args(["--exact","tests::process_commit_helper","--nocapture"]).env("VIEWER_ASSISTANCE_PROCESS_TEST",&p).stdout(std::process::Stdio::piped()).spawn().unwrap());}
-  let outputs:Vec<_>=children.into_iter().map(|child|{let out=child.wait_with_output().unwrap();assert!(out.status.success());String::from_utf8(out.stdout).unwrap()}).collect();
+  for _ in 0..2 {children.push(std::process::Command::new(&exe).args(["--exact",helper,"--nocapture"]).env("VIEWER_ASSISTANCE_PROCESS_TEST",&p).stdout(std::process::Stdio::piped()).spawn().unwrap());}
+  let outputs:Vec<_>=children.into_iter().map(|child|{let out=child.wait_with_output().unwrap();let output=String::from_utf8(out.stdout).unwrap();assert!(out.status.success(),"helper {helper} failed: {output}");assert_eq!(output.matches("ASSISTANCE_RESULT=").count(),1,"child must execute helper {helper} exactly once: {output}");output}).collect();
   assert_eq!(outputs.iter().filter(|s|s.contains("ASSISTANCE_RESULT=committed")).count(),1);
   assert_eq!(outputs.iter().filter(|s|s.contains("ASSISTANCE_RESULT=conflict")).count(),1);
   fs::remove_dir_all(p).unwrap();
