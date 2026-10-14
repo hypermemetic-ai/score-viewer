@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "974ebc5dd3f5d9d5788a4129a3343d21e310af62",
-    "tree": "ebea1b5994249c3b964a7d1d5a80fc24941f6829",
-    "timestamp": "2026-10-14T05:52:20.000Z"
+    "revision": "6e8867baeb7187e9c3398822b2e65208b31c9ac1",
+    "tree": "0b38ab13b0bd290168c948074165f5d7586aea28",
+    "timestamp": "2026-10-14T06:11:32.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
@@ -7623,13 +7623,13 @@
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-BxnugaOR.js": {
-        "sha256": "d4af7da15cdfca19562a181245750330d245de92e77ae73ec2acd25980367bdb",
-        "size": 599729
-      },
       "assets/index-CBPmQiGv.css": {
         "sha256": "7f611354dfbc49462ddd04ab9308d45efa225073a375fcd82d6cbee5a91983e0",
         "size": 44852
+      },
+      "assets/index-UyVmAyL6.js": {
+        "sha256": "f0137826c6988206914f8f824e66e8f0c47f1152413a429b53663c13125f01b2",
+        "size": 599705
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7684,7 +7684,7 @@
         "size": 327
       },
       "index.html": {
-        "sha256": "12b3fc9b3c8f03636f70bdcd70247a043fb575e5645de8014a8e55ff56692bd6",
+        "sha256": "a2e9ffab9f7cc75124be15813f03256d4b382e37db7f4256a830c3010b3c6aa2",
         "size": 728
       },
       "review/schumann-no14-conventional-20261006.isoscore": {
@@ -7692,11 +7692,11 @@
         "size": 423909
       }
     },
-    "digest": "3f62b1cb5cee0a1ddf6d3376e3b19d85acda3e2c5f1e46e53cc546b8295a2a14"
+    "digest": "4fb8d9dbd0c4433ad2b8e5ffa7523e8835c464ac25b940bdc649b9d69e79ebae"
   },
   "checks": {
-    "sha256": "fd6142cbd8dde196da221f0ac4dc2c83179f157aa73947a427cc0bceb8d448a0",
-    "size": 2780
+    "sha256": "52aa022b197a95c935fd0442a1ca1d955614e1284b4664aea0bd5cfff9a8e346",
+    "size": 1917
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v1",
