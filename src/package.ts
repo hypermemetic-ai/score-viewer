@@ -3,7 +3,7 @@ import {selectReadingNotation,admitDualReadingContentAsync} from './dual-reading
 import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
 import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {conservativeMaterialBytes} from './package-material';
-import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady} from './annotation-ink-policy';
+import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady,type PersonalAnnotationInkPolicy} from './annotation-ink-policy';
 import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {requirePianoEvent} from './piano-event';
 import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
@@ -32,7 +32,7 @@ export interface Metadata {title:string;composer:string;opus?:number;opusLabel?:
 
 export interface Manifest {format:'iso-score';version:1|2|3;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;transposition?:ScoreTransposition;reading?:ReadingDescriptor}
 export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;calculationContext?:PianoCalculationContext|null}
-export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;transposition?:ScoreTransposition;transpositionOriginal?:ScorePackage;archiveSha256?:string;reading?:ReadingContent}
+export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;generationAvailable?:boolean;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;personalAnnotationInkPolicy?:PersonalAnnotationInkPolicy;transposition?:ScoreTransposition;transpositionOriginal?:ScorePackage;archiveSha256?:string;reading?:ReadingContent}
 
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
 // Only a completed ordinary cold import can bind an archive to these frozen
@@ -151,7 +151,7 @@ function headSignature(p:ScorePackage,allowed?:WeakSet<object>,capture?:HeadObje
  };
  return JSON.stringify(['score','sourceScore','sourceSha256','sourceRevision','seats','renderingRecipe','calculationContext',
   'preparationIdentity','keyboardLayout','availablePresentations','calculatedHandReceipt','manifest','collectionManifest',
-  'fingerLayer','transposition','annotationGeometry','profileId','profileSha256','effectiveHandSha256'].map(key=>{
+  'fingerLayer','transposition','annotationGeometry','personalAnnotationInkPolicy','profileId','profileSha256','effectiveHandSha256'].map(key=>{
    const descriptor=Object.getOwnPropertyDescriptor(p,key);if(descriptor&&!('value'in descriptor))fail('Nonliteral head binding accessor');
    return[key,literal(descriptor?.value)];
  }));

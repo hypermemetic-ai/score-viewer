@@ -1,3 +1,4 @@
+import {PERSONAL_ANNOTATION_INK_POLICY} from '../src/annotation-ink-policy';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -46,7 +47,7 @@ function fixture(){
  let recipes=0,cores=0,warms=0,asyncWarms=0,asyncProjects=0,projects=0;
  const code=readFileSync(new URL('../src/personal-presentation.ts',import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'').replace(/^export /gm,'');
  const pool=new PersonalPreparationPool<any>();
- const context:any={structuredClone,Uint8Array,PersonalPreparationPool,conservativeMaterialBytes,capturedReadingExecution,checkReadingExecution,
+ const context:any={structuredClone,Uint8Array,PERSONAL_ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady:async()=>{},PersonalPreparationPool,conservativeMaterialBytes,capturedReadingExecution,checkReadingExecution,
   hashBytes:async(v:any)=>createHash('sha256').update(typeof v==='string'?v:v).digest('hex'),
   calculatedRecipeForRequest:async(p:any)=>{recipes++;return p.renderingRecipe;},scoreWithCalculationContext:(s:any)=>s,
   effectiveAssignments:(p:any,s:any)=>p.score.notes.map((n:any)=>({...n,pitch:n.pitch.octave*12+n.pitch.pitchClass,hand:s.hand??n.hand})),

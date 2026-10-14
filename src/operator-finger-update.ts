@@ -56,7 +56,7 @@ export async function applyOperatorFingerReview(bytes:Uint8Array,value:unknown){
   referencePerformanceTempo:corrected.plan.performanceClock!.tempo,performanceClock:corrected.plan.performanceClock,costUnits:corrected.plan.costUnits,
   reviewedFingerAuthority:authority,attacks:layer.attacks,sourceOwnerToAttack:layer.sourceOwnerToAttack,traversal:layer.traversal,
   objective:corrected.result.objective,search:{status:'operator-reviewed-fixed-route',optimized:false,reviewId:review.id},
-  limitations:'Operator choices replay the complete source/held-contact/repeat route in the existing provisional RR model. Other fingers and rows are retained; this is no new optimization or anatomical calibration.'};
+  limitations:'Operator choices replay the complete source/held-contact/repeat route in the existing provisional RR model. Other fingers and rows are retained; this is no new optimization or individualized anatomy.'};
  await validateLayerAsync(updated,before);
  const files={...before.files},manifest=structuredClone(m);delete files['manifest.json'];
  files[descriptor.fingers]=strToU8(JSON.stringify(updated,null,2)+'\n');manifest.files[descriptor.fingers]=await hashBytes(files[descriptor.fingers]);
