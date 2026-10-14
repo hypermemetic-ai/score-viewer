@@ -30,7 +30,8 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
   const owners=new Map(source.notes.map(n=>[n.id,n])),constraints:PianoAssignmentConstraint[]=[],
     edited=new Set(Object.values(personal?.overrides??{}).flatMap(c=>c.ownerIds)),choices=readPersonalAssignments(personal?.assignments,p)?.choices??{};
   const shared=personal?.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?personal.memoryResolved.choices:{};
-  for(const [id,field] of Object.entries(shared)){edited.add(id);const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('Shared knowledge names a stale owner.',[id]);const prior=choices[id];choices[id]={...(prior??{ownerId:id,guard:{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand as 'LH'|'RH'},createdAt:'Shared memory revision '+personal!.memoryResolved!.revision}),finger:field.finger??undefined};}
+  for(const id of Object.keys(personal?.calculatedOwners??{}))if(choices[id])delete choices[id].finger;
+  for(const [id,field] of Object.entries(shared)){if(personal?.calculatedOwners?.[id])continue;edited.add(id);const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('Shared knowledge names a stale owner.',[id]);const prior=choices[id];choices[id]={...(prior??{ownerId:id,guard:{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand as 'LH'|'RH'},createdAt:'Shared memory revision '+personal!.memoryResolved!.revision}),finger:field.finger??undefined};}
   const guard=(id:string)=>{
     const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('Saved authority names a stale source owner.',[id]);
     return{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks};
@@ -106,7 +107,7 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
     constraints.push(check({ownerId:n.id,guard:guard(n.id),hand:n.hand,
       provenance:{kind:'editorial-hand-retention',reference:AUTOMATIC_HAND_RETENTION_REFERENCE}}));
   for(const c of Object.values(personal?.overrides??{}))for(const id of c.ownerIds){
-    const retained={...(choices[id]?.hand===undefined?{hand:c.hand}:{}),...(choices[id]?.finger===undefined&&!Object.hasOwn(shared,id)?{finger:c.replacement,...(c.proposedRow===undefined?{}:{row:c.proposedRow}),...(c.proposedContact?{contact:c.proposedContact}:{})}:{})};
+    const retained={...(choices[id]?.hand===undefined?{hand:c.hand}:{}),...(choices[id]?.finger===undefined&&!Object.hasOwn(shared,id)&&!personal?.calculatedOwners?.[id]?{finger:c.replacement,...(c.proposedRow===undefined?{}:{row:c.proposedRow}),...(c.proposedContact?{contact:c.proposedContact}:{})}:{})};
     if(Object.keys(retained).length)add(id,retained,'Saved per-note operator choice: '+c.createdAt);
   }
 

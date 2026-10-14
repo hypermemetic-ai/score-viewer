@@ -51,7 +51,7 @@ export function effectiveAssignments(p:ScorePackage,s:PersonalState):EffectivePe
  readPersonalAssignments(s.assignments,p);
  const legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
  return p.score.notes.filter(isPitchedEvent).map(n=>{
-  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,finger=shared?shared.finger??undefined:c?.finger??legacy?.replacement??fingers.get(n.id);
+  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??fingers.get(n.id);
   return{id:n.id,...guard(n),hand:(c?.hand??n.hand) as PersonalHand,...(finger===undefined?{}:{finger})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
@@ -65,10 +65,11 @@ export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:
  const next=structuredClone(s),ids=[...new Set(seat.ownerIds.flatMap(id=>aliases(p,id)))];
  if(!ids.length)throw Error('No editable source owner.');
  next.assignments??={version:'personal-owner-assignments-v1',sourceRevision:sourceRevision(p),choices:{}};
+ const now=new Date().toISOString(),editIntent:NonNullable<PersonalOwnerChoice['intent']>={};for(const field of ['hand','finger'] as const)if(choice[field]!==undefined){const decisionId=crypto.randomUUID();editIntent[field]={decisionId,lineageId:decisionId,authoredAt:now};}
  for(const id of ids){const n=p.score.notes.find(n=>n.id===id)!,old=next.assignments.choices[id];
   // Preserve prior explicit fields. Unedited fields resolve through existing authority.
-  const finger=choice.finger??old?.finger??Object.values(s.overrides).find(c=>c.ownerIds.includes(id))?.replacement,hand=choice.hand??old?.hand,now=new Date().toISOString(),intent={...old?.intent};
-  for(const field of ['hand','finger'] as const)if(choice[field]!==undefined){const decisionId=crypto.randomUUID();intent[field]={decisionId,lineageId:decisionId,authoredAt:now};}
+  const finger=choice.finger??old?.finger??Object.values(s.overrides).find(c=>c.ownerIds.includes(id))?.replacement,hand=choice.hand??old?.hand,intent={...old?.intent,...editIntent};
+  if(choice.finger!==undefined&&next.calculatedOwners)delete next.calculatedOwners[id];
   next.assignments.choices[id]={ownerId:id,guard:guard(n),original:old?.original??{hand:n.hand as PersonalHand,...(baseFinger(p,s,id)===undefined?{}:{finger:baseFinger(p,s,id)})},...(hand===undefined?{}:{hand}),intent,
    ...(finger===undefined?{}:{finger}),createdAt:old?.createdAt??new Date().toISOString()};
  }

@@ -134,3 +134,13 @@ test('resolved personal memory is shared by display and calculation; suppression
  assert.equal(readPersonal(s,p).memoryResolved,undefined);
  s.memoryResolved.sourceRevision='stale';assert.equal(fingerFor(p,s,p.seats[0]),3);
 });
+test('one admitted physical edit retains one decision lineage across its written owners',()=>{
+ const p=fixture();p.score.notes.push({...p.score.notes[0],id:'alias'});p.seats[0].ownerIds.push('alias');
+ const s=assigned(p,initialPersonal(p),p.seats[0],{finger:4});assert.deepEqual(s.assignments!.choices.alias.intent?.finger,s.assignments!.choices['owner-0'].intent?.finger);
+});
+test('restore-calculated preference differs from blank suppression and stays source bound',()=>{
+ const p=fixture(),s=assigned(p,initialPersonal(p),p.seats[0],{finger:5});s.memoryResolved={revision:1,sourceRevision:p.sourceRevision!,choices:{'owner-0':{finger:null}}};s.calculatedOwners={'owner-0':true};
+ assert.equal(fingerFor(p,s,p.seats[0]),3);assert.equal(effectiveAssignments(p,s)[0].finger,3);assert.deepEqual(readPersonal(s,p).calculatedOwners,s.calculatedOwners);
+ assert.throws(()=>readPersonal({...s,calculatedOwners:{stale:true}},p),/stale source owner/);
+ const entered=assigned(p,s,p.seats[0],{finger:2});assert.equal(entered.calculatedOwners?.['owner-0'],undefined);
+});
