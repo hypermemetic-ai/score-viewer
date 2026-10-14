@@ -166,3 +166,17 @@ test('promoting another field excludes calculated dispositions and preserves the
  assert.equal(resolvePersonalFingeringMemory(doc,input.entryId,input.p,input.personal).byOwner.b0n2.reference?.writtenBar,2);
  delete input.personal.calculatedOwners;assert.equal(finger(doc,input,'b1n1'),3);assert.equal(resolvePersonalFingeringMemory(doc,input.entryId,input.p,input.personal).byOwner.b1n1.finger?.provenance,'local');
 });
+
+test('new authorship immediately orders succession without changing custody or crediting no-op copies',()=>{
+ const source=choose(fixture('source',[48]),'b0n1',2,'2020-01-01'),first=fixture('first',[48]),second=fixture('second',[48]);first.importedAt='2010-01-01';second.importedAt='2000-01-01';
+ let doc=bootstrapPersonalFingeringMemory([source,first,second]);
+ const record=(d:typeof doc,input:MemoryScoreInput)=>Object.values(d.occurrences).find(r=>r.entryId===input.entryId&&!r.occurrence.scope)!;
+ doc=edit(doc,first,'b0n1',2).document;assert.equal(record(doc,first).authoredAt,undefined);
+ doc=edit(doc,first,'b0n1','inherit').document;assert.equal(record(doc,first).authoredAt,undefined);
+ doc=editPersonalFingeringMemory(doc,first,{ownerId:'b0n1',finger:3,decisionId:'first-authorship',authoredAt:'2025-01-01'}).document;
+ doc=editPersonalFingeringMemory(doc,second,{ownerId:'b0n1',finger:null,decisionId:'second-authorship',authoredAt:'2026-01-01'}).document;
+ assert.equal(record(doc,first).authoredAt,Date.parse('2025-01-01'));assert.equal(record(doc,second).authoredAt,Date.parse('2026-01-01'));
+ const future=fixture('future',[48]);assert.equal(resolvePersonalFingeringMemory(doc,future.entryId,future.p,future.personal).byOwner.b0n1.reference?.entryId,'source');
+ doc=deletePersonalFingeringEntry(doc,source.entryId);assert.equal(resolvePersonalFingeringMemory(doc,future.entryId,future.p,future.personal).byOwner.b0n1.reference?.entryId,'first');
+ assert.equal(finger(doc,first,'b0n1'),3);assert.equal(finger(doc,second,'b0n1'),undefined);assert.equal(finger(doc,future,'b0n1'),2);
+});

@@ -206,6 +206,10 @@ export function editPersonalFingeringMemory(document:PersonalFingeringMemory,inp
   next.keyboards[keyboard]=result.memory;diagnostics.push(...result.diagnostics);
  }
  for(const link of linked){const m=next.keyboards[link.occurrence.keyboardId],result=applyMeasureMemoryEdits(m,link.occurrence,link.ownerIds.map(ownerId=>({ownerId,patch:{finger:edit.finger},decisions:{finger:decision}})),m.revision,'publish');next.keyboards[link.occurrence.keyboardId]=result.memory;diagnostics.push(...result.diagnostics);}
+ // The input is the state before this key press. Record actual authorship now,
+ // including suppression, so deletion succession never depends on reopening.
+ // Reset/no-op actions and propagated projections are not new authors.
+ if(operation!=='reset')for(const r of records){const stored=next.occurrences[identity(r.occurrence)];stored.authoredAt=Math.min(stored.authoredAt??unknownAge,authoredAt);stored.ageKnown=true;}
  next.revision++;return{document:next,operation,diagnostics};
 }
 
