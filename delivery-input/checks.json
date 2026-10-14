@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "viewerRevision": "6e8867baeb7187e9c3398822b2e65208b31c9ac1",
+  "viewerRevision": "bfd999fd12fd227f82b94c014f6f33163381099d",
   "notationRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
-  "frontendDigest": "4fb8d9dbd0c4433ad2b8e5ffa7523e8835c464ac25b940bdc649b9d69e79ebae",
+  "frontendDigest": "c3900f2fc28170c2a42bb88052a8b2d98ab30b5fea206a4dc55d7d4447296f5c",
   "checks": {
     "tests": {
       "status": "passed",
       "focused": 2,
-      "scope": "Native JSON reorder save, true collision refusal, and existing pending recovery.",
+      "scope": "Native JSON reorder save, true collision refusal, and opening the score BEFORE retry of an existing native pending choice.",
       "baseline": {
         "viewerRevision": "974ebc5dd3f5d9d5788a4129a3343d21e310af62",
         "checksSha256": "fd6142cbd8dde196da221f0ac4dc2c83179f157aa73947a427cc0bceb8d448a0"
@@ -15,9 +15,9 @@
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "1630bfd76046e57f4fe13b02426d7104150b7ddc",
+      "sourceCommit": "bfd999fd12fd227f82b94c014f6f33163381099d",
       "configured": "TypeScript + source pin validation + Vite",
-      "frontendDigest": "4fb8d9dbd0c4433ad2b8e5ffa7523e8835c464ac25b940bdc649b9d69e79ebae"
+      "frontendDigest": "c3900f2fc28170c2a42bb88052a8b2d98ab30b5fea206a4dc55d7d4447296f5c"
     },
     "browserInspection": {
       "status": "passed",
@@ -38,9 +38,9 @@
     "independentReview": {
       "status": "passed",
       "reviewer": "review_application",
-      "sourceCommit": "1630bfd76046e57f4fe13b02426d7104150b7ddc",
-      "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/104",
-      "scope": "Canonical pending comparison and existing recovery, without additional test or desktop actions."
+      "sourceCommit": "bfd999fd12fd227f82b94c014f6f33163381099d",
+      "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/106",
+      "scope": "Canonical score occurrence comparison keeps recovery controls reachable before retry. Native-shaped store regression includes opening before retry, with no extra test/desktop actions by reviewer."
     }
   }
 }
