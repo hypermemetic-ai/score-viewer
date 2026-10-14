@@ -25,14 +25,14 @@
 
 - [x] 4.1 Add measure navigation over visible editable occurrences and a persistent Notes/Measures toggle defaulting to Space; verify cross-page first-contact selection, empty measures, held continuations, endpoints, no movement on toggle and note-based digit/Tab advance with selection tests.
 - [x] 4.2 Wire navigation/source/reference actions into context-aware bindings and persistent accessible controls; verify input/dialog/toolbar/capture ownership, custom bindings, practice Space, repeated keydown and Shift+Right behavior in production keyboard tests, and document the default shortcuts.
-- [ ] 4.3 Add selected-choice shared/local provenance, make-reference and source/return behavior; verify cross-score source visits preserve edits and restore score/edition, visible source alias, view and navigation mode with navigation/persistence tests.
-- [ ] 4.4 Inspect real editor output in the collaborative browser with the toolbar hidden, rotated views and reflow after a hand edit; verify mode visibility, undecorated kbd hints, return position and unchanged faithful fingering placement, retaining screenshots and stated inspection limits.
+- [x] 4.3 Add selected-choice shared/local provenance, make-reference and source/return behavior; verify cross-score source visits preserve edits and restore score/edition, visible source alias, view and navigation mode with navigation/persistence tests.
+- [x] 4.4 Inspect real editor output in the collaborative browser with the toolbar hidden, rotated views and reflow after a hand edit; verify mode visibility, undecorated kbd hints, return position and unchanged faithful fingering placement, retaining screenshots and stated inspection limits.
 
 ## 5. Editor advice
 
 - [x] 5.1 Adapt effective assignments to performed contact/timing streams and reviewed geometry/travel APIs; verify cross-bar/repeat transitions, actual rows, holds, same-finger lanes, reference tempo and unassessed gaps with bounded contact fixtures.
 - [x] 5.2 Maintain comparable personal transition evidence by independent decision lineage; verify at least 20 comparables, strict absolute/percentile boundaries, self-exclusion, inherited-copy deduplication and replacement/retraction after edits, and document evidence limitations.
-- [ ] 5.3 Render revision-bound accessible editor markers and selected explanations with both transition ends and reasons; verify obsolete asynchronous results are rejected, notation ink is unobscured and practice entry/display is unchanged in tests and actual browser inspection.
+- [x] 5.3 Render revision-bound accessible editor markers and selected explanations with both transition ends and reasons; verify obsolete asynchronous results are rejected, notation ink is unobscured and practice entry/display is unchanged in tests and actual browser inspection.
 - [x] 5.4 Add persisted Options controls for a positive finite absolute threshold in cm/s and independent absolute/personal-unusual enablement; verify default 25 cm/s, invalid drafts, restart persistence, independent categories and unchanged practice flow with settings tests, and document their meaning.
 
 ## 6. Schumann 14 one-time consolidation
@@ -40,11 +40,13 @@
 - [x] 6.1 Resolve the operator-selected Schumann 14 to its admitted library/source identity and capture a read-only local snapshot without disturbing practice; verify package/personal hashes and keep private inputs outside Git.
 - [x] 6.2 Implement snapshot-based earliest-field consolidation across combined admitted whole/hand equivalence before materializing scope records, including ambiguous saved legacy fingers and later gap-filling; verify conflicting RH choices under independently repeated differing LH accompaniments, later protected exceptions, shuffled input, absent fields, immutable hand partition, no copied/undo/calculated donors, and no changes outside the target.
 - [x] 6.3 Produce immutable recovery data and a readable before/after donor report, stage inherited consolidated results and commit an idempotent completion receipt; verify no-op retries, later local exceptions, stale-input aborts and interrupted commits in migration tests, and document recovery.
-- [ ] 6.4 Inspect the generated Schumann 14 consolidation report and rendered result on the local candidate; verify changed measures and source links against retained originals, and record counts and visual limits without claiming a live migration has run.
+- [x] 6.4 Inspect the generated Schumann 14 consolidation report and rendered result on the local candidate; verify changed measures and source links against retained originals, and record counts and visual limits without claiming a live migration has run.
 
 ## 7. Integration and delivery
 
-- [ ] 7.1 Run the configured tests/build through the required resource launcher and measure end-to-end warm edit latency with matching occurrences; verify coherent painted results and report median/p95, score sizes, host and viewport rather than claiming the 100 ms tuning goal without evidence.
+- [x] 7.1 Run the configured tests/build through the required resource launcher and measure end-to-end warm edit latency with matching occurrences; verify coherent painted results and report median/p95, score sizes, host and viewport rather than claiming the 100 ms tuning goal without evidence.
 - [ ] 7.2 Complete integrated browser flows for addition, local modification, promotion, source/return, deletion succession, navigation and warnings; verify preserved progress and the recent annotation-placement fix across actual rendered cases.
 - [ ] 7.3 Review and land the scoped viewer implementation through the ordinary PR path, then sync/archive the completed specification change only when its required work is complete; verify source and dependency identities and report any native verification blocker separately.
 - [ ] 7.4 Build and admit the intended native package through the repository's delivery path and activate the Schumann 14 consolidation at an application-owned safe boundary after the practicing app's pending work is drained; verify current input guards, completion receipt, retained originals, current score location, practice progress and settings. Do not externally overwrite a live journal or interrupt an active practice attempt.
+
+Integration evidence and remaining limits: `docs/practice-fingering-validation-20261014.md`. Task 7.2 has actual one-score browser coverage and automated cross-score/succession coverage; the application has no deletion UI. Native activation and live consolidation remain pending while the operator practices.

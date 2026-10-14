@@ -14,7 +14,9 @@ Occurrence identities include source revision and presentation/profile binding; 
 
 ## Durable records and recovery
 
-All assistance writes use `AssistanceStore` compare-and-swap revisions. Browser writers serialize through Web Locks. Native writers use an interprocess file lock. Immutable content-addressed documents and manifests are written before the single active-pointer replacement. A manifest binds the personal state, shared memory, applied-intent ledger and any migration receipt as one visible revision. Old objects and manifests remain available for recovery; no garbage collection is introduced.
+All assistance writes use `AssistanceStore` compare-and-swap revisions. Browser writers use IndexedDB transactions; migration from earlier localStorage assistance journals verifies and retains their complete reachable history before atomic activation. The old bytes remain untouched, and a concurrent older application changing that journal is detected. Native writers use an interprocess file lock. Immutable content-addressed documents and manifests are written before the single active-pointer replacement. A manifest binds the personal state, shared memory, applied-intent ledger and any migration receipt as one visible revision. Old objects and manifests remain available for recovery; no garbage collection is introduced.
+
+Derived warning evidence is persisted separately in `fingering-advice-corpus`, bound to the full active context and memory revision; stale work cannot overwrite newer decisions.
 
 `personal-fingering-memory` stores the versioned keyboard memories and occurrence registry. Personal documents use their exact existing logical storage keys. `personal-fingering-pending` retains captured source-bound intent before applying it. An applied-intent ledger prevents duplicate execution after uncertain acknowledgements. Retry replays intent against the latest compatible state, rather than writing a stale whole-state snapshot. Navigation saves merge only view fields. Invalid source or personal bindings fail closed and retain pending work for recovery.
 
