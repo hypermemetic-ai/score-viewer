@@ -109,3 +109,20 @@ test('practice context admission resolves current personal hands while preservin
  const personal=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),next=admitPracticeContext(p,old.state,undefined,personal);
  assert.equal(next.plan.ownerGroup.get('owner-0'),'0:RH');assert.equal(next.plan.chunks[0].pattern,a.pattern);assert.equal(progressFor(next.plan.chunks[0],next.state),progressFor(a,old.state));assert.equal(next.state.best[a.pattern],90);assert.equal(next.state.start,old.state.start);
 });
+test('hand-only entry records only hand intent and does not freeze a calculated finger',()=>{
+ const p=fixture(),s=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),c=s.assignments!.choices['owner-0'];
+ assert.equal(c.finger,undefined);assert.equal(c.intent?.finger,undefined);assert.ok(c.intent?.hand?.decisionId);
+ p.fingerLayer!.attacks[0].finger=4;assert.equal(fingerFor(p,s,p.seats[0]),4);
+ const next=assigned(p,s,p.seats[0],{finger:2});assert.deepEqual(next.assignments!.choices['owner-0'].intent?.hand,c.intent?.hand);assert.ok(next.assignments!.choices['owner-0'].intent?.finger?.decisionId);
+});
+test('sparse finger entry preserves retained hand authority, sparse hand entry preserves retained finger authority',()=>{
+ const p=fixture(),n=p.score.notes[0];p.fingerLayer!.operatorConstraints=[{ownerId:n.id,guard:{pitch:48,startTick:0,durationTicks:24},hand:'LH',finger:3,provenance:{kind:'operator-choice',reference:'Previous explicit fields'}}];
+ for(const [choice,hand,finger] of [[{finger:5},'LH',5],[{hand:'RH'},'RH',3]] as const){
+  const s=assigned(p,initialPersonal(p),p.seats[0],choice),constraints=pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,s,'calculate').filter(c=>c.ownerId===n.id);
+  assert.deepEqual([...new Set(constraints.flatMap(c=>c.hand===undefined?[]:[c.hand]))],[hand]);assert.deepEqual([...new Set(constraints.flatMap(c=>c.finger===undefined?[]:[c.finger]))],[finger]);
+ }
+});
+test('coincident independently represented owners are not manufactured into personal aliases',()=>{
+ const p=fixture();p.score.notes.push({...p.score.notes[0],id:'independent'});
+ const s=assigned(p,initialPersonal(p),p.seats[0],{finger:2});assert.equal(s.assignments!.choices.independent,undefined);assert.deepEqual(readPersonal(s,p),s);
+});
