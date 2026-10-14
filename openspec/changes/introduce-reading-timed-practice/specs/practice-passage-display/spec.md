@@ -25,17 +25,17 @@ Free view SHALL have one shared configurable control across supported piano, gui
 - **AND** repeated mode keydown does not repeatedly reset positions or restart transport
 
 ### Requirement: Clear selector and practice settings presentation
-Selector rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Shared tempo controls in Options SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance Tempo SHALL display a percentage above the absolute Score reference; Practice Performance target SHALL remain absolute. Performance percentage edits SHALL preserve exact selected rates and existing absolute admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; Performance helper text SHALL plainly describe the chosen tempo, note/timing checks and available fingerings without changing assessment. A fresh practice state's default increase per success SHALL be 2% of its performance target; retained saved increases and achievements SHALL remain unchanged.
+Concrete selector exercise rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Completed group rows SHALL omit percentages. Category labels SHALL be concise and descriptive: Completed, Incomplete, Connections and existing Contrasts, without instructional suffixes or new learning terminology. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance controls and execution SHALL be absent; historical records SHALL remain retained. Practice Performance target SHALL remain absolute, and retained practice tempo controls SHALL preserve their existing admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; No helper text SHALL offer full-score note/timing assessment outside section Reading/Timed. Fresh and retained practice increase values and achievements SHALL retain their current admitted behavior; removing full-score assessment SHALL NOT change speed settings.
 
 #### Scenario: Uncompleted selector row and focused tempo decrement
-- **WHEN** an uncompleted group is shown in the selector or a tempo decrement button receives focus
+- **WHEN** an incomplete exercise is shown in the selector or a tempo decrement button receives focus
 - **THEN** the row communicates progress without redundant incomplete-status wording
 - **AND** the down chevron sits below the up chevron inside the numeric box's right edge, with its focus border in its own visible space without covering the entered value
 - **AND** the percentage or metronome unit remains outside the numeric box
 
 #### Scenario: Target marking and fresh increase
 - **WHEN** a fresh practice state opens the Practice section in Options
-- **THEN** its increase per success reads 2% and its performance target retains the metronome marking
+- **THEN** its increase per success retains the current application default and its performance target retains the metronome marking
 - **AND** the explanation identifies that tempo as the reference for speed and increase percentages
 - **AND** reopening a retained state preserves its saved exact increase and achievements
 
@@ -46,10 +46,9 @@ Selector rows SHALL retain achieved-speed percentages and genuine completion evi
 - **AND** the beat duration and exact stored rate retain their existing musical meaning
 
 #### Scenario: Performance tempo relative to score reference
-- **WHEN** full-score Performance opens with the selected rate equal to a score reference of 180 notes per minute
-- **THEN** Tempo reads 100% and Score reference below retains the absolute metronome marking at 180/min
-- **AND** entering 50% selects 90 notes per minute while retaining the reference, absolute range admission and existing assessment rules
-- **AND** untouched, committed-unchanged and cancelled percentage edits preserve an exact retained selected rate
+- **WHEN** an existing saved score contains full-score Performance tempo or accuracy records
+- **THEN** those historical records remain retained without exposing a full-score Performance start or grading control
+- **AND** section practice keeps its genuine score reference, selected rates and numeric controls
 
 ## ADDED Requirements
 

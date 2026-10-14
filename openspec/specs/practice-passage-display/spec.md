@@ -77,20 +77,20 @@ A selected original leaf SHALL display all its source measures using available p
 - **AND** ordinary four-bar previews retain their continuous single-strip presentation
 
 ### Requirement: Consistent practice range rows
-Both selector lists and completed/unfinished sections SHALL use one roomier row rhythm, with text vertically centered within highlight and focus borders and aligned first-row baselines. Human measure ranges SHALL use consistently spaced dashes in the existing font without changing saved passage identities. Joined ranges SHALL retain accessible component identity without a redundant visible arrow.
+Both selector lists and completed/unfinished sections SHALL use one roomier row rhythm, with text vertically centered within highlight and focus borders and aligned first-row baselines. Human measure ranges SHALL use consistently spaced dashes in the existing font without changing saved passage identities. Completed group rows SHALL retain accessible component identity without a redundant visible arrow or a synthetic percentage.
 
 #### Scenario: Mixed completion beside original groups
-- **WHEN** completed joined ranges and unfinished leaf ranges appear beside original groups
+- **WHEN** completed group ranges and incomplete original ranges appear beside concrete exercise rows
 - **THEN** both lists use the same row height, padding and text centering regardless of completion status
 - **AND** each focused highlight encloses its centered row content, and three-digit ranges remain clear of right-aligned percentages
 
 ### Requirement: Quiet practice range context and progress summary
-Practice strips SHALL omit individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Selector and active header SHALL identify the selected exercise. Each row SHALL show its highest measured or manual-inclusive achieved speed relative to target, without a preparation bonus. Total SHALL equally weight all included catalog exercises, including locked exercises. Include manual SHALL remain checked by default and affect presentation only. Library/save totals SHALL use the same manual-inclusive catalog total.
+Practice strips SHALL omit individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Selector and active header SHALL identify the selected exercise. Each concrete exercise row SHALL show its highest measured or manual-inclusive achieved speed relative to target, without a preparation bonus. Group rows SHALL have no percentage or assessment identity. Total SHALL equally weight all included catalog exercises, including locked exercises. Include manual SHALL remain checked by default and affect presentation only. Library/save totals SHALL use the same manual-inclusive catalog total.
 
 #### Scenario: Original and independent connections
 - **WHEN** originals A, B, C, pairs A–B, B–C and one contrast are included
 - **THEN** each of those six exercises contributes one sixth of the Total weight regardless of length
-- **AND** each row retains its own genuine achieved-speed percentage without borrowing similar-section or component evidence
+- **AND** each concrete exercise row retains its own genuine achieved-speed percentage without borrowing similar-section or component evidence
 - **AND** locked exercises remain in the denominator before unlocking
 
 #### Scenario: Select and practise measures 1–4
@@ -105,14 +105,14 @@ Practice strips SHALL omit individual measure numbers while retaining accessible
 
 #### Scenario: Mixed completion with manual results included
 - **WHEN** some included exercises are completed and others are in progress with Include manual checked
-- **THEN** ordinary completed entries appear above the divider and unfinished entries sort by decreasing own progress then chronological source order
-- **AND** each row shows one percentage, with a manual rate at 25% of target displaying 25% without a preparation bonus
+- **THEN** maximal adjacent completed-original groups appear above incomplete originals on the left; incomplete originals sort by decreasing own progress then chronological source order
+- **AND** each concrete exercise row shows one percentage while group rows show none, with a manual rate at 25% of target displaying 25% without a preparation bonus
 - **AND** excluded rows retain their anchored positions and remain visibly excluded
 
 #### Scenario: Display measured results only
 - **WHEN** the player unchecks Include manual
 - **THEN** rows, selected detail, active header and Total use measured results only while retaining selection and checkbox focus
-- **AND** manual marks, measured records and historical joins remain intact, with no change to completion eligibility or automatic progression
+- **AND** manual marks, measured records and historical joins remain intact, with no change to completion eligibility and no automatic change of active exercise
 - **AND** toggling or using the checkbox's native keys neither starts practice nor persists evidence changes
 
 #### Scenario: Manual display criterion and sorting
@@ -172,7 +172,7 @@ Entering Free view SHALL stop active or pending playback and restore complete so
 - **AND** Ready returns to the admitted initial live allocation at the existing count-in transition
 
 ### Requirement: Preserve practice modes and musical interaction
-The display repair SHALL preserve the existing measured/unmeasured distinction, beat-aligned count-in/repeat and speed transitions, first-loop eligibility, reversible Done completion, and queued speed changes. Unmeasured practice SHALL retain readable source music without fabricating observed attacks or measured attainment. Existing paused/unmeasured passage-window controls SHALL remain usable.
+The display repair SHALL preserve the existing measured/unmeasured distinction, beat-aligned count-in/repeat and speed transitions within the selected exercise, first-loop eligibility, reversible Done completion, and queued speed changes. Unmeasured practice SHALL retain readable source music without fabricating observed attacks or measured attainment. Existing paused/unmeasured passage-window controls SHALL remain usable.
 
 #### Scenario: Unmeasured loop and manual window change
 - **WHEN** a user practises without MIDI and turns a passage window
@@ -181,7 +181,7 @@ The display repair SHALL preserve the existing measured/unmeasured distinction, 
 
 #### Scenario: Done or queued speed during repeat
 - **WHEN** the user toggles eligible Done through Enter or an assigned pedal, or queues a speed change
-- **THEN** the same reversible completion target and musical beat-aligned transition apply as before the display repair
+- **THEN** the same reversible completion target and musical beat-aligned repeat transition apply within the selected exercise, without selecting another exercise
 
 ### Requirement: Supported presentation and shared control compatibility
 The passage display and note-ink lifecycle SHALL work in both Conventional piano and Jankó four-row presentations when supplied by the score package. Shared display rotation and input bindings SHALL continue across the relevant interfaces. Layout changes SHALL NOT restart the practice loop or reinterpret its musical state.
@@ -226,10 +226,10 @@ Options SHALL have a configurable keyboard binding in the shared Keys and pedals
 - **AND** the library Options entry remains available
 
 ### Requirement: Clear selector and practice settings presentation
-Selector rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance controls and execution SHALL be absent; historical records SHALL remain retained. Practice Performance target SHALL remain absolute, and retained practice tempo controls SHALL preserve their existing admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; No helper text SHALL offer full-score note/timing assessment outside section Reading/Timed. Fresh and retained practice increase values and achievements SHALL retain their current admitted behavior; removing full-score assessment SHALL NOT change speed settings.
+Concrete selector exercise rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Completed group rows SHALL omit percentages. Category labels SHALL be concise and descriptive: Completed, Incomplete, Connections and existing Contrasts, without instructional suffixes or new learning terminology. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance controls and execution SHALL be absent; historical records SHALL remain retained. Practice Performance target SHALL remain absolute, and retained practice tempo controls SHALL preserve their existing admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; No helper text SHALL offer full-score note/timing assessment outside section Reading/Timed. Fresh and retained practice increase values and achievements SHALL retain their current admitted behavior; removing full-score assessment SHALL NOT change speed settings.
 
 #### Scenario: Uncompleted selector row and focused tempo decrement
-- **WHEN** an uncompleted group is shown in the selector or a tempo decrement button receives focus
+- **WHEN** an incomplete exercise is shown in the selector or a tempo decrement button receives focus
 - **THEN** the row communicates progress without redundant incomplete-status wording
 - **AND** the down chevron sits below the up chevron inside the numeric box's right edge, with its focus border in its own visible space without covering the entered value
 - **AND** the percentage or metronome unit remains outside the numeric box
@@ -337,13 +337,13 @@ Free view Previous/Next controls SHALL inherit the current main-menu controls pe
 - **AND** runtime, binding Test, capture and visible hints use the same effective admitted controls
 
 ### Requirement: Bounded exercise browsing
-Passage selection SHALL browse original sections, independent adjacent doubles and contrast exercises without recursive growing joins. Existing column geometry, row spacing, right-aligned percentages and accessible source/component identity SHALL remain stable. Originals and doubles SHALL retain coherent source previews; contrasts SHALL identify both excerpt locations without implying the intervening source is played. Attainment SHALL remain independent.
+Passage selection SHALL browse original sections, independent adjacent doubles and contrast exercises through completed groups and incomplete originals, without recursive growing joins. Existing column geometry, row spacing, concrete-exercise right-aligned percentages and accessible source/component identity SHALL remain stable. Group rows SHALL open contents without being practice targets. Originals and doubles SHALL retain coherent source previews; contrasts SHALL identify both excerpt locations without implying the intervening source is played. Attainment SHALL remain independent.
 
 #### Scenario: Selecting an adjacent double and its originals
 - **WHEN** A–B and B–C are available
-- **THEN** both have distinct accessible rows and exactly two original components
-- **AND** Right enters the component list, Up/Down browses it and Left returns to the exercise list
-- **AND** Enter starts the actual selected exercise or component without creating a larger join
+- **THEN** both remain distinct accessible exercises with exactly two original components, shown under their completed-original group when its constituents are completed
+- **AND** Right or Enter on a group enters its contents without starting practice, Up/Down browses the active column and Left returns to the enclosing group
+- **AND** Enter on an eligible concrete exercise starts that exercise, while a group never creates or starts a larger join
 - **AND** the first list entries remain aligned and reserved preview space does not shift
 
 #### Scenario: Selecting a contrast exercise
@@ -377,3 +377,29 @@ Every exercise row SHALL support an accessible mouse and keyboard exclusion togg
 - **WHEN** a text editor, numeric edit, modal, control capture or saved authoritative binding owns the proposed shortcut
 - **THEN** exclusion does not steal that input
 - **AND** the mouse control remains available and its accessible name describes the current Include or Exclude action
+
+### Requirement: Compact completed groups and ordered contents
+Each maximal consecutive run of completed original sections SHALL occupy one group row under Completed, with incomplete originals below under Incomplete. Group membership SHALL depend on displayed original completion, not connection completion. The selected group's right column SHALL show incomplete connections under Connections before completed sections and completed connections under Completed. Empty categories SHALL be omitted.
+
+#### Scenario: Two completed runs
+- **WHEN** original sections 1–4, 5–8 and 9–12 are completed with connections 1–8 and 5–12 still incomplete, 13–16 is incomplete, and 17–20 and 21–24 are completed
+- **THEN** the Completed area contains exactly two group rows, 1–12 and 17–24, and Incomplete contains 13–16
+- **AND** an uncompleted connection does not split either group or give its group a 0% label
+- **AND** selecting 1–12 shows incomplete 1–8 and 5–12 connections first, followed by completed originals and any completed connections
+
+#### Scenario: Groups do not acquire exercise behavior
+- **WHEN** a completed group contains one or many original sections
+- **THEN** its row is only a browsing target, with no Practice, Done, exclusion action or aggregate percentage
+- **AND** its concrete children retain independent evidence and exclusion controls
+- **AND** no exercise is added to Total and no larger practice span is created
+
+#### Scenario: Incomplete original and remaining catalog access
+- **WHEN** the player selects an incomplete original
+- **THEN** its real preview and practice target remain available without duplicating the original as another right-column list row
+- **AND** associated connections remain inspectable, with existing prerequisite feedback for locked pairs and normal eligibility for admitted manual evidence even when its display is filtered
+- **AND** contrast exercises retain their existing Contrasts category and genuine excerpt identities
+
+#### Scenario: Grouping changes without losing the selected exercise
+- **WHEN** completion or Include manual causes a displayed group to merge or split
+- **THEN** the selected concrete exercise and appropriate focus remain identifiable by their original source-bound identity
+- **AND** no other exercise starts, no duplicate retained group is fabricated, and raw evidence and exclusions remain intact
