@@ -1,0 +1,99 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {browserAssistanceStore,type AssistanceStore,type AssistanceBrowserLocks} from '../src/durable-assistance-store';
+import {PersonalMemorySession,personalMemoryDocument,rawMemoryPersonal,type PersonalMemoryAction} from '../src/personal-memory-session';
+import {initialPersonal,personalStorageName,type PersonalState} from '../src/state';
+import type {ScorePackage} from '../src/package';
+import type {MemoryScoreInput} from '../src/personal-fingering-memory';
+
+class Locks implements AssistanceBrowserLocks {
+ private tail:Promise<unknown>=Promise.resolve();
+ request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}
+}
+function storage(){const data=new Map<string,string>(),locks=new Locks();return browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},locks);}
+function fixture(entryId='piece',lefts=[48,48,50,50]):MemoryScoreInput {
+ const notes=lefts.flatMap((left,b)=>[left,60,64].map((pitch,j)=>({eventKind:'pitched',id:`b${b}n${j}`,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:b*192+j*24,durationTicks:24,hand:j?'RH':'LH'})));
+ const p={manifest:{version:1,revision:'revision',metadata:{title:'Fixture'}},keyboardLayout:'janko-four-row',profileSha256:'geometry',pages:['svg'],score:{id:entryId,ticksPerBeat:48,totalTicks:lefts.length*192,sourceBarTicks:Array.from({length:lefts.length+1},(_,i)=>192*i),notes},seats:notes.map((n,i)=>({id:`s${i}`,ownerIds:[n.id],writtenBar:Math.floor(i/3)+1,contactId:`c${i}`,actionId:`a${i}`,page:0,system:0,x:i,baseline:0,fontSize:12,pitchDigit:'1'}))} as unknown as ScorePackage;
+ return{entryId,importedAt:'2020-01-01',p,personal:initialPersonal(p)};
+}
+function choose(input:MemoryScoreInput,id:string,finger:number,date='2020-02-01',known=true){
+ const n=input.p.score.notes.find(n=>n.id===id)! as any;input.personal.assignments??={version:'personal-owner-assignments-v1',sourceRevision:'revision',choices:{}};
+ const lineage=`${input.entryId}:${id}:${date}`;input.personal.assignments.choices[id]={ownerId:id,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand},finger,createdAt:date,...(known?{intent:{finger:{decisionId:lineage,lineageId:lineage,authoredAt:date}}}:{})};return input;
+}
+const action=(ownerId:string,finger:1|2|3|4|5|null|'inherit',decisionId=`${ownerId}:${finger}`):PersonalMemoryAction=>({kind:'finger',edit:{ownerId,finger,decisionId,authoredAt:'2025-01-01'}});
+const session=(store:AssistanceStore,inputs:MemoryScoreInput[])=>new PersonalMemorySession(store,{scanLibrary:async()=>structuredClone(inputs),validateInputs:async()=>true});
+const finger=(s:PersonalMemorySession,input:MemoryScoreInput,id:string)=>s.resolve(input).assignments.find(a=>a.id===id)?.finger;
+async function load(s:PersonalMemorySession,input:MemoryScoreInput){return s.loadPersonalCurrent({id:input.entryId,importedAt:input.importedAt!},input.p,async()=>input.personal);}
+
+test('full-library bootstrap is deterministic and durable raw personal wins over legacy',async()=>{
+ const a=choose(fixture('a'),'b0n1',2),b=choose(fixture('b'),'b0n1',3,'2021-01-01'),store=storage(),s=session(store,[b,a]);await s.initialize();
+ assert.equal(finger(s,a,'b1n1'),2);assert.equal(finger(s,b,'b0n1'),3);
+ let legacyReads=0;const personal=await s.loadPersonalCurrent({id:'a',importedAt:a.importedAt!},a.p,async()=>{legacyReads++;return initialPersonal(a.p);});
+ assert.equal(legacyReads,0);assert.equal(personal.assignments?.choices.b0n1.finger,2);
+ const other=session(storage(),[a,b]);await other.initialize();assert.deepEqual(s.memory,other.memory);
+});
+test('bootstrap rejects changing legacy input before activating any partial index',async()=>{
+ const store=storage(),s=new PersonalMemorySession(store,{scanLibrary:async()=>[fixture()],validateInputs:async()=>false});await assert.rejects(s.initialize(),/changed during indexing/);
+ assert.equal((await store.read()).revision,0);
+});
+test('newly imported score registers custody and saved differences without reimporting stale authored source values on reload',async()=>{
+ const input=choose(fixture('first'),'b0n1',2),store=storage(),s=session(store,[input]);await s.initialize();
+ const added=choose(fixture('new'),'b0n1',3,'2021-01-01');await load(s,added);assert.equal(finger(s,added,'b0n1'),3);assert.ok(Object.values(s.memory.occurrences).some(r=>r.entryId==='new'));
+ await s.accept(input,action('b0n1',5,'new-shared')).saved;await load(s,input);
+ assert.equal(finger(s,input,'b1n1'),5);assert.equal(finger(s,added,'b0n1'),3);
+});
+test('two application sessions replay source-bound additions on latest raw personal without losing either',async()=>{
+ const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
+ const x=a.accept(input,action('b0n1',2,'first')),y=b.accept(input,action('b0n2',4,'second'));
+ assert.equal(finger(a,{...input,personal:x.personal},'b3n1'),2);
+ await Promise.all([x.saved,y.saved]);const raw=await load(a,input);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal(raw.assignments?.choices.b0n2.finger,4);
+ assert.equal(finger(a,{...input,personal:raw},'b3n2'),4);assert.deepEqual(a.recovery,[]);
+});
+test('concurrent additions to one shared field keep the second captured choice local',async()=>{
+ const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
+ const first=a.accept(input,action('b0n1',2,'a')),second=b.accept(input,action('b1n1',3,'b'));await first.saved;await second.saved;
+ const raw=await load(a,input);assert.equal(finger(a,{...input,personal:raw},'b3n1'),2);assert.equal(finger(a,{...input,personal:raw},'b1n1'),3);
+});
+test('view save merges latest authority and never stores transient resolved fingers',async()=>{
+ const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
+ const entered=a.accept(input,action('b0n1',2));await entered.saved;
+ const stale=structuredClone(input.personal) as PersonalState&{memoryResolved?:unknown};stale.view.rotation=90;stale.memoryResolved={revision:999,choices:{b3n1:{finger:5}}};
+ await b.saveView({...input,personal:stale});const raw=await load(a,input);assert.equal(raw.view.rotation,90);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal((raw as any).memoryResolved,undefined);
+ assert.equal((rawMemoryPersonal(stale) as any).memoryResolved,undefined);
+});
+test('failed effective commit leaves durable source intent recoverable after restart',async()=>{
+ const input=fixture(),base=storage();let fail=false;
+ const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{if(fail&&args.changes[personalMemoryDocument])throw Error('disk full');return base.commit(args);}};
+ const first=session(store,[input]);await first.initialize();fail=true;const accepted=first.accept(input,action('b0n1',2));await assert.rejects(accepted.saved,/disk full/);
+ assert.equal(first.recovery.length,1);assert.equal((await base.read()).documents[personalStorageName(input.entryId,input.p)]!==undefined,true);
+ const restarted=session(store,[input]);await restarted.initialize();assert.equal(restarted.recovery.length,1);assert.throws(()=>restarted.accept(input,action('b0n2',4)),/paused/);
+ fail=false;await restarted.retry();const raw=await load(restarted,input);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal(finger(restarted,{...input,personal:raw},'b3n1'),2);assert.equal(restarted.recovery.length,0);
+});
+test('lost commit acknowledgement retries without re-authoring the accepted decision',async()=>{
+ const input=fixture(),base=storage();let lose=false;
+ const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{const result=await base.commit(args);if(lose&&args.changes[personalMemoryDocument]){lose=false;throw Error('reply lost');}return result;}};
+ const s=session(store,[input]);await s.initialize();lose=true;await assert.rejects(s.accept(input,action('b0n1',2)).saved,/reply lost/);
+ const revision=(await base.read()).revision;await s.retry();assert.equal((await base.read()).revision,revision);assert.equal(s.recovery.length,0);
+});
+test('ordered optimistic entry retains selected owners and hand edits do not author displayed fingers',async()=>{
+ const input=choose(fixture(),'b0n1',2),s=session(storage(),[input]);await s.initialize();
+ const first=s.accept(input,action('b1n2',4)),second=s.accept({...input,personal:first.personal},action('b2n1',3));await Promise.all([first.saved,second.saved]);
+ const raw=await load(s,input);assert.equal(raw.assignments?.choices.b1n2.finger,4);assert.equal(raw.assignments?.choices.b2n1.finger,3);
+ const hand=s.accept({...input,personal:raw},{kind:'hand',ownerId:'b3n1',hand:'LH',decisionId:'hand',authoredAt:'2025-02-01'});await hand.saved;
+ assert.equal(hand.personal.assignments?.choices.b3n1.hand,'LH');assert.equal(hand.personal.assignments?.choices.b3n1.intent?.finger,undefined);
+});
+test('consolidation atomically retains originals and receipt; retries preserve later local exceptions',async()=>{
+ const input=choose(choose(fixture(),'b0n1',2),'b2n1',3,'2021-01-01',false);choose(input,'b2n2',4,'2022-01-01',false);
+ const store=storage(),s=session(store,[input]);await s.initialize();const before=await store.read();
+ const receipt=await s.consolidate({entryIds:['piece'],receiptId:'one-time',isSafe:()=>true,sourceRevisions:{piece:'revision'}});assert.equal(receipt.replaced.length,1);
+ let raw=await load(s,input);assert.equal(finger(s,{...input,personal:raw},'b3n1'),2);assert.equal(finger(s,{...input,personal:raw},'b3n2'),4);
+ const after=await store.read(),backupName=Object.keys(after.documents).find(key=>key.endsWith('/originals'))!;assert.deepEqual((after.documents[backupName] as any).personal[personalStorageName('piece',input.p)],input.personal);assert.equal(after.previous,before.id);
+ const local=s.accept({...input,personal:raw},action('b3n1',5,'later'));await local.saved;const revision=(await store.read()).revision;
+ await s.consolidate({entryIds:['piece'],receiptId:'one-time',isSafe:()=>false});raw=await load(s,input);assert.equal(finger(s,{...input,personal:raw},'b3n1'),5);assert.equal((await store.read()).revision,revision);
+});
+test('unsafe or changing migration inputs leave memory, raw state, and completion absent',async()=>{
+ const input=choose(fixture(),'b0n1',2),store=storage();let valid=true;
+ const s=new PersonalMemorySession(store,{scanLibrary:async()=>[input],validateInputs:async()=>valid});await s.initialize();const before=await store.read();
+ await assert.rejects(s.consolidate({entryIds:['piece'],receiptId:'unsafe',isSafe:()=>false}),/waits until practice/);
+ valid=false;await assert.rejects(s.consolidate({entryIds:['piece'],receiptId:'changed',isSafe:()=>true}),/inputs changed/);assert.equal((await store.read()).id,before.id);
+});
