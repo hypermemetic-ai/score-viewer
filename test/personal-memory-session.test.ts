@@ -11,6 +11,19 @@ class Locks implements AssistanceBrowserLocks {
  request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}
 }
 function storage(){const data=new Map<string,string>(),locks=new Locks();return browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},locks);}
+/** Both clients prepare an effective write against old state. The selected
+ * winner commits first, forcing the other to replay its captured intent after
+ * a real stale-revision rejection. Promise await order alone cannot do that. */
+function concurrentStores(winner:'a'|'b'){
+ const base=storage();let armed=false,conflicts=0,ready!:()=>void,committed!:()=>void;
+ const loserPrepared=new Promise<void>(resolve=>{ready=resolve;}),winnerCommitted=new Promise<void>(resolve=>{committed=resolve;});
+ const client=(id:'a'|'b'):AssistanceStore=>({read:key=>base.read(key),commit:async input=>{
+  if(!armed||!input.changes[personalMemoryDocument])return base.commit(input);
+  if(id===winner){await loserPrepared;const result=await base.commit(input);if(result.status==='committed')committed();return result;}
+  ready();await winnerCommitted;const result=await base.commit(input);if(result.status==='conflict')conflicts++;return result;
+ }});
+ return{a:client('a'),b:client('b'),arm:()=>{armed=true;},conflicts:()=>conflicts};
+}
 function fixture(entryId='piece',lefts=[48,48,50,50]):MemoryScoreInput {
  const notes=lefts.flatMap((left,b)=>[left,60,64].map((pitch,j)=>({eventKind:'pitched',id:`b${b}n${j}`,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:b*192+j*24,durationTicks:24,hand:j?'RH':'LH'})));
  const p={manifest:{version:1,revision:'revision',metadata:{title:'Fixture'}},keyboardLayout:'janko-four-row',profileSha256:'geometry',pages:['svg'],score:{id:entryId,ticksPerBeat:48,totalTicks:lefts.length*192,sourceBarTicks:Array.from({length:lefts.length+1},(_,i)=>192*i),notes},seats:notes.map((n,i)=>({id:`s${i}`,ownerIds:[n.id],writtenBar:Math.floor(i/3)+1,contactId:`c${i}`,actionId:`a${i}`,page:0,system:0,x:i,baseline:0,fontSize:12,pitchDigit:'1'}))} as unknown as ScorePackage;
@@ -60,10 +73,19 @@ test('two application sessions replay source-bound additions on latest raw perso
  await Promise.all([x.saved,y.saved]);const raw=await load(a,input);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal(raw.assignments?.choices.b0n2.finger,4);
  assert.equal(finger(a,{...input,personal:raw},'b3n2'),4);assert.deepEqual(a.recovery,[]);
 });
-test('concurrent additions to one shared field keep the second captured choice local',async()=>{
- const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
- const first=a.accept(input,action('b0n1',2,'a')),second=b.accept(input,action('b1n1',3,'b'));await first.saved;await second.saved;
- const raw=await load(a,input);assert.equal(finger(a,{...input,personal:raw},'b3n1'),2);assert.equal(finger(a,{...input,personal:raw},'b1n1'),3);
+for(const winner of ['a','b'] as const)test(`concurrent additions replay after CAS conflict with ${winner} committing first`,{timeout:5000},async()=>{
+ const input=fixture(),stores=concurrentStores(winner),a=session(stores.a,[input]),b=session(stores.b,[input]);await a.initialize();await b.initialize();stores.arm();
+ const first=a.accept(input,action('b0n1',2,'a')),second=b.accept(input,action('b1n1',3,'b'));
+ assert.equal(first.intent.action.kind==='finger'&&first.intent.action.edit.captured?.operation,'add');assert.equal(second.intent.action.kind==='finger'&&second.intent.action.edit.captured?.operation,'add');
+ await Promise.all([first.saved,second.saved]);assert.ok(stores.conflicts()>0,'the losing effective write must encounter a stale revision');
+ const raw=await load(a,input),effective={...input,personal:raw};assert.equal(finger(a,effective,'b3n1'),winner==='a'?2:3);assert.equal(finger(a,effective,'b0n1'),2);assert.equal(finger(a,effective,'b1n1'),3);
+ assert.equal(a.resolve(effective).byOwner[winner==='a'?'b1n1':'b0n1'].finger?.provenance,'local');
+});
+test('captured missing-field addition becomes local even when the concurrent winner makes that same owner the reference',{timeout:5000},async()=>{
+ const input=fixture(),stores=concurrentStores('a'),a=session(stores.a,[input]),b=session(stores.b,[input]);await a.initialize();await b.initialize();stores.arm();
+ const first=a.accept(input,action('b0n1',2,'a')),second=b.accept(input,action('b0n1',3,'b'));await Promise.all([first.saved,second.saved]);assert.ok(stores.conflicts()>0);
+ const raw=await load(a,input),effective={...input,personal:raw};assert.equal(finger(a,effective,'b3n1'),2);assert.equal(finger(a,effective,'b0n1'),3);
+ const resolution=a.resolve(effective).byOwner.b0n1;assert.equal(resolution.finger?.provenance,'local');assert.equal(resolution.reference?.writtenBar,1);
 });
 test('view save merges latest authority and never stores transient resolved fingers',async()=>{
  const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
