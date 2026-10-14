@@ -5,7 +5,7 @@ import type {AdviceEvidence} from './fingering-advice';
 
 export function withResolvedMemory(input:MemoryScoreInput,resolution:MemoryResolution,revision:number):PersonalState {
  const personal=rawMemoryPersonal(input.personal);
- personal.memoryResolved={revision,sourceRevision:input.p.sourceRevision??input.p.manifest.revision,choices:Object.fromEntries(Object.entries(resolution.byOwner).flatMap(([id,r])=>r.finger?[[id,{finger:r.finger.value}]]:[]))};
+ personal.memoryResolved={revision,sourceRevision:input.p.sourceRevision??input.p.manifest.revision,choices:Object.fromEntries(Object.entries(resolution.byOwner).flatMap(([id,r])=>r.finger&&!r.calculated?[[id,{finger:r.finger.value}]]:[]))};
  return personal;
 }
 /** A copied decision is useful for assessment, but never another corpus sample. */

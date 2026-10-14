@@ -26,7 +26,7 @@ test('library donor scan excludes historical editions and detects changes to act
  const input=fixture(),entry={id:'piece',file:'active.isoscore',metadata:{title:'Fixture'},importedAt:'2020-01-01',retainedPackages:['old.isoscore']} as Entry;
  const files=new Map([['active.isoscore',new Uint8Array([1])]]),reads:string[]=[];
  const library=new PersonalMemoryLibrary({read:async name=>{reads.push(name);return files.get(name)??null;}},()=>[entry],async()=>input.p);
- const inputs=await library.scan();assert.equal(inputs.length,1);assert.ok(!reads.includes('old.isoscore'));assert.equal(await library.validate(),true);
+ library.remember(input);assert.equal(library.scanned,false);const inputs=await library.scan();assert.equal(library.scanned,true);assert.equal(inputs.length,1);assert.ok(!reads.includes('old.isoscore'));assert.equal(await library.validate(),true);
  files.set('active.isoscore',new Uint8Array([2]));assert.equal(await library.validate(),false);
 });
 test('library additions during election invalidate the donor snapshot',async()=>{

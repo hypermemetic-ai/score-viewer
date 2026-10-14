@@ -8,7 +8,7 @@ import type {MemoryScoreInput} from './personal-fingering-memory';
  * Historical packages, undo buffers and calculated layers are never new donors. */
 export class PersonalMemoryLibrary {
  private captured=new Map<string,string|null>();private capturedLibrary='';
- inputs:MemoryScoreInput[]=[];
+ inputs:MemoryScoreInput[]=[];scanned=false;
  constructor(private host:{read(name:string):Promise<Uint8Array|null>},private entries:()=>readonly Entry[],private admit:(bytes:Uint8Array)=>Promise<ScorePackage>){}
  async scan():Promise<MemoryScoreInput[]>{
   const captured=new Map<string,string|null>(),library=JSON.stringify(this.entries());
@@ -22,8 +22,8 @@ export class PersonalMemoryLibrary {
    for(const p of presentations){const personal=await loadPersonalJournal({read},entry,p);inputs.push({entryId:entry.id,importedAt:entry.importedAt,p,personal});}
   }
   if(JSON.stringify(this.entries())!==library)throw Error('The library changed while fingering choices were being indexed.');
-  this.captured=captured;this.capturedLibrary=library;this.inputs=inputs;return inputs;
+  this.captured=captured;this.capturedLibrary=library;this.inputs=inputs;this.scanned=true;return inputs;
  }
  async validate(){if(JSON.stringify(this.entries())!==this.capturedLibrary)return false;for(const [name,hash] of this.captured){const bytes=await this.host.read(name);if((bytes?await hashBytes(bytes):null)!==hash)return false;}return true;}
- remember(input:MemoryScoreInput){const key=personalStorageName(input.entryId,input.p),index=this.inputs.findIndex(q=>personalStorageName(q.entryId,q.p)===key);if(index<0)this.inputs.push(input);else this.inputs[index]=input;}
+ remember(input:MemoryScoreInput){const key=personalStorageName(input.entryId,input.p);this.inputs=this.inputs.filter(q=>q.entryId!==input.entryId||q.p.keyboardLayout!==input.p.keyboardLayout||personalStorageName(q.entryId,q.p)===key);const index=this.inputs.findIndex(q=>personalStorageName(q.entryId,q.p)===key);if(index<0)this.inputs.push(input);else this.inputs[index]=input;}
 }

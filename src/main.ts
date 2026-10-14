@@ -67,11 +67,13 @@ import {LibraryMenu,instrumentPickerMarkup,libraryFocusKey,libraryFocusElement} 
 import {EditSequence} from './edit-sequence';
 import {PersonalEditQueue} from './personal-edit-queue';
 import {PersonalMemorySession,rawMemoryPersonal,type PersonalMemoryAction} from './personal-memory-session';
+import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryLibrary} from './personal-memory-library';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from './personal-assistance';
 import type {MemoryScoreInput} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
 import {EditorAdviceRunner,scoreAdviceContacts,analyzeEditorAdviceAsync,createAdviceCorpusState,replaceAdviceCorpusScore,type EditorAdviceResult} from './fingering-advice';
+import {storedAdviceCorpus,saveAdviceCorpus} from './fingering-advice-store';
 import {FingeringAdviceOptions,readFingeringAdviceSettings,type FingeringAdviceSettings} from './fingering-advice-settings';
 import {selectedAdviceExplanations} from './fingering-advice-markers';
 import {paintEditorAdvice} from './editor-advice-view';
@@ -386,12 +388,18 @@ function refreshEditorAdvice(){
  const target=current,input=memoryInput(target),memory=personalMemory.memory,settings=readFingeringAdviceSettings(preferences.fingeringAdvice),key=JSON.stringify([input.entryId,input.p.sourceSha256,memory.revision,effectiveAssignmentKey(input.p,target.personal),settings]);
  if(adviceKey===key)return;adviceKey=key;
  void adviceRunner.run({scoreId:input.entryId,sourceRevision:input.p.sourceRevision??input.p.manifest.revision,assignmentRevision:key,settingsRevision:JSON.stringify(settings)},async signal=>{
-  if(!memoryLibrary.inputs.length)await memoryLibrary.scan();signal.throwIfAborted();
-  let corpus=createAdviceCorpusState();
-  for(const cached of memoryLibrary.inputs){
-   signal.throwIfAborted();const other={...cached,personal:personalMemory.personalFor(cached)},resolution=personalMemory.resolve(other),scoreId=personalStorageName(other.entryId,other.p),context={playerId:memory.playerId,scoreId,revision:memory.revision,evidenceByOwner:memoryAdviceEvidence(other,resolution)};
-   const analysis=await analyzeEditorAdviceAsync(scoreAdviceContacts(other.p,resolution.assignments,{layer:activeLayer(other.p,other.personal)}),context,corpus.corpus,settings,signal);
-   corpus=replaceAdviceCorpusScore(corpus,memory.playerId,scoreId,memory.revision,analysis.observations);
+  if(!memoryLibrary.scanned)await memoryLibrary.scan();signal.throwIfAborted();
+  const inputs=memoryLibrary.inputs.map(cached=>({...cached,personal:personalMemory.personalFor(cached)}));
+  const contextKey=await hashBytes(JSON.stringify([memory.revision,inputs.map(other=>{const resolved=personalMemory.resolve(other);return[personalStorageName(other.entryId,other.p),other.p.manifest.revision,other.p.sourceSha256,activeLayer(other.p,other.personal),resolved.assignments,[...memoryAdviceEvidence(other,resolved)]];}).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]));
+  signal.throwIfAborted();let corpus=storedAdviceCorpus(await host.assistanceStore!.read(),memory.revision,contextKey);
+  if(!corpus){corpus=createAdviceCorpusState();
+   for(const other of inputs){
+    signal.throwIfAborted();const resolution=personalMemory.resolve(other),scoreId=personalStorageName(other.entryId,other.p),context={playerId:memory.playerId,scoreId,revision:memory.revision,evidenceByOwner:memoryAdviceEvidence(other,resolution)};
+    const analysis=await analyzeEditorAdviceAsync(scoreAdviceContacts(other.p,resolution.assignments,{layer:activeLayer(other.p,other.personal)}),context,corpus.corpus,settings,signal);
+    corpus=replaceAdviceCorpusScore(corpus,memory.playerId,scoreId,memory.revision,analysis.observations);
+   }
+   const captured=corpus;
+   void personalMemory.flush().then(()=>saveAdviceCorpus(host.assistanceStore!,{version:1,memoryRevision:memory.revision,contextKey,state:captured},()=>!signal.aborted&&adviceKey===key)).catch(error=>{if(!signal.aborted&&adviceKey===key)notify(`Fingering warning history was not saved: ${(error as Error).message}`);});
   }
   signal.throwIfAborted();const resolution=personalMemory.resolve(input);
   return analyzeEditorAdviceAsync(scoreAdviceContacts(input.p,resolution.assignments,{layer:activeLayer(input.p,input.personal)}),{playerId:memory.playerId,scoreId:personalStorageName(input.entryId,input.p),revision:memory.revision,evidenceByOwner:memoryAdviceEvidence(input,resolution)},corpus.corpus,settings,signal);
@@ -430,8 +438,7 @@ async function visitMemorySource(){
 /** An explicit delivery request is consumed only by the application, after its
  * own queues have drained. No outside tool rewrites a live personal journal. */
 async function applyPendingConsolidation(){
- const request=await readJson<{version:1;entryIds:string[];receiptId:string;sourceRevisions:Record<string,string>;personalKeys?:string[]}>('personal-fingering-consolidation-request.json');if(!request)return;
- if(request.version!==1||!Array.isArray(request.entryIds)||!request.entryIds.length||request.entryIds.some(id=>typeof id!=='string'||!entries.some(e=>e.id===id))||typeof request.receiptId!=='string'||!request.receiptId||!request.sourceRevisions||request.entryIds.some(id=>typeof request.sourceRevisions[id]!=='string'))throw Error('The requested fingering consolidation does not match this library. Saved choices are retained.');
+ const request=await pendingPersonalConsolidation(host.assistanceStore!,entries.map(entry=>entry.id));if(!request)return;
  await persist;await personalMemory.flush();
  await personalMemory.consolidate({...request,isSafe:()=>!practice&&!current&&!readingOperation&&!startupReady});
 }
@@ -548,6 +555,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
  if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
+ if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
  }catch(error){if(ownsOperation)finishReading(op,false);throw error;}
 }
@@ -895,8 +903,8 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  capturePersonalNavigation(next,readerPackage(),nextSeat,true);
  await presentPersonalChange(target,next,receipt.saved,nextSeat);
 }
-function saveFingerDigit(replacement:number){return saveSelectedChoice({finger:replacement},true);}
-function saveHandChoice(hand:PersonalHand){return saveSelectedChoice({hand},false);}
+function saveFingerDigit(replacement:number){return saveSelectedChoice({finger:replacement},true).catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});}
+function saveHandChoice(hand:PersonalHand){return saveSelectedChoice({hand},false).catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});}
 
 function paintLibrarySummaries(){if(!startupReady||current||practice)return;if(dialog){librarySummaryPaintPending=true;return;}renderLibrary();}
 const libraryProgressContext=()=>JSON.stringify([preferences.keyboardLayout,entries]);
