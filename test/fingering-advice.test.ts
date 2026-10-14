@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {rrFrontThirdContact,createTravelCorpus,type TravelCorpus,type TravelCorpusObservation} from '@hypermemetic-ai/fingering-calculator';
+import {rrFrontThirdContact,createTravelCorpus,type TravelCorpus,type TravelCorpusObservation} from '@hypermemetic-ai/fingering-editor-assistance';
 import {buildAdviceContacts,scoreAdviceContacts,analyzeEditorAdvice,analyzeEditorAdviceAsync,createAdviceCorpusState,readAdviceCorpusState,replaceAdviceCorpusScore,EditorAdviceRunner,type AdvicePerformedAttack,type AdviceContext,type AdviceRevision} from '../src/fingering-advice';
 import {DEFAULT_FINGERING_ADVICE_SETTINGS,readFingeringAdviceSettings,adviceThresholdFromInput,fingeringAdviceOptionsMarkup} from '../src/fingering-advice-settings';
 import {layoutAdviceMarkers,selectedAdviceExplanations,adviceMarkerSvg} from '../src/fingering-advice-markers';

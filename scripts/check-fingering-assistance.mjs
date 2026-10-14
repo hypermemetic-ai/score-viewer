@@ -1,0 +1,18 @@
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const source=JSON.parse(readFileSync(new URL('../docs/fingering-assistance-provenance.json',import.meta.url)));
+const root=new URL('../',import.meta.url),bytes=readFileSync(new URL(source.artifact,root));
+const hash=(bytes,algorithm='sha256',encoding='hex')=>createHash(algorithm).update(bytes).digest(encoding);
+if(hash(bytes)!==source.sha256)throw Error('Fingering assistance artifact differs from the reviewed pin');
+const member=name=>execFileSync('tar',['-xzOf',new URL(source.artifact,root).pathname,'package/'+name]);
+const embedded=JSON.parse(member('provenance.json'));
+if(embedded.sourceRepository!==source.repository||embedded.sourceRevision!==source.revision)throw Error('Fingering assistance source provenance differs');
+const names=execFileSync('tar',['-tzf',new URL(source.artifact,root).pathname],{encoding:'utf8'}).trim().split('\n').sort();
+const expected=[...embedded.files.map(f=>'package/'+f.path),'package/provenance.json'].sort();
+if(JSON.stringify(names)!==JSON.stringify(expected))throw Error('Fingering assistance has undeclared payload files');
+for(const file of embedded.files)if(hash(member(file.path))!==file.sha256)throw Error('Fingering assistance emitted module differs: '+file.path);
+const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url))),lock=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url)));
+if(pkg.dependencies[source.package]!=='file:'+source.artifact||lock.packages[''].dependencies[source.package]!==pkg.dependencies[source.package])throw Error('Fingering assistance package declaration differs');
+if(lock.packages['node_modules/'+source.package]?.integrity!=='sha512-'+hash(bytes,'sha512','base64'))throw Error('Fingering assistance lock integrity differs');
+console.log('Fingering assistance pin verified: '+source.revision);

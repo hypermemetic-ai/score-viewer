@@ -3,7 +3,7 @@ import {
  createTravelCorpus,readTravelCorpus,DEFAULT_UNUSUAL_TRAVEL_SETTINGS,
  type PerformedTravelContact,type TravelContact,type TravelFinger,type TravelHand,
  type FingerTravelAnalysis,type FingerTravelTransition,type TravelCorpus,type TravelCorpusObservation,type UnusualTravelResult,
-} from '@hypermemetic-ai/fingering-calculator';
+} from '@hypermemetic-ai/fingering-editor-assistance';
 import {referencePerformanceClock} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage,FingerLayer} from './package';

@@ -3,7 +3,7 @@ import {
  resolveMeasureMemory,applyMeasureMemoryEdits,importMeasureMemoryHistory,promoteMeasureMemoryReference,transferMeasureMemoryReference,
  type MeasureFingeringMemory,type MeasureMemoryOccurrence,type MeasureOwnerEdit,type MeasureHistoricalRecord,
  type MeasureMemoryDiagnostic,type ResolvedMeasureField,type MeasureFieldDecision,
-} from '@hypermemetic-ai/fingering-calculator';
+} from '@hypermemetic-ai/fingering-editor-assistance';
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage} from './package';
 import {hashBytes} from './package';

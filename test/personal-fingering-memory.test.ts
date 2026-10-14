@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {importPersonalMemoryScore,captureMemoryFingerEdit,createPersonalFingeringMemory,projectPersonalMemoryScore,bootstrapPersonalFingeringMemory,resolvePersonalFingeringMemory,editPersonalFingeringMemory,promotePersonalFingeringReference,deletePersonalFingeringEntry,registerMemoryScore,consolidatePersonalFingeringMemory,readPersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
 import type {ScorePackage} from '../src/package';import {initialPersonal} from '../src/state';
-import {measureMemoryKey} from '@hypermemetic-ai/fingering-calculator';
+import {measureMemoryKey} from '@hypermemetic-ai/fingering-editor-assistance';
 
 function fixture(entryId='piece',accompaniments=[48,48,50,50]):MemoryScoreInput {
  const notes=accompaniments.flatMap((left,b)=>[left,60,64].map((pitch,j)=>({eventKind:'pitched',id:`b${b}n${j}`,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},startTick:b*192+j*24,durationTicks:24,hand:j?'RH':'LH'})));
