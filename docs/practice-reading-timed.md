@@ -11,8 +11,14 @@ credit, and never automatically starts Timed. MIDI identifies pitches and contac
 not physical fingers. With no piano connected, Reading displays the full source
 window for manual reading without assessing notes or advancing automatically.
 
-The selector keeps three groups: original sections, connections between two
-consecutive sections, and contrasts between similar original sections. Sections
+The selector groups adjacent completed sections into one row under Completed,
+with unfinished sections below under Incomplete. Selecting a completed group
+shows unfinished Connections first, then its Completed sections and connections.
+A group only opens its contents; select an individual exercise to begin.
+Incomplete sections also expose their neighboring connections, including those
+still locked. Contrasts remain a separate category. Include manual changes the
+displayed grouping without changing connection prerequisites or saved progress.
+Sections
 balance musical boundary evidence with roughly 25 distinct onset positions;
 simultaneous chord notes share one sizing onset. This is a practice sizing
 heuristic, not a playback tempo or a measured memory limit. Schumann No. 14
