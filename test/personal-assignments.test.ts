@@ -126,3 +126,11 @@ test('coincident independently represented owners are not manufactured into pers
  const p=fixture();p.score.notes.push({...p.score.notes[0],id:'independent'});
  const s=assigned(p,initialPersonal(p),p.seats[0],{finger:2});assert.equal(s.assignments!.choices.independent,undefined);assert.deepEqual(readPersonal(s,p),s);
 });
+test('resolved personal memory is shared by display and calculation; suppression blocks fallback and is never durable input',()=>{
+ const p=fixture(),s=initialPersonal(p);s.memoryResolved={revision:4,sourceRevision:p.sourceRevision!,choices:{'owner-0':{finger:2},'owner-1':{finger:null}}};
+ assert.equal(fingerFor(p,s,p.seats[0]),2);assert.equal(fingerFor(p,s,p.seats[1]),undefined);
+ assert.equal(effectiveAssignments(p,s).find(c=>c.id==='owner-0')!.finger,2);assert.equal(effectiveAssignments(p,s).find(c=>c.id==='owner-1')!.finger,undefined);
+ const constraints=pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,s,'calculate');assert.equal(constraints.find(c=>c.ownerId==='owner-0')!.finger,2);assert.equal(constraints.find(c=>c.ownerId==='owner-1'),undefined);
+ assert.equal(readPersonal(s,p).memoryResolved,undefined);
+ s.memoryResolved.sourceRevision='stale';assert.equal(fingerFor(p,s,p.seats[0]),3);
+});

@@ -51,7 +51,7 @@ export function effectiveAssignments(p:ScorePackage,s:PersonalState):EffectivePe
  readPersonalAssignments(s.assignments,p);
  const legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
  return p.score.notes.filter(isPitchedEvent).map(n=>{
-  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),finger=c?.finger??legacy?.replacement??fingers.get(n.id);
+  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,finger=shared?shared.finger??undefined:c?.finger??legacy?.replacement??fingers.get(n.id);
   return{id:n.id,...guard(n),hand:(c?.hand??n.hand) as PersonalHand,...(finger===undefined?{}:{finger})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }

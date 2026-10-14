@@ -16,7 +16,8 @@ export interface PersonalBinding {sourceRevision:string;keyboardLayout:'conventi
  * projected contact IDs participate in the source/personal binding. */
 export interface PersonalSourceAnchor {owners:string[];writtenBar:number;actionId:string;continuation:boolean;alias:number}
 export interface PersonalNavigation {version:1;page?:PersonalSourceAnchor;edit?:PersonalSourceAnchor;followEdit:boolean}
-export interface PersonalState {version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
+export interface PersonalMemoryResolution {revision:number;sourceRevision:string;choices:Record<string,{finger:number|null}>}
+export interface PersonalState {memoryResolved?:PersonalMemoryResolution;version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
 const personalBinding=(p:ScorePackage):PersonalBinding|undefined=>{
  if(p.manifest.version!==2)return;
  if(!p.sourceRevision||!p.keyboardLayout||!p.profileId||!p.profileSha256||!p.effectiveHandSha256)throw Error('Incomplete presentation state identity');
@@ -40,7 +41,7 @@ export const initialPersonal=(p:ScorePackage):PersonalState=>({version:p.manifes
 export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJanko?:boolean}={}):PersonalState{
  if(!raw)return initialPersonal(p);
  if(typeof raw!=='object'||Array.isArray(raw))throw Error('Invalid saved personal state; original data retained');
- let s=structuredClone(raw) as PersonalState;const binding=personalBinding(p);
+ let s=structuredClone(raw) as PersonalState;delete s.memoryResolved;const binding=personalBinding(p);
  const legacy=options.allowLegacyJanko&&!!legacyPersonalStorageName(p)&&s.version===1&&s.revision===p.manifest.revision;
  if(legacy)s={...s,version:2,binding};
  const matchesBinding=binding?!!s.binding&&typeof s.binding==='object'&&!Array.isArray(s.binding)&&
@@ -77,8 +78,8 @@ export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJank
  return s;
 }
 export const activeLayer=(p:ScorePackage,s:PersonalState)=>s.layer??p.fingerLayer;
-export function fingerFor(p:ScorePackage,s:PersonalState,seat:Seat):number|undefined{const display=s.view.fingerSet==='calculated'&&s.calculatedVersion!==undefined?s.history[s.calculatedVersion]:activeLayer(p,s),a=display?.attacks.find(a=>a.id===(display.sourceOwnerToAttack[seat.ownerIds[0]]??seat.actionId)),legacy=s.overrides[seat.contactId]??Object.values(s.overrides).find(c=>c.ownerIds.includes(seat.ownerIds[0]));return s.view.fingerSet==='yours'?(s.assignments?.choices[seat.ownerIds[0]]?.finger??legacy?.replacement??a?.finger):a?.finger;}
-export function fingerDisplayAvailable(p:ScorePackage,s:PersonalState,presentation:FingerPresentation):boolean{return (!!activeLayer(p,s)||Object.values(s.assignments?.choices??{}).some(c=>c.finger!==undefined))&&(presentation==='annotations'||p.fingerEligibility.eligible);}
+export function fingerFor(p:ScorePackage,s:PersonalState,seat:Seat):number|undefined{const display=s.view.fingerSet==='calculated'&&s.calculatedVersion!==undefined?s.history[s.calculatedVersion]:activeLayer(p,s),a=display?.attacks.find(a=>a.id===(display.sourceOwnerToAttack[seat.ownerIds[0]]??seat.actionId)),legacy=s.overrides[seat.contactId]??Object.values(s.overrides).find(c=>c.ownerIds.includes(seat.ownerIds[0]));const shared=s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?s.memoryResolved.choices[seat.ownerIds[0]]:undefined;return s.view.fingerSet==='yours'?(shared?shared.finger??undefined:s.assignments?.choices[seat.ownerIds[0]]?.finger??legacy?.replacement??a?.finger):a?.finger;}
+export function fingerDisplayAvailable(p:ScorePackage,s:PersonalState,presentation:FingerPresentation):boolean{return (!!activeLayer(p,s)||Object.values(s.assignments?.choices??{}).some(c=>c.finger!==undefined)||s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)&&Object.values(s.memoryResolved.choices).some(c=>c.finger!==null))&&(presentation==='annotations'||p.fingerEligibility.eligible);}
 export function corrected(p:ScorePackage,s:PersonalState,seat:Seat,replacement:number):PersonalState{
  if(!Number.isInteger(replacement)||replacement<1||replacement>5)throw Error('Use a finger from 1 to 5');if(seat.ownerIds.some(id=>s.assignments?.choices[id]))return assigned(p,s,seat,{finger:replacement});const a=activeLayer(p,s)?.attacks.find(a=>a.id===seat.actionId);if(!a)throw Error('No complete calculated choice at this note');
  const next=structuredClone(s),prior=next.overrides[seat.contactId],layer=activeLayer(p,s)!;

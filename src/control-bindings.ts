@@ -4,7 +4,7 @@ export type ControlBinding={kind:'key';key:string}|({kind:'midi'}&MidiMapping);
 export type ControlSlots=[ControlBinding|null,ControlBinding|null];
 export const practiceModeActions=['practiceReading','practiceTimed','practiceFreeView'] as const;
 export type PracticeModeAction=typeof practiceModeActions[number];
-export const editorActions=['editorPrevious','editorNext','editorNavigation'] as const;
+export const editorActions=['editorPrevious','editorNext','editorNavigation','editorSource'] as const;
 export type EditorAction=typeof editorActions[number];
 export type ControlAction=ReadingAction|PracticeModeAction|EditorAction;
 export const isEditorAction=(action:ControlAction):action is EditorAction=>editorActions.includes(action as EditorAction);
@@ -15,7 +15,7 @@ export function controlActionsOverlap(a:ControlAction,b:ControlAction){
 }
 export const controlActions:readonly ControlAction[]=[...readingActions,...practiceModeActions,...editorActions];
 export const isPracticeModeAction=(action:ControlAction):action is PracticeModeAction=>practiceModeActions.includes(action as PracticeModeAction);
-export const controlActionLabel=(action:ControlAction)=>isEditorAction(action)?{editorPrevious:'Previous note / measure',editorNext:'Next note / measure',editorNavigation:'Notes / measures'}[action]:isPracticeModeAction(action)?{practiceReading:'Reading',practiceTimed:'Timed',practiceFreeView:'Free view'}[action]:readingActionLabel(action);
+export const controlActionLabel=(action:ControlAction)=>isEditorAction(action)?{editorPrevious:'Previous note / measure',editorNext:'Next note / measure',editorNavigation:'Notes / measures',editorSource:'Source / return'}[action]:isPracticeModeAction(action)?{practiceReading:'Reading',practiceTimed:'Timed',practiceFreeView:'Free view'}[action]:readingActionLabel(action);
 /** Missing mode slots remain missing on disk. Their effective defaults are
  * resolved only after local navigation has taken its inherited/saved form. */
 export interface ControlBindings {version:1;actions:Record<ReadingAction,ControlSlots>&Partial<Record<PracticeModeAction|EditorAction,ControlSlots>>}
@@ -61,7 +61,7 @@ export function editorControlBindings(bindings:ControlBindings):ControlBindings 
  for(const action of controlActions)if(!isEditorAction(action)&&action!=='toggle'&&action!=='practiceSettings'){
   if(isPracticeModeAction(action))delete next.actions[action];else next.actions[action]=[null,null];
  }
- for(const [action,key] of [['editorPrevious','ArrowLeft'],['editorNext','ArrowRight'],['editorNavigation','Space']] as const){
+ for(const [action,key] of [['editorPrevious','ArrowLeft'],['editorNext','ArrowRight'],['editorNavigation','Space'],['editorSource','KeyG']] as const){
   if(Object.hasOwn(next.actions,action))continue;
   // An explicit saved assignment anywhere owns a default key. Context reuse
   // remains available by assigning the editor action explicitly.
