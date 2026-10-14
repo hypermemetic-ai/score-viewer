@@ -1,0 +1,226 @@
+name: Build Windows and Mac Score Viewer
+run-name: Paired Score Viewer ${{ inputs.source_revision || github.sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Reviewed source commit (full SHA)
+        required: true
+        type: string
+      score_path:
+        description: Reviewed compatible score path in that commit
+        required: false
+        default: public/review/schumann-no14-conventional-20261006.isoscore
+        type: string
+      score_sha256:
+        description: Reviewed score-package SHA256
+        required: false
+        default: 2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d
+        type: string
+permissions:
+  contents: read
+env:
+  RUSTUP_TOOLCHAIN: 1.98.1
+  CARGO_INCREMENTAL: 0
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      source_revision: ${{ steps.prepare.outputs.source_revision }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.source_revision || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        id: node
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        id: probe-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/asset-probe-target
+          key: ${{ runner.os }}-${{ runner.arch }}-asset-probe-rust1.98.1-${{ hashFiles('scripts/native-delivery/score-viewer-asset-probe/Cargo.lock', 'scripts/native-delivery/score-viewer-asset-probe/Cargo.toml') }}
+      - name: Locked toolchain and dependencies
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+      - name: Verify reviewed source and one frozen frontend
+        id: prepare
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision || github.sha }}
+          SCORE_PATH: ${{ inputs.score_path || 'public/review/schumann-no14-conventional-20261006.isoscore' }}
+          SCORE_SHA256: ${{ inputs.score_sha256 || '2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d' }}
+          PROBE_CACHE_HIT: ${{ steps.probe-cache.outputs.cache-hit }}
+          NPM_CACHE_HIT: ${{ steps.node.outputs.cache-hit }}
+        run: node scripts/native-delivery/prepare-score-viewer.mjs "$GITHUB_WORKSPACE" "$RUNNER_TEMP/score-viewer-prepared"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Score-Viewer-prepared-${{ steps.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-prepared/
+          retention-days: 14
+          if-no-files-found: error
+  windows-x64:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: 1
+      CARGO_TARGET_DIR: ${{ github.workspace }}/build/native-target
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_revision }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        id: node
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        id: rust-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/native-target
+          key: ${{ runner.os }}-${{ runner.arch }}-viewer-x64-rust1.98.1-inc1-cgu16-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/tauri*.conf.json', 'src-tauri/build.rs') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-viewer-x64-rust1.98.1-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/tauri*.conf.json', 'src-tauri/build.rs') }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Score-Viewer-prepared-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-prepared
+      - name: Locked toolchain and dependencies
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+      - name: Native Windows tests, portable package and actual embedded proof
+        env:
+          RUST_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NPM_CACHE_HIT: ${{ steps.node.outputs.cache-hit }}
+        run: node scripts/native-delivery/build-score-viewer-windows.mjs "$env:GITHUB_WORKSPACE" "$env:RUNNER_TEMP/score-viewer-prepared" "$env:RUNNER_TEMP/score-viewer-windows"
+      - name: Capture failed Windows embedded-payload evidence
+        id: windows-diagnostics
+        if: ${{ failure() }}
+        run: node scripts/native-delivery/score-viewer-native-worker.mjs --capture-windows-diagnostics "$env:GITHUB_WORKSPACE" "$env:RUNNER_TEMP/score-viewer-prepared" "$env:CARGO_TARGET_DIR" "$env:RUNNER_TEMP/score-viewer-windows-diagnostic"
+      - name: Upload failed Windows diagnostic artifact
+        if: ${{ failure() && steps.windows-diagnostics.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Score-Viewer-windows-diagnostic-${{ needs.prepare.outputs.source_revision }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/score-viewer-windows-diagnostic/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+      - name: Save compiled Rust dependencies even if later packaging fails
+        if: ${{ always() && !cancelled() && steps.rust-cache.outputs.cache-hit != 'true' && steps.rust-cache.outputs.cache-primary-key != '' && hashFiles('build/native-target/**/release/.fingerprint/*/lib-*.json') != '' }}
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/native-target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Score-Viewer-windows-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-windows/
+          retention-days: 14
+          if-no-files-found: error
+  mac-universal:
+    needs: prepare
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: 1
+      CARGO_TARGET_DIR: ${{ github.workspace }}/build/native-target
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_revision }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        id: node
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        id: rust-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/native-target
+          key: ${{ runner.os }}-${{ runner.arch }}-viewer-universal-macos13.3-rust1.98.1-inc1-cgu16-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/tauri*.conf.json', 'src-tauri/build.rs') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-viewer-universal-macos13.3-rust1.98.1-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/tauri*.conf.json', 'src-tauri/build.rs') }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Score-Viewer-prepared-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-prepared
+      - name: Locked toolchain and dependencies
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+      - name: Native Mac tests, sealed universal package and actual embedded proof
+        env:
+          RUST_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NPM_CACHE_HIT: ${{ steps.node.outputs.cache-hit }}
+        run: node scripts/native-delivery/build-score-viewer-macos.mjs "$GITHUB_WORKSPACE" "$RUNNER_TEMP/score-viewer-prepared" "$RUNNER_TEMP/score-viewer-mac"
+      - name: Save compiled Rust dependencies even if later packaging fails
+        if: ${{ always() && !cancelled() && steps.rust-cache.outputs.cache-hit != 'true' && steps.rust-cache.outputs.cache-primary-key != '' && hashFiles('build/native-target/**/release/.fingerprint/*/lib-*.json') != '' }}
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/native-target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Score-Viewer-mac-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-mac/
+          retention-days: 14
+          if-no-files-found: error
+  assemble-pair:
+    needs: [prepare, windows-x64, mac-universal]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_revision }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Score-Viewer-prepared-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-prepared
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Score-Viewer-windows-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-windows
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Score-Viewer-mac-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-mac
+      - name: Require and independently verify the complete pair
+        run: node scripts/native-delivery/assemble-score-viewer.mjs "$RUNNER_TEMP/score-viewer-prepared" "$RUNNER_TEMP/score-viewer-windows" "$RUNNER_TEMP/score-viewer-mac" "$RUNNER_TEMP/score-viewer-pair"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ISO-Score-Viewer-paired-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ runner.temp }}/score-viewer-pair/
+          retention-days: 14
+          if-no-files-found: error

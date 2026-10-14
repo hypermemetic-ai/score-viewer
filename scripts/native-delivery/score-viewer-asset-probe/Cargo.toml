@@ -1,0 +1,9 @@
+[package]
+name = "iso-private-asset-probe"
+version = "0.1.0"
+edition = "2021"
+[dependencies]
+# Tauri's host-side encoder uses the same feature; platform libm costs otherwise
+# permit different compressed bytes for the same frozen frontend input.
+brotli = { version = "=9.0.0", features = ["portable-float"] }
+dom_query = "=0.28.0"
