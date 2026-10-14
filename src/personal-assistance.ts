@@ -1,3 +1,4 @@
+import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {projectPersonalMemoryScore,type MemoryScoreInput,type MemoryResolution,type PersonalFingeringMemory} from './personal-fingering-memory';
 import {rawMemoryPersonal} from './personal-memory-session';
 import type {PersonalState} from './state';
@@ -22,8 +23,9 @@ export function memoryAdviceEvidence(input:MemoryScoreInput,resolution:MemoryRes
  * or source IDs being identical across separately imported scores. */
 export function memoryReferenceTarget(input:MemoryScoreInput,resolution:MemoryResolution,ownerId:string){
  const reference=resolution.byOwner[ownerId]?.reference;if(!reference)return;
- const record=projectPersonalMemoryScore({...input,personal:rawMemoryPersonal(input.personal)}).find(r=>r.ownerIds.includes(ownerId)&&r.occurrence.scope===reference.occurrence.scope);
- const note=record?.occurrence.notes.find(n=>n.ownerId===ownerId);if(!note)return;
+ const source=input.p.score.notes.find(n=>n.id===ownerId),bars=input.p.score.sourceBarTicks;if(!source||!isPitchedEvent(source)||!bars)return;
+ const start=bars.findLast(tick=>tick<=source.startTick);if(start===undefined)return;const denominator=input.p.score.ticksPerBeat;
+ const note={midiPitch:source.pitch.octave*12+source.pitch.pitchClass,onset:{numerator:source.startTick-start,denominator},duration:{numerator:source.durationTicks,denominator}};
  const eq=(a:{numerator:number;denominator:number},b:{numerator:number;denominator:number})=>BigInt(a.numerator)*BigInt(b.denominator)===BigInt(b.numerator)*BigInt(a.denominator);
  const matches=reference.occurrence.notes.filter(n=>n.midiPitch===note.midiPitch&&eq(n.onset,note.onset)&&eq(n.duration,note.duration));
  if(matches.length!==1&&(!matches.length||!matches[0].physicalAliasId||!matches.every(n=>n.physicalAliasId===matches[0].physicalAliasId)))return;

@@ -158,3 +158,11 @@ test('restore-all and undo preserve current global knowledge and restore raw han
  assert.equal(undo.personal.assignments?.choices.b0n1.hand,'LH');assert.deepEqual(undo.personal.calculatedOwners,{b2n2:true});
  const raw=await load(a,input);assert.equal(finger(a,{...input,personal:raw},'b1n1'),5);assert.equal(finger(a,{...input,personal:raw},'b0n1'),5);
 });
+
+test('cache generation changes when equal-revision optimistic authority is replaced during save',async()=>{
+ const input=fixture(),s=session(storage(),[input]);await s.initialize();const initial=s.memoryGeneration;assert.equal(s.memoryGeneration,initial);
+ const accepted=s.accept(input,action('b0n1',2,'cache-generation')),optimisticRevision=s.memoryRevision,optimisticGeneration=s.memoryGeneration;
+ assert.ok(optimisticGeneration>initial);assert.equal(s.memoryGeneration,optimisticGeneration);
+ await accepted.saved;assert.equal(s.memoryRevision,optimisticRevision);assert.ok(s.memoryGeneration>optimisticGeneration);
+ const durableGeneration=s.memoryGeneration;input.personal.view.page=1;await s.saveView(input);assert.equal(s.memoryGeneration,durableGeneration);
+});

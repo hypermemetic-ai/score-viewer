@@ -26,7 +26,7 @@ export function personalMemoryBoundary(context:any,read:()=>any,write:(value:any
   },
   flush:()=>queue.flush(),retry:()=>queue.retry(),
  };
- Object.assign(context,{personalMemory:session,crypto,rawMemoryPersonal:structuredClone,
+ Object.assign(context,{personalMemory:session,resolveMemoryInput:(input:any)=>session.resolve(),crypto,rawMemoryPersonal:structuredClone,
   memoryInput:(target:any)=>({entryId:target.entry.id,p:target.package,personal:structuredClone(target.personal)}),
   resolveMemory:(target:any)=>structuredClone(target.personal),effectiveAssignmentKey:(_p:any,s:any)=>JSON.stringify(s.choices),
   adviceRunner:{cancel(){}},adviceKey:'',PracticeView:context.PracticeView??class{},

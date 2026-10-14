@@ -81,6 +81,11 @@ export class PersonalMemorySession {
  private inputs=new Map<string,MemoryScoreInput>();
  private pending=new Map<string,CapturedPersonalMemoryIntent>();
  constructor(private readonly store:AssistanceStore,private readonly options:PersonalMemorySessionOptions){}
+ private observedMemory?:PersonalFingeringMemory|string;private observedGeneration=0;
+ /** A rebase may replace optimistic content with a different document bearing
+  * the same revision. Cache authority by identity as well as revision. */
+ get memoryGeneration(){const authority=this.pending.size?this.optimistic:this.snapshot?.refs[personalMemoryDocument];if(this.observedMemory!==authority){this.observedMemory=authority;this.observedGeneration++;}return this.observedGeneration;}
+ get memoryRevision(){return this.optimistic?.revision??0;}
  get memory():PersonalFingeringMemory {if(!this.optimistic)throw Error('Personal fingering memory has not finished indexing.');return clone(this.optimistic);}
  get revision(){return this.snapshot?.revision??0;}
  get error(){return this.failed;}

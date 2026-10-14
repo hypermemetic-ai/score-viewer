@@ -68,9 +68,10 @@ import {EditSequence} from './edit-sequence';
 import {PersonalEditQueue} from './personal-edit-queue';
 import {PersonalMemorySession,rawMemoryPersonal,type PersonalMemoryAction} from './personal-memory-session';
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
+import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary} from './personal-memory-library';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from './personal-assistance';
-import type {MemoryScoreInput} from './personal-fingering-memory';
+import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
 import {EditorAdviceRunner,scoreAdviceContacts,analyzeEditorAdviceAsync,createAdviceCorpusState,replaceAdviceCorpusScore,type EditorAdviceResult} from './fingering-advice';
 import {storedAdviceCorpus,saveAdviceCorpus} from './fingering-advice-store';
@@ -162,7 +163,11 @@ const matchingCurrent=(target:NonNullable<typeof current>)=>current&&current.ent
 const memoryLibrary=new PersonalMemoryLibrary(host,()=>entries,bytes=>readerAdmission.import(bytes,{allowLegacyTempo:true}));
 const personalMemory=new PersonalMemorySession(host.assistanceStore!,{scanLibrary:()=>memoryLibrary.scan(),validateInputs:()=>memoryLibrary.validate()});
 const memoryInput=(target:NonNullable<typeof current>):MemoryScoreInput=>({entryId:target.entry.id,importedAt:target.entry.importedAt,p:target.package,personal:rawMemoryPersonal(target.personal)});
-function resolveMemory(target:NonNullable<typeof current>){const input=memoryInput(target);memoryLibrary.remember(input);return withResolvedMemory(input,personalMemory.resolve(input),personalMemory.memory.revision);}
+const memoryResolutions=new PersonalMemoryResolutionCache();
+const resolveMemoryInput=(input:MemoryScoreInput)=>memoryResolutions.resolve(input,personalMemory.memoryGeneration,q=>personalMemory.resolve(q));
+let memoryDocumentCache:PersonalFingeringMemory|undefined,memoryDocumentGeneration=-1;
+function memoryDocument(){if(!memoryDocumentCache||memoryDocumentGeneration!==personalMemory.memoryGeneration){memoryDocumentCache=personalMemory.memory;memoryDocumentGeneration=personalMemory.memoryGeneration;}return memoryDocumentCache;}
+function resolveMemory(target:NonNullable<typeof current>){const input=memoryInput(target);memoryLibrary.remember(input);return withResolvedMemory(input,resolveMemoryInput(input),personalMemory.memoryRevision);}
 interface LivePersonalEditor {view:ScorePackage;visiblePersonal:PersonalState;session:PersonalPresentationSession;generation:number;recovering?:boolean;queue:PersonalEditQueue<PersonalState>;projections:Map<number,Promise<ScorePackage>>}
 const livePersonalEditors=new WeakMap<NonNullable<typeof current>,LivePersonalEditor>();
 function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
@@ -376,6 +381,7 @@ function renderEditorNavigation(){
  if(focused)control.querySelector<HTMLElement>('button')?.focus();
 }
 let adviceOptions:FingeringAdviceOptions|undefined,editorAdvice:EditorAdviceResult|undefined,adviceKey='';
+const adviceWork=new AfterPaintWork();
 const adviceRunner=new EditorAdviceRunner(result=>{editorAdvice=result;paintAdviceOnly();});
 function paintAdviceOnly(){
  if(!current||practice)return;const p=readerPackage();
@@ -385,23 +391,27 @@ function paintAdviceOnly(){
 function selectedWarningText(){return current&&selection?selectedAdviceExplanations(editorAdvice,'edit',selection.ownerIds,ids=>{const seat=readerPackage().seats.find(s=>s.ownerIds.some(id=>ids.includes(id)));return seat?`measure ${seat.writtenBar}`:'previous contact';}).join(' '):'';}
 function refreshEditorAdvice(){
  if(!current||!selection||practice)return;
- const target=current,input=memoryInput(target),memory=personalMemory.memory,settings=readFingeringAdviceSettings(preferences.fingeringAdvice),key=JSON.stringify([input.entryId,input.p.sourceSha256,memory.revision,effectiveAssignmentKey(input.p,target.personal),settings]);
- if(adviceKey===key)return;adviceKey=key;
+ const target=current,settings=readFingeringAdviceSettings(preferences.fingeringAdvice),key=JSON.stringify([personalMemoryResolutionKey({entryId:target.entry.id,p:target.package,personal:target.personal},personalMemory.memoryGeneration),settings]);
+ if(adviceKey===key)return;adviceKey=key;adviceRunner.cancel();
+ adviceWork.schedule(()=>{if(current!==target||!selection||practice||adviceKey!==key)return;runEditorAdvice(target,key,settings);});
+}
+function runEditorAdvice(target:NonNullable<typeof current>,key:string,settings:FingeringAdviceSettings){
+ const input=memoryInput(target),memory=memoryDocument();
  void adviceRunner.run({scoreId:input.entryId,sourceRevision:input.p.sourceRevision??input.p.manifest.revision,assignmentRevision:key,settingsRevision:JSON.stringify(settings)},async signal=>{
   if(!memoryLibrary.scanned)await memoryLibrary.scan();signal.throwIfAborted();
   const inputs=memoryLibrary.inputs.map(cached=>({...cached,personal:personalMemory.personalFor(cached)}));
-  const contextKey=await hashBytes(JSON.stringify([memory.revision,inputs.map(other=>{const resolved=personalMemory.resolve(other);return[personalStorageName(other.entryId,other.p),other.p.manifest.revision,other.p.sourceSha256,activeLayer(other.p,other.personal),resolved.assignments,[...memoryAdviceEvidence(other,resolved)]];}).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]));
+  const contextKey=await hashBytes(JSON.stringify([memory.revision,inputs.map(other=>{const resolved=resolveMemoryInput(other);return[personalStorageName(other.entryId,other.p),other.p.manifest.revision,other.p.sourceSha256,activeLayer(other.p,other.personal),resolved.assignments,[...memoryAdviceEvidence(other,resolved)]];}).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]));
   signal.throwIfAborted();let corpus=storedAdviceCorpus(await host.assistanceStore!.read(),memory.revision,contextKey);
   if(!corpus){corpus=createAdviceCorpusState();
    for(const other of inputs){
-    signal.throwIfAborted();const resolution=personalMemory.resolve(other),scoreId=personalStorageName(other.entryId,other.p),context={playerId:memory.playerId,scoreId,revision:memory.revision,evidenceByOwner:memoryAdviceEvidence(other,resolution)};
+    signal.throwIfAborted();const resolution=resolveMemoryInput(other),scoreId=personalStorageName(other.entryId,other.p),context={playerId:memory.playerId,scoreId,revision:memory.revision,evidenceByOwner:memoryAdviceEvidence(other,resolution)};
     const analysis=await analyzeEditorAdviceAsync(scoreAdviceContacts(other.p,resolution.assignments,{layer:activeLayer(other.p,other.personal)}),context,corpus.corpus,settings,signal);
     corpus=replaceAdviceCorpusScore(corpus,memory.playerId,scoreId,memory.revision,analysis.observations);
    }
    const captured=corpus;
    void personalMemory.flush().then(()=>saveAdviceCorpus(host.assistanceStore!,{version:1,memoryRevision:memory.revision,contextKey,state:captured},()=>!signal.aborted&&adviceKey===key)).catch(error=>{if(!signal.aborted&&adviceKey===key)notify(`Fingering warning history was not saved: ${(error as Error).message}`);});
   }
-  signal.throwIfAborted();const resolution=personalMemory.resolve(input);
+  signal.throwIfAborted();const resolution=resolveMemoryInput(input);
   return analyzeEditorAdviceAsync(scoreAdviceContacts(input.p,resolution.assignments,{layer:activeLayer(input.p,input.personal)}),{playerId:memory.playerId,scoreId:personalStorageName(input.entryId,input.p),revision:memory.revision,evidenceByOwner:memoryAdviceEvidence(input,resolution)},corpus.corpus,settings,signal);
  }).catch(error=>{if(adviceKey===key)notify(`Fingering warnings unavailable: ${(error as Error).message}`);});
 }
@@ -409,7 +419,7 @@ interface SourceReturn {entryId:string;file:string;sourceRevision:string;view:Pe
 let sourceReturn:SourceReturn|undefined,sourceNavigating=false;
 function editorMemoryMarkup(){
  if(!current||!selection)return'';
- const input=memoryInput(current),resolution=personalMemory.resolve(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId),description=memorySourceLabel(personalMemory.memory,resolution,ownerId,id=>entries.find(e=>e.id===id)?.metadata.title??'Score');
+ const input=memoryInput(current),resolution=resolveMemoryInput(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId),description=memorySourceLabel(memoryDocument(),resolution,ownerId,id=>entries.find(e=>e.id===id)?.metadata.title??'Score');
  const self=reference?.entryId===current.entry.id&&reference.ownerId===ownerId;
  return `${label?`<span class="personal-choice-kind" title="${esc(description)}" aria-label="${esc(label+'. '+description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${resolution.byOwner[ownerId]?.personal?button('Use for matching measures','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span>`;
 }
@@ -422,7 +432,7 @@ async function visitMemorySource(){
   if(!current||current.package.sourceRevision!==departure.sourceRevision&&current.package.manifest.revision!==departure.sourceRevision)throw Error('The departure source changed. Your choices are retained.');
   current.personal.view={...departure.view};selection=sourceNavigationSeat(readerPackage(),departure.selection);editNavigation=departure.mode;selectionPitchToggle=departure.pitchToggle;sourceReturn=undefined;
  }else{
-  const input=memoryInput(current),reference=memoryReferenceTarget(input,personalMemory.resolve(input),selection.ownerIds[0]);
+  const input=memoryInput(current),reference=memoryReferenceTarget(input,resolveMemoryInput(input),selection.ownerIds[0]);
   if(!reference)throw Error('The reference score is unavailable; its shared choices are retained.');
   const entry=entries.find(e=>e.id===reference.entryId);if(!entry)throw Error('The reference score is unavailable; its shared choices are retained.');
   if(current.entry.id!==entry.id){const bytes=await host.read(entry.file);if(!bytes)throw Error('The reference score is unavailable.');const archive=await readerAdmission.import(bytes,{allowLegacyTempo:true}),candidate=archive.availablePresentations?.includes(current.package.keyboardLayout!)?await selectPresentation(archive,current.package.keyboardLayout!):archive;if((candidate.sourceRevision??candidate.manifest.revision)!==reference.sourceRevision)throw Error('The reference edition is unavailable; its shared choices are retained.');}
@@ -731,7 +741,7 @@ async function earlierEditions(){
 }
 function closeDialog(returnParent=true){adviceOptions?.dispose();adviceOptions=undefined;if(['piano-preparation','score-reading'].includes(dialog?.dataset.kind??'')&&job?.state==='installing')return;if(dialog&&readingOperation?.dialog===dialog&&readingOperation.running.state==='working')readingOperation.running.cancel();const back=dialogBack;dialogBack=undefined;practiceOptionsCleanup?.();practiceOptionsCleanup=undefined;transposeControls?.dispose();transposeControls=undefined;optionsNavigation?.dispose();optionsNavigation=undefined;dialogNavigation?.dispose();dialogNavigation=undefined;bindingOptions?.dispose();bindingOptions=undefined;midiOptions?.dispose();midiOptions=undefined;audioOptions?.dispose();audioOptions=undefined;pianoOptions?.dispose();pianoOptions=undefined;if(!dialog)return;dialog.close();dialog.remove();dialog=undefined;input.capture=undefined;resetInput();const practiceFocus=practiceFocusReturn?app.querySelector<HTMLElement>(practiceFocusReturn):undefined;practiceFocusReturn=undefined;if(selection)focusSelection();else if(practiceFocus)practiceFocus.focus();else if(focusReturn?.isConnected)focusReturn.focus();else app.querySelector<HTMLElement>('.practice-overview:not([hidden]) .practice-chunks [aria-current=true],.practice-stage,.reader')?.focus();focusReturn=undefined;if(librarySummaryPaintPending&&!current&&!practice)paintLibrarySummaries();if(returnParent)back?.();}
 function showDialog(html:string,kind='options'){const parentSection=dialog?.dataset.kind==='options'&&kind==='earlier-editions'?optionsSection:undefined,opener=document.activeElement as HTMLElement,openerAction=opener?.dataset.action;closeDialog(false);if(parentSection)dialogBack=()=>{options(parentSection);if(openerAction)dialog?.querySelector<HTMLElement>(`[data-action="${CSS.escape(openerAction)}"]`)?.focus();};focusReturn=document.activeElement as HTMLElement;dialog=document.createElement('dialog');dialog.innerHTML=html;arrangeDialogNavigation(dialog);dialog.dataset.kind=kind;dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});document.body.append(dialog);dialog.showModal();fitDialog(dialog,orientation.rotation);resetInput();if(kind!=='options')dialogNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});dialog.querySelector<HTMLElement>('input:not([hidden]),button:not([hidden]),select:not([hidden])')?.focus();return dialog;}
-async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore calculated','restore-one','',!personalMemory.resolve(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{await acceptMemoryAction(target,{kind:'calculated',ownerId:seat.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
+async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore calculated','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{await acceptMemoryAction(target,{kind:'calculated',ownerId:seat.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
 function onMidi(event:MidiCC){if(!startupReady)return;if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;syncControls();
  midiOptions?.receive(event);
  if([120,121,123].includes(event.controller)){bindingOptions?.cancel('Input reset. Start again.');musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();resetInput();return;}
