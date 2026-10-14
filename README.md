@@ -21,10 +21,6 @@ Practice offers bounded original sections, overlapping connections of two consec
 
 Common instrument reading and local MusicXML preparation are described in [instrument reading](docs/instrument-reading.md).
 
-Hand calibration collects four relative fingertip readings, ten adaptive static pair sweeps and ten conditional triple slots per measured hand on the accepted sloping Jankó model. Percentage and direct millimeter entry, a rotatable visualizer, grouped review and optional curl ruler evidence are described in [stretch calibration](docs/stretch-calibration.md). New observations remain raw evidence; historical calibration and existing fingerings are preserved.
-
-The [calibration start delivery](docs/calibration-start-delivery-20261012.md) records direct hand selection, corrected length landmarks, native installation and reviewed reuse of existing fingertip evidence.
-
-Application navigation places Back at the bottom left and Options at the bottom right of the active screen or dialog, with task controls between them. The reader keeps its hideable toolbar. Scrolling uses no stock bars; Options retains its thin position marker. See the [interface rules](docs/calibration-interface.md).
+Application navigation places Back at the bottom left and Options at the bottom right of the active screen or dialog, with task controls between them. The reader keeps its hideable toolbar. Scrolling uses no stock bars; Options retains its thin position marker. See the [interface rules](docs/interface.md).
 
 See [migration and native delivery boundaries](docs/migration.md), [source provenance](docs/source-provenance.json) and [the immediate practice repair handoff](docs/practice-repair-handoff.md). The extracted [historical application README](docs/source-viewer-readme.md) describes the original accepted source and its delivery history; paths and installation claims there refer to the earlier monorepo.

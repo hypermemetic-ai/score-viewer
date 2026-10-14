@@ -8,13 +8,5 @@
 .surface:has(>.library-navigation)>.library{padding-bottom:max(76px,6vw)}
 .dialog-navigation{position:sticky;bottom:0;background:inherit;padding-top:12px;z-index:2}
 .toolbar.application-navigation{align-items:end}
-.calibration-dialog{display:flex;flex-direction:column}
-.calibration-shell-body{flex:1;min-height:0;overflow:auto}
-.calibration-shell-footer{margin-top:20px}
-.calibration-shell-footer .calibration-home-hint{margin:0!important;justify-content:center}
-.calibration-shell-footer[hidden]{display:none!important}
-.calibration-shell-body:has(.fingertips){overflow:hidden}
-.calibration-dialog .fingertips{height:100%;min-height:0}
-.calibration-dialog .fingertips .body{min-height:0;overflow:auto}
 @media(max-width:700px){.library-navigation{left:16px;right:16px}}
 @media(max-width:500px){.application-navigation-actions:not(:empty){grid-column:1/-1;grid-row:1}.application-navigation-back,.application-navigation-options{grid-row:2}.application-navigation-back{grid-column:1}.application-navigation-options{grid-column:3}.application-navigation-actions:empty{grid-column:2;grid-row:2}}

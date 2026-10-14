@@ -8,7 +8,7 @@ See proposal.md for the purpose. Current main 639179e has a one-shot `Groundwork
 
 **Goals:** Separate selected practice mode from transport phase; preserve proven musical grading/count-in/repeat, ownership, saved evidence and complete-frame fitting. Make keyboard, button and pedal actions agree. A selected mode is a view/session choice, not an attained-speed record.
 
-**Non-Goals:** Change the notation dependency, musical source, package/cold admission, native audio policy, converter/TAB renderer, public catalog, calibration or native identity. Do not fabricate Reading assessment for neutral manual Guitar/Bass. Do not rewrite prior receipts or autoarchive other completed changes.
+**Non-Goals:** Change the notation dependency, musical source, package/cold admission, native audio policy, converter/TAB renderer, public catalog or native identity. Do not fabricate Reading assessment for neutral manual Guitar/Bass. Do not rewrite prior receipts or autoarchive other completed changes.
 
 ## Decisions
 

@@ -192,7 +192,7 @@ The passage display and note-ink lifecycle SHALL work in both Conventional piano
 - **AND** input bindings and the active loop's musical state remain consistent
 
 ### Requirement: Frozen source and saved-state preservation
-Practice presentation repair SHALL preserve prepared score bytes, source/keyboard identities, finger corrections, library, calibration, settings, and practice/attainment/history data. Unsupported source geometry or unresolved ink ownership SHALL be reported explicitly rather than silently inventing musical content or claiming successful rendering.
+Practice presentation repair SHALL preserve prepared score bytes, source/keyboard identities, finger corrections, library, other personal evidence, settings, and practice/attainment/history data. Unsupported source geometry or unresolved ink ownership SHALL be reported explicitly rather than silently inventing musical content or claiming successful rendering.
 
 #### Scenario: Viewing a retained prepared score
 - **WHEN** an existing prepared package is opened for selection or practice

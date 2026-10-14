@@ -12,7 +12,7 @@ A source-stage split locates the No. 14 cost: replaying its retained rendering r
 
 **Goals:** Consolidate readiness, remove repeated derived work, and keep host tasks and cancellation available during cold preparation. Retain exact source, notation and current personal-choice meaning.
 
-**Non-Goals:** Alter section sizing, calibration protocol, practice credit, physical MIDI/audio interpretation, native identity or the accepted editing trade-off. Do not persist private admission certificates or duplicate shared engraving in the viewer.
+**Non-Goals:** Alter section sizing, practice credit, physical MIDI/audio interpretation, native identity or the accepted editing trade-off. Do not persist private admission certificates or duplicate shared engraving in the viewer.
 
 ## Decisions
 
