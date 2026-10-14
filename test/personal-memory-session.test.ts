@@ -5,6 +5,7 @@ import {PersonalMemorySession,personalMemoryDocument,rawMemoryPersonal,type Pers
 import {initialPersonal,personalStorageName,type PersonalState} from '../src/state';
 import type {ScorePackage} from '../src/package';
 import type {MemoryScoreInput} from '../src/personal-fingering-memory';
+import {canonicalJson} from '../src/piano-preparation-identity';
 
 class Locks implements AssistanceBrowserLocks {
  private tail:Promise<unknown>=Promise.resolve();
@@ -116,6 +117,28 @@ test('lost commit acknowledgement retries without re-authoring the accepted deci
  const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{const result=await base.commit(args);if(lose&&args.changes[personalMemoryDocument]){lose=false;throw Error('reply lost');}return result;}};
  const s=session(store,[input]);await s.initialize();lose=true;await assert.rejects(s.accept(input,action('b0n1',2)).saved,/reply lost/);
  const revision=(await base.read()).revision;await s.retry();assert.equal((await base.read()).revision,revision);assert.equal(s.recovery.length,0);
+});
+test('native reordered pending records save and retain genuine collision protection',async()=>{
+ const input=fixture(),base=storage();let alter=false;
+ const reorder=<T>(value:T):T=>JSON.parse(canonicalJson(value));
+ const store:AssistanceStore={read:async id=>reorder(await base.read(id)),commit:async args=>{
+  const serialized=reorder(args),pending=serialized.changes['personal-fingering-pending'] as Record<string,any>|undefined;
+  if(alter&&pending)for(const intent of Object.values(pending))intent.action.edit.finger=5;
+  return reorder(await base.commit(serialized));
+ }};
+ const s=session(store,[input]);await s.initialize();await s.accept(input,action('b0n1',2,'native-first')).saved;
+ let raw=await load(s,input);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal(s.recovery.length,0);
+ alter=true;await assert.rejects(s.accept({...input,personal:raw},action('b0n2',4,'native-collision')).saved,/identity was reused/);
+ raw=(await base.read()).documents[personalStorageName(input.entryId,input.p)] as unknown as PersonalState;
+ assert.equal(raw.assignments?.choices.b0n2,undefined);assert.equal(s.recovery.length,1);
+});
+test('existing native pending choice can be recovered without changing its decision identity',async()=>{
+ const input=fixture(),base=storage(),s=session(base,[input]);await s.initialize();
+ const intent=s.capture(input,action('b0n1',4,'existing-native-pending')),before=await base.read();
+ await base.commit({expectedRevision:before.revision,changes:{'personal-fingering-pending':JSON.parse(canonicalJson({[intent.id]:intent}))}});
+ const reopened=session(base,[input]);await reopened.initialize();await reopened.retry();
+ const raw=await load(reopened,input);assert.equal(raw.assignments?.choices.b0n1.finger,4);
+ assert.equal(raw.assignments?.choices.b0n1.intent?.finger?.decisionId,intent.id);assert.equal(reopened.recovery.length,0);
 });
 test('retry also preserves an ordered failed view save without replacing newer personal authority',async()=>{
  const input=fixture(),base=storage();let fail=false;const store:AssistanceStore={read:id=>base.read(id),commit:args=>{if(fail)throw Error('temporary write failure');return base.commit(args);}};

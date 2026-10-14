@@ -1,6 +1,7 @@
 import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-store';
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
+import {canonicalJson} from './piano-preparation-identity';
 import {assigned,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
@@ -256,7 +257,9 @@ export class PersonalMemorySession {
   for(let attempt=0;attempt<maxAttempts;attempt++){
    const current=await this.store.read(),applied=record(current.documents[appliedDocument]),pending=record(current.documents[pendingDocument]);
    if(applied[intent.id]){if(applied[intent.id]!==fingerprint)throw Error('Personal decision identity was reused.');this.pending.delete(intent.id);this.rebase(current);return;}
-   if(pending[intent.id]&&JSON.stringify(pending[intent.id])!==JSON.stringify(intent))throw Error('Pending personal decision identity was reused.');
+   // Native JSON storage reorders object fields. Compare the decision's values,
+   // not insertion order, while still rejecting a genuinely different intent.
+   if(pending[intent.id]&&canonicalJson(pending[intent.id])!==canonicalJson(intent))throw Error('Pending personal decision identity was reused.');
    if(!pending[intent.id]){
     pending[intent.id]=intent;const stage=await this.store.commit({expectedRevision:current.revision,changes:{[pendingDocument]:pending}});
     if(stage.status==='conflict')continue;
