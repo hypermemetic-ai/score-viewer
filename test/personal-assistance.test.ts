@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {assigned,effectiveAssignments} from '../src/personal-assignments';
 import {initialPersonal,fingerFor,readPersonal,type Entry} from '../src/state';
 import {bootstrapPersonalFingeringMemory,editPersonalFingeringMemory,resolvePersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
-import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel} from '../src/personal-assistance';
+import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from '../src/personal-assistance';
 import {PersonalMemoryLibrary} from '../src/personal-memory-library';
 import type {ScorePackage} from '../src/package';
 function fixture(entryId='piece'):MemoryScoreInput{
@@ -20,7 +20,22 @@ test('source navigation maps exact written source owners and evidence counts the
  assert.deepEqual(memoryReferenceTarget(input,r,'b2n1'),{entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'});
  assert.equal(e.get('b0n1')?.evidence,'personal');assert.equal(e.get('b2n1')?.evidence,'inherited');assert.equal(e.get('b0n1')?.lineageId,e.get('b2n1')?.lineageId);
  assert.equal(memoryChoiceLabel(r,'b2n1'),'Shared');const next=editPersonalFingeringMemory(memory,input,{ownerId:'b2n1',finger:4,decisionId:'local',authoredAt:'2025-01-01'}).document;
- assert.equal(memoryChoiceLabel(resolvePersonalFingeringMemory(next,input.entryId,input.p,input.personal),'b2n1'),'Local');
+ const local=resolvePersonalFingeringMemory(next,input.entryId,input.p,input.personal);
+ assert.equal(memoryChoiceLabel(local,'b2n1'),'Local');
+ assert.deepEqual(memoryReferenceTarget(input,local,'b2n1'),{entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'});
+ assert.equal(memorySourceLabel(next,local,'b2n1',()=> 'Fixture'),'Reference: Fixture, measure 1. Choice from Fixture, measure 3.');
+ assert.equal(memoryAdviceEvidence(input,local).get('b2n1')?.evidence,'personal');
+});
+test('a local hand-match exception and suppression keep navigation to their underlying shared source',()=>{
+ const input=fixture();(input.p.score.notes.find(n=>n.id==='b2n0') as any).pitch.pitchClass=2;
+ input.personal=assigned(input.p,input.personal,input.p.seats[1],{finger:2});let memory=bootstrapPersonalFingeringMemory([input]);
+ const expected={entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'};
+ for(const finger of [4,null] as const){
+  memory=editPersonalFingeringMemory(memory,input,{ownerId:'b2n1',finger,decisionId:`local-${finger}`,authoredAt:'2025-01-01'}).document;
+  const local=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal);
+  assert.equal(local.byOwner.b2n1.finger?.provenance,'local');assert.equal(local.byOwner.b2n1.finger?.value,finger);
+  assert.deepEqual(memoryReferenceTarget(input,local,'b2n1'),expected);
+ }
 });
 test('library donor scan excludes historical editions and detects changes to active source bytes',async()=>{
  const input=fixture(),entry={id:'piece',file:'active.isoscore',metadata:{title:'Fixture'},importedAt:'2020-01-01',retainedPackages:['old.isoscore']} as Entry;
