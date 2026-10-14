@@ -25,7 +25,8 @@ export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,tr
  if(disabled)field=field.replaceAll('<button type="button"','<button type="button" disabled');
  const history=s.history.length?`<label class="option-setting" data-options-row><span>Calculated version</span><select data-history data-options-size="content" aria-label="Calculated version"><option value="-1" ${s.calculatedVersion===undefined?'selected':''}>Current</option>${s.history.map((l,i)=>`<option value="${i}" ${s.calculatedVersion===i?'selected':''}>${i===0?'Original':`Earlier ${i+1}`} · ${escape(l.plannerVersion)}</option>`).join('')}</select></label>`:'';
  const primary=button(job?.state==='working'?'Calculation running':job?.state==='installing'?'Saving fingerings':'Generate fingerings','generate',busy)+button('Share score','share')+(job?.state==='working'?button('Cancel calculation','cancel-job'):'');
- const correctionActions=(corrections?button('Export corrections','feedback')+button('Restore all','restore-all'):'')+(s.undo||s.undoAssignments?button('Undo restore','undo-restore'):'');
+ const hasShared=Object.entries(s.memoryResolved?.choices??{}).some(([id,choice])=>choice.finger!==null&&!s.calculatedOwners?.[id]);
+ const correctionActions=(corrections?button('Export corrections','feedback'):'')+(corrections||hasShared?button('Restore all','restore-all'):'')+(s.undo||s.undoAssignments||s.undoCalculatedOwners?button('Undo restore','undo-restore'):'');
  const retainedActions=(entry.retainedPackages?.some(file=>file!==entry.file)?button('Earlier editions','earlier-editions'):'')+(entry.presentations?.length?button('Restore previous header','restore-header'):'');
  const calculation=transpose.steps?'Calculations keep these hand assignments and choose fingers for the transposed pitches.':'Calculations choose hands and fingers together using standard hand settings.';
  return `<section class="score-options" aria-labelledby="score-options-heading">

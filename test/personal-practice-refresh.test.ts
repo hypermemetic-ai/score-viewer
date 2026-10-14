@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
+import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 
 // Exercise the production handover and new-mount bodies. The independent
 // geometry, admission and durable storage boundaries can finish out of order.
@@ -33,13 +34,14 @@ function fixture(){
   async mount(c:any,admitted:any){this.state=admitted.state;mounts.push({owner:this,context:c,admitted,notation:this.options.package});}
  }
  const old=new FakePracticeView({}, {package:p,personal:structuredClone(personal)});
- let persist=Promise.resolve();
+ let persist=Promise.resolve(),disk=structuredClone(personal);
  context={structuredClone,current:target,practice:old,selection:undefined,PracticeView:FakePracticeView,handFor,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   PersonalPresentationSession:class{project(s:any){return projection(structuredClone(s));}},personalStorageName:()=> 'bound-personal',
   readPersonal:(s:any)=>structuredClone(s),personalContext:async(t:any)=>({p:t.package,file:'bound-personal'}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.catch(()=>{});return result;},writeJson:async(_file:string,s:any)=>save(s),paintPersonalSaveError:(_t:any,error:any)=>errors.push(error),
   app:{querySelector:()=>null},readingPresentation:undefined,requirePianoCapability(){},resetInput(){},orientation:{rotation:0},actionControlLabel:()=>'',effectiveControls:()=>({}),controls:{match:()=>false},renderPages(){readerPaints.push('pages');},renderToolbar(){readerPaints.push('toolbar');},
   currentFingerPresentation:()=> 'annotations',preferences:{keyboardLayout:'conventional-piano'},musicalSustain:{snapshot:()=>({})},midiConnection:undefined,connectMidi(){},disconnectMidi(){},settings(){},entries:[target.entry],practiceSummaries:{record:()=>false},paintLibrarySummaries(){},render(){}};
+ personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await save(s);disk=structuredClone(s);});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('async function commitPersonal(','\nfunction labelMode('),context);
  runInNewContext(body('async function retryPersonalEdits(','const personalFile='),context);
@@ -64,7 +66,7 @@ test('active restore admits new hand plan with projected notation before awaitin
 test('retry after a failed projection saves retained intent and mounts its matching practice notation and hand plan without painting the reader',async()=>{
  const f=fixture();f.setProjection(async()=>{throw Error('projection unavailable');});
  await assert.rejects(f.changeHand('RH'),/projection unavailable/);await assert.rejects(f.editor.queue.flush(),/projection unavailable/);
- assert.equal(f.writes.length,0);assert.equal(f.editor.queue.recovery.length,1);assert.equal(f.target.personal.choices.a.hand,'RH');assert.equal(f.editor.view,f.p);
+ assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.hand,'RH');assert.equal(f.editor.queue.recovery.length,1);assert.equal(f.target.personal.choices.a.hand,'RH');assert.equal(f.editor.view,f.p);
  f.setProjection(async s=>({...f.p,notationHands:f.p.score.notes.map(n=>handFor(f.p,s,n.id)),choiceSnapshot:structuredClone(s)}));
  await f.context.retryPersonalEdits(f.target);
  assert.equal(f.editor.queue.error,undefined);assert.equal(f.editor.queue.recovery.length,0);assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.hand,'RH');
@@ -94,7 +96,7 @@ test('history baseline changes are compared by effective source hands rather tha
 
 test('same-hand finger and history choices refit the existing practice without rebuilding or changing earned evidence',async()=>{
  const f=fixture();await f.context.commitPersonal(f.target,(s:any)=>{s.choices.a.finger=5;s.calculatedVersion=1;return s;});
- assert.equal(f.old.paused,0);assert.equal(f.old.refits,1);assert.equal(f.old.options.personal,f.target.personal);assert.equal(f.old.options.personal.choices.a.finger,5);
+ assert.equal(f.old.paused,0);assert.equal(f.old.refits,1);assert.deepEqual(JSON.parse(JSON.stringify(f.old.options.personal)),JSON.parse(JSON.stringify(f.target.personal)));assert.equal(f.old.options.personal.choices.a.finger,5);
  assert.equal(f.old.flushes,0);assert.equal(f.preparations.length,0);assert.equal(f.old.closed,0);assert.equal(f.context.practice,f.old);assert.deepEqual(f.old.state.evidence,f.evidence);
 });
 
@@ -134,5 +136,5 @@ for(const boundary of ['projection','flush','admission'] as const)test(`${bounda
  if(boundary==='projection')f.setProjection(async()=>{throw failure;});else if(boundary==='flush')f.setFlush(async()=>{throw failure;});else f.setPrepare(async()=>{throw failure;});
  await assert.rejects(f.changeHand('RH'),new RegExp(`${boundary} unavailable`));await settle();
  assert.equal(f.old.paused,1);assert.equal(f.old.closed,0);assert.equal(f.mounts.length,0);assert.equal(f.context.practice,f.old);assert.deepEqual(f.old.state.evidence,f.evidence);assert.deepEqual(f.old.state.preferences,f.settings);
- if(boundary==='projection'){await assert.rejects(f.editor.queue.flush(),/projection unavailable/);assert.equal(f.preparations.length,0);assert.equal(f.writes.length,0);}else await f.editor.queue.flush();
+ if(boundary==='projection'){await assert.rejects(f.editor.queue.flush(),/projection unavailable/);assert.equal(f.preparations.length,0);assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.hand,'RH');}else await f.editor.queue.flush();
 });

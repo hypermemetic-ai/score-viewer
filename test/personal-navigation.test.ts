@@ -1,6 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
+import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 const main=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),state=readFileSync(new URL('../src/state.ts',import.meta.url),'utf8'),selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
 const body=(source:string,start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))).replace(/^export /gm,''));
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
@@ -18,6 +19,7 @@ function fixture(basePages=2,projectedPages=basePages){
   assigned(_p:any,s:any,owner:any,choice:any){const next=structuredClone(s),id=owner.ownerIds[0];next.choices[id]={...next.choices[id],...choice};return next;},
   editUnits:(view:any)=>[...view.seats],viewportFit:(_w:any,_h:any,v:any)=>({pages:[v.page]}),effectiveView:(v:any)=>v,innerWidth:1280,innerHeight:720,
   renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},paintPersonalSaveError(_owner:any,e:any){errors.push(e);},notify(){},practice:undefined,readingPresentation:undefined,ManualPracticeView:class{},readingViewError:undefined};
+ personalMemoryBoundary(context,()=>disk,async(s,kind)=>{disk=structuredClone(s);if(kind==='navigation')writes.push(structuredClone(s));});
  runInNewContext(body(state,'export function readPersonal(','export const activeLayer='),context);
  runInNewContext(body(main,'function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body(main,'async function savePersonal(','\nfunction labelMode('),context);
@@ -45,10 +47,10 @@ test('a later explicit navigation during projection stays authoritative without 
  gate.resolve(f.projected);await editing;await navigation;await f.editor.queue.flush();assert.equal(f.target.personal.view.page,0);assert.equal(f.context.selection.ownerIds[0],'a');assert.equal(f.disk.view.page,0);assert.equal(f.disk.editContactId,'contact-a');assert.equal(f.disk.choices.a.finger,3);
  assert.equal(f.writes[0].view.page,5);assert.equal(f.writes[1].view.page,0);
 });
-test('reverse projection completion preserves exact ordered snapshots rather than putting later choices in older writes',async()=>{
+test('reverse projection completion preserves ordered navigation without replacing newer durable choices',async()=>{
  const f=fixture(5,6),gate=deferred();let calls=0;f.setProject(async()=>++calls===1?gate.promise:f.projected);
  const first=f.context.saveHandChoice('RH');await f.context.saveFingerDigit(4);assert.equal(f.target.personal.view.page,5);gate.resolve({...f.p,seats:f.seats});await first;await f.editor.queue.flush();
- assert.equal(f.writes.length,2);assert.equal(f.writes[0].choices.a.finger,1);assert.equal(f.writes[1].choices.a.finger,4);assert.equal(f.disk.view.page,5);assert.equal(f.target.personal.view.page,5);
+ assert.equal(f.writes.length,2);assert.equal(f.writes[0].choices.a.finger,4);assert.equal(f.writes[0].view.page,0);assert.equal(f.writes[1].choices.a.finger,4);assert.equal(f.disk.view.page,5);assert.equal(f.target.personal.view.page,5);
 });
 test('a generic restore/history command captures and durably resolves its selected source alias across reflow',async()=>{
  const f=fixture(5,6);f.context.selection=f.seats[1];f.target.personal.editContactId=f.seats[1].contactId;f.target.personal.view.page=4;

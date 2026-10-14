@@ -16,7 +16,8 @@ export interface PersonalBinding {sourceRevision:string;keyboardLayout:'conventi
  * projected contact IDs participate in the source/personal binding. */
 export interface PersonalSourceAnchor {owners:string[];writtenBar:number;actionId:string;continuation:boolean;alias:number}
 export interface PersonalNavigation {version:1;page?:PersonalSourceAnchor;edit?:PersonalSourceAnchor;followEdit:boolean}
-export interface PersonalState {version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
+export interface PersonalMemoryResolution {revision:number;sourceRevision:string;choices:Record<string,{finger:number|null}>}
+export interface PersonalState {calculatedOwners?:Record<string,true>;undoCalculatedOwners?:Record<string,true>;memoryResolved?:PersonalMemoryResolution;version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
 const personalBinding=(p:ScorePackage):PersonalBinding|undefined=>{
  if(p.manifest.version!==2)return;
  if(!p.sourceRevision||!p.keyboardLayout||!p.profileId||!p.profileSha256||!p.effectiveHandSha256)throw Error('Incomplete presentation state identity');
@@ -40,16 +41,17 @@ export const initialPersonal=(p:ScorePackage):PersonalState=>({version:p.manifes
 export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJanko?:boolean}={}):PersonalState{
  if(!raw)return initialPersonal(p);
  if(typeof raw!=='object'||Array.isArray(raw))throw Error('Invalid saved personal state; original data retained');
- let s=structuredClone(raw) as PersonalState;const binding=personalBinding(p);
+ let s=structuredClone(raw) as PersonalState;delete s.memoryResolved;const binding=personalBinding(p);
  const legacy=options.allowLegacyJanko&&!!legacyPersonalStorageName(p)&&s.version===1&&s.revision===p.manifest.revision;
  if(legacy)s={...s,version:2,binding};
  const matchesBinding=binding?!!s.binding&&typeof s.binding==='object'&&!Array.isArray(s.binding)&&
    Object.keys(s.binding).length===Object.keys(binding).length&&Object.entries(binding).every(([key,value])=>
      Object.prototype.hasOwnProperty.call(s.binding,key)&&(s.binding as unknown as Record<string,unknown>)[key]===value):s.binding===undefined;
  if(s.version!==(binding?2:1)||s.revision!==p.manifest.revision||!matchesBinding||!s.view||!s.overrides||typeof s.overrides!=='object'||Array.isArray(s.overrides)||!Array.isArray(s.history))throw Error('Saved source/layout/profile/hand revision differs; original data retained');
+ for(const mask of [s.calculatedOwners,s.undoCalculatedOwners])if(mask!==undefined&&(!mask||typeof mask!=='object'||Array.isArray(mask)||Object.entries(mask).some(([id,v])=>v!==true||!p.score.notes.some(n=>n.id===id))))throw Error('Saved calculated preference has a stale source owner; original data retained');
  s.assignments=readPersonalAssignments(s.assignments,p);s.undoAssignments=readPersonalAssignments(s.undoAssignments,p);
  if(s.assignments===undefined)delete s.assignments;if(s.undoAssignments===undefined)delete s.undoAssignments;
- if(p.manifest.version===3&&(s.assignments||s.undoAssignments||s.layer||s.history.length||Object.keys(s.overrides).length||s.undo&&Object.keys(s.undo).length))throw Error('This reading score cannot carry piano finger choices; original data retained');
+ if(p.manifest.version===3&&(s.calculatedOwners||s.undoCalculatedOwners||s.assignments||s.undoAssignments||s.layer||s.history.length||Object.keys(s.overrides).length||s.undo&&Object.keys(s.undo).length))throw Error('This reading score cannot carry piano finger choices; original data retained');
  const v=s.view;if(![0,90,180,270].includes(v.rotation)||![1,.9,.75,.5].includes(v.scale)||![1,2,3].includes(v.count)||!['slide','group'].includes(v.advance)||!['pitch','finger'].includes(v.labelMode)||!['calculated','yours'].includes(v.fingerSet)||!Number.isInteger(v.page))throw Error('Invalid saved view');
  if(s.calculatedVersion!==undefined&&(!Number.isInteger(s.calculatedVersion)||s.calculatedVersion<0||s.calculatedVersion>=s.history.length))throw Error('Saved calculated version differs; data retained');
  // A stale optional cursor must never discard otherwise valid personal corrections.
@@ -77,8 +79,8 @@ export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJank
  return s;
 }
 export const activeLayer=(p:ScorePackage,s:PersonalState)=>s.layer??p.fingerLayer;
-export function fingerFor(p:ScorePackage,s:PersonalState,seat:Seat):number|undefined{const display=s.view.fingerSet==='calculated'&&s.calculatedVersion!==undefined?s.history[s.calculatedVersion]:activeLayer(p,s),a=display?.attacks.find(a=>a.id===(display.sourceOwnerToAttack[seat.ownerIds[0]]??seat.actionId)),legacy=s.overrides[seat.contactId]??Object.values(s.overrides).find(c=>c.ownerIds.includes(seat.ownerIds[0]));return s.view.fingerSet==='yours'?(s.assignments?.choices[seat.ownerIds[0]]?.finger??legacy?.replacement??a?.finger):a?.finger;}
-export function fingerDisplayAvailable(p:ScorePackage,s:PersonalState,presentation:FingerPresentation):boolean{return (!!activeLayer(p,s)||Object.values(s.assignments?.choices??{}).some(c=>c.finger!==undefined))&&(presentation==='annotations'||p.fingerEligibility.eligible);}
+export function fingerFor(p:ScorePackage,s:PersonalState,seat:Seat):number|undefined{const display=s.view.fingerSet==='calculated'&&s.calculatedVersion!==undefined?s.history[s.calculatedVersion]:activeLayer(p,s),a=display?.attacks.find(a=>a.id===(display.sourceOwnerToAttack[seat.ownerIds[0]]??seat.actionId)),legacy=s.overrides[seat.contactId]??Object.values(s.overrides).find(c=>c.ownerIds.includes(seat.ownerIds[0]));const shared=s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?s.memoryResolved.choices[seat.ownerIds[0]]:undefined;return s.view.fingerSet==='yours'?(s.calculatedOwners?.[seat.ownerIds[0]]?a?.finger:shared?shared.finger??undefined:s.assignments?.choices[seat.ownerIds[0]]?.finger??legacy?.replacement??a?.finger):a?.finger;}
+export function fingerDisplayAvailable(p:ScorePackage,s:PersonalState,presentation:FingerPresentation):boolean{return (!!activeLayer(p,s)||Object.values(s.assignments?.choices??{}).some(c=>c.finger!==undefined)||s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)&&Object.values(s.memoryResolved.choices).some(c=>c.finger!==null))&&(presentation==='annotations'||p.fingerEligibility.eligible);}
 export function corrected(p:ScorePackage,s:PersonalState,seat:Seat,replacement:number):PersonalState{
  if(!Number.isInteger(replacement)||replacement<1||replacement>5)throw Error('Use a finger from 1 to 5');if(seat.ownerIds.some(id=>s.assignments?.choices[id]))return assigned(p,s,seat,{finger:replacement});const a=activeLayer(p,s)?.attacks.find(a=>a.id===seat.actionId);if(!a)throw Error('No complete calculated choice at this note');
  const next=structuredClone(s),prior=next.overrides[seat.contactId],layer=activeLayer(p,s)!;
@@ -87,7 +89,7 @@ export function corrected(p:ScorePackage,s:PersonalState,seat:Seat,replacement:n
  next.view.fingerSet='yours';return next;
 }
 export function personalCorrectionCount(s:PersonalState):number{const covered=new Set(Object.values(s.overrides).flatMap(c=>c.ownerIds));return Object.keys(s.overrides).length+Object.keys(s.assignments?.choices??{}).filter(id=>!covered.has(id)).length;}
-export function restoreAll(s:PersonalState):PersonalState{const next={...structuredClone(s),undo:structuredClone(s.overrides),overrides:{}};if(s.assignments)next.undoAssignments=structuredClone(s.assignments);else delete next.undoAssignments;delete next.assignments;return next;}
+export function restoreAll(s:PersonalState):PersonalState{const next={...structuredClone(s),undo:structuredClone(s.overrides),overrides:{}};if(s.calculatedOwners)next.undoCalculatedOwners=structuredClone(s.calculatedOwners);else delete next.undoCalculatedOwners;if(s.assignments)next.undoAssignments=structuredClone(s.assignments);else delete next.undoAssignments;delete next.assignments;return next;}
 export function installLayer(s:PersonalState,p:ScorePackage,layer:FingerLayer):PersonalState{
  if(p.manifest.version===3)throw Error('Piano finger choices cannot be attached to this reading score');
  if(p.manifest.version===2&&((layer.version!=='piano-finger-assignments-v1'&&layer.version!==(p.keyboardLayout==='conventional-piano'?'physical-contact-finger-layer-v2':'physical-attack-finger-layer-v1'))||layer.version==='piano-finger-assignments-v1'&&layer.layoutId!==p.keyboardLayout||layer.profileId!==p.profileId||layer.profileSha256!==p.profileSha256||p.keyboardLayout==='conventional-piano'&&layer.effectiveHandSha256!==p.effectiveHandSha256))throw Error('Calculated layer belongs to a different keyboard/profile/hand presentation');

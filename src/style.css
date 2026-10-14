@@ -134,3 +134,5 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
  .practice-overview>.practice-browser:has(>.practice-catalog){grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(120px,30%) minmax(0,1fr);gap:12px}
  .practice-overview>.practice-browser:has(>.practice-catalog)>.practice-passage-detail{grid-column:1/-1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:8px}
 }
+
+.editor-navigation{position:absolute;top:12px;right:16px;z-index:4}.editor-navigation[hidden]{display:none}.editor-navigation button{font-size:13px;padding:7px 10px;background:#181818e8;border-color:#555}.editor-navigation kbd{margin-left:9px;color:#aaa;font-size:11px}

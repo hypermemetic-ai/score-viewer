@@ -11,8 +11,14 @@ credit, and never automatically starts Timed. MIDI identifies pitches and contac
 not physical fingers. With no piano connected, Reading displays the full source
 window for manual reading without assessing notes or advancing automatically.
 
-The selector keeps three groups: original sections, connections between two
-consecutive sections, and contrasts between similar original sections. Sections
+The selector groups adjacent completed sections into one row under Completed,
+with unfinished sections below under Incomplete. Selecting a completed group
+shows unfinished Connections first, then its Completed sections and connections.
+A group only opens its contents; select an individual exercise to begin.
+Incomplete sections also expose their neighboring connections, including those
+still locked. Contrasts remain a separate category. Include manual changes the
+displayed grouping without changing connection prerequisites or saved progress.
+Sections
 balance musical boundary evidence with roughly 25 distinct onset positions;
 simultaneous chord notes share one sizing onset. This is a practice sizing
 heuristic, not a playback tempo or a measured memory limit. Schumann No. 14
@@ -47,6 +53,13 @@ speeds, count-in/cooldown settings, custom increments and historical evidence
 remain their existing choices. Working speed moves in half-percent steps. Done
 appears only in disconnected Timed practice and keeps its existing reversible,
 exact-loop eligibility and independent manual/observed evidence.
+
+Practice stays on the selected exercise until you choose another or leave.
+Successful Timed loops repeat with the usual speed increase, including when
+replaying a previously completed section. Reaching target speed keeps the same
+exercise active; newly available connections wait in the selector. Contrasts
+cycle A, B, then A again. If a repeat cannot start on time, Resume starts a fresh
+count-in for the same selection.
 
 Reading, Timed, Start/Resume, applicable Done and Speed form one compact centered
 primary footer group. Speed sits beside the transport rather than at the far right. Mode selection

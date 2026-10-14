@@ -6,11 +6,12 @@ import {PracticeSlots} from '../src/practice-window';
 import {PracticeDone,hasDone} from '../src/practice-attainment';
 import {PracticeClock} from '../src/practice-clock';
 import {host} from '../src/host';
-import {planPractice,initialPractice,PracticeSession,reconcilePassages} from '../src/practice';
+import {planPractice,initialPractice,PracticeSession,reconcilePassages,practiceCatalogChunks} from '../src/practice';
 import {planPracticeRepeat} from '../src/practice-repeat';
 const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg,'connection-boundary-v1');
 const until=async(condition:()=>boolean)=>{for(let i=0;i<100&&!condition();i++)await new Promise<void>(done=>setImmediate(done));assert.ok(condition(),'did not reach controlled asynchronous boundary');};
-function fixture(t:any,bpm=100,index=0){
+function fixture(t:any,bpm=100,index=0,activePlan=plan){
+ const plan=activePlan;
  const oldWrite=host.write;t.after(()=>{host.write=oldWrite;});const state=initialPractice(plan);state.working=bpm;(state as typeof state & {countInBars?:number}).countInBars=1;
  const session=new PracticeSession(plan,plan.chunks[index],state,true);session.ready(1000);for(const a of session.events)session.note(a.midi,session.startMs+(a.tick-session.startTick)*session.tickMs);session.update(session.startMs+(session.chunk.end-session.startTick)*session.tickMs);assert.equal(session.phase,'complete');
  const view=Object.create(PracticeView.prototype) as any,writes:unknown[]=[],messages:string[]=[];
@@ -29,23 +30,44 @@ test('mode letters are owned by the shared resolver while Space remains explicit
 test('held selector arrows keep browsing while repeated activation and active-play shortcuts remain suppressed',t=>{const f=fixture(t);f.view.overview=true;f.view.paintBrowser=()=>{};f.view.browser.select(f.state,plan.chunks[0].id);assert.equal(f.view.key('ArrowDown',true),true);assert.equal(f.view.browser.current(f.state)?.id,plan.chunks[1].id);assert.equal(f.view.key('ArrowDown',true),true);assert.equal(f.view.browser.current(f.state)?.id,plan.chunks[2].id);assert.equal(f.view.key('Enter',true),false);f.view.overview=false;assert.equal(f.view.key('ArrowRight',true),true);assert.equal(f.view.key('ArrowDown',true),false);assert.equal(f.view.browser.current(f.state)?.id,plan.chunks[2].id);});
 test('Reading always reopens despite retained preparation credit and never writes new credit',async t=>{const f=fixture(t),chunk=plan.chunks[0];f.state.groundwork={[chunk.pattern]:true};f.view.selectPassage(chunk);assert.equal(f.view.mode,'reading');assert.ok(f.view.reading);while(!f.view.reading.cycles)for(const note of [...f.view.reading.current.events])f.view.reading.note(note.midi);await f.view.saved;assert.equal(f.view.reading.complete,false);f.view.selectPassage(chunk);assert.equal(f.view.reading.index,0);assert.equal(f.state.groundwork[chunk.pattern],true);assert.deepEqual(f.state.best,{});assert.deepEqual(f.writes,[]);});
 test('a measured loop without an admitted repeat retains actual achievement and waits for explicit Resume',async t=>{
- const f=fixture(t);let saved!:()=>void;host.write=()=>new Promise<void>(done=>{saved=done;});const anchors:unknown[]=[];f.view.continueTrial=async(anchor:unknown)=>{anchors.push(anchor);};const oldTickMs=f.session.tickMs,oldStart=f.session.startMs;
- f.view.completeTimedTrial(f.session);await until(()=>!!saved);assert.equal(f.state.working,103.5);assert.equal(f.state.best[f.session.chunk.pattern],100);assert.equal(f.session.phase,'paused');assert.equal(f.session.startMs,oldStart);assert.match(f.messages.at(-1)!,/Resume starts a fresh count-in/);assert.equal(anchors.length,0);saved();await f.view.saved;assert.equal(anchors.length,0);
+ const f=fixture(t);let saved!:()=>void;host.write=()=>new Promise<void>(done=>{saved=done;});const oldTickMs=f.session.tickMs,oldStart=f.session.startMs;
+ f.view.completeTimedTrial(f.session);await until(()=>!!saved);assert.equal(f.state.working,103.5);assert.equal(f.state.best[f.session.chunk.pattern],100);assert.equal(f.session.phase,'paused');assert.equal(f.session.startMs,oldStart);assert.match(f.messages.at(-1)!,/Resume starts a fresh count-in/);assert.equal(f.view.session,f.session);assert.equal(f.view.overview,false);assert.equal(f.session.tickMs,oldTickMs);saved();await f.view.saved;assert.equal(f.view.session,f.session);assert.equal(f.view.overview,false);assert.equal(f.session.tickMs,oldTickMs);
 });
 test('keep-tempo without a prepared receipt does not automatically append count bars after saving',async t=>{
  const f=fixture(t,180);f.state.keepTempo=true;const actions:Array<{name:string;repeat:ReturnType<typeof planPracticeRepeat>}>=[];f.view.action=async(name:string,repeat:any)=>{actions.push({name,repeat});};const anchor={previousStartMs:f.session.startMs,phraseEndMs:f.session.startMs+(f.session.chunk.end-f.session.startTick)*f.session.tickMs,previousBpm:180};
  f.view.completeTimedTrial(f.session);await f.view.saved;assert.equal(f.state.working,180);assert.equal(f.session.phase,'paused');assert.equal(actions.length,0);assert.match(f.messages.at(-1)!,/fresh count-in/);
 });
-test('new joined unit is saved and waits for source boundary preparation before any playback',async t=>{
+test('newly unlocked connection is saved without selecting it or starting playback',async t=>{
  const f=fixture(t,180,1);f.state.best[plan.chunks[0].pattern]=180;const actions:unknown[]=[];f.view.action=async(...args:unknown[])=>{actions.push(args);};
- f.view.completeTimedTrial(f.session);await until(()=>f.view.session.chunk.id==='1-8');await f.view.saved;assert.deepEqual(f.state.composites?.['1-8'],['1-4','5-8']);assert.ok(f.writes.every((s:any)=>s.composites?.['1-8']));assert.equal(f.state.working,90);assert.equal(f.view.reading.complete,false);assert.deepEqual([...new Set(f.view.reading.steps.flatMap((step:any)=>step.events.map((a:any)=>a.bar)))],[3,4]);assert.equal(actions.length,0);
+ f.view.completeTimedTrial(f.session);await f.view.saved;assert.deepEqual(f.state.composites?.['1-8'],['1-4','5-8']);assert.ok(f.writes.every((s:any)=>s.composites?.['1-8']));assert.equal(f.state.working,180);assert.equal(f.view.session,f.session);assert.equal(f.session.chunk.id,'5-8');assert.equal(f.session.phase,'paused');assert.equal(f.view.overview,false);assert.equal(actions.length,0);
 });
 test('failed save retains achievement and grouping in memory but cannot start another trial',async t=>{
- const f=fixture(t,180,1);f.state.best[plan.chunks[0].pattern]=180;host.write=async()=>{throw Error('disk full');};let continued=false;f.view.continueTrial=async()=>{continued=true;};f.view.completeTimedTrial(f.session);await until(()=>!!f.view.saveError);assert.equal(continued,false);assert.equal(f.state.best[plan.chunks[1].pattern],180);assert.deepEqual(f.state.composites?.['1-8'],['1-4','5-8']);assert.match(f.view.saveError,/retry saving/);
+ const f=fixture(t,180,1);f.state.best[plan.chunks[0].pattern]=180;host.write=async()=>{throw Error('disk full');};f.view.completeTimedTrial(f.session);await until(()=>!!f.view.saveError);assert.equal(f.view.session,f.session);assert.equal(f.view.overview,false);assert.equal(f.session.phase,'paused');assert.equal(f.state.best[plan.chunks[1].pattern],180);assert.deepEqual(f.state.composites?.['1-8'],['1-4','5-8']);assert.match(f.view.saveError,/retry saving/);
 });
-test('pause during completed-trial persistence cancels automatic continuation',async t=>{
- const f=fixture(t);let saved!:()=>void;host.write=()=>new Promise<void>(done=>{saved=done;});let continued=false;f.view.continueTrial=async()=>{continued=true;};f.view.completeTimedTrial(f.session);await until(()=>!!saved);f.view.pause();saved();await f.view.saved;await new Promise<void>(done=>setImmediate(done));assert.equal(f.session.phase,'paused');assert.equal(continued,false);assert.equal(f.state.best[f.session.chunk.pattern],100);
+test('pause during completed-trial persistence keeps the selected exercise paused',async t=>{
+ const f=fixture(t);let saved!:()=>void;host.write=()=>new Promise<void>(done=>{saved=done;});f.view.completeTimedTrial(f.session);await until(()=>!!saved);f.view.pause();saved();await f.view.saved;await new Promise<void>(done=>setImmediate(done));assert.equal(f.session.phase,'paused');assert.equal(f.view.session,f.session);assert.equal(f.view.overview,false);assert.equal(f.session.phase,'paused');assert.equal(f.state.best[f.session.chunk.pattern],100);
 });
+for(const policy of ['connection-boundary-v1','bounded-exercises-v1'] as const){
+ for(const scenario of ['historical replay','first target success','repeated target success','all complete'] as const){
+  test(`${policy}: ${scenario} adopts the prepared repeat of the selected Schumann section`,async t=>{
+   const activePlan=planPractice(pkg,policy),bpm=scenario==='historical replay'?18:180,f=fixture(t,bpm,0,activePlan);
+   if(scenario==='historical replay'||scenario==='repeated target success')f.state.best[f.session.chunk.pattern]=180;
+   if(scenario==='all complete'){for(const chunk of practiceCatalogChunks(activePlan))f.state.best[chunk.pattern]=180;for(const chunk of reconcilePassages(activePlan,f.state).all.values())f.state.best[chunk.pattern]=180;}
+   const historical=structuredClone(f.state.best),expected=scenario==='historical replay'?21.6:180;
+   f.session.phase='trial';assert.equal(f.view.predictedRepeatRate(f.session),expected);assert.deepEqual(f.state.best,historical);f.session.phase='complete';
+   const boundary=f.session.startMs+(f.session.completionTick-f.session.startTick)*f.session.tickMs,repeat=planPracticeRepeat({previousStartMs:f.session.startMs,phraseEndMs:boundary,previousBpm:bpm,nextBpm:expected,grid:f.session.sourcePulseGrid,previousGrid:f.session.pulseGrid,sourceBoundary:true}),receipt={armId:1,countStartMs:boundary,startMs:boundary+repeat.countInMs,nextBpm:expected};
+   let adoptions=0;f.view.clock={now:()=>boundary,stop:async()=>{},adoptRepeat:()=>{adoptions++;return {...receipt,extraBeats:0,totalGapBeats:2};}};
+   f.view.repeatPreparation={session:f.session,generation:0,rate:expected,receipt,plan:repeat,pending:false};f.view.heldPitches=new Set();f.view.heldStreams=new Map();
+   f.view.completeTimedTrial(f.session);await f.view.saved;
+   assert.equal(adoptions,1);assert.equal(f.view.session,f.session);assert.equal(f.view.overview,false);assert.equal(f.session.phase,'countin');assert.equal(f.session.bpm,expected);assert.equal(f.state.working,expected);assert.equal(f.state.best[f.session.chunk.pattern],180);
+   for(const [pattern,rate] of Object.entries(historical))assert.equal(f.state.best[pattern],rate);
+  });
+ }
+ test(`${policy}: historical replay without a prepared receipt pauses the same section`,async t=>{
+  const f=fixture(t,18,0,planPractice(pkg,policy));f.state.best[f.session.chunk.pattern]=180;f.view.completeTimedTrial(f.session);await f.view.saved;
+  assert.equal(f.view.session,f.session);assert.equal(f.session.phase,'paused');assert.equal(f.view.overview,false);assert.equal(f.state.working,21.6);assert.equal(f.state.best[f.session.chunk.pattern],180);assert.match(f.messages.at(-1)!,/Resume starts a fresh count-in/);
+ });
+}
 test('Done adds reversible self-report without overwriting measured history or selecting another passage',async t=>{
  const f=fixture(t,180,1);f.session.measured=false;f.state.best[plan.chunks[0].pattern]=180;const target={passage:f.session.chunk.id,pattern:f.session.chunk.pattern,rate:180};await f.view.action('done');assert.equal(hasDone(f.state,target),false);f.view.doneClaims.completed(target);await f.view.action('done');await f.view.saved;assert.equal(hasDone(f.state,target),true);assert.equal(f.view.session,f.session);assert.equal(f.state.best[plan.chunks[1].pattern],undefined);assert.equal(f.state.best[`connected:${plan.revision}:1-8`],undefined);await f.view.action('done');await f.view.saved;assert.equal(hasDone(f.state,target),false);assert.equal(f.state.best[plan.chunks[0].pattern],180);
 });

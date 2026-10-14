@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
-import {ControlResolver,readControlBindings,controlActionAllowed} from '../src/control-bindings';
+import {ControlResolver,readControlBindings,controlActionAllowed,editorControlBindings,readerControlBindings,isEditorAction} from '../src/control-bindings';
 import {actionCode,inputCode,chord,directFingerKey,InputController,rotationShortcut,defaultBindings} from '../src/input';
-import {systemSelection} from '../src/selection';
+import {systemSelection,measureSelection} from '../src/selection';
 import {defaultView,viewportFit} from '../src/state';
 import {PracticeView} from '../src/practice-view';
 import {isMusicalSustain} from '../src/midi-sustain';
@@ -17,19 +17,19 @@ const pkg=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no
 function keyboardFixture(){
  let key!:(e:any)=>void;const calls:string[]=[],first=pkg.seats.find(s=>s.page===0)!,context:any={startupReady:true,startupFailed:false,
   window:{addEventListener(_type:string,handler:any){key=handler;}},document:{hidden:false,activeElement:null},innerWidth:1280,innerHeight:720,
-  input:new InputController(),controls:new ControlResolver(readControlBindings(undefined,{bindings:defaultBindings()})),
+  input:new InputController(),controls:new ControlResolver(editorControlBindings(readControlBindings(undefined,{bindings:defaultBindings()}))),editNavigation:'notes',
   current:{package:pkg,personal:{view:defaultView(),editContactId:first.contactId}},selection:first,readerFocused:true,preferences:{fingerBehavior:'toggle'},
   practice:undefined,dialog:undefined,bindingOptions:undefined,optionsNavigation:undefined,dialogNavigation:undefined,toolbarNavigation:undefined,
-  inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,PracticeView,systemSelection,viewportFit,arrangeBottomNavigation,applicationNavigationKey,effectiveView:(v:any)=>v,readerPackage:()=>pkg,
-  syncControls(){},editSequence:{reset(){calls.push('reset');}},savePersonal(){calls.push('save');},savePersonalQuietly(){calls.push('save');},renderPages(){calls.push('pages');},renderToolbar(){calls.push('toolbar');},focusSelection(){calls.push('focus');},
-  selectFinger(step:number){calls.push(`chronological:${step}`);},act(action:string){calls.push(`action:${action}`);},edit(){calls.push('dialog');},saveFingerDigit(){calls.push('digit');return Promise.resolve();},saveHandChoice(hand:string){calls.push(`hand:${hand}`);return Promise.resolve();},reveal(){},notify(){},
+  inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,isEditorAction,PracticeView,systemSelection,measureSelection,viewportFit,arrangeBottomNavigation,applicationNavigationKey,effectiveView:(v:any)=>v,readerPackage:()=>pkg,
+  syncControls(){},editSequence:{reset(){calls.push('reset');}},savePersonal(){calls.push('save');},savePersonalQuietly(){calls.push('save');},renderPages(){calls.push('pages');},renderToolbar(){calls.push('toolbar');},renderEditorNavigation(){calls.push('mode');},focusSelection(){calls.push('focus');},
+  selectFinger(step:number){calls.push(`chronological:${step}`);},act(action:string){if(action==='editorPrevious'||action==='editorNext'){if(context.editNavigation==='measures')context.selectFingerMeasure(action==='editorPrevious'?-1:1);else context.selectFinger(action==='editorPrevious'?-1:1);}else if(action==='editorNavigation')context.editNavigation=context.editNavigation==='notes'?'measures':'notes';else calls.push(`action:${action}`);},edit(){calls.push('dialog');},saveFingerDigit(){calls.push('digit');return Promise.resolve();},saveHandChoice(hand:string){calls.push(`hand:${hand}`);return Promise.resolve();},reveal(){},notify(){},
   HTMLInputElement:class {},ManualPracticeView:class {},
  };
  runInNewContext(production('function selectFingerSystem(','function exitSelection('),context);
  runInNewContext(production("window.addEventListener('keydown'",'\n\nfunction onMidiNote('),context);
  const target={closest(){return null;},matches(){return false;}};
  const press=(code:string,extra:any={})=>{let prevented=false;key({code,key:code,target,repeat:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,preventDefault(){prevented=true;},...extra});return prevented;};
- return {context,calls,press};
+ return {context,calls,press,useActualActions(){runInNewContext(production('async function act(','\nasync function startJob('),context);}};
 }
 test('production edit arrows reveal the nearest note in the next page and restore selection focus',()=>{
  const f=keyboardFixture(),last=pkg.seats.filter(s=>s.page===0).sort((a,b)=>b.system-a.system)[0],next=systemSelection(pkg,last,1);assert.equal(next.page,1);
@@ -54,7 +54,7 @@ test('production vertical arrows respect editor fields, toolbar navigation, moda
 });
 test('production chronological editing and explicit reader page commands retain ownership',()=>{
  const edit=keyboardFixture();edit.press('ArrowRight');assert.deepEqual(edit.calls,['chronological:1']);edit.context.input.clear();edit.context.controls.clear();edit.press('Tab',{shiftKey:true});assert.deepEqual(edit.calls,['chronological:1','chronological:-1']);
- const reader=keyboardFixture();reader.context.selection=undefined;reader.press('ArrowRight');assert.deepEqual(reader.calls,['action:next']);
+ const reader=keyboardFixture();reader.context.selection=undefined;reader.context.controls.configure(readerControlBindings(readControlBindings(undefined,{bindings:defaultBindings()})));reader.press('ArrowRight');assert.deepEqual(reader.calls,['action:next']);
 });
 test('production L/R editing retains note ownership and respects inactive or modified input',()=>{
  const f=keyboardFixture();f.press('KeyR');assert.deepEqual(f.calls,['hand:RH']);const selected=f.context.selection;
@@ -74,8 +74,8 @@ test('production MIDI note routing leaves the full reader/editor untouched while
 });
 test('production reader toolbar omits Performance and stale actions cannot start a session',async()=>{
  const f=keyboardFixture();let markup='';const bar={contains:()=>false,set className(_value:string){},set innerHTML(value:string){markup=value;},querySelector:()=>null};
- Object.assign(f.context,{app:{querySelector:()=>bar},activeLayer:()=>undefined,scoreCapabilities:()=>({}),button:(label:string,action:string)=>`<button data-action="${action}">${label}</button>`,actionControlLabel:()=>'',rotationHint:()=>'',keyboardControl:()=>'',readingNotationControl:()=>'',OptionsNavigation:class{constructor(){}},readingPresentation:undefined,toolbarVisible:true,job:undefined,readingOperation:undefined});
- runInNewContext(production('function renderToolbar(','function keyboardControl('),f.context);f.context.renderToolbar();assert.ok(!markup.includes('performance'));
+ Object.assign(f.context,{app:{querySelector:(selector:string)=>selector==='.editor-navigation'?null:bar},activeLayer:()=>undefined,scoreCapabilities:()=>({}),button:(label:string,action:string)=>`<button data-action="${action}">${label}</button>`,actionControlLabel:()=>'',rotationHint:()=>'',keyboardControl:()=>'',readingNotationControl:()=>'',OptionsNavigation:class{constructor(){}},readingPresentation:undefined,toolbarVisible:true,job:undefined,readingOperation:undefined});
+ runInNewContext(production('function renderToolbar(','function renderEditorNavigation('),f.context);f.context.renderToolbar();assert.ok(!markup.includes('performance'));assert.deepEqual(f.calls,['mode']);f.calls.length=0;
  const previous=f.context.current.personal.view.page;runInNewContext(production('async function act(','\nasync function startJob('),f.context);await f.context.act('performance');await f.context.act('performance-stop');assert.equal(f.context.current.personal.view.page,previous);assert.deepEqual(f.calls,[]);
 });
 
@@ -85,4 +85,40 @@ test('production explicit pedal commands still turn pages outside interpreting m
  Object.assign(f.context,{midiConnection:{source:'piano',generation:1},pitchInput:{accepts:()=>true},midiOptions:undefined,isMusicalSustain,musicalSustain:{receive(){},clear(){}}});
  runInNewContext(production('function onMidi(event:','function settings('),f.context);
  f.context.onMidi({source:'piano',generation:1,channel:1,controller:80,value:127});assert.deepEqual(f.calls,['action:next']);
+});
+
+
+test('production measure navigation toggles without moving and reveals the first contact across pages',()=>{
+ const f=keyboardFixture(),initial=f.context.selection;f.useActualActions();f.press('Space');assert.equal(f.context.editNavigation,'measures');assert.equal(f.context.selection,initial);
+ const last=pkg.seats.filter(s=>s.page===0).sort((a,b)=>b.writtenBar-a.writtenBar)[0];f.context.selection=last;
+ const expected=measureSelection(pkg,last,1);assert.equal(expected.page,1);f.press('ArrowRight');assert.equal(f.context.selection.id,expected.id);assert.equal(f.context.current.personal.view.page,1);
+ f.context.input.clear();f.context.controls.clear();f.press('Tab',{shiftKey:true});assert.ok(f.calls.includes('chronological:-1'));assert.equal(f.context.editNavigation,'measures');
+ f.context.input.clear();f.context.controls.clear();f.press('Digit2',{key:'2'});assert.ok(f.calls.includes('digit'));assert.equal(f.context.editNavigation,'measures');
+});
+test('production editor toggle respects fields, dialogs, toolbar, capture, hidden and held input',()=>{
+ for(const owner of ['field','toolbar','modal','capture','repeat','held','blurred','hidden']){
+  const f=keyboardFixture();let extra:any={};
+  if(owner==='field')extra.target={closest:(s:string)=>s.includes('input')?{}:null};
+  if(owner==='toolbar'){f.context.toolbarNavigation={keyDown:()=>true};extra.target={closest:(s:string)=>s==='.toolbar'?{}:null};}
+  if(owner==='modal')f.context.dialog={dataset:{kind:'edit'}};
+  if(owner==='capture')f.context.input.capture='previous';if(owner==='repeat')extra.repeat=true;if(owner==='held'){f.press('Space');f.context.editNavigation='notes';}
+  if(owner==='blurred')f.context.readerFocused=false;if(owner==='hidden')f.context.document.hidden=true;
+  f.press('Space',extra);assert.equal(f.context.editNavigation,'notes',owner);
+ }
+});
+test('production custom editor binding owns toggle while Space remains free for practice',()=>{
+ const f=keyboardFixture(),bindings=readControlBindings(undefined,{bindings:defaultBindings()});bindings.actions.editorNavigation=[{kind:'key',key:'KeyN'},null];
+ f.context.controls.configure(editorControlBindings(bindings));f.press('Space');assert.equal(f.context.editNavigation,'notes');f.press('KeyN');assert.equal(f.context.editNavigation,'measures');
+ f.context.selection=undefined;f.context.controls.configure(readerControlBindings(bindings));f.context.input.clear();f.context.practice={bindingContext:{active:true},action:(action:string)=>f.calls.push(`practice:${action}`)};
+ f.press('Space');assert.ok(f.calls.includes('practice:ready'));
+});
+test('production Shift+Right cannot become previous note and respects an explicit modified binding',()=>{
+ const f=keyboardFixture();f.press('ArrowRight',{shiftKey:true});assert.ok(!f.calls.includes('chronological:-1'));
+ const bindings=readControlBindings(undefined,{bindings:defaultBindings()});bindings.actions.editorNext=[{kind:'key',key:'Shift+ArrowRight'},null];f.context.controls.keyUp({code:'ArrowRight'});f.context.controls.configure(editorControlBindings(bindings));f.context.input.clear();f.press('ArrowRight',{shiftKey:true});assert.ok(f.calls.includes('chronological:1'));
+});
+test('production persistent mode control stays outside the auto-hidden toolbar and exit resets mode',()=>{
+ const f=keyboardFixture();let markup='';const control={hidden:true,contains:()=>false,set innerHTML(value:string){markup=value;},insertAdjacentHTML(_position:string,html:string){markup+=html;}};
+ Object.assign(f.context,{app:{querySelector:(selector:string)=>selector==='.editor-navigation'?control:{focus(){}}},esc:(s:string)=>s,actionControlLabel:()=> 'Space',refreshEditorAdvice(){},editorMemoryMarkup:()=>'',adviceRunner:{cancel(){}},adviceKey:'',editorAdvice:undefined,resetInput(){}});
+ runInNewContext(production('function renderEditorNavigation(','let adviceOptions:'),f.context);f.context.editNavigation='measures';f.context.renderEditorNavigation();assert.equal(control.hidden,false);assert.match(markup,/Measures/);assert.match(markup,/<kbd>Space<\/kbd>/);assert.match(markup,/aria-pressed="true"/);
+ runInNewContext(production('function exitSelection(','function gainFocus('),f.context);f.context.exitSelection();assert.equal(f.context.editNavigation,'notes');assert.equal(f.context.selection,undefined);f.context.renderEditorNavigation();assert.equal(control.hidden,true);
 });
