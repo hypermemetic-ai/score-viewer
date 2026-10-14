@@ -1,12 +1,12 @@
 import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-store';
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
-import {hashBytes,type ScorePackage} from './package';
+import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {assigned,type PersonalHand} from './personal-assignments';
-import {personalStorageName,readPersonal,type Entry,type PersonalState} from './state';
+import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
  bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
  resolvePersonalFingeringMemory,captureMemoryFingerEdit,editPersonalFingeringMemory,promotePersonalFingeringReference,
- deletePersonalFingeringEntry,consolidatePersonalFingeringMemory,
+ deletePersonalFingeringEntry,consolidatePersonalFingeringMemory,preservePersonalMemoryHandChange,
  type PersonalFingeringMemory,type MemoryScoreInput,type MemoryFingerEdit,type ConsolidationReceipt,
 } from './personal-fingering-memory';
 
@@ -20,13 +20,13 @@ export type PersonalMemoryAction=
  | {kind:'finger';edit:MemoryFingerEdit;operation?:FingerOperation}
  | {kind:'hand';ownerId:string;hand:PersonalHand;decisionId:string;authoredAt:string}
  | {kind:'reference';ownerId:string;decisionId:string;authoredAt:string}
- | {kind:'reset';ownerId:string;decisionId:string;authoredAt:string};
+ | {kind:'reset'|'calculated'|'restoreAll'|'undoRestore';ownerId:string;decisionId:string;authoredAt:string};
 /** Serializable, source-bound user intent. A package and whole personal snapshot
  * are deliberately not journaled as replacement state. */
 export interface CapturedPersonalMemoryIntent {
  version:1;id:string;entryId:string;sourceRevision:string;sourceSha256?:string;
  personalKey:string;ownerId:string;guard:{pitch:number;startTick:number;durationTicks:number};
- action:PersonalMemoryAction;
+ action:PersonalMemoryAction;undoGuard?:string;
 }
 export interface PersonalMemorySessionOptions {
  /** Complete active library only. Never return historical editions/undo donors. */
@@ -55,6 +55,7 @@ export function rawMemoryPersonal(personal:PersonalState):PersonalState {
 }
 const json=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
 const inputKey=(input:MemoryScoreInput)=>personalStorageName(input.entryId,input.p);
+const undoGuard=(personal:PersonalState)=>JSON.stringify({undo:personal.undo,undoAssignments:personal.undoAssignments,undoCalculatedOwners:personal.undoCalculatedOwners});
 const record=(value:unknown):Record<string,any>=>{
  if(value===undefined)return{};
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid personal memory transaction journal.');
@@ -74,6 +75,7 @@ export class PersonalMemorySession {
  private optimistic?:PersonalFingeringMemory;
  private initializing?:Promise<void>;
  private tail:Promise<void>=Promise.resolve();
+ private queued:Array<()=>Promise<void>>=[];
  private failed?:Error;
  private maintenance=false;
  private inputs=new Map<string,MemoryScoreInput>();
@@ -107,7 +109,15 @@ export class PersonalMemorySession {
    this.failed=Error('Personal fingering saves are pending recovery.');
   }
  }
- private remember(inputs:readonly MemoryScoreInput[]){for(const input of inputs)this.inputs.set(inputKey(input),{...input,personal:rawMemoryPersonal(input.personal)});}
+ private remember(inputs:readonly MemoryScoreInput[]){for(const input of inputs){const key=inputKey(input),old=this.inputs.get(key),pending=[...this.pending.values()].some(intent=>intent.personalKey===key);this.inputs.set(key,{...input,personal:pending&&old?old.personal:rawMemoryPersonal(input.personal)});}}
+ /** Latest known durable raw authority plus this session's queued edits. This
+ * does not reread the library or expose inherited copies as fresh evidence. */
+ personalFor(input:MemoryScoreInput):PersonalState {
+  if(!this.snapshot)throw Error('Personal fingering memory has not finished indexing.');
+  const key=inputKey(input),pending=[...this.pending.values()].some(intent=>intent.personalKey===key),remembered=this.inputs.get(key);
+  return rawMemoryPersonal(pending&&remembered?remembered.personal:this.personalAt(this.snapshot,input));
+ }
+ currentInputs():MemoryScoreInput[]{return [...this.inputs.values()].map(input=>({...input,personal:this.personalFor(input)}));}
  private adopt(snapshot:AssistanceSnapshot){
   const document=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);
   if(!document.indexed)throw Error('Personal fingering library index is incomplete.');
@@ -119,7 +129,21 @@ export class PersonalMemorySession {
  /** Durable personal authority wins over legacy files. Loading never copies a
  * resolved/inherited display value into personal authorship. */
  async loadPersonalCurrent(entry:Pick<Entry,'id'|'importedAt'>,p:ScorePackage,legacy:()=>Promise<PersonalState>):Promise<PersonalState>{
-  await this.initialize();const current=await this.store.read(),key=personalStorageName(entry.id,p);
+  await this.initialize();let current=await this.store.read();const key=personalStorageName(entry.id,p);
+  // A validated companion can retain the same source/profile/hand storage key
+  // while changing only its package revision. Preserve current raw choices and
+  // recheck every guard and layer before activating that narrow rebind.
+  for(let attempt=0;current.documents[key]!==undefined;attempt++){
+   const raw=current.documents[key] as unknown as PersonalState;
+   try{readPersonal(raw,p);break;}catch(error){
+    const binding=initialPersonal(p).binding;
+    if(raw.version!==2||p.manifest.version!==2||raw.revision===p.manifest.revision||!binding||!raw.binding||JSON.stringify(Object.entries(raw.binding).sort())!==JSON.stringify(Object.entries(binding).sort()))throw error;
+    if(attempt>=maxAttempts)throw Error('Personal library remained busy; companion revision was not rebound.');
+    const rebound=readPersonal({...raw,revision:p.manifest.revision},p);
+    if(rebound.layer)await validateLayerAsync(rebound.layer,p);for(const layer of rebound.history)await validateLayerAsync(layer,p,{history:true});
+    const result=await this.store.commit({expectedRevision:current.revision,changes:json({[key]:rawMemoryPersonal(rebound)})});current=result.snapshot;
+   }
+  }
   const personal=current.documents[key]===undefined?rawMemoryPersonal(await legacy()):readPersonal(current.documents[key],p);
   const input={entryId:entry.id,importedAt:entry.importedAt,p,personal};this.remember([input]);
   const known=(snapshot:AssistanceSnapshot,candidate:MemoryScoreInput)=>{
@@ -146,7 +170,7 @@ export class PersonalMemorySession {
  resolve(input:MemoryScoreInput){return resolvePersonalFingeringMemory(this.memory,input.entryId,input.p,rawMemoryPersonal(input.personal));}
  private readIntent(raw:unknown):CapturedPersonalMemoryIntent {
   const intent=clone(raw) as CapturedPersonalMemoryIntent;
-  if(!intent||intent.version!==1||typeof intent.id!=='string'||!intent.id||typeof intent.entryId!=='string'||typeof intent.personalKey!=='string'||typeof intent.sourceRevision!=='string'||!intent.guard||!intent.action||!['finger','hand','reference','reset'].includes(intent.action.kind))throw Error('Invalid pending personal fingering intent.');
+  if(!intent||intent.version!==1||typeof intent.id!=='string'||!intent.id||typeof intent.entryId!=='string'||typeof intent.personalKey!=='string'||typeof intent.sourceRevision!=='string'||!intent.guard||!intent.action||!['finger','hand','reference','reset','calculated','restoreAll','undoRestore'].includes(intent.action.kind))throw Error('Invalid pending personal fingering intent.');
   return intent;
  }
  private target(intent:CapturedPersonalMemoryIntent):MemoryScoreInput {
@@ -170,7 +194,7 @@ export class PersonalMemorySession {
   if(!id||!Number.isFinite(Date.parse(authoredAt)))throw Error('Personal edit requires stable authorship.');
   if(this.pending.has(id))throw Error('Personal decision identity is already pending.');
   this.remember([input]);
-  return json({version:1,id,entryId:input.entryId,sourceRevision:source(input.p),sourceSha256:input.p.sourceSha256,personalKey:inputKey(input),ownerId,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},action:captured});
+  return json({version:1,id,entryId:input.entryId,sourceRevision:source(input.p),sourceSha256:input.p.sourceSha256,personalKey:inputKey(input),ownerId,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},action:captured,...(captured.kind==='undoRestore'?{undoGuard:undoGuard(input.personal)}:{})});
  }
  /** Accept immediately for paint; persist the original source-bound intent in
  * order. Promise rejection pauses entry and retains all pending recovery data. */
@@ -187,8 +211,10 @@ export class PersonalMemorySession {
   const clearFinger=()=>{for(const id of ownerIds){const c=personal.assignments?.choices[id];if(c){delete c.finger;if(c.intent)delete c.intent.finger;if(c.hand===undefined)delete personal.assignments!.choices[id];}}for(const [key,c]of Object.entries(personal.overrides))if(c.ownerIds.some(id=>ownerIds.has(id)))delete personal.overrides[key];};
   if(action.kind==='finger'||action.kind==='reset'){
    const edit:MemoryFingerEdit=action.kind==='finger'?action.edit:{ownerId:action.ownerId,finger:'inherit',decisionId:action.decisionId,authoredAt:action.authoredAt};
+   for(const id of ownerIds)if(personal.calculatedOwners)delete personal.calculatedOwners[id];
    if(action.kind==='finger'&&action.operation==='none')return{document,personal};
-   next=editPersonalFingeringMemory(document,{...input,personal},edit).document;
+   const result=editPersonalFingeringMemory(document,{...input,personal},edit);next=result.document;
+   if(result.operation==='none')return{document:next,personal};
    clearFinger();
    if(typeof edit.finger==='number'){
     const seat=input.p.seats.find(s=>s.ownerIds.includes(intent.ownerId));if(!seat)throw Error('Personal edit has no admitted contact.');
@@ -199,12 +225,25 @@ export class PersonalMemorySession {
    const seat=input.p.seats.find(s=>s.ownerIds.includes(intent.ownerId));if(!seat)throw Error('Personal edit has no admitted contact.');
    personal=assigned(input.p,personal,seat,{hand:action.hand});
    for(const id of ownerIds){const c=personal.assignments!.choices[id];c.intent!.hand={decisionId:action.decisionId,lineageId:action.decisionId,authoredAt:action.authoredAt};c.createdAt=input.personal.assignments?.choices[id]?.createdAt??action.authoredAt;}
+   next=preservePersonalMemoryHandChange(document,input,{...input,personal},intent.ownerId);
+  }else if(action.kind==='calculated'){
+   clearFinger();personal.calculatedOwners??={};for(const id of ownerIds)personal.calculatedOwners[id]=true;
+  }else if(action.kind==='restoreAll'){
+   personal=restoreAll(personal);personal.calculatedOwners=Object.fromEntries(input.p.score.notes.filter(isPitchedEvent).map(note=>[note.id,true]));
+   next=registerMemoryScore(document,{...input,personal});next.revision++;
+  }else if(action.kind==='undoRestore'){
+   if(intent.undoGuard!==undoGuard(personal))throw Error('The saved restore operation changed; pending undo retained.');
+   if(personal.undo!==undefined)personal.overrides=clone(personal.undo);
+   if(personal.undoAssignments!==undefined)personal.assignments=clone(personal.undoAssignments);else delete personal.assignments;
+   if(personal.undoCalculatedOwners!==undefined)personal.calculatedOwners=clone(personal.undoCalculatedOwners);else delete personal.calculatedOwners;
+   delete personal.undo;delete personal.undoAssignments;delete personal.undoCalculatedOwners;
    next=registerMemoryScore(document,{...input,personal});next.revision++;
   }else next=promotePersonalFingeringReference(document,{...input,personal},action.ownerId);
   return{document:next,personal:readPersonal(personal,input.p)};
  }
  private schedule(work:()=>Promise<void>):Promise<void>{
-  const next=this.tail.then(async()=>{if(this.failed)throw this.failed;try{await work();}catch(error){this.failed=error instanceof Error?error:Error(String(error));throw this.failed;}});
+  this.queued.push(work);
+  const next=this.tail.then(async()=>{if(this.failed)throw this.failed;try{await work();this.queued.splice(this.queued.indexOf(work),1);}catch(error){this.failed=error instanceof Error?error:Error(String(error));throw this.failed;}});
   this.tail=next.catch(()=>{});return next;
  }
  private async persist(intent:CapturedPersonalMemoryIntent){
@@ -239,7 +278,7 @@ export class PersonalMemorySession {
  async flush(){await this.tail;if(this.failed)throw this.failed;}
  async retry(){
   if(this.maintenance)throw Error('Personal recovery is already running.');this.maintenance=true;
-  try{await this.tail;this.failed=undefined;for(const intent of [...this.pending.values()])await this.persist(intent);}
+  try{await this.tail;this.failed=undefined;while(this.queued.length){await this.queued[0]();this.queued.shift();}for(const intent of [...this.pending.values()])await this.persist(intent);}
   catch(error){this.failed=error instanceof Error?error:Error(String(error));throw this.failed;}
   finally{this.maintenance=false;}
  }

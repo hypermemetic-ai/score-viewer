@@ -42,6 +42,17 @@ test('newly imported score registers custody and saved differences without reimp
  await s.accept(input,action('b0n1',5,'new-shared')).saved;await load(s,input);
  assert.equal(finger(s,input,'b1n1'),5);assert.equal(finger(s,added,'b0n1'),3);
 });
+test('same-key companion revision rebind retains latest choices and rejects any changed source binding',async()=>{
+ const input=fixture();Object.assign(input.p,{sourceRevision:'revision',profileId:'profile',effectiveHandSha256:'hands'});input.p.manifest.version=2;input.personal=initialPersonal(input.p);choose(input,'b0n1',2);
+ const store=storage(),s=session(store,[input]);await s.initialize();const before=await store.read(),companion=structuredClone(input.p);companion.manifest.revision='header-edition';
+ assert.equal(personalStorageName('piece',companion),personalStorageName('piece',input.p));
+ const loaded=await s.loadPersonalCurrent({id:'piece',importedAt:input.importedAt!},companion,async()=>{throw Error('Unexpected legacy fallback');});assert.equal(loaded.revision,'header-edition');assert.equal(loaded.assignments?.choices.b0n1.finger,2);
+ assert.equal((await store.read()).previous,before.id);assert.equal((await store.read(before.id!)).documents[personalStorageName('piece',input.p)]!==undefined,true);
+ // A corrupt value at the expected key cannot use the companion exception to
+ // bypass the immutable source binding.
+ const current=await store.read(),bad={...loaded,binding:{...loaded.binding!,sourceRevision:'different'}};await store.commit({expectedRevision:current.revision,changes:{[personalStorageName('piece',companion)]:bad}});
+ await assert.rejects(s.loadPersonalCurrent({id:'piece',importedAt:input.importedAt!},companion,async()=>initialPersonal(companion)),/differs/);
+});
 test('two application sessions replay source-bound additions on latest raw personal without losing either',async()=>{
  const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
  const x=a.accept(input,action('b0n1',2,'first')),y=b.accept(input,action('b0n2',4,'second'));
@@ -57,7 +68,7 @@ test('concurrent additions to one shared field keep the second captured choice l
 test('view save merges latest authority and never stores transient resolved fingers',async()=>{
  const input=fixture(),store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
  const entered=a.accept(input,action('b0n1',2));await entered.saved;
- const stale=structuredClone(input.personal) as PersonalState&{memoryResolved?:unknown};stale.view.rotation=90;stale.memoryResolved={revision:999,choices:{b3n1:{finger:5}}};
+ const stale=structuredClone(input.personal) as PersonalState&{memoryResolved?:unknown};stale.view.rotation=90;stale.memoryResolved={revision:999,sourceRevision:'revision',choices:{b3n1:{finger:5}}};
  await b.saveView({...input,personal:stale});const raw=await load(a,input);assert.equal(raw.view.rotation,90);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal((raw as any).memoryResolved,undefined);
  assert.equal((rawMemoryPersonal(stale) as any).memoryResolved,undefined);
 });
@@ -75,12 +86,18 @@ test('lost commit acknowledgement retries without re-authoring the accepted deci
  const s=session(store,[input]);await s.initialize();lose=true;await assert.rejects(s.accept(input,action('b0n1',2)).saved,/reply lost/);
  const revision=(await base.read()).revision;await s.retry();assert.equal((await base.read()).revision,revision);assert.equal(s.recovery.length,0);
 });
+test('retry also preserves an ordered failed view save without replacing newer personal authority',async()=>{
+ const input=fixture(),base=storage();let fail=false;const store:AssistanceStore={read:id=>base.read(id),commit:args=>{if(fail)throw Error('temporary write failure');return base.commit(args);}};
+ const s=session(store,[input]);await s.initialize();const entered=s.accept(input,action('b0n1',2));await entered.saved;fail=true;
+ const view=structuredClone(input.personal);view.view.rotation=90;await assert.rejects(s.saveView({...input,personal:view}),/temporary/);fail=false;await s.retry();const raw=await load(s,input);assert.equal(raw.view.rotation,90);assert.equal(raw.assignments?.choices.b0n1.finger,2);
+});
 test('ordered optimistic entry retains selected owners and hand edits do not author displayed fingers',async()=>{
  const input=choose(fixture(),'b0n1',2),s=session(storage(),[input]);await s.initialize();
  const first=s.accept(input,action('b1n2',4)),second=s.accept({...input,personal:first.personal},action('b2n1',3));await Promise.all([first.saved,second.saved]);
  const raw=await load(s,input);assert.equal(raw.assignments?.choices.b1n2.finger,4);assert.equal(raw.assignments?.choices.b2n1.finger,3);
  const hand=s.accept({...input,personal:raw},{kind:'hand',ownerId:'b3n1',hand:'LH',decisionId:'hand',authoredAt:'2025-02-01'});await hand.saved;
  assert.equal(hand.personal.assignments?.choices.b3n1.hand,'LH');assert.equal(hand.personal.assignments?.choices.b3n1.intent?.finger,undefined);
+ assert.equal(finger(s,{...input,personal:hand.personal},'b3n1'),2);
 });
 test('consolidation atomically retains originals and receipt; retries preserve later local exceptions',async()=>{
  const input=choose(choose(fixture(),'b0n1',2),'b2n1',3,'2021-01-01',false);choose(input,'b2n2',4,'2022-01-01',false);
@@ -96,4 +113,26 @@ test('unsafe or changing migration inputs leave memory, raw state, and completio
  const s=new PersonalMemorySession(store,{scanLibrary:async()=>[input],validateInputs:async()=>valid});await s.initialize();const before=await store.read();
  await assert.rejects(s.consolidate({entryIds:['piece'],receiptId:'unsafe',isSafe:()=>false}),/waits until practice/);
  valid=false;await assert.rejects(s.consolidate({entryIds:['piece'],receiptId:'changed',isSafe:()=>true}),/inputs changed/);assert.equal((await store.read()).id,before.id);
+});
+test('restore calculated masks reuse without deleting shared knowledge; entry and reset clear the mask',async()=>{
+ const input=choose(fixture(),'b0n1',2);input.p.fingerLayer={attacks:input.p.score.notes.map(n=>({id:`a:${n.id}`,finger:1,owners:[{id:n.id}]})),sourceOwnerToAttack:Object.fromEntries(input.p.score.notes.map(n=>[n.id,`a:${n.id}`]))} as any;
+ const s=session(storage(),[input]);await s.initialize();
+ const restored=s.accept(input,{kind:'calculated',ownerId:'b1n1',decisionId:'calculated',authoredAt:'2025-01-01'});await restored.saved;
+ assert.equal(restored.personal.calculatedOwners?.b1n1,true);assert.equal(finger(s,{...input,personal:restored.personal},'b0n1'),2);assert.equal(finger(s,{...input,personal:restored.personal},'b1n1'),1);
+ const same=s.accept({...input,personal:restored.personal},action('b1n1',2,'inherit-value'));await same.saved;
+ assert.equal(same.personal.calculatedOwners?.b1n1,undefined);assert.equal(same.personal.assignments?.choices.b1n1,undefined);assert.equal(finger(s,{...input,personal:same.personal},'b1n1'),2);
+ const another=s.accept({...input,personal:same.personal},{kind:'calculated',ownerId:'b1n1',decisionId:'calculated-again',authoredAt:'2025-01-01'});await another.saved;
+ const local=s.accept({...input,personal:another.personal},action('b1n1',4,'local-after-calc'));await local.saved;
+ assert.equal(finger(s,{...input,personal:local.personal},'b0n1'),2);assert.equal(finger(s,{...input,personal:local.personal},'b1n1'),4);
+ const reset=s.accept({...input,personal:local.personal},{kind:'reset',ownerId:'b1n1',decisionId:'reset',authoredAt:'2025-01-01'});await reset.saved;assert.equal(finger(s,{...input,personal:reset.personal},'b1n1'),2);
+});
+test('restore-all and undo preserve current global knowledge and restore raw hand authority and previous masks',async()=>{
+ const input=choose(fixture(),'b0n1',2),choice=input.personal.assignments!.choices.b0n1;choice.hand='LH';choice.intent!.hand={decisionId:'old-hand',lineageId:'old-hand',authoredAt:'2020-01-01'};
+ input.personal.calculatedOwners={b2n2:true};const store=storage(),a=session(store,[input]),b=session(store,[input]);await a.initialize();await b.initialize();
+ const restored=a.accept(input,{kind:'restoreAll',ownerId:'b0n1',decisionId:'restore-all',authoredAt:'2025-01-01'});await restored.saved;
+ assert.equal(restored.personal.assignments,undefined);assert.equal(Object.keys(restored.personal.calculatedOwners!).length,input.p.score.notes.length);
+ const concurrentRaw=await load(b,input);await b.accept({...input,personal:concurrentRaw},action('b0n1',5,'other-shared')).saved;
+ const undo=a.accept({...input,personal:restored.personal},{kind:'undoRestore',ownerId:'b0n1',decisionId:'undo-all',authoredAt:'2025-01-01'});await undo.saved;
+ assert.equal(undo.personal.assignments?.choices.b0n1.hand,'LH');assert.deepEqual(undo.personal.calculatedOwners,{b2n2:true});
+ const raw=await load(a,input);assert.equal(finger(a,{...input,personal:raw},'b1n1'),5);assert.equal(finger(a,{...input,personal:raw},'b0n1'),5);
 });
