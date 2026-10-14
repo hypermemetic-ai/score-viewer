@@ -1,6 +1,6 @@
 import {DOMParser} from '@xmldom/xmldom';
 import {svgClassStyles,resolvedSvgStyle} from './svg-style';
-import {footerGlyphPoints,assertAnnotationInkPolicyReady,ANNOTATION_INK_POLICY,type ViewerAnnotationInkPolicy} from './annotation-ink-policy';
+import {footerGlyphPoints,measureNumberGlyphPoints,expressionGlyphPoints,assertAnnotationInkPolicyReady,ANNOTATION_INK_POLICY,PERSONAL_ANNOTATION_INK_POLICY,type AnnotationInkPolicy} from './annotation-ink-policy';
 export type AnnotationBox=[number,number,number,number];
 type Matrix=[number,number,number,number,number,number];
 const unit:Matrix=[1,0,0,1,0,0];
@@ -85,9 +85,9 @@ const obstaclePages=new Map<string,PageObstacles>();
 const ordinaryMapGet=Map.prototype.get,ordinaryMapIterator=Map.prototype[Symbol.iterator];
 const maximumObstaclePages=12,maximumObstacleKeyUnits=4_000_000;
 let obstacleKeyUnits=0;
-function obstacleKey(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy:ViewerAnnotationInkPolicy|undefined):string|undefined{
+function obstacleKey(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy:AnnotationInkPolicy|undefined):string|undefined{
  if(Object.getPrototypeOf(heads)!==Map.prototype||Reflect.ownKeys(heads).length||heads.get!==ordinaryMapGet||heads[Symbol.iterator]!==ordinaryMapIterator||
-  'toJSON' in []||policy!==undefined&&policy!==ANNOTATION_INK_POLICY)return;
+  'toJSON' in []||policy!==undefined&&policy!==ANNOTATION_INK_POLICY&&policy!==PERSONAL_ANNOTATION_INK_POLICY)return;
  const entries=[...heads];
  // Preserve the old uncached path for malformed/nonfinite caller geometry;
  // JSON's nonfinite/null and negative-zero equivalences cannot establish reuse.
@@ -108,7 +108,7 @@ function rememberObstacles(key:string,p:PageObstacles):void{
  * voices, curves, rests and text. Owned carrier bounds are not this inventory.
  * Foreign text reserves a full page-width band, avoiding font substitution
  * assumptions. Unsupported geometry fails closed only for NEW editions. */
-export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy?:ViewerAnnotationInkPolicy):PageObstacles{
+export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy?:AnnotationInkPolicy):PageObstacles{
  // Readiness remains a live admission even when all geometry was seen before.
  if(policy)assertAnnotationInkPolicyReady(policy);
  const key=obstacleKey(svg,heads,policy),saved=key===undefined?undefined:obstaclePages.get(key);
@@ -143,7 +143,7 @@ export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,Annotati
    if(Array.from(el.childNodes).some(n=>n.nodeType===1)||['dx','dy','rotate','textLength','lengthAdjust','dominant-baseline','alignment-baseline'].some(k=>el.hasAttribute(k)||style[k]!==undefined))
     throw Error('Unsupported SVG text positioning in annotation clearance');
    const seat=el.getAttribute('data-viewer-seat');if(seat){const b=heads.get(seat);if(!b)throw Error('Annotation head ownership missing: '+seat);boxes.push(b);}
-   else{const measured=policy?footerGlyphPoints(el,style,policy):undefined;
+   else{const measured=policy?(measureNumberGlyphPoints(el,style,policy)??expressionGlyphPoints(el,style,policy)??footerGlyphPoints(el,style,policy)):undefined;
     if(measured){const b=pointsBox(measured,m,stroke),magnitude=Math.max(...measured.flatMap(([x,y])=>[Math.abs(x),Math.abs(y),
       Math.abs(m[0]*x)+Math.abs(m[2]*y)+Math.abs(m[4]),Math.abs(m[1]*x)+Math.abs(m[3]*y)+Math.abs(m[5])])),margin=1e-6+magnitude*Number.EPSILON*64;
      const expanded:AnnotationBox=[b[0]-margin,b[1]-margin,b[2]+margin,b[3]+margin];

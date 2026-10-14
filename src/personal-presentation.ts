@@ -1,6 +1,7 @@
 import {createPersonalHandProjection,type OwnerHand} from '../vendor/iso-notation/src/score-presentation';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {calculatedRecipeForRequest} from './calculated-hand-edition';
+import {PERSONAL_ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from './annotation-ink-policy';
 import {effectiveAssignments} from './personal-assignments';
 import {hashBytes,type ScorePackage} from './package';
 import type {PersonalState} from './state';
@@ -64,9 +65,10 @@ export class PersonalPresentationSession {
   if(owners.every(a=>this.base.score.notes.find(n=>n.id===a.id)?.hand===a.hand))return this.base;
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
+  await ensureAnnotationInkPolicyReady(PERSONAL_ANNOTATION_INK_POLICY);checkReadingExecution(execution);
   const digest=await hashBytes(key);checkReadingExecution(execution);
   const result=await this.use((core,e)=>e?core.projectAsync(owners,digest,e):core.project(owners,digest),execution);
-  const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry};
+  const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;
  }
 }

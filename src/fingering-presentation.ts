@@ -13,11 +13,12 @@ const ns='http://www.w3.org/2000/svg';
 const attribute=(el:Element,key:string,value:string)=>{if(el.getAttribute(key)!==value)el.setAttribute(key,value);};
 const cache=new WeakMap<object,Map<string,AnnotationPosition>>();
 const pageCache=new WeakMap<object,Map<number,Map<string,AnnotationPosition>>>();
-/** Keep the entire stack in its original source column's reading space. The
- * original x wins; otherwise select the smallest cleared local displacement.
+/** Keep the complete stack inside its original source column's reading space.
+ * Personal readings prefer the nearest clear row, then the smallest x shift;
+ * retained editions preserve their original exact-column preference.
  * Candidate boundaries come from actual obstacles, not guessed text widths. */
 export function affiliatedAnnotationPosition(input:{x:number;top:number;direction:-1|1;gap:number;height:number;em:number;
- width:[number,number];columns:readonly number[];page:{width:number;height:number;boxes:AnnotationBox[]};occupied:AnnotationBox[]}):{x:number;top:number}|undefined{
+ width:[number,number];columns:readonly number[];page:{width:number;height:number;boxes:AnnotationBox[]};occupied:AnnotationBox[];preferNearest?:boolean}):{x:number;top:number}|undefined{
  const {x,top,direction,gap,height,em,width,columns,page,occupied}=input,lower=columns.filter(c=>c<x),upper=columns.filter(c=>c>x),
   left=lower.length?(Math.max(...lower)+x)/2:0,right=upper.length?(Math.min(...upper)+x)/2:page.width,
   min=Math.max(x-em/2,left-width[0],-width[0]),max=Math.min(x+em/2,right-width[1],page.width-width[1]),ink=[...page.boxes,...occupied];
@@ -29,13 +30,16 @@ export function affiliatedAnnotationPosition(input:{x:number;top:number;directio
    if(relevant.some(other=>boxesOverlap(b,other)))continue;
    if(!best||Math.abs(candidate-x)<Math.abs(best.x-x))best={x:candidate,top:y};
   }
-  if(best?.x===x)break;
+  // Personal edits preserve attachment proximity: a small local horizontal
+  // clearance must not lose to an exact column tens of units above the note.
+  // Retained calculated editions keep their original placement policy.
+  if(best&&(input.preferNearest||best.x===x))break;
  }
  return best;
 }
 /** Reserve all 1–5 outlines beyond the frozen carrier. Shared stems form one
  * pitch-ordered vertical stack; changing a finger changes only its value. */
-type AnnotationScore=Pick<ScorePackage,'seats'|'score'|'pages'|'annotationGeometry'|'calculatedHandReceipt'>;
+type AnnotationScore=Pick<ScorePackage,'seats'|'score'|'pages'|'annotationGeometry'|'calculatedHandReceipt'|'personalAnnotationInkPolicy'>;
 /** Page selection limits overlay work only: every source owner, admitted
  * geometry identity and original page remains in the complete input package. */
 export function annotationPositions(p:AnnotationScore,pages?:readonly number[]):Map<string,AnnotationPosition>{
@@ -87,7 +91,7 @@ function computeAnnotationPositions(p:AnnotationScore,selected?:ReadonlySet<numb
    width:[number,number]=[(metric[0]-280)*smallEm/1000,(metric[2]-280)*smallEm/1000],
    fit=affiliatedAnnotationPosition({x:carrier.x,top,direction:carrier.direction,gap,height:stackHeight,
     em:Math.min(...group.map(s=>s.fontSize))*4/3,width,columns:columns.get(group[0].page+':'+group[0].system)!,page,
-    occupied:occupiedByPage.get(group[0].page)??[]});
+    occupied:occupiedByPage.get(group[0].page)??[],preferNearest:annotationInkPolicyFor(p)?.version==='viewer-personal-annotation-ink-policy-v1'});
    if(!fit)throw Error('Calculated finger annotations cannot fit actual page ink for '+group.map(s=>s.id).join(', '));
    top=fit.top;annotationX=fit.x;
   }
