@@ -133,10 +133,16 @@ test('native reordered pending records save and retain genuine collision protect
  assert.equal(raw.assignments?.choices.b0n2,undefined);assert.equal(s.recovery.length,1);
 });
 test('existing native pending choice can be recovered without changing its decision identity',async()=>{
- const input=fixture(),base=storage(),s=session(base,[input]);await s.initialize();
+ const input=fixture(),underlying=storage(),reorder=<T>(value:T):T=>JSON.parse(canonicalJson(value));
+ const base:AssistanceStore={read:async id=>reorder(await underlying.read(id)),commit:async args=>reorder(await underlying.commit(reorder(args)))};
+ const s=session(base,[input]);await s.initialize();
  const intent=s.capture(input,action('b0n1',4,'existing-native-pending')),before=await base.read();
  await base.commit({expectedRevision:before.revision,changes:{'personal-fingering-pending':JSON.parse(canonicalJson({[intent.id]:intent}))}});
- const reopened=session(base,[input]);await reopened.initialize();await reopened.retry();
+ const reopened=session(base,[input]);await reopened.initialize();
+ // Opening must not misidentify the unchanged native record as a new score and
+ // enqueue a write behind the failed save before the recovery control can show.
+ const stagedRevision=(await base.read()).revision;await load(reopened,input);assert.equal((await base.read()).revision,stagedRevision);
+ await reopened.retry();
  const raw=await load(reopened,input);assert.equal(raw.assignments?.choices.b0n1.finger,4);
  assert.equal(raw.assignments?.choices.b0n1.intent?.finger?.decisionId,intent.id);assert.equal(reopened.recovery.length,0);
 });
