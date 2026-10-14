@@ -2,10 +2,12 @@ import {isMeterPulseGrid,type PracticePulseGrid} from './score-clock';
 import {validateScoreSave} from './publication';
 import type {ScoreSaveResult} from './share-score';
 import {managedFileStorage} from './managed-file-storage';
-import {browserAssistanceStore,captureAssistanceCommit,type AssistanceStore,type AssistanceSnapshot,type AssistanceCommitResult} from './durable-assistance-store';
+import {indexedDBAssistanceStore,captureAssistanceCommit,type AssistanceStore,type AssistanceSnapshot,type AssistanceCommitResult} from './durable-assistance-store';
+let browserAssistance:AssistanceStore|undefined;
+const browserAssistanceStorage=()=>browserAssistance??=indexedDBAssistanceStore(globalThis.indexedDB,localStorage,navigator.locks);
 const assistanceStore:AssistanceStore={
- read:id=>isTauri()?invoke<AssistanceSnapshot>('read_assistance',{id:id??null}):browserAssistanceStore(localStorage,navigator.locks).read(id),
- commit:async input=>isTauri()?invoke<AssistanceCommitResult>('commit_assistance',{input:captureAssistanceCommit(input)}):browserAssistanceStore(localStorage,navigator.locks).commit(input)
+ read:id=>isTauri()?invoke<AssistanceSnapshot>('read_assistance',{id:id??null}):browserAssistanceStorage().read(id),
+ commit:async input=>isTauri()?invoke<AssistanceCommitResult>('commit_assistance',{input:captureAssistanceCommit(input)}):browserAssistanceStorage().commit(input)
 };
 import {invoke,isTauri} from '@tauri-apps/api/core';import {listen} from '@tauri-apps/api/event';import type {MidiCC,MidiStatus,MidiNote} from './midi';import {getCurrentWindow} from '@tauri-apps/api/window';
 const encode=(bytes:Uint8Array)=>{let s='';for(let i=0;i<bytes.length;i+=16384)s+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(s);};
