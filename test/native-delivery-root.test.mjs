@@ -95,3 +95,15 @@ test('migration refuses unordered viewer sources or a substituted current downlo
   f.current.downloads.windows.sha256='0'.repeat(64);await file(f.output,'current.json',JSON.stringify(f.current));
   await assert.rejects(publishPair(f.artifact,f.output,{validate:f.validate,migration:{fromRevision:f.before,compareViewerRevisions:async()=>true}}),/differs from its verified pair/);
 });
+
+test('a different migration pin cannot bypass normal delivery ancestry',async t=>{
+  const f=await publicationFixture(t),calls=[];
+  await assert.rejects(publishPair(f.artifact,f.output,{validate:f.validate,compareRevisions:async(a,b)=>{calls.push([a,b]);return false;},migration:{fromRevision:'9'.repeat(40),compareViewerRevisions:()=>{throw Error('must not migrate another source');}}}),/does not descend/);
+  assert.deepEqual(calls,[[f.before,f.after]]);
+  assert.equal(JSON.parse(await readFile(join(f.output,'current.json'))).identity.sourceRevision,f.before);
+});
+test('normal viewer delivery continues to enforce delivery-commit ancestry',async t=>{
+  const f=await publicationFixture(t),calls=[];
+  const result=await publishPair(f.artifact,f.output,{validate:f.validate,compareRevisions:async(a,b)=>{calls.push([a,b]);return true;}});
+  assert.deepEqual(calls,[[f.before,f.after]]);assert.equal(result.identity.sourceRevision,f.after);
+});

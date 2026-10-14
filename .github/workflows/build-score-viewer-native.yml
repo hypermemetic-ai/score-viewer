@@ -101,6 +101,17 @@ jobs:
         run: |
           rustup toolchain install 1.98.1 --profile minimal
           npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+      - name: Build separately verified operational assistance staging tool
+        run: |
+          cargo test --locked --target x86_64-pc-windows-msvc --manifest-path scripts/assistance-stage/Cargo.toml
+          cargo build --locked --release --target x86_64-pc-windows-msvc --manifest-path scripts/assistance-stage/Cargo.toml
+      - name: Upload operational tool separately from the application package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Score-Viewer-assistance-stage-${{ needs.prepare.outputs.source_revision }}
+          path: ${{ env.CARGO_TARGET_DIR }}/x86_64-pc-windows-msvc/release/viewer-assistance-stage.exe
+          retention-days: 14
+          if-no-files-found: error
       - name: Native Windows tests, portable package and actual embedded proof
         env:
           RUST_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
