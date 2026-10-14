@@ -28,3 +28,13 @@ export function systemSelection(p:Pick<ScorePackage,'score'|'seats'>,current:Sea
  if(index<0||!target)return current;
  return [...target].sort((a,b)=>Math.abs(a.x-current.x)-Math.abs(b.x-current.x)||Math.abs(a.baseline-current.baseline)-Math.abs(b.baseline-current.baseline)||(rank.get(a.contactId)!-rank.get(b.contactId)!)||a.id.localeCompare(b.id))[0];
 }
+
+/** Measures are written occurrences, not source attack owners: a held alias
+ * remains a destination in the bar and page where it is printed. */
+export function measureSelection(p:Pick<ScorePackage,'score'|'seats'>,current:Seat,direction:-1|1):Seat {
+ const units=editUnits(p),rank=new Map(units.map((seat,index)=>[seat.contactId,index]));
+ const bars=[...new Set(p.seats.filter(s=>rank.has(s.contactId)).map(s=>s.writtenBar))].sort((a,b)=>a-b);
+ const bar=direction===1?bars.find(bar=>bar>current.writtenBar):bars.findLast(bar=>bar<current.writtenBar);
+ if(bar===undefined)return current;
+ return p.seats.filter(s=>s.writtenBar===bar&&rank.has(s.contactId)).sort((a,b)=>a.page-b.page||a.system-b.system||(rank.get(a.contactId)!-rank.get(b.contactId)!)||a.id.localeCompare(b.id))[0];
+}

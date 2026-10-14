@@ -37,3 +37,10 @@ test('both shipped piano presentations navigate their printed systems independen
   assert.ok(crossings>0);
  }
 });
+
+
+test('measure movement follows written bars, skips empty bars and retains held aliases',async()=>{
+ const {measureSelection}=await import('../src/selection'),units=editUnits(p),start={...units[0],writtenBar:1,page:0},held={...units[0],id:'held-bar-3',writtenBar:3,page:1,continuation:true},later={...units[1],writtenBar:5,page:1},last={...units[2],writtenBar:5,page:1};
+ const q={score:p.score,seats:[last,later,held,start]};
+ assert.equal(measureSelection(q,start,1),held);assert.equal(measureSelection(q,held,1),later);assert.equal(measureSelection(q,later,-1),held);assert.equal(measureSelection(q,held,-1),start);assert.equal(measureSelection(q,start,-1),start);assert.equal(measureSelection(q,last,1),last);
+});

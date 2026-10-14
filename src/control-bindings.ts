@@ -4,14 +4,22 @@ export type ControlBinding={kind:'key';key:string}|({kind:'midi'}&MidiMapping);
 export type ControlSlots=[ControlBinding|null,ControlBinding|null];
 export const practiceModeActions=['practiceReading','practiceTimed','practiceFreeView'] as const;
 export type PracticeModeAction=typeof practiceModeActions[number];
-export type ControlAction=ReadingAction|PracticeModeAction;
-export const controlActions:readonly ControlAction[]=[...readingActions,...practiceModeActions];
+export const editorActions=['editorPrevious','editorNext','editorNavigation'] as const;
+export type EditorAction=typeof editorActions[number];
+export type ControlAction=ReadingAction|PracticeModeAction|EditorAction;
+export const isEditorAction=(action:ControlAction):action is EditorAction=>editorActions.includes(action as EditorAction);
+/** Only actions that can be active together compete for a physical control. */
+export function controlActionsOverlap(a:ControlAction,b:ControlAction){
+ const contexts=(action:ControlAction)=>isEditorAction(action)?['editor']:isPracticeModeAction(action)||action==='done'?['practice']:action==='toggle'||action==='practiceSettings'?['reader','editor','practice']:['reader','practice'];
+ return contexts(a).some(context=>contexts(b).includes(context));
+}
+export const controlActions:readonly ControlAction[]=[...readingActions,...practiceModeActions,...editorActions];
 export const isPracticeModeAction=(action:ControlAction):action is PracticeModeAction=>practiceModeActions.includes(action as PracticeModeAction);
-export const controlActionLabel=(action:ControlAction)=>isPracticeModeAction(action)?{practiceReading:'Reading',practiceTimed:'Timed',practiceFreeView:'Free view'}[action]:readingActionLabel(action);
+export const controlActionLabel=(action:ControlAction)=>isEditorAction(action)?{editorPrevious:'Previous note / measure',editorNext:'Next note / measure',editorNavigation:'Notes / measures'}[action]:isPracticeModeAction(action)?{practiceReading:'Reading',practiceTimed:'Timed',practiceFreeView:'Free view'}[action]:readingActionLabel(action);
 /** Missing mode slots remain missing on disk. Their effective defaults are
  * resolved only after local navigation has taken its inherited/saved form. */
-export interface ControlBindings {version:1;actions:Record<ReadingAction,ControlSlots>&Partial<Record<PracticeModeAction,ControlSlots>>}
-export function controlActionAllowed(action:ControlAction,context:Parameters<typeof readingActionAllowed>[1]&{practiceModes?:boolean;practiceFreeView?:boolean}){return isPracticeModeAction(action)?!context.modal&&!context.selecting&&context.practice&&(action==='practiceFreeView'?context.practiceFreeView===true||context.practiceModes===true:context.practiceModes===true):readingActionAllowed(action,context);}
+export interface ControlBindings {version:1;actions:Record<ReadingAction,ControlSlots>&Partial<Record<PracticeModeAction|EditorAction,ControlSlots>>}
+export function controlActionAllowed(action:ControlAction,context:Parameters<typeof readingActionAllowed>[1]&{practiceModes?:boolean;practiceFreeView?:boolean}){return isEditorAction(action)?!context.modal&&context.selecting&&!context.practice:isPracticeModeAction(action)?!context.modal&&!context.selecting&&context.practice&&(action==='practiceFreeView'?context.practiceFreeView===true||context.practiceModes===true:context.practiceModes===true):readingActionAllowed(action,context);}
 export type KeyInput=Pick<KeyboardEvent,'code'|'ctrlKey'|'altKey'|'shiftKey'|'metaKey'|'repeat'>&{key?:string};
 export const controlIdentity=(binding:ControlBinding)=>binding.kind==='key'?`key:${binding.key}`:JSON.stringify(['midi',binding.source,binding.channel,binding.controller]);
 export const controlLabel=(binding:ControlBinding|null)=>!binding?'Unbound':binding.kind==='key'?readableChord(binding.key).replaceAll('Left arrow','←').replaceAll('Right arrow','→').replaceAll('Up arrow','↑').replaceAll('Down arrow','↓'):`Pedal · CC${binding.controller}`;
@@ -21,14 +29,14 @@ export const controlDetail=(binding:ControlBinding|null)=>binding?.kind==='midi'
 export function readControlBindings(value:unknown,legacy:{bindings:unknown;midi?:unknown;midiBindings?:unknown}):ControlBindings {
  if(value===undefined){const keys=readBindings(legacy.bindings),pedals=readMidiBindings(legacy.midiBindings,legacy.midi);return {version:1,actions:Object.fromEntries(readingActions.map(action=>[action,[{kind:'key',key:keys[action]},pedals[action]&&pedals[action]!.controller<120?{kind:'midi',source:pedals[action]!.source,channel:pedals[action]!.channel,controller:pedals[action]!.controller,press:pedals[action]!.press,release:pedals[action]!.release}:null]])) as Record<ReadingAction,ControlSlots>};}
  const raw=value as ControlBindings,oldActions=readingActions.filter(a=>a!=='practiceSettings');if(!raw||raw.version!==1||Object.keys(raw).some(k=>!['version','actions'].includes(k))||!raw.actions||typeof raw.actions!=='object'||Object.keys(raw.actions).some(k=>!controlActions.includes(k as ControlAction))||oldActions.some(a=>!Object.hasOwn(raw.actions,a)))throw Error('Saved controls version differs; data retained.');
- const identities=new Set<string>(),actions={} as Record<ReadingAction,ControlSlots>;
- for(const action of controlActions){if(!Object.hasOwn(raw.actions,action))continue;const slots=raw.actions[action];if(!Array.isArray(slots)||slots.length!==2)throw Error('Saved controls require two slots; data retained.');(actions as ControlBindings['actions'])[action]=slots.map(b=>{if(b===null)return null;if(!b||typeof b!=='object')throw Error('Saved control is unsupported; data retained.');let binding:ControlBinding;if(b.kind==='key'){if(typeof b.key!=='string'||!b.key.trim()||Object.keys(b).some(k=>!['kind','key'].includes(k)))throw Error('Saved key is unsupported; data retained.');binding={kind:'key',key:b.key};}else if(b.kind==='midi'){if(Object.keys(b).some(k=>!['kind','source','channel','controller','press','release'].includes(k)))throw Error('Saved pedal is unsupported; data retained.');const mapping=readMidiMapping(b)!;if(mapping.controller>=120)throw Error('Reset controllers stay reserved.');binding={kind:'midi',...mapping};}else throw Error('Saved control type differs; data retained.');const id=controlIdentity(binding);if(identities.has(id))throw Error('Saved controls conflict; data retained.');identities.add(id);return binding;}) as ControlSlots;}
+ const identities=new Set<string>(),owners=new Map<string,ControlAction[]>(),actions={} as Record<ReadingAction,ControlSlots>;
+ for(const action of controlActions){if(!Object.hasOwn(raw.actions,action))continue;const slots=raw.actions[action];if(!Array.isArray(slots)||slots.length!==2)throw Error('Saved controls require two slots; data retained.');(actions as ControlBindings['actions'])[action]=slots.map(b=>{if(b===null)return null;if(!b||typeof b!=='object')throw Error('Saved control is unsupported; data retained.');let binding:ControlBinding;if(b.kind==='key'){if(typeof b.key!=='string'||!b.key.trim()||Object.keys(b).some(k=>!['kind','key'].includes(k)))throw Error('Saved key is unsupported; data retained.');if(isEditorAction(action)&&(/^(?:Digit|Numpad)[1-5]$/.test(b.key)||['KeyL','KeyR','Tab','Shift+Tab','ArrowUp','ArrowDown','Escape'].includes(b.key)))throw Error('That key is reserved for note editing.');binding={kind:'key',key:b.key};}else if(b.kind==='midi'){if(Object.keys(b).some(k=>!['kind','source','channel','controller','press','release'].includes(k)))throw Error('Saved pedal is unsupported; data retained.');const mapping=readMidiMapping(b)!;if(mapping.controller>=120)throw Error('Reset controllers stay reserved.');binding={kind:'midi',...mapping};}else throw Error('Saved control type differs; data retained.');const id=controlIdentity(binding);if(owners.get(id)?.some(owner=>controlActionsOverlap(owner,action)))throw Error('Saved controls conflict; data retained.');owners.set(id,[...(owners.get(id)??[]),action]);identities.add(id);return binding;}) as ControlSlots;}
  if(!Object.hasOwn(raw.actions,'practiceSettings'))actions.practiceSettings=[{kind:'key',key:practiceSettingsFallback([...identities].filter(id=>id.startsWith('key:')).map(id=>id.slice(4)))},null];
  return {version:1,actions};
 }
 export function replaceControl(bindings:ControlBindings,action:ControlAction,slot:0|1,binding:ControlBinding|null):ControlBindings {
  const next=structuredClone(bindings);next.actions[action]??=[null,null];next.actions[action]![slot]=binding;
- try{return readControlBindings(next,{bindings:{}});}catch(error){if(binding){const owner=controlActions.find(a=>bindings.actions[a]?.some((b,s)=>b&&controlIdentity(b)===controlIdentity(binding)&&!(a===action&&s===slot)));if(owner)throw Error(`Already assigned to ${controlActionLabel(owner)}.`);}throw error;}
+ try{return readControlBindings(next,{bindings:{}});}catch(error){if(binding){const owner=controlActions.find(a=>bindings.actions[a]?.some((b,s)=>b&&controlIdentity(b)===controlIdentity(binding)&&controlActionsOverlap(a,action)&&!(a===action&&s===slot)));if(owner)throw Error(`Already assigned to ${controlActionLabel(owner)}.`);}throw error;}
 }
 export function restoreControlPages(bindings:ControlBindings):ControlBindings {
  const next=structuredClone(bindings);next.actions.previous[0]={kind:'key',key:'ArrowLeft'};next.actions.next[0]={kind:'key',key:'ArrowRight'};return readControlBindings(next,{bindings:{}});
@@ -39,8 +47,27 @@ export function changeControls(bindings:ControlBindings,change:ControlChange){re
 
 export const actionControlLabel=(bindings:ControlBindings,action:ControlAction)=>(bindings.actions[action]??[]).filter((b):b is ControlBinding=>!!b).map(controlLabel).join(' / ');
 export function practiceControlBindings(bindings:ControlBindings,pianoModes=true):ControlBindings {
- const next=structuredClone(bindings),used=new Set(Object.values(next.actions).flatMap(slots=>slots.filter((b):b is ControlBinding=>!!b).map(controlIdentity)));
+ const next=readerControlBindings(bindings),used=new Set(Object.values(next.actions).flatMap(slots=>slots.filter((b):b is ControlBinding=>!!b).map(controlIdentity)));
  for(const [action,key]of [['practiceReading','KeyR'],['practiceTimed','KeyT'],['practiceFreeView','KeyV']] as const){if(!pianoModes&&action!=='practiceFreeView'||Object.hasOwn(next.actions,action))continue;next.actions[action]=[used.has(`key:${key}`)?null:{kind:'key',key},null];}
+ return readControlBindings(next,{bindings:{}});
+}
+/** Stored editor controls are dormant outside editing, so compatible practice
+ * bindings may use the same key without stealing its current context. */
+export function readerControlBindings(bindings:ControlBindings):ControlBindings {
+ const next=structuredClone(bindings);for(const action of editorActions)delete next.actions[action];return next;
+}
+export function editorControlBindings(bindings:ControlBindings):ControlBindings {
+ const next=structuredClone(bindings);
+ for(const action of controlActions)if(!isEditorAction(action)&&action!=='toggle'&&action!=='practiceSettings'){
+  if(isPracticeModeAction(action))delete next.actions[action];else next.actions[action]=[null,null];
+ }
+ for(const [action,key] of [['editorPrevious','ArrowLeft'],['editorNext','ArrowRight'],['editorNavigation','Space']] as const){
+  if(Object.hasOwn(next.actions,action))continue;
+  // An explicit saved assignment anywhere owns a default key. Context reuse
+  // remains available by assigning the editor action explicitly.
+  const owner=controlActions.find(other=>other!==action&&bindings.actions[other]?.some(b=>b?.kind==='key'&&b.key===key)&&!(['previous','next'].includes(other)&&['ArrowLeft','ArrowRight'].includes(key)));
+  next.actions[action]=[owner?null:{kind:'key',key},null];
+ }
  return readControlBindings(next,{bindings:{}});
 }
 /** An explicit saved V assignment owns the key even when its action is unavailable. */

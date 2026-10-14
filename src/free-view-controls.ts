@@ -1,4 +1,4 @@
-import {changeControls,controlIdentity,controlActionLabel,controlActions,isPracticeModeAction,practiceControlBindings,readControlBindings,type ControlAction,type ControlBinding,type ControlBindings,type ControlChange} from './control-bindings';
+import {changeControls,controlIdentity,controlActionLabel,controlActions,isPracticeModeAction,isEditorAction,editorControlBindings,controlActionsOverlap,practiceControlBindings,readControlBindings,type ControlAction,type ControlBinding,type ControlBindings,type ControlChange} from './control-bindings';
 
 export type FreeViewNavigationAction='previous'|'next';
 /** Missing slots inherit; an owned null deliberately has no control. */
@@ -12,7 +12,7 @@ export function freeViewControlBindings(main:ControlBindings,overrides?:FreeView
  const next=structuredClone(main);
  for(const action of ['previous','next'] as const)for(const slot of [0,1] as const)if(hasFreeViewOverride(overrides,action,slot))next.actions[action][slot]=overrides!.actions[action]![slot]!;
  const owners=new Map<string,{action:ControlAction;slot:0|1}>();
- for(const action of controlActions)for(const slot of [0,1] as const){const binding=next.actions[action]?.[slot];if(!binding)continue;const id=controlIdentity(binding),owner=owners.get(id);if(owner)throw Error(`Free view conflict: ${label(owner.action)} ${slotLabel(owner.slot)} control and ${label(action)} ${slotLabel(slot)} control. Change the conflicting local binding.`);owners.set(id,{action,slot});}
+ for(const action of controlActions)for(const slot of [0,1] as const){const binding=next.actions[action]?.[slot];if(!binding)continue;const id=controlIdentity(binding),owner=owners.get(id);if(owner&&controlActionsOverlap(owner.action,action))throw Error(`Free view conflict: ${label(owner.action)} ${slotLabel(owner.slot)} control and ${label(action)} ${slotLabel(slot)} control. Change the conflicting local binding.`);owners.set(id,{action,slot});}
  return readControlBindings(next,{bindings:{}});
 }
 
@@ -36,8 +36,8 @@ export function changeScopedControls(main:ControlBindings,overrides:FreeViewCont
  else{
   // Editing a secondary control preserves the primary shown by the effective
   // default, while an explicit empty slot remains owned on later reloads.
-  if(change.kind==='assign'&&isPracticeModeAction(change.action)&&!Object.hasOwn(main.actions,change.action)){
-   nextMain=structuredClone(main);nextMain.actions[change.action]=practiceControlBindings(freeViewControlBindings(main,overrides)).actions[change.action];
+  if(change.kind==='assign'&&(isPracticeModeAction(change.action)||isEditorAction(change.action))&&!Object.hasOwn(main.actions,change.action)){
+   nextMain=structuredClone(main);nextMain.actions[change.action]=(isEditorAction(change.action)?editorControlBindings(main):practiceControlBindings(freeViewControlBindings(main,overrides))).actions[change.action];
   }
   nextMain=changeControls(nextMain,change);
  }
