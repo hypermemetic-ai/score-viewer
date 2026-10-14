@@ -75,7 +75,7 @@ test('production MIDI note routing leaves the full reader/editor untouched while
 test('production reader toolbar omits Performance and stale actions cannot start a session',async()=>{
  const f=keyboardFixture();let markup='';const bar={contains:()=>false,set className(_value:string){},set innerHTML(value:string){markup=value;},querySelector:()=>null};
  Object.assign(f.context,{app:{querySelector:(selector:string)=>selector==='.editor-navigation'?null:bar},activeLayer:()=>undefined,scoreCapabilities:()=>({}),button:(label:string,action:string)=>`<button data-action="${action}">${label}</button>`,actionControlLabel:()=>'',rotationHint:()=>'',keyboardControl:()=>'',readingNotationControl:()=>'',OptionsNavigation:class{constructor(){}},readingPresentation:undefined,toolbarVisible:true,job:undefined,readingOperation:undefined});
- runInNewContext(production('function renderToolbar(','function keyboardControl('),f.context);f.context.renderToolbar();assert.ok(!markup.includes('performance'));
+ runInNewContext(production('function renderToolbar(','function renderEditorNavigation('),f.context);f.context.renderToolbar();assert.ok(!markup.includes('performance'));assert.deepEqual(f.calls,['mode']);f.calls.length=0;
  const previous=f.context.current.personal.view.page;runInNewContext(production('async function act(','\nasync function startJob('),f.context);await f.context.act('performance');await f.context.act('performance-stop');assert.equal(f.context.current.personal.view.page,previous);assert.deepEqual(f.calls,[]);
 });
 
@@ -117,8 +117,8 @@ test('production Shift+Right cannot become previous note and respects an explici
  const bindings=readControlBindings(undefined,{bindings:defaultBindings()});bindings.actions.editorNext=[{kind:'key',key:'Shift+ArrowRight'},null];f.context.controls.keyUp({code:'ArrowRight'});f.context.controls.configure(editorControlBindings(bindings));f.context.input.clear();f.press('ArrowRight',{shiftKey:true});assert.ok(f.calls.includes('chronological:1'));
 });
 test('production persistent mode control stays outside the auto-hidden toolbar and exit resets mode',()=>{
- const f=keyboardFixture();let markup='';const control={hidden:true,contains:()=>false,set innerHTML(value:string){markup=value;}};
- Object.assign(f.context,{app:{querySelector:(selector:string)=>selector==='.editor-navigation'?control:{focus(){}}},esc:(s:string)=>s,actionControlLabel:()=> 'Space',resetInput(){}});
- runInNewContext(production('function renderEditorNavigation(','function keyboardControl('),f.context);f.context.editNavigation='measures';f.context.renderEditorNavigation();assert.equal(control.hidden,false);assert.match(markup,/Measures/);assert.match(markup,/<kbd>Space<\/kbd>/);assert.match(markup,/aria-pressed="true"/);
+ const f=keyboardFixture();let markup='';const control={hidden:true,contains:()=>false,set innerHTML(value:string){markup=value;},insertAdjacentHTML(_position:string,html:string){markup+=html;}};
+ Object.assign(f.context,{app:{querySelector:(selector:string)=>selector==='.editor-navigation'?control:{focus(){}}},esc:(s:string)=>s,actionControlLabel:()=> 'Space',refreshEditorAdvice(){},editorMemoryMarkup:()=>'',adviceRunner:{cancel(){}},adviceKey:'',editorAdvice:undefined,resetInput(){}});
+ runInNewContext(production('function renderEditorNavigation(','let adviceOptions:'),f.context);f.context.editNavigation='measures';f.context.renderEditorNavigation();assert.equal(control.hidden,false);assert.match(markup,/Measures/);assert.match(markup,/<kbd>Space<\/kbd>/);assert.match(markup,/aria-pressed="true"/);
  runInNewContext(production('function exitSelection(','function gainFocus('),f.context);f.context.exitSelection();assert.equal(f.context.editNavigation,'notes');assert.equal(f.context.selection,undefined);f.context.renderEditorNavigation();assert.equal(control.hidden,true);
 });
