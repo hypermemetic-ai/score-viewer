@@ -37,6 +37,14 @@ test('a local hand-match exception and suppression keep navigation to their unde
   assert.deepEqual(memoryReferenceTarget(input,local,'b2n1'),expected);
  }
 });
+test('uncertain saved local fingers retain a known shared source without inventing one when absent',()=>{
+ const input=fixture();input.personal=assigned(input.p,input.personal,input.p.seats[7],{finger:4});delete input.personal.assignments!.choices.b2n1.intent;
+ let memory=bootstrapPersonalFingeringMemory([input]),resolved=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal);
+ assert.equal(memoryChoiceLabel(resolved,'b2n1'),'Local');assert.equal(memoryReferenceTarget(input,resolved,'b2n1'),undefined);
+ input.personal=assigned(input.p,input.personal,input.p.seats[1],{finger:2});memory=bootstrapPersonalFingeringMemory([input]);resolved=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal);
+ assert.equal(resolved.byOwner.b2n1.finger?.value,4);assert.equal(memoryChoiceLabel(resolved,'b2n1'),'Local');
+ assert.deepEqual(memoryReferenceTarget(input,resolved,'b2n1'),{entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'});
+});
 test('library donor scan excludes historical editions and detects changes to active source bytes',async()=>{
  const input=fixture(),entry={id:'piece',file:'active.isoscore',metadata:{title:'Fixture'},importedAt:'2020-01-01',retainedPackages:['old.isoscore']} as Entry;
  const files=new Map([['active.isoscore',new Uint8Array([1])]]),reads:string[]=[];
