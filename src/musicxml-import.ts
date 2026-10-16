@@ -56,7 +56,7 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  let score;
  try{score=projectMusicXml(written,{id:`musicxml-${inputSha256}`,pianoHands:'source-v1'}).score;}
  catch(error){
-  const program=/^Piano import needs a piano instrument; part .* declares MIDI program (\d+)\.$/.exec((error as Error).message)?.[1];
+  const program=/^Piano import needs a piano instrument; part .* declares MIDI program (-?\d+)\.$/.exec((error as Error).message)?.[1];
   if(program)throw new MusicXmlImportRefusal(`This part is written for an instrument other than piano (General MIDI program ${program}). MusicXML import reads piano scores only.`);
   throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);
  }

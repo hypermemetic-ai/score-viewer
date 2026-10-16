@@ -12,7 +12,7 @@ const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('
  notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>
   ['licenses/'+name,readFileSync(new URL('../licenses/'+name,import.meta.url))]))};
 // The intake's own refusal of converter output it can't read yet (ISO reader work).
-const readerRefusal=/^This MuseScore score can't be opened yet: the viewer's notation reader doesn't understand part of it yet \(MusicXML [^)]+\)\.$/;
+const readerRefusal=/^This MuseScore score can't be opened yet: it uses [a-z -]+, which the viewer doesn't read yet\.$/;
 
 test('MuseScore import and its picker extensions stay behind the MusicXML release gate',()=>{
  assert.equal(MUSICXML_IMPORT_ENABLED,false);
@@ -34,8 +34,12 @@ test('converter refusals read in plain words',()=>{
  for(const code of ['native-zip','zip-identification','xml','native-container'])assert.match(museScoreRefusalMessage(code),/isn't a readable MuseScore score/);
  assert.match(museScoreRefusalMessage('native-part'),/parts or staves of this MuseScore score can't be read/);
  assert.match(museScoreRefusalMessage('worker-runtime'),/stopped unexpectedly/);
- assert.equal(museScoreRefusalMessage('native-figured-bass'),'This MuseScore score uses notation the viewer can\'t convert yet (figured bass).');
- for(const code of ['runtime-codec','native-version','xml','native-tremolo'])assert.doesNotMatch(museScoreRefusalMessage(code),/deflate|serialization|adapter|native|[<>]/i);
+ assert.equal(museScoreRefusalMessage('native-figured-bass'),'This MuseScore score uses figured bass, which the viewer can\'t convert yet.');
+ assert.equal(museScoreRefusalMessage('native-accidental-cent-conflict'),'This MuseScore score uses quarter-tone or other microtonal accidentals, which the viewer can\'t convert yet.');
+ assert.equal(museScoreRefusalMessage('native-articulation-anchor-placement'),'This MuseScore score uses articulation marks, which the viewer can\'t convert yet.');
+ // An unnamed feature gets no developer slug.
+ assert.equal(museScoreRefusalMessage('native-linked-ottava-clock'),'This MuseScore score uses notation the viewer can\'t convert yet.');
+ for(const code of ['runtime-codec','native-version','xml','native-tremolo','native-view-link'])assert.doesNotMatch(museScoreRefusalMessage(code),/deflate|serialization|adapter|native|link|clock|[<>]|\((?!\.msc[xz]\))/i);
 });
 
 test('MuseScore fixtures convert through the public entry and meet the unchanged MusicXML intake',async t=>{
@@ -59,7 +63,8 @@ test('MuseScore fixtures convert through the public entry and meet the unchanged
   // Piano and clarinet: the reader refuses its pedal marking before it counts the instruments.
   await assert.rejects(prepareMuseScore(fixture('original-piano-clarinet.mscx'),assets),(error:unknown)=>{
    assert.ok(error instanceof MuseScoreImportRefusal,(error as Error).message);
-   assert.match(error.message,readerRefusal);assert.doesNotMatch(error.message,/\/part\[|\.musicxml:\d/);
+   assert.equal(error.message,'This MuseScore score can\'t be opened yet: it uses pedal markings, which the viewer doesn\'t read yet.');
+   assert.match(error.message,readerRefusal);assert.ok(error.cause instanceof Error&&/unsupported pedal/.test(error.cause.message),'The reader\'s own diagnosis stays on the refusal.');
    t.diagnostic(`original-piano-clarinet.mscx: ${error.message}`);return true;
   });
  }finally{restore();}

@@ -12,8 +12,21 @@ export function museScoreRuntime():Promise<typeof PublicMuseScore>{
 }
 
 export class MuseScoreImportRefusal extends Error {
- constructor(message:string,readonly code?:string){super(message);this.name='MuseScoreImportRefusal';}
+ constructor(message:string,readonly code?:string,options?:ErrorOptions){super(message,options);this.name='MuseScoreImportRefusal';}
 }
+/** Musical names for notation the converter or reader can't take yet. The
+ * developer's code or reader message stays on the refusal for diagnosis. */
+const notationWords:readonly (readonly [RegExp,string])[]=[
+ [/(?:^|[-\s])cents?(?:[-\s]|$)|microtonal|alter: expected safe integer/,'quarter-tone or other microtonal accidentals'],
+ [/figured-bass/,'figured bass'],[/harmony|frame/,'chord symbols or chord diagrams'],
+ [/pedal/,'pedal markings'],[/fermata/,'fermatas'],[/arpeggio/,'arpeggio signs'],[/glissando/,'glissandos'],
+ [/tremolo/,'tremolos'],[/ornament|trill|mordent|\bturn\b/,'ornaments'],[/articulation/,'articulation marks'],
+ [/fingering/,'fingerings'],[/\bbend/,'string bends'],[/drum|unpitched|percussion/,'percussion notation'],
+ [/\b(?:tab|tablature|other-technical|capo|fret)\b/,'tablature'],[/notehead/,'special noteheads'],
+ [/measure-style|\brepeat\b/,'measure repeats or slashes'],[/custom-key|key-(?:step|alter|octave)/,'a custom key signature'],
+ [/grace/,'grace notes'],[/symbol/,'musical symbols'],[/lyric/,'lyrics'],
+];
+const notationName=(detail:string)=>notationWords.find(([pattern])=>pattern.test(detail))?.[1];
 /** The converter's located findings are written for developers. Players see
  * what happened to their file and, where there is one, what they can do. */
 export function museScoreRefusalMessage(code:string):string {
@@ -26,29 +39,22 @@ export function museScoreRefusalMessage(code:string):string {
  if(/^native-(?:part|staff|measure|segment|duration)$/.test(code))
   return 'The parts or staves of this MuseScore score can\'t be read. Open it in MuseScore, save it again and import it once more.';
  if(code.startsWith('worker-'))return 'The MuseScore converter stopped unexpectedly. Please try again.';
- const feature=code.replace(/^(?:native|writer)-/,'').replaceAll('-',' ');
- return `This MuseScore score uses notation the viewer can't convert yet (${feature}).`;
+ const name=notationName(code);
+ return name?`This MuseScore score uses ${name}, which the viewer can't convert yet.`:'This MuseScore score uses notation the viewer can\'t convert yet.';
 }
 function refusal(report:MuseScoreReport){
  const blocking=report.findings.find(f=>f.disposition==='blocking'),code=blocking?.code??'conversion-refused';
  return new MuseScoreImportRefusal(museScoreRefusalMessage(code),code);
 }
-/** The reader's refusal without its position in the converted text, which
- * the player never sees. */
-function readerDetail(message:string){
- const detail=message.replace(/^[^\s:]+\.musicxml:\d+(?::\d+)?: /,'').replace(/^\/part\[[^\]]*\](?:\/measure\[\d+\])?: /,'');
- const element=/unsupported (?:[a-z-]+ )?<([A-Za-z0-9-]+)>/.exec(detail)?.[1];
- if(element)return `MusicXML <${element}>`;
- if(/^alter: expected safe integer/.test(detail))return 'microtonal accidentals';
- const feature=/^unsupported ([A-Za-z0-9/ -]+?)(?::|$)/.exec(detail)?.[1];
- return feature?`MusicXML ${feature}`:detail;
-}
 /** MusicXML intake wording, retold for the file the player actually chose. */
 function retold(error:MusicXmlImportRefusal){
  const reader=/^This MusicXML file can't be read yet: (.*)$/s.exec(error.message)?.[1];
- if(reader!==undefined)return new MuseScoreImportRefusal(`This MuseScore score can't be opened yet: the viewer's notation reader doesn't understand part of it yet (${readerDetail(reader)}).`,'musicxml-intake');
- return new MuseScoreImportRefusal(error.message.replace(/^This (?:compressed )?MusicXML file/,'This MuseScore score').replace(/^MusicXML import currently reads/,'The viewer currently reads')
-  .replace(/\. MusicXML import currently reads/,'. The viewer currently reads'),'musicxml-intake');
+ if(reader!==undefined){
+  const name=notationName(reader);
+  return new MuseScoreImportRefusal(name?`This MuseScore score can't be opened yet: it uses ${name}, which the viewer doesn't read yet.`
+   :'This MuseScore score can\'t be opened yet: it uses notation the viewer doesn\'t read yet.','musicxml-intake',{cause:error});
+ }
+ return new MuseScoreImportRefusal(error.message.replace(/^This (?:compressed )?MusicXML file/,'This MuseScore score').replace(/MusicXML import (currently )?reads/g,'The viewer $1reads'),'musicxml-intake',{cause:error});
 }
 
 /** The main MuseScore score, converted by the public converter in its own
