@@ -1,0 +1,1 @@
+`original-family-gp5-500.gp5` is copied unchanged from score-converter `2146166` (`test/fixtures/gp-family/`). It is an original one-track bass study authored for the converter's tests, and contains no acquired repertoire. SHA-256: `eb3c8405f23f7d846120700dcead12572e46517d581373360fb3a0148d4c1670`.

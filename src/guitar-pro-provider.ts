@@ -6,7 +6,7 @@ import {selectReadingNotation} from './dual-reading-package';
 import {assertGuitarProArchive} from './guitar-pro-archive';
 import {guitarProRuntime} from './guitar-pro-runtime';
 import {assertGuitarProStagedMaterial} from './guitar-pro-material';
-import {GUITAR_PRO_FILES,GuitarProImportRefusal,type GuitarProInspection,type GuitarProSourceIdentity,type GuitarProContext,
+import {GUITAR_PRO_FILES,GuitarProImportRefusal,guitarProFamilyRefusal,type GuitarProInspection,type GuitarProSourceIdentity,type GuitarProContext,
  type GuitarProStageOptions,type GuitarProColdOptions,type GuitarProPreparedInput,type StagedGuitarProImport} from './guitar-pro-types';
 export * from './guitar-pro-types';
 
@@ -49,7 +49,8 @@ function family(result:ConversionSuccess,trackId:string):{family:'guitar'|'bass'
  if(r.inputSha256!==result.inputSource.sha256||parts.length!==1||r.requestedScope==='all-tracks'||!same(r.requestedScope.trackIds,[trackId]))
   throw Error('Converter did not return the exact selected source scope.');
  const p=parts[0],a=p.admission;
- if(p.sourceTrackId!==trackId||!p.musicxmlPartId||!['guitar','bass'].includes(a.instrumentFamily)||a.profile!==r.profile||
+ if(p.sourceTrackId===trackId){const refusal=guitarProFamilyRefusal(a.instrumentFamily,result.scoreKind);if(refusal)throw Error(refusal);}
+ if(p.sourceTrackId!==trackId||!p.musicxmlPartId||(a.instrumentFamily!=='guitar'&&a.instrumentFamily!=='bass')||a.profile!==r.profile||
   result.score.parts.length!==1||result.score.parts[0].id!==trackId||!Array.isArray(a.evidenceFindingIndices)||a.evidenceFindingIndices.length>256)
   throw Error('Converter part mapping or admission differs from its report.');
  let located=false;
@@ -183,6 +184,18 @@ export function guitarProContext(p:ScorePackage):GuitarProContext|undefined{
  selectReadingNotation(p,'iso');selectReadingNotation(p,'tab');
  if(admitted.score!==p.score)throw Error('Guitar Pro source identity no longer matches its receiving context.');
  return admitted.context;
+}
+
+/** Exact cold replay needs the converter that prepared the retained source.
+ * A package from an earlier converter still opens through ordinary package
+ * admission, but receives no Guitar/Bass source authority. A descriptor that
+ * claims an earlier converter therefore only withholds a context. */
+export function guitarProPreparedByEarlierConverter(p:ScorePackage):boolean{
+ const bytes=p.files[GUITAR_PRO_FILES.descriptor];if(!bytes||!p.manifest.files[GUITAR_PRO_FILES.descriptor]||bytes.byteLength>8192)return false;
+ let source:Partial<GuitarProSourceIdentity>|undefined;
+ try{source=JSON.parse(decoder.decode(bytes));}catch{return false;}
+ return source?.version==='viewer-guitar-pro-source-v1'&&typeof source.converterArchiveSha256==='string'&&
+  /^[0-9a-f]{64}$/.test(source.converterArchiveSha256)&&source.converterArchiveSha256!==converterArchiveSha256;
 }
 
 export function admitGuitarProContext(p:ScorePackage,options:GuitarProColdOptions={}):Promise<GuitarProContext>{

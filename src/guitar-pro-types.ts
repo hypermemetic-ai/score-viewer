@@ -35,3 +35,12 @@ export class GuitarProImportRefusal extends Error {
   super(blocked?.message??fallback);this.name='GuitarProImportRefusal';this.code=blocked?.code??'conversion-refused';
  }
 }
+const otherFamilies:Readonly<Record<string,string>>={keyboard:'a keyboard',vocal:'a vocal',percussion:'a percussion',other:'not a guitar or bass'};
+/** The converter also admits other instruments as arrangements. The viewer
+ * reads tuned guitar and bass parts only, and refuses the rest plainly. */
+export function guitarProFamilyRefusal(instrumentFamily:string,scoreKind:string):string|undefined{
+ if(instrumentFamily!=='guitar'&&instrumentFamily!=='bass')
+  return `This source part is ${otherFamilies[instrumentFamily]??'not a guitar or bass'} part. Guitar Pro import reads guitar and bass parts only.`;
+ if(scoreKind!=='fretted')return 'This source part has no string tuning to read. Guitar Pro import reads tuned guitar and bass parts only.';
+}
+export const EARLIER_GUITAR_PRO_CONVERTER='This part was imported with an earlier Guitar Pro converter. Its music opens as before; its instrument name and other source parts aren\'t available.';
