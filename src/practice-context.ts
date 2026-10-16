@@ -1,4 +1,4 @@
-import {initialPractice,readPractice,passageHierarchy,planPractice,practicePartition,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
+import {initialPractice,readPractice,passageHierarchy,planPractice,requirePracticeHands,practicePartition,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
 import type {PracticeMode,PracticePrimaryMode} from './practice-view';
 import type {PersonalState} from './state';
 import type {ScorePackage} from './package';
@@ -15,6 +15,7 @@ export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,c
 }
 export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean}
 export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState):AdmittedPracticeContext {
+ requirePracticeHands(p,personal);
  const plan=planPractice(p,'bounded-exercises-v1',personal);
  return {plan,state:practiceStateForContext(plan,saved,context),saved:!!saved};
 }

@@ -10,7 +10,8 @@ import {HandPresentationError} from '../vendor/iso-notation/src/score-presentati
 import {initialPersonal} from '../src/state';
 import {assigned,effectiveAssignments,handChoiceOwners,handFor,personalPracticePackage,readPersonalAssignments} from '../src/personal-assignments';
 import {ensurePianoReady} from '../src/piano-readiness';
-import {planSource} from '../src/practice';
+import {planSource,requirePracticeHands} from '../src/practice';
+import {createScoreTransposition} from '../src/score-transposition';
 
 const xml=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url),'utf8');
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
@@ -68,6 +69,15 @@ test('one struck key with a hand on one voice only reads from its source pages, 
  assert.deepEqual(['P1:m1:n1','P1:m1:n3'].map(id=>fingered.assignments!.choices[id].finger),[2,2]);
 });
 
+test('a hand choice elsewhere waits until a half-handed key has its hand',async()=>{
+ const p=await open(mixedKey);
+ assert.throws(()=>assigned(p,initialPersonal(p),seatOf(p,'P1:m1:n2'),{hand:'LH'}),{message:'Bar 1 has a key written as two notes, and only one of them has a hand. Choose a hand for that key first (L or R).'});
+ // Resolving that key first lets every later choice through.
+ const s=assigned(p,assigned(p,initialPersonal(p),seatOf(p,'P1:m1:n1'),{hand:'RH'}),seatOf(p,'P1:m1:n2'),{hand:'RH'});
+ assert.equal(handFor(p,s,'P1:m1:n2'),'RH');
+ await new PersonalPresentationSession(p).project(s);
+});
+
 test('ISO\'s refusal of a half-handed key reaches the player in plain words, keeping its diagnosis',async()=>{
  const p=await open(oneStaff),s=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),
   refusal=new HandPresentationError('unsupported-fit','One struck key is written in notes with a performing hand and notes without one, so it has no single head to engrave. Choose the same hand for all of its notes.',['a','b']),
@@ -86,7 +96,12 @@ test('fingers and timed practice wait for the player to give every note a hand',
  const result=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',intent:'calculate',forceRecalculate:true});
  assert.equal(result.status,'needs-data');assert.equal((result as {code:string}).code,'performing-hands');
  assert.equal((result as {message:string}).message,`${count} notes have no hand in this score. Choose a hand for each (L or R while editing) before fingers can be calculated.`);
- assert.throws(()=>planSource(p,'bounded-exercises-v1',initialPersonal(p)),{message:`${count} notes have no hand in this score. Choose a hand for each (L or R while editing) before timed practice.`});
+ assert.throws(()=>requirePracticeHands(p,initialPersonal(p)),{message:`${count} notes have no hand in this score. Choose a hand for each (L or R while editing) before timed practice.`});
+ // Once the player gives every key a hand, practice plans with those hands.
+ let s=initialPersonal(p);for(const seat of p.seats)s=assigned(p,s,seat,{hand:'RH'});
+ requirePracticeHands(p,s);
+ assert.ok(planSource(p,'bounded-exercises-v1',s).gestures.every(g=>g.hand==='RH'));
+ await assert.rejects(createScoreTransposition(p,bytes,2,'conventional-piano'),{message:`Transposing keeps the score's own hands, and ${count} notes have none, so this score can't be transposed yet.`});
  // Reading the score is not a calculation request.
  assert.equal((await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',intent:'read-retained'})).status,'reading');
 });

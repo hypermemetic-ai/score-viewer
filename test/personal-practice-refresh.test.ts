@@ -39,7 +39,7 @@ function fixture(){
   PersonalPresentationSession:class{project(s:any){return projection(structuredClone(s));}},personalStorageName:()=> 'bound-personal',
   readPersonal:(s:any)=>structuredClone(s),personalContext:async(t:any)=>({p:t.package,file:'bound-personal'}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.catch(()=>{});return result;},writeJson:async(_file:string,s:any)=>save(s),paintPersonalSaveError:(_t:any,error:any)=>errors.push(error),
-  app:{querySelector:()=>null},readingPresentation:undefined,requirePianoCapability(){},resetInput(){},orientation:{rotation:0},actionControlLabel:()=>'',effectiveControls:()=>({}),controls:{match:()=>false},renderPages(){readerPaints.push('pages');},renderToolbar(){readerPaints.push('toolbar');},
+  app:{querySelector:()=>null},readingPresentation:undefined,requirePianoCapability(){},requirePracticeHands(){},resetInput(){},orientation:{rotation:0},actionControlLabel:()=>'',effectiveControls:()=>({}),controls:{match:()=>false},renderPages(){readerPaints.push('pages');},renderToolbar(){readerPaints.push('toolbar');},
   currentFingerPresentation:()=> 'annotations',preferences:{keyboardLayout:'conventional-piano'},musicalSustain:{snapshot:()=>({})},midiConnection:undefined,connectMidi(){},disconnectMidi(){},settings(){},entries:[target.entry],practiceSummaries:{record:()=>false},paintLibrarySummaries(){},render(){}};
  personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await save(s);disk=structuredClone(s);});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
@@ -137,4 +137,13 @@ for(const boundary of ['projection','flush','admission'] as const)test(`${bounda
  await assert.rejects(f.changeHand('RH'),new RegExp(`${boundary} unavailable`));await settle();
  assert.equal(f.old.paused,1);assert.equal(f.old.closed,0);assert.equal(f.mounts.length,0);assert.equal(f.context.practice,f.old);assert.deepEqual(f.old.state.evidence,f.evidence);assert.deepEqual(f.old.state.preferences,f.settings);
  if(boundary==='projection'){await assert.rejects(f.editor.queue.flush(),/projection unavailable/);assert.equal(f.preparations.length,0);assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.hand,'RH');}else await f.editor.queue.flush();
+});
+
+test('a change that leaves notes hand-less returns from practice to reading and says why, without remounting',async()=>{
+ const f=fixture(),notices:string[]=[];let rendered=0;
+ f.context.requirePracticeHands=()=>{throw Error('One note has no hand in this score. Choose a hand for it (L or R while editing) before timed practice.');};
+ f.context.notify=(text:string)=>notices.push(text);f.context.render=()=>{rendered++;};
+ await f.changeHand('RH');await settle();
+ assert.equal(f.old.closed,1);assert.equal(f.context.practice,undefined);assert.equal(f.mounts.length,0);assert.equal(f.preparations.length,0);assert.equal(rendered,1);
+ assert.deepEqual(notices,['One note has no hand in this score. Choose a hand for it (L or R while editing) before timed practice.']);
 });

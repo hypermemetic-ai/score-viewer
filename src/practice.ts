@@ -8,7 +8,7 @@ import {practiceSimilarityPairs} from './practice-similarity';
 import {practiceContrastEpisodes} from './practice-contrast';
 import {registerPersonalPracticeIdentity,registerPersonalPracticeRangePattern,personalPracticePattern,recognizesPersonalPracticeClaim} from './personal-practice-identity';
 import type {PersonalState} from './state';
-import {requirePianoEvent} from './piano-event';
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {snapPracticeSpeed,snapPracticeStep} from './tempo-presentation';
 import {registerPracticePatterns,bindPracticePassages,equivalentPracticeClaims,practiceSpanEvidenceKey,practiceExerciseEvidenceKey,musicalSpanFact} from './practice-equivalence';
 import {requirePianoCapability} from './score-capabilities';
@@ -22,7 +22,9 @@ import {practiceTiming} from './practice-timing';
 import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
 import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 export interface PracticeAttack {id:string;tick:number;end:number;midi:number;bar:number;owners:string[];groups:string[]}
-export interface Gesture {id:string;bar:number;hand:'LH'|'RH';start:number;end:number;owners:string[];attackIds:string[]}
+/** `hand: null` groups notes the score leaves hand-less; only plans that are not
+ * practised carry it (source identity, earlier editions, summaries). */
+export interface Gesture {id:string;bar:number;hand:'LH'|'RH'|null;start:number;end:number;owners:string[];attackIds:string[]}
 export interface PracticeChunk {id:string;firstBar:number;lastBar:number;start:number;end:number;weight:number;pattern:string;components?:string[];joins?:number[];boundaryReasons?:string[];kind?:PracticeExercise['kind'];clips?:readonly ExerciseClip[];originalIds?:readonly string[];prerequisites?:readonly string[];episode?:number;clipIndex?:number}
 export type LegacyPracticePartition='fixed-four-v1'|'connection-boundary-v1';
 export type PracticePartition=LegacyPracticePartition|'bounded-exercises-v1';
@@ -53,6 +55,11 @@ export function setPracticeGoal(state:PracticeState,plan:PracticePassagePlan,bpm
  next.target=next.personalGoal?.bpm??reference.bpm;
  return readPractice(plan.partition==='bounded-exercises-v1'?normalizePracticePreferences(next):next,plan);
 }
+/** Timed practice needs every note in a hand: the score's own, or the player's choice. */
+export function requirePracticeHands(p:ScorePackage,personal?:PersonalState):void {
+ const handless=(personal?personalPracticePackage(p,personal):p).score.notes.filter(n=>n.hand===undefined).length;
+ if(handless)throw Error(handlessMessage(handless,'timed practice'));
+}
 export function planPractice(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState):PracticePlan {
  requireReferencePerformanceTempo(p.score);
  if(p.score.graceGroups?.length)throw Error('Timed practice needs performed timing for the score’s grace notes; the written notes remain available in Score.');
@@ -61,12 +68,10 @@ export function planPractice(p:ScorePackage,partition:PracticePartition='bounded
 export function planSource(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState):PracticePlan {
  requirePianoCapability(p,'pianoPractice');
  const original=p,base=personal?planSource(p,partition):undefined;if(personal)p=personalPracticePackage(p,personal);
- const handless=p.score.notes.filter(n=>n.hand===undefined).length;
- if(handless)throw Error(handlessMessage(handless,'timed practice'));
  const bars=p.score.sourceBarTicks;if(!bars||bars.length<2||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||bars.some((b,i)=>!Number.isFinite(b)||(i>0&&b<=bars[i-1])))throw Error('This score has no complete written-measure map.');
  const barFor=(tick:number)=>Math.max(0,bars.findIndex((b,i)=>i<bars.length-1&&tick>=b&&tick<bars[i+1]));
  const ownerGroup=new Map<string,string>(),groups=new Map<string,Gesture>(),attacks=new Map<string,PracticeAttack>();
- for(const event of p.score.notes){const n=requirePianoEvent(event),bar=barFor(n.startTick),group=`${bar}:${n.hand}`,pitch=n.pitch.octave*12+n.pitch.pitchClass,id=`${n.startTick}:${pitch}`;ownerGroup.set(n.id,group);let g=groups.get(group);if(!g){g={id:group,bar,hand:n.hand,start:n.startTick,end:n.startTick+n.durationTicks,owners:[],attackIds:[]};groups.set(group,g);}g.start=Math.min(g.start,n.startTick);g.end=Math.max(g.end,n.startTick+n.durationTicks);g.owners.push(n.id);if(!g.attackIds.includes(id))g.attackIds.push(id);
+ for(const event of p.score.notes){const n=requirePitchedEvent(event),hand=n.hand??null,bar=barFor(n.startTick),group=`${bar}:${hand??'none'}`,pitch=n.pitch.octave*12+n.pitch.pitchClass,id=`${n.startTick}:${pitch}`;ownerGroup.set(n.id,group);let g=groups.get(group);if(!g){g={id:group,bar,hand,start:n.startTick,end:n.startTick+n.durationTicks,owners:[],attackIds:[]};groups.set(group,g);}g.start=Math.min(g.start,n.startTick);g.end=Math.max(g.end,n.startTick+n.durationTicks);g.owners.push(n.id);if(!g.attackIds.includes(id))g.attackIds.push(id);
  let a=attacks.get(id);if(!a){a={id,tick:n.startTick,end:n.startTick+n.durationTicks,midi:pitch+12,bar,owners:[],groups:[]};attacks.set(id,a);}a.end=Math.max(a.end,n.startTick+n.durationTicks);a.owners.push(n.id);if(!a.groups.includes(group))a.groups.push(group);
  }
  const ordered=[...attacks.values()].sort((a,b)=>a.tick-b.tick||a.midi-b.midi),gestures=[...groups.values()].sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));

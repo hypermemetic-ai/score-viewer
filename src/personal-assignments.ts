@@ -91,7 +91,17 @@ export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:
   next.assignments.choices[id]={ownerId:id,guard:guard(n),original:old?.original??{hand:n.hand??null,...(baseFinger(p,s,id)===undefined?{}:{finger:baseFinger(p,s,id)})},...(hand===undefined?{}:{hand}),intent,
    ...(finger===undefined?{}:{finger}),createdAt:old?.createdAt??new Date().toISOString()};
  }
+ if(choice.hand!==undefined){const mixed=halfHandedKey(p,next);if(mixed)throw Error(`${mixed.bar===undefined?'This score':`Bar ${mixed.bar}`} has a key written as two notes, and only one of them has a hand. Choose a hand for that key first (L or R).`);}
  next.view.fingerSet='yours';readPersonalAssignments(next.assignments,p);return next;
+}
+/** The pages draw one head per struck key, so personal hands cannot be drawn
+ * while a key still mixes a hand with no hand. The source's own pages already
+ * draw such a key; only a changed hand needs the whole key resolved. */
+function halfHandedKey(p:ScorePackage,s:PersonalState):{bar?:number}|undefined {
+ const hand=(n:ScorePackage['score']['notes'][number])=>s.assignments?.choices[n.id]?.hand??n.hand??null,notes=p.score.notes.filter(isPitchedEvent);
+ if(notes.every(n=>hand(n)===(n.hand??null)))return;
+ const keys=new Map<string,typeof notes>();for(const n of notes){const k=`${n.startTick}:${pitch(n)}`;keys.set(k,[...keys.get(k)??[],n]);}
+ for(const key of keys.values())if(key.some(n=>hand(n)===null)&&key.some(n=>hand(n)!==null))return {bar:p.seats.find(seat=>seat.ownerIds.some(id=>key.some(n=>n.id===id)))?.writtenBar};
 }
 export function restorePersonalAssignment(p:ScorePackage,s:PersonalState,seat:Seat):PersonalState {
  const next=structuredClone(s);for(const id of seat.ownerIds.flatMap(id=>aliases(p,id)))if(next.assignments)delete next.assignments.choices[id];
