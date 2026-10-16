@@ -63,12 +63,10 @@ test('a lower staff of rests still reads as a two-staff piano part',async()=>{
  assert.ok(p.score.notes.length>0&&p.score.notes.every(n=>requirePianoEvent(n).hand==='RH'));
 });
 
-test('multi-instrument, one-staff and unreadable files refuse with a reason',async()=>{
+test('multi-instrument and unreadable files refuse with a reason',async()=>{
  const twoParts=xml.replace('</part-list>','<score-part id="P2"><part-name>Violin</part-name></score-part></part-list>')
   .replace('</score-partwise>',`<part id="P2"><measure number="1"><attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes><note><rest measure="yes"/><duration>8</duration><voice>1</voice><type>whole</type></note></measure><measure number="2"><note><rest measure="yes"/><duration>8</duration><voice>1</voice><type>whole</type></note></measure></part></score-partwise>`);
  await assert.rejects(prepareMusicXmlScore(strToU8(twoParts),assets),{name:'Error',message:/contains 2 instruments.*one instrument at a time/});
- const oneStaff=xml.replace('<staves>2</staves>','').replace(/<clef number="2">.*?<\/clef>/,'').replaceAll('<staff>2</staff>','<staff>1</staff>').replace('<clef number="1">','<clef>');
- await assert.rejects(prepareMusicXmlScore(strToU8(oneStaff),assets),/written on 1 staff\. MusicXML import currently reads two-staff piano scores/);
  const fermata=xml.replace('<staff>1</staff></note>','<staff>1</staff><notations><fermata/></notations></note>');
  await assert.rejects(prepareMusicXmlScore(strToU8(fermata),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*fermata/.test(err.message));
  const violin=xml.replace('<midi-program>1</midi-program>','<midi-program>41</midi-program>');

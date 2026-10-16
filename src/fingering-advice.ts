@@ -9,7 +9,7 @@ import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage,FingerLayer} from './package';
 import {DEFAULT_FINGERING_ADVICE_SETTINGS,readFingeringAdviceSettings,type FingeringAdviceSettings} from './fingering-advice-settings';
 
-export interface AdviceAssignment {id:string;hand?:TravelHand;finger?:number}
+export interface AdviceAssignment {id:string;hand?:TravelHand|null;finger?:number}
 export interface AdvicePerformedAttack {
  id:string;ownerIds:readonly string[];midiPitch:number;onsetTick?:number;durationTicks?:number;
  /** Only independently admitted physical aliases; never inferred from pitch equality. */

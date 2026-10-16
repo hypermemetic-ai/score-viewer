@@ -1,4 +1,4 @@
-import {requirePianoEvent} from './piano-event';
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {digitMetrics,type ScorePackage,type Seat} from './package';
 import type {FingerPresentation} from './input';
 import {fingeringCarriers,type FingerCarrier} from './fingering-carriers';
@@ -52,7 +52,7 @@ export function annotationPositions(p:AnnotationScore,pages?:readonly number[]):
  if(selected&&p.annotationGeometry){const geometry=p.annotationGeometry,owned=new Map(geometry.seats.map(s=>[s.seatId,s])),notes=new Map(p.score.notes.map(n=>[n.id,n]));
   if(geometry.version!=='annotation-carrier-geometry-v1'||geometry.coverage!=='owned-head-and-duration'||
    geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length)throw Error('Calculated annotation ownership differs from the admitted presentation.');
-  for(const seat of p.seats){const g=owned.get(seat.id);if(!g||g.page!==seat.page||g.system!==seat.system||g.hand!==notes.get(seat.ownerIds[0])?.hand)throw Error('Calculated annotation seat ownership differs: '+seat.id);}
+  for(const seat of p.seats){const g=owned.get(seat.id);if(!g||g.page!==seat.page||g.system!==seat.system||g.hand!==(notes.get(seat.ownerIds[0])?.hand??null))throw Error('Calculated annotation seat ownership differs: '+seat.id);}
  }
  const saved=cache.get(p);
  if(!selected){if(saved)return saved;const positions=computeAnnotationPositions(p);cache.set(p,positions);return positions;}
@@ -72,7 +72,7 @@ function computeAnnotationPositions(p:AnnotationScore,selected?:ReadonlySet<numb
   obstacles=geometry?p.pages.map((svg,page)=>!selected||selected.has(page)?actualPageObstacles(svg,new Map(geometry.seats.filter(s=>s.page===page).map(s=>[s.seatId,box(s.headBounds)])),annotationInkPolicyFor(p)):undefined):undefined;
  if(geometry&&(geometry.version!=='annotation-carrier-geometry-v1'||geometry.coverage!=='owned-head-and-duration'||
   geometry.presentationIdentity!==p.score.performingHandPresentation?.assignmentId||owned.size!==p.seats.length))throw Error('Calculated annotation ownership differs from the admitted presentation.');
- const pitch=(seat:Seat)=>{const n=requirePianoEvent(notes.get(seat.ownerIds[0])!);return n.pitch.octave*12+n.pitch.pitchClass;};
+ const pitch=(seat:Seat)=>{const n=requirePitchedEvent(notes.get(seat.ownerIds[0])!);return n.pitch.octave*12+n.pitch.pitchClass;};
  for(const seat of p.seats){if(selected&&!selected.has(seat.page))continue;const key=carriers.get(seat.id)!.id,group=groups.get(key)??[];group.push(seat);groups.set(key,group);}
  const columns=new Map<string,number[]>(),occupiedByPage=new Map<number,AnnotationBox[]>();
  for(const group of groups.values()){const key=group[0].page+':'+group[0].system,x=carriers.get(group[0].id)!.x,values=columns.get(key)??[];
@@ -80,8 +80,9 @@ function computeAnnotationPositions(p:AnnotationScore,selected?:ReadonlySet<numb
  for(const group of [...groups.values()].sort((a,b)=>a[0].page-b[0].page||a[0].system-b[0].system||Math.min(...a.map(s=>s.x))-Math.min(...b.map(s=>s.x))||
   (a.map(s=>s.id).sort()[0]<b.map(s=>s.id).sort()[0]?-1:1))){
   const ordered=[...group].sort((a,b)=>pitch(b)-pitch(a)||(a.id<b.id?-1:a.id>b.id?1:0)),carrier={...carriers.get(ordered[0].id)!},em=Math.max(...group.map(s=>s.fontSize))*4/3,gap=em*.4;
-  if(geometry){const own=group.map(s=>{const g=owned.get(s.id);if(!g||g.page!==s.page||g.system!==s.system||g.hand!==notes.get(s.ownerIds[0])!.hand)throw Error('Calculated annotation seat ownership differs: '+s.id);return g;});
-   carrier.direction=own[0].hand==='RH'?-1:1;
+  if(geometry){const own=group.map(s=>{const g=owned.get(s.id);if(!g||g.page!==s.page||g.system!==s.system||g.hand!==(notes.get(s.ownerIds[0])!.hand??null))throw Error('Calculated annotation seat ownership differs: '+s.id);return g;});
+   // Left hand below; right hand and hand-less (single-staff) fingering above.
+   carrier.direction=own[0].hand==='LH'?1:-1;
    const bounds=own.flatMap(s=>[s.headBounds,s.maskBounds,...s.durationBounds]);
    carrier.edge=carrier.direction===-1?Math.min(...bounds.map(b=>b.y0)):Math.max(...bounds.map(b=>b.y1));
   }

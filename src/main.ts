@@ -46,7 +46,7 @@ import {ReadingPartCatalog} from './reading-part-catalog';
 import {guitarProTracksMarkup} from './guitar-pro-tracks';
 import {scoreImportKind,MUSICXML_IMPORT_ENABLED} from './score-import-kind';
 import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
-import {practicePercent} from './practice';
+import {practicePercent,requirePracticeHands} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
 import {loadingMarkup,updateLoading,preparationMessage} from './viewer-loading';
 import type {ReadingExecution} from './reading-execution';
@@ -305,6 +305,8 @@ async function refreshPersonalPractice(target:NonNullable<typeof current>,owner:
  const owns=()=>current===target&&practice===owner&&personalEditor(target).generation===generation;
  while(owns()){
   await owner.flush();if(!owns())return;
+  // Restoring choices can leave notes hand-less again: return to reading and say why.
+  try{requirePracticeHands(target.package,target.personal);}catch(error){owner.close();practice=undefined;resetInput();render();notify((error as Error).message);return;}
   const context=owner.contextSnapshot(),admitted=await PracticeView.prepareContext(target.package,target.entry.id,context,target.personal);
   if(!owns())return;
   // Options remain usable during admission. A later settings or navigation
@@ -373,8 +375,8 @@ function paintReaderSeats(page:ReaderPage,base:ScorePackage,p:ScorePackage,s:Per
  page.element.dataset.fingers=String(mode==='finger');const presentation=currentFingerPresentation(p);
  for(const {seat,text} of page.seats){
   const finger=fingerFor(base,s,seat),hand=handFor(base,s,seat.ownerIds[0]);
-  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
-  text.dataset.performingHand=hand;
+  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
+  if(hand)text.dataset.performingHand=hand;else delete text.dataset.performingHand;
  }
 }
 /** Save every page as the reader currently reads it: this edition, keyboard

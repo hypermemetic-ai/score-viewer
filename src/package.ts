@@ -248,8 +248,9 @@ export async function handDigest(source:QuantizedGridScore,effective:QuantizedGr
  const input=normalizeHandPlanningInput(source),personal=effective.performingHandPresentation?.personalRequirements;
  if(personal?.length){validateDerivedHandPresentation(effective);input.personalHandRequirements=personal.map(q=>({ownerId:q.ownerId,hand:q.hand,guard:{...q.guard},assignmentId:q.authorityId}));}
  const requirements=compilePlanningRequirements(input);
- for(const a of input.gestures.flatMap(g=>g.attacks)){const hands=new Set(a.owners.map(o=>byId.get(o.id)));
-  if(hands.size!==1||requirements.attackHands[a.id]&&!hands.has(requirements.attackHands[a.id]))fail('Linked performing hands contradict a source instruction or physical alias');}
+ // A hand-less owner may share a key with a handed one; only two different hands conflict.
+ for(const a of input.gestures.flatMap(g=>g.attacks)){const hands=new Set(a.owners.flatMap(o=>byId.get(o.id)??[]));
+  if(hands.size>1||requirements.attackHands[a.id]&&!hands.has(requirements.attackHands[a.id]))fail('Linked performing hands contradict a source instruction or physical alias');}
  return hashBytes(JSON.stringify(input.gestures.flatMap(g=>g.attacks.flatMap(a=>a.owners.map(o=>[o.id,byId.get(o.id)])))));
 }
 export async function selectPresentation(p:ScorePackage,id:PhysicalKeyboardId):Promise<ScorePackage>{
@@ -296,13 +297,15 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(score.id!==m.scoreId||!Array.isArray(score.notes)||!Number.isInteger(score.ticksPerBeat)||score.ticksPerBeat<=0||!Number.isInteger(score.totalTicks)||!Array.isArray(seats))fail('Invalid semantic score');
  if(score.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(score.referencePerformanceTempo);else if(!options.allowLegacyTempo&&(m.version===1||!!fingersName&&!!files[fingersName]))requireReferencePerformanceTempo(score);
  const notes=new Map(score.notes.map(n=>[n.id,n]));if(notes.size!==score.notes.length)fail('Duplicate source owner');
- for(const n of score.notes){if(!isPitchedEvent(n))fail('Legacy piano packages require pitched events');if(!n.id||!['LH','RH'].includes(n.hand??'')||!Number.isInteger(n.startTick)||!Number.isInteger(n.durationTicks)||n.startTick<0||n.durationTicks<=0||n.startTick+n.durationTicks>score.totalTicks||!Number.isInteger(n.pitch?.octave)||!Number.isInteger(n.pitch?.pitchClass)||n.pitch.pitchClass<0||n.pitch.pitchClass>11)fail('Invalid pitch/timing/hand');}
+ // A note the source gives no performing hand stays hand-less; the player may assign it a personal hand.
+ for(const n of score.notes){if(!isPitchedEvent(n))fail('Legacy piano packages require pitched events');if(!n.id||n.hand!==undefined&&!['LH','RH'].includes(n.hand)||!Number.isInteger(n.startTick)||!Number.isInteger(n.durationTicks)||n.startTick<0||n.durationTicks<=0||n.startTick+n.durationTicks>score.totalTicks||!Number.isInteger(n.pitch?.octave)||!Number.isInteger(n.pitch?.pitchClass)||n.pitch.pitchClass<0||n.pitch.pitchClass>11)fail('Invalid pitch/timing/hand');}
  const pages:string[]=[];
  function* pianoChecks():Generator<PreparationStage,void,void>{
  const seen=new Set<string>(),covered=new Set<string>();
  for(const s of seats){if(seen.has(s.id)||!s.id||!Number.isInteger(s.page)||s.page<0||s.page>=m.pages.length||!Array.isArray(s.ownerIds)||!s.ownerIds.length||s.ownerIds.some(id=>!notes.has(id))||!s.actionId||!s.contactId||s.contactId!==s.actionId||![s.x,s.baseline,s.fontSize].every(Number.isFinite))fail('Invalid source-linked seat');seen.add(s.id);s.ownerIds.forEach(id=>covered.add(id));
- const n=requirePianoEvent(notes.get(s.ownerIds[0])!);if(!s.continuation&&s.actionId!==`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`)fail('Wrong physical action seat');
- if(s.ownerIds.some(id=>{const q=requirePianoEvent(notes.get(id)!);return q.hand!==n.hand||q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');yield 'geometry';}
+ const n=requirePitchedEvent(notes.get(s.ownerIds[0])!);if(!s.continuation&&s.actionId!==`${n.startTick}:${n.pitch.octave*12+n.pitch.pitchClass}`)fail('Wrong physical action seat');
+ // One head is one key: a hand-less owner may share it, but never two different hands.
+ if(new Set(s.ownerIds.flatMap(id=>notes.get(id)!.hand??[])).size>1||s.ownerIds.some(id=>{const q=requirePitchedEvent(notes.get(id)!);return q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');yield 'geometry';}
  if(covered.size!==notes.size)fail('Incomplete source-owner seating');
  for(const [i,name] of m.pages.entries()){if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);pages.push(svg);yield 'paint';}
  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});yield 'commit';

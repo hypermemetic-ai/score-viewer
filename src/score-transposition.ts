@@ -108,6 +108,9 @@ export async function createScoreTransposition(p:ScorePackage,archive:Uint8Array
  const original=p.transpositionOriginal??p;
  await admitTranspositionBaselineRecipe(original);
  if(steps===0)throw Error('Select the retained original edition to restore 0 steps.');
+ // A transposed edition keeps the score's hands and calculates fingers; it never supplies a missing hand.
+ const handless=p.score.notes.filter(n=>n.hand===undefined).length;
+ if(handless)throw Error(`Transposing keeps the score's own hands, and ${handless===1?'one note has':`${handless} notes have`} none, so this score can't be transposed yet.`);
  const originalBytes=getOriginalScorePackageBytes(p)??new Uint8Array(archive),source=original.sourceScore??original.score,
   prepared=transposedArchiveSource(original,steps),effective=prepared.source,sourceBytes=prepared.bytes,
   map=transpositionOwnerMap(p),content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:'transposition/original.isoscore',

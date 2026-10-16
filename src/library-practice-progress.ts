@@ -1,6 +1,6 @@
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {importPackage,selectPresentation,hashBytes,type ScorePackage} from './package';
-import {planPractice,practicePartition,readPractice,wholePracticeProgress} from './practice';
+import {planPractice,practicePartition,readPractice,requirePracticeHands,wholePracticeProgress} from './practice';
 import {displayedPracticeTotal} from './practice-display';
 import {collectionId,practiceStorageName,legacyPracticeStorageName,personalStorageName,legacyPersonalStorageName,readPersonal,type Entry} from './state';
 import {assertSelectedTransposition} from './score-transposition-selection';
@@ -59,6 +59,7 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  const personalKey=personalStorageName(entry.id,p),declared=entry.personalFiles?.[personalKey],personalRaw=await reader.readRecord(declared??personalKey),legacyPersonal=legacyPersonalStorageName(p);
  if(declared&&personalRaw==null)throw Error('Declared personal journal is missing; library evidence retained.');
  const personal=readPersonal(personalRaw??(!declared&&legacyPersonal?await reader.readRecord(legacyPersonal):undefined),p,{allowLegacyJanko:personalRaw==null&&!declared&&!!legacyPersonal});
+ requirePracticeHands(p,personal);
  const plan=planPractice(p,'bounded-exercises-v1',personal),state=readPractice(saved,plan);
  return {entryId:entry.id,file:entry.file,keyboard,sections:displayedPracticeTotal(plan,state),whole:wholePracticeProgress(plan,state)>=1};
 }

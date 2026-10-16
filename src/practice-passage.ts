@@ -95,7 +95,7 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  // the relation, not only the bars where endpoint attacks originally start.
  clone.querySelectorAll('[data-phrase]').forEach(el=>{const phrase=p.score.phrases?.find(q=>q.id===el.getAttribute('data-phrase'));if(!phrase)throw Error(`Measure ${bar+1}: unresolved source phrase.`);const previous=el.previousElementSibling,knockout=previous?.classList.contains('janko-phrase-grid-knockout')?previous:undefined;
   if(phrase.startTick>=plan.barTicks[bar+1]||phrase.endTick<plan.barTicks[bar]){el.remove();knockout?.remove();return;}
-  const endpoint=[...(phrase.fromNoteIds??[]),...(phrase.toNoteIds??[])],hands=new Set(p.score.notes.filter(n=>endpoint.includes(n.id)).map(n=>n.hand)),groups=[...new Set([...endpoint.map(id=>plan.ownerGroup.get(id)).filter((g):g is string=>!!g),...plan.gestures.filter(g=>g.bar===bar&&hands.has(g.hand)).map(g=>g.id)])];
+  const endpoint=[...(phrase.fromNoteIds??[]),...(phrase.toNoteIds??[])],hands=new Set(p.score.notes.filter(n=>endpoint.includes(n.id)).map(n=>n.hand)),groups=[...new Set([...endpoint.map(id=>plan.ownerGroup.get(id)).filter((g):g is string=>!!g),...plan.gestures.filter(g=>g.bar===bar&&g.hand!==null&&hands.has(g.hand)).map(g=>g.id)])];
   if(groups.length){owned.push({el:el as SVGElement,groups});if(knockout)owned.push({el:knockout as SVGElement,groups});}
  });
  // Full-span structural lanes identify the shared reference. A locally

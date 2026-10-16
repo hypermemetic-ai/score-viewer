@@ -103,7 +103,7 @@ function sources(p:ScorePackage,plan:PracticePlan,positions:ReadonlyArray<number
     throw Error(`Incompatible source relation sides: ${id}.`);
   }
   const owners=kind==='tie'?[original(firstPath.getAttribute('data-tie-note')!)]:[...fromIds,...toIds].map(original),hands=new Set(p.score.notes.filter(n=>owners.includes(n.id)).map(n=>n.hand));
-  const groups=[...new Set([...owners.map(owner=>plan.ownerGroup.get(owner)),...(kind==='phrase'?plan.gestures.filter(g=>g.start<=end&&g.end>=start&&hands.has(g.hand)).map(g=>g.id):[])].filter((g):g is string=>!!g))];
+  const groups=[...new Set([...owners.map(owner=>plan.ownerGroup.get(owner)),...(kind==='phrase'?plan.gestures.filter(g=>g.start<=end&&g.end>=start&&g.hand!==null&&hands.has(g.hand)).map(g=>g.id):[])].filter((g):g is string=>!!g))];
   if(!groups.length)throw Error(`Unresolved relation contributors: ${id}.`);
   const relation:Relation={id,kind,start,end,from:a.seat,to:b.seat,first:a.part,last:b.part,groups,reconcileSides};resolved?.relations.set(raw,relation);relations.push(relation);
  }

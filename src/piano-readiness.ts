@@ -17,6 +17,7 @@ import {RR_PERFORMANCE_POSE_PROFILE} from '../vendor/iso-notation/src/model/isom
 import {pianoRequestAuthority,PianoAuthorityConflict,type PerformingHandPolicy} from './piano-request-authority';
 import {preparationRequestIdentity,canonicalJson} from './piano-preparation-identity';
 import {personalForCalculatedEdition,PersonalEditionConflict} from './presentation-install';
+import {handlessMessage} from './personal-assignments';
 import {prepareCalculatedEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
 
 import {createScoreTransposition,getScoreTransposition} from './score-transposition';
@@ -140,6 +141,9 @@ export async function ensurePianoReady(request:PianoReadinessRequest,admission?:
       interrupted(request);
       return{status:'reading',packageBytes:bytes,package:p,calculationDiagnostics:[],availableFingerPresentations:[],...(personal?{personal}:{})};
     }
+    // Hands are never calculated for notes the source leaves hand-less; the player chooses them.
+    const handless=p.score.notes.filter(n=>n.hand===undefined&&personal?.assignments?.choices[n.id]?.hand===undefined).length;
+    if(handless)return failure('needs-data','performing-hands',handlessMessage(handless,'fingers can be calculated'));
     if(source.referencePerformanceTempo===undefined)
       return failure('needs-data','reference-tempo','Choose a duration unit and rate per minute for this score before calculating fingers.');
     requireReferencePerformanceTempo(source);interrupted(request);
