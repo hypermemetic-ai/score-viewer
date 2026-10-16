@@ -1,5 +1,5 @@
 import {unzipSync,strToU8} from 'fflate';
-import {parseMusicXmlAsync,projectMusicXml,type HandPolicy} from '../vendor/iso-notation/src/musicxml';
+import {parseMusicXmlAsync,projectMusicXml} from '../vendor/iso-notation/src/musicxml';
 import {renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
 import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
@@ -35,9 +35,11 @@ function decodeXml(bytes:Uint8Array){
 }
 
 /** One printed piano part becomes a native .tuna archive. Hands come from the
- * printed staff (upper right, lower left) and are never calculated; the
- * player corrects them in the handedness editor. Pages use the approved
- * production engraving, and the package passes ordinary admission. */
+ * source: the upper staff is the right hand, the lower staff the left, and an
+ * explicit source hand mark (m.s., m.d., l.h., r.h.) overrides its staff.
+ * Nothing is inferred; the player corrects hands in the handedness editor.
+ * Pages use the approved production engraving, and the package passes
+ * ordinary admission. */
 export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):Promise<{bytes:Uint8Array;filename:string}> {
  const execution=capturedReadingExecution(inputExecution),inputSha256=await hashBytes(bytes);checkReadingExecution(execution);
  let written;
@@ -48,12 +50,16 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  if(parts===0||!written.measures.length)throw new MusicXmlImportRefusal('This MusicXML file contains no music.');
  if(parts!==1)throw new MusicXmlImportRefusal(`This file contains ${parts} instruments. The score viewer opens one instrument at a time; export just the piano part.`);
  // Staves count even when one holds only rests, as in a right-hand study.
- const part=written.measures[0].part,staves=[...new Set(written.events.map(e=>e.staff))].sort();
- if(staves.join()!=='1,2')throw new MusicXmlImportRefusal(`This part is written on ${staves.length} ${staves.length===1?'staff':'staves'}. MusicXML import currently reads two-staff piano scores.`);
- const hands:HandPolicy[]=[{part,staff:'1',hand:'RH',rationale:'printed upper staff',confidence:'contextual'},{part,staff:'2',hand:'LH',rationale:'printed lower staff',confidence:'contextual'}];
+ // Both staves must be printed so that each carries its hand.
+ const staves=[...new Set(written.events.map(e=>e.staff))].sort(),declared=written.parts?.[0]?.staves??1;
+ if(staves.join()!=='1,2'||declared!==2){const count=Math.max(staves.length,declared);throw new MusicXmlImportRefusal(`This part is written on ${count} ${count===1?'staff':'staves'}. MusicXML import currently reads two-staff piano scores.`);}
  let score;
- try{score=projectMusicXml(written,{id:`musicxml-${inputSha256}`,hands}).score;}
- catch(error){throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);}
+ try{score=projectMusicXml(written,{id:`musicxml-${inputSha256}`,pianoHands:'source-v1'}).score;}
+ catch(error){
+  const program=/^Piano import needs a piano instrument; part .* declares MIDI program (-?\d+)\.$/.exec((error as Error).message)?.[1];
+  if(program)throw new MusicXmlImportRefusal(`This part is written for an instrument other than piano (General MIDI program ${program}). MusicXML import reads piano scores only.`);
+  throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);
+ }
  score.title||='Untitled score';score.composer??='';
  const source=strToU8(JSON.stringify(score)),sourceSha256=await hashBytes(source);
  let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,
@@ -64,7 +70,7 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  checkReadingExecution(execution);
  if(rendered.lint.violations.length)throw new MusicXmlImportRefusal("This score can't be engraved cleanly yet: some of its notation doesn't fit the page layout.");
  recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
- const published=await publishPreparedNative({source,metadata:{title:score.title,composer:score.composer,provenance:[`MusicXML import ${inputSha256}; hands from printed staves.`]},
+ const published=await publishPreparedNative({source,metadata:{title:score.title,composer:score.composer,provenance:[`MusicXML import ${inputSha256}; hands from printed staves and source hand marks.`]},
   engineVersion:APPROVED_SCORE_RENDERING_ENGINE,createdAt:new Date().toISOString(),font:assets.font,notices:assets.notices,
   presentations:(['conventional-piano','janko-four-row'] as const).map(layoutId=>({layoutId,seats:rendered.seats,pages:rendered.pages}))});
  checkReadingExecution(execution);

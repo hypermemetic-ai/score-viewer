@@ -41,7 +41,7 @@ import {ReadingPresentationController} from './reading-presentation';
 import {manualReaderView,retainManualReaderView} from './manual-reader-presentation';
 import {readingNotationControl} from './reading-notation-control';
 import {selectReadingNotation,prepareDualReadingPacket,type ReadingNotation} from './dual-reading-package';
-import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
+import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,guitarProPreparedByEarlierConverter,EARLIER_GUITAR_PRO_CONVERTER,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
 import {ReadingPartCatalog} from './reading-part-catalog';
 import {guitarProTracksMarkup} from './guitar-pro-tracks';
 import {scoreImportKind,MUSICXML_IMPORT_ENABLED} from './score-import-kind';
@@ -141,7 +141,8 @@ async function admitReading(bytes:Uint8Array,op:ReadingOperation){
  await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
  readingProgress(op,'Checking saved score…');
  const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
- if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
+ if(p.manifest.files[GUITAR_PRO_FILES.descriptor]&&guitarProPreparedByEarlierConverter(p))notify(EARLIER_GUITAR_PRO_CONVERTER);
+ else if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
  return p;
 }
 function readingProgress(op:ReadingOperation,text:string){checkReadingOwner(op);op.running.progress=text;if(op.dialog)updateLoading(op.dialog,text);}
@@ -712,11 +713,14 @@ async function switchReadingPart(id:string){
 }
 async function importScore(){
  let bytes=await host.pickScore();if(!bytes)return;const kind=scoreImportKind(bytes);if(kind==='guitar-pro'){await importGuitarProScore(bytes);return;}
- if(kind==='musescore')throw Error(MUSICXML_IMPORT_ENABLED?'MuseScore files can\'t be opened directly yet. In MuseScore, choose File › Export › MusicXML, then import that file.':'MuseScore files can\'t be opened yet.');
+ if(kind==='musescore'&&!MUSICXML_IMPORT_ENABLED)throw Error('MuseScore files can\'t be opened yet.');
  if(kind==='musicxml'&&!MUSICXML_IMPORT_ENABLED)throw Error('MusicXML files can\'t be opened yet.');
  const op=beginReading('import');try{await readingCheckpoint(op);
  if(kind==='musicxml'){readingProgress(op,'Engraving the score…');const [{frettedPreparationAssets},{prepareMusicXmlScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musicxml-import')]);checkReading(op);
   bytes=(await prepareMusicXmlScore(bytes,await frettedPreparationAssets(op.controller.signal),{signal:op.controller.signal})).bytes;await readingCheckpoint(op);}
+ if(MUSICXML_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'Converting the MuseScore file…');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
+  const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
+  bytes=(await prepareMuseScore(bytes,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
  const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false;
