@@ -69,8 +69,26 @@ test('multi-instrument, one-staff and unreadable files refuse with a reason',asy
  await assert.rejects(prepareMusicXmlScore(strToU8(twoParts),assets),{name:'Error',message:/contains 2 instruments.*one instrument at a time/});
  const oneStaff=xml.replace('<staves>2</staves>','').replace(/<clef number="2">.*?<\/clef>/,'').replaceAll('<staff>2</staff>','<staff>1</staff>').replace('<clef number="1">','<clef>');
  await assert.rejects(prepareMusicXmlScore(strToU8(oneStaff),assets),/written on 1 staff\. MusicXML import currently reads two-staff piano scores/);
- const playback=xml.replace('<instrument-name>Piano</instrument-name>','<instrument-name>Piano</instrument-name><instrument-sound>keyboard.piano</instrument-sound>');
- await assert.rejects(prepareMusicXmlScore(strToU8(playback),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*instrument-sound/.test(err.message));
+ const fermata=xml.replace('<staff>1</staff></note>','<staff>1</staff><notations><fermata/></notations></note>');
+ await assert.rejects(prepareMusicXmlScore(strToU8(fermata),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*fermata/.test(err.message));
+ const violin=xml.replace('<midi-program>1</midi-program>','<midi-program>41</midi-program>');
+ await assert.rejects(prepareMusicXmlScore(strToU8(violin),assets),err=>err instanceof MusicXmlImportRefusal&&
+  err.message==='This part is written for an instrument other than piano (General MIDI program 41). MusicXML import reads piano scores only.');
+});
+
+test('source hand marks override their staff, and playback metadata is ignored',async()=>{
+ // An explicit m.d. moves the first lower-staff chord to the right hand; nothing else changes and nothing is inferred.
+ const marked=xml.replace('<backup><duration>8</duration></backup>','<backup><duration>8</duration></backup><direction placement="above"><direction-type><words>m.d.</words></direction-type><voice>5</voice><staff>2</staff></direction>')
+  .replace('<instrument-name>Piano</instrument-name>','<instrument-name>Piano</instrument-name><instrument-sound>keyboard.piano</instrument-sound>');
+ const p=await importPackage((await prepareMusicXmlScore(strToU8(marked),assets)).bytes,{allowLegacyTempo:true});
+ const first=p.score.notes.find(n=>n.staffId==='2'&&n.startTick===0)!;
+ assert.equal(requirePianoEvent(first).hand,'RH');assert.equal(first.handInference?.confidence,'high');assert.match(first.handInference!.evidence,/Source hand mark "m\.d\."/);
+ for(const n of p.score.notes.filter(n=>n!==first)){assert.equal(requirePianoEvent(n).hand,n.staffId==='1'?'RH':'LH');assert.equal(n.handInference?.confidence,'contextual');}
+ assert.ok(p.score.notes.every(n=>!n.sourceProvenance?.hands.length));assert.equal(p.score.sourceHandRequirements,undefined);
+ // Without a MIDI program, the piano import mode declares the capability.
+ const unprogrammed=xml.replace(/<midi-instrument id="P1-I1">.*?<\/midi-instrument>/,'');
+ const q=await importPackage((await prepareMusicXmlScore(strToU8(unprogrammed),assets)).bytes,{allowLegacyTempo:true});
+ assert.deepEqual(q.score.parts?.map(part=>part.declaredCapability),[{kind:'piano',authority:'musicxml-piano-mode-v1'}]);
 });
 
 test('chords prepare for reading as well as engraving',async()=>{

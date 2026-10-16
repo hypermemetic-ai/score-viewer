@@ -24,9 +24,7 @@ test('other instrument families are refused plainly and withheld from track sele
  assert.match(html,/data-gp-track="1" checked>/);assert.match(html,/data-gp-track="2" checked>/);
 });
 
-test('a bass track still stages, admits ISO and TAB, and cold-replays as Bass',{
- todo:'Blocked: converter 2146166 MusicXML adds <tuplet> notations and a notation-staff <staff-details>, which the pinned ISO reader refuses.'
-},async()=>{
+test('a bass track still stages, admits ISO and TAB, and cold-replays as Bass',async()=>{
  const restore=installConverterNodeRuntime(),fixture=authoredFrettedInput();
  try{
   const inspection=await inspectGuitarProSource(bass);

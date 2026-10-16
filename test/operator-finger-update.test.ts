@@ -6,7 +6,7 @@ import {importPackage,validateLayerAsync,hashBytes} from '../src/package';
 import {publishPackage} from '../src/publication';
 import {readOperatorFingerReview} from '../src/operator-finger-authority';
 import {prepareFingeringStudio} from '../vendor/iso-notation/scripts/lib/fingering-studio-review';
-import {getCandidate,CURRENT_CANDIDATES,NO14_OPERATOR_FINGER_CANDIDATES} from '../vendor/iso-notation/src/render/iso/candidates';
+import {getCandidate,ROUND_83_CANDIDATES,NO14_OPERATOR_FINGER_CANDIDATES} from '../vendor/iso-notation/src/render/iso/candidates';
 import {renderCandidatesView} from '../vendor/iso-notation/src/render/iso/studio';
 import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
 
@@ -85,7 +85,8 @@ test('opt-in real-engine review is clean, retains pitch pages and changes only t
  }
  assert.deepEqual(original.receipt.lint,{violations:[],warnings:[]});assert.deepEqual(corrected.receipt.lint,original.receipt.lint);
  assert.deepEqual(corrected.presentation.pages,original.presentation.pages);assert.deepEqual(corrected.presentation.seats,original.presentation.seats);assert.deepEqual(corrected.positions,original.positions);
- assert.deepEqual(CURRENT_CANDIDATES.map(c=>c.id),['no14-absolute-condensed']);
+ // The No. 14 reading round stays retained beside the operator finger candidates.
+ assert.deepEqual(ROUND_83_CANDIDATES.map(c=>c.id),['no14-absolute-condensed']);for(const c of ROUND_83_CANDIDATES)assert.equal(getCandidate(c.id),c);
  for(const c of NO14_OPERATOR_FINGER_CANDIDATES){assert.equal(getCandidate(c.id),c);const window=c.windows?.[1];assert.ok(window&&'measureStart' in window);assert.equal(window.measureStart,10);assert.equal(window.measureCount,4);}
  let changed=0;
  for(const page of before.pages){

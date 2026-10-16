@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {prepareFingeringStudio} from '../vendor/iso-notation/scripts/lib/fingering-studio-review';
-import {CURRENT_CANDIDATES,CURRENT_ROUND_METADATA,NO14_FINGERING_CANDIDATES,getCandidate} from '../vendor/iso-notation/src/render/iso/candidates';
+import {ROUND_83_CANDIDATES,ROUND_83_METADATA,NO14_FINGERING_CANDIDATES,getCandidate} from '../vendor/iso-notation/src/render/iso/candidates';
 import {renderCandidatesView} from '../vendor/iso-notation/src/render/iso/studio';
 import {renderIsoCrop} from '../vendor/iso-notation/src/render/iso/engine';
 import {lintIsoScore} from '../vendor/iso-notation/src/render/iso/linter';
@@ -29,7 +29,8 @@ function musicalSvg(svg:string){
 }
 
 test('separate fingering round preserves current registry and reproduces frozen source pages/seats exactly',()=>{
- assert.equal(CURRENT_ROUND_METADATA.round,83);assert.deepEqual(CURRENT_CANDIDATES.map(c=>c.id),['no14-absolute-condensed']);
+ // Round 83 (No. 14) is parked, not replaced, now that ISO's developer studio has opened later rounds.
+ assert.equal(ROUND_83_METADATA.round,83);assert.deepEqual(ROUND_83_CANDIDATES.map(c=>c.id),['no14-absolute-condensed']);for(const c of ROUND_83_CANDIDATES)assert.equal(getCandidate(c.id),c);
  for(const c of NO14_FINGERING_CANDIDATES)assert.equal(getCandidate(c.id),c);
  assert.deepEqual(review.presentation.pages,p.pages);assert.deepEqual(review.presentation.seats,p.seats);
  assert.equal(p.pages.length,3);assert.equal(p.seats.length,381);assert.equal(p.score.notes.length,383);
@@ -92,5 +93,5 @@ test('revised comparison is separately selectable without changing the current r
  assert.equal(STEM_END_FINGERING_ROUND.round,86);assert.equal(STEM_END_FINGERING_CANDIDATES.length,3);
  assert.deepEqual(STEM_END_FINGERING_CANDIDATES.map(c=>c.fingerPresentation),['pitch','annotations','replacement']);
  for(const c of STEM_END_FINGERING_CANDIDATES){assert.equal(getCandidate(c.id),c);assert.deepEqual(c.windows,NO14_FINGERING_CANDIDATES[0].windows);}
- assert.equal(CURRENT_ROUND_METADATA.round,83);
+ assert.equal(ROUND_83_METADATA.round,83);
 });

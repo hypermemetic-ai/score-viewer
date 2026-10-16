@@ -1424,11 +1424,11 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "63a0e481049cf12a7fccebd1c1da58969aaa8607",
+  "dependencyRevision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351",
   "dependencyReview": {
-    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/373",
-    "previousRevision": "1dbd447d1be556a6b5e865d20aa3985ff545b6d9",
-    "scope": "Jankó to ISO notation rename of paths and identifiers on top of the PR372 chord duration ownership fix: render/janko becomes render/iso and Janko/JANKO identifiers become Iso/ISO. Engine and recipe IDs, storage keys, janko-* SVG/CSS classes and physical keyboard names are unchanged, and every page of the 19 studio scores is byte-identical to the previous main. Merged without a GitHub review record after a bounded 25-file run (only failures known on main), strict engraving lint and build. Earlier extraction rewrite records below keep their historical render/janko paths."
+    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/375",
+    "previousRevision": "63a0e481049cf12a7fccebd1c1da58969aaa8607",
+    "scope": "Stage 1 MusicXML piano import on top of PR374 test-time changes and the PR373 ISO rename: projectMusicXml(written,{id,pianoHands:'source-v1'}) projects one piano part with hands from the printed top and bottom staves plus explicit source hand marks, no sourceHandRequirements, and a piano capability declared by the import mode when the source names no MIDI program. Parse admission retains playback metadata (ignored), bracket/dashes lines, notation-staff staff-details including score-converter 2146166 Guitar Pro output, tuplet boundaries, non-traditional keys and arpeggiate marks as data; articulations, ornaments, fermatas and fingering still refuse. A tie-continuation head records its own written voice; Bach, Brahms, No. 14 and fretted outputs are unchanged. Merged without a GitHub review record after its release gate (48 selected files, known failures deferred), strict engraving lint and build. The viewer adopts it for piano MusicXML and MuseScore import behind the development-only MusicXML gate."
   },
   "previousDependencyReviews": [
     {

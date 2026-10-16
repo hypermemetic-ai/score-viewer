@@ -33,10 +33,20 @@ function refusal(report:MuseScoreReport){
  const blocking=report.findings.find(f=>f.disposition==='blocking'),code=blocking?.code??'conversion-refused';
  return new MuseScoreImportRefusal(museScoreRefusalMessage(code),code);
 }
+/** The reader's refusal without its position in the converted text, which
+ * the player never sees. */
+function readerDetail(message:string){
+ const detail=message.replace(/^[^\s:]+\.musicxml:\d+(?::\d+)?: /,'').replace(/^\/part\[[^\]]*\](?:\/measure\[\d+\])?: /,'');
+ const element=/unsupported (?:[a-z-]+ )?<([A-Za-z0-9-]+)>/.exec(detail)?.[1];
+ if(element)return `MusicXML <${element}>`;
+ if(/^alter: expected safe integer/.test(detail))return 'microtonal accidentals';
+ const feature=/^unsupported ([A-Za-z0-9/ -]+?)(?::|$)/.exec(detail)?.[1];
+ return feature?`MusicXML ${feature}`:detail;
+}
 /** MusicXML intake wording, retold for the file the player actually chose. */
 function retold(error:MusicXmlImportRefusal){
- const unsupported=/^This MusicXML file can't be read yet: .*?unsupported <([A-Za-z0-9-]+)>/.exec(error.message)?.[1];
- if(unsupported)return new MuseScoreImportRefusal(`This MuseScore score can't be opened yet: the viewer's notation reader doesn't understand part of it yet (MusicXML <${unsupported}>).`,'musicxml-intake');
+ const reader=/^This MusicXML file can't be read yet: (.*)$/s.exec(error.message)?.[1];
+ if(reader!==undefined)return new MuseScoreImportRefusal(`This MuseScore score can't be opened yet: the viewer's notation reader doesn't understand part of it yet (${readerDetail(reader)}).`,'musicxml-intake');
  return new MuseScoreImportRefusal(error.message.replace(/^This (?:compressed )?MusicXML file/,'This MuseScore score').replace(/^MusicXML import currently reads/,'The viewer currently reads')
   .replace(/\. MusicXML import currently reads/,'. The viewer currently reads'),'musicxml-intake');
 }

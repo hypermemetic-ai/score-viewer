@@ -12,7 +12,7 @@ const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('
  notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>
   ['licenses/'+name,readFileSync(new URL('../licenses/'+name,import.meta.url))]))};
 // The intake's own refusal of converter output it can't read yet (ISO reader work).
-const readerRefusal=/^This MuseScore score can't be opened yet: the viewer's notation reader doesn't understand part of it yet \(MusicXML <[A-Za-z0-9-]+>\)\.$/;
+const readerRefusal=/^This MuseScore score can't be opened yet: the viewer's notation reader doesn't understand part of it yet \(MusicXML [^)]+\)\.$/;
 
 test('MuseScore import and its picker extensions stay behind the MusicXML release gate',()=>{
  assert.equal(MUSICXML_IMPORT_ENABLED,false);
@@ -45,18 +45,23 @@ test('MuseScore fixtures convert through the public entry and meet the unchanged
    const xml=await convertMuseScoreToMusicXml(fixture(name));
    assert.match(xml,/<score-partwise version="4.0">/);
    assert.equal(scoreImportKind(new TextEncoder().encode(xml)),'musicxml');
-   try{
-    const {bytes}=await prepareMuseScore(fixture(name),assets),p=await importPackage(bytes,{allowLegacyTempo:true});
-    // Admitted only where the ISO reader accepts the converter's MusicXML.
-    assert.equal(name,'cross-staff-arpeggio.mscz','Only the one-piano fixture may become a score.');
-    for(const n of p.score.notes){const e=requirePianoEvent(n);assert.equal(e.hand,e.staffId==='1'?'RH':'LH');}
-    t.diagnostic(`${name}: admitted .tuna with ${p.score.notes.length} notes`);
-   }catch(error){
-    assert.ok(error instanceof MuseScoreImportRefusal,(error as Error).message);
-    assert.match(error.message,name==='cross-staff-arpeggio.mscz'?readerRefusal:new RegExp(`${readerRefusal.source}|^This file contains 2 instruments\\.`));
-    t.diagnostic(`${name}: ${error.message}`);
-   }
   }
+  // One piano: hands come from the printed staves; no source mark, nothing inferred.
+  const {bytes}=await prepareMuseScore(fixture('cross-staff-arpeggio.mscz'),assets),p=await importPackage(bytes,{allowLegacyTempo:true});
+  assert.equal(p.score.notes.length,36);
+  for(const n of p.score.notes){
+   const e=requirePianoEvent(n);assert.equal(e.hand,e.staffId==='1'?'RH':'LH');
+   assert.deepEqual(n.sourceProvenance?.hands,[]);assert.equal(n.handInference?.confidence,'contextual');
+  }
+  assert.equal(p.score.sourceHandRequirements,undefined);
+  assert.deepEqual(p.score.parts?.map(part=>part.declaredCapability),[undefined],'The source names a piano program, so the import mode declares nothing.');
+  t.diagnostic(`cross-staff-arpeggio.mscz: admitted .tuna with ${p.score.notes.length} notes`);
+  // Piano and clarinet: the reader refuses its pedal marking before it counts the instruments.
+  await assert.rejects(prepareMuseScore(fixture('original-piano-clarinet.mscx'),assets),(error:unknown)=>{
+   assert.ok(error instanceof MuseScoreImportRefusal,(error as Error).message);
+   assert.match(error.message,readerRefusal);assert.doesNotMatch(error.message,/\/part\[|\.musicxml:\d/);
+   t.diagnostic(`original-piano-clarinet.mscx: ${error.message}`);return true;
+  });
  }finally{restore();}
 });
 
