@@ -67,8 +67,10 @@ test('multi-instrument and unreadable files refuse with a reason',async()=>{
  const twoParts=xml.replace('</part-list>','<score-part id="P2"><part-name>Violin</part-name></score-part></part-list>')
   .replace('</score-partwise>',`<part id="P2"><measure number="1"><attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes><note><rest measure="yes"/><duration>8</duration><voice>1</voice><type>whole</type></note></measure><measure number="2"><note><rest measure="yes"/><duration>8</duration><voice>1</voice><type>whole</type></note></measure></part></score-partwise>`);
  await assert.rejects(prepareMusicXmlScore(strToU8(twoParts),assets),{name:'Error',message:/contains 2 instruments.*one instrument at a time/});
- const fermata=xml.replace('<staff>1</staff></note>','<staff>1</staff><notations><fermata/></notations></note>');
- await assert.rejects(prepareMusicXmlScore(strToU8(fermata),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*fermata/.test(err.message));
+ const glissando=xml.replace('<staff>1</staff></note>','<staff>1</staff><notations><glissando type="start"/></notations></note>');
+ await assert.rejects(prepareMusicXmlScore(strToU8(glissando),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*glissando/.test(err.message));
+ // A fermata is retained though not yet drawn, so it no longer refuses the file.
+ await prepareMusicXmlScore(strToU8(xml.replace('<staff>1</staff></note>','<staff>1</staff><notations><fermata/></notations></note>')),assets);
  const violin=xml.replace('<midi-program>1</midi-program>','<midi-program>41</midi-program>');
  await assert.rejects(prepareMusicXmlScore(strToU8(violin),assets),err=>err instanceof MusicXmlImportRefusal&&
   err.message==='This part is written for an instrument other than piano (General MIDI program 41). MusicXML import reads piano scores only.');

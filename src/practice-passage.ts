@@ -51,8 +51,10 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  // Give each authored separator one side. Ordinary/double/end rules belong
  // to the ending bar; start-repeat ink belongs to the following bar.
  const boundary=p.score.barlines?.find(rule=>rule.tick===plan.barTicks[bar]),ending=p.score.barlines?.find(rule=>rule.tick===plan.barTicks[bar+1]);
+ // A back-to-back boundary draws an end half for the ending bar and a start half for the next.
+ const opensRepeat=(type?:string)=>type==='repeat-start'||type==='repeat-end-start';
  const repeatEdge=(group:Element)=>Math.max(...[...group.querySelectorAll('line')].map(l=>Number(l.getAttribute('x1'))));
- if(boundary&&boundary.type!=='repeat-start'){
+ if(boundary&&!opensRepeat(boundary.type)){
   clone.querySelectorAll<SVGLineElement>('.janko-barlines line').forEach(line=>{const x=Number(line.getAttribute('x1'));if(x>=left!-3&&x<=left!+.02&&Math.abs(Number(line.getAttribute('x2'))-x)<.02)line.remove();});
   clone.querySelectorAll('.janko-repeat').forEach(group=>{if(Math.abs(repeatEdge(group)-left!)<.02)group.remove();});
  }
@@ -62,7 +64,7 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  clone.querySelectorAll('.janko-repeat').forEach(group=>{const tick=Number(group.getAttribute('data-repeat-tick')),edge=plan.barTicks.indexOf(tick),owner=edge-(group.getAttribute('data-repeat')==='repeat-end'?1:0);if(edge<0)throw Error(`Measure ${bar+1}: unresolved source repeat boundary.`);if(owner!==bar)group.remove();});
  if(ending?.type==='repeat-start')clone.querySelectorAll<SVGLineElement>('.janko-barlines line').forEach(line=>{if(Math.abs(Number(line.getAttribute('x1'))-right!)<.03)line.remove();});
  const sourceFinal=bar===plan.barTicks.length-2&&[...system.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].some(line=>Math.abs(Number(line.getAttribute('x1'))-right!)<.03&&Number(line.getAttribute('stroke-width'))===.9),endingType=ending?.type&&ending.type!=='regular'?ending.type:sourceFinal?'final':ending?.type;
- const leftAir=boundary?.type==='repeat-start'?5:.8,rightAir=endingType==='repeat-end'||endingType==='final'?5:.8;
+ const leftAir=opensRepeat(boundary?.type)?5:.8,rightAir=endingType==='repeat-end'||endingType==='repeat-end-start'||endingType==='final'?5:.8;
  svg.setAttribute('viewBox',`${left!-leftAir} ${top} ${right!-left!+leftAir+rightAir} ${bottom-top}`);
  const owned:Crop['owned']=[];const noteGroup=(s:Seat)=>[...new Set(s.ownerIds.map(id=>{const group=plan.ownerGroup.get(id);if(!group)throw Error(`Measure ${bar+1}: unknown source owner ${id}.`);return group;}))];
  let carriers=carrierCache.get(p);if(!carriers){carriers=fingeringCarriers(p);carrierCache.set(p,carriers);}
