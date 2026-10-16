@@ -35,7 +35,7 @@ var limits = Object.freeze({
   xmlNodeText: 65536,
   xmlPath: 4096,
   xmlPathTotal: 8 * 1024 * 1024,
-  tracks: 8,
+  tracks: 32,
   measures: 512,
   occurrences: 2e4,
   binaryRecords: 2e5,
@@ -58,10 +58,10 @@ var byteOffset = descriptor(typedArray, "byteOffset").get;
 var byteLength = descriptor(typedArray, "byteLength").get;
 var arrayBufferLength = descriptor(ArrayBuffer.prototype, "byteLength").get;
 var set = ByteArray.prototype.set;
-function inputView(bytes) {
+function inputView(bytes, maximum = limits.inputBytes, sizeMessage = "GP input exceeds 8 MiB; no snapshot, digest, worker or decoding started.") {
   if (apply(tag, bytes, []) !== "Uint8Array") throw new TypeError("Expected a Uint8Array input view.");
   const length = apply(byteLength, bytes, []);
-  if (length > limits.inputBytes) throw new RangeError("GP input exceeds 8 MiB; no snapshot, digest, worker or decoding started.");
+  if (length > maximum) throw new RangeError(sizeMessage);
   const storage = apply(buffer, bytes, []);
   try {
     apply(arrayBufferLength, storage, []);
@@ -219,7 +219,7 @@ async function run(operation, bytes, options) {
               if (Object.keys(result).some((key) => !["ok", "report"].includes(key)) || report.convertedParts !== void 0) throw new Error("failure-shape");
             } else if (operation === "inspect") {
               if (!Array.isArray(result.tracks) || Object.keys(result).some((key) => !["ok", "report", "tracks"].includes(key)) || report.convertedParts !== void 0) throw new Error("inventory-shape");
-            } else if (typeof result.musicxml !== "string" || !Array.isArray(report.convertedParts) || !result.score || !Array.isArray(result.score.parts) || !Array.isArray(result.occurrences) || !Array.isArray(result.containerSource) || !result.inputSource || result.inputSource.bytes !== inputBytes || result.inputSource.sha256 !== inputSha256 || typeof result.inputSource.dataBase64 !== "string" || Object.keys(result).some((key) => !["ok", "report", "musicxml", "score", "occurrences", "containerSource", "inputSource", "source", "binarySource", "gpxSource"].includes(key)) || ["source", "binarySource", "gpxSource"].some((key) => result[key] !== void 0 && (!result[key] || typeof result[key] !== "object" || Array.isArray(result[key])))) throw new Error("conversion-shape");
+            } else if (!["fretted", "arrangement"].includes(result.scoreKind) || typeof result.musicxml !== "string" || !Array.isArray(report.convertedParts) || !result.score || !Array.isArray(result.score.parts) || !Array.isArray(result.occurrences) || !Array.isArray(result.containerSource) || !result.inputSource || result.inputSource.bytes !== inputBytes || result.inputSource.sha256 !== inputSha256 || typeof result.inputSource.dataBase64 !== "string" || Object.keys(result).some((key) => !["ok", "report", "musicxml", "scoreKind", "score", "occurrences", "containerSource", "inputSource", "source", "binarySource", "gpxSource"].includes(key)) || ["source", "binarySource", "gpxSource"].some((key) => result[key] !== void 0 && (!result[key] || typeof result[key] !== "object" || Array.isArray(result[key])))) throw new Error("conversion-shape");
             finish(data.result);
           } catch {
             finish(failure("worker-identity", "Worker response does not match the bounded immutable request/result contract."));
