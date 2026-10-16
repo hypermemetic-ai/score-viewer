@@ -48,6 +48,9 @@ export async function freezeInputs({viewerSource,viewerRevision,frontend,checks,
   }
   inputs.nativeFiles=Object.fromEntries(Object.entries(inputs.nativeFiles).sort(([a],[b])=>a.localeCompare(b)));
   await validatePianoSources(viewerSource, inputs.nativeFiles);
+  // Windows checkouts convert text newlines; every sealed native file must keep its exact bytes.
+  const converted=git(viewerSource,['check-attr','--source',viewerRevision,'text','--',...Object.keys(inputs.nativeFiles)]).trim().split('\n').filter(line=>!line.endsWith(': text: unset'));
+  if(converted.length)throw Error('Native inputs lack -text in .gitattributes: '+converted.map(line=>line.slice(0,line.lastIndexOf(': text:'))).join(', '));
   const newFooterNotice=!!inputs.nativeFiles['licenses/'+footerNotice];
   if(newFooterNotice){
     const policy=JSON.parse(git(viewerSource,['show',`${viewerRevision}:src/footer-ink-policy.json`])),fixtureBytes=git(viewerSource,['show',`${viewerRevision}:fixtures/authored-calculated-preparation-v2.isoscore`],true),

@@ -78,6 +78,7 @@ delivery-input/** -text
 "src-tauri/src/practice_audio_repeat.rs" -text
 "src-tauri/src/practice_audio_timing.rs" -text
 "src-tauri/src/practice_audio_windows.rs" -text
+"src-tauri/src/score_pdf.rs" -text
 "src-tauri/src/score_save.rs" -text
 "src-tauri/tauri.conf.json" -text
 "src-tauri/tauri.macos.conf.json" -text

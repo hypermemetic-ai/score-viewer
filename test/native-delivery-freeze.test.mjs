@@ -8,11 +8,12 @@ import {freezeInputs} from '../scripts/native-delivery/freeze-inputs.mjs';
 import {sha256,canonical,inventory} from '../scripts/native-delivery/score-viewer-carrier-inputs.mjs';
 const git=(root,...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 async function put(root,path,data){await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),data);}
-async function fixture(t){
+async function fixture(t,{unprotected}={}){
  const root=await mkdtemp(join(tmpdir(),'viewer-freeze-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const viewerSource=join(root,'source'),frontend=join(root,'frontend'),checks=join(root,'checks.json'),output=join(root,'sealed');await mkdir(viewerSource);await mkdir(frontend);
  const notationRevision='b'.repeat(40);
  for(const [path,data]of Object.entries({'package.json':'{"name":"iso-score-viewer","version":"0.1.0"}','package-lock.json':'{"packages":{}}','src-tauri/Cargo.toml':'[package]\nname="iso-score-viewer"\nversion="0.1.0"\n','src-tauri/tauri.conf.json':JSON.stringify({version:'0.1.0',identifier:'dev.qqp.iso-score-viewer',productName:'ISO Score Viewer'}),'src-tauri/src/assistance_store.rs':'const VALID_RECORD_NAME_LIMIT: usize = 400;\n','docs/source-provenance.json':JSON.stringify({dependencyRevision:notationRevision}),'delivery-input/inputs.json':'old seal remains untouched\n'}))await put(viewerSource,path,data);
+ await put(viewerSource,'.gitattributes',['package.json','package-lock.json','src-tauri/Cargo.toml','src-tauri/tauri.conf.json','src-tauri/src/assistance_store.rs'].filter(path=>path!==unprotected).map(path=>`"${path}" -text\n`).join(''));
  git(viewerSource,'init','-q');git(viewerSource,'add','.');git(viewerSource,'update-index','--add','--cacheinfo',`160000,${notationRevision},vendor/iso-notation`);await mkdir(join(viewerSource,'vendor/iso-notation'),{recursive:true});git(viewerSource,'-c','user.name=fixture','-c','user.email=f@example.invalid','commit','-qm','new application');
  const viewerRevision=git(viewerSource,'rev-parse','HEAD');
  for(const [path,data]of Object.entries({'index.html':'<!DOCTYPE html><html></html>','assets/reader.js':'console.log("new runtime")','assets/font.otf':'fixture font'}))await put(frontend,path,data);
@@ -29,6 +30,10 @@ test('new viewer seal derives current source and exact native bytes without copy
  assert.equal(await readFile(join(f.viewerSource,'delivery-input/inputs.json'),'utf8'),'old seal remains untouched\n');
  assert.equal(git(f.viewerSource,'status','--porcelain'),before);
  await assert.rejects(freezeInputs(f),{code:'EEXIST'});
+});
+test('freezing refuses a native file that a Windows checkout would convert to CRLF',async t=>{
+ const f=await fixture(t,{unprotected:'src-tauri/src/assistance_store.rs'});
+ await assert.rejects(freezeInputs(f),/lack -text in \.gitattributes: src-tauri\/src\/assistance_store\.rs$/);await assert.rejects(access(f.output),{code:'ENOENT'});
 });
 test('freezing refuses stale receipts, dirty sources and output overlapping source without changing the original seal',async t=>{
  const f=await fixture(t);f.receipt.viewerRevision='c'.repeat(40);await writeFile(f.checks,JSON.stringify(f.receipt));
