@@ -73,6 +73,16 @@ test('multi-instrument, one-staff and unreadable files refuse with a reason',asy
  await assert.rejects(prepareMusicXmlScore(strToU8(playback),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*instrument-sound/.test(err.message));
 });
 
+test('chords prepare for reading as well as engraving',async()=>{
+ // The fixture's closing left-hand whole chord shares one stem; every member must own it.
+ const p=await importPackage((await prepareMusicXmlScore(fixture,assets)).bytes,{allowLegacyTempo:true});
+ assert.ok(p.score.notes.some((n,i,a)=>a.some(m=>m!==n&&m.startTick===n.startTick&&m.hand===n.hand)));
+ await new PersonalPresentationSession(p).warm();
+ const half=xml.replace(/<duration>8<\/duration><voice>5<\/voice><type>whole<\/type>/g,'<duration>4</duration><voice>5</voice><type>half</type>')
+  .replace('<barline location="right">','<note><pitch><step>C</step><octave>3</octave></pitch><duration>4</duration><voice>5</voice><type>half</type><staff>2</staff></note><barline location="right">');
+ await new PersonalPresentationSession(await importPackage((await prepareMusicXmlScore(strToU8(half),assets)).bytes,{allowLegacyTempo:true})).warm();
+});
+
 test('an engraving refusal reaches the player in plain words, keeping its diagnosis',async()=>{
  const p=await importPackage((await prepareMusicXmlScore(fixture,assets)).bytes,{allowLegacyTempo:true}),
   refusal=new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.'),
