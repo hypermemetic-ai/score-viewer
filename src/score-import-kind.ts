@@ -20,9 +20,10 @@ export function scoreImportKind(bytes:Uint8Array):ScoreImportKind {
  if(head!==undefined){if(/<score-(partwise|timewise)[\s>]/.test(head))return 'musicxml';if(/<museScore[\s>]/.test(head))return 'musescore';}
  return 'guitar-pro';
 }
-/** The leading text of an XML document in UTF-8 or UTF-16, otherwise undefined. */
+/** The leading text of an XML document in UTF-8 or UTF-16, otherwise undefined.
+ * Generous enough to pass a DOCTYPE and long leading comments. */
 function xmlHead(bytes:Uint8Array):string|undefined {
- const sample=bytes.subarray(0,4096),encoding=sample[0]===0xff&&sample[1]===0xfe?'utf-16le':sample[0]===0xfe&&sample[1]===0xff?'utf-16be':'utf-8',
+ const sample=bytes.subarray(0,65536),encoding=sample[0]===0xff&&sample[1]===0xfe?'utf-16le':sample[0]===0xfe&&sample[1]===0xff?'utf-16be':'utf-8',
   text=new TextDecoder(encoding).decode(sample).replace(/^\uFEFF/,'').trimStart();
  return text.startsWith('<')?text:undefined;
 }

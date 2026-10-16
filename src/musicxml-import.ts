@@ -23,9 +23,15 @@ export function musicXmlText(bytes:Uint8Array):string {
  if(bytes.byteLength>MAX_XML_BYTES)throw new MusicXmlImportRefusal('This MusicXML file is larger than 10 MB.');
  return decodeXml(bytes);
 }
+/** BOM first, then the XML declaration's encoding, otherwise UTF-8. */
 function decodeXml(bytes:Uint8Array){
- const encoding=bytes[0]===0xff&&bytes[1]===0xfe?'utf-16le':bytes[0]===0xfe&&bytes[1]===0xff?'utf-16be':'utf-8';
- return new TextDecoder(encoding,{fatal:true}).decode(bytes).replace(/^\uFEFF/,'');
+ const bom=bytes[0]===0xff&&bytes[1]===0xfe?'utf-16le':bytes[0]===0xfe&&bytes[1]===0xff?'utf-16be':undefined,
+  declared=bom?undefined:/^(?:\uFEFF)?<\?xml[^>]*\bencoding\s*=\s*["']([A-Za-z0-9._-]+)["']/.exec(new TextDecoder('latin1').decode(bytes.subarray(0,200)))?.[1];
+ let decoder;
+ try{decoder=new TextDecoder(bom??declared??'utf-8',{fatal:true});}
+ catch{throw new MusicXmlImportRefusal(`This MusicXML file uses an unsupported text encoding (${declared}).`);}
+ try{return decoder.decode(bytes).replace(/^\uFEFF/,'');}
+ catch{throw new MusicXmlImportRefusal(`This MusicXML file isn't valid ${decoder.encoding.toUpperCase()} text.`);}
 }
 
 /** One printed piano part becomes a native .tuna archive. Hands come from the
@@ -39,8 +45,10 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  catch(error){if(error instanceof MusicXmlImportRefusal)throw error;throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);}
  checkReadingExecution(execution);
  const parts=written.parts?.length??new Set(written.measures.map(m=>m.part)).size;
+ if(parts===0||!written.measures.length)throw new MusicXmlImportRefusal('This MusicXML file contains no music.');
  if(parts!==1)throw new MusicXmlImportRefusal(`This file contains ${parts} instruments. The score viewer opens one instrument at a time; export just the piano part.`);
- const part=written.measures[0].part,staves=[...new Set(written.events.filter(e=>e.kind!=='rest').map(e=>e.staff))].sort();
+ // Staves count even when one holds only rests, as in a right-hand study.
+ const part=written.measures[0].part,staves=[...new Set(written.events.map(e=>e.staff))].sort();
  if(staves.join()!=='1,2')throw new MusicXmlImportRefusal(`This part is written on ${staves.length} ${staves.length===1?'staff':'staves'}. MusicXML import currently reads two-staff piano scores.`);
  const hands:HandPolicy[]=[{part,staff:'1',hand:'RH',rationale:'printed upper staff',confidence:'contextual'},{part,staff:'2',hand:'LH',rationale:'printed lower staff',confidence:'contextual'}];
  let score;
@@ -54,7 +62,7 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  try{rendered=await renderScorePresentationAsync(score,recipe,execution);}
  catch(error){if((error as Error).name==='AbortError')throw error;throw new MusicXmlImportRefusal(`This score can't be engraved yet: ${(error as Error).message}`);}
  checkReadingExecution(execution);
- if(rendered.lint.violations.length)throw new MusicXmlImportRefusal(`This score can't be engraved cleanly yet (${rendered.lint.violations.length} layout problems).`);
+ if(rendered.lint.violations.length)throw new MusicXmlImportRefusal("This score can't be engraved cleanly yet: some of its notation doesn't fit the page layout.");
  recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
  const published=await publishPreparedNative({source,metadata:{title:score.title,composer:score.composer,provenance:[`MusicXML import ${inputSha256}; hands from printed staves.`]},
   engineVersion:APPROVED_SCORE_RENDERING_ENGINE,createdAt:new Date().toISOString(),font:assets.font,notices:assets.notices,

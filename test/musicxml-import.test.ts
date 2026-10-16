@@ -28,11 +28,18 @@ test('import routing reads content, not filenames',()=>{
  assert.equal(scoreImportKind(zipSync({'manifest.json':strToU8('{}'),'META-INF/container.xml':container('x.musicxml')})),'score');
  assert.equal(scoreImportKind(strToU8('FICHIER GUITAR PRO v5.00')),'guitar-pro');
  assert.equal(scoreImportKind(strToU8('<GPIF/>')),'guitar-pro');
+ assert.equal(scoreImportKind(strToU8(xml.replace('<score-partwise','<!--'+' '.repeat(5000)+'-->\n<score-partwise'))),'musicxml');
 });
 
 test('compressed MusicXML reads its declared root score',()=>{
  assert.equal(musicXmlText(zipSync({'META-INF/container.xml':container('inner/score.xml'),'inner/score.xml':fixture})),xml);
  assert.throws(()=>musicXmlText(zipSync({'META-INF/container.xml':container('missing.xml')})),MusicXmlImportRefusal);
+});
+
+test('MusicXML text honours its declared encoding',()=>{
+ const latin=xml.replace('encoding="UTF-8"','encoding="ISO-8859-1"').replace('Two-staff study','Étude'),bytes=Uint8Array.from(latin,c=>c.charCodeAt(0));
+ assert.match(musicXmlText(bytes),/<work-title>Étude<\/work-title>/);
+ assert.throws(()=>musicXmlText(strToU8(xml.replace('encoding="UTF-8"','encoding="X-NOPE"'))),/unsupported text encoding/);
 });
 
 test('a two-staff piano part becomes an admitted .tuna with hands from the printed staves',async()=>{
@@ -46,6 +53,14 @@ test('a two-staff piano part becomes an admitted .tuna with hands from the print
  assert.equal(p.renderingRecipe?.sourceSha256,p.sourceSha256);
  // The same input reimports as the same score, so it updates rather than duplicates.
  assert.equal((await importPackage((await prepareMusicXmlScore(fixture,assets)).bytes,{allowLegacyTempo:true})).manifest.scoreId,p.manifest.scoreId);
+});
+
+test('a lower staff of rests still reads as a two-staff piano part',async()=>{
+ const rest='<note><rest measure="yes"/><duration>8</duration><voice>5</voice><type>whole</type><staff>2</staff></note>',
+  lower=xml.match(/^.*<staff>2<\/staff><\/note>$/gm)!;assert.equal(lower.length,4);
+ const rests=xml.replace(lower[0],rest).replace(lower[1]+'\n','').replace(lower[2],rest).replace(lower[3]+'\n','');
+ const p=await importPackage((await prepareMusicXmlScore(strToU8(rests),assets)).bytes,{allowLegacyTempo:true});
+ assert.ok(p.score.notes.length>0&&p.score.notes.every(n=>requirePianoEvent(n).hand==='RH'));
 });
 
 test('multi-instrument, one-staff and unreadable files refuse with a reason',async()=>{
