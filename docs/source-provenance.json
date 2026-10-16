@@ -1424,11 +1424,11 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
+  "dependencyRevision": "1dbd447d1be556a6b5e865d20aa3985ff545b6d9",
   "dependencyReview": {
-    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/364",
-    "review": "https://github.com/hypermemetic-ai/iso-notation/pull/364#pullrequestreview-5484923104",
-    "scope": "Reviewed cooperative retained rendering and personal/calculated preparation with per-step private ownership, captured inputs, cancellation at final await and overlap isolation; 87 distinct focused regressions across runs, configured types/build and exact retained No14 output. Individual steps remain indivisible. Viewer browser and native acceptance are recorded separately."
+    "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/372",
+    "previousRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
+    "scope": "Chord duration ownership on top of reviewed PR364 cooperative preparation: a shared-stem or vertical-chord carrier's paint lists every chord member whose stem it hides, and the source-owned coverage audit accepts a painted clasp that states a clasp-owned member's exact value. Ink is unchanged. Merged without a GitHub review record; its release gate passed except four tests that fail identically on main, with strict engraving lint and build. The viewer's chord-opening regression fails on the previous pin and passes here."
   },
   "previousDependencyReviews": [
     {
