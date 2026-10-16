@@ -1910,6 +1910,7 @@ dependencies = [
  "sha2",
  "tauri",
  "tauri-build",
+ "webview2-com",
  "windows 0.62.2",
  "zip",
 ]

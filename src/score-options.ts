@@ -10,12 +10,13 @@ const escape=(text:string)=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').
 const button=(label:string,action:string,disabled=false)=>`<button type="button" data-action="${action}"${disabled?' disabled':''}>${label}</button>`;
 
 /** Shared reader/practice Score section. Only provenance is a disclosure. */
-export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string},instrumentControl=''){
+export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string},instrumentControl='',pdf=false){
+ const pdfAction=pdf?button('Save as PDF','pdf'):'';
  if(!scoreCapabilities(p).pianoPreparation)return `<section class="score-options" aria-labelledby="score-options-heading">
   <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${escape(entry.metadata.title)}</p></header>
   ${instrumentControl?`<label class="option-setting" data-options-row><span>Instrument</span>${instrumentControl}</label>`:''}
   ${p.reading?.dual?`<label class="option-setting" data-options-row><span>Notation</span>${readingNotationControl(p)}</label>`:'<p class="help">Read the score with its notes, rhythm and articulations.</p>'}
-  <div class="dialog-actions score-primary-actions" data-options-row>${button('Share score','share')}</div>
+  <div class="dialog-actions score-primary-actions" data-options-row>${button('Share score','share')}${pdfAction}</div>
   <details class="score-source-review"><summary>Source & review</summary>
    ${p.manifest.metadata.provenance.map(text=>`<p class="help">${escape(text)}</p>`).join('')}
   </details>
@@ -24,7 +25,7 @@ export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,tr
  let field=manualTempoField('transpose',`<input type="text" inputmode="numeric" data-score-transpose aria-label="Transpose, steps" value="${transpose.steps}" data-min="${transpose.min}" data-max="${transpose.max}"${disabled?' disabled':''}>`,'transpose','steps');
  if(disabled)field=field.replaceAll('<button type="button"','<button type="button" disabled');
  const history=s.history.length?`<label class="option-setting" data-options-row><span>Calculated version</span><select data-history data-options-size="content" aria-label="Calculated version"><option value="-1" ${s.calculatedVersion===undefined?'selected':''}>Current</option>${s.history.map((l,i)=>`<option value="${i}" ${s.calculatedVersion===i?'selected':''}>${i===0?'Original':`Earlier ${i+1}`} · ${escape(l.plannerVersion)}</option>`).join('')}</select></label>`:'';
- const primary=button(job?.state==='working'?'Calculation running':job?.state==='installing'?'Saving fingerings':'Generate fingerings','generate',busy)+button('Share score','share')+(job?.state==='working'?button('Cancel calculation','cancel-job'):'');
+ const primary=button(job?.state==='working'?'Calculation running':job?.state==='installing'?'Saving fingerings':'Generate fingerings','generate',busy)+button('Share score','share')+pdfAction+(job?.state==='working'?button('Cancel calculation','cancel-job'):'');
  const hasShared=Object.entries(s.memoryResolved?.choices??{}).some(([id,choice])=>choice.finger!==null&&!s.calculatedOwners?.[id]);
  const correctionActions=(corrections?button('Export corrections','feedback'):'')+(corrections||hasShared?button('Restore all','restore-all'):'')+(s.undo||s.undoAssignments||s.undoCalculatedOwners?button('Undo restore','undo-restore'):'');
  const retainedActions=(entry.retainedPackages?.some(file=>file!==entry.file)?button('Earlier editions','earlier-editions'):'')+(entry.presentations?.length?button('Restore previous header','restore-header'):'');
