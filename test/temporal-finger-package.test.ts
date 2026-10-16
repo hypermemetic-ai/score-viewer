@@ -3,7 +3,7 @@ import {strToU8} from 'fflate';
 import {hashBytes,archivePackage,importPackage,validateLayerAsync} from '../src/package';
 import {publishPreparedNative,publishPackage} from '../src/publication';
 import {corrected,fingerFor,fingerDisplayAvailable,initialPersonal,readPersonal} from '../src/state';
-import {attachPresentationSeats} from '../vendor/iso-notation/src/render/janko/presentation-seats';
+import {attachPresentationSeats} from '../vendor/iso-notation/src/render/iso/presentation-seats';
 import {normalizeTemporalHandPlanningInput} from '../vendor/iso-notation/src/model/temporal-hand-planning-input';
 import {rrTemporalFingerLayer} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
 import {completeFingerGrip} from '../vendor/iso-notation/src/model/isomorphic-fingering-profile';

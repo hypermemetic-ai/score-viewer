@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {importPackage,digitMetrics,type ScorePackage,type Seat} from '../src/package';
-import {hollowStemSvg} from '../vendor/iso-notation/src/render/janko/hollow-stem';
+import {hollowStemSvg} from '../vendor/iso-notation/src/render/iso/hollow-stem';
 import {fingeringCarriers} from '../src/fingering-carriers';
 import {annotationPositions,ANNOTATION_COLOR} from '../src/fingering-presentation';
 import {expertSettings} from '../src/expert-settings';

@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DOMParser} from '@xmldom/xmldom';
-import {renderOttavaGlyph,OTTAVA_LABELS} from '../vendor/iso-notation/src/render/janko/elements/ottava';
-import {URTEXT_SERIF} from '../vendor/iso-notation/src/render/janko/elements/style';
+import {renderOttavaGlyph,OTTAVA_LABELS} from '../vendor/iso-notation/src/render/iso/elements/ottava';
+import {URTEXT_SERIF} from '../vendor/iso-notation/src/render/iso/elements/style';
 
 test('all four ottava labels serialize valid XML with the intended quoted serif family',()=>{
  for(const kind of ['up10','up20','down10','down20'] as const){

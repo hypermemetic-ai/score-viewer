@@ -4,8 +4,8 @@ import {publishPreparedNative} from '../../src/publication';import {archivePacka
 import {prepareCalculatedEdition} from '../../src/calculated-hand-edition';import {packagePianoPresentation} from '../../src/piano-package-presentation';
 import {calculatePianoAssignments,type PianoAssignmentConstraint} from '../../vendor/iso-notation/src/model/piano-finger-assignments';
 import {renderScorePresentation} from '../../vendor/iso-notation/src/score-presentation';
-import {SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../../vendor/iso-notation/src/render/janko/score-rendering-recipe';
-import {resolveJankoOptions,resolveJankoTokens} from '../../vendor/iso-notation/src/render/janko/types';
+import {SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {resolveIsoOptions,resolveIsoTokens} from '../../vendor/iso-notation/src/render/iso/types';
 import type {Hand,QuantizedGridScore} from '../../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../../vendor/iso-notation/src/model/physical-keyboard';
 /** Public independently authored musical source, with a two-level gesture and
@@ -65,9 +65,9 @@ export function completeTieBoundaryStudy(count:3|4,hand:Hand):QuantizedGridScore
   tieForward:i<values.length-1,tieWait:false,sourceBeam:i===values.length-1?{group:'ending',noBeam:false}:{noBeam:true}}))}];
  s.barlines=s.sourceBarTicks.map((tick,i)=>({tick,barNumber:i+1,type:i===bars?'final':'regular'}));return s;
 }
-export async function sourcePackage(source:QuantizedGridScore,options:Parameters<typeof resolveJankoOptions>[0]={},tokens:Parameters<typeof resolveJankoTokens>[0]={}){
+export async function sourcePackage(source:QuantizedGridScore,options:Parameters<typeof resolveIsoOptions>[0]={},tokens:Parameters<typeof resolveIsoTokens>[0]={}){
  const sourceBytes=strToU8(JSON.stringify(source)),sourceSha256=await hashBytes(sourceBytes),recipe={version:SCORE_RENDERING_RECIPE_VERSION,engineId:SCORE_RENDERING_ENGINE,sourceSha256,
-  options:resolveJankoOptions({measuresPerSystem:2,...options}),tokens:resolveJankoTokens({ticksPerMeasure:144,...tokens}),baseline:{pageSha256:['a'.repeat(64)],seatSha256:'b'.repeat(64)}},
+  options:resolveIsoOptions({measuresPerSystem:2,...options}),tokens:resolveIsoTokens({ticksPerMeasure:144,...tokens}),baseline:{pageSha256:['a'.repeat(64)],seatSha256:'b'.repeat(64)}},
   r=renderScorePresentation(source,recipe);
  recipe.baseline={pageSha256:await Promise.all(r.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(r.seats))};
  const published=await publishPreparedNative({source:sourceBytes,metadata:{title:source.title,composer:source.composer,provenance:['Newly authored public regression']},

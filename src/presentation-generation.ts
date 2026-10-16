@@ -5,7 +5,7 @@ import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-
 import {calculateConventionalPiano,type ConventionalSolverOptions} from '../vendor/iso-notation/src/model/conventional-piano-planner';
 import {conventionalFingerLayer,conventionalIdentityHash,validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
 import {renderScorePresentation,replayRetainedHandPresentation} from '../vendor/iso-notation/src/score-presentation';
-import {validateScoreRenderingRecipe,SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {validateScoreRenderingRecipe,SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 
 export const GENERATION_ENGINE=SCORE_RENDERING_ENGINE;

@@ -1,6 +1,6 @@
 import {strFromU8,strToU8,zipSync} from 'fflate';
 import {prepareInstrumentReading,validateInstrumentReadingScore,instrumentReadingEngine,
-  type ReadingOwner,type JankoLayoutOptions,type JankoTokens} from '../vendor/iso-notation/src/score-presentation';
+  type ReadingOwner,type IsoLayoutOptions,type IsoTokens} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,type Manifest,type Metadata} from './package';
 import {admitDualReadingContent,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
@@ -11,8 +11,8 @@ export interface LegacyReadingDescriptor {
   policy:InstrumentReadingPolicy;
   owners:'reading-owners.json';
   layout:'reading-layout.json';
-  options:Partial<JankoLayoutOptions>;
-  tokens:Partial<JankoTokens>;
+  options:Partial<IsoLayoutOptions>;
+  tokens:Partial<IsoTokens>;
 }
 export type ReadingDescriptor=LegacyReadingDescriptor|DualReadingDescriptor;
 export interface ReadingContent {
@@ -29,7 +29,7 @@ function boundedScore(score:QuantizedGridScore):void {
     score.sourceBarTicks.length>2_001)throw Error('Reading preparation needs a complete score of at most 10,000 events and 2,000 measures.');
   validateInstrumentReadingScore(score);
 }
-function checkedPreparation(score:QuantizedGridScore,options:Partial<JankoLayoutOptions>,tokens:Partial<JankoTokens>){
+function checkedPreparation(score:QuantizedGridScore,options:Partial<IsoLayoutOptions>,tokens:Partial<IsoTokens>){
   const result=prepareInstrumentReading(score,options,tokens);
   if(!result.geometryEvidence.ok)throw Error('Reading page geometry needs correction: '+result.geometryEvidence.violations.slice(0,3).map(v=>v.message).join('; '));
   const ids=new Set(result.owners.map(owner=>owner.id));
@@ -86,7 +86,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
  * source score, personal state, input device or native installation is changed. */
 export async function prepareReadingPackage(input:{score:QuantizedGridScore;metadata:Metadata;createdAt:string;
   font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;
-  options?:Partial<JankoLayoutOptions>;tokens?:Partial<JankoTokens>}):Promise<Uint8Array> {
+  options?:Partial<IsoLayoutOptions>;tokens?:Partial<IsoTokens>}):Promise<Uint8Array> {
   boundedScore(input.score);
   if(!input.createdAt||input.metadata.title!==input.score.title||input.metadata.composer!==input.score.composer||
     !input.font.name||!input.font.bytes.length||!Object.keys(input.notices).length)throw Error('Incomplete musical reading preparation.');

@@ -16,7 +16,7 @@ import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-
 import {RR_TEMPORAL_LAYER_PLANNER,validateRRTemporalFingerLayer} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
 import {validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
 import type {PhysicalKeyboardId,PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {validateReferenceMidi} from './reference-midi';
 import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
 import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';

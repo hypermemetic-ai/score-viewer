@@ -1,6 +1,6 @@
 import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
-import {layoutJankoScore,renderJankoPage,countJankoPages} from '../../vendor/iso-notation/src/render/janko/engine';
-import {resolveJankoOptions,resolveJankoTokens} from '../../vendor/iso-notation/src/render/janko/types';
+import {layoutIsoScore,renderIsoPage,countIsoPages} from '../../vendor/iso-notation/src/render/iso/engine';
+import {resolveIsoOptions,resolveIsoTokens} from '../../vendor/iso-notation/src/render/iso/types';
 import {requirePitchedEvent} from '../../vendor/iso-notation/src/model/musical-event';
 import type {QuantizedGridScore} from '../../vendor/iso-notation/src/model/types';
 import type {ScorePackage,Seat} from '../../src/package';
@@ -28,9 +28,9 @@ export function boundedSourceFixtures():{name:string;package:ScorePackage}[]{
  return result;
 }
 function engrave(score:QuantizedGridScore):ScorePackage {
- const options=resolveJankoOptions({core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',sharedRhCarrier:true,readingGlyphSeats:{},measuresPerSystem:3,showMeasureNumbers:true,ticksPerMeasure:192,showHonorHalo:false}),tokens=resolveJankoTokens({stemLength:18}),layouts=layoutJankoScore(score,options,tokens),seats:Seat[]=[];
- const pages=Array.from({length:countJankoPages(score,options,tokens)},(_,page)=>{
-  const doc=new DOMParser().parseFromString(renderJankoPage(score,page,options,tokens,layouts),'image/svg+xml');
+ const options=resolveIsoOptions({core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',sharedRhCarrier:true,readingGlyphSeats:{},measuresPerSystem:3,showMeasureNumbers:true,ticksPerMeasure:192,showHonorHalo:false}),tokens=resolveIsoTokens({stemLength:18}),layouts=layoutIsoScore(score,options,tokens),seats:Seat[]=[];
+ const pages=Array.from({length:countIsoPages(score,options,tokens)},(_,page)=>{
+  const doc=new DOMParser().parseFromString(renderIsoPage(score,page,options,tokens,layouts),'image/svg+xml');
   for(const head of Array.from(doc.getElementsByTagName('*')).filter(e=>e.getAttribute('class')==='janko-reading-head')){
    const text=Array.from(head.getElementsByTagName('text')).find(e=>e.getAttribute('class')==='janko-digit')!;let parent=head.parentNode as unknown as Element;while(parent&&!/^system-/.test(parent.getAttribute('id')??''))parent=parent.parentNode as unknown as Element;
    const id=head.getAttribute('data-note-id')!,owners=(head.getAttribute('data-owner-ids')??'').split('|'),placed=layouts.flatMap(l=>[...l.notes,...l.unisonVoices]).find(n=>n.note.id===id)!;

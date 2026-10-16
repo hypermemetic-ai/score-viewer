@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {prepareFingeringStudio} from '../vendor/iso-notation/scripts/lib/fingering-studio-review';
-import {CURRENT_CANDIDATES,CURRENT_ROUND_METADATA,NO14_FINGERING_CANDIDATES,getCandidate} from '../vendor/iso-notation/src/render/janko/candidates';
-import {renderCandidatesView} from '../vendor/iso-notation/src/render/janko/studio';
-import {renderJankoCrop} from '../vendor/iso-notation/src/render/janko/engine';
-import {lintJankoScore} from '../vendor/iso-notation/src/render/janko/linter';
+import {CURRENT_CANDIDATES,CURRENT_ROUND_METADATA,NO14_FINGERING_CANDIDATES,getCandidate} from '../vendor/iso-notation/src/render/iso/candidates';
+import {renderCandidatesView} from '../vendor/iso-notation/src/render/iso/studio';
+import {renderIsoCrop} from '../vendor/iso-notation/src/render/iso/engine';
+import {lintIsoScore} from '../vendor/iso-notation/src/render/iso/linter';
 import {ANNOTATION_COLOR} from '../src/fingering-presentation';
-import {STEM_END_FINGERING_CANDIDATES,STEM_END_FINGERING_ROUND} from '../vendor/iso-notation/src/render/janko/candidates';
+import {STEM_END_FINGERING_CANDIDATES,STEM_END_FINGERING_ROUND} from '../vendor/iso-notation/src/render/iso/candidates';
 
 const require=createRequire(new URL('../package.json',import.meta.url));
 const {DOMParser,XMLSerializer}=require('@xmldom/xmldom') as {
@@ -65,9 +65,9 @@ test('literal windows retain crop bounds, neighboring onsets and source-contact 
  assert.equal(entry.options.retainedEngraving,true,'crops execute the retained recipe that admitted these layouts');
  assert.equal(entry.options.elasticSpacing,undefined);
  assert.ok(review.presentation.layouts.every(layout=>layout.geometry.elasticTimeMaps===undefined));
- assert.deepEqual(lintJankoScore(p.score,entry.options,entry.tokens,undefined,review.presentation.layouts).diagnostics,[]);
+ assert.deepEqual(lintIsoScore(p.score,entry.options,entry.tokens,undefined,review.presentation.layouts).diagnostics,[]);
  for(const [start,count]of [[1,6],[13,6],[43,6],[48,2]]){
-  const crop=renderJankoCrop(p.score,start,count,entry.options,entry.tokens,undefined,review.presentation.layouts);
+  const crop=renderIsoCrop(p.score,start,count,entry.options,entry.tokens,undefined,review.presentation.layouts);
   for(const mode of ['annotations','replacement'] as const){
    const painted=review.paint(crop,mode);
    assert.equal(musicalSvg(painted),musicalSvg(crop),`${mode},bars${start}–${start+count-1}`);

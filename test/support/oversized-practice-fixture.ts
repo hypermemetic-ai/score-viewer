@@ -3,8 +3,8 @@ import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
 import {authoredReadingScore} from './instrument-reading-fixture';
 import {prepareReadingPackage} from '../../src/reading-package';
 import {importPackage,type ScorePackage,type Seat} from '../../src/package';
-import {layoutJankoScore,renderJankoPage,countJankoPages} from '../../vendor/iso-notation/src/render/janko/engine';
-import {resolveJankoOptions,resolveJankoTokens} from '../../vendor/iso-notation/src/render/janko/types';
+import {layoutIsoScore,renderIsoPage,countIsoPages} from '../../vendor/iso-notation/src/render/iso/engine';
+import {resolveIsoOptions,resolveIsoTokens} from '../../vendor/iso-notation/src/render/iso/types';
 import {requirePitchedEvent} from '../../vendor/iso-notation/src/model/musical-event';
 import {authoredFrettedInput} from './fretted-dual-fixture';
 import {parseMusicXml} from '../../vendor/iso-notation/src/import/musicxml/parse';
@@ -23,9 +23,9 @@ export async function oversizedPracticeFixture(){
  const pianoScore=structuredClone(score);delete pianoScore.readingPolicy;delete pianoScore.parts;
  pianoScore.notes=pianoScore.notes.map(n=>({...n,hand:n.voiceId==='2'?'LH' as const:'RH' as const}));
  for(const n of pianoScore.notes){const pitch=requirePitchedEvent(n).pitch;n.readingDisplay={pitchClass:pitch.pitchClass,relativeOctave:pitch.octave-4,referencePitch:48,isAnchor:false,mode:'absolute'};}
- const options=resolveJankoOptions({pageWidth:2200,core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',sharedRhCarrier:true,readingGlyphSeats:{},measuresPerSystem:2,showMeasureNumbers:true,ticksPerMeasure:1536,showHonorHalo:false}),tokens=resolveJankoTokens({stemLength:18}),layouts=layoutJankoScore(pianoScore,options,tokens),seats:Seat[]=[];
- const pages=Array.from({length:countJankoPages(pianoScore,options,tokens)},(_,page)=>{
-  const doc=new DOMParser().parseFromString(renderJankoPage(pianoScore,page,options,tokens,layouts),'image/svg+xml');
+ const options=resolveIsoOptions({pageWidth:2200,core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',sharedRhCarrier:true,readingGlyphSeats:{},measuresPerSystem:2,showMeasureNumbers:true,ticksPerMeasure:1536,showHonorHalo:false}),tokens=resolveIsoTokens({stemLength:18}),layouts=layoutIsoScore(pianoScore,options,tokens),seats:Seat[]=[];
+ const pages=Array.from({length:countIsoPages(pianoScore,options,tokens)},(_,page)=>{
+  const doc=new DOMParser().parseFromString(renderIsoPage(pianoScore,page,options,tokens,layouts),'image/svg+xml');
   for(const head of Array.from(doc.getElementsByTagName('*')).filter(e=>e.getAttribute('class')==='janko-reading-head')){
    const text=Array.from(head.getElementsByTagName('text')).find(e=>e.getAttribute('class')==='janko-digit')!;let parent=head.parentNode as unknown as Element;while(parent&&!/^system-/.test(parent.getAttribute('id')??''))parent=parent.parentNode as unknown as Element;
    const id=head.getAttribute('data-note-id')!,owners=(head.getAttribute('data-owner-ids')??'').split('|'),placed=layouts.flatMap(l=>[...l.notes,...l.unisonVoices]).find(n=>n.note.id===id)!;

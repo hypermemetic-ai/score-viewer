@@ -1,9 +1,9 @@
 import {unzipSync,strToU8} from 'fflate';
 import {parseMusicXmlAsync,projectMusicXml,type HandPolicy} from '../vendor/iso-notation/src/musicxml';
 import {renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
-import {approvedProductionJankoOptions} from '../vendor/iso-notation/src/render/janko/approved-production';
-import {resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
-import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
+import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
+import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {archivePackage,hashBytes,importPackage} from './package';
 import {publishPackage,publishPreparedNative} from './publication';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
@@ -57,7 +57,7 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  score.title||='Untitled score';score.composer??='';
  const source=strToU8(JSON.stringify(score)),sourceSha256=await hashBytes(source);
  let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,
-  options:approvedProductionJankoOptions(),tokens:resolveJankoTokens({}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
+  options:approvedProductionIsoOptions(),tokens:resolveIsoTokens({}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
  let rendered;
  try{rendered=await renderScorePresentationAsync(score,recipe,execution);}
  catch(error){if((error as Error).name==='AbortError')throw error;throw new MusicXmlImportRefusal(`This score can't be engraved yet: ${(error as Error).message}`);}

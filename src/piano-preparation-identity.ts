@@ -2,7 +2,7 @@ import type {ScorePackage,FingerLayer} from './package';
 import {pianoRequestAuthority,type PerformingHandPolicy} from './piano-request-authority';
 import type {PianoAssignmentConstraint} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
-import {APPROVED_SCORE_RENDERING_ENGINE,CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {APPROVED_SCORE_RENDERING_ENGINE,CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 
 import {ANNOTATION_INK_POLICY} from './annotation-ink-policy';
 
