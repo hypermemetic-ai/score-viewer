@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {MUSICXML_IMPORT_ENABLED,SCORE_PICKER_EXTENSIONS,scoreImportKind} from '../src/score-import-kind';
 import {convertMuseScoreToMusicXml,prepareMuseScore,museScoreRefusalMessage,MuseScoreImportRefusal} from '../src/musescore-import';
 import {importPackage} from '../src/package';
+import {MusicXmlImportRefusal} from '../src/musicxml-import';
 import {requirePianoEvent} from '../src/piano-event';
 import {installConverterNodeRuntime} from './support/converter-node-runtime';
 
@@ -60,11 +61,11 @@ test('MuseScore fixtures convert through the public entry and meet the unchanged
   assert.equal(p.score.sourceHandRequirements,undefined);
   assert.deepEqual(p.score.parts?.map(part=>part.declaredCapability),[undefined],'The source names a piano program, so the import mode declares nothing.');
   t.diagnostic(`cross-staff-arpeggio.mscz: admitted .tuna with ${p.score.notes.length} notes`);
-  // Piano and clarinet: the reader refuses its pedal marking before it counts the instruments.
+  // Piano and clarinet: the reader now takes its pedal marking, so the intake counts the instruments.
   await assert.rejects(prepareMuseScore(fixture('original-piano-clarinet.mscx'),assets),(error:unknown)=>{
    assert.ok(error instanceof MuseScoreImportRefusal,(error as Error).message);
-   assert.equal(error.message,'This MuseScore score can\'t be opened yet: it uses pedal markings, which the viewer doesn\'t read yet.');
-   assert.match(error.message,readerRefusal);assert.ok(error.cause instanceof Error&&/unsupported pedal/.test(error.cause.message),'The reader\'s own diagnosis stays on the refusal.');
+   assert.equal(error.message,'This file contains 2 instruments. The score viewer opens one instrument at a time; export just the piano part.');
+   assert.doesNotMatch(error.message,readerRefusal);assert.ok(error.cause instanceof MusicXmlImportRefusal,'The intake\'s own refusal stays on the refusal.');
    t.diagnostic(`original-piano-clarinet.mscx: ${error.message}`);return true;
   });
  }finally{restore();}
