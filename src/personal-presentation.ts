@@ -1,4 +1,4 @@
-import {createPersonalHandProjection,HandPresentationError,type OwnerHand} from '../vendor/iso-notation/src/score-presentation';
+import {createPersonalHandProjection,HandPresentationError,type PersonalOwnerHand} from '../vendor/iso-notation/src/score-presentation';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {calculatedRecipeForRequest} from './calculated-hand-edition';
 import {PERSONAL_ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from './annotation-ink-policy';
@@ -40,9 +40,13 @@ async function capture(base:ScorePackage):Promise<PreparationRequest<Core>> {
 }
 /** Engraving refusals arrive in ISO notation's terms; players see what failed
  * in theirs, and the original diagnosis stays attached as the cause. */
-function playerFacing<V>(work:Promise<V>,message:string):Promise<V>{
- return work.catch(error=>{if(error instanceof HandPresentationError&&error.code==='unsupported-fit')throw Error(message,{cause:error});throw error;});
+function playerFacing<V>(work:Promise<V>,message:string,key?:string):Promise<V>{
+ return work.catch(error=>{
+  if(error instanceof HandPresentationError&&error.code==='unsupported-fit')throw Error(key&&MIXED_KEY.test(error.message)?key:message,{cause:error});
+  throw error;});
 }
+/** ISO's refusal for one struck key written as notes with a hand and notes without one. */
+const MIXED_KEY=/notes with a performing hand and notes without one/;
 /** A reader owns its package/wrapper/buffers and local last view. Shared cores
  * are captured, bounded and serialized; changed pages are never a paint shortcut. */
 export class PersonalPresentationSession {
@@ -62,19 +66,26 @@ export class PersonalPresentationSession {
  async warm(input?:ReadingExecution):Promise<void>{
   if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  await playerFacing(this.use((core,e)=>e?core.warmAsync(e):core.warm(),execution),
-   "This score can't be displayed yet: the viewer can't draw its pages.");
+  try{await this.use((core,e)=>e?core.warmAsync(e):core.warm(),execution);}
+  catch(error){
+   // The source's own pages already draw a key whose notes differ in having a
+   // hand; only a personal projection must refuse it. Read those pages, and
+   // the player can give the key one hand.
+   if(error instanceof HandPresentationError&&error.code==='unsupported-fit'&&MIXED_KEY.test(error.message))return;
+   await playerFacing(Promise.reject(error),"This score can't be displayed yet: the viewer can't draw its pages.");
+  }
  }
  async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  const owners:OwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
-  if(owners.every(a=>this.base.score.notes.find(n=>n.id===a.id)?.hand===a.hand))return this.base;
+  const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
+  if(owners.every(a=>(this.base.score.notes.find(n=>n.id===a.id)?.hand??null)===a.hand))return this.base;
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
   await ensureAnnotationInkPolicyReady(PERSONAL_ANNOTATION_INK_POLICY);checkReadingExecution(execution);
   const digest=await hashBytes(key);checkReadingExecution(execution);
   const result=await playerFacing(this.use((core,e)=>e?core.projectAsync(owners,digest,e):core.project(owners,digest),execution),
-   "These hand choices can't be drawn on the page yet.");
+   "These hand choices can't be drawn on the page yet.",
+   "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;
  }

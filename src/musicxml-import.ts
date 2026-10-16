@@ -37,7 +37,8 @@ function decodeXml(bytes:Uint8Array){
 /** One printed piano part becomes a native .tuna archive. Hands come from the
  * source: the upper staff is the right hand, the lower staff the left, and an
  * explicit source hand mark (m.s., m.d., l.h., r.h.) overrides its staff.
- * Nothing is inferred; the player corrects hands in the handedness editor.
+ * A note on a single staff or an unmarked middle staff stays hand-less.
+ * Nothing is inferred; the player chooses hands in the handedness editor.
  * Pages use the approved production engraving, and the package passes
  * ordinary admission. */
 export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):Promise<{bytes:Uint8Array;filename:string}> {
@@ -49,10 +50,6 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
  const parts=written.parts?.length??new Set(written.measures.map(m=>m.part)).size;
  if(parts===0||!written.measures.length)throw new MusicXmlImportRefusal('This MusicXML file contains no music.');
  if(parts!==1)throw new MusicXmlImportRefusal(`This file contains ${parts} instruments. The score viewer opens one instrument at a time; export just the piano part.`);
- // Staves count even when one holds only rests, as in a right-hand study.
- // Both staves must be printed so that each carries its hand.
- const staves=[...new Set(written.events.map(e=>e.staff))].sort(),declared=written.parts?.[0]?.staves??1;
- if(staves.join()!=='1,2'||declared!==2){const count=Math.max(staves.length,declared);throw new MusicXmlImportRefusal(`This part is written on ${count} ${count===1?'staff':'staves'}. MusicXML import currently reads two-staff piano scores.`);}
  let score;
  try{score=projectMusicXml(written,{id:`musicxml-${inputSha256}`,pianoHands:'source-v1'}).score;}
  catch(error){

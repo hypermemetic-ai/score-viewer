@@ -1,9 +1,9 @@
-import {requirePianoEvent} from './piano-event';
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage,Seat} from './package';
 /** One keyboard stop per physical contact, independent of SVG position or duplicate heads. */
 export function editUnits(p:Pick<ScorePackage,'score'|'seats'>):Seat[]{
  const notes=new Map(p.score.notes.map(n=>[n.id,n]));
- const order=(a:Seat,b:Seat)=>a.writtenBar-b.writtenBar||(requirePianoEvent(notes.get(a.ownerIds[0])!).startTick-requirePianoEvent(notes.get(b.ownerIds[0])!).startTick)||(requirePianoEvent(notes.get(a.ownerIds[0])!).pitch.octave*12+requirePianoEvent(notes.get(a.ownerIds[0])!).pitch.pitchClass)-(requirePianoEvent(notes.get(b.ownerIds[0])!).pitch.octave*12+requirePianoEvent(notes.get(b.ownerIds[0])!).pitch.pitchClass)||requirePianoEvent(notes.get(a.ownerIds[0])!).hand.localeCompare(requirePianoEvent(notes.get(b.ownerIds[0])!).hand)||a.page-b.page||a.system-b.system||a.id.localeCompare(b.id);
+ const order=(a:Seat,b:Seat)=>a.writtenBar-b.writtenBar||(requirePitchedEvent(notes.get(a.ownerIds[0])!).startTick-requirePitchedEvent(notes.get(b.ownerIds[0])!).startTick)||(requirePitchedEvent(notes.get(a.ownerIds[0])!).pitch.octave*12+requirePitchedEvent(notes.get(a.ownerIds[0])!).pitch.pitchClass)-(requirePitchedEvent(notes.get(b.ownerIds[0])!).pitch.octave*12+requirePitchedEvent(notes.get(b.ownerIds[0])!).pitch.pitchClass)||(notes.get(a.ownerIds[0])!.hand??'').localeCompare(notes.get(b.ownerIds[0])!.hand??'')||a.page-b.page||a.system-b.system||a.id.localeCompare(b.id);
  const seats=[...p.seats].sort((a,b)=>Number(!!a.continuation)-Number(!!b.continuation)||order(a,b)),seen=new Set<string>();
  return seats.filter(s=>{if(seen.has(s.contactId))return false;seen.add(s.contactId);return true;}).sort(order);
 }

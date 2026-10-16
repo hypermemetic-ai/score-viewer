@@ -373,8 +373,8 @@ function paintReaderSeats(page:ReaderPage,base:ScorePackage,p:ScorePackage,s:Per
  page.element.dataset.fingers=String(mode==='finger');const presentation=currentFingerPresentation(p);
  for(const {seat,text} of page.seats){
   const finger=fingerFor(base,s,seat),hand=handFor(base,s,seat.ownerIds[0]);
-  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
-  text.dataset.performingHand=hand;
+  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
+  if(hand)text.dataset.performingHand=hand;else delete text.dataset.performingHand;
  }
 }
 /** Save every page as the reader currently reads it: this edition, keyboard

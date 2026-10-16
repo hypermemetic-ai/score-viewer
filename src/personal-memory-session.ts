@@ -2,7 +2,7 @@ import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-stor
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {canonicalJson} from './piano-preparation-identity';
-import {assigned,type PersonalHand} from './personal-assignments';
+import {assigned,handChoiceOwners,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
  bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
@@ -230,7 +230,7 @@ export class PersonalMemorySession {
   }else if(action.kind==='hand'){
    const seat=input.p.seats.find(s=>s.ownerIds.includes(intent.ownerId));if(!seat)throw Error('Personal edit has no admitted contact.');
    personal=assigned(input.p,personal,seat,{hand:action.hand});
-   for(const id of ownerIds){const c=personal.assignments!.choices[id];c.intent!.hand={decisionId:action.decisionId,lineageId:action.decisionId,authoredAt:action.authoredAt};c.createdAt=input.personal.assignments?.choices[id]?.createdAt??action.authoredAt;}
+   for(const id of handChoiceOwners(input.p,seat)){const c=personal.assignments!.choices[id];c.intent!.hand={decisionId:action.decisionId,lineageId:action.decisionId,authoredAt:action.authoredAt};c.createdAt=input.personal.assignments?.choices[id]?.createdAt??action.authoredAt;}
    next=preservePersonalMemoryHandChange(document,input,{...input,personal},intent.ownerId);
   }else if(action.kind==='calculated'){
    clearFinger();personal.calculatedOwners??={};for(const id of ownerIds)personal.calculatedOwners[id]=true;

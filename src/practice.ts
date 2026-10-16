@@ -1,5 +1,5 @@
 import {practiceClipCompletionTick,practiceClipPlan} from './practice-clip';
-import {personalPracticePackage} from './personal-assignments';
+import {personalPracticePackage,handlessMessage} from './personal-assignments';
 import {samePracticeEditionMusic} from './practice-edition-source';
 import {planPracticeSections,type PracticeSectionPlanning} from './practice-boundaries';
 import {boundedPracticePolicyFingerprint} from './practice-sizing';
@@ -61,6 +61,8 @@ export function planPractice(p:ScorePackage,partition:PracticePartition='bounded
 export function planSource(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState):PracticePlan {
  requirePianoCapability(p,'pianoPractice');
  const original=p,base=personal?planSource(p,partition):undefined;if(personal)p=personalPracticePackage(p,personal);
+ const handless=p.score.notes.filter(n=>n.hand===undefined).length;
+ if(handless)throw Error(handlessMessage(handless,'timed practice'));
  const bars=p.score.sourceBarTicks;if(!bars||bars.length<2||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||bars.some((b,i)=>!Number.isFinite(b)||(i>0&&b<=bars[i-1])))throw Error('This score has no complete written-measure map.');
  const barFor=(tick:number)=>Math.max(0,bars.findIndex((b,i)=>i<bars.length-1&&tick>=b&&tick<bars[i+1]));
  const ownerGroup=new Map<string,string>(),groups=new Map<string,Gesture>(),attacks=new Map<string,PracticeAttack>();

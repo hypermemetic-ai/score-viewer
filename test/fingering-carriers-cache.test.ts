@@ -33,7 +33,7 @@ test('custom serialization, accessors and source discriminators cannot borrow a 
  const getter=fixture();Object.defineProperty(getter.score.notes[0],'hand',{enumerable:true,get:()=> 'LH'});check(getter);assert.equal(fingeringCarriers(getter).get('a')!.direction,1);
  const serialized=fixture();serialized.score.notes[0].hand='LH';(serialized.score.notes[0] as any).toJSON=()=>p.score.notes[0];check(serialized);assert.equal(fingeringCarriers(serialized).get('a')!.direction,1);
  const hidden=fixture();Object.defineProperty(hidden.score.notes[0],'hand',{enumerable:false,value:'LH'});check(hidden);assert.equal(fingeringCarriers(hidden).get('a')!.direction,1);
- const bad=fixture();(bad.score.notes[0] as any).eventKind='unpitched';assert.throws(()=>fingeringCarriers(bad),/performing-hand role/);
+ const bad=fixture();(bad.score.notes[0] as any).eventKind='unpitched';assert.throws(()=>fingeringCarriers(bad),/is unpitched/);
  const missing=fixture();missing.pages[0]=missing.pages[0].replace('data-viewer-seat="a"','data-viewer-seat="unknown"');assert.throws(()=>fingeringCarriers(missing),/seat missing/);
 });
 test('bounded page eviction preserves complete maps after independent physical source changes',()=>{

@@ -1,10 +1,10 @@
-import {requirePianoEvent} from './piano-event';
+import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {DOMParser} from '@xmldom/xmldom';
 import type {ScorePackage,Seat} from './package';
 
 export interface FingerCarrier {id:string;x:number;direction:-1|1;edge:number;stemIds:string[];associatedStemIds:string[];kind:'stem'|'head'}
 type Box=[number,number,number,number];
-interface Head {seat:Seat;element:Element;column:number;box:Box;tick:number;release:number;hand:string;pitch:number;voices:string}
+interface Head {seat:Seat;element:Element;column:number;box:Box;tick:number;release:number;hand?:string;pitch:number;voices:string}
 interface Stem {id:string;element:Element;x:number;low:number;high:number;start?:number;end?:number;width:number;heads:Head[]}
 const number=(el:Element,key:string)=>Number(el.getAttribute(key));
 const has=(el:Element,cls:string)=>(el.getAttribute('class')??'').split(/\s+/).includes(cls);
@@ -141,7 +141,7 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>,p
     let previous=element.previousSibling;while(previous&&previous.nodeType!==1)previous=previous.previousSibling;
     const rect=has(group,'janko-reading-head')?descendants(group).find(el=>has(el,'janko-knockout')):previous?.nodeType===1&&has(previous as Element,'janko-knockout')?previous as Element:undefined;
     const em=seat.fontSize*4/3,box:Box=rect?[number(rect,'x'),number(rect,'y'),number(rect,'x')+number(rect,'width'),number(rect,'y')+number(rect,'height')]:[seat.x-em*.4,seat.baseline-em*.8,seat.x+em*.4,seat.baseline+em*.15];
-    const note=requirePianoEvent(notes.get(seat.ownerIds[0])!);
+    const note=requirePitchedEvent(notes.get(seat.ownerIds[0])!);
     return {seat,element:group,column:group.hasAttribute('data-note-x')?number(group,'data-note-x'):seat.x,box,tick:note.startTick,release:note.startTick+note.durationTicks,hand:note.hand,pitch:note.pitch.octave*12+note.pitch.pitchClass,voices:JSON.stringify(note.sourceProvenance?.voices??[note.voice??null])};
    });
    const stems:Stem[]=elements.filter(el=>has(el,'janko-stem')||has(el,'janko-hollow-stem')).flatMap((element,index)=>{
@@ -185,7 +185,8 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>,p
     const associated=owned.get(head)!,directions=new Set(associated.map(c=>c.direction));
     // An opposed engraved alias keeps both vector branches. The single
     // performing contact follows its established performing-hand branch.
-    const primaryDirection=head.hand==='RH'?-1:1,carriers=directions.size>1?associated.filter(c=>c.direction===primaryDirection):associated;
+    // Left hand below; right hand and hand-less (single-staff) fingering above.
+    const primaryDirection=head.hand==='LH'?1:-1,carriers=directions.size>1?associated.filter(c=>c.direction===primaryDirection):associated;
     if(carriers.length){
      const direction=carriers[0].direction,edges=carriers.map(c=>stemEnvelope(c.stem,direction,system,head.seat.fontSize*4/3));
      // An aliased contact may retain several independent duration branches.
@@ -194,7 +195,7 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>,p
     }else{
      // Stemless symbols are anchored to their own source-linked head. Never
      // borrow an unrelated stem, and never refuse annotations for crowding.
-     const direction=head.hand==='RH'?-1:1;
+     const direction=head.hand==='LH'?1:-1;
      pageResult.set(head.seat.id,{id:`${page}:${systemId}:head-${head.seat.id}`,x:head.column,direction,edge:direction===-1?head.box[1]:head.box[3],stemIds:[],associatedStemIds:[],kind:'head'});
     }
    }

@@ -24,7 +24,7 @@ export interface PersonalFingeringMemory {
 }
 export interface MemoryOwnerResolution {
  finger?:ResolvedMeasureField<1|2|3|4|5>;reference?:PersonalMemoryOccurrence;
- hand:PersonalHand;personal:boolean;calculated?:boolean;
+ hand:PersonalHand|null;personal:boolean;calculated?:boolean;
 }
 export interface MemoryResolution {
  assignments:EffectivePersonalAssignment[];byOwner:Record<string,MemoryOwnerResolution>;diagnostics:MeasureMemoryDiagnostic[];
@@ -64,7 +64,9 @@ export function projectPersonalMemoryScore(input:MemoryScoreInput):PersonalMemor
   const record=(o:MeasureMemoryOccurrence):PersonalMemoryOccurrence=>({occurrence:o,entryId,presentationId:presentationId(input),writtenBar:i+1,ownerIds:o.notes.map(n=>n.ownerId),...(authoredAt===undefined?{}:{authoredAt}),registeredAt:importAge??unknownAge,ageKnown:authoredAt!==undefined||importAge!==undefined});
   result.push(record(occurrence));
   const hands=selected.map(n=>({ownerId:n.id,hand:effective.get(n.id)!.hand}));
-  for(const hand of ['LH','RH'] as const){const projected=projectMeasureMemoryHand(occurrence,hands,hand);
+  // A measure with a hand-less note has no complete hand partition; it keeps its whole-measure scope only.
+  if(hands.some(h=>h.hand===null))continue;
+  for(const hand of ['LH','RH'] as const){const projected=projectMeasureMemoryHand(occurrence,hands as {ownerId:string;hand:PersonalHand}[],hand);
    // A direct hand change creates a new source-bound partition identity. Previous
    // local scope records remain recoverable and cannot bind to a changed pattern.
    projected.occurrenceId=JSON.stringify([occurrence.occurrenceId,hand,projected.notes.map(n=>n.ownerId).sort()]);result.push(record(projected));}
