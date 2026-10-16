@@ -5,14 +5,18 @@ import {createHash} from 'node:crypto';
 import type {Plugin} from 'vite';
 const sha=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const root=fileURLToPath(new URL('../',import.meta.url));
-export const guitarProAssetPrefix='converter/gp/';
-/** Resolve the supported entry, preserving its exact local relative Worker URL.
- * The complete upstream source package accompanies the redistributed assets. */
-export function converterAssetFiles():Record<string,Uint8Array>{
+export const guitarProAssetPrefix='converter/gp/',museScoreAssetPrefix='converter/musescore/';
+function pinnedPackage(){
  const identity=JSON.parse(readFileSync(join(root,'vendor/score-converter/source-package-identity.json'),'utf8'));
  const archive=readFileSync(join(root,'vendor/score-converter/score-converter-proof-0.0.0.tgz'));
  if(identity.schema!=='score-converter-private-package/1'||archive.length!==identity.archive.bytes||sha(archive)!==identity.archive.sha256)
   throw Error('Pinned Guitar Pro source package differs.');
+ return {identity,archive};
+}
+/** Resolve the supported entry, preserving its exact local relative Worker URL.
+ * The complete upstream source package accompanies the redistributed assets. */
+export function converterAssetFiles():Record<string,Uint8Array>{
+ const {identity,archive}=pinnedPackage();
  const entry=fileURLToPath(import.meta.resolve('score-converter-proof/guitar-pro/webview')),
   publicPath=identity.exports?.['./guitar-pro/webview']?.import;
  if(publicPath!=='./dist/webview/index.js'||!entry.endsWith('/dist/webview/index.js'))throw Error('Unsupported public Guitar Pro entry.');
@@ -37,12 +41,39 @@ export function converterAssetFiles():Record<string,Uint8Array>{
   'Source archive SHA-256: '+identity.archive.sha256+'\n');
  return files;
 }
-export function guitarProAssets():Plugin{
- return {name:'source-bound-public-guitar-pro-assets',
-  generateBundle(){for(const [fileName,source]of Object.entries(converterAssetFiles()))this.emitFile({type:'asset',fileName,source});},
-  configureServer(server){const files=converterAssetFiles();server.middlewares.use((req,res,next)=>{
-   const path=(req.url??'').split('?')[0].replace(/^\//,'');if(!Object.hasOwn(files,path)){next();return;}
+/** The MuseScore WebView host, its adjacent local Worker and notices, unchanged
+ * from the same pinned package. They are emitted only where MuseScore import
+ * is enabled (the MusicXML intake gate), never into a production bundle. */
+export function museScoreAssetFiles():Record<string,Uint8Array>{
+ const {identity}=pinnedPackage(),pins=identity.musescore?.runtimeGraph?.assets;
+ const entry=fileURLToPath(import.meta.resolve('score-converter-proof/musescore/webview')),
+  publicPath=identity.exports?.['./musescore/webview']?.import;
+ if(publicPath!=='./dist/webview/musescore.js'||!entry.endsWith('/dist/webview/musescore.js'))throw Error('Unsupported public MuseScore entry.');
+ const files:Record<string,Uint8Array>={};
+ const names=['musescore-NOTICE.txt','musescore.js','musescore.worker.js','musescore.worker.js.LEGAL.txt'];
+ if(!Array.isArray(pins)||pins.length!==names.length||identity.musescore.workerAsset!=='dist/webview/musescore.worker.js')throw Error('Unsupported MuseScore asset closure.');
+ for(const name of names){
+  const pin=pins.find((p:{path:string})=>p.path==='dist/webview/'+name),bytes=readFileSync(join(dirname(entry),name));
+  if(!pin||bytes.length!==pin.bytes||sha(bytes)!==pin.sha256)throw Error('Public MuseScore runtime asset differs: '+name);
+  files[museScoreAssetPrefix+name]=bytes;
+ }
+ if(sha(files[museScoreAssetPrefix+'musescore-NOTICE.txt'])!==identity.musescore.noticeSha256)throw Error('MuseScore notice differs.');
+ const worker=Buffer.from(files[museScoreAssetPrefix+'musescore.worker.js']).toString('utf8'),host=Buffer.from(files[museScoreAssetPrefix+'musescore.js']).toString('utf8');
+ if(!/new URL\(\s*["']\.\/musescore\.worker\.js["']\s*,\s*import\.meta\.url\s*\)/.test(host))throw Error('Public MuseScore local Worker link differs.');
+ if(!worker.includes('musescore.worker.js.LEGAL.txt')||!host.includes('./musescore-NOTICE.txt'))throw Error('MuseScore linked legal notice missing.');
+ return files;
+}
+/** Production builds keep MuseScore assets out exactly when the viewer's
+ * `import.meta.env.DEV` gate keeps MuseScore import off. */
+export function converterAssets():Plugin{
+ let museScore=false;
+ const files=()=>({...converterAssetFiles(),...(museScore?museScoreAssetFiles():{})});
+ return {name:'source-bound-public-converter-assets',
+  configResolved(config){museScore=!config.isProduction;},
+  generateBundle(){for(const [fileName,source]of Object.entries(files()))this.emitFile({type:'asset',fileName,source});},
+  configureServer(server){const served=files();server.middlewares.use((req,res,next)=>{
+   const path=(req.url??'').split('?')[0].replace(/^\//,'');if(!Object.hasOwn(served,path)){next();return;}
    res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.json')?'application/json':path.endsWith('.tgz')?'application/gzip':'text/plain; charset=utf-8');
-   res.end(files[path]);
+   res.end(served[path]);
   });}};
 }
