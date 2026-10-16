@@ -43,7 +43,7 @@ import {selectReadingNotation,prepareDualReadingPacket,type ReadingNotation} fro
 import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
 import {ReadingPartCatalog} from './reading-part-catalog';
 import {guitarProTracksMarkup} from './guitar-pro-tracks';
-import {scoreImportKind} from './score-import-kind';
+import {scoreImportKind,MUSICXML_IMPORT_ENABLED} from './score-import-kind';
 import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
 import {practicePercent} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
@@ -344,7 +344,7 @@ function loseFocus(){bindingOptions?.blur();midiOptions?.cancelListening();music
 function transformSurface(el:HTMLElement,_rotation:Rotation){fitSurface(el,orientation.rotation);}
 function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
  readerPages.clear();toolbarNavigation?.dispose();toolbarNavigation=undefined;librarySummaryPaintPending=false;
- app.innerHTML=`<section class="surface"><div class="library"><header><h1>Scores</h1><nav aria-label="Library actions">${instrumentPickerMarkup(preferences.keyboardLayout)}${button('Import','import','M')}${button('Rotate','rotate',rotationHint())}${button('Options','options',actionControlLabel(mainControls,'practiceSettings'))}${button('Exit','exit')}</nav></header><div class="scores" aria-label="Composers and scores"></div>${entries.length?'':'<p class="empty">Add a score to begin.<br><small>Import a .tuna score or a legacy .isoscore file.</small></p>'}<p class="job">${job?.state==='working'?esc(job.progress):''}</p></div></section>`;
+ app.innerHTML=`<section class="surface"><div class="library"><header><h1>Scores</h1><nav aria-label="Library actions">${instrumentPickerMarkup(preferences.keyboardLayout)}${button('Import','import','M')}${button('Rotate','rotate',rotationHint())}${button('Options','options',actionControlLabel(mainControls,'practiceSettings'))}${button('Exit','exit')}</nav></header><div class="scores" aria-label="Composers and scores"></div>${entries.length?'':'<p class="empty">Add a score to begin.<br><small>Import a .tuna score or a Guitar Pro file.</small></p>'}<p class="job">${job?.state==='working'?esc(job.progress):''}</p></div></section>`;
  const libraryNavigation=document.createElement('nav');libraryNavigation.className='library-navigation';libraryNavigation.setAttribute('aria-label','Library navigation');app.querySelector('.surface')!.append(libraryNavigation);arrangeBottomNavigation(libraryNavigation,null,app.querySelector<HTMLButtonElement>('[data-action=options]'));
  transformSurface(app.querySelector('.surface')!,preferences.libraryRotation);
  libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>{const summary=practiceSummaries.get(entry,preferences.keyboardLayout);return `${readingParts.summary(entry)?esc(readingParts.summary(entry))+' · ':''}${esc(entry.metadata.opusLabel??'')}${entry.metadata.piece?` · No. ${entry.metadata.piece}`:''}${entry.metadata.variant?` · ${esc(entry.metadata.variant)}`:''}${summary?` · Sections ${practicePercent(summary.sections)}%${summary.whole?' · Whole piece at goal':''}`:''}`;},preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
@@ -689,7 +689,13 @@ async function switchReadingPart(id:string){
  finally{partChanging=false;}
 }
 async function importScore(){
- const bytes=await host.pickScore();if(!bytes)return;if(scoreImportKind(bytes)==='guitar-pro'){await importGuitarProScore(bytes);return;}const op=beginReading('import');try{await readingCheckpoint(op);const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
+ let bytes=await host.pickScore();if(!bytes)return;const kind=scoreImportKind(bytes);if(kind==='guitar-pro'){await importGuitarProScore(bytes);return;}
+ if(kind==='musescore')throw Error(MUSICXML_IMPORT_ENABLED?'MuseScore files can\'t be opened directly yet. In MuseScore, choose File › Export › MusicXML, then import that file.':'MuseScore files can\'t be opened yet.');
+ if(kind==='musicxml'&&!MUSICXML_IMPORT_ENABLED)throw Error('MusicXML files can\'t be opened yet.');
+ const op=beginReading('import');try{await readingCheckpoint(op);
+ if(kind==='musicxml'){readingProgress(op,'Engraving the score…');const [{frettedPreparationAssets},{prepareMusicXmlScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musicxml-import')]);checkReading(op);
+  bytes=(await prepareMusicXmlScore(bytes,await frettedPreparationAssets(op.controller.signal),{signal:op.controller.signal})).bytes;await readingCheckpoint(op);}
+ const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false;
  if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op);
