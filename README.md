@@ -19,6 +19,8 @@ The ordinary score viewer and editor are passive: played notes do not turn pages
 
 Practice offers bounded original sections, overlapping connections of two consecutive sections, and separate A/B contrast excerpts for similar sections. Excluding an exercise changes the displayed total while preserving its progress. Current modes and controls are described in [Reading and Timed practice](docs/practice-reading-timed.md).
 
+Save as PDF exports every page as the reader shows it, including personal hands and the current label mode; see [Save as PDF](docs/pdf-export.md).
+
 Common instrument reading and local MusicXML preparation are described in [instrument reading](docs/instrument-reading.md).
 
 Application navigation places Back at the bottom left and Options at the bottom right of the active screen or dialog, with task controls between them. The reader keeps its hideable toolbar. Scrolling uses no stock bars; Options retains its thin position marker. See the [interface rules](docs/interface.md).
