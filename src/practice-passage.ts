@@ -4,11 +4,11 @@ import type {ScorePackage,Seat} from './package';
 import type {PracticePlan} from './practice';
 import {fingeringCarriers} from './fingering-carriers';
 import {annotationPositions} from './fingering-presentation';
-import {glyphDotIsOwned} from '../vendor/iso-notation/src/render/janko/dot-ownership';
-import {durationDotCount} from '../vendor/iso-notation/src/render/janko/elements/duration';
-import {digitBaselineOffset} from '../vendor/iso-notation/src/render/janko/elements/notehead';
-import {resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
-import type {PositionedJankoNote} from '../vendor/iso-notation/src/render/janko/engine';
+import {glyphDotIsOwned} from '../vendor/iso-notation/src/render/iso/dot-ownership';
+import {durationDotCount} from '../vendor/iso-notation/src/render/iso/elements/duration';
+import {digitBaselineOffset} from '../vendor/iso-notation/src/render/iso/elements/notehead';
+import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
+import type {PositionedIsoNote} from '../vendor/iso-notation/src/render/iso/engine';
 import {projectRelations,type InkBox,type ProjectedRelation} from './practice-relations';
 const ns='http://www.w3.org/2000/svg';
 const projectedRelationPaint='.janko-phrase,.janko-phrase-grid-knockout,path[data-tie-note]';
@@ -80,8 +80,8 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  const dotHeads=all.map(seat=>{const note=requirePianoEvent(p.score.notes.find(n=>n.id===seat.ownerIds[0])!),text=doc.querySelector(`[data-viewer-seat="${seat.id}"]`)!,rect=text.closest('.janko-reading-head')?.querySelector('rect')??text.previousElementSibling!,width=Number(rect.getAttribute('width'))/2,height=Number(rect.getAttribute('height'))/2;
   // Invert the shared digit baseline on the actual frozen glyph seat. This
   // projection is only a glyph-rim ownership query, never new score paint.
-  return {seat,placed:{note:{...note,id:seat.id,pitch:{...note.pitch,pitchClass:parseInt(seat.pitchDigit,12)}},x:seat.x,y:seat.baseline-digitBaselineOffset(seat.fontSize),rhythm:{hand:note.hand,durationTicks:writtenValue(seat,note.id),sourceVoice:note.sourceProvenance?.voices[0],sourceBeam:note.sourceBeam,maskHalfWidth:width,maskHalfHeight:height},symbolScale:seat.fontSize/resolveJankoTokens(p.renderingRecipe?.tokens).digitFontSize} as unknown as PositionedJankoNote};});
- clone.querySelectorAll('.janko-augmentation-dot,.janko-dot,.janko-duration-dot').forEach(el=>{const x=Number(el.getAttribute('cx')),y=Number(el.getAttribute('cy')),index=Number(el.getAttribute('data-dot'))||1,tokens=resolveJankoTokens({...p.renderingRecipe?.tokens,augmentationDotRadius:Number(el.getAttribute('r'))}),matches=dotHeads.filter(({seat,placed})=>seat.ownerIds.some(id=>durationDotCount(writtenValue(seat,id),'complete')>=index)&&Math.abs(seat.x-x)<seat.fontSize*4/3*2&&Math.abs(seat.baseline-y)<seat.fontSize*4/3*4&&glyphDotIsOwned(placed,dotHeads.map(h=>h.placed),x,y,tokens));
+  return {seat,placed:{note:{...note,id:seat.id,pitch:{...note.pitch,pitchClass:parseInt(seat.pitchDigit,12)}},x:seat.x,y:seat.baseline-digitBaselineOffset(seat.fontSize),rhythm:{hand:note.hand,durationTicks:writtenValue(seat,note.id),sourceVoice:note.sourceProvenance?.voices[0],sourceBeam:note.sourceBeam,maskHalfWidth:width,maskHalfHeight:height},symbolScale:seat.fontSize/resolveIsoTokens(p.renderingRecipe?.tokens).digitFontSize} as unknown as PositionedIsoNote};});
+ clone.querySelectorAll('.janko-augmentation-dot,.janko-dot,.janko-duration-dot').forEach(el=>{const x=Number(el.getAttribute('cx')),y=Number(el.getAttribute('cy')),index=Number(el.getAttribute('data-dot'))||1,tokens=resolveIsoTokens({...p.renderingRecipe?.tokens,augmentationDotRadius:Number(el.getAttribute('r'))}),matches=dotHeads.filter(({seat,placed})=>seat.ownerIds.some(id=>durationDotCount(writtenValue(seat,id),'complete')>=index)&&Math.abs(seat.x-x)<seat.fontSize*4/3*2&&Math.abs(seat.baseline-y)<seat.fontSize*4/3*4&&glyphDotIsOwned(placed,dotHeads.map(h=>h.placed),x,y,tokens));
   const first=matches[0]?.placed,compatible=matches.every(({placed})=>placed.note.startTick===first?.note.startTick&&placed.rhythm.hand===first?.rhythm.hand&&placed.rhythm.durationTicks===first?.rhythm.durationTicks&&placed.rhythm.sourceVoice===first?.rhythm.sourceVoice&&(placed.rhythm.sourceBeam?.group??null)===(first?.rhythm.sourceBeam?.group??null));
   if(!matches.length||!compatible)throw Error(`Measure ${bar+1}: ${matches.length?'ambiguous':'unresolved'} duration dot ownership.`);
   const printed=matches.map(h=>h.seat),owners=[...new Set(printed.flatMap(seat=>seat.ownerIds.filter(id=>durationDotCount(writtenValue(seat,id),'complete')>=index)))];assign(el,owners.map(id=>plan.ownerGroup.get(id)!),printed);el.setAttribute('data-practice-owner-ids',owners.join('|'));

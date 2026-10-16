@@ -1,12 +1,12 @@
 import {admittedWrittenHeads,type ScorePackage,type Seat} from './package';
 import type {PracticePlan} from './practice';
 import {cropMeasure,type Crop,type PassageTrack} from './practice-passage';
-import {deriveTieDisplayPlan,taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments,tieArcDepth,tieArcInkBox} from '../vendor/iso-notation/src/render/janko/ties';
-import {resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
-import {expressionIntersectsBox,expressionsOverlap,expressionContourOutwardShift,expressionSliceAtX,type ExpressionInk} from '../vendor/iso-notation/src/render/janko/elements/expressions';
-import {layoutJankoScore} from '../vendor/iso-notation/src/render/janko/engine';
-import {buildInkScene} from '../vendor/iso-notation/src/render/janko/ink-scene';
-import {scoreRenderingRecipeOptions,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {deriveTieDisplayPlan,taperedSpanPath,tieArcPath,tieArcEntersBoxes,tieArcSegments,tieArcDepth,tieArcInkBox} from '../vendor/iso-notation/src/render/iso/ties';
+import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
+import {expressionIntersectsBox,expressionsOverlap,expressionContourOutwardShift,expressionSliceAtX,type ExpressionInk} from '../vendor/iso-notation/src/render/iso/elements/expressions';
+import {layoutIsoScore} from '../vendor/iso-notation/src/render/iso/engine';
+import {buildInkScene} from '../vendor/iso-notation/src/render/iso/ink-scene';
+import {scoreRenderingRecipeOptions,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 type Contour=NonNullable<ExpressionInk['contour']>;
 export interface InkBox {x0:number;x1:number;y0:number;y1:number;seatId?:string}
 interface SourceFragment {path:SVGPathElement;systemElement:Element;page:number;system:number}
@@ -25,7 +25,7 @@ function replayedHeads(p:ScorePackage):Map<string,string[]> {
  const admitted=admittedWrittenHeads(p);if(admitted)return new Map([...admitted].map(([seat,ids])=>[seat,[...ids]]));
  const saved=headCache.get(p);if(saved)return saved;
  const recipe=validateScoreRenderingRecipe(p.renderingRecipe),options=scoreRenderingRecipeOptions(recipe),heads=new Map<string,string[]>(),display=deriveTieDisplayPlan(p.score,options.chordGrouping==='compatible-stems'),owners=new Set(p.score.notes.map(n=>n.id));
- for(const layout of layoutJankoScore(p.score,options,recipe.tokens))for(const [id,pieces]of buildInkScene(layout,options,recipe.tokens,p.score).heads){
+ for(const layout of layoutIsoScore(p.score,options,recipe.tokens))for(const [id,pieces]of buildInkScene(layout,options,recipe.tokens,p.score).heads){
   const glyph=pieces.find(q=>q.primitive.kind==='glyph'&&q.paint.cls==='janko-digit');if(!glyph||glyph.primitive.kind!=='glyph')continue;
   const match=glyph.svg.match(/<text[^>]+x="([^"]+)"[^>]+y="([^"]+)"[^>]+font-size="([^"]+)pt"/);if(!match)throw Error('Unsupported source relation head typography.');
   const digit=glyph.primitive.digit,sourceOwners=[...new Set(glyph.ownerIds.flatMap(owner=>owners.has(owner)?[owner]:display.chains.filter(c=>c.components.some(k=>k.added&&k.headId===owner)).map(c=>c.noteId)))].sort();
@@ -210,7 +210,7 @@ export function readableTieContinuation(p:ScorePackage,q:ProjectedRelation,curre
  const origin=offsets.get(currentBar);if(origin===undefined||q.contour.xEnd<=origin+.2)return;
  // Both verified tips in the same source-adjacent run retain the complete bow.
  if(q.contour.xStart>=q.left&&q.contour.xEnd<=q.right)return {...q,path:q.path.cloneNode(true) as SVGPathElement};
- const right=q.contour.xEnd,uniform=q.path.getAttribute('data-tie-profile')==='uniform',profile=uniform?'uniform':'traced',tokens=resolveJankoTokens(p.renderingRecipe?.tokens),c=q.contour,left=Math.min(origin,right-Math.max(tokens.tieMinDepth/tokens.tieDepthRatio,c.thickness*8));
+ const right=q.contour.xEnd,uniform=q.path.getAttribute('data-tie-profile')==='uniform',profile=uniform?'uniform':'traced',tokens=resolveIsoTokens(p.renderingRecipe?.tokens),c=q.contour,left=Math.min(origin,right-Math.max(tokens.tieMinDepth/tokens.tieDepthRatio,c.thickness*8));
  const cueTokens={...p.renderingRecipe?.tokens,tieEdgeStroke:Number(q.path.getAttribute('stroke-width'))||tokens.tieEdgeStroke};
  const arc={x1:left,x2:right,y:c.yEnd,side:c.side,depth:Math.max(c.thickness+.1,Math.min(c.depth,tieArcDepth(left,right,tokens))),profile:profile as 'uniform'|'traced',thickness:c.thickness,fragment:'incoming' as const};
  const boxes=positions.flatMap(bar=>{if(bar===undefined)return [];const source=crops.find(c=>c.bar===bar)!,offset=offsets.get(bar)!;return (track.boxes.get(bar)??[]).map((b,i)=>({id:bar+':'+i,x0:offset+b.x0-source.left,x1:offset+b.x1-source.left,y0:b.y0-source.frame,y1:b.y1-source.frame}));});

@@ -1,7 +1,7 @@
 import {requirePitchedEvent} from '../../vendor/iso-notation/src/model/musical-event';
 import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
-import {layoutJankoScore,renderJankoPage,countJankoPages} from '../../vendor/iso-notation/src/render/janko/engine';
-import {resolveJankoOptions,resolveJankoTokens} from '../../vendor/iso-notation/src/render/janko/types';
+import {layoutIsoScore,renderIsoPage,countIsoPages} from '../../vendor/iso-notation/src/render/iso/engine';
+import {resolveIsoOptions,resolveIsoTokens} from '../../vendor/iso-notation/src/render/iso/types';
 import type {QuantizedGridScore} from '../../vendor/iso-notation/src/model/types';
 import type {ScorePackage,Seat} from '../../src/package';
 
@@ -37,11 +37,11 @@ export function durationFixture(marker:'hollow-stem'|'ring'='hollow-stem',finalO
  if(pairedTie){score.notes.push({id:'carry-companion',startTick:960,durationTicks:288,hand:'RH',eventKind:'pitched',pitch:{pitchClass:2,octave:5}});score.tieChains!.push({noteId:'carry-companion',voice:'upper',soundingTicks:288,components:[{startTick:960,durationTicks:192,tieForward:true,tieWait:false,voice:'upper'},{startTick:1152,durationTicks:96,tieForward:false,tieWait:false,voice:'upper'}]});}
  if(!finalOverlay)score.barlines=score.barlines?.filter(b=>b.type!=='final');
  for(const note of score.notes)note.readingDisplay={pitchClass:requirePitchedEvent(note).pitch.pitchClass,relativeOctave:requirePitchedEvent(note).pitch.octave-4,referencePitch:48,isAnchor:false,mode:'absolute'};
- const options=resolveJankoOptions({core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',tieProfile,sharedRhCarrier:true,authoredRestMode:'source',restStyle:'classical-urtext',...(longHold?{continuityLayout:true}:{}),...(marker==='hollow-stem'?{standaloneLongMarker:'hollow-stem' as const}:{}),readingGlyphSeats:{},measuresPerSystem,showMeasureNumbers:true,ticksPerMeasure:192,showHonorHalo:false}),tokens=resolveJankoTokens({stemLength:18});
- const layouts=layoutJankoScore(score,options,tokens);
+ const options=resolveIsoOptions({core:'fixed-3',pitchMapping:'twin-rows',durationGrammar:'complete',writtenTies:'source',tieProfile,sharedRhCarrier:true,authoredRestMode:'source',restStyle:'classical-urtext',...(longHold?{continuityLayout:true}:{}),...(marker==='hollow-stem'?{standaloneLongMarker:'hollow-stem' as const}:{}),readingGlyphSeats:{},measuresPerSystem,showMeasureNumbers:true,ticksPerMeasure:192,showHonorHalo:false}),tokens=resolveIsoTokens({stemLength:18});
+ const layouts=layoutIsoScore(score,options,tokens);
  for(const layout of layouts)for(const placed of [...layout.notes,...layout.unisonVoices])if(placed.note.id.includes('~c'))placed.note.readingDisplay=score.notes.find(n=>n.id===placed.note.id.replace(/~c\d+$/,''))!.readingDisplay;
- const seats:Seat[]=[],pages=Array.from({length:countJankoPages(score,options,tokens)},(_,page)=>{
-  const doc=new DOMParser().parseFromString(renderJankoPage(score,page,options,tokens,layouts),'image/svg+xml');
+ const seats:Seat[]=[],pages=Array.from({length:countIsoPages(score,options,tokens)},(_,page)=>{
+  const doc=new DOMParser().parseFromString(renderIsoPage(score,page,options,tokens,layouts),'image/svg+xml');
   const elements=Array.from(doc.getElementsByTagName('*'));
   for(const head of elements.filter(e=>e.getAttribute('class')==='janko-reading-head')){
    const text=Array.from(head.getElementsByTagName('text')).find(e=>e.getAttribute('class')==='janko-digit')!;

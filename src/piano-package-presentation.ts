@@ -3,7 +3,7 @@ import {strToU8} from 'fflate';
 import {archivePackage,hashBytes,importPackage,type FingerLayer,type ScorePackage,type PresentationDescriptor} from './package';
 import {publishPackage} from './publication';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
-import type {PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import type {PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {RR_TEMPORAL_LAYER_PLANNER} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
 import {PIANO_ASSIGNMENT_VERSION} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {createPianoPreparationIdentity} from './piano-preparation-identity';

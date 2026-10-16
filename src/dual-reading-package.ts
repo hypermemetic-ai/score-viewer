@@ -1,6 +1,6 @@
 import {strFromU8,strToU8,zipSync} from 'fflate';
 import {prepareFrettedViews,prepareFrettedViewsAsync,FRETTED_ISO_ENGINE,FRETTED_TAB_ENGINE,validateInstrumentReadingScore,
- type FrettedReadingScene,type JankoLayoutOptions,type JankoTokens,type ReadingOwner} from '../vendor/iso-notation/src/score-presentation';
+ type FrettedReadingScene,type IsoLayoutOptions,type IsoTokens,type ReadingOwner} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,type Manifest,type Metadata,type ScorePackage} from './package';
 import type {ReadingContent} from './reading-package';
@@ -15,7 +15,7 @@ export interface DualReadingViewDescriptor {
 }
 export interface DualReadingDescriptor {
  version:'instrument-reading-package-v2';sourcePartId:string;sourceStaffId:string;
- policy:InstrumentReadingPolicy;options:Partial<JankoLayoutOptions>;tokens:Partial<JankoTokens>;
+ policy:InstrumentReadingPolicy;options:Partial<IsoLayoutOptions>;tokens:Partial<IsoTokens>;
  views:Record<ReadingNotation,DualReadingViewDescriptor>;
 }
 export interface DualReadingView {
@@ -77,7 +77,7 @@ function scoreBounds(score:QuantizedGridScore){
   throw Error('Dual reading requires bounded complete source components and measures.');
  validateInstrumentReadingScore(score);
 }
-function checkedViews(score:QuantizedGridScore,options:Partial<JankoLayoutOptions>,tokens:Partial<JankoTokens>){
+function checkedViews(score:QuantizedGridScore,options:Partial<IsoLayoutOptions>,tokens:Partial<IsoTokens>){
  scoreBounds(score);return completeViews(score,prepareFrettedViews(score,options,tokens));
 }
 function completeViews(score:QuantizedGridScore,result:PreparedViews){
@@ -151,7 +151,7 @@ export async function admitDualReadingContentAsync(inputManifest:Manifest,inputF
 /** One owned graph before asynchronous hashing. This path remains generic
  * MusicXML/source intake and does not manufacture a Guitar Pro family claim. */
 export interface DualReadingPreparationInput {score:QuantizedGridScore;metadata:Metadata;createdAt:string;
- font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;retainedFiles?:Record<string,Uint8Array>;options?:Partial<JankoLayoutOptions>;tokens?:Partial<JankoTokens>}
+ font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;retainedFiles?:Record<string,Uint8Array>;options?:Partial<IsoLayoutOptions>;tokens?:Partial<IsoTokens>}
 export interface DualReadingPacket {bytes:Uint8Array;package:ScorePackage}
 /** Includes the existing independent final cold receiving result; a caller
  * does not need to replay a third time just to retain its actual scene context. */

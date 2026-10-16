@@ -1,10 +1,10 @@
 import type {ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
-import {URTEXT_FLAGS_UP} from '../vendor/iso-notation/src/render/janko/elements/urtext-paths';
-import {hollowStemSvg,HOLLOW_STEM_STROKE,HOLLOW_STEM_HALF_WIDTH,HOLLOW_STEM_WHOLE_WIDTH} from '../vendor/iso-notation/src/render/janko/hollow-stem';
+import {URTEXT_FLAGS_UP} from '../vendor/iso-notation/src/render/iso/elements/urtext-paths';
+import {hollowStemSvg,HOLLOW_STEM_STROKE,HOLLOW_STEM_HALF_WIDTH,HOLLOW_STEM_WHOLE_WIDTH} from '../vendor/iso-notation/src/render/iso/hollow-stem';
 
 /* UI-only adapter for the native duration grammar. Duration interpretation mirrors the
  * exact 48-quarter-grid grammar in elements/duration.ts; proportions come from
- * DEFAULT_JANKO_TOKENS, JANKO_STEM_STROKE_WIDTH and notehead digitBaselineOffset.
+ * DEFAULT_ISO_TOKENS, ISO_STEM_STROKE_WIDTH and notehead digitBaselineOffset.
  * The Bravura flags remain the shared immutable outlines, not redrawn symbols. */
 function duration(beat:ReferencePerformanceTempo['beat']) {
  const ticks=192*beat.numerator/beat.denominator;

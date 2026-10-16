@@ -6,8 +6,8 @@ import {importPackage,importPackageForReading,hashBytes,referenceMidiDiffers,sel
 import {publishPackage,publishPreparedNative,scoreFilename,validateScoreSave} from '../src/publication';
 import {shareInstalledScore,scoreSaveMessage} from '../src/share-score';
 import {validateReferenceMidi,MAX_REFERENCE_MIDI_BYTES} from '../src/reference-midi';
-import {attachPresentationSeats} from '../vendor/iso-notation/src/render/janko/presentation-seats';
-import {validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {attachPresentationSeats} from '../vendor/iso-notation/src/render/iso/presentation-seats';
+import {validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {collectionId,personalStorageName,initialPersonal,corrected} from '../src/state';
 import {planPractice} from '../src/practice';
 import {planPerformance} from '../src/performance';

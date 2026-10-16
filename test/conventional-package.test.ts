@@ -1,5 +1,5 @@
 import {requirePianoEvent} from '../src/piano-event';
-import {validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {publishPackage} from '../src/publication';
 import test from 'node:test';
 import assert from 'node:assert/strict';

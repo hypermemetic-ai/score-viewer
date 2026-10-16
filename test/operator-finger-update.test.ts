@@ -6,8 +6,8 @@ import {importPackage,validateLayerAsync,hashBytes} from '../src/package';
 import {publishPackage} from '../src/publication';
 import {readOperatorFingerReview} from '../src/operator-finger-authority';
 import {prepareFingeringStudio} from '../vendor/iso-notation/scripts/lib/fingering-studio-review';
-import {getCandidate,CURRENT_CANDIDATES,NO14_OPERATOR_FINGER_CANDIDATES} from '../vendor/iso-notation/src/render/janko/candidates';
-import {renderCandidatesView} from '../vendor/iso-notation/src/render/janko/studio';
+import {getCandidate,CURRENT_CANDIDATES,NO14_OPERATOR_FINGER_CANDIDATES} from '../vendor/iso-notation/src/render/iso/candidates';
+import {renderCandidatesView} from '../vendor/iso-notation/src/render/iso/studio';
 import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url));

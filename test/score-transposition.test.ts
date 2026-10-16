@@ -12,9 +12,9 @@ import {readinessWorkerResult} from '../src/piano-readiness-worker-protocol';
 import {admitPianoRequestResult} from '../src/piano-request-admission';
 import {transposeScore,getScoreTransposition,getOriginalScorePackageBytes,scoreTranspositionRange,scoreTranspositionCompatible} from '../src/score-transposition';
 import {identityHash} from '../src/piano-preparation-identity';
-import {renderScorePresentation} from '../vendor/iso-notation/src/render/janko/score-presentation';
-import {resolveJankoOptions,resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
-import {SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
+import {renderScorePresentation} from '../vendor/iso-notation/src/render/iso/score-presentation';
+import {resolveIsoOptions,resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
+import {SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {SourceHandRequirement} from '../vendor/iso-notation/src/model/physical-source-constraints';
 import {transferStudy,boundaryStudy,sourcePackage,calculatedStudy} from './support/hand-edition-fixture';
@@ -35,7 +35,7 @@ async function prepared({reference=true,recipe=true,dual=false,leap=false,legacy
     provenance:{kind:'editorial',reference:'Explicit authored fixture clock'}};
   const sourceBytes=strToU8(JSON.stringify(source,legacy?(key,value)=>key==='eventKind'?undefined:value:undefined)),sourceSha256=await hashBytes(sourceBytes),
     r={version:SCORE_RENDERING_RECIPE_VERSION,engineId:SCORE_RENDERING_ENGINE,sourceSha256,
-      options:resolveJankoOptions({measuresPerSystem:1}),tokens:resolveJankoTokens({ticksPerMeasure:192}),
+      options:resolveIsoOptions({measuresPerSystem:1}),tokens:resolveIsoTokens({ticksPerMeasure:192}),
       baseline:{pageSha256:['a'.repeat(64)],seatSha256:'b'.repeat(64)}},rendered=renderScorePresentation(source,r);
   assert.deepEqual(rendered.lint.violations,[]);assert.deepEqual(rendered.lint.warnings,[]);
   r.baseline={pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))};

@@ -5,7 +5,7 @@ import {publishPreparedNative,publishPackage} from '../src/publication';
 import {preparePianoCalculationContext} from '../src/piano-context-package';
 import {hashBytes,importPackage,pianoPlanningScore,type Manifest} from '../src/package';
 import {collectionId,personalStorageName} from '../src/state';
-import {attachPresentationSeats} from '../vendor/iso-notation/src/render/janko/presentation-seats';
+import {attachPresentationSeats} from '../vendor/iso-notation/src/render/iso/presentation-seats';
 import {validatePianoCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 

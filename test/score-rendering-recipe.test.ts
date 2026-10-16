@@ -1,19 +1,19 @@
 import {normalizeLegacyScoreEvents,requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {requirePianoEvent} from '../src/piano-event';
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';import {unzipSync,strFromU8} from 'fflate';
-import {resolveJankoOptions,resolveJankoTokens} from '../vendor/iso-notation/src/render/janko/types';
-import {SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe,type ScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
-import {renderScorePresentation,scoreWithPerformingHands} from '../vendor/iso-notation/src/render/janko/score-presentation';
+import {resolveIsoOptions,resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
+import {SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe,type ScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {renderScorePresentation,scoreWithPerformingHands} from '../vendor/iso-notation/src/render/iso/score-presentation';
 import {sourceFactsProjection} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 const files=unzipSync(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)));
 const score:QuantizedGridScore=normalizeLegacyScoreEvents(JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore),seats=JSON.parse(strFromU8(files['seats.json']));
-const gold=JSON.parse(readFileSync(new URL('../vendor/iso-notation/src/render/janko/no14-gold-profile.json',import.meta.url),'utf8'));
+const gold=JSON.parse(readFileSync(new URL('../vendor/iso-notation/src/render/iso/no14-gold-profile.json',import.meta.url),'utf8'));
 const hash=(s:string|Uint8Array)=>createHash('sha256').update(s).digest('hex');
 const pages=[1,2,3].map(n=>strFromU8(files[`pages/${n}.svg`]).replace(/ data-viewer-seat="seat-\d+"/g,''));
 const recipe:ScoreRenderingRecipe={version:SCORE_RENDERING_RECIPE_VERSION,engineId:'janko-real-engine-no14-recovery-20261006',sourceSha256:hash(files['score.json']),
-  options:resolveJankoOptions({...gold.options,runningHeaderHeight:20,printedNotices:score.publicationNotices!.slice(0,2),beatPulseTicks:72,pitchPlacement:'parity-columns',measuresPerSystem:6,productionWidthPolicy:'protected-heads',readingGlyphSeats:{'1':-.01625,B:-.025},authoredRestMode:'source',phraseRouting:'optical-open',sharedTerminalPolicy:'all-carriers'}),
-  tokens:resolveJankoTokens(gold.tokens),baseline:{pageSha256:pages.map(hash),seatSha256:hash(files['seats.json'])}};
+  options:resolveIsoOptions({...gold.options,runningHeaderHeight:20,printedNotices:score.publicationNotices!.slice(0,2),beatPulseTicks:72,pitchPlacement:'parity-columns',measuresPerSystem:6,productionWidthPolicy:'protected-heads',readingGlyphSeats:{'1':-.01625,B:-.025},authoredRestMode:'source',phraseRouting:'optical-open',sharedTerminalPolicy:'all-carriers'}),
+  tokens:resolveIsoTokens(gold.tokens),baseline:{pageSha256:pages.map(hash),seatSha256:hash(files['seats.json'])}};
 
 test('passive recipe admits resolved preparation, rejects programs, unresolved defaults and wrong source bindings',()=>{
   assert.deepEqual(validateScoreRenderingRecipe(recipe,{sourceSha256:recipe.sourceSha256,engineId:recipe.engineId}),recipe);

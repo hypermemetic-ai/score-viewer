@@ -1,9 +1,9 @@
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import {renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
-import {renderScorePresentation} from '../vendor/iso-notation/src/render/janko/score-presentation';
-import {APPROVED_SCORE_RENDERING_ENGINE,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/janko/score-rendering-recipe';
-import {approvedProductionJankoOptions} from '../vendor/iso-notation/src/render/janko/approved-production';
+import {renderScorePresentation} from '../vendor/iso-notation/src/render/iso/score-presentation';
+import {APPROVED_SCORE_RENDERING_ENGINE,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 import {hashBytes} from './package';
 
 /** Reproduce the caller's retained source baseline before choosing the known
@@ -12,7 +12,7 @@ import {hashBytes} from './package';
 export async function compatiblePianoRecipe(source:QuantizedGridScore,recipe:PassiveScoreRenderingRecipe,sourceSha256:string){
   const checked=await replayRetainedRecipeBaseline(source,recipe,sourceSha256);
   if(checked.engineId===APPROVED_SCORE_RENDERING_ENGINE)return checked;
-  const next=validateScoreRenderingRecipe({...checked,engineId:APPROVED_SCORE_RENDERING_ENGINE,options:approvedProductionJankoOptions(checked.options)}),
+  const next=validateScoreRenderingRecipe({...checked,engineId:APPROVED_SCORE_RENDERING_ENGINE,options:approvedProductionIsoOptions(checked.options)}),
     rendered=renderScorePresentation(source,next);
   return validateScoreRenderingRecipe({...next,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),
     seatSha256:await hashBytes(JSON.stringify(rendered.seats))}});
