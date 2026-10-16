@@ -6,6 +6,9 @@ import {scoreImportKind} from '../src/score-import-kind';
 import {prepareMusicXmlScore,musicXmlText,MusicXmlImportRefusal} from '../src/musicxml-import';
 import {importPackage} from '../src/package';
 import {requirePianoEvent} from '../src/piano-event';
+import {PersonalPresentationSession} from '../src/personal-presentation';
+import {PersonalPreparationPool} from '../src/personal-preparation-pool';
+import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 
 const fixture=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url)),xml=fixture.toString('utf8');
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
@@ -53,4 +56,11 @@ test('multi-instrument, one-staff and unreadable files refuse with a reason',asy
  await assert.rejects(prepareMusicXmlScore(strToU8(oneStaff),assets),/written on 1 staff\. MusicXML import currently reads two-staff piano scores/);
  const playback=xml.replace('<instrument-name>Piano</instrument-name>','<instrument-name>Piano</instrument-name><instrument-sound>keyboard.piano</instrument-sound>');
  await assert.rejects(prepareMusicXmlScore(strToU8(playback),assets),err=>err instanceof MusicXmlImportRefusal&&/can't be read yet: .*instrument-sound/.test(err.message));
+});
+
+test('an engraving refusal reaches the player in plain words, keeping its diagnosis',async()=>{
+ const p=await importPackage((await prepareMusicXmlScore(fixture,assets)).bytes,{allowLegacyTempo:true}),
+  refusal=new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.'),
+  pool={use:async()=>{throw refusal;}} as unknown as PersonalPreparationPool<never>;
+ await assert.rejects(new PersonalPresentationSession(p,pool).warm(),(err:Error)=>err.message==="This score can't be displayed yet: the viewer can't draw its pages."&&err.cause===refusal);
 });
