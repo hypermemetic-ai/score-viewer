@@ -2,4 +2,4 @@ Guitar Pro conversion uses the reviewed score-converter public WebView entry.
 The adjacent NOTICE.txt and guitar-pro.worker.js.LEGAL.txt remain unmodified.
 Complete covered source, MPL license, alphaTab provenance and patches are delivered in source-package.tgz in this same directory.
 Extract its package/third_party/alphatab directory for the source location mentioned by the upstream NOTICE.
-Source archive SHA-256: 2cace1ed51280a406051f195f71fc99d7b2e166e798df89e677ed47283adf044
+Source archive SHA-256: 66ee9317ff47e0ded6d42535921d54474af5a0bdf6d8cf3bd6a10f4affc06d25

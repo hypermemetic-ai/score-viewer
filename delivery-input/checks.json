@@ -1,46 +1,45 @@
 {
   "schema": 1,
-  "viewerRevision": "bfd999fd12fd227f82b94c014f6f33163381099d",
-  "notationRevision": "b3fb5faa4297f92500f53513cdfee8496ab14d93",
-  "frontendDigest": "c3900f2fc28170c2a42bb88052a8b2d98ab30b5fea206a4dc55d7d4447296f5c",
+  "viewerRevision": "ba35e574ff39d96ee0fa3f3b0ebf64abe515f218",
+  "notationRevision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351",
+  "frontendDigest": "1ff2419734bf3558f0c0334fe08d79e60a7bd654276305e0b13d60a9923bab74",
   "checks": {
     "tests": {
       "status": "passed",
-      "focused": 2,
-      "scope": "Native JSON reorder save, true collision refusal, and opening the score BEFORE retry of an existing native pending choice.",
-      "baseline": {
-        "viewerRevision": "974ebc5dd3f5d9d5788a4129a3343d21e310af62",
-        "checksSha256": "fd6142cbd8dde196da221f0ac4dc2c83179f157aa73947a427cc0bceb8d448a0"
-      }
+      "sourceCommit": "ba35e574ff39d96ee0fa3f3b0ebf64abe515f218",
+      "command": "npm test",
+      "tests": 1172,
+      "passed": 1172,
+      "failed": 0,
+      "durationMs": 83124,
+      "scope": "Complete suite at the merged source, after PR 112 (Save as PDF) and PR 108 (MuseScore/Guitar Pro converter, source-owned MusicXML hands at notation 5364d40)."
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "bfd999fd12fd227f82b94c014f6f33163381099d",
+      "sourceCommit": "ba35e574ff39d96ee0fa3f3b0ebf64abe515f218",
       "configured": "TypeScript + source pin validation + Vite",
-      "frontendDigest": "c3900f2fc28170c2a42bb88052a8b2d98ab30b5fea206a4dc55d7d4447296f5c"
+      "frontendFiles": 22,
+      "frontendDigest": "1ff2419734bf3558f0c0334fe08d79e60a7bd654276305e0b13d60a9923bab74"
     },
     "browserInspection": {
       "status": "passed",
-      "evidence": "docs/practice-fingering-validation-20261014.md",
-      "browser": "Chromium154 Linux",
-      "viewport": [
-        1280,
-        800
-      ],
-      "warmEdit": {
-        "samples": 13,
-        "medianMs": 164,
-        "p95Ms": 235
-      },
-      "limits": "Controlled preview and private local snapshot; cross-score and deletion succession automated; no live Windows installation or physical MIDI/audio acceptance.",
-      "scope": "Retained prior UI inspection only. Change is pending-intent equality; no rendering changes. User explicitly owns current desktop acceptance; no new UI inspection performed."
+      "script": "scripts/check-pdf-export.mjs",
+      "browser": "Chromium (playwright chromium-1234) headless Linux",
+      "viewport": [1440, 1200],
+      "score": "Op. 68 No. 14 Kleine Studie with 71 personal hand choices, private data copy (1042 files), unchanged after the run",
+      "pdf": "3 A4 pages each for pitch labels, finger numbers and double-click; 6 embedded fonts; no leftover print pages; no page errors",
+      "readerVsPdfDifferingBlocks": [0, 1, 1],
+      "observed": "Page 1 PDF raster inspected by eye: hand edits, beams, pedal lines, hairpins, footer present.",
+      "limits": "Headless Chromium printing with simulated IPC, not Windows WebView2 PrintToPdf, its fonts or an installed package. MuseScore/Guitar Pro import retained from PR 108's own end-to-end test, not re-inspected in a browser here."
     },
     "independentReview": {
       "status": "passed",
-      "reviewer": "review_application",
-      "sourceCommit": "bfd999fd12fd227f82b94c014f6f33163381099d",
-      "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/106",
-      "scope": "Canonical score occurrence comparison keeps recovery controls reachable before retry. Native-shaped store regression includes opening before retry, with no extra test/desktop actions by reviewer."
+      "sourceCommit": "ba35e574ff39d96ee0fa3f3b0ebf64abe515f218",
+      "reviews": [
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/112", "verdict": "no blocking issues; findings fixed at 4e37541 before merge"},
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/108", "verdict": "no blocking issues (fresh-context code read of the full diff; did not run the viewer)"}
+      ],
+      "scope": "Each merged change reviewed independently; the merge commit combines them without conflicting edits."
     }
   }
 }

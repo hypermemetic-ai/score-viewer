@@ -1350,15 +1350,15 @@ var require_saxes = __commonJS({
         if (c === EOC) {
           return;
         }
-        const tag2 = this.tag = {
+        const tag4 = this.tag = {
           name: this.name,
           attributes: /* @__PURE__ */ Object.create(null)
         };
         this.name = "";
         if (this.xmlnsOpt) {
-          this.topNS = tag2.ns = /* @__PURE__ */ Object.create(null);
+          this.topNS = tag4.ns = /* @__PURE__ */ Object.create(null);
         }
-        (_a = this.openTagStartHandler) === null || _a === void 0 ? void 0 : _a.call(this, tag2);
+        (_a = this.openTagStartHandler) === null || _a === void 0 ? void 0 : _a.call(this, tag4);
         this.sawRoot = true;
         if (!this.fragmentOpt && this.closedRoot) {
           this.fail("documents may contain only one root.");
@@ -1712,8 +1712,8 @@ var require_saxes = __commonJS({
         }
         const { tags } = this;
         while (tags.length > 0) {
-          const tag2 = tags.pop();
-          this.fail(`unclosed tag: ${tag2.name}`);
+          const tag4 = tags.pop();
+          this.fail(`unclosed tag: ${tag4.name}`);
         }
         if (this.state !== S_BEGIN && this.state !== S_TEXT) {
           this.fail("unexpected end.");
@@ -1776,26 +1776,26 @@ var require_saxes = __commonJS({
       processAttribsNS() {
         var _a;
         const { attribList } = this;
-        const tag2 = this.tag;
+        const tag4 = this.tag;
         {
-          const { prefix, local } = this.qname(tag2.name);
-          tag2.prefix = prefix;
-          tag2.local = local;
-          const uri = tag2.uri = (_a = this.resolve(prefix)) !== null && _a !== void 0 ? _a : "";
+          const { prefix, local } = this.qname(tag4.name);
+          tag4.prefix = prefix;
+          tag4.local = local;
+          const uri = tag4.uri = (_a = this.resolve(prefix)) !== null && _a !== void 0 ? _a : "";
           if (prefix !== "") {
             if (prefix === "xmlns") {
               this.fail('tags may not have "xmlns" as prefix.');
             }
             if (uri === "") {
               this.fail(`unbound namespace prefix: ${JSON.stringify(prefix)}.`);
-              tag2.uri = prefix;
+              tag4.uri = prefix;
             }
           }
         }
         if (attribList.length === 0) {
           return;
         }
-        const { attributes } = tag2;
+        const { attributes } = tag4;
         const seen = /* @__PURE__ */ new Set();
         for (const attr of attribList) {
           const { name, prefix, local } = attr;
@@ -1841,10 +1841,10 @@ var require_saxes = __commonJS({
         var _a;
         this.processAttribs();
         const { tags } = this;
-        const tag2 = this.tag;
-        tag2.isSelfClosing = false;
-        (_a = this.openTagHandler) === null || _a === void 0 ? void 0 : _a.call(this, tag2);
-        tags.push(tag2);
+        const tag4 = this.tag;
+        tag4.isSelfClosing = false;
+        (_a = this.openTagHandler) === null || _a === void 0 ? void 0 : _a.call(this, tag4);
+        tags.push(tag4);
         this.state = S_TEXT;
         this.name = "";
       }
@@ -1857,10 +1857,10 @@ var require_saxes = __commonJS({
         var _a, _b, _c;
         this.processAttribs();
         const { tags } = this;
-        const tag2 = this.tag;
-        tag2.isSelfClosing = true;
-        (_a = this.openTagHandler) === null || _a === void 0 ? void 0 : _a.call(this, tag2);
-        (_b = this.closeTagHandler) === null || _b === void 0 ? void 0 : _b.call(this, tag2);
+        const tag4 = this.tag;
+        tag4.isSelfClosing = true;
+        (_a = this.openTagHandler) === null || _a === void 0 ? void 0 : _a.call(this, tag4);
+        (_b = this.closeTagHandler) === null || _b === void 0 ? void 0 : _b.call(this, tag4);
         const top = this.tag = (_c = tags[tags.length - 1]) !== null && _c !== void 0 ? _c : null;
         if (top === null) {
           this.closedRoot = true;
@@ -1885,10 +1885,10 @@ var require_saxes = __commonJS({
         const handler = this.closeTagHandler;
         let l = tags.length;
         while (l-- > 0) {
-          const tag2 = this.tag = tags.pop();
-          this.topNS = tag2.ns;
-          handler === null || handler === void 0 ? void 0 : handler(tag2);
-          if (tag2.name === name) {
+          const tag4 = this.tag = tags.pop();
+          this.topNS = tag4.ns;
+          handler === null || handler === void 0 ? void 0 : handler(tag4);
+          if (tag4.name === name) {
             break;
           }
           this.fail("unexpected close tag.");
@@ -1909,9 +1909,9 @@ var require_saxes = __commonJS({
        */
       parseEntity(entity) {
         if (entity[0] !== "#") {
-          const defined2 = this.ENTITIES[entity];
-          if (defined2 !== void 0) {
-            return defined2;
+          const defined = this.ENTITIES[entity];
+          if (defined !== void 0) {
+            return defined;
           }
           this.fail(this.isName(entity) ? "undefined entity." : "disallowed character in entity name.");
           return `&${entity};`;
@@ -2129,20 +2129,712 @@ function freeze(value2) {
   return value2;
 }
 
+// src/core/canonical-symbols.ts
+var canonicalSymbolVocabulary = new Set(`
+4stringTabClef 6stringTabClef accSagittal11LargeDiesisDown accSagittal11LargeDiesisUp accSagittal11MediumDiesisDown
+accSagittal11MediumDiesisUp accSagittal11v19LargeDiesisDown accSagittal11v19LargeDiesisUp
+accSagittal11v19MediumDiesisDown accSagittal11v19MediumDiesisUp accSagittal11v49CommaDown accSagittal11v49CommaUp
+accSagittal143CommaDown accSagittal143CommaUp accSagittal17CommaDown accSagittal17CommaUp accSagittal17KleismaDown
+accSagittal17KleismaUp accSagittal19CommaDown accSagittal19CommaUp accSagittal19SchismaDown accSagittal19SchismaUp
+accSagittal1MinaDown accSagittal1MinaUp accSagittal1TinaDown accSagittal1TinaUp accSagittal23CommaDown
+accSagittal23CommaUp accSagittal23SmallDiesisDown accSagittal23SmallDiesisUp accSagittal25SmallDiesisDown
+accSagittal25SmallDiesisUp accSagittal2MinasDown accSagittal2MinasUp accSagittal2TinasDown accSagittal2TinasUp
+accSagittal35LargeDiesisDown accSagittal35LargeDiesisUp accSagittal35MediumDiesisDown accSagittal35MediumDiesisUp
+accSagittal3TinasDown accSagittal3TinasUp accSagittal49LargeDiesisDown accSagittal49LargeDiesisUp
+accSagittal49MediumDiesisDown accSagittal49MediumDiesisUp accSagittal49SmallDiesisDown accSagittal49SmallDiesisUp
+accSagittal4TinasDown accSagittal4TinasUp accSagittal55CommaDown accSagittal55CommaUp accSagittal5CommaDown
+accSagittal5CommaUp accSagittal5TinasDown accSagittal5TinasUp accSagittal5v11SmallDiesisDown
+accSagittal5v11SmallDiesisUp accSagittal5v13LargeDiesisDown accSagittal5v13LargeDiesisUp
+accSagittal5v13MediumDiesisDown accSagittal5v13MediumDiesisUp accSagittal5v19CommaDown accSagittal5v19CommaUp
+accSagittal5v23SmallDiesisDown accSagittal5v23SmallDiesisUp accSagittal5v49MediumDiesisDown
+accSagittal5v49MediumDiesisUp accSagittal5v7KleismaDown accSagittal5v7KleismaUp accSagittal6TinasDown
+accSagittal6TinasUp accSagittal7CommaDown accSagittal7CommaUp accSagittal7TinasDown accSagittal7TinasUp
+accSagittal7v11CommaDown accSagittal7v11CommaUp accSagittal7v11KleismaDown accSagittal7v11KleismaUp
+accSagittal7v19CommaDown accSagittal7v19CommaUp accSagittal8TinasDown accSagittal8TinasUp accSagittal9TinasDown
+accSagittal9TinasUp accSagittalAcute accSagittalDoubleFlat accSagittalDoubleFlat11v49CUp accSagittalDoubleFlat143CUp
+accSagittalDoubleFlat17CUp accSagittalDoubleFlat17kUp accSagittalDoubleFlat19CUp accSagittalDoubleFlat19sUp
+accSagittalDoubleFlat23CUp accSagittalDoubleFlat23SUp accSagittalDoubleFlat25SUp accSagittalDoubleFlat49SUp
+accSagittalDoubleFlat55CUp accSagittalDoubleFlat5CUp accSagittalDoubleFlat5v11SUp accSagittalDoubleFlat5v19CUp
+accSagittalDoubleFlat5v23SUp accSagittalDoubleFlat5v7kUp accSagittalDoubleFlat7CUp accSagittalDoubleFlat7v11CUp
+accSagittalDoubleFlat7v11kUp accSagittalDoubleFlat7v19CUp accSagittalDoubleSharp accSagittalDoubleSharp11v49CDown
+accSagittalDoubleSharp143CDown accSagittalDoubleSharp17CDown accSagittalDoubleSharp17kDown
+accSagittalDoubleSharp19CDown accSagittalDoubleSharp19sDown accSagittalDoubleSharp23CDown
+accSagittalDoubleSharp23SDown accSagittalDoubleSharp25SDown accSagittalDoubleSharp49SDown
+accSagittalDoubleSharp55CDown accSagittalDoubleSharp5CDown accSagittalDoubleSharp5v11SDown
+accSagittalDoubleSharp5v19CDown accSagittalDoubleSharp5v23SDown accSagittalDoubleSharp5v7kDown
+accSagittalDoubleSharp7CDown accSagittalDoubleSharp7v11CDown accSagittalDoubleSharp7v11kDown
+accSagittalDoubleSharp7v19CDown accSagittalFlat accSagittalFlat11LDown accSagittalFlat11MDown
+accSagittalFlat11v19LDown accSagittalFlat11v19MDown accSagittalFlat11v49CDown accSagittalFlat11v49CUp
+accSagittalFlat143CDown accSagittalFlat143CUp accSagittalFlat17CDown accSagittalFlat17CUp accSagittalFlat17kDown
+accSagittalFlat17kUp accSagittalFlat19CDown accSagittalFlat19CUp accSagittalFlat19sDown accSagittalFlat19sUp
+accSagittalFlat23CDown accSagittalFlat23CUp accSagittalFlat23SDown accSagittalFlat23SUp accSagittalFlat25SDown
+accSagittalFlat25SUp accSagittalFlat35LDown accSagittalFlat35MDown accSagittalFlat49LDown accSagittalFlat49MDown
+accSagittalFlat49SDown accSagittalFlat49SUp accSagittalFlat55CDown accSagittalFlat55CUp accSagittalFlat5CDown
+accSagittalFlat5CUp accSagittalFlat5v11SDown accSagittalFlat5v11SUp accSagittalFlat5v13LDown
+accSagittalFlat5v13MDown accSagittalFlat5v19CDown accSagittalFlat5v19CUp accSagittalFlat5v23SDown
+accSagittalFlat5v23SUp accSagittalFlat5v49MDown accSagittalFlat5v7kDown accSagittalFlat5v7kUp accSagittalFlat7CDown
+accSagittalFlat7CUp accSagittalFlat7v11CDown accSagittalFlat7v11CUp accSagittalFlat7v11kDown accSagittalFlat7v11kUp
+accSagittalFlat7v19CDown accSagittalFlat7v19CUp accSagittalFractionalTinaDown accSagittalFractionalTinaUp
+accSagittalGrave accSagittalShaftDown accSagittalShaftUp accSagittalSharp accSagittalSharp11LUp
+accSagittalSharp11MUp accSagittalSharp11v19LUp accSagittalSharp11v19MUp accSagittalSharp11v49CDown
+accSagittalSharp11v49CUp accSagittalSharp143CDown accSagittalSharp143CUp accSagittalSharp17CDown
+accSagittalSharp17CUp accSagittalSharp17kDown accSagittalSharp17kUp accSagittalSharp19CDown accSagittalSharp19CUp
+accSagittalSharp19sDown accSagittalSharp19sUp accSagittalSharp23CDown accSagittalSharp23CUp accSagittalSharp23SDown
+accSagittalSharp23SUp accSagittalSharp25SDown accSagittalSharp25SUp accSagittalSharp35LUp accSagittalSharp35MUp
+accSagittalSharp49LUp accSagittalSharp49MUp accSagittalSharp49SDown accSagittalSharp49SUp accSagittalSharp55CDown
+accSagittalSharp55CUp accSagittalSharp5CDown accSagittalSharp5CUp accSagittalSharp5v11SDown accSagittalSharp5v11SUp
+accSagittalSharp5v13LUp accSagittalSharp5v13MUp accSagittalSharp5v19CDown accSagittalSharp5v19CUp
+accSagittalSharp5v23SDown accSagittalSharp5v23SUp accSagittalSharp5v49MUp accSagittalSharp5v7kDown
+accSagittalSharp5v7kUp accSagittalSharp7CDown accSagittalSharp7CUp accSagittalSharp7v11CDown accSagittalSharp7v11CUp
+accSagittalSharp7v11kDown accSagittalSharp7v11kUp accSagittalSharp7v19CDown accSagittalSharp7v19CUp
+accSagittalUnused1 accSagittalUnused2 accSagittalUnused3 accSagittalUnused4 accdnCombDot accdnCombLH2RanksEmpty
+accdnCombLH3RanksEmptySquare accdnCombRH3RanksEmpty accdnCombRH4RanksEmpty accdnDiatonicClef accdnLH2Ranks16Round
+accdnLH2Ranks8Plus16Round accdnLH2Ranks8Round accdnLH2RanksFullMasterRound accdnLH2RanksMasterPlus16Round
+accdnLH2RanksMasterRound accdnLH3Ranks2Plus8Square accdnLH3Ranks2Square accdnLH3Ranks8Square
+accdnLH3RanksDouble8Square accdnLH3RanksTuttiSquare accdnPull accdnPush accdnRH3RanksAccordion
+accdnRH3RanksAuthenticMusette accdnRH3RanksBandoneon accdnRH3RanksBassoon accdnRH3RanksClarinet
+accdnRH3RanksDoubleTremoloLower8ve accdnRH3RanksDoubleTremoloUpper8ve accdnRH3RanksFullFactory
+accdnRH3RanksHarmonium accdnRH3RanksImitationMusette accdnRH3RanksLowerTremolo8 accdnRH3RanksMaster
+accdnRH3RanksOboe accdnRH3RanksOrgan accdnRH3RanksPiccolo accdnRH3RanksTremoloLower8ve accdnRH3RanksTremoloUpper8ve
+accdnRH3RanksTwoChoirs accdnRH3RanksUpperTremolo8 accdnRH3RanksViolin accdnRH4RanksAlto accdnRH4RanksBassAlto
+accdnRH4RanksMaster accdnRH4RanksSoftBass accdnRH4RanksSoftTenor accdnRH4RanksSoprano accdnRH4RanksTenor
+accdnRicochet2 accdnRicochet3 accdnRicochet4 accdnRicochet5 accdnRicochet6 accdnRicochetStem2 accdnRicochetStem3
+accdnRicochetStem4 accdnRicochetStem5 accdnRicochetStem6 accidental1CommaFlat accidental1CommaSharp
+accidental2CommaFlat accidental2CommaSharp accidental3CommaFlat accidental3CommaSharp accidental4CommaFlat
+accidental5CommaSharp accidentalArrowDown accidentalArrowUp accidentalBakiyeFlat accidentalBakiyeSharp
+accidentalBracketLeft accidentalBracketRight accidentalBuyukMucennebFlat accidentalBuyukMucennebSharp
+accidentalCombiningCloseCurlyBrace accidentalCombiningLower17Schisma accidentalCombiningLower19Schisma
+accidentalCombiningLower23Limit29LimitComma accidentalCombiningLower29LimitComma accidentalCombiningLower31Schisma
+accidentalCombiningLower37Quartertone accidentalCombiningLower41Comma accidentalCombiningLower43Comma
+accidentalCombiningLower47Quartertone accidentalCombiningLower53LimitComma accidentalCombiningOpenCurlyBrace
+accidentalCombiningRaise17Schisma accidentalCombiningRaise19Schisma accidentalCombiningRaise23Limit29LimitComma
+accidentalCombiningRaise29LimitComma accidentalCombiningRaise31Schisma accidentalCombiningRaise37Quartertone
+accidentalCombiningRaise41Comma accidentalCombiningRaise43Comma accidentalCombiningRaise47Quartertone
+accidentalCombiningRaise53LimitComma accidentalCommaSlashDown accidentalCommaSlashUp accidentalDoubleFlat
+accidentalDoubleFlatArabic accidentalDoubleFlatEqualTempered accidentalDoubleFlatOneArrowDown
+accidentalDoubleFlatOneArrowUp accidentalDoubleFlatReversed accidentalDoubleFlatThreeArrowsDown
+accidentalDoubleFlatThreeArrowsUp accidentalDoubleFlatTurned accidentalDoubleFlatTwoArrowsDown
+accidentalDoubleFlatTwoArrowsUp accidentalDoubleSharp accidentalDoubleSharpArabic accidentalDoubleSharpEqualTempered
+accidentalDoubleSharpOneArrowDown accidentalDoubleSharpOneArrowUp accidentalDoubleSharpThreeArrowsDown
+accidentalDoubleSharpThreeArrowsUp accidentalDoubleSharpTwoArrowsDown accidentalDoubleSharpTwoArrowsUp
+accidentalEnharmonicAlmostEqualTo accidentalEnharmonicEquals accidentalEnharmonicTilde
+accidentalFilledReversedFlatAndFlat accidentalFilledReversedFlatAndFlatArrowDown
+accidentalFilledReversedFlatAndFlatArrowUp accidentalFilledReversedFlatArrowDown accidentalFilledReversedFlatArrowUp
+accidentalFiveQuarterTonesFlatArrowDown accidentalFiveQuarterTonesSharpArrowUp accidentalFlat accidentalFlatArabic
+accidentalFlatEqualTempered accidentalFlatLoweredStockhausen accidentalFlatOneArrowDown accidentalFlatOneArrowUp
+accidentalFlatRaisedStockhausen accidentalFlatRepeatedLineStockhausen accidentalFlatRepeatedSpaceStockhausen
+accidentalFlatThreeArrowsDown accidentalFlatThreeArrowsUp accidentalFlatTurned accidentalFlatTwoArrowsDown
+accidentalFlatTwoArrowsUp accidentalHabaFlatQuarterToneHigher accidentalHabaFlatThreeQuarterTonesLower
+accidentalHabaQuarterToneHigher accidentalHabaQuarterToneLower accidentalHabaSharpQuarterToneLower
+accidentalHabaSharpThreeQuarterTonesHigher accidentalHalfSharpArrowDown accidentalHalfSharpArrowUp
+accidentalJohnston13 accidentalJohnston31 accidentalJohnstonDown accidentalJohnstonEl accidentalJohnstonMinus
+accidentalJohnstonPlus accidentalJohnstonSeven accidentalJohnstonUp accidentalKomaFlat accidentalKomaSharp
+accidentalKoron accidentalKucukMucennebFlat accidentalKucukMucennebSharp accidentalLargeDoubleSharp
+accidentalLowerOneSeptimalComma accidentalLowerOneTridecimalQuartertone accidentalLowerOneUndecimalQuartertone
+accidentalLowerTwoSeptimalCommas accidentalLoweredStockhausen accidentalNarrowReversedFlat
+accidentalNarrowReversedFlatAndFlat accidentalNatural accidentalNaturalArabic accidentalNaturalEqualTempered
+accidentalNaturalFlat accidentalNaturalLoweredStockhausen accidentalNaturalOneArrowDown accidentalNaturalOneArrowUp
+accidentalNaturalRaisedStockhausen accidentalNaturalReversed accidentalNaturalSharp accidentalNaturalThreeArrowsDown
+accidentalNaturalThreeArrowsUp accidentalNaturalTwoArrowsDown accidentalNaturalTwoArrowsUp
+accidentalOneAndAHalfSharpsArrowDown accidentalOneAndAHalfSharpsArrowUp accidentalOneQuarterToneFlatFerneyhough
+accidentalOneQuarterToneFlatStockhausen accidentalOneQuarterToneSharpFerneyhough
+accidentalOneQuarterToneSharpStockhausen accidentalOneThirdToneFlatFerneyhough
+accidentalOneThirdToneSharpFerneyhough accidentalParensLeft accidentalParensRight accidentalQuarterFlatEqualTempered
+accidentalQuarterSharpEqualTempered accidentalQuarterToneFlat4 accidentalQuarterToneFlatArabic
+accidentalQuarterToneFlatArrowUp accidentalQuarterToneFlatFilledReversed accidentalQuarterToneFlatNaturalArrowDown
+accidentalQuarterToneFlatPenderecki accidentalQuarterToneFlatStein accidentalQuarterToneFlatVanBlankenburg
+accidentalQuarterToneSharp4 accidentalQuarterToneSharpArabic accidentalQuarterToneSharpArrowDown
+accidentalQuarterToneSharpBusotti accidentalQuarterToneSharpNaturalArrowUp accidentalQuarterToneSharpStein
+accidentalQuarterToneSharpWiggle accidentalRaiseOneSeptimalComma accidentalRaiseOneTridecimalQuartertone
+accidentalRaiseOneUndecimalQuartertone accidentalRaiseTwoSeptimalCommas accidentalRaisedStockhausen
+accidentalReversedFlatAndFlatArrowDown accidentalReversedFlatAndFlatArrowUp accidentalReversedFlatArrowDown
+accidentalReversedFlatArrowUp accidentalSharp accidentalSharpArabic accidentalSharpEqualTempered
+accidentalSharpLoweredStockhausen accidentalSharpOneArrowDown accidentalSharpOneArrowUp
+accidentalSharpOneHorizontalStroke accidentalSharpRaisedStockhausen accidentalSharpRepeatedLineStockhausen
+accidentalSharpRepeatedSpaceStockhausen accidentalSharpReversed accidentalSharpSharp accidentalSharpThreeArrowsDown
+accidentalSharpThreeArrowsUp accidentalSharpTwoArrowsDown accidentalSharpTwoArrowsUp accidentalSims12Down
+accidentalSims12Up accidentalSims4Down accidentalSims4Up accidentalSims6Down accidentalSims6Up accidentalSori
+accidentalTavenerFlat accidentalTavenerSharp accidentalThreeQuarterTonesFlatArabic
+accidentalThreeQuarterTonesFlatArrowDown accidentalThreeQuarterTonesFlatArrowUp
+accidentalThreeQuarterTonesFlatCouper accidentalThreeQuarterTonesFlatGrisey accidentalThreeQuarterTonesFlatTartini
+accidentalThreeQuarterTonesFlatZimmermann accidentalThreeQuarterTonesSharpArabic
+accidentalThreeQuarterTonesSharpArrowDown accidentalThreeQuarterTonesSharpArrowUp
+accidentalThreeQuarterTonesSharpBusotti accidentalThreeQuarterTonesSharpStein
+accidentalThreeQuarterTonesSharpStockhausen accidentalTripleFlat accidentalTripleSharp
+accidentalTwoThirdTonesFlatFerneyhough accidentalTwoThirdTonesSharpFerneyhough accidentalUpsAndDownsDown
+accidentalUpsAndDownsLess accidentalUpsAndDownsMore accidentalUpsAndDownsUp accidentalWilsonMinus
+accidentalWilsonPlus accidentalWyschnegradsky10TwelfthsFlat accidentalWyschnegradsky10TwelfthsSharp
+accidentalWyschnegradsky11TwelfthsFlat accidentalWyschnegradsky11TwelfthsSharp accidentalWyschnegradsky1TwelfthsFlat
+accidentalWyschnegradsky1TwelfthsSharp accidentalWyschnegradsky2TwelfthsFlat accidentalWyschnegradsky2TwelfthsSharp
+accidentalWyschnegradsky3TwelfthsFlat accidentalWyschnegradsky3TwelfthsSharp accidentalWyschnegradsky4TwelfthsFlat
+accidentalWyschnegradsky4TwelfthsSharp accidentalWyschnegradsky5TwelfthsFlat accidentalWyschnegradsky5TwelfthsSharp
+accidentalWyschnegradsky6TwelfthsFlat accidentalWyschnegradsky6TwelfthsSharp accidentalWyschnegradsky7TwelfthsFlat
+accidentalWyschnegradsky7TwelfthsSharp accidentalWyschnegradsky8TwelfthsFlat accidentalWyschnegradsky8TwelfthsSharp
+accidentalWyschnegradsky9TwelfthsFlat accidentalWyschnegradsky9TwelfthsSharp accidentalXenakisOneThirdToneSharp
+accidentalXenakisTwoThirdTonesSharp analyticsChoralmelodie analyticsEndStimme analyticsHauptrhythmus
+analyticsHauptstimme analyticsInversion1 analyticsNebenstimme analyticsStartStimme analyticsTheme analyticsTheme1
+analyticsThemeInversion analyticsThemeRetrograde analyticsThemeRetrogradeInversion arpeggiato arpeggiatoDown
+arpeggiatoUp arrowBlackDown arrowBlackDownLeft arrowBlackDownRight arrowBlackLeft arrowBlackRight arrowBlackUp
+arrowBlackUpLeft arrowBlackUpRight arrowOpenDown arrowOpenDownLeft arrowOpenDownRight arrowOpenLeft arrowOpenRight
+arrowOpenUp arrowOpenUpLeft arrowOpenUpRight arrowWhiteDown arrowWhiteDownLeft arrowWhiteDownRight arrowWhiteLeft
+arrowWhiteRight arrowWhiteUp arrowWhiteUpLeft arrowWhiteUpRight arrowheadBlackDown arrowheadBlackDownLeft
+arrowheadBlackDownRight arrowheadBlackLeft arrowheadBlackRight arrowheadBlackUp arrowheadBlackUpLeft
+arrowheadBlackUpRight arrowheadOpenDown arrowheadOpenDownLeft arrowheadOpenDownRight arrowheadOpenLeft
+arrowheadOpenRight arrowheadOpenUp arrowheadOpenUpLeft arrowheadOpenUpRight arrowheadWhiteDown
+arrowheadWhiteDownLeft arrowheadWhiteDownRight arrowheadWhiteLeft arrowheadWhiteRight arrowheadWhiteUp
+arrowheadWhiteUpLeft arrowheadWhiteUpRight articAccentAbove articAccentBelow articAccentStaccatoAbove
+articAccentStaccatoBelow articLaissezVibrerAbove articLaissezVibrerBelow articMarcatoAbove articMarcatoBelow
+articMarcatoStaccatoAbove articMarcatoStaccatoBelow articMarcatoTenutoAbove articMarcatoTenutoBelow
+articSoftAccentAbove articSoftAccentBelow articSoftAccentStaccatoAbove articSoftAccentStaccatoBelow
+articSoftAccentTenutoAbove articSoftAccentTenutoBelow articSoftAccentTenutoStaccatoAbove
+articSoftAccentTenutoStaccatoBelow articStaccatissimoAbove articStaccatissimoBelow articStaccatissimoStrokeAbove
+articStaccatissimoStrokeBelow articStaccatissimoWedgeAbove articStaccatissimoWedgeBelow articStaccatoAbove
+articStaccatoBelow articStressAbove articStressBelow articTenutoAbove articTenutoAccentAbove articTenutoAccentBelow
+articTenutoBelow articTenutoStaccatoAbove articTenutoStaccatoBelow articUnstressAbove articUnstressBelow
+augmentationDot barlineDashed barlineDotted barlineDouble barlineFinal barlineHeavy barlineHeavyHeavy
+barlineReverseFinal barlineShort barlineSingle barlineTick beamAccelRit1 beamAccelRit10 beamAccelRit11
+beamAccelRit12 beamAccelRit13 beamAccelRit14 beamAccelRit15 beamAccelRit2 beamAccelRit3 beamAccelRit4 beamAccelRit5
+beamAccelRit6 beamAccelRit7 beamAccelRit8 beamAccelRit9 beamAccelRitFinal brace bracket bracketBottom bracketTop
+brassBend brassDoitLong brassDoitMedium brassDoitShort brassFallLipLong brassFallLipMedium brassFallLipShort
+brassFallRoughLong brassFallRoughMedium brassFallRoughShort brassFallSmoothLong brassFallSmoothMedium
+brassFallSmoothShort brassFlip brassHarmonMuteClosed brassHarmonMuteStemHalfLeft brassHarmonMuteStemHalfRight
+brassHarmonMuteStemOpen brassJazzTurn brassLiftLong brassLiftMedium brassLiftShort brassLiftSmoothLong
+brassLiftSmoothMedium brassLiftSmoothShort brassMuteClosed brassMuteHalfClosed brassMuteOpen brassPlop brassScoop
+brassSmear brassValveTrill breathMarkComma breathMarkSalzedo breathMarkTick breathMarkUpbow bridgeClef buzzRoll
+cClef cClef8vb cClefArrowDown cClefArrowUp cClefChange cClefCombining cClefReversed cClefSquare caesura
+caesuraCurved caesuraShort caesuraSingleStroke caesuraThick chantAccentusAbove chantAccentusBelow chantAuctumAsc
+chantAuctumDesc chantAugmentum chantCaesura chantCclef chantCirculusAbove chantCirculusBelow
+chantConnectingLineAsc2nd chantConnectingLineAsc3rd chantConnectingLineAsc4th chantConnectingLineAsc5th
+chantConnectingLineAsc6th chantCustosStemDownPosHigh chantCustosStemDownPosHighest chantCustosStemDownPosMiddle
+chantCustosStemUpPosLow chantCustosStemUpPosLowest chantCustosStemUpPosMiddle chantDeminutumLower
+chantDeminutumUpper chantDivisioFinalis chantDivisioMaior chantDivisioMaxima chantDivisioMinima chantEntryLineAsc2nd
+chantEntryLineAsc3rd chantEntryLineAsc4th chantEntryLineAsc5th chantEntryLineAsc6th chantEpisema chantFclef
+chantIctusAbove chantIctusBelow chantLigaturaDesc2nd chantLigaturaDesc3rd chantLigaturaDesc4th chantLigaturaDesc5th
+chantOriscusAscending chantOriscusDescending chantOriscusLiquescens chantPodatusLower chantPodatusUpper chantPunctum
+chantPunctumCavum chantPunctumDeminutum chantPunctumInclinatum chantPunctumInclinatumAuctum
+chantPunctumInclinatumDeminutum chantPunctumLinea chantPunctumLineaCavum chantPunctumVirga chantPunctumVirgaReversed
+chantQuilisma chantSemicirculusAbove chantSemicirculusBelow chantStaff chantStaffNarrow chantStaffWide
+chantStrophicus chantStrophicusAuctus chantStrophicusLiquescens2nd chantStrophicusLiquescens3rd
+chantStrophicusLiquescens4th chantStrophicusLiquescens5th chantVirgula clef15 clef8 clefChangeCombining coda
+codaSquare conductorBeat2Compound conductorBeat2Simple conductorBeat3Compound conductorBeat3Simple
+conductorBeat4Compound conductorBeat4Simple conductorLeftBeat conductorRightBeat conductorStrongBeat
+conductorUnconducted conductorWeakBeat controlBeginBeam controlBeginPhrase controlBeginSlur controlBeginTie
+controlEndBeam controlEndPhrase controlEndSlur controlEndTie csymAccidentalDoubleFlat csymAccidentalDoubleSharp
+csymAccidentalFlat csymAccidentalNatural csymAccidentalSharp csymAccidentalTripleFlat csymAccidentalTripleSharp
+csymAlteredBassSlash csymAugmented csymBracketLeftTall csymBracketRightTall csymDiagonalArrangementSlash
+csymDiminished csymHalfDiminished csymMajorSeventh csymMinor csymParensLeftTall csymParensLeftVeryTall
+csymParensRightTall csymParensRightVeryTall curlewSign daCapo dalSegno daseianExcellentes1 daseianExcellentes2
+daseianExcellentes3 daseianExcellentes4 daseianFinales1 daseianFinales2 daseianFinales3 daseianFinales4
+daseianGraves1 daseianGraves2 daseianGraves3 daseianGraves4 daseianResidua1 daseianResidua2 daseianSuperiores1
+daseianSuperiores2 daseianSuperiores3 daseianSuperiores4 doubleLateralRollStevens doubleTongueAbove
+doubleTongueBelow dynamicCombinedSeparatorColon dynamicCombinedSeparatorHyphen dynamicCombinedSeparatorSlash
+dynamicCombinedSeparatorSpace dynamicCrescendoHairpin dynamicDiminuendoHairpin dynamicFF dynamicFFF dynamicFFFF
+dynamicFFFFF dynamicFFFFFF dynamicForte dynamicFortePiano dynamicForzando dynamicHairpinBracketLeft
+dynamicHairpinBracketRight dynamicHairpinParenthesisLeft dynamicHairpinParenthesisRight dynamicMF dynamicMP
+dynamicMessaDiVoce dynamicMezzo dynamicNiente dynamicNienteForHairpin dynamicPF dynamicPP dynamicPPP dynamicPPPP
+dynamicPPPPP dynamicPPPPPP dynamicPiano dynamicRinforzando dynamicRinforzando1 dynamicRinforzando2 dynamicSforzando
+dynamicSforzando1 dynamicSforzandoPianissimo dynamicSforzandoPiano dynamicSforzato dynamicSforzatoFF
+dynamicSforzatoPiano dynamicZ elecAudioChannelsEight elecAudioChannelsFive elecAudioChannelsFour
+elecAudioChannelsOne elecAudioChannelsSeven elecAudioChannelsSix elecAudioChannelsThreeFrontal
+elecAudioChannelsThreeSurround elecAudioChannelsTwo elecAudioIn elecAudioMono elecAudioOut elecAudioStereo
+elecCamera elecDataIn elecDataOut elecDisc elecDownload elecEject elecFastForward elecHeadphones elecHeadset
+elecLineIn elecLineOut elecLoop elecLoudspeaker elecMIDIController0 elecMIDIController100 elecMIDIController20
+elecMIDIController40 elecMIDIController60 elecMIDIController80 elecMIDIIn elecMIDIOut elecMicrophone
+elecMicrophoneMute elecMicrophoneUnmute elecMixingConsole elecMonitor elecMute elecPause elecPlay elecPowerOnOff
+elecProjector elecReplay elecRewind elecShuffle elecSkipBackwards elecSkipForwards elecStop elecTape elecUSB
+elecUnmute elecUpload elecVideoCamera elecVideoIn elecVideoOut elecVolumeFader elecVolumeFaderThumb elecVolumeLevel0
+elecVolumeLevel100 elecVolumeLevel20 elecVolumeLevel40 elecVolumeLevel60 elecVolumeLevel80 fClef fClef15ma fClef15mb
+fClef8va fClef8vb fClefArrowDown fClefArrowUp fClefChange fClefReversed fClefTurned fermataAbove fermataBelow
+fermataLongAbove fermataLongBelow fermataLongHenzeAbove fermataLongHenzeBelow fermataShortAbove fermataShortBelow
+fermataShortHenzeAbove fermataShortHenzeBelow fermataVeryLongAbove fermataVeryLongBelow fermataVeryShortAbove
+fermataVeryShortBelow figbass0 figbass1 figbass2 figbass2Raised figbass3 figbass4 figbass4Raised figbass5
+figbass5Raised1 figbass5Raised2 figbass5Raised3 figbass6 figbass6Raised figbass6Raised2 figbass7 figbass7Diminished
+figbass7Raised1 figbass7Raised2 figbass8 figbass9 figbass9Raised figbassBracketLeft figbassBracketRight
+figbassCombiningLowering figbassCombiningRaising figbassDoubleFlat figbassDoubleSharp figbassFlat figbassNatural
+figbassParensLeft figbassParensRight figbassPlus figbassSharp figbassTripleFlat figbassTripleSharp fingering0
+fingering0Italic fingering1 fingering1Italic fingering2 fingering2Italic fingering3 fingering3Italic fingering4
+fingering4Italic fingering5 fingering5Italic fingering6 fingering6Italic fingering7 fingering7Italic fingering8
+fingering8Italic fingering9 fingering9Italic fingeringALower fingeringCLower fingeringELower fingeringILower
+fingeringLeftBracket fingeringLeftBracketItalic fingeringLeftParenthesis fingeringLeftParenthesisItalic
+fingeringMLower fingeringMultipleNotes fingeringOLower fingeringPLower fingeringQLower fingeringRightBracket
+fingeringRightBracketItalic fingeringRightParenthesis fingeringRightParenthesisItalic fingeringSLower
+fingeringSeparatorMiddleDot fingeringSeparatorMiddleDotWhite fingeringSeparatorSlash fingeringSubstitutionAbove
+fingeringSubstitutionBelow fingeringSubstitutionDash fingeringTLower fingeringTUpper fingeringXLower flag1024thDown
+flag1024thUp flag128thDown flag128thUp flag16thDown flag16thUp flag256thDown flag256thUp flag32ndDown flag32ndUp
+flag512thDown flag512thUp flag64thDown flag64thUp flag8thDown flag8thUp flagInternalDown flagInternalUp
+fretboard3String fretboard3StringNut fretboard4String fretboard4StringNut fretboard5String fretboard5StringNut
+fretboard6String fretboard6StringNut fretboardFilledCircle fretboardO fretboardX functionAngleLeft
+functionAngleRight functionBracketLeft functionBracketRight functionDD functionDLower functionDUpper functionEight
+functionFUpper functionFive functionFour functionGLower functionGUpper functionGreaterThan functionILower
+functionIUpper functionKLower functionKUpper functionLLower functionLUpper functionLessThan functionMLower
+functionMUpper functionMinus functionNLower functionNUpper functionNUpperSuperscript functionNine functionOne
+functionPLower functionPUpper functionParensLeft functionParensRight functionPlus functionRLower functionRepetition1
+functionRepetition2 functionRing functionSLower functionSSLower functionSSUpper functionSUpper functionSeven
+functionSix functionSlashedDD functionTLower functionTUpper functionThree functionTwo functionVLower functionVUpper
+functionZero gClef gClef15ma gClef15mb gClef8va gClef8vb gClef8vbCClef gClef8vbOld gClef8vbParens gClefArrowDown
+gClefArrowUp gClefChange gClefLigatedNumberAbove gClefLigatedNumberBelow gClefReversed gClefTurned glissandoDown
+glissandoUp graceNoteAcciaccaturaStemDown graceNoteAcciaccaturaStemUp graceNoteAppoggiaturaStemDown
+graceNoteAppoggiaturaStemUp graceNoteSlashStemDown graceNoteSlashStemUp guitarBarreFull guitarBarreHalf
+guitarClosePedal guitarFadeIn guitarFadeOut guitarGolpe guitarHalfOpenPedal guitarLeftHandTapping guitarOpenPedal
+guitarRightHandTapping guitarShake guitarString0 guitarString1 guitarString10 guitarString11 guitarString12
+guitarString13 guitarString2 guitarString3 guitarString4 guitarString5 guitarString6 guitarString7 guitarString8
+guitarString9 guitarStrumDown guitarStrumUp guitarVibratoBarDip guitarVibratoBarScoop guitarVibratoStroke
+guitarVolumeSwell guitarWideVibratoStroke handbellsBelltree handbellsDamp3 handbellsEcho1 handbellsEcho2
+handbellsGyro handbellsHandMartellato handbellsMalletBellOnTable handbellsMalletBellSuspended handbellsMalletLft
+handbellsMartellato handbellsMartellatoLift handbellsMutedMartellato handbellsPluckLift handbellsSwing
+handbellsSwingDown handbellsSwingUp handbellsTablePairBells handbellsTableSingleBell harpMetalRod harpPedalCentered
+harpPedalDivider harpPedalLowered harpPedalRaised harpSalzedoAeolianAscending harpSalzedoAeolianDescending
+harpSalzedoDampAbove harpSalzedoDampBelow harpSalzedoDampBothHands harpSalzedoDampLowStrings
+harpSalzedoFluidicSoundsLeft harpSalzedoFluidicSoundsRight harpSalzedoIsolatedSounds harpSalzedoMetallicSounds
+harpSalzedoMetallicSoundsOneString harpSalzedoMuffleTotally harpSalzedoOboicFlux harpSalzedoPlayUpperEnd
+harpSalzedoSlideWithSuppleness harpSalzedoSnareDrum harpSalzedoTamTamSounds harpSalzedoThunderEffect
+harpSalzedoTimpanicSounds harpSalzedoWhistlingSounds harpStringNoiseStem harpTuningKey harpTuningKeyGlissando
+harpTuningKeyHandle harpTuningKeyShank indianDrumClef kahnBackChug kahnBackFlap kahnBackRiff kahnBackRip
+kahnBallChange kahnBallDig kahnBrushBackward kahnBrushForward kahnChug kahnClap kahnDoubleSnap kahnDoubleWing
+kahnDrawStep kahnDrawTap kahnFlam kahnFlap kahnFlapStep kahnFlat kahnFleaHop kahnFleaTap kahnGraceTap
+kahnGraceTapChange kahnGraceTapHop kahnGraceTapStamp kahnHeel kahnHeelChange kahnHeelClick kahnHeelDrop kahnHeelStep
+kahnHeelTap kahnHop kahnJumpApart kahnJumpTogether kahnKneeInward kahnKneeOutward kahnLeap kahnLeapFlatFoot
+kahnLeapHeelClick kahnLeftCatch kahnLeftCross kahnLeftFoot kahnLeftToeStrike kahnLeftTurn kahnOverTheTop
+kahnOverTheTopTap kahnPull kahnPush kahnRiff kahnRiffle kahnRightCatch kahnRightCross kahnRightFoot
+kahnRightToeStrike kahnRightTurn kahnRip kahnRipple kahnScrape kahnScuff kahnScuffle kahnShuffle kahnSlam kahnSlap
+kahnSlideStep kahnSlideTap kahnSnap kahnStamp kahnStampStamp kahnStep kahnStepStamp kahnStomp kahnStompBrush kahnTap
+kahnToe kahnToeClick kahnToeDrop kahnToeStep kahnToeTap kahnTrench kahnWing kahnWingChange kahnZank kahnZink
+keyboardBebung2DotsAbove keyboardBebung2DotsBelow keyboardBebung3DotsAbove keyboardBebung3DotsBelow
+keyboardBebung4DotsAbove keyboardBebung4DotsBelow keyboardLeftPedalPictogram keyboardMiddlePedalPictogram
+keyboardPedalD keyboardPedalDot keyboardPedalE keyboardPedalHalf keyboardPedalHalf2 keyboardPedalHalf3
+keyboardPedalHeel1 keyboardPedalHeel2 keyboardPedalHeel3 keyboardPedalHeelToToe keyboardPedalHeelToe
+keyboardPedalHookEnd keyboardPedalHookStart keyboardPedalHyphen keyboardPedalP keyboardPedalParensLeft
+keyboardPedalParensRight keyboardPedalPed keyboardPedalS keyboardPedalSost keyboardPedalToe1 keyboardPedalToe2
+keyboardPedalToeToHeel keyboardPedalUp keyboardPedalUpNotch keyboardPedalUpSpecial keyboardPlayWithLH
+keyboardPlayWithLHEnd keyboardPlayWithRH keyboardPlayWithRHEnd keyboardPluckInside keyboardRightPedalPictogram
+kievanAccidentalFlat kievanAccidentalSharp kievanAugmentationDot kievanCClef kievanEndingSymbol
+kievanNote8thStemDown kievanNote8thStemUp kievanNoteBeam kievanNoteHalfStaffLine kievanNoteHalfStaffSpace
+kievanNoteQuarterStemDown kievanNoteQuarterStemUp kievanNoteReciting kievanNoteWhole kievanNoteWholeFinal
+kodalyHandDo kodalyHandFa kodalyHandLa kodalyHandMi kodalyHandRe kodalyHandSo kodalyHandTi leftRepeatSmall legerLine
+legerLineNarrow legerLineWide luteBarlineEndRepeat luteBarlineFinal luteBarlineStartRepeat luteDuration16th
+luteDuration32nd luteDuration8th luteDurationDoubleWhole luteDurationHalf luteDurationQuarter luteDurationWhole
+luteFingeringRHFirst luteFingeringRHSecond luteFingeringRHThird luteFingeringRHThumb luteFrench10thCourse
+luteFrench7thCourse luteFrench8thCourse luteFrench9thCourse luteFrenchAppoggiaturaAbove luteFrenchAppoggiaturaBelow
+luteFrenchFretA luteFrenchFretB luteFrenchFretC luteFrenchFretD luteFrenchFretE luteFrenchFretF luteFrenchFretG
+luteFrenchFretH luteFrenchFretI luteFrenchFretK luteFrenchFretL luteFrenchFretM luteFrenchFretN
+luteFrenchMordentInverted luteFrenchMordentLower luteFrenchMordentUpper luteGermanALower luteGermanAUpper
+luteGermanBLower luteGermanBUpper luteGermanCLower luteGermanCUpper luteGermanDLower luteGermanDUpper
+luteGermanELower luteGermanEUpper luteGermanFLower luteGermanFUpper luteGermanGLower luteGermanGUpper
+luteGermanHLower luteGermanHUpper luteGermanILower luteGermanIUpper luteGermanKLower luteGermanKUpper
+luteGermanLLower luteGermanLUpper luteGermanMLower luteGermanMUpper luteGermanNLower luteGermanNUpper
+luteGermanOLower luteGermanPLower luteGermanQLower luteGermanRLower luteGermanSLower luteGermanTLower
+luteGermanVLower luteGermanXLower luteGermanYLower luteGermanZLower luteItalianClefCSolFaUt luteItalianClefFFaUt
+luteItalianFret0 luteItalianFret1 luteItalianFret2 luteItalianFret3 luteItalianFret4 luteItalianFret5
+luteItalianFret6 luteItalianFret7 luteItalianFret8 luteItalianFret9 luteItalianHoldFinger luteItalianHoldNote
+luteItalianReleaseFinger luteItalianTempoFast luteItalianTempoNeitherFastNorSlow luteItalianTempoSlow
+luteItalianTempoSomewhatFast luteItalianTempoVerySlow luteItalianTimeTriple luteItalianTremolo luteItalianVibrato
+luteStaff6Lines luteStaff6LinesNarrow luteStaff6LinesWide lyricsElision lyricsElisionNarrow lyricsElisionWide
+lyricsHyphenBaseline lyricsHyphenBaselineNonBreaking lyricsTextRepeat medRenFlatHardB medRenFlatSoftB
+medRenFlatWithDot medRenGClefCMN medRenLiquescenceCMN medRenLiquescentAscCMN medRenLiquescentDescCMN medRenNatural
+medRenNaturalWithCross medRenOriscusCMN medRenPlicaCMN medRenPunctumCMN medRenQuilismaCMN medRenSharpCroix
+medRenStrophicusCMN mensuralAlterationSign mensuralBlackBrevis mensuralBlackBrevisVoid mensuralBlackDragma
+mensuralBlackLonga mensuralBlackMaxima mensuralBlackMinima mensuralBlackMinimaVoid mensuralBlackSemibrevis
+mensuralBlackSemibrevisCaudata mensuralBlackSemibrevisOblique mensuralBlackSemibrevisVoid mensuralBlackSemiminima
+mensuralCclef mensuralCclefPetrucciPosHigh mensuralCclefPetrucciPosHighest mensuralCclefPetrucciPosLow
+mensuralCclefPetrucciPosLowest mensuralCclefPetrucciPosMiddle mensuralColorationEndRound mensuralColorationEndSquare
+mensuralColorationStartRound mensuralColorationStartSquare mensuralCombStemDiagonal mensuralCombStemDown
+mensuralCombStemDownFlagExtended mensuralCombStemDownFlagFlared mensuralCombStemDownFlagFusa
+mensuralCombStemDownFlagLeft mensuralCombStemDownFlagRight mensuralCombStemDownFlagSemiminima mensuralCombStemUp
+mensuralCombStemUpFlagExtended mensuralCombStemUpFlagFlared mensuralCombStemUpFlagFusa mensuralCombStemUpFlagLeft
+mensuralCombStemUpFlagRight mensuralCombStemUpFlagSemiminima mensuralCustosCheckmark mensuralCustosDown
+mensuralCustosTurn mensuralCustosUp mensuralFclef mensuralFclefPetrucci mensuralGclef mensuralGclefPetrucci
+mensuralModusImperfectumVert mensuralModusPerfectumVert mensuralNoteheadLongaBlack mensuralNoteheadLongaBlackVoid
+mensuralNoteheadLongaVoid mensuralNoteheadLongaWhite mensuralNoteheadMaximaBlack mensuralNoteheadMaximaBlackVoid
+mensuralNoteheadMaximaVoid mensuralNoteheadMaximaWhite mensuralNoteheadMinimaWhite mensuralNoteheadSemibrevisBlack
+mensuralNoteheadSemibrevisBlackVoid mensuralNoteheadSemibrevisBlackVoidTurned mensuralNoteheadSemibrevisVoid
+mensuralNoteheadSemiminimaWhite mensuralObliqueAsc2ndBlack mensuralObliqueAsc2ndBlackVoid mensuralObliqueAsc2ndVoid
+mensuralObliqueAsc2ndWhite mensuralObliqueAsc3rdBlack mensuralObliqueAsc3rdBlackVoid mensuralObliqueAsc3rdVoid
+mensuralObliqueAsc3rdWhite mensuralObliqueAsc4thBlack mensuralObliqueAsc4thBlackVoid mensuralObliqueAsc4thVoid
+mensuralObliqueAsc4thWhite mensuralObliqueAsc5thBlack mensuralObliqueAsc5thBlackVoid mensuralObliqueAsc5thVoid
+mensuralObliqueAsc5thWhite mensuralObliqueDesc2ndBlack mensuralObliqueDesc2ndBlackVoid mensuralObliqueDesc2ndVoid
+mensuralObliqueDesc2ndWhite mensuralObliqueDesc3rdBlack mensuralObliqueDesc3rdBlackVoid mensuralObliqueDesc3rdVoid
+mensuralObliqueDesc3rdWhite mensuralObliqueDesc4thBlack mensuralObliqueDesc4thBlackVoid mensuralObliqueDesc4thVoid
+mensuralObliqueDesc4thWhite mensuralObliqueDesc5thBlack mensuralObliqueDesc5thBlackVoid mensuralObliqueDesc5thVoid
+mensuralObliqueDesc5thWhite mensuralProlation1 mensuralProlation10 mensuralProlation11 mensuralProlation2
+mensuralProlation3 mensuralProlation4 mensuralProlation5 mensuralProlation6 mensuralProlation7 mensuralProlation8
+mensuralProlation9 mensuralProlationCombiningDot mensuralProlationCombiningDotVoid mensuralProlationCombiningStroke
+mensuralProlationCombiningThreeDots mensuralProlationCombiningThreeDotsTri mensuralProlationCombiningTwoDots
+mensuralProportion1 mensuralProportion2 mensuralProportion3 mensuralProportion4 mensuralProportion5
+mensuralProportion6 mensuralProportion7 mensuralProportion8 mensuralProportion9 mensuralProportionMajor
+mensuralProportionMinor mensuralProportionProportioDupla1 mensuralProportionProportioDupla2
+mensuralProportionProportioQuadrupla mensuralProportionProportioTripla mensuralProportionTempusPerfectum
+mensuralRestBrevis mensuralRestFusa mensuralRestLongaImperfecta mensuralRestLongaPerfecta mensuralRestMaxima
+mensuralRestMinima mensuralRestSemibrevis mensuralRestSemifusa mensuralRestSemiminima mensuralSignumDown
+mensuralSignumUp mensuralTempusImperfectumHoriz mensuralTempusPerfectumHoriz mensuralWhiteBrevis mensuralWhiteFusa
+mensuralWhiteLonga mensuralWhiteMaxima mensuralWhiteMinima mensuralWhiteSemibrevis mensuralWhiteSemiminima
+metAugmentationDot metNote1024thDown metNote1024thUp metNote128thDown metNote128thUp metNote16thDown metNote16thUp
+metNote256thDown metNote256thUp metNote32ndDown metNote32ndUp metNote512thDown metNote512thUp metNote64thDown
+metNote64thUp metNote8thDown metNote8thUp metNoteDoubleWhole metNoteDoubleWholeSquare metNoteHalfDown metNoteHalfUp
+metNoteQuarterDown metNoteQuarterUp metNoteWhole metricModulationArrowLeft metricModulationArrowRight miscDoNotCopy
+miscDoNotPhotocopy miscEyeglasses note1024thDown note1024thUp note128thDown note128thUp note16thDown note16thUp
+note256thDown note256thUp note32ndDown note32ndUp note512thDown note512thUp note64thDown note64thUp note8thDown
+note8thUp noteABlack noteAFlatBlack noteAFlatHalf noteAFlatWhole noteAHalf noteASharpBlack noteASharpHalf
+noteASharpWhole noteAWhole noteBBlack noteBFlatBlack noteBFlatHalf noteBFlatWhole noteBHalf noteBSharpBlack
+noteBSharpHalf noteBSharpWhole noteBWhole noteCBlack noteCFlatBlack noteCFlatHalf noteCFlatWhole noteCHalf
+noteCSharpBlack noteCSharpHalf noteCSharpWhole noteCWhole noteDBlack noteDFlatBlack noteDFlatHalf noteDFlatWhole
+noteDHalf noteDSharpBlack noteDSharpHalf noteDSharpWhole noteDWhole noteDiBlack noteDiHalf noteDiWhole noteDoBlack
+noteDoHalf noteDoWhole noteDoubleWhole noteDoubleWholeSquare noteEBlack noteEFlatBlack noteEFlatHalf noteEFlatWhole
+noteEHalf noteESharpBlack noteESharpHalf noteESharpWhole noteEWhole noteEmptyBlack noteEmptyHalf noteEmptyWhole
+noteFBlack noteFFlatBlack noteFFlatHalf noteFFlatWhole noteFHalf noteFSharpBlack noteFSharpHalf noteFSharpWhole
+noteFWhole noteFaBlack noteFaHalf noteFaWhole noteFiBlack noteFiHalf noteFiWhole noteGBlack noteGFlatBlack
+noteGFlatHalf noteGFlatWhole noteGHalf noteGSharpBlack noteGSharpHalf noteGSharpWhole noteGWhole noteHBlack
+noteHHalf noteHSharpBlack noteHSharpHalf noteHSharpWhole noteHWhole noteHalfDown noteHalfUp noteLaBlack noteLaHalf
+noteLaWhole noteLeBlack noteLeHalf noteLeWhole noteLiBlack noteLiHalf noteLiWhole noteMeBlack noteMeHalf noteMeWhole
+noteMiBlack noteMiHalf noteMiWhole noteQuarterDown noteQuarterUp noteRaBlack noteRaHalf noteRaWhole noteReBlack
+noteReHalf noteReWhole noteRiBlack noteRiHalf noteRiWhole noteSeBlack noteSeHalf noteSeWhole
+noteShapeArrowheadLeftBlack noteShapeArrowheadLeftDoubleWhole noteShapeArrowheadLeftWhite noteShapeDiamondBlack
+noteShapeDiamondDoubleWhole noteShapeDiamondWhite noteShapeIsoscelesTriangleBlack
+noteShapeIsoscelesTriangleDoubleWhole noteShapeIsoscelesTriangleWhite noteShapeKeystoneBlack
+noteShapeKeystoneDoubleWhole noteShapeKeystoneWhite noteShapeMoonBlack noteShapeMoonDoubleWhole
+noteShapeMoonLeftBlack noteShapeMoonLeftDoubleWhole noteShapeMoonLeftWhite noteShapeMoonWhite
+noteShapeQuarterMoonBlack noteShapeQuarterMoonDoubleWhole noteShapeQuarterMoonWhite noteShapeRoundBlack
+noteShapeRoundDoubleWhole noteShapeRoundWhite noteShapeSquareBlack noteShapeSquareDoubleWhole noteShapeSquareWhite
+noteShapeTriangleLeftBlack noteShapeTriangleLeftDoubleWhole noteShapeTriangleLeftWhite noteShapeTriangleRightBlack
+noteShapeTriangleRightDoubleWhole noteShapeTriangleRightWhite noteShapeTriangleRoundBlack
+noteShapeTriangleRoundDoubleWhole noteShapeTriangleRoundLeftBlack noteShapeTriangleRoundLeftDoubleWhole
+noteShapeTriangleRoundLeftWhite noteShapeTriangleRoundWhite noteShapeTriangleUpBlack noteShapeTriangleUpDoubleWhole
+noteShapeTriangleUpWhite noteSiBlack noteSiHalf noteSiWhole noteSoBlack noteSoHalf noteSoWhole noteTeBlack
+noteTeHalf noteTeWhole noteTiBlack noteTiHalf noteTiWhole noteWhole noteheadBlack noteheadCircleSlash
+noteheadCircleX noteheadCircleXDoubleWhole noteheadCircleXHalf noteheadCircleXWhole noteheadCircledBlack
+noteheadCircledBlackLarge noteheadCircledDoubleWhole noteheadCircledDoubleWholeLarge noteheadCircledHalf
+noteheadCircledHalfLarge noteheadCircledWhole noteheadCircledWholeLarge noteheadCircledXLarge
+noteheadClusterDoubleWhole2nd noteheadClusterDoubleWhole3rd noteheadClusterDoubleWholeBottom
+noteheadClusterDoubleWholeMiddle noteheadClusterDoubleWholeTop noteheadClusterHalf2nd noteheadClusterHalf3rd
+noteheadClusterHalfBottom noteheadClusterHalfMiddle noteheadClusterHalfTop noteheadClusterQuarter2nd
+noteheadClusterQuarter3rd noteheadClusterQuarterBottom noteheadClusterQuarterMiddle noteheadClusterQuarterTop
+noteheadClusterRoundBlack noteheadClusterRoundWhite noteheadClusterSquareBlack noteheadClusterSquareWhite
+noteheadClusterWhole2nd noteheadClusterWhole3rd noteheadClusterWholeBottom noteheadClusterWholeMiddle
+noteheadClusterWholeTop noteheadCowellEleventhNoteSeriesHalf noteheadCowellEleventhNoteSeriesWhole
+noteheadCowellEleventhSeriesBlack noteheadCowellFifteenthNoteSeriesBlack noteheadCowellFifteenthNoteSeriesHalf
+noteheadCowellFifteenthNoteSeriesWhole noteheadCowellFifthNoteSeriesBlack noteheadCowellFifthNoteSeriesHalf
+noteheadCowellFifthNoteSeriesWhole noteheadCowellNinthNoteSeriesBlack noteheadCowellNinthNoteSeriesHalf
+noteheadCowellNinthNoteSeriesWhole noteheadCowellSeventhNoteSeriesBlack noteheadCowellSeventhNoteSeriesHalf
+noteheadCowellSeventhNoteSeriesWhole noteheadCowellThirdNoteSeriesBlack noteheadCowellThirdNoteSeriesHalf
+noteheadCowellThirdNoteSeriesWhole noteheadCowellThirteenthNoteSeriesBlack noteheadCowellThirteenthNoteSeriesHalf
+noteheadCowellThirteenthNoteSeriesWhole noteheadDiamondBlack noteheadDiamondBlackOld noteheadDiamondBlackWide
+noteheadDiamondClusterBlack2nd noteheadDiamondClusterBlack3rd noteheadDiamondClusterBlackBottom
+noteheadDiamondClusterBlackMiddle noteheadDiamondClusterBlackTop noteheadDiamondClusterWhite2nd
+noteheadDiamondClusterWhite3rd noteheadDiamondClusterWhiteBottom noteheadDiamondClusterWhiteMiddle
+noteheadDiamondClusterWhiteTop noteheadDiamondDoubleWhole noteheadDiamondDoubleWholeOld noteheadDiamondHalf
+noteheadDiamondHalfFilled noteheadDiamondHalfOld noteheadDiamondHalfWide noteheadDiamondOpen noteheadDiamondWhite
+noteheadDiamondWhiteWide noteheadDiamondWhole noteheadDiamondWholeOld noteheadDoubleWhole noteheadDoubleWholeSquare
+noteheadDoubleWholeWithX noteheadHalf noteheadHalfFilled noteheadHalfWithX noteheadHeavyX noteheadHeavyXHat
+noteheadLargeArrowDownBlack noteheadLargeArrowDownDoubleWhole noteheadLargeArrowDownHalf noteheadLargeArrowDownWhole
+noteheadLargeArrowUpBlack noteheadLargeArrowUpDoubleWhole noteheadLargeArrowUpHalf noteheadLargeArrowUpWhole
+noteheadMoonBlack noteheadMoonWhite noteheadNancarrowSine noteheadNull noteheadParenthesis noteheadParenthesisLeft
+noteheadParenthesisRight noteheadPlusBlack noteheadPlusDoubleWhole noteheadPlusHalf noteheadPlusWhole
+noteheadRectangularClusterBlackBottom noteheadRectangularClusterBlackMiddle noteheadRectangularClusterBlackTop
+noteheadRectangularClusterWhiteBottom noteheadRectangularClusterWhiteMiddle noteheadRectangularClusterWhiteTop
+noteheadRoundBlack noteheadRoundBlackDoubleSlashed noteheadRoundBlackLarge noteheadRoundBlackSlashed
+noteheadRoundBlackSlashedLarge noteheadRoundWhite noteheadRoundWhiteDoubleSlashed noteheadRoundWhiteLarge
+noteheadRoundWhiteSlashed noteheadRoundWhiteSlashedLarge noteheadRoundWhiteWithDot noteheadRoundWhiteWithDotLarge
+noteheadSlashDiamondWhite noteheadSlashHorizontalEnds noteheadSlashHorizontalEndsMuted noteheadSlashVerticalEnds
+noteheadSlashVerticalEndsMuted noteheadSlashVerticalEndsSmall noteheadSlashWhiteDoubleWhole noteheadSlashWhiteHalf
+noteheadSlashWhiteMuted noteheadSlashWhiteWhole noteheadSlashX noteheadSlashedBlack1 noteheadSlashedBlack2
+noteheadSlashedDoubleWhole1 noteheadSlashedDoubleWhole2 noteheadSlashedHalf1 noteheadSlashedHalf2
+noteheadSlashedWhole1 noteheadSlashedWhole2 noteheadSquareBlack noteheadSquareBlackLarge noteheadSquareBlackWhite
+noteheadSquareWhite noteheadTriangleDownBlack noteheadTriangleDownDoubleWhole noteheadTriangleDownHalf
+noteheadTriangleDownWhite noteheadTriangleDownWhole noteheadTriangleLeftBlack noteheadTriangleLeftWhite
+noteheadTriangleRightBlack noteheadTriangleRightWhite noteheadTriangleRoundDownBlack noteheadTriangleRoundDownWhite
+noteheadTriangleUpBlack noteheadTriangleUpDoubleWhole noteheadTriangleUpHalf noteheadTriangleUpRightBlack
+noteheadTriangleUpRightWhite noteheadTriangleUpWhite noteheadTriangleUpWhole noteheadVoidWithX noteheadWhole
+noteheadWholeFilled noteheadWholeWithX noteheadXBlack noteheadXDoubleWhole noteheadXHalf noteheadXOrnate
+noteheadXOrnateEllipse noteheadXWhole octaveBaselineA octaveBaselineB octaveBaselineM octaveBaselineV octaveBassa
+octaveLoco octaveParensLeft octaveParensRight octaveSuperscriptA octaveSuperscriptB octaveSuperscriptM
+octaveSuperscriptV oneHandedRollStevens organGerman2Fusae organGerman2Minimae organGerman2OctaveUp
+organGerman2Semifusae organGerman2Semiminimae organGerman3Fusae organGerman3Minimae organGerman3Semifusae
+organGerman3Semiminimae organGerman4Fusae organGerman4Minimae organGerman4Semifusae organGerman4Semiminimae
+organGerman5Fusae organGerman5Minimae organGerman5Semifusae organGerman5Semiminimae organGerman6Fusae
+organGerman6Minimae organGerman6Semifusae organGerman6Semiminimae organGermanALower organGermanAUpper
+organGermanAugmentationDot organGermanBLower organGermanBUpper organGermanBuxheimerBrevis2
+organGermanBuxheimerBrevis3 organGermanBuxheimerMinimaRest organGermanBuxheimerSemibrevis
+organGermanBuxheimerSemibrevisRest organGermanCLower organGermanCUpper organGermanCisLower organGermanCisUpper
+organGermanDLower organGermanDUpper organGermanDisLower organGermanDisUpper organGermanELower organGermanEUpper
+organGermanFLower organGermanFUpper organGermanFisLower organGermanFisUpper organGermanFusa organGermanFusaRest
+organGermanGLower organGermanGUpper organGermanGisLower organGermanGisUpper organGermanHLower organGermanHUpper
+organGermanMinima organGermanMinimaRest organGermanOctaveDown organGermanOctaveUp organGermanSemibrevis
+organGermanSemibrevisRest organGermanSemifusa organGermanSemifusaRest organGermanSemiminima
+organGermanSemiminimaRest organGermanTie ornamentBottomLeftConcaveStroke ornamentBottomLeftConcaveStrokeLarge
+ornamentBottomLeftConvexStroke ornamentBottomRightConcaveStroke ornamentBottomRightConvexStroke ornamentComma
+ornamentDoubleObliqueLinesAfterNote ornamentDoubleObliqueLinesBeforeNote ornamentDownCurve ornamentHaydn
+ornamentHighLeftConcaveStroke ornamentHighLeftConvexStroke ornamentHighRightConcaveStroke
+ornamentHighRightConvexStroke ornamentHookAfterNote ornamentHookBeforeNote ornamentLeftFacingHalfCircle
+ornamentLeftFacingHook ornamentLeftPlus ornamentLeftShakeT ornamentLeftVerticalStroke
+ornamentLeftVerticalStrokeWithCross ornamentLowLeftConcaveStroke ornamentLowLeftConvexStroke
+ornamentLowRightConcaveStroke ornamentLowRightConvexStroke ornamentMiddleVerticalStroke ornamentMordent
+ornamentObliqueLineAfterNote ornamentObliqueLineBeforeNote ornamentObliqueLineHorizAfterNote
+ornamentObliqueLineHorizBeforeNote ornamentOriscus ornamentPinceCouperin ornamentPortDeVoixV
+ornamentPrecompAppoggTrill ornamentPrecompAppoggTrillSuffix ornamentPrecompCadence ornamentPrecompCadenceUpperPrefix
+ornamentPrecompCadenceUpperPrefixTurn ornamentPrecompCadenceWithTurn ornamentPrecompDescendingSlide
+ornamentPrecompDoubleCadenceLowerPrefix ornamentPrecompDoubleCadenceUpperPrefix
+ornamentPrecompDoubleCadenceUpperPrefixTurn ornamentPrecompInvertedMordentUpperPrefix ornamentPrecompMordentRelease
+ornamentPrecompMordentUpperPrefix ornamentPrecompPortDeVoixMordent ornamentPrecompSlide
+ornamentPrecompSlideTrillBach ornamentPrecompSlideTrillDAnglebert ornamentPrecompSlideTrillMarpurg
+ornamentPrecompSlideTrillMuffat ornamentPrecompSlideTrillSuffixMuffat ornamentPrecompTrillLowerSuffix
+ornamentPrecompTrillSuffixDandrieu ornamentPrecompTrillWithMordent ornamentPrecompTurnTrillBach
+ornamentPrecompTurnTrillDAnglebert ornamentQuilisma ornamentRightFacingHalfCircle ornamentRightFacingHook
+ornamentRightVerticalStroke ornamentSchleifer ornamentShake3 ornamentShakeMuffat1 ornamentShortObliqueLineAfterNote
+ornamentShortObliqueLineBeforeNote ornamentShortTrill ornamentTopLeftConcaveStroke ornamentTopLeftConvexStroke
+ornamentTopRightConcaveStroke ornamentTopRightConvexStroke ornamentTremblement ornamentTremblementCouperin
+ornamentTrill ornamentTurn ornamentTurnInverted ornamentTurnSlash ornamentTurnUp ornamentTurnUpS ornamentUpCurve
+ornamentVerticalLine ornamentZigZagLineNoRightEnd ornamentZigZagLineWithRightEnd ottava ottavaAlta ottavaBassa
+ottavaBassaBa ottavaBassaVb pendereckiTremolo pictAgogo pictAlmglocken pictAnvil pictBambooChimes pictBambooScraper
+pictBassDrum pictBassDrumOnSide pictBeaterBow pictBeaterBox pictBeaterBrassMalletsDown pictBeaterBrassMalletsLeft
+pictBeaterBrassMalletsRight pictBeaterBrassMalletsUp pictBeaterCombiningDashedCircle pictBeaterCombiningParentheses
+pictBeaterDoubleBassDrumDown pictBeaterDoubleBassDrumUp pictBeaterFinger pictBeaterFingernails pictBeaterFist
+pictBeaterGuiroScraper pictBeaterHammer pictBeaterHammerMetalDown pictBeaterHammerMetalUp
+pictBeaterHammerPlasticDown pictBeaterHammerPlasticUp pictBeaterHammerWoodDown pictBeaterHammerWoodUp pictBeaterHand
+pictBeaterHardBassDrumDown pictBeaterHardBassDrumUp pictBeaterHardGlockenspielDown pictBeaterHardGlockenspielLeft
+pictBeaterHardGlockenspielRight pictBeaterHardGlockenspielUp pictBeaterHardTimpaniDown pictBeaterHardTimpaniLeft
+pictBeaterHardTimpaniRight pictBeaterHardTimpaniUp pictBeaterHardXylophoneDown pictBeaterHardXylophoneLeft
+pictBeaterHardXylophoneRight pictBeaterHardXylophoneUp pictBeaterHardYarnDown pictBeaterHardYarnLeft
+pictBeaterHardYarnRight pictBeaterHardYarnUp pictBeaterJazzSticksDown pictBeaterJazzSticksUp
+pictBeaterKnittingNeedle pictBeaterMallet pictBeaterMalletDown pictBeaterMediumBassDrumDown
+pictBeaterMediumBassDrumUp pictBeaterMediumTimpaniDown pictBeaterMediumTimpaniLeft pictBeaterMediumTimpaniRight
+pictBeaterMediumTimpaniUp pictBeaterMediumXylophoneDown pictBeaterMediumXylophoneLeft pictBeaterMediumXylophoneRight
+pictBeaterMediumXylophoneUp pictBeaterMediumYarnDown pictBeaterMediumYarnLeft pictBeaterMediumYarnRight
+pictBeaterMediumYarnUp pictBeaterMetalBassDrumDown pictBeaterMetalBassDrumUp pictBeaterMetalDown
+pictBeaterMetalHammer pictBeaterMetalLeft pictBeaterMetalRight pictBeaterMetalUp pictBeaterSnareSticksDown
+pictBeaterSnareSticksUp pictBeaterSoftBassDrumDown pictBeaterSoftBassDrumUp pictBeaterSoftGlockenspielDown
+pictBeaterSoftGlockenspielLeft pictBeaterSoftGlockenspielRight pictBeaterSoftGlockenspielUp
+pictBeaterSoftTimpaniDown pictBeaterSoftTimpaniLeft pictBeaterSoftTimpaniRight pictBeaterSoftTimpaniUp
+pictBeaterSoftXylophone pictBeaterSoftXylophoneDown pictBeaterSoftXylophoneLeft pictBeaterSoftXylophoneRight
+pictBeaterSoftXylophoneUp pictBeaterSoftYarnDown pictBeaterSoftYarnLeft pictBeaterSoftYarnRight pictBeaterSoftYarnUp
+pictBeaterSpoonWoodenMallet pictBeaterSuperballDown pictBeaterSuperballLeft pictBeaterSuperballRight
+pictBeaterSuperballUp pictBeaterTriangleDown pictBeaterTrianglePlain pictBeaterTriangleUp pictBeaterWireBrushesDown
+pictBeaterWireBrushesUp pictBeaterWoodTimpaniDown pictBeaterWoodTimpaniLeft pictBeaterWoodTimpaniRight
+pictBeaterWoodTimpaniUp pictBeaterWoodXylophoneDown pictBeaterWoodXylophoneLeft pictBeaterWoodXylophoneRight
+pictBeaterWoodXylophoneUp pictBell pictBellOfCymbal pictBellPlate pictBellTree pictBirdWhistle pictBoardClapper
+pictBongos pictBrakeDrum pictCabasa pictCannon pictCarHorn pictCastanets pictCastanetsWithHandle pictCelesta
+pictCencerro pictCenter1 pictCenter2 pictCenter3 pictChainRattle pictChimes pictChineseCymbal pictChokeCymbal
+pictClaves pictCoins pictConga pictCowBell pictCrashCymbals pictCrotales pictCrushStem pictCuica pictCymbalTongs
+pictDamp1 pictDamp2 pictDamp3 pictDamp4 pictDeadNoteStem pictDrumStick pictDuckCall pictEdgeOfCymbal pictEmptyTrap
+pictFingerCymbals pictFlexatone pictFootballRatchet pictGlassHarmonica pictGlassHarp pictGlassPlateChimes
+pictGlassTubeChimes pictGlsp pictGlspSmithBrindle pictGobletDrum pictGong pictGongWithButton pictGuiro
+pictGumHardDown pictGumHardLeft pictGumHardRight pictGumHardUp pictGumMediumDown pictGumMediumLeft
+pictGumMediumRight pictGumMediumUp pictGumSoftDown pictGumSoftLeft pictGumSoftRight pictGumSoftUp pictHalfOpen1
+pictHalfOpen2 pictHandbell pictHiHat pictHiHatOnStand pictJawHarp pictJingleBells pictKlaxonHorn pictLeftHandCircle
+pictLionsRoar pictLithophone pictLogDrum pictLotusFlute pictMar pictMarSmithBrindle pictMaraca pictMaracas
+pictMegaphone pictMetalPlateChimes pictMetalTubeChimes pictMusicalSaw pictNormalPosition pictOnRim pictOpen
+pictOpenRimShot pictPistolShot pictPoliceWhistle pictQuijada pictRainstick pictRatchet pictRecoReco
+pictRightHandSquare pictRim1 pictRim2 pictRim3 pictRimShotOnStem pictSandpaperBlocks pictScrapeAroundRim
+pictScrapeAroundRimClockwise pictScrapeCenterToEdge pictScrapeEdgeToCenter pictShellBells pictShellChimes pictSiren
+pictSistrum pictSizzleCymbal pictSleighBell pictSlideBrushOnGong pictSlideWhistle pictSlitDrum pictSnareDrum
+pictSnareDrumMilitary pictSnareDrumSnaresOff pictSteelDrums pictStickShot pictSuperball pictSuspendedCymbal
+pictSwishStem pictTabla pictTamTam pictTamTamWithBeater pictTambourine pictTempleBlocks pictTenorDrum
+pictThundersheet pictTimbales pictTimpani pictTomTom pictTomTomChinese pictTomTomIndoAmerican pictTomTomJapanese
+pictTriangle pictTubaphone pictTubularBells pictTurnLeftStem pictTurnRightLeftStem pictTurnRightStem pictVib
+pictVibMotorOff pictVibSmithBrindle pictVibraslap pictVietnameseHat pictWhip pictWindChimesGlass pictWindMachine
+pictWindWhistle pictWoodBlock pictWoundHardDown pictWoundHardLeft pictWoundHardRight pictWoundHardUp
+pictWoundSoftDown pictWoundSoftLeft pictWoundSoftRight pictWoundSoftUp pictXyl pictXylBass pictXylSmithBrindle
+pictXylTenor pictXylTenorTrough pictXylTrough pluckedBuzzPizzicato pluckedDamp pluckedDampAll pluckedDampOnStem
+pluckedFingernailFlick pluckedLeftHandPizzicato pluckedPlectrum pluckedSnapPizzicatoAbove pluckedSnapPizzicatoBelow
+pluckedWithFingernails quindicesima quindicesimaAlta quindicesimaBassa quindicesimaBassaMb repeat1Bar repeat2Bars
+repeat4Bars repeatBarLowerDot repeatBarSlash repeatBarUpperDot repeatDot repeatDots repeatLeft repeatRight
+repeatRightLeft rest1024th rest128th rest16th rest256th rest32nd rest512th rest64th rest8th restDoubleWhole
+restDoubleWholeLegerLine restHBar restHBarLeft restHBarMiddle restHBarRight restHalf restHalfLegerLine restLonga
+restMaxima restQuarter restQuarterOld restQuarterZ restWhole restWholeLegerLine reversedBrace reversedBracketBottom
+reversedBracketTop rightRepeatSmall scaleDegree1 scaleDegree2 scaleDegree3 scaleDegree4 scaleDegree5 scaleDegree6
+scaleDegree7 scaleDegree8 scaleDegree9 schaefferClef schaefferFClefToGClef schaefferGClefToFClef
+schaefferPreviousClef segno segnoSerpent1 segnoSerpent2 semipitchedPercussionClef1 semipitchedPercussionClef2
+smnFlat smnFlatWhite smnHistoryDoubleFlat smnHistoryDoubleSharp smnHistoryFlat smnHistorySharp smnNatural smnSharp
+smnSharpDown smnSharpWhite smnSharpWhiteDown splitBarDivider staff1Line staff1LineNarrow staff1LineWide staff2Lines
+staff2LinesNarrow staff2LinesWide staff3Lines staff3LinesNarrow staff3LinesWide staff4Lines staff4LinesNarrow
+staff4LinesWide staff5Lines staff5LinesNarrow staff5LinesWide staff6Lines staff6LinesNarrow staff6LinesWide
+staffDivideArrowDown staffDivideArrowUp staffDivideArrowUpDown staffPosLower1 staffPosLower2 staffPosLower3
+staffPosLower4 staffPosLower5 staffPosLower6 staffPosLower7 staffPosLower8 staffPosRaise1 staffPosRaise2
+staffPosRaise3 staffPosRaise4 staffPosRaise5 staffPosRaise6 staffPosRaise7 staffPosRaise8 stem stemBowOnBridge
+stemBowOnTailpiece stemBuzzRoll stemDamp stemHarpStringNoise stemMultiphonicsBlack stemMultiphonicsBlackWhite
+stemMultiphonicsWhite stemPendereckiTremolo stemRimShot stemSprechgesang stemSulPonticello stemSussurando
+stemSwished stemVibratoPulse stockhausenTremolo stringsBowBehindBridge stringsBowBehindBridgeFourStrings
+stringsBowBehindBridgeOneString stringsBowBehindBridgeThreeStrings stringsBowBehindBridgeTwoStrings
+stringsBowOnBridge stringsBowOnTailpiece stringsChangeBowDirection stringsDownBow stringsDownBowAwayFromBody
+stringsDownBowBeyondBridge stringsDownBowTowardsBody stringsDownBowTurned stringsFouette stringsHalfHarmonic
+stringsHarmonic stringsJeteAbove stringsJeteBelow stringsMuteOff stringsMuteOn stringsOverpressureDownBow
+stringsOverpressureNoDirection stringsOverpressurePossibileDownBow stringsOverpressurePossibileUpBow
+stringsOverpressureUpBow stringsScrapeCircularClockwise stringsScrapeCircularCounterclockwise
+stringsScrapeParallelInward stringsScrapeParallelOutward stringsThumbPosition stringsThumbPositionTurned
+stringsTripleChopInward stringsTripleChopOutward stringsUpBow stringsUpBowAwayFromBody stringsUpBowBeyondBridge
+stringsUpBowTowardsBody stringsUpBowTurned stringsVibratoPulse swissRudimentsNoteheadBlackDouble
+swissRudimentsNoteheadBlackFlam swissRudimentsNoteheadHalfDouble swissRudimentsNoteheadHalfFlam systemDivider
+systemDividerExtraLong systemDividerLong textAugmentationDot textBlackNoteFrac16thLongStem
+textBlackNoteFrac16thShortStem textBlackNoteFrac32ndLongStem textBlackNoteFrac8thLongStem
+textBlackNoteFrac8thShortStem textBlackNoteLongStem textBlackNoteShortStem textCont16thBeamLongStem
+textCont16thBeamShortStem textCont32ndBeamLongStem textCont8thBeamLongStem textCont8thBeamShortStem
+textHeadlessBlackNoteFrac16thLongStem textHeadlessBlackNoteFrac16thShortStem textHeadlessBlackNoteFrac32ndLongStem
+textHeadlessBlackNoteFrac8thLongStem textHeadlessBlackNoteFrac8thShortStem textHeadlessBlackNoteLongStem
+textHeadlessBlackNoteShortStem textTie textTuplet3LongStem textTuplet3ShortStem textTupletBracketEndLongStem
+textTupletBracketEndShortStem textTupletBracketStartLongStem textTupletBracketStartShortStem timeSig0
+timeSig0Reversed timeSig0Turned timeSig1 timeSig1Reversed timeSig1Turned timeSig2 timeSig2Reversed timeSig2Turned
+timeSig3 timeSig3Reversed timeSig3Turned timeSig4 timeSig4Reversed timeSig4Turned timeSig5 timeSig5Reversed
+timeSig5Turned timeSig6 timeSig6Reversed timeSig6Turned timeSig7 timeSig7Reversed timeSig7Turned timeSig8
+timeSig8Reversed timeSig8Turned timeSig9 timeSig9Reversed timeSig9Turned timeSigBracketLeft timeSigBracketLeftSmall
+timeSigBracketRight timeSigBracketRightSmall timeSigCombDenominator timeSigCombNumerator timeSigComma timeSigCommon
+timeSigCommonReversed timeSigCommonTurned timeSigCut2 timeSigCut3 timeSigCutCommon timeSigCutCommonReversed
+timeSigCutCommonTurned timeSigEquals timeSigFractionHalf timeSigFractionOneThird timeSigFractionQuarter
+timeSigFractionThreeQuarters timeSigFractionTwoThirds timeSigFractionalSlash timeSigMinus timeSigMultiply
+timeSigOpenPenderecki timeSigParensLeft timeSigParensLeftSmall timeSigParensRight timeSigParensRightSmall
+timeSigPlus timeSigPlusSmall timeSigSlash timeSigX tremolo1 tremolo2 tremolo3 tremolo4 tremolo5 tremoloDivisiDots2
+tremoloDivisiDots3 tremoloDivisiDots4 tremoloDivisiDots6 tremoloFingered1 tremoloFingered2 tremoloFingered3
+tremoloFingered4 tremoloFingered5 tripleTongueAbove tripleTongueBelow tuplet0 tuplet1 tuplet2 tuplet3 tuplet4
+tuplet5 tuplet6 tuplet7 tuplet8 tuplet9 tupletBracketLeftItalic tupletBracketLeftRoman tupletBracketRightItalic
+tupletBracketRightRoman tupletColon tupletParenthesisLeftItalic tupletParenthesisLeftRoman
+tupletParenthesisRightItalic tupletParenthesisRightRoman unmeasuredTremolo unmeasuredTremoloSimple
+unpitchedPercussionClef1 unpitchedPercussionClef2 ventiduesima ventiduesimaAlta ventiduesimaBassa
+ventiduesimaBassaMb vocalFingerClickStockhausen vocalHalbGesungen vocalMouthClosed vocalMouthOpen vocalMouthPursed
+vocalMouthSlightlyOpen vocalMouthWideOpen vocalNasalVoice vocalSprechgesang vocalTongueClickStockhausen
+vocalTongueFingerClickStockhausen vocalsSussurando wiggleArpeggiatoDown wiggleArpeggiatoDownArrow
+wiggleArpeggiatoDownSwash wiggleArpeggiatoUp wiggleArpeggiatoUpArrow wiggleArpeggiatoUpSwash wiggleCircular
+wiggleCircularConstant wiggleCircularConstantFlipped wiggleCircularConstantFlippedLarge wiggleCircularConstantLarge
+wiggleCircularEnd wiggleCircularLarge wiggleCircularLarger wiggleCircularLargerStill wiggleCircularLargest
+wiggleCircularSmall wiggleCircularStart wiggleGlissando wiggleGlissandoGroup1 wiggleGlissandoGroup2
+wiggleGlissandoGroup3 wiggleRandom1 wiggleRandom2 wiggleRandom3 wiggleRandom4 wiggleSawtooth wiggleSawtoothNarrow
+wiggleSawtoothWide wiggleSquareWave wiggleSquareWaveNarrow wiggleSquareWaveWide wiggleTrill wiggleTrillFast
+wiggleTrillFaster wiggleTrillFasterStill wiggleTrillFastest wiggleTrillSlow wiggleTrillSlower wiggleTrillSlowerStill
+wiggleTrillSlowest wiggleVIbratoLargestSlower wiggleVIbratoMediumSlower wiggleVibrato wiggleVibratoLargeFast
+wiggleVibratoLargeFaster wiggleVibratoLargeFasterStill wiggleVibratoLargeFastest wiggleVibratoLargeSlow
+wiggleVibratoLargeSlower wiggleVibratoLargeSlowest wiggleVibratoLargestFast wiggleVibratoLargestFaster
+wiggleVibratoLargestFasterStill wiggleVibratoLargestFastest wiggleVibratoLargestSlow wiggleVibratoLargestSlowest
+wiggleVibratoMediumFast wiggleVibratoMediumFaster wiggleVibratoMediumFasterStill wiggleVibratoMediumFastest
+wiggleVibratoMediumSlow wiggleVibratoMediumSlowest wiggleVibratoSmallFast wiggleVibratoSmallFaster
+wiggleVibratoSmallFasterStill wiggleVibratoSmallFastest wiggleVibratoSmallSlow wiggleVibratoSmallSlower
+wiggleVibratoSmallSlowest wiggleVibratoSmallestFast wiggleVibratoSmallestFaster wiggleVibratoSmallestFasterStill
+wiggleVibratoSmallestFastest wiggleVibratoSmallestSlow wiggleVibratoSmallestSlower wiggleVibratoSmallestSlowest
+wiggleVibratoStart wiggleVibratoWide wiggleWavy wiggleWavyNarrow wiggleWavyWide windClosedHole windFlatEmbouchure
+windHalfClosedHole1 windHalfClosedHole2 windHalfClosedHole3 windLessRelaxedEmbouchure windLessTightEmbouchure
+windMouthpiecePop windMultiphonicsBlackStem windMultiphonicsBlackWhiteStem windMultiphonicsWhiteStem windOpenHole
+windReedPositionIn windReedPositionNormal windReedPositionOut windRelaxedEmbouchure windRimOnly windSharpEmbouchure
+windStrongAirPressure windThreeQuartersClosedHole windTightEmbouchure windTrillKey windVeryTightEmbouchure
+windWeakAirPressure
+`.trim().split(/\s+/));
+
+// src/core/key-signatures.ts
+var esc = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+var tag = (name, value2) => `<${name}>${esc(String(value2))}</${name}>`;
+var color = (key, hidden = false) => {
+  const rgba = key.sourceColor?.rgba;
+  if (rgba && rgba.some((v) => !Number.isInteger(v) || v < 0 || v > 255)) refuse("writer-key-color", "Key color requires source byte channels.", key.sourceColor.source);
+  return hidden ? ' color="#00000000"' : rgba ? ` color="#${[rgba[3], ...rgba.slice(0, 3)].map((n) => n.toString(16).padStart(2, "0")).join("").toUpperCase()}"` : "";
+};
+function keySignatureXml(key, staff, hidden = false) {
+  let content;
+  if (key.customTones) {
+    content = key.customTones.map((t) => {
+      if (!/^[A-G]$/.test(t.step) || !Number.isFinite(t.alter) || Math.abs(t.alter) > 16 || t.smufl && !canonicalSymbolVocabulary.has(t.smufl.name)) refuse("writer-custom-key", "Unqualified source custom key tone.", t.source);
+      return tag("key-step", t.step) + tag("key-alter", t.alter) + `<key-accidental${t.smufl ? ` smufl="${esc(t.smufl.name)}"` : ""}>${esc(t.accidental)}</key-accidental>`;
+    }).join("");
+    for (const [index, t] of key.customTones.entries()) if (t.octave !== void 0) {
+      if (!Number.isInteger(t.octave) || t.octave < 0 || t.octave > 9) refuse("writer-custom-key", "Standard key octave must be between zero and nine.", t.source);
+      content += `<key-octave number="${index + 1}">${t.octave}</key-octave>`;
+    }
+  } else content = tag("fifths", key.fifths) + (key.mode ? tag("mode", key.mode) : "");
+  return `<key${staff ? ` number="${staff}"` : ""}${hidden || key.printObject === false || key.customProjection ? ' print-object="no"' : ""}${color(key)}>${content}</key>`;
+}
+function keyInstructionXml(key, staff) {
+  if (!key.customProjection) return "";
+  const appearance = color(key, key.printObject === false), words = (text) => `<direction-type><words${appearance}>${esc(text)}</words></direction-type>`;
+  const standard = { sharp: "accidentalSharp", flat: "accidentalFlat", natural: "accidentalNatural", "double-sharp": "accidentalDoubleSharp", "flat-flat": "accidentalDoubleFlat", "natural-sharp": "accidentalNaturalSharp", "natural-flat": "accidentalNaturalFlat" };
+  let content = words("Key signature: ");
+  for (const [index, tone] of (key.customTones ?? []).entries()) {
+    content += words(`${index ? "; " : ""}${tone.step}${tone.octave ?? ""} `);
+    for (const component of tone.components ?? [{ source: tone.source, name: tone.smufl?.name ?? standard[tone.accidental] }]) {
+      if (!canonicalSymbolVocabulary.has(component.name)) refuse("writer-custom-key-component", "Key instruction needs an exact canonical accidental symbol.", component.source);
+      content += `<direction-type><symbol${appearance}>${esc(component.name)}</symbol></direction-type>`;
+    }
+  }
+  return `<direction placement="above">${content}${tag("staff", staff)}</direction>`;
+}
+
+// src/core/clefs.ts
+var aliases = {
+  G8vbo: ["G8vb", "gClef8vbOld"],
+  G8vbc: ["G8vb", "gClef8vbCClef"],
+  G8vbp: ["G", "gClef8vbParens"],
+  C_19C: ["G", "cClefSquare"],
+  C1_F18C: ["C1", "cClefFrench"],
+  C3_F18C: ["C3", "cClefFrench"],
+  C4_F18C: ["C4", "cClefFrench"],
+  C1_F20C: ["C1", "cClefFrench20C"],
+  C3_F20C: ["C3", "cClefFrench20C"],
+  C4_F20C: ["C4", "cClefFrench20C"],
+  F_F18C: ["F", "fClefFrench"],
+  F_19C: ["F", "fClef19thCentury"],
+  C4_8VB: ["C48vb", "cClef8vb"],
+  PERC2: ["PERC", "unpitchedPercussionClef2"],
+  TAB4: ["TAB", "fourStringTabClef"],
+  TAB2: ["TAB", "sixStringTabClefSerif"],
+  TAB4_SERIF: ["TAB", "fourStringTabClefSerif"]
+};
+function standardClef(token) {
+  const alias = Object.hasOwn(aliases, token) ? aliases[token] : void 0, canonical = alias?.[0] ?? token;
+  let result;
+  if (canonical === "TAB") result = { sign: "TAB" };
+  else if (canonical === "PERC") result = { sign: "percussion" };
+  else {
+    const match = /^([GFC])([1-5])?(8va|8vb|15ma|15mb)?$/.exec(canonical);
+    if (!match) return void 0;
+    const sign = match[1], line = match[2] ? Number(match[2]) : sign === "G" ? 2 : sign === "F" ? 4 : 3;
+    const octaveChange = match[3] ? { "8va": 1, "8vb": -1, "15ma": 2, "15mb": -2 }[match[3]] : void 0;
+    result = { sign, line, ...octaveChange ? { octaveChange } : {} };
+  }
+  if (alias) {
+    result.sourceGlyph = alias[1];
+    result.appearanceVariant = token !== "C4_8VB";
+  }
+  return result;
+}
+
 // src/core/rational.ts
 function gcd(a, b) {
   while (b) [a, b] = [b, a % b];
   return Math.abs(a);
 }
 function q(n, d = 1) {
-  if (!Number.isSafeInteger(n) || !Number.isSafeInteger(d) || d <= 0 || Math.abs(n) > 1e12 || d > 1e9)
+  if (!Number.isSafeInteger(n) || !Number.isSafeInteger(d) || d <= 0)
     refuse("clock-budget", "Exact rational arithmetic exceeds the proving profile budget.");
   const g = gcd(n, d);
-  return { n: n / g, d: d / g };
+  n /= g;
+  d /= g;
+  if (Math.abs(n) > 1e12 || d > 1e9) refuse("clock-budget", "Exact rational arithmetic exceeds the proving profile budget.");
+  return { n, d };
 }
-var add = (a, b) => q(a.n * b.d + b.n * a.d, a.d * b.d);
-var mul = (a, b) => q(a.n * b.n, a.d * b.d);
-var equal = (a, b) => a.n * b.d === b.n * a.d;
+function exact(n, d) {
+  let a = n < 0n ? -n : n, b = d;
+  while (b) [a, b] = [b, a % b];
+  n /= a;
+  d /= a;
+  if (n < -1000000000000n || n > 1000000000000n || d > 1000000000n)
+    refuse("clock-budget", "Exact rational arithmetic exceeds the proving profile budget.");
+  return { n: Number(n), d: Number(d) };
+}
+function add(a, b) {
+  const g = gcd(a.d, b.d), ad = a.d / g, bd = b.d / g;
+  const x = a.n * bd, y = b.n * ad, d = ad * b.d;
+  if (Number.isSafeInteger(x) && Number.isSafeInteger(y) && Number.isSafeInteger(x + y) && Number.isSafeInteger(d)) return q(x + y, d);
+  return exact(BigInt(a.n) * BigInt(bd) + BigInt(b.n) * BigInt(ad), BigInt(ad) * BigInt(b.d));
+}
+function mul(a, b) {
+  const g = gcd(a.n, b.d), h = gcd(b.n, a.d);
+  const an = a.n / g, bn = b.n / h, ad = a.d / h, bd = b.d / g;
+  const n = an * bn, d = ad * bd;
+  if (Number.isSafeInteger(n) && Number.isSafeInteger(d)) return q(n, d);
+  return exact(BigInt(an) * BigInt(bn), BigInt(ad) * BigInt(bd));
+}
+function equal(a, b) {
+  const g = gcd(a.n, a.d), h = gcd(b.n, b.d);
+  return a.n / g === b.n / h && a.d / g === b.d / h;
+}
+function compare(a, b) {
+  const x = a.n * b.d, y = b.n * a.d;
+  if (Number.isSafeInteger(x) && Number.isSafeInteger(y)) return x < y ? -1 : x > y ? 1 : 0;
+  const difference = BigInt(a.n) * BigInt(b.d) - BigInt(b.n) * BigInt(a.d);
+  return difference < 0n ? -1 : difference > 0n ? 1 : 0;
+}
 function decimal(s) {
   if (!/^\d{1,4}(?:\.\d{1,6})?$/.test(s)) refuse("number", "Expected a bounded nonnegative decimal.");
   const [whole, fraction = ""] = s.split(".");
@@ -2157,11 +2849,516 @@ function divisions(clocks) {
   return d;
 }
 
+// src/core/tab-grid.ts
+function tabGridRelations(score) {
+  const relations = [], levels2 = /* @__PURE__ */ new Map();
+  for (const part of score.parts) {
+    const events = new Map(part.measures.flatMap((measure, mi) => measure.voices.flatMap((voice, vi) => voice.map((event) => [event.id, { event, mi, vi }]))));
+    for (const [eventId, { event, mi, vi }] of events) {
+      const grid = event.tabRhythm?.durationSymbol?.grid;
+      if (!grid) continue;
+      if (!Number.isInteger(grid.lines) || grid.lines < 0 || grid.lines > 10) refuse("writer-tab-grid", "TAB duration grid needs a bounded exact line count.", grid.source);
+      if (!grid.lines || !grid.previous) continue;
+      const previous = events.get(grid.previous.eventId ?? "");
+      if (!previous || previous.vi !== vi || grid.previous.partId !== part.id || grid.previous.measure !== previous.mi || compare(grid.previous.position, previous.event.start) !== 0 || previous.mi > mi || previous.mi === mi && compare(previous.event.start, event.start) > 0)
+        refuse("writer-tab-grid", "TAB grid connection must resolve to its actual preceding source event.", grid.source);
+      for (let index = 1; index <= grid.lines; index++) {
+        const id = `tab-grid:${part.id}:${eventId}:${index}`;
+        relations.push({
+          source: grid.source,
+          id,
+          kind: "text-line",
+          line: "bracket",
+          lineType: "solid",
+          startHook: index === 1 ? "down" : "none",
+          endHook: index === 1 ? "down" : "none",
+          placement: { source: grid.source, value: "above" },
+          ...event.printObject === false ? { printObject: false } : {},
+          start: grid.previous,
+          end: { partId: part.id, measure: mi, position: event.start, staff: event.staff ?? Math.floor(vi / 4) + 1, voiceId: event.voiceId ?? String(vi + 1), eventId }
+        });
+        levels2.set(id, { index, count: grid.lines, serial: levels2.size + 1 });
+      }
+    }
+  }
+  return { relations, levels: levels2 };
+}
+
+// src/core/text-font.ts
+var esc2 = (value2) => value2.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+function pointSizeXml(size, userCredit = false) {
+  const point = size?.pointSize;
+  if (point?.context === "musescore-source-scaled-text") {
+    const scale = point.scaling, dependent = point.spatiumDependent, music = point.music;
+    const musicValid = !music || Number(music.nativeVersion) >= 3 && Number(music.nativeVersion) < 5 && (!scale || scale.nativeVersion === music.nativeVersion) && (music.rule === "fragment" && music.factor === 1 || music.rule === "tempo-ratio" && Number(music.nativeVersion) >= 4 && Number(music.nativeVersion) < 4.7 && music.factor === 5 / 3 || music.rule === "legacy-dynamic" && Number(music.nativeVersion) >= 4 && Number(music.nativeVersion) < 4.1 && music.factor === 2 || music.rule === "smufl-scale" && Number(music.nativeVersion) >= 4.1 && music.factor === (Number(music.nativeVersion) >= 4.7 ? 4 * 1.75 * 72 / 25.4 : 20) || music.rule === "symbol-size" && Number(music.nativeVersion) >= 4.6 && music.factor === 1);
+    const musicFactor = music?.factor ?? 1;
+    const valid = musicValid && size && ["source-property", "source-style", "source-markup", "native-default"].includes(size.origin) && /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(size.rawValue.trim()) && Number(size.rawValue) === size.value && Number.isFinite(size.value) && size.value > 0 && size.value <= 1e4 && point.origin === "source-context" && ["source-property", "source-style", "native-default"].includes(dependent.origin) && (!scale ? dependent.value === false && point.value === size.value * musicFactor : typeof dependent.value === "boolean" && Number(scale.nativeVersion) >= 3 && Number(scale.nativeVersion) < 5 && scale.referenceSpatiumMillimeters === (Number(scale.nativeVersion) >= 4.7 ? 1.75 : 127 / 72) && ["source-style", "native-default"].includes(scale.scoreSpatium.origin) && Number.isFinite(scale.scoreSpatium.millimeters) && scale.scoreSpatium.millimeters > 0 && scale.scoreSpatium.millimeters <= 1e4 && (scale.scoreSpatium.rawValue === void 0 ? scale.scoreSpatium.origin === "native-default" : Number(scale.scoreSpatium.rawValue) === scale.scoreSpatium.millimeters) && ["source-staff", "native-default", "score-scope"].includes(scale.staff.origin) && Number.isFinite(scale.staff.factor) && scale.staff.factor > 0 && scale.staff.factor <= 4 && (scale.staff.origin !== "score-scope" || scale.staff.factor === 1) && (!scale.lineSpatiumDependent || Number(scale.nativeVersion) >= 4.1 && typeof scale.lineSpatiumDependent.value === "boolean" && ["source-property", "source-style", "native-default"].includes(scale.lineSpatiumDependent.origin)) && point.value === (dependent.value ? size.value * scale.scoreSpatium.millimeters / scale.referenceSpatiumMillimeters * scale.staff.factor : size.value) / (scale.lineSpatiumDependent?.value === false ? scale.scoreSpatium.millimeters / scale.referenceSpatiumMillimeters * scale.staff.factor : 1) * musicFactor) && Number.isFinite(point.value) && point.value > 0 && point.value <= 1e4;
+    if (!valid) refuse("writer-text-font-size", "Projected point size requires the exact source request, unit dependency and version-qualified scale facts.", size.source);
+    const [mantissa, exponent] = point.value.toString().split("e");
+    let decimal4 = mantissa;
+    if (exponent) {
+      const digits = mantissa.replace(".", ""), position = (mantissa.includes(".") ? mantissa.indexOf(".") : mantissa.length) + Number(exponent);
+      decimal4 = position <= 0 ? "0." + "0".repeat(-position) + digits : position >= digits.length ? digits + "0".repeat(position - digits.length) : digits.slice(0, position) + "." + digits.slice(position);
+    }
+    return ` font-size="${decimal4}"`;
+  }
+  const explicit = point?.context === "musescore-explicit-unscaled-text" && size?.origin === "source-property" && point.spatiumDependent.origin === "source-property";
+  const inherited = point?.context === "musescore-source-style-unscaled-text" && ["source-property", "source-style"].includes(size.origin) && ["source-property", "source-style"].includes(point.spatiumDependent.origin) && (size.origin === "source-style" || point.spatiumDependent.origin === "source-style");
+  if (point && (!explicit && !inherited && !(userCredit ? size.origin === "source-style" && point.context === "musescore-3.6.1-user-text-style" : size.origin === "source-property" && ["musescore-3.3.4-default-text", "musescore-3.6.2-text-line-default-text"].includes(point.context)) || point.origin !== "source-context" || point.spatiumDependent.value !== false || !inherited && point.spatiumDependent.origin !== (explicit ? "source-property" : "source-style") || !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(size.rawValue.trim()) || Number(size.rawValue.trim()) !== point.value || !Number.isFinite(point.value) || point.value <= 0 || point.value > 1e4 || point.value !== size.value))
+    refuse("writer-text-font-size", "Point size requires the independently qualified unscaled source context and exact requested value.", size.source);
+  return point ? ` font-size="${size.rawValue.trim()}"` : "";
+}
+var ordinaryFamily = (value2) => !!value2 && value2 === value2.trim() && value2 !== "ScoreText" && !/[,\t\r\n\uE000-\uF8FF\u{F0000}-\u{FFFFD}\u{100000}-\u{10FFFD}]/u.test(value2);
+function plainTextFontXml(owner) {
+  const family = owner.textFontFamily, style = owner.textFontStyle;
+  if (family && (!["source-property", "source-style", "native-default"].includes(family.origin) || typeof family.value !== "string" || family.value.length > 65536 || family.qualification && !["unverified-inline-context", "unrepresentable-inline-reset"].includes(family.qualification))) refuse("writer-text-family", "Unverified bounded source text family.", family.source);
+  if (style && (!Number.isInteger(style.value) || style.value < 0 || style.value > 15 || !["source", "source-style", "native-default"].includes(style.origin))) refuse("writer-text-font-style", "Uninterpreted native text emphasis bit field.", style.source);
+  const flag2 = (name, bit) => {
+    const fact = owner.textEmphasis?.[name];
+    if (fact && typeof fact.value !== "boolean") refuse("writer-text-emphasis", "Text emphasis requires a source Boolean.", fact.source);
+    return fact ? fact.value : style ? !!(style.value & bit) : void 0;
+  };
+  const bold = flag2("bold", 1), italic = flag2("italic", 2);
+  return (family && !family.qualification && ordinaryFamily(family.value) ? ` font-family="${esc2(family.value)}"` : "") + pointSizeXml(owner.textFontSize) + (bold === void 0 ? "" : ` font-weight="${bold ? "bold" : "normal"}"`) + (italic === void 0 ? "" : ` font-style="${italic ? "italic" : "normal"}"`);
+}
+function inlineTextFontXml(run, base) {
+  const reset = run.lineFontSize;
+  if (reset && (reset.origin !== "derived-native-line-reset" || reset.request.pointSize && (reset.request.pointSize.context !== "musescore-source-scaled-text" || reset.request.pointSize.scaling?.lineSpatiumDependent?.value !== false))) refuse("writer-line-font-size", "Unverified native line size reset.", reset.source);
+  const size = run.musicFontSize ?? reset?.request ?? run.textFontSize ?? base;
+  const attrs2 = pointSizeXml(size), script = run.script;
+  if (!script) return attrs2;
+  if (script.origin !== "source-markup" || !["normal", "super", "sub"].includes(script.value)) refuse("writer-text-script", "Unverified source script state.", script.source);
+  const projection = script.projection;
+  if (!projection) return attrs2;
+  if (projection.origin !== "derived-readable-layout" || projection.relativeY !== (script.value === "super" ? 6 : script.value === "sub" ? -4 : 0) || projection.sizeFactor !== (script.value === "normal" ? 1 : 0.6) || !size?.pointSize) refuse("writer-text-script", "Unverified derived script presentation.", script.source);
+  const decimal4 = (number) => {
+    const [mantissa, exponent] = String(number).split("e");
+    if (!exponent) return mantissa;
+    const digits = mantissa.replace(".", ""), position = (mantissa.includes(".") ? mantissa.indexOf(".") : mantissa.length) + Number(exponent);
+    return position <= 0 ? "0." + "0".repeat(-position) + digits : position >= digits.length ? digits + "0".repeat(position - digits.length) : digits.slice(0, position) + "." + digits.slice(position);
+  };
+  const scaled = attrs2.replace(/font-size="[^"]+"/, `font-size="${decimal4(size.pointSize.value * projection.sizeFactor)}"`);
+  return scaled + ` relative-y="${projection.relativeY}"`;
+}
+function fingeringNeedsWords(finger) {
+  const mask = finger.textFontStyle?.value ?? 0;
+  const align = finger.textAlignment, centered = !align || [align.halign, align.justify].every((v) => v === void 0 || v === "center") && [void 0, "middle"].includes(align.valign);
+  return !!(finger.textRuns?.length || !centered || finger.textEnclosure && finger.textEnclosure.value !== "none" || (finger.textEmphasis?.underline?.value ?? !!(mask & 4)) || (finger.textEmphasis?.strike?.value ?? !!(mask & 8)));
+}
+
+// src/core/harmony.ts
+var esc3 = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+var tag2 = (name, value2) => `<${name}>${esc3(String(value2))}</${name}>`;
+var kinds = /* @__PURE__ */ new Set(["major", "minor", "augmented", "diminished", "dominant", "major-seventh", "minor-seventh", "diminished-seventh", "augmented-seventh", "half-diminished", "major-minor", "major-sixth", "minor-sixth", "dominant-ninth", "major-ninth", "minor-ninth", "dominant-11th", "major-11th", "minor-11th", "dominant-13th", "major-13th", "minor-13th", "suspended-second", "suspended-fourth", "Neapolitan", "Italian", "French", "German", "pedal", "power", "Tristan", "other", "none"]);
+function colorXml(color2) {
+  if (!color2) return "";
+  if (color2.rgba.length !== 4 || color2.rgba.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255)) return refuse("writer-harmony-color", "Harmony color requires exact source RGBA.", color2.source);
+  return ` color="#${[color2.rgba[3], ...color2.rgba.slice(0, 3)].map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}"`;
+}
+function frameXml(frame) {
+  if (!Number.isSafeInteger(frame.strings) || frame.strings < 1 || frame.strings > 32 || !Number.isSafeInteger(frame.frets) || frame.frets < 1 || !frame.notes.length || frame.notes.length > 256 || frame.firstFret !== void 0 && (!Number.isSafeInteger(frame.firstFret) || frame.firstFret < 1) || frame.unplayed !== void 0 && !["", "x"].includes(frame.unplayed))
+    return refuse("writer-frame", "Chord frame requires bounded strings, frets and explicit source positions.", frame.source);
+  for (const marker2 of frame.markers ?? []) {
+    if (!Number.isInteger(marker2.string) || marker2.string < 1 || marker2.string > frame.strings || !["muted", "open", "none"].includes(marker2.kind)) return refuse("writer-frame-marker", "Unknown source frame-string marker.", marker2.source);
+    if (marker2.kind === "open" && !frame.notes.some((note) => note.string === marker2.string && note.fret === 0) || marker2.kind === "muted" && frame.notes.some((note) => note.string === marker2.string)) return refuse("writer-frame-marker", "Source frame marker conflicts with its explicit note.", marker2.source);
+  }
+  let content = tag2("frame-strings", frame.strings) + tag2("frame-frets", frame.frets) + (frame.firstFret === void 0 ? "" : tag2("first-fret", frame.firstFret));
+  const barres = /* @__PURE__ */ new Map();
+  for (const note of frame.notes) {
+    if (!Number.isSafeInteger(note.string) || note.string < 1 || note.string > frame.strings || !Number.isSafeInteger(note.fret) || note.fret < 0 || note.barre && !["start", "stop"].includes(note.barre)) return refuse("writer-frame-note", "Invalid source chord-frame note.", note.source);
+    if (note.barre) barres.set(note.fret, (barres.get(note.fret) ?? 0) + (note.barre === "start" ? 1 : -1));
+    content += `<frame-note>${tag2("string", note.string)}${tag2("fret", note.fret)}${note.fingering ? `<fingering${note.fingeringVisible === false ? ' color="#00000000"' : ""}>${esc3(note.fingering)}</fingering>` : ""}${note.barre ? `<barre type="${note.barre}"/>` : ""}</frame-note>`;
+  }
+  if ([...barres.values()].some((value2) => value2 !== 0)) return refuse("writer-frame-barre", "Chord-frame barre endpoints must pair at the same fret.", frame.source);
+  return `<frame${colorXml(frame.sourceColor)}${frame.unplayed !== void 0 ? ` unplayed="${frame.unplayed}"` : ""}>${content}</frame>`;
+}
+function harmonyXml(direction, offset) {
+  const style = direction.textFontStyle?.value ?? 0;
+  const underline = direction.textEmphasis?.underline?.value ?? !!(style & 4);
+  const strike = direction.textEmphasis?.strike?.value ?? !!(style & 8);
+  const enclosure = direction.textEnclosure, alignment = direction.textAlignment;
+  if (direction.printObject !== false && (underline || strike || enclosure && enclosure.value !== "none" || alignment)) {
+    const harmony = direction.harmony;
+    if (!harmony) return refuse("writer-harmony", "Missing source harmony.", direction.source);
+    const label = harmony.role === "literal-function" ? harmony.value : [harmony, ...harmony.additional ?? []].map((component) => [component.value, ...(component.degrees ?? []).map((degree) => `${degree.type === "subtract" ? "omit" : degree.type}${degree.alter === 0 ? "" : degree.alter === 1 ? "#" : degree.alter === -1 ? "b" : `(${degree.alter})`}${degree.value}`)].filter(Boolean).join(" ")).join("\n");
+    const attrs2 = plainTextFontXml(direction) + colorXml(direction.sourceColor) + ` underline="${underline ? 1 : 0}" line-through="${strike ? 1 : 0}"` + (enclosure ? ` enclosure="${enclosure.value}"` : "") + (alignment?.halign ? ` halign="${alignment.halign}"` : "") + (alignment?.valign ? ` valign="${alignment.valign}"` : "") + (alignment?.justify ? ` justify="${alignment.justify}"` : "");
+    const words = `<direction${direction.placement ? ` placement="${direction.placement}"` : ""}><direction-type><words${attrs2}>${esc3(label)}</words></direction-type>${tag2("offset", offset)}${direction.voiceId ? tag2("voice", direction.voiceId) : ""}${tag2("staff", direction.staff)}</direction>`;
+    return harmonyBodyXml({ ...direction, printObject: false }, offset) + words;
+  }
+  return harmonyBodyXml(direction, offset);
+}
+function harmonyBodyXml(direction, offset) {
+  const harmony = direction.harmony;
+  if (!harmony) return refuse("writer-harmony", "Missing source harmony.", direction.source);
+  const font = plainTextFontXml(direction);
+  const attributes = `${font}${colorXml(direction.sourceColor)}${direction.printObject === false ? ' print-object="no"' : ""}${direction.placement ? ` placement="${direction.placement}"` : ""}`;
+  const ending = tag2("offset", offset) + tag2("staff", direction.staff);
+  if (harmony.role === "literal-function") {
+    if (!/^[IVXivx]{1,16}$/.test(harmony.value.trim())) return refuse("writer-harmony", "Unverified literal functional harmony projection.", harmony.source);
+    return `<harmony${attributes}><function>${esc3(harmony.value)}</function><kind>none</kind>${ending}</harmony>`;
+  }
+  if (harmony.role !== "chord-symbol") return refuse("writer-harmony", "Unknown source harmony role.", direction.source);
+  const frame = harmony.frame ? frameXml(harmony.frame) : "";
+  const frameVisibility = harmony.frame?.printObject === false ? ' print-frame="no"' : "";
+  const separateFrame = !!frame && direction.printObject === false && harmony.frame?.printObject !== false;
+  const frameInside = separateFrame ? "" : frame;
+  const frameAfter = separateFrame ? `<harmony><function></function><kind text="">none</kind>${frame}${ending}</harmony>` : "";
+  const muted = harmony.frame?.unplayed !== "x" ? harmony.frame?.markers?.filter((marker2) => marker2.kind === "muted").map((marker2) => marker2.string) ?? [] : [];
+  const annotationWords = (harmony.annotations ?? []).map((annotation) => `<direction><direction-type><words${annotation.printObject === false ? ' color="#00000000"' : colorXml(annotation.sourceColor)}>${esc3(annotation.value)}</words></direction-type>${ending}</direction>`).join("");
+  const markerWords = annotationWords + (muted.length && harmony.frame?.printObject !== false ? `<direction><direction-type><words${colorXml(harmony.frame?.sourceColor)}>${esc3(`mute strings ${muted.join(", ")}`)}</words></direction-type>${ending}</direction>` : "");
+  if (!harmony.root || !harmony.kind || harmony.additional?.some((component) => !component.root || !component.kind)) {
+    const label = [harmony, ...harmony.additional ?? []].map((component) => [component.value, ...(component.degrees ?? []).map((degree) => `${degree.type === "subtract" ? "omit" : degree.type}${degree.alter === 0 ? "" : degree.alter === 1 ? "#" : degree.alter === -1 ? "b" : `(${degree.alter})`}${degree.value}`)].filter(Boolean).join(" ")).join("\n");
+    const words = label ? `<direction${direction.placement ? ` placement="${direction.placement}"` : ""}><direction-type><words${font}${direction.printObject === false ? ' color="#00000000"' : colorXml(direction.sourceColor)}>${esc3(label)}</words></direction-type>${tag2("offset", offset)}${direction.voiceId ? tag2("voice", direction.voiceId) : ""}${tag2("staff", direction.staff)}</direction>` : "";
+    return markerWords + words + (frameInside ? `<harmony${attributes}${frameVisibility}><function></function><kind text="">none</kind>${frameInside}${ending}</harmony>` : "") + frameAfter;
+  }
+  if (!kinds.has(harmony.kind)) return refuse("writer-harmony-kind", "Unknown standard chord quality.", harmony.source);
+  const tone = (name, pitch2) => {
+    if (!/^[A-G]$/.test(pitch2.step) || !Number.isFinite(pitch2.alter) || Math.abs(pitch2.alter) > 4) return refuse("writer-harmony-pitch", "Chord pitch requires a source spelling and accidental.", harmony.source);
+    const text = name === "root" ? harmony.rootText : harmony.bassText;
+    const printAlter = name === "root" ? harmony.rootAlterPrintObject : harmony.bassAlterPrintObject;
+    return `<${name}><${name}-step${text !== void 0 ? ` text="${esc3(text)}"` : ""}>${pitch2.step}</${name}-step>${pitch2.alter ? `<${name}-alter${printAlter === false ? ' print-object="no"' : ""}>${pitch2.alter}</${name}-alter>` : ""}</${name}>`;
+  };
+  if (harmony.inversion !== void 0 && (!Number.isSafeInteger(harmony.inversion) || harmony.inversion < 0)) return refuse("writer-harmony-inversion", "Invalid chord inversion.", harmony.source);
+  let content = tone("root", harmony.root) + `<kind${harmony.kindText !== void 0 ? ` text="${esc3(harmony.kindText)}"` : ""}>${harmony.kind}</kind>`;
+  if (harmony.inversion !== void 0) content += tag2("inversion", harmony.inversion);
+  if (harmony.bass) content += tone("bass", harmony.bass);
+  for (const degree of harmony.degrees ?? []) {
+    if (!Number.isSafeInteger(degree.value) || degree.value < 1 || !Number.isFinite(degree.alter) || Math.abs(degree.alter) > 4 || !["add", "alter", "subtract"].includes(degree.type)) return refuse("writer-harmony-degree", "Invalid source chord degree.", degree.source);
+    content += `<degree>${tag2("degree-value", degree.value)}${tag2("degree-alter", degree.alter)}${tag2("degree-type", degree.type)}</degree>`;
+  }
+  for (const additional of harmony.additional ?? []) {
+    if (additional.frame || additional.additional?.length) return refuse("writer-harmony-stack", "Stacked harmony components cannot contain nested frames or stacks.", additional.source);
+    const component = harmonyBodyXml({ ...direction, harmony: additional }, 0);
+    const match = /^<harmony[^>]*>([\s\S]*?)<offset>0<\/offset><staff>\d+<\/staff><\/harmony>$/.exec(component);
+    if (!match) return refuse("writer-harmony-stack", "Stacked harmony needs independently established tonal components.", additional.source);
+    content += match[1];
+  }
+  return markerWords + `<harmony${attributes}${frameVisibility}>${content}${frameInside}${ending}</harmony>` + frameAfter;
+}
+
+// src/core/fretted-techniques.ts
+var esc4 = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+function sourceColor(color2) {
+  if (!color2) return "";
+  if (color2.rgba.length !== 4 || color2.rgba.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255)) return refuse("writer-technique-color", "Technique color needs exact source RGBA channels.", color2.source);
+  return ` color="#${[color2.rgba[3], ...color2.rgba.slice(0, 3)].map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}"`;
+}
+var notation = (content, visible) => `<notations${visible === false ? ' print-object="no"' : ""}>${content}</notations>`;
+function decimal2(value2, source, optional = false) {
+  const r = q(value2.n, value2.d);
+  let denominator = r.d;
+  while (denominator % 2 === 0) denominator /= 2;
+  while (denominator % 5 === 0) denominator /= 5;
+  if (denominator !== 1) {
+    if (optional) return void 0;
+    return refuse("writer-bend-decimal", "Bend amount has no finite exact MusicXML decimal representation.", source);
+  }
+  let n = BigInt(Math.abs(r.n)), d = BigInt(r.d), result = String(n / d);
+  n %= d;
+  if (n) {
+    result += ".";
+    while (n) {
+      n *= 10n;
+      result += String(n / d);
+      n %= d;
+    }
+  }
+  return (r.n < 0 ? "-" : "") + result;
+}
+function bendXml(bend) {
+  const labelFonts = bend.labels?.map((label) => plainTextFontXml(label)) ?? [];
+  const font = labelFonts.length && labelFonts.every((value2) => value2 === labelFonts[0]) ? labelFonts[0] : "";
+  if (bend.qualitative) {
+    if (!bend.withBar || !["slack", "release-from-slack"].includes(bend.qualitative.value) || bend.points.length) return refuse("writer-bend-qualitative", "A qualitative bar instruction cannot invent a numerical slack curve.", bend.qualitative.source);
+    return notation(`<technical><other-technical${sourceColor(bend.sourceColor)}>${bend.qualitative.value === "slack" ? "whammy bar: slack" : "release whammy bar from slack"}</other-technical></technical>`, bend.printObject);
+  }
+  if (!bend.points.length || bend.points.length > 1024) return refuse("writer-bend-points", "Bend requires a bounded ordered source curve.", bend.source);
+  if (bend.initialState && (bend.initialState.origin !== "preceding-bend" || compare(bend.initialState.semitones, bend.points[0].semitones) !== 0 || Math.abs(bend.initialState.semitones.n / bend.initialState.semitones.d) > 96)) return refuse("writer-bend-state", "A source continuation must begin at its established preceding displacement.", bend.initialState.source);
+  let previous = bend.initialState?.semitones ?? q(0), previousOffset = q(0), content = "";
+  for (let index = 0; index < bend.points.length; index++) {
+    const point = bend.points[index], offset = q(point.offset.n, point.offset.d), semitones2 = q(point.semitones.n, point.semitones.d);
+    if (compare(offset, q(0)) < 0 || compare(offset, q(1)) > 0 || compare(offset, previousOffset) < 0 || Math.abs(semitones2.n / semitones2.d) > 96)
+      return refuse("writer-bend-points", "Bend points require ordered normalized offsets and bounded semitone displacement.", point.source);
+    const delta = add(semitones2, q(-previous.n, previous.d));
+    if (delta.n) {
+      const preBend = !bend.initialState && index === 0 && offset.n === 0;
+      const first = decimal2(mul(previousOffset, q(100)), point.source, true), last = decimal2(mul(offset, q(100)), point.source, true);
+      const timing = !preBend && first !== void 0 && last !== void 0 ? ` first-beat="${first}" last-beat="${last}"` : "";
+      const color2 = bend.sourceColor;
+      if (color2 && (color2.rgba.length !== 4 || color2.rgba.some((channel) => !Number.isInteger(channel) || channel < 0 || channel > 255))) return refuse("writer-bend-color", "Bend color requires exact RGBA channels.", color2.source);
+      const colorAttribute = color2 ? ` color="#${[color2.rgba[3], ...color2.rgba.slice(0, 3)].map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase()}"` : "";
+      const crossing = previous.n * semitones2.n < 0;
+      const segments = crossing ? [{ amount: q(-previous.n, previous.d), release: true }, { amount: semitones2, release: false }] : [{ amount: preBend ? q(-delta.n, delta.d) : delta, release: previous.n !== 0 && (previous.n > 0 ? delta.n < 0 : delta.n > 0) }];
+      for (const segment of segments) content += `<bend${crossing ? "" : timing}${colorAttribute}${font}><bend-alter>${decimal2(segment.amount, point.source)}</bend-alter>${preBend ? "<pre-bend/>" : segment.release ? "<release/>" : ""}${bend.withBar ? `<with-bar>${esc4(bend.withBar.text ?? "")}</with-bar>` : ""}</bend>`;
+    }
+    previous = semitones2;
+    previousOffset = offset;
+  }
+  const vibratoPoints = bend.points.filter((point) => point.vibrato?.value);
+  if (vibratoPoints.length) {
+    for (const point of vibratoPoints) if (point.vibrato?.speed && !["fast", "average", "slow"].includes(point.vibrato.speed)) refuse("writer-bend-vibrato", "Unknown source vibrato speed.", point.vibrato.source);
+    const speeds = vibratoPoints.filter((point) => point.vibrato?.speed).map((point) => `${point.vibrato.speed} at ${point.offset.n}/${point.offset.d} of curve`);
+    content += `<other-technical>${esc4(speeds.length ? `vibrato: ${speeds.join("; ")}` : "vibrato")}</other-technical>`;
+  }
+  return content ? notation(`<technical>${content}</technical>`, bend.printObject) : "";
+}
+function frettedTechniqueXml(note, whammy) {
+  let result = (whammy ? bendXml(whammy) : "") + (note.bend ? bendXml(note.bend) : "") + (note.whammy ? bendXml(note.whammy) : "");
+  if (note.hopoNotations?.length && (note.hopoStart || note.hopoStop)) refuse("writer-hopo-duplicate", "H/P endpoints cannot use both legacy and located carriers.", note.source);
+  for (const mark of note.hopoNotations ?? []) {
+    if (!["start", "stop"].includes(mark.type) || !["hammer-on", "pull-off"].includes(mark.kind) || !Number.isInteger(mark.number) || mark.number < 1 || mark.number > 16) refuse("writer-hopo", "Invalid source H/P endpoint.", mark.source);
+    result += notation(`<technical><${mark.kind} type="${mark.type}" number="${mark.number}"${sourceColor(mark.sourceColor)}>${mark.type === "start" ? esc4(mark.text ?? (mark.kind === "hammer-on" ? "H" : "P")) : ""}</${mark.kind}></technical>`, mark.printObject);
+  }
+  if (note.bendTransition) {
+    const transition = note.bendTransition;
+    if (note.bend || transition.origin !== "derived-source-pitches" || !transition.targetSource || Math.abs(transition.semitones.n / transition.semitones.d) > 96) refuse("writer-bend-transition", "A source endpoint bend must be distinct from a raw curve and retain its target provenance.", transition.source);
+    result += notation(`<technical><bend><bend-alter>${decimal2(transition.semitones, transition.source)}</bend-alter></bend></technical>`);
+  }
+  if (note.trill) {
+    const target = note.trill.target;
+    if (target && (!/^[A-G]$/.test(target.step) || !Number.isInteger(target.octave) || !Number.isFinite(target.alter))) return refuse("writer-trill-target", "Trill target requires established source pitch spelling.", note.trill.source);
+    const accidental = target ? target.alter === 0 ? "" : target.alter === 1 ? "#" : target.alter === -1 ? "b" : `(${target.alter > 0 ? "+" : ""}${target.alter})` : "";
+    result += notation(`<ornaments><trill-mark/>${target ? `<other-ornament>${esc4(`trill to ${target.step}${accidental}${target.octave}`)}</other-ornament>` : ""}</ornaments>`, note.trill.printObject);
+  }
+  const harmonic = note.harmonic;
+  if (harmonic) {
+    if (!["natural", "artificial", "pinch", "tap", "semi", "feedback"].includes(harmonic.type) || harmonic.pitchRole && !["base", "touching", "sounding"].includes(harmonic.pitchRole))
+      return refuse("writer-harmonic", "Unknown source harmonic type or pitch role.", harmonic.source);
+    const subtype = ["natural", "artificial"].includes(harmonic.type) ? "" : `<other-technical>${esc4(`${harmonic.type} harmonic`)}</other-technical>`;
+    const role = harmonic.pitchRole ? `<${harmonic.pitchRole === "touching" ? "touching" : harmonic.pitchRole === "sounding" ? "sounding" : "base"}-pitch/>` : "";
+    result += notation(`<technical><harmonic>${harmonic.type === "natural" || harmonic.type === "artificial" ? `<${harmonic.type}/>` : ""}${role}</harmonic>${subtype}</technical>`, harmonic.printObject);
+  }
+  for (const gesture of note.gestures ?? []) {
+    const labels = { "vibrato": "vibrato", "wide-vibrato": "wide vibrato", "palm-mute": "P.M.", "let-ring": "let ring", tap: "tap", slap: "slap", pop: "pop", "pick-scrape": "pick scrape", whammy: "whammy bar" };
+    if (!Object.hasOwn(labels, gesture.kind) || gesture.hand && !["left", "right"].includes(gesture.hand)) return refuse("writer-gesture", "Unknown source playing gesture.", gesture.source);
+    const color2 = sourceColor(gesture.sourceColor);
+    const content = gesture.kind === "tap" ? `<tap${color2}${gesture.hand ? ` hand="${gesture.hand}"` : ""}>${esc4(gesture.text ?? "")}</tap>` : `<other-technical${color2}>${esc4(gesture.text ?? labels[gesture.kind])}</other-technical>`;
+    result += notation(`<technical>${content}</technical>`, gesture.printObject);
+  }
+  for (const finger of note.fingerings ?? []) {
+    if (finger.hand && !["left", "right"].includes(finger.hand) || !finger.value || finger.placement && !["above", "below"].includes(finger.placement)) return refuse("writer-fingering", "Located fingering requires a hand and source value.", finger.source);
+    const element = finger.hand === "right" ? "pluck" : "fingering";
+    result += notation(`<technical><${element}${plainTextFontXml(finger)}${sourceColor(finger.sourceColor)}${finger.placement ? ` placement="${finger.placement}"` : ""}>${esc4(finger.value)}</${element}></technical>`, fingeringNeedsWords(finger) ? false : finger.printObject);
+  }
+  for (const slide of note.slides ?? []) {
+    const elements = { "into-from-below": "scoop", "into-from-above": "plop", "out-up": "doit", "out-down": "falloff" };
+    const element = elements[slide.kind];
+    if (slide.lineShape && !["straight", "curved"].includes(slide.lineShape) || slide.lineType && !["solid", "wavy"].includes(slide.lineType)) return refuse("writer-slide-shape", "Unknown source slide shape.", slide.source);
+    if (element) result += notation(`<articulations><${element} line-shape="${slide.lineShape ?? "straight"}"${slide.lineType ? ` line-type="${slide.lineType}"` : ""}${sourceColor(slide.sourceColor)}/></articulations>`, slide.printObject);
+    else if (slide.kind === "pick-slide-up" || slide.kind === "pick-slide-down") result += notation(`<technical><other-technical>${slide.kind === "pick-slide-up" ? "pick slide up" : "pick slide down"}</other-technical></technical>`, slide.printObject);
+    else return refuse("writer-slide", "Unknown source note-local slide.", slide.source);
+  }
+  return result;
+}
+function frettedTechniqueMetadata(note, owner) {
+  const facts = [];
+  for (const [index, finger] of (note.fingerings ?? []).entries()) if (fingeringNeedsWords(finger)) facts.push({ source: finger.source, name: `source-fingering:${owner}:${index + 1}`, value: JSON.stringify(finger) });
+  if (note.bendTransition) facts.push({ source: note.bendTransition.source, name: `source-bend-transition:${owner}`, value: JSON.stringify(note.bendTransition) });
+  if (note.whammy) facts.push({ source: note.whammy.source, name: `source-whammy:${owner}`, value: JSON.stringify(note.whammy) });
+  if (note.bend) facts.push({ source: note.bend.source, name: `source-bend:${owner}`, value: (note.bend.sourceCurve?.points ?? note.bend.points).map((p) => `${p.offset.n}/${p.offset.d}:${p.semitones.n}/${p.semitones.d}${p.vibrato ? `:vibrato=${p.vibrato.value}${p.vibrato.speed ? `:speed=${p.vibrato.speed}` : ""}` : ""}`).join(";") });
+  if (note.bend?.sourceCurve) facts.push({ source: note.bend.sourceCurve.source, name: `derived-bend-segment:${owner}`, value: JSON.stringify({ origin: note.bend.sourceCurve.origin, segment: note.bend.sourceCurve.segment, points: note.bend.points }) });
+  if (note.bend?.sourceBendType) facts.push({ source: note.bend.sourceBendType.source, name: `source-bend:${owner}:type`, value: note.bend.sourceBendType.value });
+  if (note.bend?.sourceEndpoints) facts.push({ source: note.bend.source, name: `source-bend:${owner}:endpoints`, value: JSON.stringify(note.bend.sourceEndpoints) });
+  if (note.bend?.initialState) facts.push({ source: note.bend.initialState.source, name: `source-bend:${owner}:initial`, value: JSON.stringify(note.bend.initialState) });
+  if (note.bend?.labels) facts.push({ source: note.bend.source, name: `source-bend:${owner}:labels`, value: JSON.stringify(note.bend.labels) });
+  for (const key of ["sourceHoldMode", "sourceVibrato"]) if (note.bend?.[key]) facts.push({ source: note.bend[key].source, name: `source-bend:${owner}:${key}`, value: JSON.stringify(note.bend[key]) });
+  if (note.trill) {
+    if (note.trill.fret !== void 0) facts.push({ source: note.trill.source, name: `source-trill:${owner}:fret`, value: String(note.trill.fret) });
+    if (note.trill.speed) facts.push({ source: note.trill.source, name: `source-trill:${owner}:speed`, value: note.trill.speed });
+  }
+  if (note.harmonic) {
+    for (const role of ["base", "touch", "result"]) {
+      const pitch2 = note.harmonic[role];
+      if (pitch2) facts.push({ source: note.harmonic.source, name: `source-harmonic:${owner}:${role}`, value: `${pitch2.step}:${pitch2.alter}:${pitch2.octave}:${pitch2.midi}` });
+    }
+    const fret = note.harmonic.harmonicFret;
+    if (fret) facts.push({ source: fret.source, name: `source-harmonic:${owner}:fret`, value: `${fret.value.n}/${fret.value.d}` });
+  }
+  return facts;
+}
+function harmonicWrittenPitch(pitch2, transpose) {
+  const steps = "CDEFGAB", natural = [0, 2, 4, 5, 7, 9, 11];
+  const index = steps.indexOf(pitch2.step) + pitch2.octave * 7 - transpose.diatonic - (transpose.octaveChange ?? 0) * 7;
+  const octave = Math.floor(index / 7), step = (index % 7 + 7) % 7;
+  const midi = pitch2.midi - transpose.chromatic - (transpose.octaveChange ?? 0) * 12;
+  return { step: steps[step], octave, alter: midi - (octave + 1) * 12 - natural[step], midi, origin: "inferred" };
+}
+function harmonicTransposes(part) {
+  const result = /* @__PURE__ */ new Map(), active = /* @__PURE__ */ new Map();
+  const initial = { diatonic: part.transpose?.diatonic ?? 0, chromatic: part.transpose?.chromatic ?? 0, octaveChange: part.transpose?.octaveChange ?? part.transposeOctaves };
+  for (const measure of part.measures) {
+    const changes = (measure.changes ?? []).filter((change) => change.transpose && !change.courtesy).sort((a, b) => compare(a.position, b.position));
+    const events = measure.voices.flat().filter((event) => event.notes.some((note) => note.harmonic)).sort((a, b) => compare(a.start, b.start));
+    let index = 0;
+    for (const event of events) {
+      while (index < changes.length && compare(changes[index].position, event.start) <= 0) {
+        const change = changes[index++];
+        active.set(change.staff, change.transpose);
+      }
+      result.set(event, active.get(event.staff ?? 1) ?? initial);
+    }
+    while (index < changes.length) {
+      const change = changes[index++];
+      active.set(change.staff, change.transpose);
+    }
+  }
+  return result;
+}
+function harmonicComponents(notes, transpose = { diatonic: 0, chromatic: 0 }) {
+  const companions = [];
+  for (const note of notes) {
+    if (!note.harmonic || note.kind === "unpitched") continue;
+    const primaryRole = note.harmonic.pitchRole;
+    const primary = primaryRole ? note.harmonic[primaryRole === "touching" ? "touch" : primaryRole === "sounding" ? "result" : "base"] : void 0;
+    const steps = "CDEFGAB";
+    const localTranspose = primary ? {
+      diatonic: steps.indexOf(primary.step) + primary.octave * 7 - steps.indexOf(note.written.step) - note.written.octave * 7,
+      chromatic: primary.midi - note.written.midi
+    } : transpose;
+    for (const [field, role] of [["base", "base"], ["touch", "touching"], ["result", "sounding"]]) {
+      const pitch2 = note.harmonic[field];
+      if (!pitch2 || role === note.harmonic.pitchRole) continue;
+      if (!/^[A-G]$/.test(pitch2.step) || !Number.isInteger(pitch2.octave) || !Number.isFinite(pitch2.alter) || !Number.isFinite(pitch2.midi)) return refuse("writer-harmonic-pitch", "Harmonic component requires established source pitch facts.", note.harmonic.source);
+      const written = harmonicWrittenPitch(pitch2, localTranspose);
+      if (notes.some((candidate) => candidate.kind !== "unpitched" && candidate.harmonic?.pitchRole === role && Object.keys(candidate.harmonic.source).length === Object.keys(note.harmonic.source).length && Object.entries(candidate.harmonic.source).every(([key, value2]) => note.harmonic.source[key] === value2) && candidate.written.step === written.step && candidate.written.alter === written.alter && candidate.written.octave === written.octave)) continue;
+      companions.push({
+        source: note.harmonic.source,
+        id: `${note.id}:harmonic-${role}`,
+        kind: "pitched",
+        written,
+        sounding: role === "sounding" ? pitch2 : null,
+        tieStart: false,
+        tieStop: false,
+        printObject: false,
+        performance: { source: note.harmonic.source, play: false },
+        harmonic: { source: note.harmonic.source, type: note.harmonic.type, pitchRole: role, printObject: false }
+      });
+    }
+  }
+  return [...notes, ...companions];
+}
+
+// src/core/font-character.ts
+function xmlCharacter(code) {
+  return Number.isInteger(code) && (code === 9 || code === 10 || code === 13 || code >= 32 && code <= 55295 || code >= 57344 && code <= 65533 || code >= 65536 && code <= 1114111) ? String.fromCodePoint(code) : void 0;
+}
+function literalFontFamily(value2) {
+  return !!value2 && !/[,\x00-\x1f\x7f]/.test(value2);
+}
+
+// src/core/symbols.ts
+var symbolVocabulary = /* @__PURE__ */ new Set([
+  "textTie",
+  "timeSigBracketLeft",
+  "accidentalNaturalFlat",
+  "coda",
+  "keyboardPedalPed",
+  "keyboardPedalUp",
+  "keyboardPedalSost",
+  "keyboardPedalS",
+  "segno",
+  "articTenutoAbove",
+  "articStaccatoBelow",
+  "figbassSharp",
+  "figbassNatural",
+  "noteheadParenthesisLeft",
+  "noteheadParenthesisRight",
+  "barlineFinal",
+  "fClef",
+  "gClef",
+  "graceNoteAcciaccaturaStemUp",
+  "noteQuarterUp",
+  "timeSigParensLeftSmall",
+  "timeSigParensRightSmall",
+  "reversedBrace",
+  "accidentalNaturalArabic",
+  "timeSigCommon",
+  "accidentalParensLeft",
+  "accidentalParensRight",
+  "articStaccatoAbove",
+  "fermataAbove",
+  "fermataBelow",
+  "metNoteQuarterUp",
+  "dynamicForte",
+  "dynamicPiano",
+  "lyricsElision",
+  "pictEdgeOfCymbal",
+  "guitarGolpe"
+]);
+var textRunSymbolVocabulary = /* @__PURE__ */ new Set([
+  ...symbolVocabulary,
+  "dynamicMezzo",
+  "dynamicSforzando",
+  "note8thUp",
+  "note16thUp",
+  "note32ndUp",
+  "augmentationDot",
+  "metNote8thUp"
+]);
+var techniqueGlyphNames = {
+  guitarFadeIn: "fade in",
+  guitarVolumeSwell: "volume swell",
+  brassMuteOpen: "open",
+  stringsDownBowTurned: "down-bow"
+};
+
 // src/core/musicxml.ts
-var esc = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-var tag = (name, value2) => `<${name}>${esc(String(value2))}</${name}>`;
-function pitchXml(p) {
-  return tag("step", p.step) + (p.alter ? tag("alter", p.alter) : "") + tag("octave", p.octave);
+var esc5 = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+var tag3 = (name, value2) => `<${name}>${esc5(String(value2))}</${name}>`;
+var meterXml = (time, staff) => `<time${staff ? ` number="${staff}"` : ""}${!time.senzaMisura && time.symbol ? ` symbol="${time.symbol}"` : ""}${time.printObject === false ? ' print-object="no"' : ""}>${time.senzaMisura ? tag3("senza-misura", time.senzaMisura.text ?? "") : tag3("beats", time.textBeats ?? time.beats) + tag3("beat-type", time.textUnit ?? time.unit)}</time>`;
+var sameMeter = (a, b) => a.beats === b.beats && a.unit === b.unit && a.symbol === b.symbol && a.textBeats === b.textBeats && a.textUnit === b.textUnit && a.printObject === b.printObject && !!a.senzaMisura === !!b.senzaMisura && a.senzaMisura?.text === b.senzaMisura?.text;
+var articulationVocabulary = /* @__PURE__ */ new Set(["accent", "strong-accent", "soft-accent", "staccato", "tenuto", "detached-legato", "staccatissimo", "spiccato", "scoop", "plop", "doit", "falloff", "breath-mark", "caesura", "stress", "unstress"]);
+var accidentalVocabulary = /* @__PURE__ */ new Set(["sharp", "flat", "natural", "double-sharp", "flat-flat", "natural-sharp", "natural-flat", "other"]);
+var noteheadVocabulary = /* @__PURE__ */ new Set(["slash", "triangle", "diamond", "square", "cross", "x", "circle-x", "inverted triangle", "arrow down", "arrow up", "circled", "slashed", "back slashed", "normal", "cluster", "circle dot", "left triangle", "rectangle", "none", "do", "re", "mi", "fa", "fa up", "so", "la", "ti", "other"]);
+function ornamentSound(details) {
+  const interval = details?.intervalAbove;
+  if (!interval || interval.active === false) return "";
+  if (interval.step === "unison" && interval.quality === "perfect") return ' trill-step="unison"';
+  return interval.step === "second" && ["major", "minor"].includes(interval.quality) ? ` trill-step="${interval.quality === "major" ? "whole" : "half"}"` : "";
+}
+function ornamentIntervals(details) {
+  return [["upper", details?.intervalAbove], ["lower", details?.intervalBelow]].map(([side, interval]) => {
+    if (!interval || interval.active === false) return "";
+    if (!["unison", "second", "third", "fourth", "fifth", "sixth", "seventh", "octave"].includes(interval.step) || !["auto", "diminished", "minor", "major", "perfect", "augmented"].includes(interval.quality)) refuse("writer-ornament-interval", "Unqualified source ornament interval.", interval.source);
+    const text = `${side} auxiliary: ${interval.quality === "auto" ? "diatonic" : interval.quality} ${interval.step}${interval.quality === "auto" ? " (active accidentals)" : ""}`;
+    return `<other-ornament>${esc5(text)}</other-ornament>`;
+  }).join("");
+}
+var glyphPointSize = (size) => {
+  if (size && (size.origin !== "source-staff-space" || ![size.points, size.millimeters, size.staffFactor, size.multiplier].every((x) => Number.isFinite(x) && x > 0) || size.points > 1e4 || size.points !== 4 * size.millimeters * size.staffFactor * 72 / 25.4 * size.multiplier)) refuse("writer-symbol-size", "Glyph point size must retain its qualified four-spatium source em.", size.source);
+  if (size?.sourceSpace && (size.sourceSpace.scoreSpatium.millimeters !== size.millimeters || size.sourceSpace.staff.factor !== size.staffFactor)) refuse("writer-symbol-size", "Glyph size and source staff-space authority disagree.", size.source);
+  let pointText = size?.points.toString();
+  if (pointText?.includes("e")) {
+    const [mantissa, exponent] = pointText.split("e"), digits = mantissa.replace(".", ""), position = (mantissa.includes(".") ? mantissa.indexOf(".") : mantissa.length) + Number(exponent);
+    pointText = position <= 0 ? "0." + "0".repeat(-position) + digits : position >= digits.length ? digits + "0".repeat(position - digits.length) : digits.slice(0, position) + "." + digits.slice(position);
+  }
+  return pointText;
+};
+function accidentalSmuflXml(smufl, name) {
+  if (smufl && (!canonicalSymbolVocabulary.has(smufl.name) || !/^(accidental|accSagittal)/.test(smufl.name))) refuse("writer-accidental-smufl", "Accidental glyph needs a canonical accidental identity.", smufl.source);
+  if (name === "other" && !smufl) refuse("writer-accidental-smufl", "An other accidental requires its exact standard glyph.");
+  return smufl ? ` smufl="${esc5(smufl.name)}"` : "";
+}
+function accidentalColorXml(color2, visible = true) {
+  if (!color2) return visible ? "" : ' color="#00000000"';
+  if (color2.rgba.length !== 4 || color2.rgba.some((v) => !Number.isInteger(v) || v < 0 || v > 255)) refuse("writer-color", "Accidental color requires four byte channels.", color2.source);
+  const [r, g, b, a] = color2.rgba;
+  return ` color="#${[visible ? a : 0, r, g, b].map((v) => v.toString(16).padStart(2, "0").toUpperCase()).join("")}"`;
+}
+function ornamentAccidentalXml(accidental) {
+  if (accidental.sourceName === "noSym" && accidental.name === "other" && !accidental.smufl) return "";
+  if (!accidentalVocabulary.has(accidental.name) || !["above", "below"].includes(accidental.placement)) refuse("writer-ornament-accidental", "Unsupported ornament accidental.", accidental.source);
+  return `<accidental-mark placement="${accidental.placement}"${accidentalSmuflXml(accidental.smufl, accidental.name)}${accidentalColorXml(accidental.sourceColor, accidental.printObject !== false)}${accidental.fontSize ? ` font-size="${glyphPointSize(accidental.fontSize)}"` : ""}>${esc5(accidental.name)}</accidental-mark>`;
+}
+function pitchXml(p, cents = 0) {
+  if (!Number.isFinite(cents)) refuse("writer-cent-offset", "Pitch cent offset must be finite.");
+  const alter = p.alter + cents / 100;
+  return tag3("step", p.step) + (alter ? tag3("alter", alter) : "") + tag3("octave", p.octave);
+}
+function capoXml(capo) {
+  if (!capo) return "";
+  if (!Number.isSafeInteger(capo.fret) || capo.fret < 0) refuse("writer-capo", "Full capo requires a source-qualified nonnegative safe integer fret.", capo.source);
+  return tag3("capo", capo.fret);
 }
 function tuningXml(midi) {
   const [step, alter] = [
@@ -2178,29 +3375,566 @@ function tuningXml(midi) {
     ["A", 1],
     ["B", 0]
   ][midi % 12];
-  return tag("tuning-step", step) + (alter ? tag("tuning-alter", alter) : "") + tag("tuning-octave", Math.floor(midi / 12) - 1);
+  return tag3("tuning-step", step) + (alter ? tag3("tuning-alter", alter) : "") + tag3("tuning-octave", Math.floor(midi / 12) - 1);
 }
-function writeMusicXml(score, display = { hideDynamics: false, hideTempo: false }, onPartAssigned, writerLimits) {
-  const partIds = score.parts.map((part, i) => {
-    const id = `P${i + 1}`;
+function tuningEntries(tuning, upsideDown = false) {
+  if (!tuning.length || tuning.length > 32 || tuning.some((midi) => !Number.isInteger(midi) || midi < 0 || midi > 127)) refuse("writer-tuning", "Tuning needs one through32 explicit MIDI pitches.");
+  return tuning.map((midi, index) => midi < 12 ? "" : `<staff-tuning line="${upsideDown ? tuning.length - index : index + 1}">${tuningXml(midi)}</staff-tuning>`).join("");
+}
+function tuningFallback(tuning) {
+  if (!tuning.some((midi) => midi < 12)) return void 0;
+  const names2 = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  return "Open strings (string 1 first): " + [...tuning].reverse().map((midi) => `${names2[midi % 12]}${Math.floor(midi / 12) - 1} (MIDI ${midi})`).join(", ") + ".";
+}
+function writeMusicXml(score, display = { hideDynamics: false, hideTempo: false }, onPartAssigned, limits2) {
+  const grids = tabGridRelations(score), relations = [...score.relations ?? [], ...grids.relations];
+  const partIds = score.parts.map((part, index) => {
+    const id = `P${index + 1}`;
     onPartAssigned?.(part.id, id);
     return id;
   });
   const clocks = [];
   for (const p of score.parts) for (const m of p.measures) {
     clocks.push(m.duration);
-    for (const v of m.voices) for (const e of v) clocks.push(e.start, e.duration);
+    for (const v of m.voices) for (const e of v) {
+      clocks.push(e.start, e.duration);
+      for (const figure of e.figuredBass ?? []) clocks.push(figure.position, figure.duration, figure.projection.offset);
+      for (const n of e.notes) {
+        if (n.attack) clocks.push(n.attack);
+        if (n.release) clocks.push(n.release);
+      }
+    }
+    for (const direction of m.directions ?? []) clocks.push(direction.position);
+    for (const change of m.changes ?? []) clocks.push(change.position);
+    for (const barline of m.barlines ?? []) clocks.push(barline.position);
   }
+  for (const p of score.parts) for (const capo of p.capoChanges ?? []) clocks.push(capo.position);
   for (const t of score.tempos) clocks.push(t.position);
+  for (const r of relations) clocks.push(r.start.position, r.end.position);
+  for (const image of score.sourceImages ?? []) if (image.attachment) clocks.push(image.attachment.position);
   const d = divisions(clocks);
   const ticks = (r) => {
-    const n = r.n * d / r.d;
+    const n = r.n * (d / r.d);
     if (!Number.isSafeInteger(n)) refuse("writer-clock", "Unable to represent exact clock in MusicXML.");
     return n;
   };
+  const clefXml = (staff, afterBarline = false) => {
+    const c = standardClef(staff.clef);
+    if (!c) return refuse("writer-clef", `Unsupported clef ${staff.clef}.`, staff.source);
+    return `<clef number="${staff.number}"${staff.clefPrintObject === false ? ' print-object="no"' : ""}${afterBarline ? ' after-barline="yes"' : ""}>${tag3("sign", c.sign)}${c.line ? tag3("line", c.line) : ""}${c.octaveChange ? tag3("clef-octave-change", c.octaveChange) : ""}</clef>`;
+  };
+  const anchorXml = (anchor) => {
+    if (anchor && !["above", "below", "auto"].includes(anchor.placement)) refuse("writer-mark-anchor", "Unverified source mark placement.", anchor.source);
+    return anchor && anchor.placement !== "auto" ? ` placement="${anchor.placement}"` : "";
+  };
+  const strongAccentType = (direction, anchor) => direction && direction !== "auto" ? ` type="${direction}"` : anchor && anchor.placement !== "auto" ? ` type="${anchor.placement === "above" ? "up" : "down"}"` : "";
+  const articulationsXml = (names2, source, directions, anchors) => {
+    const byIndex = /* @__PURE__ */ new Map();
+    const anchorByIndex = /* @__PURE__ */ new Map();
+    for (const entry of anchors ?? []) {
+      if (!Number.isInteger(entry.index) || !names2[entry.index] || anchorByIndex.has(entry.index)) refuse("writer-mark-anchor", "Ambiguous source articulation anchor ownership.", entry.anchor.source);
+      anchorByIndex.set(entry.index, entry.anchor);
+    }
+    for (const direction of directions ?? []) {
+      if (!Number.isInteger(direction.index) || names2[direction.index] !== "strong-accent" || byIndex.has(direction.index) || !["auto", "up", "down"].includes(direction.value)) refuse("writer-articulation-direction", "Unverified strong-accent direction ownership.", direction.source);
+      byIndex.set(direction.index, direction.value);
+    }
+    return `<articulations>${names2.map((name, index) => {
+      if (!articulationVocabulary.has(name)) refuse("writer-articulation", `Unsupported articulation ${name}.`, source);
+      const direction = byIndex.get(index);
+      const anchor = anchorByIndex.get(index);
+      return `<${name}${name === "strong-accent" ? strongAccentType(direction, anchor) : ""}${anchorXml(anchor)}/>`;
+    }).join("")}</articulations>`;
+  };
+  const colorXml2 = (color2, visible) => {
+    if (!color2) return visible ? "" : ' color="#00000000"';
+    if (color2.rgba.length !== 4 || color2.rgba.some((value2) => !Number.isInteger(value2) || value2 < 0 || value2 > 255))
+      refuse("writer-color", "Source color requires exactly four integer channels from 0 through 255.", color2.source);
+    const [r, g, b, a] = color2.rgba;
+    return ` color="#${[visible ? a : 0, r, g, b].map((value2) => value2.toString(16).padStart(2, "0").toUpperCase()).join("")}"`;
+  };
+  const rotatedGlyph = (glyph) => !!glyph.rotation?.degrees && canonicalSymbolVocabulary.has(glyph.name) && glyph.projection !== "notehead-parenthesis";
+  const glyphXml = (glyph, role, inheritedColor, visible = true) => {
+    if (glyph.projection === "font-character") {
+      const character = glyph.fontCharacter;
+      if (!character) return refuse("writer-font-character", "Missing source font character.", glyph.source);
+      if (glyph.name !== "FSymbol" || glyph.fontSize || glyph.rotation || !Number.isInteger(character.code) || character.code < -2147483648 || character.code > 2147483647 || !["source-property", "native-default"].includes(character.origin) || character.origin === "native-default" && character.code !== 0 || character.text !== xmlCharacter(character.code)) refuse("writer-font-character", "Font character must retain its exact source code without inferred glyph meaning.", glyph.source);
+      const size2 = character.pointSize;
+      if (size2 && (!/^-?\d{1,6}(?:\.\d{1,20})?$/.test(size2.rawValue) || Number(size2.rawValue) !== size2.value || !Number.isFinite(size2.value) || Math.abs(size2.value) > 1e4)) refuse("writer-font-character-size", "Font character point size must match its exact source field.", size2.source);
+      const font = glyph.sourceFont;
+      if (font && (typeof font.value !== "string" || font.value.length > 256)) refuse("writer-font-character-family", "Font character family must retain its bounded source label.", font.source);
+      const shown2 = visible && glyph.printObject !== false && character.text !== void 0;
+      const appearance2 = colorXml2(glyph.sourceColor ?? inheritedColor, shown2) + (font && literalFontFamily(font.value) ? ` font-family="${esc5(font.value)}"` : "") + (size2 && size2.value > 0 ? ` font-size="${size2.rawValue}"` : "");
+      const text = character.text === void 0 ? `U+${(character.code >>> 0).toString(16).toUpperCase().padStart(4, "0")}` : esc5(character.text).replace(/\r/g, "&#13;");
+      return role === "direction" ? `<words${appearance2}>${text}</words>` : `<other-notation type="single"${shown2 ? "" : ' print-object="no"'}${appearance2}>${text}</other-notation>`;
+    }
+    if (glyph.fontCharacter) refuse("writer-font-character", "Font character facts require their explicit source projection.", glyph.source);
+    if (glyph.projection && !["source-name", "empty", "notehead-parenthesis"].includes(glyph.projection)) refuse("writer-symbol", "Unknown source glyph projection.", glyph.source);
+    if (!glyph.name || glyph.name.length > 256 || !["source-name", "empty"].includes(glyph.projection ?? "") && !canonicalSymbolVocabulary.has(glyph.name)) refuse("writer-symbol", "Unverified standard direction glyph or note/rest glyph.", glyph.source);
+    if (glyph.projection === "empty" && glyph.name !== "noSym" || glyph.projection === "source-name" && canonicalSymbolVocabulary.has(glyph.name)) refuse("writer-symbol", "Contradictory native glyph projection.", glyph.source);
+    const size = glyph.fontSize, pointText = glyphPointSize(size);
+    if (glyph.rotation && (!Number.isFinite(glyph.rotation.degrees) || glyph.rotation.degrees < -180 || glyph.rotation.degrees > 180)) refuse("writer-symbol-rotation", "Glyph rotation must be a finite standard degree value.", glyph.rotation.source);
+    const shown = visible && glyph.printObject !== false && glyph.projection !== "empty";
+    const appearance = colorXml2(glyph.sourceColor ?? inheritedColor, shown) + (size ? ` font-size="${pointText}"` : "");
+    if (role === "direction" && !["source-name", "empty"].includes(glyph.projection ?? "")) return `<symbol${appearance}${glyph.rotation ? ` rotation="${glyph.rotation.degrees}"` : ""}>${esc5(glyph.name)}</symbol>`;
+    const name = role === "direction" ? "other-direction" : "other-notation";
+    const open = `<${name}${role === "notation" ? ' type="single"' : ""}${shown ? "" : ' print-object="no"'}${appearance}${!glyph.projection || glyph.projection === "notehead-parenthesis" ? ` smufl="${esc5(glyph.name)}"` : ""}`;
+    return ["source-name", "empty"].includes(glyph.projection ?? "") ? `${open}>${esc5(glyph.name)}</${name}>` : `${open}/>`;
+  };
+  const textResetMask = (run) => {
+    const resets = run.emphasisResets ?? [];
+    let mask = 0;
+    if (resets.length > 4) refuse("writer-text-reset", "Too many independently located text emphasis resets.", run.source);
+    for (const reset of resets) {
+      if (![1, 2, 4, 8].includes(reset.bit) || mask & reset.bit || run.emphasis & reset.bit) refuse("writer-text-reset", "Ambiguous source text emphasis reset.", reset.source);
+      mask |= reset.bit;
+    }
+    return mask;
+  };
+  const familyPlan = (owner, runs) => {
+    if (owner && (!["source-property", "source-style", "native-default"].includes(owner.origin) || typeof owner.value !== "string" || owner.value.length > 65536 || owner.qualification && !["unverified-inline-context", "unrepresentable-inline-reset"].includes(owner.qualification))) refuse("writer-text-family", "Unverified bounded source text family.", owner.source);
+    const base = owner && !owner.qualification && ordinaryFamily(owner.value) ? owner.value : void 0;
+    if (!runs) return { base };
+    let introduced = !!base, unsafeReset = false;
+    const values2 = runs.map((run) => {
+      const font = run.sourceFont;
+      if (font && (font.origin !== "source-markup" || typeof font.face !== "string" || font.face.length > 65536 || font.role && font.role !== "ordinary-family" || font.qualification && font.qualification !== "ambiguous-properties")) refuse("writer-text-family", "Unverified bounded inline font context.", font.source);
+      const value2 = run.symbolName ? void 0 : font ? font.role === "ordinary-family" && !font.qualification && ordinaryFamily(font.face) ? font.face : void 0 : base;
+      if (!run.symbolName) {
+        if (introduced && !value2) unsafeReset = true;
+        introduced ||= !!value2;
+      }
+      return value2;
+    });
+    return unsafeReset ? {} : { base, values: values2 };
+  };
+  const familyXml = (value2) => value2 === void 0 ? "" : ` font-family="${esc5(value2)}"`;
+  const scriptCaption = (runs) => runs?.some((run) => run.script?.projection && run.script.value !== "normal") === true;
+  const lyricTextXml = (lyric) => {
+    const flags = [["bold", 1, "font-weight"], ["italic", 2, "font-style"], ["underline", 4, "underline"], ["strike", 8, "line-through"]];
+    let base = lyric.textFontStyle?.value ?? 0, introduced = lyric.textFontStyle ? 15 : 0;
+    if (!Number.isInteger(base) || base < 0 || base > 15) refuse("writer-lyric-font-style", "Invalid lyric font style mask.", lyric.source);
+    for (const [name, bit] of flags) {
+      const fact = lyric.textEmphasis?.[name];
+      if (!fact) continue;
+      if (typeof fact.value !== "boolean") refuse("writer-lyric-emphasis", "Authored lyric emphasis requires a boolean source fact.", fact.source);
+      introduced |= bit;
+      base = fact.value ? base | bit : base & ~bit;
+    }
+    const runs = lyric.textRuns;
+    const families = familyPlan(lyric.textFontFamily, runs);
+    if (runs) {
+      if (!runs.length || runs.length > 4096 || runs.map((run) => run.text).join("") !== lyric.text) refuse("writer-lyric-runs", "Ordered lyric runs must equal the literal syllable within the bounded profile.", lyric.source);
+      for (const run of runs) {
+        if (!Number.isInteger(run.emphasis) || run.emphasis < 0 || run.emphasis > 15 || run.origin !== "source-markup" || run.symbolName && !symbolVocabulary.has(run.symbolName)) refuse("writer-lyric-runs", "Unverified source lyric inline emphasis or symbol.", run.source);
+        introduced |= run.emphasis | textResetMask(run);
+      }
+    }
+    const textXml = (value2, emphasis, family, run) => {
+      const attrs2 = flags.filter(([, bit]) => introduced & bit).map(([name, bit, attribute]) => {
+        const enabled = !!(emphasis & bit), setting = name === "bold" ? enabled ? "bold" : "normal" : name === "italic" ? enabled ? "italic" : "normal" : enabled ? "1" : "0";
+        return ` ${attribute}="${setting}"`;
+      }).join("");
+      return `<text${attrs2}${(run ? inlineTextFontXml(run, lyric.textFontSize) : pointSizeXml(lyric.textFontSize)).replace(/ relative-y="[^"]+"/, "")}${scriptCaption(runs) ? ' color="#00000000"' : ""}${familyXml(family)}>${esc5(value2)}</text>`;
+    };
+    const split = runs && (!runs.every((run) => !run.symbolName && run.emphasis === 0 && run.emphasisResets === void 0 && !run.textFontSize && !run.musicFontSize && !run.script) || families.values?.some((value2) => value2 !== families.values[0]));
+    return split ? runs.map((run, index) => textXml(run.text, base & ~textResetMask(run) | run.emphasis, families.values?.[index], run)).join("") : textXml(lyric.text, base, families.values?.[0] ?? families.base);
+  };
+  const directionXml = (direction, wordsOnly = false) => {
+    if (direction.playbackOnly) {
+      if (direction.kind !== "tempo" || wordsOnly || !(Number(direction.quarterRate) > 0)) refuse("writer-playback-tempo", "A playback-only direction must be a positive tempo.", direction.source);
+      return `<sound tempo="${direction.quarterRate}">${tag3("offset", ticks(direction.position))}</sound>`;
+    }
+    if (wordsOnly && direction.kind !== "words") refuse("writer-caption-content", "A line caption requires the standard words formatter.", direction.source);
+    if (direction.textEnclosure && !["words", "rehearsal", "dynamic", "harmony"].includes(direction.kind)) refuse("writer-rehearsal-enclosure", "The qualified source enclosure needs a text or dynamic carrier.", direction.textEnclosure.source);
+    const enclosure = direction.textEnclosure;
+    if (enclosure && (!["source-property", "source-style"].includes(enclosure.origin) || ![0, 1, 2].includes(enclosure.nativeFrameType) || enclosure.value !== ["none", "rectangle", "circle"][enclosure.nativeFrameType])) refuse("writer-rehearsal-enclosure", "Text enclosure requires the exact qualified source frame shape.", enclosure.source);
+    const enclosureXml = enclosure ? ` enclosure="${enclosure.value}"` : "";
+    const alignment = direction.textAlignment;
+    if (alignment && (alignment.halign && !["left", "center", "right"].includes(alignment.halign) || alignment.justify && !["left", "center", "right"].includes(alignment.justify) || alignment.valign && !["top", "middle", "bottom", "baseline"].includes(alignment.valign))) refuse("writer-text-alignment", "Uninterpreted standard text alignment.", alignment.source);
+    const positionXml = `${alignment?.halign ? ` halign="${alignment.halign}"` : ""}${alignment?.valign ? ` valign="${alignment.valign}"` : ""}`;
+    const alignmentXml = `${positionXml}${alignment?.justify ? ` justify="${alignment.justify}"` : ""}`;
+    if (direction.kind === "harmony") return harmonyXml(direction, ticks(direction.position));
+    const visibilityXml = colorXml2(direction.sourceColor, direction.printObject !== false);
+    const fontStyle = direction.textFontStyle;
+    if (fontStyle && (!Number.isInteger(fontStyle.value) || fontStyle.value < 0 || fontStyle.value > 15)) refuse("writer-text-font-style", "Uninterpreted native text emphasis bit field.", fontStyle.source);
+    const showFontStyle = fontStyle && (fontStyle.value !== 0 || fontStyle.origin === "source" || direction.kind === "tempo" && direction.showMetronome !== false && direction.text !== void 0 && direction.textRuns !== void 0);
+    const emphasisValue = (name, bit) => {
+      const fact = direction.textEmphasis?.[name];
+      if (fact && typeof fact.value !== "boolean") refuse("writer-text-emphasis", "Authored text emphasis requires a boolean source fact.", fact.source);
+      return fact ? fact.value : showFontStyle ? !!(fontStyle.value & bit) : void 0;
+    };
+    const bold = emphasisValue("bold", 1), italic = emphasisValue("italic", 2), underline = emphasisValue("underline", 4), strike = emphasisValue("strike", 8);
+    const sizeXml = pointSizeXml(direction.kind === "dynamic" && !direction.customDynamic || direction.kind === "pedal" ? direction.musicFontSize ?? direction.textFontSize : direction.textFontSize);
+    const fontXml = `${bold !== void 0 ? ` font-weight="${bold ? "bold" : "normal"}"` : ""}${italic !== void 0 ? ` font-style="${italic ? "italic" : "normal"}"` : ""}`;
+    const decorationXml = `${underline !== void 0 ? ` underline="${underline ? 1 : 0}"` : ""}${strike !== void 0 ? ` line-through="${strike ? 1 : 0}"` : ""}`;
+    const literalTempoCaption = direction.kind === "tempo" && direction.showMetronome !== false && !!direction.textRuns?.some((run) => run.musicFontSize || run.textFontSize || run.script?.projection) && (direction.text === void 0 || direction.textRuns.some((run) => run.script?.projection) || new Set(direction.textRuns.filter((run) => run.symbolName).map((run) => inlineTextFontXml(run, direction.textFontSize))).size > 1);
+    const componentCaption = !literalTempoCaption && direction.kind === "tempo" && direction.showMetronome !== false && direction.text !== void 0 && direction.textRuns !== void 0;
+    const mixedDynamicTypography = direction.customDynamic && !!direction.textRuns?.some((run) => run.script?.projection) || direction.customDynamic && new Set((direction.textRuns ?? []).map((run) => inlineTextFontXml(run, direction.textFontSize))).size > 1;
+    const richDynamic = (!enclosure || enclosure.value === "none") && !direction.textRuns?.some((run) => run.script?.projection) && direction.kind === "dynamic" && direction.customDynamic && direction.textRuns?.some((run) => ["dynamicPiano", "dynamicForte", "dynamicMezzo", "dynamicSforzando"].includes(run.symbolName ?? "")) && direction.textRuns.every((run) => !run.symbolName || ["dynamicPiano", "dynamicForte", "dynamicMezzo", "dynamicSforzando"].includes(run.symbolName)) && direction.textRuns.every((run, index, runs) => !["dynamicMezzo", "dynamicSforzando"].includes(run.symbolName ?? "") || !runs[index + 1] || inlineTextFontXml(run, direction.textFontSize) === inlineTextFontXml(runs[index + 1], direction.textFontSize));
+    const families = familyPlan(direction.textFontFamily, direction.kind === "words" || direction.kind === "rehearsal" || direction.kind === "tempo" && direction.showMetronome === false || componentCaption || direction.customDynamic || literalTempoCaption ? direction.textRuns : void 0);
+    const words = (text, family = families.base) => `<words${alignmentXml}${enclosureXml}${fontXml}${sizeXml}${decorationXml}${familyXml(family)}${visibilityXml}>${esc5(text)}</words>`;
+    const inlineWords = (text = direction.text, runs = direction.textRuns, values2 = families.values) => {
+      if (!runs.length || runs.length > 4096 || runs.map((run) => run.text).join("") !== text) refuse("writer-text-runs", "Ordered inline caption facts must equal the literal direction text within the bounded profile.", direction.source);
+      const styled = !runs.every((run) => run.origin === "source-markup" && !run.symbolName && run.emphasis === 0 && run.emphasisResets === void 0 && !run.textFontSize && !run.musicFontSize && !run.script);
+      if (!styled && !values2?.some((value2) => value2 !== values2[0])) return words(text ?? "", values2?.[0]);
+      if (enclosure && enclosure.value !== "none") {
+        if (enclosure.inlineProjection === "whole-caption-format-limit") return words(text ?? "", families.base);
+        const attributes = runs.map((run, index) => {
+          const value2 = ((bold ? 1 : 0) | (italic ? 2 : 0) | (underline ? 4 : 0) | (strike ? 8 : 0)) & ~textResetMask(run) | run.emphasis;
+          return ` font-weight="${value2 & 1 ? "bold" : "normal"}" font-style="${value2 & 2 ? "italic" : "normal"}" underline="${value2 & 4 ? 1 : 0}" line-through="${value2 & 8 ? 1 : 0}"${inlineTextFontXml(run, direction.textFontSize)}${familyXml(values2?.[index])}`;
+        });
+        if (runs.every((run) => !run.symbolName) && attributes.every((value2) => value2 === attributes[0])) return `<words${alignmentXml}${enclosureXml}${attributes[0]} xml:space="preserve"${visibilityXml}>${esc5(text ?? "")}</words>`;
+        if (runs.length === 1 && runs[0].symbolName && textRunSymbolVocabulary.has(runs[0].symbolName)) return `<symbol${alignmentXml}${enclosureXml}${attributes[0]}${visibilityXml}>${esc5(runs[0].symbolName)}</symbol>`;
+        refuse("writer-text-frame-runs", "A shared caption frame with mixed formatting requires its located whole-caption format qualification.", enclosure.source);
+      }
+      let ordinaryHintEmitted = false;
+      return runs.map((run, index) => {
+        if (!Number.isInteger(run.emphasis) || run.emphasis < 0 || run.emphasis > 15 || run.origin !== "source-markup") refuse("writer-text-runs", "Uninterpreted source inline emphasis.", run.source);
+        const value2 = ((bold ? 1 : 0) | (italic ? 2 : 0) | (underline ? 4 : 0) | (strike ? 8 : 0)) & ~textResetMask(run) | run.emphasis;
+        if (run.symbolName && !textRunSymbolVocabulary.has(run.symbolName) && !(literalTempoCaption && run.symbolName === "metAugmentationDot" && direction.dots === 1)) refuse("writer-text-runs", "Unverified source inline symbol.", run.source);
+        const element = run.symbolName ? "symbol" : "words";
+        const emphasisXml = styled ? ` font-weight="${value2 & 1 ? "bold" : "normal"}" font-style="${value2 & 2 ? "italic" : "normal"}" underline="${value2 & 4 ? 1 : 0}" line-through="${value2 & 8 ? 1 : 0}"` : fontXml + decorationXml;
+        const family = run.symbolName && ordinaryHintEmitted ? "music" : values2?.[index];
+        if (!run.symbolName && family !== void 0) ordinaryHintEmitted = true;
+        return `<${element}${alignmentXml}${emphasisXml}${inlineTextFontXml(run, direction.textFontSize)}${familyXml(family)}${run.symbolName ? "" : ' xml:space="preserve"'}${visibilityXml}>${esc5(run.symbolName ?? run.text)}</${element}>`;
+      }).join("");
+    };
+    let componentProjection;
+    if (componentCaption) {
+      const text = direction.text, runs = direction.textRuns;
+      if (!runs.length || runs.length > 4096 || runs.map((run) => run.text).join("") !== text)
+        refuse("writer-tempo-components", "Metronome runs must equal the complete bounded formatter caption.", direction.source);
+      const match = /^(.*?)(♩)(\s*·)?\s*=\s*(\d+(?:\.\d+)?)([\s\S]*)$/ds.exec(text);
+      const glyphs = runs.filter((run) => run.symbolName);
+      if (!match || direction.unit !== "quarter" || Number(match[4]) <= 0 || match[4] !== direction.rate || (match[3] ? 1 : 0) !== (direction.dots ?? 0) || match[1] !== direction.tempoWords?.before || match[5] !== direction.tempoWords?.after || !fontStyle || !["native-default", "source-style", "source"].includes(fontStyle.origin) || fontStyle.origin === "source" && (fontStyle.source.member !== direction.source.member || fontStyle.source.path !== direction.source.path + "/fontStyle[1]") || glyphs.length !== 1 + (direction.dots ?? 0) || glyphs[0].symbolName !== "metNoteQuarterUp" || direction.dots && glyphs[1].symbolName !== "metAugmentationDot")
+        refuse("writer-tempo-components", "Complete caption, source styles, named beat/dots and printed rate must agree with all existing metronome fields.", direction.source);
+      const boundary = (at2) => at2 <= 0 || at2 >= text.length || !(text.charCodeAt(at2 - 1) >= 55296 && text.charCodeAt(at2 - 1) <= 56319 && text.charCodeAt(at2) >= 56320 && text.charCodeAt(at2) <= 57343);
+      const intervals2 = [];
+      let at = 0;
+      for (let i = 0; i < runs.length; i++) {
+        const run = runs[i], end = at + run.text.length;
+        if (!boundary(at) || !boundary(end) || !Number.isInteger(run.emphasis) || run.emphasis < 0 || run.emphasis > 15 || run.origin !== "source-markup" || run.symbolName && !["metNoteQuarterUp", "metAugmentationDot"].includes(run.symbolName)) refuse("writer-tempo-components", "Metronome run boundaries and source style/glyph facts must be exact.", run.source);
+        intervals2.push({ run, start: at, end, family: families.values?.[i] });
+        at = end;
+      }
+      const glyphIntervals = intervals2.filter((item) => item.run.symbolName);
+      const beat = match.indices[2], dot = match.indices[3];
+      if (glyphIntervals[0].start !== beat[0] || glyphIntervals[0].end !== beat[1] || dot && (glyphIntervals[1].start !== dot[1] - 1 || glyphIntervals[1].end !== dot[1]) || glyphs.some((run) => !run.source.path?.startsWith(direction.source.path + "/text[1]") || (run.sourceText === void 0 ? !/\/sym\[\d+\]$/.test(run.source.path) : run.sourceText !== (run.symbolName === "metNoteQuarterUp" ? "\uECA5" : "\uECB7"))))
+        refuse("writer-tempo-components", "Named glyph owners must equal the exact beat and augmentation-dot spans.", direction.source);
+      const slice = (range) => {
+        if (!boundary(range[0]) || !boundary(range[1])) refuse("writer-tempo-components", "A component boundary cannot split a Unicode character.", direction.source);
+        const selected = intervals2.filter((item) => item.start < range[1] && item.end > range[0]);
+        return {
+          runs: selected.map((item) => ({ ...item.run, text: item.run.text.slice(Math.max(0, range[0] - item.start), Math.min(item.run.text.length, range[1] - item.start)) })),
+          values: selected.map((item) => item.family)
+        };
+      };
+      const effective = (run) => ((bold ? 1 : 0) | (italic ? 2 : 0) | (underline ? 4 : 0) | (strike ? 8 : 0)) & ~textResetMask(run) | run.emphasis;
+      const uniform = (values2) => values2.length && values2.every((value2) => value2 === values2[0]) ? values2[0] : void 0;
+      const fontAttrs = (value2) => value2 === void 0 ? "" : ` font-weight="${value2 & 1 ? "bold" : "normal"}" font-style="${value2 & 2 ? "italic" : "normal"}"`;
+      const prefix = slice(match.indices[1]), suffix = slice(match.indices[5]), numeric = slice(match.indices[4]);
+      const numericFamilies = numeric.runs.map((run) => run.sourceFont ? run.sourceFont.role === "ordinary-family" && !run.sourceFont.qualification && ordinaryFamily(run.sourceFont.face) ? run.sourceFont.face : void 0 : direction.textFontFamily && !direction.textFontFamily.qualification && ordinaryFamily(direction.textFontFamily.value) ? direction.textFontFamily.value : void 0);
+      componentProjection = {
+        before: match[1] ? inlineWords(match[1], prefix.runs, prefix.values) : "",
+        after: match[5] ? inlineWords(match[5], suffix.runs, suffix.values) : "",
+        // Canonical sym insertion temporarily clears bold/italic;
+        // private characters retain their authored cursor emphasis.
+        metronomeFont: (uniform(glyphs.map((run) => inlineTextFontXml(run, direction.textFontSize))) ?? "") + fontAttrs(uniform(glyphs.map((run) => effective(run) & (run.sourceText === void 0 ? ~3 : ~0)))) + (prefix.values.some((value2) => value2 !== void 0) ? familyXml("music") : ""),
+        minuteFont: (uniform(numeric.runs.map((run) => inlineTextFontXml(run, direction.textFontSize))) ?? "") + fontAttrs(uniform(numeric.runs.map(effective))) + familyXml(uniform(numericFamilies))
+      };
+    }
+    let content, projectedLine = "", dynamicTypes = "";
+    if (direction.kind === "words") content = direction.textRuns ? inlineWords() : words(direction.text ?? "");
+    else if (direction.kind === "segno" || direction.kind === "coda") {
+      const glyph = direction.navigation?.glyph;
+      if (glyph && !["segno", "segnoSerpent1", "coda"].includes(glyph)) refuse("writer-navigation-glyph", "Unverified source navigation glyph.", direction.source);
+      content = `<${direction.kind}${glyph === "segnoSerpent1" ? ' smufl="segnoSerpent1"' : ""}${positionXml}${visibilityXml}/>`;
+    } else if (direction.kind === "symbol") {
+      if (!direction.symbol) refuse("writer-symbol", "A glyph direction needs its source identity.", direction.source);
+      content = glyphXml(direction.symbol, "direction", direction.sourceColor, direction.printObject !== false);
+    } else if (direction.kind === "rehearsal") {
+      const enclosure2 = direction.textEnclosure;
+      if (enclosure2 && (!["source-property", "source-style"].includes(enclosure2.origin) || ![0, 1, 2].includes(enclosure2.nativeFrameType) || enclosure2.value !== ["none", "rectangle", "circle"][enclosure2.nativeFrameType]))
+        refuse("writer-rehearsal-enclosure", "Rehearsal enclosure requires the exact qualified source frame shape.", enclosure2.source);
+      content = `<rehearsal${alignmentXml}${fontXml}${sizeXml}${familyXml(families.base)}${decorationXml}${enclosure2 ? ` enclosure="${enclosure2.value}"` : ""}${visibilityXml}>${esc5(direction.text ?? "")}</rehearsal>`;
+      if (direction.textRuns?.length) {
+        content = inlineWords();
+        dynamicTypes = `<direction-type>${content}</direction-type><direction-type><rehearsal color="#00000000">${esc5(direction.text ?? "")}</rehearsal></direction-type>`;
+        content = "";
+      }
+    } else if (direction.kind === "dynamic") {
+      if (!direction.customDynamic && !/^(?:p{1,6}|f{1,6}|mp|mf|sf|sfp|sfpp|fp|rf|rfz|sfz|sffz|fz|n|pf|sfzp)$/.test(direction.text ?? "")) refuse("writer-dynamic", "Unsupported dynamic.", direction.source);
+      if (richDynamic) {
+        if (enclosure && enclosure.value !== "none") refuse("writer-text-frame-runs", "A shared Dynamic frame cannot become separate per-component enclosures.", enclosure.source);
+        const runs = direction.textRuns;
+        if (!fontStyle || !runs.length || runs.length > 4096 || runs.map((run) => run.text).join("") !== direction.text)
+          refuse("writer-dynamic-components", "Ordered Dynamic components must equal their bounded complete caption.", direction.source);
+        const effective = (run) => ((bold ? 1 : 0) | (italic ? 2 : 0) | (underline ? 4 : 0)) & ~textResetMask(run) | run.emphasis;
+        const glyphStyle = (run) => {
+          const letter = { dynamicPiano: "p", dynamicForte: "f", dynamicMezzo: "m", dynamicSforzando: "s" }[run.symbolName];
+          if (run.text !== letter || !run.source.path?.startsWith(direction.source.path + "/text[1]") || (run.sourceText === void 0 ? !/\/sym\[\d+\]$/.test(run.source.path) : !["p", "f"].includes(letter) || run.sourceText !== (letter === "p" ? "\uE520" : "\uE522") || run.sourceFont?.face !== "ScoreText" || run.sourceFont.qualification))
+            refuse("writer-dynamic-components", "Semantic Dynamic glyphs require their exact canonical or private source interval.", run.source);
+          return effective(run) & (run.sourceText === void 0 ? ~3 : ~0);
+        };
+        let at = 0, familyEmitted = false;
+        for (let index = 0; index < runs.length; index++) {
+          const run = runs[index];
+          let end = at + run.text.length;
+          const boundary = (position) => position === 0 || position === direction.text.length || !(/[\uD800-\uDBFF]/.test(direction.text[position - 1]) && /[\uDC00-\uDFFF]/.test(direction.text[position]));
+          if (!boundary(at) || !boundary(end) || run.origin !== "source-markup" || !Number.isInteger(run.emphasis) || run.emphasis < 0 || run.emphasis > 7)
+            refuse("writer-dynamic-components", "Dynamic component character boundaries and source emphasis must be exact.", run.source);
+          if (!run.symbolName) {
+            dynamicTypes += `<direction-type>${inlineWords(run.text, [run], [families.values?.[index]])}</direction-type>`;
+            familyEmitted ||= families.values?.[index] !== void 0;
+          } else {
+            const letter = { dynamicPiano: "p", dynamicForte: "f", dynamicMezzo: "m", dynamicSforzando: "s" }[run.symbolName];
+            const style = glyphStyle(run);
+            let group = letter;
+            if (letter === "m" || letter === "s") {
+              const next = runs[index + 1], ordinal = /^(.*\/sym\[)(\d+)\]$/.exec(run.source.path ?? "");
+              if (!next || next.symbolName !== "dynamicForte" || glyphStyle(next) !== style || next.origin !== "source-markup" || !Number.isInteger(next.emphasis) || next.emphasis < 0 || next.emphasis > 7 || !ordinal || next.source.path !== `${ordinal[1]}${Number(ordinal[2]) + 1}]`)
+                refuse("writer-dynamic-components", "Native mf/sf requires one exact adjacent canonical source pair with uniform emphasis.", run.source);
+              index++;
+              end += next.text.length;
+              group += "f";
+            }
+            while (["p", "f"].includes(letter) && group.length < 6 && runs[index + 1]?.symbolName === run.symbolName && glyphStyle(runs[index + 1]) === style && inlineTextFontXml(runs[index + 1], direction.textFontSize) === inlineTextFontXml(run, direction.textFontSize)) {
+              const next = runs[++index];
+              if (next.origin !== "source-markup" || !Number.isInteger(next.emphasis) || next.emphasis < 0 || next.emphasis > 7)
+                refuse("writer-dynamic-components", "Grouped Dynamic glyphs require exact source emphasis.", next.source);
+              end += next.text.length;
+              group += letter;
+            }
+            if (group.length === 6 && runs[index + 1]?.symbolName === run.symbolName && glyphStyle(runs[index + 1]) === style && inlineTextFontXml(runs[index + 1], direction.textFontSize) === inlineTextFontXml(run, direction.textFontSize))
+              refuse("writer-dynamic-components", "A uniform source Dynamic group exceeds the six-letter standard profile.", runs[index + 1].source);
+            dynamicTypes += `<direction-type><dynamics${positionXml}${pointSizeXml(run.musicFontSize ?? direction.musicFontSize ?? direction.textFontSize)} font-weight="${style & 1 ? "bold" : "normal"}" font-style="${style & 2 ? "italic" : "normal"}" underline="${style & 4 ? 1 : 0}" line-through="0"${familyEmitted ? familyXml("music") : ""}${visibilityXml}><${group}/></dynamics></direction-type>`;
+          }
+          at = end;
+        }
+        content = "";
+      } else {
+        let dynamicFontXml = "", splitCustom = !!mixedDynamicTypography || enclosure?.inlineProjection === "whole-caption-format-limit";
+        if (direction.customDynamic && fontStyle) {
+          let base = fontStyle.value;
+          for (const [name, bit] of [["bold", 1], ["italic", 2], ["underline", 4], ["strike", 8]]) {
+            const fact = direction.textEmphasis?.[name];
+            if (fact) base = fact.value ? base | bit : base & ~bit;
+          }
+          const runs = direction.textRuns;
+          if (runs && (!runs.length || runs.length > 4096 || runs.map((run) => run.text).join("") !== direction.text)) refuse("writer-dynamic-runs", "Custom dynamic runs must equal the bounded literal label.", direction.source);
+          const styles = new Set((runs ?? []).map((run) => {
+            if (!Number.isInteger(run.emphasis) || run.emphasis < 0 || run.emphasis > 15 || run.origin !== "source-markup" || run.symbolName && !textRunSymbolVocabulary.has(run.symbolName)) refuse("writer-dynamic-runs", "Unverified custom dynamic inline emphasis or glyph.", run.source);
+            return base & ~textResetMask(run) | run.emphasis;
+          }));
+          splitCustom ||= styles.size > 1 || !!families.values?.some((value3) => value3 !== families.values[0]);
+          const value2 = styles.size <= 1 ? styles.values().next().value ?? base : void 0;
+          if (value2 !== void 0) dynamicFontXml = ` font-weight="${value2 & 1 ? "bold" : "normal"}" font-style="${value2 & 2 ? "italic" : "normal"}" underline="${value2 & 4 ? 1 : 0}" line-through="${value2 & 8 ? 1 : 0}"`;
+        }
+        content = `<dynamics${positionXml}${enclosureXml}${direction.customDynamic && fontStyle ? dynamicFontXml : fontXml + decorationXml}${sizeXml}${familyXml(families.base)}${visibilityXml}>${direction.customDynamic ? tag3("other-dynamics", direction.text ?? "") : `<${direction.text}/>`}</dynamics>`;
+        if (splitCustom) {
+          const visible = inlineWords();
+          const typed = `<dynamics${colorXml2(direction.sourceColor, false)}>${tag3("other-dynamics", direction.text ?? "")}</dynamics>`;
+          dynamicTypes = `<direction-type>${visible}</direction-type><direction-type>${typed}</direction-type>`;
+          content = "";
+        }
+      }
+    } else if (direction.kind === "pedal") {
+      const relation = direction.relationId ? relationsById.get(direction.relationId) : void 0;
+      const dotted = relation?.kind === "pedal" && relation.lineType === "dotted" && direction.line !== false;
+      content = `<pedal type="${direction.action}" number="${serializedNumber(direction.relationId, direction.number)}" line="${direction.line === false ? "no" : "yes"}"${dotted ? ' sign="no"' : direction.sign !== void 0 ? ` sign="${direction.sign ? "yes" : "no"}"` : ""}${direction.abbreviated !== void 0 ? ` abbreviated="${direction.abbreviated ? "yes" : "no"}"` : ""}${fontXml}${sizeXml}${dotted ? colorXml2(direction.sourceColor, false) : visibilityXml}/>`;
+      if (dotted) {
+        const projectedVisibilityXml = visibilityXml || ' color="#000000"';
+        const stop = direction.action === "stop" || direction.action === "discontinue";
+        const hook = (stop ? relation.endHook : relation.startHook) ?? "none";
+        if (!["none", "up", "down", "both", "arrow"].includes(hook)) refuse("writer-pedal-line-hook", "Unverified source dotted pedal hook.", relation.source);
+        projectedLine = `<direction-type><bracket type="${stop ? "stop" : "start"}" number="${serializedNumber(relation.id, void 0, "bracket")}" line-end="${hook}" line-type="dotted"${projectedVisibilityXml}/></direction-type>`;
+        if (direction.sign) {
+          const glyph = stop ? "keyboardPedalUp" : direction.action === "sostenuto" ? direction.abbreviated ? "keyboardPedalS" : "keyboardPedalSost" : "keyboardPedalPed";
+          projectedLine += `<direction-type><symbol${fontXml}${sizeXml}${decorationXml}${projectedVisibilityXml}>${glyph}</symbol></direction-type>`;
+        }
+      }
+    } else if (direction.kind === "wedge") content = `<wedge type="${direction.action}" number="${serializedNumber(direction.relationId, direction.number)}"${direction.niente ? ' niente="yes"' : ""}${colorXml2(direction.sourceColor, direction.printObject !== false && direction.line !== false)}/>`;
+    else content = direction.showMetronome === false ? "" : `<metronome${alignmentXml}${componentProjection?.metronomeFont ?? ""}${direction.printObject === false || literalTempoCaption ? ' print-object="no"' : ""}>${tag3("beat-unit", direction.unit ?? "quarter")}${"<beat-unit-dot/>".repeat(direction.dots ?? 0)}${componentProjection ? `<per-minute${componentProjection.minuteFont}>${esc5(direction.rate)}</per-minute>` : tag3("per-minute", direction.rate ?? String(direction.quarterRate))}</metronome>`;
+    if (wordsOnly) return content;
+    const before = literalTempoCaption ? `<direction-type>${inlineWords(direction.textRuns.map((run) => run.text).join(""))}</direction-type>` : direction.kind === "tempo" && direction.tempoWords?.before ? `<direction-type>${componentProjection ? componentProjection.before : direction.showMetronome === false && direction.textRuns ? inlineWords(direction.tempoWords.before) : words(direction.tempoWords.before)}</direction-type>` : "";
+    const after = !literalTempoCaption && direction.kind === "tempo" && direction.tempoWords?.after ? `<direction-type>${componentProjection ? componentProjection.after : words(direction.tempoWords.after)}</direction-type>` : "";
+    const technique = direction.playingTechnique;
+    const feel = direction.rhythmicFeel;
+    if (feel && (!["triplet", "dotted", "scottish"].includes(feel.kind) || !["eighth", "16th"].includes(feel.unit))) refuse("writer-rhythmic-feel", "Unknown source rhythmic feel.", feel.source);
+    const navigation2 = direction.navigation;
+    if (navigation2?.standardSound && Object.entries(navigation2.standardSound).some(([key, value2]) => !["segno", "coda", "fine", "tocoda", "dalsegno", "dacapo"].includes(key) || typeof value2 !== "string" || !value2.length || key === "dacapo" && value2 !== "yes")) refuse("writer-navigation-sound", "Unqualified standard navigation target.", direction.source);
+    const navigationSound = navigation2?.standardSound !== void 0 ? Object.keys(navigation2.standardSound).length ? `<sound ${Object.entries(navigation2.standardSound).map(([key, value2]) => `${key}="${esc5(value2)}"`).join(" ")}/>` : "" : navigation2?.kind === "marker" ? direction.kind === "segno" || direction.kind === "coda" ? `<sound ${direction.kind}="${esc5(navigation2.label ?? "1")}"/>` : navigation2.label === "fine" ? '<sound fine="yes"/>' : "" : navigation2?.kind === "jump" ? `<sound ${navigation2.jumpTo === "start" ? 'dacapo="yes"' : `${navigation2.targetKind === "coda" ? "tocoda" : "dalsegno"}="${esc5(navigation2.jumpTo ?? "")}"`}/>` : "";
+    const sound = (feel ? `<sound><swing><first>${feel.kind === "triplet" ? 2 : feel.kind === "dotted" ? 3 : 1}</first><second>${feel.kind === "scottish" ? 3 : 1}</second><swing-type>${feel.unit}</swing-type></swing></sound>` : "") || navigationSound || (direction.kind === "tempo" ? `<sound tempo="${direction.quarterRate}"/>` : direction.velocity !== void 0 && direction.performance?.play !== false ? `<sound dynamics="${(direction.velocity / 90 * 100).toFixed(2)}"/>` : technique && technique.play !== false ? technique.kind === "pizzicato" ? '<sound pizzicato="yes"/>' : technique.kind === "natural" || technique.kind === "arco" ? '<sound pizzicato="no"/>' : `<sound><play><other-play type="${technique.kind}">${esc5(technique.kind)}</other-play></play></sound>` : "");
+    return `<direction${direction.system ? ' system="only-top"' : ""}${direction.placement ? ` placement="${direction.placement}"` : ""}>${before}${dynamicTypes || (content ? `<direction-type>${content}</direction-type>` : before || after ? "" : "<direction-type><words/></direction-type>")}${projectedLine}${after}${tag3("offset", ticks(direction.position))}${direction.voiceId ? tag3("voice", direction.voiceId) : ""}${tag3("staff", direction.staff)}${sound}</direction>`;
+  };
+  const relationMarks = /* @__PURE__ */ new Map();
+  const ornamentEndpoints = /* @__PURE__ */ new Map();
+  const noteLineEndpoints = /* @__PURE__ */ new Map();
+  const lyricStops = /* @__PURE__ */ new Map();
+  const attachedTrills = relations.filter((relation) => relation.kind === "trill" && relation.notationAttachments !== void 0);
+  if (attachedTrills.length) {
+    const attachmentIds = /* @__PURE__ */ new Set();
+    for (const relation of attachedTrills) {
+      const attachments = relation.notationAttachments;
+      if (relation.projection || !attachments?.start || !attachments.end) return refuse("writer-trill-attachment", "Qualified positive Trill needs both source notation attachments.", relation.source);
+      for (const attachment of [attachments.start, attachments.end]) {
+        if (typeof attachment.eventId !== "string" || !attachment.eventId) refuse("writer-trill-attachment", "Trill attachment needs a real ordinary event identity.", relation.source);
+        attachmentIds.add(attachment.eventId);
+      }
+    }
+    const attachmentEvents = /* @__PURE__ */ new Map();
+    const attachmentMeasureClocks = /* @__PURE__ */ new Map();
+    for (const part of score.parts) {
+      let clock = q(0);
+      const starts = [];
+      for (const [mi, measure] of part.measures.entries()) {
+        if (attachmentIds.size) starts.push(clock);
+        for (const [vi, voice] of measure.voices.entries()) for (const event of voice) {
+          if (attachmentIds.has(event.id)) {
+            if (attachmentEvents.has(event.id)) refuse("writer-trill-attachment", "Trill carrier identity occurs more than once.", event.source);
+            attachmentEvents.set(event.id, { partId: part.id, measure: mi, event, voiceId: event.voiceId ?? String(vi + 1), clock: add(clock, event.start), release: add(add(clock, event.start), event.duration) });
+          }
+        }
+        if (attachmentIds.size) clock = add(clock, measure.duration);
+      }
+      if (attachmentIds.size) attachmentMeasureClocks.set(part.id, starts);
+    }
+    const logicalClock = (endpoint, source) => {
+      const clock = attachmentMeasureClocks.get(endpoint.partId)?.[endpoint.measure];
+      if (!clock) return refuse("writer-trill-attachment", "Trill logical endpoint has no source measure.", source);
+      return add(clock, endpoint.position);
+    };
+    for (const relation of attachedTrills) {
+      if (relation.start.partId !== relation.end.partId || relation.start.staff !== relation.end.staff || relation.start.voiceId !== relation.end.voiceId) refuse("writer-trill-attachment", "Source-qualified Trill keeps one logical source staff and voice.", relation.source);
+      if (compare(logicalClock(relation.start, relation.source), logicalClock(relation.end, relation.source)) >= 0) refuse("writer-trill-attachment", "Qualified Trill notation pair needs a positive logical interval.", relation.source);
+      const attachments = relation.notationAttachments;
+      for (const [start, attachment] of [[true, attachments.start], [false, attachments.end]]) {
+        const owner = attachmentEvents.get(attachment.eventId), event = owner?.event;
+        if (!owner || !event || event.grace || compare(event.duration, q(0)) <= 0 || attachment.origin !== "native-segment-anchor" || attachment.partId !== relation.start.partId || attachment.partId !== owner.partId || attachment.measure !== owner.measure || attachment.staff !== (event.staff ?? 1) || attachment.staff !== relation.start.staff || attachment.voiceId !== owner.voiceId || compare(attachment.position, event.start) !== 0 || attachment.noteId !== void 0 || attachment.graceIndex !== void 0 || !attachment.source || Object.keys(attachment.source).length !== Object.keys(event.source).length || Object.keys(event.source).some((key) => attachment.source[key] !== event.source[key]))
+          return refuse("writer-trill-attachment", "Trill carrier facts contradict the complete existing source event identity.", relation.source);
+        if (compare(start ? owner.clock : owner.release, logicalClock(start ? relation.start : relation.end, relation.source)) !== 0)
+          refuse("writer-trill-attachment", "Trill source carrier does not preserve the exact logical start or end release.", relation.source);
+      }
+    }
+  }
+  for (const part of score.parts) for (const measure of part.measures) for (const voice of measure.voices) for (const event of voice) {
+    for (const lyric of event.notes[0]?.lyrics ?? event.lyrics ?? []) if (lyric.extendTo?.eventId) {
+      const stops = lyricStops.get(lyric.extendTo.eventId) ?? [];
+      stops.push(lyric);
+      lyricStops.set(lyric.extendTo.eventId, stops);
+    }
+  }
+  const relationsById = /* @__PURE__ */ new Map(), relationsByPart = /* @__PURE__ */ new Map();
+  for (const relation of relations) {
+    if (relationsById.has(relation.id)) refuse("writer-relation-identity", "Ambiguous relation identity.", relation.source);
+    relationsById.set(relation.id, relation);
+    const items = relationsByPart.get(relation.start.partId) ?? [];
+    items.push(relation);
+    relationsByPart.set(relation.start.partId, items);
+  }
+  const legacySlurNumbers = /* @__PURE__ */ new Map();
+  for (const part of score.parts) {
+    const numbers = /* @__PURE__ */ new Set();
+    for (const measure of part.measures) for (const voice of measure.voices) for (const event of voice) for (const slur of [...event.slurs ?? [], ...event.notes.flatMap((note) => note.slurs ?? [])]) if (!slur.relationId) numbers.add(slur.number ?? 1);
+    legacySlurNumbers.set(part.id, numbers);
+  }
+  const openNumbers = /* @__PURE__ */ new Map(), emittedEndpoints = /* @__PURE__ */ new Map(), occupied = /* @__PURE__ */ new Map();
+  const projectedOpenNumbers = /* @__PURE__ */ new Map(), projectedEndpoints = /* @__PURE__ */ new Map();
+  const serializedNumber = (id, legacy, projection) => {
+    if (!id) return legacy ?? 1;
+    const relation = relationsById.get(id);
+    if (!relation) return refuse("writer-relation-reference", "Notation endpoint has no source relation.", void 0);
+    const endpoints = projection ? projectedEndpoints : emittedEndpoints, open = projection ? projectedOpenNumbers : openNumbers;
+    const namespace = `${relation.start.partId}:${projection || (relation.kind === "ottava" || relation.kind === "ending") && relation.projection ? "text-line" : relation.kind}`, count = endpoints.get(id) ?? 0, numbers = occupied.get(namespace) ?? /* @__PURE__ */ new Set();
+    occupied.set(namespace, numbers);
+    if (count >= 2) refuse("writer-relation-endpoints", "Musical relation would emit more than two endpoint marks.", relation.source);
+    endpoints.set(id, count + 1);
+    if (count === 1) {
+      const number2 = open.get(id);
+      open.delete(id);
+      numbers.delete(number2);
+      return number2;
+    }
+    let number = 1;
+    while (numbers.has(number) || relation.kind === "slur" && legacySlurNumbers.get(relation.start.partId)?.has(number)) number++;
+    if (number > 16) refuse("writer-relation-budget", "More than 16 overlapping MusicXML document intervals require another verified representation.", relation.source);
+    numbers.add(number);
+    open.set(id, number);
+    return number;
+  };
+  const hopoOpen = /* @__PURE__ */ new Map();
+  let hopoSerial = 0;
+  const hopoSlurNumber = (partId, note, start) => {
+    const raw = note.hopoNumber ?? 1, key = `${partId}:${raw}`;
+    if (!Number.isInteger(raw) || raw < 1 || raw > 16) return refuse("writer-hopo-number", "H/P pair needs a standard number level.", note.source);
+    let id = hopoOpen.get(key);
+    if (start) {
+      if (id) return refuse("writer-hopo-overlap", "Overlapping H/P pairs reuse a source pair number.", note.source);
+      id = `writer-hopo-${++hopoSerial}`;
+      while (relationsById.has(id)) id = `writer-hopo-${++hopoSerial}`;
+      const endpoint = { partId, measure: 0, position: q(0), staff: 1 };
+      relationsById.set(id, { source: note.source, id, kind: "slur", start: endpoint, end: endpoint });
+      hopoOpen.set(key, id);
+    } else if (!id) return refuse("writer-hopo-endpoint", "H/P stop has no matching source pair.", note.source);
+    const number = serializedNumber(id);
+    if (!start) hopoOpen.delete(key);
+    return number;
+  };
+  const slurXml = (slur) => `<notations${slur.printObject === false ? ' print-object="no"' : ""}><slur type="${slur.type}" number="${serializedNumber(slur.relationId, slur.number)}"${slur.orientation ? ` orientation="${slur.orientation}"` : ""}${slur.lineType ? ` line-type="${slur.lineType}"` : ""}/></notations>`;
+  const tupletXml = (boundary, inherited) => {
+    const hidden = boundary.printObject === false, bracket = boundary.bracketType?.value, direction = boundary.direction?.value;
+    const attrs2 = `${hidden ? ' bracket="no" show-number="none" show-type="none"' : `${bracket && bracket !== "auto" ? ` bracket="${bracket}"` : ""}${boundary.numberType ? ` show-number="${boundary.numberType.value}"` : ""}`}${direction && direction !== "auto" ? ` placement="${direction === "up" ? "above" : "below"}"` : ""}`;
+    const content = boundary.type === "start" && boundary.actual !== void 0 && boundary.normal !== void 0 && (boundary.actual !== inherited?.actual || boundary.normal !== inherited?.normal) ? `<tuplet-actual>${tag3("tuplet-number", boundary.actual)}</tuplet-actual><tuplet-normal>${tag3("tuplet-number", boundary.normal)}</tuplet-normal>` : "";
+    if ((boundary.actual !== void 0 || boundary.normal !== void 0) && ![boundary.actual, boundary.normal].every((value2) => Number.isSafeInteger(value2) && value2 > 0 && value2 <= 128)) refuse("writer-tuplet", "Invalid individual source tuplet counts.", boundary.source);
+    return `<tuplet type="${boundary.type}" number="${boundary.number}"${attrs2}${content ? `>${content}</tuplet>` : "/>"}`;
+  };
+  for (const relation of relations) if (relation.kind === "trill") for (const start of relation.projection?.kind === "point-ornament" ? [true] : [true, false]) {
+    if (relation.projection && (relation.form !== "trill" || relation.start.partId !== relation.end.partId || relation.start.eventId !== relation.end.eventId)) refuse("writer-trill-endpoint", "Point ornament must retain one exact source trill host.", relation.source);
+    const endpoint = relation.notationAttachments ? start ? relation.notationAttachments.start : relation.notationAttachments.end : start ? relation.start : relation.end;
+    if (!endpoint.eventId) return refuse("writer-trill-endpoint", "Trill line has no resolved source event attachment.", relation.source);
+    const marks = ornamentEndpoints.get(endpoint.eventId) ?? [];
+    marks.push({ relation, start });
+    ornamentEndpoints.set(endpoint.eventId, marks);
+  }
+  for (const relation of relations) if (relation.kind === "note-line" || relation.kind === "glissando") for (const start of [true, false]) {
+    const endpoint = start ? relation.start : relation.end;
+    if (!endpoint.noteId) refuse("writer-note-line-endpoint", "Visual note line has no resolved source component.", relation.source);
+    const marks = noteLineEndpoints.get(endpoint.noteId) ?? [];
+    marks.push({ relation, start });
+    noteLineEndpoints.set(endpoint.noteId, marks);
+  }
+  for (const part of score.parts) {
+    const offsets = [];
+    let clock = q(0);
+    for (const measure of part.measures) {
+      offsets.push(clock);
+      clock = add(clock, measure.duration);
+    }
+    const boundaries = [];
+    for (const relation of relationsByPart.get(part.id) ?? []) if (!["tie", "slur", "trill", "note-line", "glissando"].includes(relation.kind)) {
+      if (relation.end.partId !== part.id || !offsets[relation.start.measure] || !offsets[relation.end.measure]) refuse("writer-relation", "Relation must resolve inside one source part.", relation.source);
+      const start = add(offsets[relation.start.measure], relation.start.position), end = add(offsets[relation.end.measure], relation.end.position);
+      if (compare(start, end) > 0 || compare(start, end) === 0 && !["pedal", "wedge", "text-line"].includes(relation.kind) && !(relation.kind === "ottava" && relation.projection?.reason === "zero-duration")) refuse("writer-relation-clock", "Relation stop must follow its start, except an explicitly degenerate paired direction.", relation.source);
+      const degenerate = compare(start, end) === 0 && relation.kind === "ottava" && relation.projection?.reason === "zero-duration";
+      boundaries.push({ relation, start: true, clock: start, degenerate }, { relation, start: false, clock: end, degenerate });
+    }
+    boundaries.sort((a, b) => compare(a.clock, b.clock) || (a.degenerate ? 1 : a.start ? 2 : 0) - (b.degenerate ? 1 : b.start ? 2 : 0) || (a.degenerate && b.degenerate ? a.relation.id < b.relation.id ? -1 : a.relation.id > b.relation.id ? 1 : Number(b.start) - Number(a.start) : Number(a.start) - Number(b.start)));
+    const measures = /* @__PURE__ */ new Map();
+    for (const boundary of boundaries) {
+      const { relation, start } = boundary;
+      const endpoint = start ? relation.start : relation.end;
+      if (!["pedal", "wedge"].includes(relation.kind)) {
+        const marks = measures.get(endpoint.measure) ?? [];
+        marks.push({ relation, start });
+        measures.set(endpoint.measure, marks);
+      }
+    }
+    relationMarks.set(part.id, measures);
+  }
   let out = "", outputBytes = 0;
   const emit = (value2) => {
-    if (writerLimits) {
+    if (limits2) {
       let bytes = value2.length;
       for (let i = 0; i < value2.length; i++) {
         const c = value2.charCodeAt(i);
@@ -2211,85 +3945,829 @@ function writeMusicXml(score, display = { hideDynamics: false, hideTempo: false 
         else if (c >= 128) bytes++;
       }
       outputBytes += bytes;
-      if (outputBytes > writerLimits.outputBytes) refuse("writer-output-size", "MusicXML output exceeds the adapter byte budget; no output admitted.");
+      if (outputBytes > limits2.outputBytes) refuse("writer-output-size", "MusicXML output exceeds the adapter byte budget; no output admitted.");
     }
     out += value2;
   };
   emit('<?xml version="1.0" encoding="utf-8"?>\n<score-partwise version="4.0">');
-  emit(`<work>${tag("work-title", score.title)}</work><identification><encoding><software>score-converter proving slice</software></encoding></identification><part-list>`);
+  const metadata2 = score.metadata ?? [], meta = new Map(metadata2.map((fact) => [fact.name, fact.value]));
+  emit(`<work>${meta.get("workNumber") ? tag3("work-number", meta.get("workNumber")) : ""}${tag3("work-title", score.title)}</work>`);
+  for (const name of ["movementNumber", "movementTitle"]) if (meta.get(name)) emit(tag3(name === "movementNumber" ? "movement-number" : "movement-title", meta.get(name)));
+  emit("<identification>");
+  const creatorRoles = /* @__PURE__ */ new Set(["composer", "arranger", "lyricist", "poet", "translator"]);
+  for (const fact of metadata2) if (creatorRoles.has(fact.name) && fact.value) emit(`<creator type="${fact.name}">${esc5(fact.value)}</creator>`);
+  for (const fact of metadata2) if (fact.name === "copyright" && fact.value) emit(tag3("rights", fact.value));
+  emit(`<encoding>${meta.get("encoder") ? tag3("encoder", meta.get("encoder")) : ""}<software>score-converter proving slice</software></encoding>`);
+  if (meta.get("source")) emit(tag3("source", meta.get("source")));
+  const standardMetadata = /* @__PURE__ */ new Set([...creatorRoles, "copyright", "encoder", "source", "workTitle", "workNumber", "movementTitle", "movementNumber"]);
+  const miscellaneous = metadata2.filter((fact) => !standardMetadata.has(fact.name));
+  const preserveOrnament = (details, owner) => {
+    if (details?.intervalAbove || details?.intervalBelow || details?.cueNote || details?.showAccidental || details?.alwaysShowTrillCue || details?.sign) miscellaneous.push({ source: details.source, name: `source-ornament-intervals:${owner}`, value: JSON.stringify({ above: details.intervalAbove, below: details.intervalBelow, principal: details.principal, cueNote: details.cueNote, showAccidental: details.showAccidental, alwaysShowTrillCue: details.alwaysShowTrillCue, sourceSubtype: details.sourceSubtype, sign: details.sign }) });
+  };
+  for (const relation of relations) if (relation.kind === "trill") preserveOrnament(relation.ornament, relation.id);
+  for (const part of score.parts) {
+    const previousClefs = /* @__PURE__ */ new Map();
+    for (const [measureIndex, measure] of part.measures.entries()) {
+      for (const staff of measure.staffs ?? part.staves ?? []) {
+        const definition = standardClef(staff.clef);
+        if (previousClefs.get(staff.number) === staff.clef) continue;
+        previousClefs.set(staff.number, staff.clef);
+        if (definition?.sourceGlyph) miscellaneous.push({ source: staff.clefOrigin?.source ?? staff.source, name: `source-clef-glyph:${part.id}:${measureIndex + 1}:${staff.number}`, value: JSON.stringify({ token: staff.clef, glyph: definition.sourceGlyph }) });
+      }
+      for (const [index, change] of (measure.changes ?? []).entries()) if (change.clef) {
+        const definition = standardClef(change.clef);
+        if (definition?.sourceGlyph) miscellaneous.push({ source: change.source, name: `source-clef-change-glyph:${part.id}:${measureIndex + 1}:${change.staff}:${index + 1}`, value: JSON.stringify({ token: change.clef, glyph: definition.sourceGlyph, position: change.position }) });
+      }
+    }
+    const previousTab = /* @__PURE__ */ new Map();
+    const previousPercussion = /* @__PURE__ */ new Map();
+    for (const [measureIndex, measure] of part.measures.entries()) for (const staff of measure.staffs ?? part.staves ?? []) if (staff.percussionStepOffset) {
+      const fact = staff.percussionStepOffset;
+      if (previousPercussion.get(staff.number) === fact.value) continue;
+      previousPercussion.set(staff.number, fact.value);
+      miscellaneous.push({ source: fact.source, name: `source-percussion-step-offset:${part.id}:${measureIndex + 1}:${staff.number}`, value: JSON.stringify(fact) });
+    }
+    const previousHeads = /* @__PURE__ */ new Map();
+    for (const [measureIndex, measure] of part.measures.entries()) for (const staff of measure.staffs ?? part.staves ?? []) if (staff.noteheadScheme) {
+      const value2 = staff.noteheadScheme.value;
+      if (previousHeads.get(staff.number) === value2) continue;
+      previousHeads.set(staff.number, value2);
+      miscellaneous.push({ source: staff.noteheadScheme.source, name: `source-head-scheme:${part.id}:${measureIndex + 1}:${staff.number}`, value: value2 });
+    }
+    for (const [measureIndex, measure] of part.measures.entries()) for (const staff of measure.staffs ?? part.staves ?? []) if (staff.tablature) {
+      const value2 = JSON.stringify(staff.tablature);
+      if (previousTab.get(staff.number) === value2) continue;
+      previousTab.set(staff.number, value2);
+      miscellaneous.push({ source: staff.tablature.source, name: `source-tab-staff:${part.id}:${measureIndex + 1}:${staff.number}`, value: value2 });
+    }
+  }
+  const retainSharedFrame = (owner, id) => {
+    if (owner.textEnclosure?.inlineProjection === "whole-caption-format-limit") miscellaneous.push({ source: owner.source, name: `source-shared-enclosure:${id}`, value: JSON.stringify({ enclosure: owner.textEnclosure, runs: owner.textRuns }) });
+  };
+  for (const part of score.parts) for (const [mi, measure] of part.measures.entries()) for (const [di, direction] of (measure.directions ?? []).entries()) retainSharedFrame(direction, `${part.id}:M${mi + 1}:D${di + 1}`);
+  for (const [ci, credit] of (score.credits ?? []).entries()) retainSharedFrame(credit, `credit:${ci + 1}`);
+  for (const part of score.parts) for (const [index, measure] of part.measures.entries()) for (const fact of measure.numbering?.appearances ?? []) miscellaneous.push({ source: fact.source, name: `source-measure-number:${part.id}:M${index + 1}:S${fact.staff}`, value: JSON.stringify(fact) });
+  const preserveGlyph = (glyph, owner) => miscellaneous.push({ source: glyph.source, name: `source-glyph:${owner}:${glyph.id}`, value: JSON.stringify(glyph) });
+  for (const [index, credit] of (score.credits ?? []).entries()) if (credit.symbol) preserveGlyph(credit.symbol, `credit-${index + 1}`);
+  for (const part of score.parts) for (const [mi, measure] of part.measures.entries()) {
+    for (const [di, direction] of (measure.directions ?? []).entries()) if (direction.symbol) preserveGlyph(direction.symbol, `${part.id}:M${mi + 1}:D${di + 1}`);
+    for (const voice of measure.voices) for (const event of voice) {
+      for (const glyph of event.symbols ?? []) preserveGlyph(glyph, `${part.id}:M${mi + 1}:E${event.id}`);
+      for (const note of event.notes) for (const glyph of note.symbols ?? []) preserveGlyph(glyph, `${part.id}:M${mi + 1}:E${event.id}:N${note.id}`);
+    }
+  }
+  const preserveInstrumentTranspose = (name, interval) => {
+    if (!interval) return;
+    if (![interval.diatonic, interval.chromatic, interval.octaveChange ?? 0].every(Number.isSafeInteger)) refuse("writer-source-transpose", "Source instrument transpose requires exact integer intervals.", interval.source);
+    miscellaneous.push({ source: interval.source, name, value: `diatonic=${interval.diatonic};chromatic=${interval.chromatic};octave=${interval.octaveChange ?? 0}` });
+  };
+  for (const [pi, part] of score.parts.entries()) {
+    preserveInstrumentTranspose(`source-instrument:${partIds[pi]}:transpose`, part.sourceInstrumentTranspose);
+    for (const [owner, tuning] of [[`part`, part.tuning], ...(part.staves ?? []).map((staff) => [`staff-${staff.number}`, staff.tuning])]) if (tuning && tuningFallback(tuning)) miscellaneous.push({ source: part.source, name: `source-tuning:${partIds[pi]}:${owner}:midi-line-order`, value: tuning.join(" ") });
+    for (const [mi, measure] of part.measures.entries()) for (const [ci, change] of (measure.changes ?? []).entries()) if (change.tuning && tuningFallback(change.tuning)) miscellaneous.push({ source: change.source, name: `source-tuning:${partIds[pi]}:M${mi + 1}:change-${ci + 1}:midi-line-order`, value: change.tuning.join(" ") });
+    for (const [mi, measure] of part.measures.entries()) for (const [vi, voice] of measure.voices.entries()) for (const [ei, event] of voice.entries()) {
+      const owner = `${partIds[pi]}:M${mi + 1}:V${vi + 1}:E${ei + 1}`;
+      for (const { relation, start } of ornamentEndpoints.get(event.id) ?? []) if (start && relation.kind === "trill" && relation.ornament?.principal && !event.notes.some((note) => note.id === relation.ornament.principal.noteId)) refuse("writer-ornament-principal", "Trill principal must belong to its source start chord.", relation.ornament.principal.source);
+      for (const [index, ornament] of (event.ornaments ?? []).entries()) {
+        if (ornament.details?.principal && !event.notes.some((note) => note.id === ornament.details.principal.noteId)) refuse("writer-ornament-principal", "Ornament principal must belong to its source chord.", ornament.details.principal.source);
+        preserveOrnament(ornament.details, `${owner}:O${index + 1}`);
+      }
+      for (const [ni, note] of event.notes.entries()) {
+        for (const [index, ornament] of (note.ornaments ?? []).entries()) preserveOrnament(ornament.details, `${owner}:N${ni + 1}:O${index + 1}`);
+        miscellaneous.push(...frettedTechniqueMetadata(note, `${owner}:N${ni + 1}`));
+        if (note.linkedOctaveShift) miscellaneous.push({ source: note.linkedOctaveShift.source, name: `source-linked-octave:${owner}:N${ni + 1}`, value: JSON.stringify(note.linkedOctaveShift) });
+        if (note.dynamic) miscellaneous.push({ source: note.dynamic.source, name: `source-note-dynamic:${owner}:N${ni + 1}`, value: JSON.stringify(note.dynamic) });
+        if (note.tieSound) miscellaneous.push({ source: note.source, name: `source-tie-sound:${owner}:N${ni + 1}`, value: JSON.stringify(note.tieSound) });
+        if (note.tabTieVisibility?.length) miscellaneous.push({ source: note.source, name: `source-tab-ties:${owner}:N${ni + 1}`, value: JSON.stringify(note.tabTieVisibility) });
+        if (note.tabFretFont) miscellaneous.push({ source: note.tabFretFont.source, name: `source-tab-fret-font:${owner}:N${ni + 1}`, value: JSON.stringify(note.tabFretFont) });
+        if (note.fretDisplay) {
+          if (note.fretDisplay.origin !== "short-string-notation" || !Number.isSafeInteger(note.fretDisplay.value) || note.fretDisplay.value < 0 || !Number.isSafeInteger(note.fretDisplay.startFret) || note.fretDisplay.startFret < 0 || note.fret === void 0 || note.fretDisplay.value !== (note.fret === 0 ? 0 : note.fret + note.fretDisplay.startFret)) refuse("writer-short-string-fret", "Short-string display fret must retain the exact encoded local-nut displacement.", note.fretDisplay.source);
+          miscellaneous.push({ source: note.fretDisplay.source, name: `source-relative-fret:${owner}:N${ni + 1}`, value: JSON.stringify({ sourceFret: note.fret, ...note.fretDisplay }) });
+        }
+        if (note.sourceAccidental || note.centOffset) miscellaneous.push({ source: note.sourceAccidental?.source ?? note.centOffset.source, name: `source-accidental:${owner}:N${ni + 1}`, value: JSON.stringify({ glyph: note.sourceAccidental, centOffset: note.centOffset, derivedPitch: note.microtonalPitch }) });
+        if (note.sourceHeadScheme) miscellaneous.push({ source: note.sourceHeadScheme.source, name: `source-head-scheme:${owner}:N${ni + 1}`, value: note.sourceHeadScheme.value });
+        if (note.tabFret) miscellaneous.push({ source: note.tabFret.source, name: `source-tab-fret:${owner}:N${ni + 1}`, value: JSON.stringify(note.tabFret) });
+        if (note.bend?.sourceCurveFields) miscellaneous.push({ source: note.bend.source, name: `source-bend-fields:${owner}:N${ni + 1}`, value: JSON.stringify(note.bend.sourceCurveFields) });
+      }
+      if (event.whammy?.sourceCurveFields) miscellaneous.push({ source: event.whammy.source, name: `source-whammy-fields:${owner}`, value: JSON.stringify(event.whammy.sourceCurveFields) });
+      if (event.tabRhythm) miscellaneous.push({ source: event.tabRhythm.source, name: `source-tab-rhythm:${owner}`, value: JSON.stringify(event.tabRhythm) });
+      for (const [index, instruction] of (event.performerInstructions ?? []).entries()) miscellaneous.push({ source: instruction.source, name: `source-performer-instruction:${owner}:${index + 1}:${instruction.kind}`, value: instruction.nativeValue });
+      if (event.whammy) miscellaneous.push({ source: event.whammy.source, name: `source-whammy:${owner}`, value: event.whammy.points.map((point) => `${point.offset.n}/${point.offset.d}:${point.semitones.n}/${point.semitones.d}${point.vibrato ? `:vibrato=${point.vibrato.value}${point.vibrato.speed ? `:speed=${point.vibrato.speed}` : ""}` : ""}`).join(";") });
+    }
+    for (const [mi, measure] of part.measures.entries()) if (measure.time.senzaMisura) miscellaneous.push({ source: measure.time.senzaMisura.source, name: `source-free-time:${partIds[pi]}:M${mi + 1}:encoded-meter`, value: `${measure.time.beats}/${measure.time.unit}` });
+    for (const [ci, capo] of (part.capoChanges ?? []).entries()) {
+      if (capo.transposeMode) miscellaneous.push({ source: capo.transposeMode.source, name: `source-capo:${partIds[pi]}:${ci + 1}:pitch-policy`, value: capo.transposeMode.value });
+      if (capo.ignoredStrings) miscellaneous.push({ source: capo.ignoredStrings.source, name: `source-capo:${partIds[pi]}:${ci + 1}:ignored-strings`, value: JSON.stringify(capo.ignoredStrings.values) });
+      if (capo.appliedStrings) miscellaneous.push({ source: capo.appliedStrings.source, name: `source-capo:${partIds[pi]}:${ci + 1}:applied-strings`, value: JSON.stringify(capo.appliedStrings) });
+    }
+  }
+  for (const [index, part] of score.parts.entries()) for (const role of ["track", "instrumentTrack"]) {
+    const label = part.names?.[role];
+    if (label) miscellaneous.push({ source: label.source, name: `${role === "track" ? "source-part-track-name" : "source-instrument-track-name"}:${partIds[index]}`, value: label.value });
+  }
+  const sourcePartIds = new Map(score.parts.map((part, index) => [part.id, partIds[index]]));
+  const sourceParts = new Map(score.parts.map((part) => [part.id, part]));
+  const imageDirections = /* @__PURE__ */ new Map();
+  for (const [index, image] of (score.sourceImages ?? []).entries()) {
+    const partId = sourcePartIds.get(image.partId);
+    if (!partId) refuse("writer-image-owner", "Source image links an unknown part.", image.source);
+    const prefix = `source-image:${index + 1}`;
+    miscellaneous.push({ source: image.source, name: `${prefix}:owner`, value: image.attachment ? JSON.stringify({ partId, staff: image.staff, ...image.attachment }) : `${partId}:S${image.staff}:before-M${image.beforeMeasure + 1}:${image.frame}:${image.viewSource ? "alternate-view" : "primary"}` });
+    miscellaneous.push({ source: image.source, name: `${prefix}:content-status`, value: image.contentStatus });
+    for (const [field, value2] of Object.entries({ size: image.size, offset: image.offset, autoScale: image.autoScale, appearance: image.appearance, placement: image.placement })) if (value2 !== void 0) miscellaneous.push({ source: image.source, name: `${prefix}:${field}`, value: JSON.stringify(value2) });
+    for (const field of ["path", "linkPath"]) if (image[field]) miscellaneous.push({ source: image[field].source, name: `${prefix}:${field}`, value: image[field].value });
+    miscellaneous.push({ source: image.source, name: `${prefix}:visibility`, value: image.printObject === false ? "hidden" : "visible" });
+    if (image.resource) {
+      const resource = image.resource;
+      if (!["image/png", "image/jpeg", "image/gif", "image/svg+xml"].includes(resource.mime) || !/^[A-Za-z0-9+/]+={0,2}$/.test(resource.base64) || resource.base64.length % 4 || resource.base64.length > 32 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(resource.sha256)) refuse("writer-image-resource", "Embedded image requires a bounded qualified MIME resource.", resource.source);
+      const uri = `data:${resource.mime};base64,${resource.base64}`;
+      miscellaneous.push({ source: resource.source, name: `${prefix}:sha256`, value: resource.sha256 });
+      if (image.viewSource || image.printObject === false) miscellaneous.push({ source: resource.source, name: `${prefix}:${image.viewSource ? "alternate-view-resource" : "hidden-resource"}`, value: uri });
+      else {
+        const part = sourceParts.get(image.partId);
+        const attached = image.attachment;
+        if (!Number.isSafeInteger(image.staff) || image.staff < 1) refuse("writer-image-owner", "Image needs an exact source staff.", image.source);
+        let measure, offset;
+        if (attached) {
+          if (image.beforeMeasure !== void 0 || image.frame !== void 0 || !Number.isSafeInteger(attached.measure) || attached.measure < 0 || attached.measure >= part.measures.length || compare(attached.position, q(0)) < 0 || compare(attached.position, part.measures[attached.measure].duration) > 0) refuse("writer-image-owner", "Attached image requires one exact musical measure and clock.", image.source);
+          measure = attached.measure;
+          offset = ticks(attached.position);
+          if (attached.eventId) {
+            const event = part.measures[measure].voices.flat().find((e) => e.id === attached.eventId);
+            if (!event || compare(event.start, attached.position) !== 0 || (event.staff ?? 1) !== image.staff || attached.voiceId !== void 0 && event.voiceId !== attached.voiceId || attached.noteId && !event.notes.some((n) => n.id === attached.noteId)) refuse("writer-image-owner", "Image attachment does not match its original event/note owner.", image.source);
+          } else if (attached.noteId) refuse("writer-image-owner", "Image note identity requires its event owner.", image.source);
+        } else {
+          if (!Number.isSafeInteger(image.beforeMeasure) || image.beforeMeasure < 0 || image.beforeMeasure > part.measures.length || !image.frame) refuse("writer-image-owner", "Frame image requires its original boundary.", image.source);
+          measure = Math.min(image.beforeMeasure, part.measures.length - 1);
+          offset = image.beforeMeasure === part.measures.length ? ticks(part.measures[measure].duration) : 0;
+        }
+        const placement = image.placement, targetId = placement?.partId ?? image.partId, target = sourceParts.get(targetId), staff = placement?.staff ?? image.staff, voice = placement?.voiceId ?? image.attachment?.voiceId;
+        if (!target || !target.measures[measure] || !(target.measures[measure].staffs ?? target.staves ?? [{ number: 1 }]).some((s) => s.number === staff) || offset > ticks(target.measures[measure].duration)) refuse("writer-image-owner", "Image placement addresses an unavailable staff or clock.", image.source);
+        const key = `${targetId}\0${measure}`, items = imageDirections.get(key) ?? [];
+        items.push(`<direction><direction-type><image source="${uri}" type="${resource.mime}"/></direction-type>${tag3("offset", offset)}${voice ? tag3("voice", voice) : ""}${tag3("staff", staff)}</direction>`);
+        imageDirections.set(key, items);
+      }
+    }
+  }
+  for (const pageText of score.sourcePageText ?? []) {
+    const prefix = `source-page-text:${pageText.field}`;
+    miscellaneous.push({ source: pageText.source, name: `${prefix}:raw`, value: pageText.raw }, { source: pageText.source, name: `${prefix}:role`, value: `${pageText.role}:${pageText.parity}:${pageText.side}` }, { source: pageText.source, name: `${prefix}:conditions`, value: `enabled=${pageText.conditions.enabled.value};first-page=${pageText.conditions.firstPage.value};odd-even=${pageText.conditions.oddEven.value}` });
+  }
+  for (const [index, link] of (score.sourceObjectLinks ?? []).entries()) {
+    const prefix = `source-object-link:${index + 1}`, owner = link.owner, ownerPart = sourcePartIds.get(owner.partId);
+    if (!ownerPart) refuse("writer-object-link-owner", "Source object link has an unknown primary part.", link.source);
+    miscellaneous.push({ source: link.source, name: `${prefix}:owner`, value: `${ownerPart}:S${owner.staff}:M${owner.measure + 1}:V${owner.voiceId}:${owner.position.n}/${owner.position.d}:${owner.kind}` }, { source: link.source, name: `${prefix}:status`, value: link.status });
+    if (owner.sourceEid) miscellaneous.push({ source: owner.source, name: `${prefix}:owner-eid`, value: owner.sourceEid });
+    if (link.targetEid) miscellaneous.push({ source: link.targetEid.source, name: `${prefix}:target-eid`, value: link.targetEid.value });
+    if (link.relativeStaff) miscellaneous.push({ source: link.relativeStaff.source, name: `${prefix}:relative-staff`, value: String(link.relativeStaff.value) });
+    if (link.target) {
+      const target = link.target;
+      miscellaneous.push({ source: target.source, name: `${prefix}:target`, value: `${sourcePartIds.get(target.partId)}:S${target.staff}:M${target.measure + 1}:V${target.voiceId}:${target.position.n}/${target.position.d}:${target.kind}` });
+    }
+  }
+  for (const relation of relations) {
+    if (relation.clockGap) miscellaneous.push({ source: relation.source, name: `source-tie-clock-gap:${relation.id}`, value: JSON.stringify({ start: relation.start, end: relation.end, gap: relation.clockGap }) });
+    if ("sourceTechnique" in relation && relation.sourceTechnique) miscellaneous.push({ source: relation.sourceTechnique.source, name: `source-relation-technique:${relation.id}`, value: relation.sourceTechnique.kind });
+    for (const [field, fact] of Object.entries(relation.textFacts ?? {})) if (field === "continueText") miscellaneous.push({ source: fact.source, name: `source-line-text:${relation.id}:${field}`, value: fact.value });
+    if (relation.kind === "ending" && relation.sourceNumbers) miscellaneous.push({ source: relation.sourceNumbers.source, name: `source-ending:${relation.id}:encoded-numbers`, value: relation.sourceNumbers.values.join(",") });
+  }
+  for (const [pi, part] of score.parts.entries()) for (const [mi, measure] of part.measures.entries()) for (const [di, direction] of (measure.directions ?? []).entries()) {
+    const frame = direction.harmony?.role === "chord-symbol" ? direction.harmony : void 0;
+    for (const [ci, component] of (frame ? [frame, ...frame.additional ?? []] : []).entries()) if (component.sourceNoteNaming) miscellaneous.push({ source: component.source, name: `source-chord:${partIds[pi]}:M${mi + 1}:S${direction.staff}:D${di + 1}:C${ci + 1}:note-naming`, value: JSON.stringify(component.sourceNoteNaming) });
+    for (const fact of frame?.sourceAnalysis ?? []) miscellaneous.push({ source: fact.source, name: `source-chord:${partIds[pi]}:M${mi + 1}:S${direction.staff}:D${di + 1}:${fact.name}`, value: String(fact.value) });
+    if (frame?.sourceBarStates) miscellaneous.push({ source: frame.sourceBarStates.source, name: `source-frame:${partIds[pi]}:M${mi + 1}:S${direction.staff}:D${di + 1}:bar-states`, value: frame.sourceBarStates.value });
+    const nav = direction.navigation;
+    if (!nav) continue;
+    for (const field of ["label", "glyph", "jumpTo", "playUntil", "continueAt"]) if (nav[field] !== void 0) miscellaneous.push({ source: nav.source, name: `source-navigation:${partIds[pi]}:M${mi + 1}:S${direction.staff}:D${di + 1}:${field}`, value: nav[field] });
+    if (nav.markerType) miscellaneous.push({ source: nav.markerType.source, name: `source-navigation:${partIds[pi]}:M${mi + 1}:S${direction.staff}:D${di + 1}:marker-type`, value: nav.markerType.value });
+  }
+  for (const [pi, part] of score.parts.entries()) for (const [ci, context] of (part.instrumentChanges ?? []).entries()) {
+    const prefix = `source-instrument-change:${partIds[pi]}:C${ci + 1}`;
+    preserveInstrumentTranspose(`${prefix}:transpose`, context.sourceInstrumentTranspose);
+    miscellaneous.push({ source: context.source, name: `${prefix}:owner`, value: `M${context.measure + 1}:S${context.staff}:${context.position.n}/${context.position.d}` });
+    for (const role of ["track", "long", "short", "instrumentTrack"]) {
+      const name = context.names?.[role];
+      if (name) miscellaneous.push({ source: name.source, name: `${prefix}:${role}-name`, value: name.value });
+    }
+    if (context.instrumentId) miscellaneous.push({ source: context.instrumentId.source, name: `${prefix}:catalog-identity`, value: context.instrumentId.value });
+    for (const clef of context.defaultClefs) miscellaneous.push({ source: clef.source, name: `${prefix}:catalog-clef:S${clef.staff}`, value: clef.value });
+  }
+  for (const [pi, part] of score.parts.entries()) for (const [mi, measure] of part.measures.entries()) for (const voice of measure.voices) for (const event of voice) for (const [fi, figure] of (event.figuredBass ?? []).entries()) {
+    miscellaneous.push({ source: figure.source, name: `source-figured-bass:${partIds[pi]}:M${mi + 1}:S${event.staff ?? 1}:V${event.voiceId ?? "1"}:E${event.id}:F${fi + 1}`, value: JSON.stringify({ position: figure.position, duration: figure.duration, onNote: figure.onNote?.value, items: figure.items.map((item) => ({ digit: item.digit?.value, prefix: item.prefix?.encoded, suffix: item.suffix?.encoded, brackets: item.brackets?.values, continuation: item.continuation?.value })) }) });
+  }
+  const frameDirections = /* @__PURE__ */ new Map();
+  for (const [index, credit] of (score.credits ?? []).entries()) {
+    const partId = sourcePartIds.get(credit.partId);
+    if (!partId) refuse("writer-credit-owner", "Printed source text links an unknown part.", credit.source);
+    miscellaneous.push({ source: credit.source, name: `source-frame-text:${index + 1}:owner`, value: `${partId}:S${credit.staff}:before-M${credit.beforeMeasure + 1}:${credit.frame}` });
+    if (credit.sourceStyle) miscellaneous.push({ source: credit.sourceStyle.source, name: `source-frame-text:${index + 1}:style`, value: credit.sourceStyle.value });
+    if (!credit.beforeMeasure) continue;
+    const part = sourceParts.get(credit.partId);
+    if (credit.beforeMeasure > part.measures.length) refuse("writer-credit-owner", "Printed source text lies beyond its part measures.", credit.source);
+    const mi = Math.min(credit.beforeMeasure, part.measures.length - 1), directions = frameDirections.get(credit.partId) ?? /* @__PURE__ */ new Map(), atMeasure = directions.get(mi) ?? [];
+    atMeasure.push({ source: credit.source, staff: credit.staff, position: credit.beforeMeasure === part.measures.length ? part.measures[mi].duration : q(0), kind: credit.symbol ? "symbol" : "words", ...credit.symbol ? { symbol: credit.symbol } : { text: credit.text }, ...credit.textAlignment ? { textAlignment: credit.textAlignment } : {}, ...credit.textEnclosure ? { textEnclosure: credit.textEnclosure } : {}, ...credit.textFrameAppearance ? { textFrameAppearance: credit.textFrameAppearance } : {}, ...credit.textFontFamily ? { textFontFamily: credit.textFontFamily } : {}, ...credit.textFontSize ? { textFontSize: credit.textFontSize } : {}, ...credit.textFontStyle ? { textFontStyle: credit.textFontStyle } : {}, ...credit.textEmphasis ? { textEmphasis: credit.textEmphasis } : {}, ...credit.textRuns ? { textRuns: credit.textRuns } : {}, ...credit.sourceColor ? { sourceColor: credit.sourceColor } : {}, ...credit.printObject !== void 0 ? { printObject: credit.printObject } : {} });
+    directions.set(mi, atMeasure);
+    frameDirections.set(credit.partId, directions);
+  }
+  for (const [index, view] of (score.alternateViews ?? []).entries()) {
+    const viewId = `V${index + 1}`;
+    if (view.name) miscellaneous.push({ source: view.name.source, name: `source-view-name:${viewId}`, value: view.name.value });
+    for (const fact of view.metadata) miscellaneous.push({ source: fact.source, name: `source-view-metadata:${viewId}:${fact.name}`, value: fact.value });
+    for (const [ci, credit] of view.credits.entries()) {
+      miscellaneous.push({ source: credit.source, name: `source-view-text:${viewId}:C${ci + 1}:text`, value: credit.text });
+      miscellaneous.push({ source: credit.source, name: `source-view-text:${viewId}:C${ci + 1}:owner`, value: `${sourcePartIds.get(credit.partId)}:S${credit.staff}:before-M${credit.beforeMeasure + 1}:${credit.frame}` });
+      miscellaneous.push({ source: credit.source, name: `source-view-text:${viewId}:C${ci + 1}:visibility`, value: credit.printObject === false ? "hidden" : "visible" });
+      if (credit.role) miscellaneous.push({ source: credit.source, name: `source-view-text:${viewId}:C${ci + 1}:role`, value: credit.role });
+      if (credit.sourceStyle) miscellaneous.push({ source: credit.sourceStyle.source, name: `source-view-text:${viewId}:C${ci + 1}:style`, value: credit.sourceStyle.value });
+    }
+    for (const [partIndex, part] of view.parts.entries()) {
+      const partId = sourcePartIds.get(part.sourcePartId);
+      if (!partId) refuse("writer-view-link", "Alternate view links an unknown primary part.", part.source);
+      const viewPartId = `${viewId}:VP${partIndex + 1}`;
+      miscellaneous.push({ source: part.source, name: `source-view-part-link:${viewPartId}`, value: partId });
+      for (const role of ["track", "long", "short", "instrumentTrack"]) {
+        const label = part.names?.[role];
+        if (label) miscellaneous.push({ source: label.source, name: `source-view-${role}-name:${viewPartId}`, value: label.value });
+      }
+      for (const staff of part.staffs) miscellaneous.push({ source: staff.source, name: `source-view-staff-link:${viewId}:${staff.viewStaffId}`, value: `${partId}:${staff.sourceStaffNumber}` });
+    }
+  }
+  for (const [pi, part] of score.parts.entries()) for (const [mi, measure] of part.measures.entries()) {
+    const keys = [...(measure.staffs ?? []).map((staff) => ({ staff: staff.number, position: q(0), key: staff.key })), ...(measure.changes ?? []).map((change) => ({ staff: change.staff, position: change.position, key: change.key }))];
+    for (const [index, entry] of keys.entries()) if (entry.key?.customDefinitions) miscellaneous.push({ source: entry.key.custom.source, name: `source-custom-key:${partIds[pi]}:M${mi + 1}:S${entry.staff}:${entry.position.n}/${entry.position.d}:${index}`, value: JSON.stringify({ definitions: entry.key.customDefinitions, tones: entry.key.customTones, projection: entry.key.customProjection }) });
+  }
+  if (miscellaneous.length) {
+    emit("<miscellaneous>");
+    for (const fact of miscellaneous) emit(`<miscellaneous-field name="${esc5(fact.name)}">${esc5(fact.value)}</miscellaneous-field>`);
+    emit("</miscellaneous>");
+  }
+  emit("</identification>");
+  if (score.sourceView?.concertPitch) emit("<defaults><concert-score/></defaults>");
+  for (const credit of score.credits ?? []) if (!credit.beforeMeasure) {
+    pointSizeXml(credit.textFontSize, true);
+    const direction = { ...credit, kind: credit.symbol ? "symbol" : "words", position: q(0) };
+    if (credit.symbol) delete direction.text;
+    const historicalSize = credit.textFontSize?.pointSize?.context === "musescore-3.6.1-user-text-style" ? credit.textFontSize : void 0;
+    if (historicalSize) delete direction.textFontSize;
+    const content = (credit.symbol ? glyphXml(credit.symbol, "direction", credit.sourceColor, credit.printObject !== false) : directionXml(direction, true)).replace(/<(\/?)(?:words|other-direction)(?=[\s>])/g, "<$1credit-words").replace(/<(\/?)symbol(?=[\s>])/g, "<$1credit-symbol").replace(/ print-object="no"/g, "").replace(/<credit-words(?=[\s>])/g, "<credit-words" + pointSizeXml(historicalSize, true));
+    emit(`<credit>${credit.role ? tag3("credit-type", credit.role) : ""}${content}</credit>`);
+  }
+  const pageCredits = /* @__PURE__ */ new Set();
+  for (const pageText of score.sourcePageText ?? []) if (["generic-credit", "unresolved"].includes(pageText.projection) && pageText.text.trim()) {
+    const visible = pageText.conditions.enabled.value && (pageText.conditions.oddEven.value || pageText.parity === "odd"), key = `${visible}:${pageText.text}`;
+    if (pageCredits.has(key)) continue;
+    pageCredits.add(key);
+    emit(`<credit><credit-words${visible ? "" : ' color="#00000000"'}>${esc5(pageText.text)}</credit-words></credit>`);
+  }
+  emit("<part-list>");
+  const percussionIds = /* @__PURE__ */ new Map();
+  const instrumentContextIds = /* @__PURE__ */ new Map();
   for (let i = 0; i < score.parts.length; i++) {
     const p = score.parts[i];
-    emit(`<score-part id="${partIds[i]}">${tag("part-name", p.name)}<score-instrument id="I${i + 1}">${tag("instrument-name", p.instrument)}</score-instrument><midi-instrument id="I${i + 1}">${tag("midi-program", p.midiProgram + 1)}</midi-instrument></score-part>`);
+    const channel = p.playbackChannels?.[0];
+    const midiXml = (id, drum) => {
+      const body = (channel?.midiChannel === void 0 ? "" : tag3("midi-channel", channel.midiChannel + 1)) + (channel?.bank === void 0 ? "" : tag3("midi-bank", channel.bank + 1)) + (p.midiProgram === void 0 ? "" : tag3("midi-program", p.midiProgram + 1)) + (drum === void 0 ? "" : tag3("midi-unpitched", drum + 1)) + (channel ? tag3("volume", Number((channel.volume.value * 100 / 127).toFixed(6))) + tag3("pan", Math.trunc((channel.pan.value * 2 - 127) * 90 / 127)) : "");
+      return body ? `<midi-instrument id="${id}">${body}</midi-instrument>` : "";
+    };
+    emit(`<score-part id="${partIds[i]}"><part-name${p.namePrintObject === false ? ' print-object="no"' : ""}>${esc5(p.name)}</part-name>${p.abbreviation ? `<part-abbreviation>${esc5(p.abbreviation)}</part-abbreviation>` : ""}`);
+    const drums = /* @__PURE__ */ new Map();
+    for (const drum of [...p.percussionInstruments ?? [], ...(p.instrumentChanges ?? []).flatMap((context) => context.percussionInstruments ?? [])]) {
+      const previous = drums.get(drum.id);
+      if (previous && (previous.midi !== drum.midi || previous.name !== drum.name)) refuse("writer-drum-reference", "Conflicting percussion instrument identities.", drum.source);
+      drums.set(drum.id, drum);
+    }
+    const hasPitched = !drums.size || p.measures.some((measure) => measure.voices.some((voice) => voice.some((event) => event.notes.some((note) => note.kind !== "unpitched"))));
+    if (hasPitched) emit(`<score-instrument id="I${i + 1}">${tag3("instrument-name", p.instrumentName ?? p.instrument)}${p.instrumentAbbreviation ? tag3("instrument-abbreviation", p.instrumentAbbreviation) : ""}${p.instrumentSound ? tag3("instrument-sound", p.instrumentSound.value) : ""}</score-instrument>`);
+    for (const [di, drum] of [...drums.values()].entries()) {
+      const id = `I${i + 1}D${di + 1}`;
+      if (percussionIds.has(drum.id)) refuse("writer-drum-reference", "Percussion instrument identities must be unique across source parts.", drum.source);
+      percussionIds.set(drum.id, id);
+      emit(`<score-instrument id="${id}">${tag3("instrument-name", drum.name)}</score-instrument>`);
+    }
+    for (const [ci, context] of (p.instrumentChanges ?? []).entries()) {
+      const id = `I${i + 1}C${ci + 1}`, key = `${p.id}\0${context.id}`;
+      if (instrumentContextIds.has(key)) refuse("writer-instrument-context", "Repeated source instrument-context identity.", context.source);
+      instrumentContextIds.set(key, id);
+      emit(`<score-instrument id="${id}">${tag3("instrument-name", context.names?.long?.value ?? context.names?.track?.value ?? context.instrumentId?.value ?? "Source instrument change")}${context.names?.short ? tag3("instrument-abbreviation", context.names.short.value) : ""}${context.instrumentId ? tag3("instrument-sound", context.instrumentId.value) : ""}</score-instrument>`);
+    }
+    if (channel?.midiPort !== void 0) emit(`<midi-device port="${channel.midiPort + 1}"/>`);
+    if (hasPitched) emit(midiXml(`I${i + 1}`));
+    for (const drum of drums.values()) emit(midiXml(percussionIds.get(drum.id), drum.midi));
+    for (const context of p.instrumentChanges ?? []) if (context.midiProgram !== void 0) {
+      if (!Number.isInteger(context.midiProgram) || context.midiProgram < 0 || context.midiProgram > 127) refuse("writer-instrument-program", "Source instrument program must be a MIDI program from 0 to 127.", context.source);
+      emit(`<midi-instrument id="${instrumentContextIds.get(`${p.id}\0${context.id}`)}">${tag3("midi-program", context.midiProgram + 1)}</midi-instrument>`);
+    }
+    emit("</score-part>");
   }
   emit("</part-list>");
   for (let pi = 0; pi < score.parts.length; pi++) {
     const p = score.parts[pi];
+    const laterTuning = p.measures.flatMap((measure) => measure.changes ?? []).find((change) => change.tuning?.length)?.tuning ?? p.instrumentChanges?.find((context) => context.tuning?.length)?.tuning;
+    const carrierTuning = p.tuning ?? laterTuning;
+    const harmonicTranspose = harmonicTransposes(p);
+    const voicePlayback = new Map(p.staves?.flatMap((staff) => staff.voicePlayback?.map((setting) => [setting.voiceId, setting.play]) ?? []));
+    const previousClefs = /* @__PURE__ */ new Map();
+    const previousStaffSizes = /* @__PURE__ */ new Map();
+    const previousStaffDetails = /* @__PURE__ */ new Map();
+    const initialStaffCapos = /* @__PURE__ */ new Map();
+    const initialHeaders = /* @__PURE__ */ new Map(), initialChanges = /* @__PURE__ */ new Map();
+    const initialRoleOrder = /* @__PURE__ */ new Map();
     emit(`<part id="${partIds[pi]}">`);
     for (let mi = 0; mi < p.measures.length; mi++) {
       const m = p.measures[mi];
-      emit(`<measure number="${mi + 1}"${m.pickup ? ' implicit="yes"' : ""}><attributes>${tag("divisions", d)}<key>${tag("fifths", m.key.fifths)}${tag("mode", m.key.mode)}</key><time>${tag("beats", m.time.beats)}${tag("beat-type", m.time.unit)}</time>`);
-      const [sign, line] = { G2: ["G", 2], F4: ["F", 4], C3: ["C", 3], C4: ["C", 4] }[m.clef];
-      if (mi === 0) emit(tag("staves", 2));
-      emit(`<clef number="1">${tag("sign", sign)}${tag("line", line)}</clef>`);
-      if (mi === 0) {
-        emit('<clef number="2" print-object="no"><sign>TAB</sign></clef>');
-        emit(`<staff-details number="2" print-object="no" print-spacing="no"><staff-type>alternate</staff-type>${tag("staff-lines", p.tuning.length)}`);
-        for (let i = 0; i < p.tuning.length; i++) emit(`<staff-tuning line="${i + 1}">${tuningXml(p.tuning[i])}</staff-tuning>`);
+      const sourceStaves2 = m.staffs ?? p.staves ?? [{ number: 1, source: m.source, clef: m.clef }];
+      const staffNumbers = mi === 0 ? new Set(sourceStaves2.map((staff) => staff.number)) : void 0;
+      if (mi === 0) for (let index = 0; index < (m.changes?.length ?? 0); index++) {
+        const change = m.changes[index];
+        if (!change.clefRole) continue;
+        if (!change.clef || change.courtesy || change.position.n !== 0 || !staffNumbers.has(change.staff) || !["header", "change"].includes(change.clefRole.value)) refuse("writer-clef-role", "Qualified initial clef role needs its actual first-measure zero-clock staff occurrence.", change.source);
+        const map = change.clefRole.value === "header" ? initialHeaders : initialChanges;
+        if (map.has(change.staff)) refuse("writer-clef-role", "Ambiguous initial clef role ownership.", change.source);
+        map.set(change.staff, change);
+        initialRoleOrder.set(change, index);
+      }
+      if (mi === 0) for (const staff of /* @__PURE__ */ new Set([...initialHeaders.keys(), ...initialChanges.keys()])) {
+        const header = initialHeaders.get(staff), change = initialChanges.get(staff);
+        if (!header || !change || header.clef === change.clef || initialRoleOrder.get(header) >= initialRoleOrder.get(change)) refuse("writer-clef-role", "Initial header projection needs its ordered distinct source change.", (header ?? change).source);
+      }
+      const carrier = !!carrierTuning?.length && !sourceStaves2.some((s) => s.kind === "tablature" && s.tuning?.length);
+      const carrierNumber = sourceStaves2.length + 1;
+      if (p.capo && !carrier && !sourceStaves2.some((s) => s.kind === "tablature" && s.tuning?.length)) refuse("writer-capo", "Full capo requires non-capo tuning on a TAB staff or alternate carrier.", p.capo.source);
+      for (const staff of sourceStaves2) {
+        if (staff.tuning?.length && staff.kind !== "tablature") refuse("writer-tuning-staff", "String tuning must use a TAB staff or alternate carrier, never change ordinary staff geometry.", staff.source);
+        if (staff.capo && (staff.kind !== "tablature" || !staff.tuning?.length)) refuse("writer-capo", "Staff capo requires an explicitly tuned TAB staff.", staff.capo.source);
+        if (staff.capo && p.capo && staff.capo.fret !== p.capo.fret) refuse("writer-capo", "Part and staff full capo declarations conflict.", staff.capo.source);
+        const capo = staff.capo ?? p.capo;
+        if (capo) capoXml(capo);
+        if (mi === 0) initialStaffCapos.set(staff.number, capo?.fret ?? 0);
+        else if ((capo?.fret ?? 0) !== (initialStaffCapos.get(staff.number) ?? 0)) refuse("writer-capo-change", "Changing capo within a part is not yet supported.", capo?.source ?? staff.source);
+      }
+      emit(`<measure number="${mi + 1}"${m.numbering?.displayNumber !== void 0 ? ` text="${m.numbering.displayNumber}"` : ""}${m.implicit ?? m.pickup ? ' implicit="yes"' : ""}>`);
+      if (m.numbering) {
+        const mode = m.numbering.mode?.value === "hide" ? "none" : m.numbering.mode?.value === "show" ? "measure" : m.numbering.automatic;
+        const appearances = m.numbering.appearances ?? [];
+        if (!appearances.length) emit(`<print>${tag3("measure-numbering", mode)}</print>`);
+        else for (const appearance of appearances) {
+          if (!p.staves?.some((staff) => staff.number === appearance.staff)) refuse("writer-measure-number-owner", "Measure-number presentation needs an actual staff.", appearance.source);
+          const alignment = appearance.textAlignment;
+          emit(`<print><measure-numbering staff="${appearance.staff}"${plainTextFontXml(appearance)}${colorXml2(appearance.sourceColor, appearance.printObject !== false)}${alignment?.halign ? ` halign="${esc5(alignment.halign)}"` : ""}${alignment?.valign ? ` valign="${esc5(alignment.valign)}"` : ""}>${appearance.printObject === false || appearance.projection === "words" ? "none" : mode}</measure-numbering></print>`);
+        }
+      }
+      emit(`<attributes>${tag3("divisions", d)}`);
+      for (const staff of sourceStaves2) {
+        const key = staff.key ?? m.key;
+        emit(keySignatureXml(key, sourceStaves2.length > 1 ? staff.number : void 0));
+      }
+      if (sourceStaves2.length > 1 && sourceStaves2.some((staff) => staff.time && !sameMeter(staff.time, m.time))) {
+        for (const staff of sourceStaves2) emit(meterXml(staff.time ?? m.time, staff.number));
+      } else emit(meterXml(sourceStaves2[0].time ?? m.time));
+      if (mi === 0 && (sourceStaves2.length > 1 || carrier)) emit(tag3("staves", sourceStaves2.length + (carrier ? 1 : 0)));
+      for (const staff of sourceStaves2) {
+        const header = mi === 0 ? initialHeaders.get(staff.number) : void 0;
+        emit(clefXml(header ? { ...staff, source: header.source, clef: header.clef, clefPrintObject: header.printObject } : staff));
+      }
+      if (mi === 0 && carrier) emit(`<clef number="${carrierNumber}" print-object="no"><sign>TAB</sign></clef>`);
+      for (const staff of sourceStaves2) if (staff.printObject !== void 0) emit(`<staff-details number="${staff.number}" print-object="${staff.printObject ? "yes" : "no"}"${staff.printObject === false && staff.cutaway?.value ? ' print-spacing="yes"' : ""}/>`);
+      for (const staff of sourceStaves2) if (staff.staffSize && (previousStaffSizes.get(staff.number) ?? 100) !== staff.staffSize.percent) {
+        if (!Number.isFinite(staff.staffSize.percent) || staff.staffSize.percent <= 0 || staff.staffSize.percent > 400) refuse("writer-staff-size", "Unverified source staff-size percentage.", staff.staffSize.source);
+        emit(`<staff-details number="${staff.number}">${tag3("staff-size", staff.staffSize.percent)}</staff-details>`);
+        previousStaffSizes.set(staff.number, staff.staffSize.percent);
+      }
+      if (mi === 0 && carrier) {
+        emit(`<staff-details number="${carrierNumber}" print-object="no" print-spacing="no"><staff-type>alternate</staff-type>${tag3("staff-lines", carrierTuning.length)}`);
+        if (p.tuning?.length) emit(tuningEntries(p.tuning));
+        emit(capoXml(p.capo));
         emit("</staff-details>");
-        if (p.transposeOctaves) emit(`<transpose>${tag("diatonic", 0)}${tag("chromatic", 0)}${tag("octave-change", p.transposeOctaves)}</transpose>`);
+      }
+      for (const staff of sourceStaves2) {
+        const lines = staff.lines ?? staff.tuning?.length ?? 5;
+        if (!Number.isInteger(lines) || lines < 0 || lines > 16) refuse("writer-staff-lines", "Staff line count must be a bounded nonnegative integer.", staff.source);
+        const state = JSON.stringify([staff.kind ?? "pitched", lines, staff.tuning, staff.capo ?? p.capo, staff.sourceColor?.rgba, staff.lineVisibility?.value, staff.notation?.useNumbers?.value, staff.notation?.upsideDown?.value]);
+        const prior = previousStaffDetails.get(staff.number);
+        if (prior?.key !== state && (prior !== void 0 || lines !== 5 || staff.tuning?.length || staff.capo || p.capo || staff.sourceColor || staff.lineVisibility || staff.notation?.useNumbers || staff.notation?.upsideDown)) {
+          emit(`<staff-details number="${staff.number}"${staff.kind === "tablature" ? ` show-frets="${staff.notation?.useNumbers?.value === false ? "letters" : "numbers"}"` : ""}>${tag3("staff-lines", lines)}`);
+          if (staff.sourceColor || staff.lineVisibility || prior?.color || prior?.hiddenLines) for (let line = 1; line <= lines; line++) emit(`<line-detail line="${line}"${staff.sourceColor ? colorXml2(staff.sourceColor, true) : prior?.color ? ' color="#FF000000"' : ""}${staff.lineVisibility || prior?.hiddenLines ? ` print-object="${staff.lineVisibility?.value === false ? "no" : "yes"}"` : ""}/>`);
+          if (staff.tuning?.length) emit(tuningEntries(staff.tuning, staff.notation?.upsideDown?.value));
+          emit(capoXml(staff.capo ?? p.capo));
+          emit("</staff-details>");
+        }
+        previousStaffDetails.set(staff.number, { key: state, color: !!staff.sourceColor, hiddenLines: staff.lineVisibility?.value === false });
+      }
+      if (mi === 0 && (p.transpose || p.transposeOctaves)) emit(`<transpose>${tag3("diatonic", p.transpose?.diatonic ?? 0)}${tag3("chromatic", p.transpose?.chromatic ?? 0)}${p.transpose?.octaveChange || p.transposeOctaves ? tag3("octave-change", p.transpose?.octaveChange ?? p.transposeOctaves) : ""}</transpose>`);
+      for (const rest of m.collapsedRests ?? []) emit(`<measure-style number="${rest.staff}">${tag3("multiple-rest", rest.count)}</measure-style>`);
+      for (const repeat of m.measureRepeats ?? []) {
+        if (!sourceStaves2.some((staff) => staff.number === repeat.staff) || !["start", "stop"].includes(repeat.type) || ![1, 2, 4].includes(repeat.count) || repeat.slashes !== void 0 && ![1, 2, 4].includes(repeat.slashes)) refuse("writer-measure-repeat", "Measure-repeat style requires an actual source staff and a qualified source pattern.", repeat.source);
+        emit(`<measure-style number="${repeat.staff}"${colorXml2(repeat.sourceColor, repeat.printObject !== false)}${repeat.fontSize ? ` font-size="${glyphPointSize(repeat.fontSize)}"` : ""}><measure-repeat type="${repeat.type}"${repeat.slashes ? ` slashes="${repeat.slashes}"` : ""}>${repeat.type === "start" ? repeat.count : ""}</measure-repeat></measure-style>`);
       }
       emit("</attributes>");
-      if (m.repeatStart) emit('<barline location="left"><repeat direction="forward"/></barline>');
-      for (const tempo of score.tempos.filter((t) => t.measure === mi)) {
-        emit(`<direction><direction-type><metronome${tempo.visible && !display.hideTempo ? "" : ' print-object="no"'}>${tag("beat-unit", tempo.unit)}${"<beat-unit-dot/>".repeat(tempo.dots)}${tag("per-minute", tempo.rate)}</metronome></direction-type><offset sound="yes">${ticks(tempo.position)}</offset><staff>1</staff><sound tempo="${tempo.quarterRate}"/></direction>`);
+      for (const staff of sourceStaves2) emit(keyInstructionXml(staff.key ?? m.key, staff.number));
+      if (mi === 0) {
+        if (p.tuning && tuningFallback(p.tuning)) emit(directionXml({ source: p.source, position: q(0), staff: 1, kind: "words", text: tuningFallback(p.tuning) }));
+        for (const staff of sourceStaves2) if (staff.tuning && tuningFallback(staff.tuning)) emit(directionXml({ source: staff.source, position: q(0), staff: staff.number, kind: "words", text: tuningFallback(staff.tuning) }));
       }
-      let wroteVoice = false;
+      for (const staff of sourceStaves2) {
+        if (staff.clefBadge && previousClefs.get(staff.number) !== staff.clef)
+          emit(directionXml({ source: staff.clefBadge.source, position: q(0), staff: staff.number, kind: "words", text: "(optional octave below)", ...staff.clefPrintObject === false || staff.printObject === false ? { printObject: false } : {} }));
+        previousClefs.set(staff.number, staff.clef);
+      }
+      const hideStaffBarlines = sourceStaves2.length > 0 && sourceStaves2.every((staff) => staff.notation?.showBarlines?.value === false);
+      const barlineXml = (barline, repeat = "") => `<barline location="${barline.location}"><bar-style${barline.printObject === false || hideStaffBarlines && barline.location === "right" ? ' color="#00000000"' : ""}>${barline.style}</bar-style>${barline.fermata ? `<fermata type="${barline.fermata.inverted ? "inverted" : "upright"}"${barline.fermata.printObject === false ? ' color="#00000000"' : ""}>${barline.fermata.shape === "normal" ? "" : barline.fermata.shape}</fermata>` : ""}${repeat}</barline>`;
+      const boundary = (location, repeat) => {
+        const seen = /* @__PURE__ */ new Set();
+        let emitted = false;
+        for (const barline of m.barlines ?? []) if (barline.location === location) {
+          const key = `${barline.style}:${barline.fermata?.shape ?? ""}:${barline.fermata?.inverted ?? ""}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          emit(barlineXml(barline, emitted ? "" : repeat));
+          emitted = true;
+        }
+        if (!emitted && (repeat || hideStaffBarlines && location === "right")) emit(`<barline location="${location}">${hideStaffBarlines && location === "right" ? "<bar-style>none</bar-style>" : ""}${repeat}</barline>`);
+      };
+      boundary("left", m.repeatStart ? '<repeat direction="forward"/>' : "");
+      const timeline = [];
+      const lastClefChanges = /* @__PURE__ */ new Map();
+      for (const change of m.changes ?? []) {
+        if (mi !== 0 && change.clefRole) refuse("writer-clef-role", "Initial header role cannot be moved to a later source measure.", change.source);
+        const initialChange = initialChanges.get(change.staff) === change;
+        if (change.courtesy || change.position.n === 0 && !initialChange && !change.tuning && !change.capo && !change.transpose) continue;
+        let xml = "";
+        if (change.key) xml += keySignatureXml(change.key, change.staff, change.printObject === false);
+        if (change.time) xml += meterXml(change.time, change.staff);
+        if (change.clef) xml += clefXml({ source: change.source, number: change.staff, clef: change.clef, clefPrintObject: change.printObject }, initialChange);
+        if (change.clef && (!lastClefChanges.has(change.staff) || compare(change.position, lastClefChanges.get(change.staff).position) >= 0)) lastClefChanges.set(change.staff, change);
+        if (change.tuning || change.capo) {
+          if (change.tuning?.some((midi) => !Number.isInteger(midi) || midi < 0 || midi > 127) || change.tuning && (!change.tuning.length || change.tuning.length > 32)) refuse("writer-tuning-change", "Tuning change needs bounded explicit open-string pitches.", change.source);
+          const sourceStaff = sourceStaves2.find((staff) => staff.number === change.staff);
+          const targetStaff = sourceStaff?.kind === "tablature" ? change.staff : carrier ? carrierNumber : void 0;
+          if (!targetStaff) refuse("writer-tuning-change", "Physical tuning change needs an actual or alternate TAB carrier.", change.source);
+          xml += `<staff-details number="${targetStaff}"${targetStaff === carrierNumber && carrier ? ' print-object="no" print-spacing="no"' : ""}>${change.tuning ? tag3("staff-lines", change.tuning.length) + tuningEntries(change.tuning, sourceStaves2.find((staff) => staff.number === targetStaff)?.notation?.upsideDown?.value) : ""}${capoXml(change.capo)}</staff-details>`;
+        }
+        if (change.transpose) xml += `<transpose number="${change.staff}">${tag3("diatonic", change.transpose.diatonic)}${tag3("chromatic", change.transpose.chromatic)}${change.transpose.octaveChange ? tag3("octave-change", change.transpose.octaveChange) : ""}</transpose>`;
+        if (xml) timeline.push({ position: ticks(change.position), xml: `<attributes>${xml}</attributes>${change.key ? keyInstructionXml(change.key, change.staff) : ""}${change.tuning && tuningFallback(change.tuning) ? directionXml({ source: change.source, position: q(0), staff: change.staff, kind: "words", text: tuningFallback(change.tuning) }) : ""}${change.clefBadge ? directionXml({ source: change.clefBadge.source, position: q(0), staff: change.staff, kind: "words", text: "(optional octave below)", ...change.printObject === false ? { printObject: false } : {} }) : ""}` });
+      }
+      for (const [staff, change] of lastClefChanges) previousClefs.set(staff, change.clef);
+      for (const barline of m.barlines ?? []) if (barline.location === "middle") timeline.push({ position: ticks(barline.position), xml: barlineXml(barline) });
+      timeline.sort((a, b) => a.position - b.position);
+      let timelineCursor = 0;
+      for (const item of timeline) {
+        if (item.position < 0 || item.position > ticks(m.duration)) refuse("writer-attribute-clock", "Located source attribute/barline lies outside its declared measure.", m.source);
+        if (item.position > timelineCursor) emit(`<forward>${tag3("duration", item.position - timelineCursor)}</forward>`);
+        emit(item.xml);
+        timelineCursor = item.position;
+      }
+      if (timelineCursor) emit(`<backup>${tag3("duration", timelineCursor)}</backup>`);
+      for (const tempo of score.tempos.filter((t) => t.measure === mi)) {
+        emit(`<direction><direction-type><metronome${tempo.visible && !display.hideTempo ? "" : ' print-object="no"'}>${tag3("beat-unit", tempo.unit)}${"<beat-unit-dot/>".repeat(tempo.dots)}${tag3("per-minute", tempo.rate)}</metronome></direction-type><offset sound="yes">${ticks(tempo.position)}</offset><staff>1</staff><sound tempo="${tempo.quarterRate}"/></direction>`);
+      }
+      for (const image of imageDirections.get(`${p.id}\0${mi}`) ?? []) emit(image);
+      for (const capo of p.capoChanges?.filter((capo2) => capo2.measure === mi) ?? []) {
+        if (!Number.isSafeInteger(capo.fret) || capo.fret < 0 || !sourceStaves2.some((staff) => staff.number === capo.staff) || compare(capo.position, q(0)) < 0 || compare(capo.position, m.duration) > 0 || capo.ignoredStrings?.values.some((string) => !Number.isInteger(string) || string < 1 || string > 32)) refuse("writer-capo-change", "Capo instruction needs valid source staff, clock and strings.", capo.source);
+        const applied = capo.appliedStrings;
+        if (applied && (!Number.isInteger(applied.stringCount) || applied.stringCount < 1 || applied.stringCount > 32 || new Set(applied.values).size !== applied.values.length || applied.values.some((string) => !Number.isInteger(string) || string < 1 || string > applied.stringCount || capo.ignoredStrings?.values.includes(string)) || (!capo.active || capo.fret === 0) && applied.values.length)) refuse("writer-capo-strings", "Applied capo strings require their exact source tuning and original mask.", applied.source);
+        if (applied && capo.active && capo.fret > 0 && Array.from({ length: applied.stringCount }, (_, i) => i + 1).some((string) => applied.values.includes(string) === !!capo.ignoredStrings?.values.includes(string))) refuse("writer-capo-strings", "Applied capo strings must retain the complete source mask complement.", applied.source);
+        const ignored = applied ? Array.from({ length: applied.stringCount }, (_, i) => i + 1).filter((string) => !applied.values.includes(string)) : capo.ignoredStrings?.values;
+        const text = capo.text ?? (!capo.active || capo.fret === 0 || applied?.values.length === 0 ? "Capo off" : `Capo ${capo.fret}${ignored?.length ? ` (except strings ${ignored.join(", ")})` : ""}`);
+        emit(directionXml({ source: capo.source, kind: "words", position: capo.position, staff: capo.staff, text, printObject: capo.printObject }));
+      }
+      for (const direction of m.directions ?? []) emit(directionXml(direction));
+      for (const voice of m.voices) for (const event of voice) for (const lyric of event.notes.length ? event.notes.flatMap((note) => note.lyrics ?? []) : event.lyrics ?? []) if (scriptCaption(lyric.textRuns)) {
+        emit(directionXml({ ...lyric, source: lyric.source ?? event.source, kind: "words", position: event.start, staff: event.staff ?? 1, voiceId: event.voiceId, placement: lyric.placement ?? "below" }));
+      }
+      for (const direction of frameDirections.get(p.id)?.get(mi) ?? []) emit(directionXml(direction));
+      for (const { relation, start } of relationMarks.get(p.id)?.get(mi) ?? []) {
+        const endpoint = start ? relation.start : relation.end;
+        if (relation.kind === "ottava" || relation.kind === "text-line") {
+          const number = relation.kind === "ottava" || relation.lineVisible !== false ? serializedNumber(relation.id) : void 0;
+          const text = start ? relation.beginText ?? (relation.kind === "ottava" && relation.projection ? `${Math.abs(relation.octaves) * 7 + 1}${Math.abs(relation.octaves) === 1 ? relation.octaves > 0 ? "va" : "vb" : relation.octaves > 0 ? "ma" : "mb"}` : void 0) : relation.endText;
+          const visibility = colorXml2(relation.sourceColor, relation.printObject !== false);
+          const field = start ? "beginText" : "endText", style = relation.textFontStyles?.[field], size = relation.textFontSizes?.[field], family = relation.textFontFamilies?.[field];
+          const caption = text && (style || size || family) ? directionXml({
+            source: relation.textFacts?.[field]?.source ?? relation.source,
+            position: endpoint.position,
+            staff: endpoint.staff,
+            kind: "words",
+            text,
+            ...style ? { textFontStyle: style } : {},
+            ...size ? { textFontSize: size } : {},
+            ...family ? { textFontFamily: family } : {},
+            ...relation.textRuns?.[field] ? { textRuns: relation.textRuns[field] } : {},
+            ...relation.sourceColor ? { sourceColor: relation.sourceColor } : {},
+            ...relation.printObject !== void 0 ? { printObject: relation.printObject } : {}
+          }, true) : text ? `<words${visibility}>${esc5(text)}</words>` : "";
+          let content = caption ? `<direction-type>${caption}</direction-type>` : "";
+          if (relation.kind === "ottava" && relation.projection) {
+            if (relation.lineVisible !== false) content += `<direction-type><bracket type="${start ? "start" : "stop"}" number="${number}" line-end="${start ? relation.startHook ?? "none" : relation.endHook ?? (relation.octaves > 0 ? "down" : "up")}" line-type="${relation.lineType ?? "dashed"}"${visibility}/></direction-type>`;
+          } else if (relation.kind === "ottava") content += `<direction-type><octave-shift type="${!start ? "stop" : relation.octaves > 0 ? "down" : "up"}" size="${Math.abs(relation.octaves) * 7 + 1}" number="${number}"${visibility}/></direction-type>`;
+          else if (relation.lineVisible !== false) {
+            const name = relation.line, grid = grids.levels.get(relation.id);
+            const gridPosition = grid ? ` id="tab-grid-${grid.serial}-${start ? "start" : "stop"}" default-y="${40 + (grid.count - grid.index) * 5}"${grid.index === 1 ? ` end-length="${10 + (grid.count - 1) * 5}"` : ""}` : "";
+            content += `<direction-type><${name} type="${start ? "start" : "stop"}" number="${number}"${name === "bracket" ? ` line-end="${(start ? relation.startHook : relation.endHook) ?? "none"}" line-type="${relation.lineType ?? "solid"}"${gridPosition}` : ""}${visibility}/></direction-type>`;
+          }
+          if (content) emit(`<direction${relation.system ? ' system="only-top"' : ""}${relation.placement ? ` placement="${relation.placement.value}"` : ""}>${content}${tag3("offset", ticks(endpoint.position))}${endpoint.voiceId ? tag3("voice", endpoint.voiceId) : ""}${tag3("staff", endpoint.staff)}</direction>`);
+        } else if (relation.kind === "ending") {
+          if (relation.projection) {
+            const number = serializedNumber(relation.id), visibility = relation.printObject === false ? ' color="#00000000"' : "", text = start ? relation.beginText : relation.endText;
+            const content = `${text ? `<direction-type><words${visibility}>${esc5(text)}</words></direction-type>` : ""}${relation.lineVisible !== false ? `<direction-type><bracket type="${start ? "start" : "stop"}" number="${number}" line-end="${start ? relation.startHook ?? "down" : relation.closed ? relation.endHook ?? "down" : "none"}" line-type="${relation.lineType ?? "solid"}"${visibility}/></direction-type>` : ""}`;
+            if (content) emit(`<direction${relation.placement ? ` placement="${relation.placement.value}"` : ""}>${content}${tag3("offset", ticks(endpoint.position))}${endpoint.voiceId ? tag3("voice", endpoint.voiceId) : ""}${tag3("staff", endpoint.staff)}</direction>`);
+          } else {
+            const location = start ? "left" : endpoint.position.n === 0 ? "left" : "right";
+            emit(`<barline location="${location}"><ending number="${relation.numbers.join(",")}" type="${start ? "start" : relation.closed ? "stop" : "discontinue"}"${relation.printObject === false ? ' print-object="no"' : ""}>${esc5(start ? relation.beginText ?? "" : "")}</ending></barline>`);
+          }
+        } else refuse("writer-relation", "Relation kind needs an explicit common-writer projection.", relation.source);
+      }
+      let cursor = 0;
       for (let vi = 0; vi < m.voices.length; vi++) {
         if (!m.voices[vi].length) continue;
-        if (wroteVoice) emit(`<backup>${tag("duration", ticks(m.duration))}</backup>`);
-        wroteVoice = true;
+        if (cursor) emit(`<backup>${tag3("duration", cursor)}</backup>`);
+        cursor = 0;
         for (const e of m.voices[vi]) {
-          if (e.dynamic && !display.hideDynamics) emit(`<direction><direction-type><dynamics><${e.dynamic.toLowerCase()}/></dynamics></direction-type>${tag("voice", vi + 1)}<staff>1</staff></direction>`);
-          if (e.text) emit(`<direction><direction-type>${tag("words", e.text)}</direction-type>${tag("voice", vi + 1)}<staff>1</staff></direction>`);
-          const notes = e.notes.length ? e.notes : [void 0];
+          const staff = e.staff ?? 1, voice = e.voiceId ?? String(vi + 1), start = ticks(e.start);
+          if (start < cursor) refuse("writer-overlap", "Events overlap within one source voice.", e.source);
+          if (start > cursor) emit(`<forward>${tag3("duration", start - cursor)}${tag3("voice", voice)}${tag3("staff", staff)}</forward>`);
+          if (e.dynamic && !display.hideDynamics) emit(`<direction><direction-type><dynamics><${e.dynamic.toLowerCase()}/></dynamics></direction-type>${tag3("voice", voice)}${tag3("staff", staff)}</direction>`);
+          if (e.text) emit(`<direction><direction-type>${tag3("words", e.text)}</direction-type>${tag3("voice", voice)}${tag3("staff", staff)}</direction>`);
+          for (const note of e.notes) for (const finger of note.fingerings ?? []) if (fingeringNeedsWords(finger)) {
+            emit(directionXml({
+              ...finger,
+              kind: "words",
+              text: finger.value,
+              position: q(0),
+              staff,
+              voiceId: voice,
+              printObject: e.printObject !== false && note.printObject !== false && finger.printObject !== false
+            }));
+          }
+          for (const note of e.notes) if (note.fret !== void 0 && note.string !== void 0 && note.tabFretFont?.style && note.tabFretFont.style & 12) {
+            const tabStaff = sourceStaves2.find((item) => item.number === staff && item.kind === "tablature");
+            if (!tabStaff) continue;
+            const font = note.tabFretFont, number = tabStaff.notation?.useNumbers?.value !== false;
+            const fretText = note.kind === "dead" ? "x" : number ? note.fret < 100 ? String(note.fret) : "?" : note.fret < 17 ? String.fromCharCode(97 + note.fret) : "?";
+            const text = note.tabFret?.parentheses ?? note.noteheadParentheses?.value ? `(${fretText})` : fretText;
+            const row = (tabStaff.notation?.upsideDown?.value ? (tabStaff.lines ?? tabStaff.tuning?.length ?? 5) - note.string : note.string - 1) - (tabStaff.tablature?.onLines.value === false ? 0.5 : 0);
+            const visible = note.printObject !== false && e.printObject !== false && note.tabFret?.printObject !== false;
+            emit(`<direction><direction-type><words default-y="${-10 * row}" halign="center" valign="middle"${colorXml2(note.noteheadColor, visible)}${font.family ? ` font-family="${esc5(font.family)}"` : ""}${font.size ? ` font-size="${font.size}"` : ""} font-weight="${font.style & 1 ? "bold" : "normal"}" font-style="${font.style & 2 ? "italic" : "normal"}" underline="${font.style & 4 ? 1 : 0}" line-through="${font.style & 8 ? 1 : 0}">${esc5(text)}</words></direction-type>${tag3("voice", voice)}${tag3("staff", staff)}</direction>`);
+          }
+          if (e.tabRhythm?.durationSymbol) {
+            const sign = e.tabRhythm.durationSymbol;
+            const glyph = { maxima: "mensuralWhiteMaxima", long: "mensuralWhiteLonga", breve: "noteDoubleWhole", whole: "noteWhole", half: "noteHalfUp", quarter: "noteQuarterUp", eighth: "note8thUp", "16th": "note16thUp", "32nd": "note32ndUp", "64th": "note64thUp", "128th": "note128thUp", "256th": "note256thUp", "512th": "note512thUp", "1024th": "note1024thUp" };
+            if (!glyph[sign.type] || !Number.isInteger(sign.dots) || sign.dots < 0 || sign.dots > 4) refuse("writer-tab-duration", "TAB duration sign needs a standard written value and dot count.", sign.source);
+            emit(`<direction placement="above"><direction-type><symbol${e.printObject === false ? ' color="#00000000"' : ""}${sign.fontSize ? ` font-size="${sign.fontSize}"` : ""}>${glyph[sign.type]}</symbol>${`<symbol${e.printObject === false ? ' color="#00000000"' : ""}>augmentationDot</symbol>`.repeat(sign.dots)}</direction-type>${tag3("voice", voice)}${tag3("staff", staff)}</direction>`);
+          }
+          for (const instruction of e.performerInstructions ?? []) emit(`<direction><direction-type>${tag3("words", instruction.text)}</direction-type>${tag3("voice", voice)}${tag3("staff", staff)}</direction>`);
+          for (const [note, glyphs] of [[void 0, e.symbols ?? []], ...e.notes.map((note2) => [note2, note2.symbols ?? []])]) for (const glyph of glyphs) if (rotatedGlyph(glyph)) {
+            emit(directionXml({ source: glyph.source, position: q(0), staff, voiceId: voice, kind: "symbol", symbol: glyph, printObject: e.printObject !== false && note?.printObject !== false }));
+          }
+          for (const figure of e.figuredBass ?? []) if (figure.literalBracketText !== void 0) {
+            emit(`<direction${figure.placement ? ` placement="${figure.placement}"` : ""}><direction-type><words${colorXml2(figure.sourceColor, figure.printObject !== false)}>${esc5(figure.literalBracketText)}</words></direction-type>${tag3("offset", ticks(figure.projection.offset))}${tag3("voice", voice)}${tag3("staff", staff)}</direction>`);
+          }
+          let figureClock = e.start;
+          for (const figure of e.figuredBass ?? []) {
+            if (e.grace || figure.projection.hostEventId !== e.id || compare(figure.position, figureClock) < 0 || figure.duration.n <= 0 || !figure.items.length) refuse("writer-figured-bass", "Figured bass must retain its verified regular host and ordered exact source intervals.", figure.source);
+            const gap = add(figure.position, q(-figureClock.n, figureClock.d));
+            if (gap.n) emit(`<figured-bass print-object="no"><figure/>${tag3("duration", ticks(gap))}</figured-bass>`);
+            emit(`<figured-bass${figure.printObject === false || figure.literalBracketText !== void 0 ? ' print-object="no"' : ""}${figure.placement ? ` placement="${figure.placement}"` : ""}${figure.parentheses ? ' parentheses="yes"' : ""}${colorXml2(figure.sourceColor, true)}>`);
+            for (const item of figure.items) {
+              const modifiers = ["", "flat-flat", "flat", "natural", "sharp", "double-sharp", "plus", "back-slash", "slash"];
+              if (item.digit && (!Number.isInteger(item.digit.value) || item.digit.value < 0) || [item.prefix, item.suffix].some((modifier) => modifier && modifiers[modifier.encoded] !== modifier.value)) refuse("writer-figured-bass", "Invalid figured-bass figure vocabulary.", item.source);
+              const extension = item.continuation?.value;
+              if (extension !== void 0 && ![0, 1, 2].includes(extension)) refuse("writer-figured-bass", "Invalid figured-bass continuation.", item.source);
+              emit(`<figure>${item.prefix?.value ? tag3("prefix", item.prefix.value) : ""}${item.digit ? tag3("figure-number", item.digit.value) : ""}${item.suffix?.value ? tag3("suffix", item.suffix.value) : ""}${extension ? `<extend${extension === 1 ? "" : ` type="${item.digit || item.prefix?.value || item.suffix?.value ? "start" : "continue"}"`}/>` : ""}</figure>`);
+            }
+            emit(`${tag3("duration", ticks(figure.duration))}</figured-bass>`);
+            figureClock = add(figure.position, figure.duration);
+          }
+          const notes = e.notes.length ? harmonicComponents(e.notes, harmonicTranspose.get(e)) : [void 0];
+          const groupNotes = e.noteheadGroups?.length ? /* @__PURE__ */ new Set() : void 0;
+          const groupIds = e.noteheadGroups?.length ? /* @__PURE__ */ new Map() : void 0;
+          for (const group of e.noteheadGroups ?? []) {
+            if (group.members.length !== 1 || group.sidesOrigin !== "native-default") refuse("writer-notehead-group", "Unverified note enclosure group projection.", group.source);
+            const member = group.members[0];
+            const original = group.duplicateOf ? groupIds.get(group.duplicateOf) : void 0;
+            if (!Number.isInteger(member.sourceIndex) || e.notes[member.sourceIndex]?.id !== member.noteId || groupIds.has(group.id) || groupNotes.has(member.noteId) && (!original || original.noteId !== member.noteId || original.sourceIndex !== member.sourceIndex || e.notes[member.sourceIndex].noteheadParentheses?.value !== true) || group.duplicateOf && !groupNotes.has(member.noteId)) refuse("writer-notehead-group", "Unresolved or repeated note enclosure member.", member.source);
+            groupIds.set(group.id, { noteId: member.noteId, sourceIndex: member.sourceIndex });
+            groupNotes.add(member.noteId);
+          }
           for (let ni = 0; ni < notes.length; ni++) {
             const n = notes[ni];
-            emit("<note>" + (ni ? "<chord/>" : ""));
-            emit(n ? n.kind === "dead" ? `<unpitched>${tag("display-step", n.written.step)}${tag("display-octave", n.written.octave)}</unpitched>` : `<pitch>${pitchXml(n.written)}</pitch>` : `<rest${e.fullMeasureRest ? ' measure="yes"' : ""}/>`);
-            emit(tag("duration", ticks(e.duration)));
-            if (n?.tieStop) emit('<tie type="stop"/>');
-            if (n?.tieStart) emit('<tie type="start"/>');
-            emit(tag("voice", vi + 1) + tag("type", e.type) + "<dot/>".repeat(e.dots));
-            if (e.tuplet) emit(`<time-modification>${tag("actual-notes", e.tuplet.actual)}${tag("normal-notes", e.tuplet.normal)}</time-modification>`);
-            if (n?.kind === "dead") emit("<notehead>x</notehead>");
-            emit("<staff>1</staff>");
+            const visualTabStaff = sourceStaves2.find((sourceStaff) => sourceStaff.number === staff && sourceStaff.kind === "tablature");
+            const tabVisualLine = n?.string !== void 0 && visualTabStaff && (visualTabStaff.notation?.upsideDown?.value || visualTabStaff.tablature?.onLines.value === false) ? (visualTabStaff.notation?.upsideDown?.value ? (visualTabStaff.lines ?? visualTabStaff.tuning?.length ?? 5) - n.string : n.string - 1) - (visualTabStaff.tablature?.onLines.value === false ? 0.5 : 0) : void 0;
+            if (n?.attack && n.tieStop || n?.release && n.tieStart) refuse("writer-performance-tie", "Performance start/stop offsets must occur at the appropriate tie endpoints.", n?.source);
+            emit(`<note${tabVisualLine !== void 0 ? ` default-y="${-10 * tabVisualLine}"` : ""}${e.crossMeasureValue?.role === "continuation" ? ' print-leger="no"' : n?.printLedgerLines ? ` print-leger="${n.printLedgerLines.value ? "yes" : "no"}"` : ""}${n?.printObject === false || e.printObject === false ? ' print-object="no"' : ""}${n?.attack?.n ? ` attack="${ticks(n.attack)}"` : ""}${n?.release?.n ? ` release="${ticks(n.release)}"` : ""}${n && (n.performance?.play === false || voicePlayback.get(voice) === false) ? ' dynamics="0"' : n?.sourceVelocity?.mode === "absolute" ? ` dynamics="${(n.sourceVelocity.value / 90 * 100).toFixed(2)}"` : ""}>${e.grace ? `<grace${e.grace.slash ? ' slash="yes"' : ""}/>` : n?.cue ? "<cue/>" : ""}` + (ni ? "<chord/>" : ""));
+            if (n?.kind === "unpitched" && n.unpitched.displayStep === void 0 !== (n.unpitched.displayOctave === void 0)) refuse("writer-unpitched-position", "Unpitched display step and octave must occur together or remain explicitly unspecified.", n.source);
+            if (n?.kind === "unpitched" && n.unpitched.displayStep === void 0 && n.unpitched.displayUnspecified?.reason !== "unassigned-source-articulation") refuse("writer-unpitched-position", "Absent display position requires a qualified source uncertainty.", n.source);
+            emit(!n ? `<rest${e.fullMeasureRest ? ' measure="yes"' : ""}/>` : n.kind === "unpitched" ? n.unpitched.displayStep === void 0 ? "<unpitched/>" : `<unpitched>${tag3("display-step", n.unpitched.displayStep)}${tag3("display-octave", n.unpitched.displayOctave)}</unpitched>` : n.kind === "dead" ? `<unpitched>${tag3("display-step", n.written.step)}${tag3("display-octave", n.written.octave)}</unpitched>` : `<pitch>${pitchXml(n.printedOctaveShift || n.octaveShift ? { ...n.written, octave: n.written.octave + (n.printedOctaveShift?.octaves ?? n.octaveShift.octaves), midi: n.written.midi + (n.printedOctaveShift?.octaves ?? n.octaveShift.octaves) * 12 } : n.written, n.centOffset?.value ?? 0)}</pitch>`);
+            if (!e.grace) emit(tag3("duration", ticks(e.duration)));
+            if (n?.tieStop && n.tieSound?.stop !== false && !n.cue) emit('<tie type="stop"/>');
+            if (n?.tieStart && n.tieSound?.start !== false && !n.cue) emit('<tie type="start"/>');
+            if (n?.kind === "unpitched" && n.unpitched.instrumentId) {
+              const id = percussionIds.get(n.unpitched.instrumentId);
+              if (!id) refuse("writer-drum-reference", "Unpitched note has no declared MIDI instrument.", n.source);
+              emit(`<instrument id="${id}"/>`);
+            } else if (n && p.instrumentChanges?.length) {
+              const id = e.instrumentContextId ? instrumentContextIds.get(`${p.id}\0${e.instrumentContextId}`) : `I${pi + 1}`;
+              if (!id) refuse("writer-instrument-context", "Source event references an undeclared instrument context.", e.source);
+              emit(`<instrument id="${id}"/>`);
+            }
+            const crossValue = e.crossMeasureValue, crossContinuation = crossValue?.role === "continuation";
+            const displayedType = crossValue?.role === "start" ? crossValue.type : e.type;
+            const displayedDots = crossContinuation ? 0 : crossValue?.role === "start" ? crossValue.dots : e.dots;
+            emit(tag3("voice", voice) + `<type${n?.small?.value || e.small?.value ? ' size="cue"' : ""}>${esc5(displayedType)}</type>`);
+            const dotFacts = n ? n.dotFacts : e.dotFacts;
+            if (dotFacts && (dotFacts.length !== e.dots || dotFacts.some((fact, index) => fact.index !== index || fact.printObject !== void 0 && typeof fact.printObject !== "boolean")))
+              refuse("writer-dot", "Dot visibility must be bound to the complete ordered printed dot count.", e.source);
+            for (let dot = 0; dot < displayedDots; dot++) emit(dotFacts?.[dot]?.printObject === false ? '<dot color="#00000000"/>' : "<dot/>");
+            if (n?.accidental) {
+              if (!accidentalVocabulary.has(n.accidental)) refuse("writer-accidental", "Unsupported accidental notation.", n.source);
+              emit(`<accidental${n.accidentalCautionary ? ' cautionary="yes"' : ""}${n.accidentalParentheses ? ' parentheses="yes"' : ""}${n.accidentalBracket ? ' bracket="yes"' : ""}${accidentalSmuflXml(n.accidentalSmufl, n.accidental)}${accidentalColorXml(n.accidentalColor, n.accidentalVisible !== false)}${n.accidentalFontSize ? ` font-size="${glyphPointSize(n.accidentalFontSize)}"` : ""}>${esc5(n.accidental)}</accidental>`);
+            }
+            const modification = e.timeModification ?? e.tuplet;
+            if (modification) emit(`<time-modification>${tag3("actual-notes", modification.actual)}${tag3("normal-notes", modification.normal)}</time-modification>`);
+            if (crossContinuation || e.sourceStemVisibility?.value === false || e.tabRhythm?.stem === "none") emit(tag3("stem", "none"));
+            else if (e.tabRhythm?.stem) emit(tag3("stem", e.tabRhythm.stem));
+            else if (e.stem) emit(tag3("stem", e.stem));
+            const hideHead = crossContinuation && crossValue.hideNotehead || visualTabStaff && !!(n?.tabFretFont?.style & 12);
+            const enclosed = hideHead ? void 0 : n && groupNotes?.has(n.id) ? true : n?.tabFret?.parentheses ?? n?.noteheadParentheses?.value;
+            if (n?.noteheadSmufl && !/^[a-zA-Z][a-zA-Z0-9]{0,127}$/.test(n.noteheadSmufl.name)) refuse("writer-notehead-smufl", "Invalid canonical SMuFL notehead name.", n.noteheadSmufl.source);
+            if (hideHead || n?.kind === "dead" || n?.notehead || n?.noteheadColor || n?.noteheadSmufl || enclosed !== void 0) {
+              const shape5 = hideHead ? "none" : n.noteheadSmufl ? n.notehead ?? "other" : n.kind === "dead" ? "x" : n.notehead ?? "normal";
+              if (!noteheadVocabulary.has(shape5)) refuse("writer-notehead", "Unsupported standard notehead.", n.source);
+              emit(`<notehead${!hideHead && n.noteheadSmufl ? ` smufl="${esc5(n.noteheadSmufl.name)}"` : ""}${colorXml2(n.noteheadColor, true)}${!hideHead && n.noteheadFilled !== void 0 ? ` filled="${n.noteheadFilled ? "yes" : "no"}"` : ""}${enclosed !== void 0 ? ` parentheses="${enclosed ? "yes" : "no"}"` : ""}>${esc5(shape5)}</notehead>`);
+            }
+            if (n?.noteheadText && !hideHead) {
+              if (!n.noteheadText.text || n.noteheadText.text.length > 32 || n.noteheadText.accidental && !["sharp", "flat"].includes(n.noteheadText.accidental)) refuse("writer-notehead-text", "Invalid source-established notehead text.", n.noteheadText.source);
+              emit(`<notehead-text><display-text${colorXml2(n.noteheadColor, true)}>${esc5(n.noteheadText.text)}</display-text>${n.noteheadText.accidental ? `<accidental-text${colorXml2(n.noteheadColor, true)}>${n.noteheadText.accidental}</accidental-text>` : ""}</notehead-text>`);
+            }
+            emit(tag3("staff", staff));
+            if (!ni && !crossContinuation && e.tabRhythm?.stem !== "none") for (const beam of e.beams ?? []) emit(`<beam number="${beam.number}"${beam.fan ? ` fan="${beam.fan}"` : ""}${colorXml2(beam.sourceColor, beam.printObject !== false)}>${esc5(beam.value)}</beam>`);
+            if (!ni) for (const slur of e.slurs ?? []) emit(slurXml(slur));
+            for (const glyph of [...n?.symbols ?? [], ...!ni ? e.symbols ?? [] : []]) if (glyph.projection !== "notehead-parenthesis") {
+              emit(`<notations${glyph.printObject === false ? ' print-object="no"' : ""}>${glyphXml(glyph, "notation", void 0, !rotatedGlyph(glyph))}</notations>`);
+            }
+            for (const { relation, start: start2 } of ornamentEndpoints.get(e.id) ?? []) {
+              if (relation.kind !== "trill") return refuse("writer-ornament-relation", "Unknown ornament relation.", relation.source);
+              if (start2 && relation.ornament?.principal ? n?.id !== relation.ornament.principal.noteId : !!ni) continue;
+              const sound = start2 ? ornamentSound(relation.ornament) : "";
+              const mark = !start2 || relation.form === "prallprall" ? "" : relation.form === "trill" ? `<trill-mark${sound}/>` : `<other-ornament smufl="${relation.form === "upprall" ? "ornamentBottomLeftConcaveStroke" : "ornamentLeftVerticalStroke"}"/>`;
+              const accidentals2 = start2 ? relation.ornament?.accidentals ?? [] : [];
+              const line = relation.projection?.kind === "point-ornament" ? "" : `<wavy-line type="${start2 ? "start" : "stop"}" number="${serializedNumber(relation.id)}"${sound}/>`;
+              if (relation.projection) emittedEndpoints.set(relation.id, (emittedEndpoints.get(relation.id) ?? 0) + 1);
+              emit(`<notations${relation.printObject === false ? ' print-object="no"' : ""}><ornaments>${mark}${line}${start2 ? ornamentIntervals(relation.ornament) : ""}${accidentals2.filter((a) => a.printObject !== false).map(ornamentAccidentalXml).join("")}</ornaments></notations>`);
+              for (const accidental of accidentals2.filter((a) => a.printObject === false)) emit(`<notations print-object="no">${ornamentAccidentalXml(accidental)}</notations>`);
+            }
             if (e.dynamic && display.hideDynamics && ni === 0) emit(`<notations print-object="no"><dynamics><${e.dynamic.toLowerCase()}/></dynamics></notations>`);
             if (n) {
-              if (n.tieStop || n.tieStart || n.hopoStart || n.hopoStop) {
+              emit(frettedTechniqueXml(n, ni === 0 ? e.whammy : void 0));
+              for (const { relation, start: start2 } of noteLineEndpoints.get(n.id) ?? []) {
+                if (relation.kind === "glissando") {
+                  const name = relation.form, label = start2 && relation.label.show ? relation.label.value : "";
+                  emit(`<notations${relation.printObject === false ? ' print-object="no"' : ""}><${name} type="${start2 ? "start" : "stop"}" number="${serializedNumber(relation.id)}" line-type="${name === "glissando" ? "wavy" : relation.lineType ?? "solid"}"${relation.lineVisible === false ? ' color="#00000000"' : ""}>${esc5(label)}</${name}></notations>`);
+                } else emit(`<notations${relation.printObject === false || relation.lineVisible === false && !(start2 ? relation.beginText : relation.endText) ? ' print-object="no"' : ""}><other-notation type="${start2 ? "start" : "stop"}" number="${serializedNumber(relation.id)}">${esc5((start2 ? relation.beginText : relation.endText) ?? "")}</other-notation></notations>`);
+              }
+              if (n.dynamic) {
+                if (!/^(ppp|pp|p|mp|mf|f|ff|fff)$/.test(n.dynamic.value)) refuse("writer-note-dynamic", "Unknown component-owned dynamic.", n.dynamic.source);
+                emit(`<notations><dynamics><${n.dynamic.value}/></dynamics></notations>`);
+              }
+              for (const tie of n.tieNotations ?? []) emit(`<notations${tie.printObject === false || tie.relationId === crossValue?.tieId || n.tabTieVisibility?.some((view) => view.relationId === tie.relationId && view.printObject === false) ? ' print-object="no"' : ""}><tied type="${tie.type}" number="${serializedNumber(tie.relationId)}"${tie.orientation ? ` orientation="${tie.orientation}"` : ""}${tie.lineType ? ` line-type="${tie.lineType}"` : ""}/></notations>`);
+              for (const slur of n.slurs ?? []) emit(slurXml(slur));
+              if (!n.tieNotations && (n.tieStop || n.tieStart) || n.hopoStart || n.hopoStop || n.fingering?.length || n.articulations?.length || n.technical?.length || !ni && e.tupletBoundary?.length) {
                 emit("<notations>");
-                if (n.tieStop) emit('<tied type="stop"/>');
-                if (n.tieStart) emit('<tied type="start"/>');
-                if (n.hopoStop) emit(`<slur type="stop" number="${n.hopoNumber}"/>`);
-                if (n.hopoStart) emit(`<slur type="start" number="${n.hopoNumber}"/>`);
+                if (!n.tieNotations && n.tieStop) emit('<tied type="stop"/>');
+                if (!n.tieNotations && n.tieStart) emit('<tied type="start"/>');
+                if (n.hopoStop) emit(`<slur type="stop" number="${hopoSlurNumber(p.id, n, false)}"/>`);
+                if (n.hopoStart) emit(`<slur type="start" number="${hopoSlurNumber(p.id, n, true)}"/>`);
+                if (!ni) for (const boundary2 of e.tupletBoundary ?? []) emit(tupletXml(boundary2, e.timeModification ?? e.tuplet));
                 if (n.hopoStart || n.hopoStop) {
                   emit("<technical>");
                   if (n.hopoStop) emit(`<${n.hopoStop} type="stop" number="${n.hopoNumber}"/>`);
                   if (n.hopoStart) emit(`<${n.hopoStart} type="start" number="${n.hopoNumber}">${n.hopoStart === "hammer-on" ? "H" : "P"}</${n.hopoStart}>`);
                   emit("</technical>");
                 }
+                if (n.fingering?.length) emit(`<technical>${n.fingering.map((f) => tag3("fingering", f)).join("")}</technical>`);
+                if (n.technical?.length) {
+                  const vocabulary2 = /* @__PURE__ */ new Set(["up-bow", "down-bow", "harmonic", "open-string", "stopped", "thumb-position", "snap-pizzicato"]);
+                  for (const technique of n.technical) if (!vocabulary2.has(technique.kind)) refuse("writer-technical", "Unsupported technical notation.", technique.source);
+                  emit(`<technical>${n.technical.map((t) => t.kind === "harmonic" && t.natural ? `<harmonic${anchorXml(t.anchor)}><natural/></harmonic>` : `<${t.kind}${anchorXml(t.anchor)}/>`).join("")}</technical>`);
+                }
+                if (n.articulations?.length) {
+                  emit(articulationsXml(n.articulations, n.source, n.strongAccentDirections, n.articulationAnchors));
+                }
                 emit("</notations>");
               }
-              emit(`<notations print-object="no"><technical>${tag("string", n.string)}${tag("fret", n.fret)}${n.kind === "dead" ? "<other-technical>dead note</other-technical>" : ""}</technical></notations>`);
+              if (n.sourceStringNumber) {
+                if (!Number.isInteger(n.sourceStringNumber.value) || n.sourceStringNumber.value < 1 || n.sourceStringNumber.value > 32) refuse("writer-string-number", "Explicit string number must be a bounded positive source position.", n.sourceStringNumber.source);
+                emit(`<notations><technical>${tag3("string", n.sourceStringNumber.value)}</technical></notations>`);
+              }
+              if (!ni && e.tabRhythm?.halfNoteSlashes) emit(`<notations${e.printObject === false ? ' print-object="no"' : ""}><other-notation type="single" smufl="tremolo2">tablature half-note duration</other-notation></notations>`);
+              if (n.string !== void 0 || n.fret !== void 0) emit(`<notations${carrier ? ' print-object="no"' : ""}><technical>${n.string !== void 0 ? tag3("string", n.string) : ""}${n.fret !== void 0 ? `<fret${n.tabFret?.printObject === false || visualTabStaff && !!(n.tabFretFont?.style & 12) ? ' color="#00000000"' : ""}${n.tabFretFont?.family ? ` font-family="${esc5(n.tabFretFont.family)}"` : ""}${n.tabFretFont?.size ? ` font-size="${n.tabFretFont.size}"` : ""}${n.tabFretFont?.style !== void 0 ? ` font-weight="${n.tabFretFont.style & 1 ? "bold" : "normal"}" font-style="${n.tabFretFont.style & 2 ? "italic" : "normal"}"` : ""}>${n.fretDisplay?.value ?? n.fret}</fret>` : ""}${n.kind === "dead" ? "<other-technical>dead note</other-technical>" : ""}</technical></notations>`);
             }
+            if (!n && e.tupletBoundary?.length) emit(`<notations>${e.tupletBoundary.map((boundary2) => tupletXml(boundary2, e.timeModification ?? e.tuplet)).join("")}</notations>`);
+            if (!n && e.whammy) emit(bendXml(e.whammy));
+            if (!ni) for (const marking of e.hiddenMarkings ?? []) {
+              const vocabulary2 = marking.kind === "articulation" ? articulationVocabulary : marking.kind === "ornament" ? /* @__PURE__ */ new Set(["trill-mark", "turn", "inverted-turn", "mordent", "inverted-mordent"]) : /* @__PURE__ */ new Set(["up-bow", "down-bow", "harmonic", "open-string", "stopped", "thumb-position", "snap-pizzicato"]);
+              if (!vocabulary2.has(marking.name)) refuse("writer-hidden-mark", "Unknown hidden musical marking.", marking.source);
+              const container = marking.kind === "articulation" ? "articulations" : marking.kind === "ornament" ? "ornaments" : "technical";
+              const direction = marking.strongAccentDirection;
+              if (direction && (marking.name !== "strong-accent" || !["auto", "up", "down"].includes(direction.value))) refuse("writer-articulation-direction", "Unverified hidden strong-accent direction ownership.", direction.source);
+              emit(`<notations print-object="no"><${container}>${marking.name === "harmonic" && marking.natural ? `<harmonic${anchorXml(marking.anchor)}><natural/></harmonic>` : `<${marking.name}${marking.name === "strong-accent" ? strongAccentType(direction?.value, marking.anchor) : ""}${anchorXml(marking.anchor)}/>`}</${container}></notations>`);
+            }
+            for (const ornament of [...(e.ornaments ?? []).filter((mark) => mark.details?.principal ? mark.details.principal.noteId === n?.id : !ni), ...n?.ornaments ?? []]) {
+              let mark;
+              if (ornament.kind === "tremolo") {
+                if (!ornament.strokes || ornament.strokes < 1 || ornament.strokes > 8 || !["single", "start", "stop"].includes(ornament.type ?? "") || ornament.details) refuse("writer-tremolo", "Unsupported tremolo notation.", ornament.source);
+                mark = `<tremolo type="${ornament.type}">${ornament.strokes}</tremolo>`;
+              } else if (["trill-mark", "turn", "inverted-turn", "vertical-turn", "inverted-vertical-turn", "mordent", "inverted-mordent", "haydn", "schleifer", "other-ornament"].includes(ornament.kind)) {
+                const sign = ornament.details?.sign, mordent = ["mordent", "inverted-mordent"].includes(ornament.kind);
+                if (sign && (sign.slash && ornament.kind !== "turn" || (sign.long || sign.approach || sign.departure) && !mordent || sign.approach && !["above", "below"].includes(sign.approach) || sign.departure && !["above", "below"].includes(sign.departure) || sign.smufl && !canonicalSymbolVocabulary.has(sign.smufl))) refuse("writer-ornament-sign", "Unqualified source ornament sign attributes.", sign.source);
+                if (ornament.kind === "other-ornament" && !sign?.smufl) refuse("writer-ornament-sign", "Other ornament requires an exact source glyph.", ornament.source);
+                const attrs2 = `${anchorXml(ornament.anchor)}${!["schleifer", "other-ornament"].includes(ornament.kind) ? ornamentSound(ornament.details) : ""}${sign?.slash ? ' slash="yes"' : ""}${sign?.long ? ' long="yes"' : ""}${sign?.approach ? ` approach="${sign.approach}"` : ""}${sign?.departure ? ` departure="${sign.departure}"` : ""}${sign?.smufl ? ` smufl="${esc5(sign.smufl)}"` : ""}`;
+                mark = `<${ornament.kind}${attrs2}/>`;
+              } else return refuse("writer-ornament", "Unsupported ornament.", ornament.source);
+              const accidentals2 = ornament.details?.accidentals ?? [];
+              emit(`<notations${ornament.printObject === false ? ' print-object="no"' : ""}><ornaments>${mark}${ornamentIntervals(ornament.details)}${accidentals2.filter((a) => a.printObject !== false).map(ornamentAccidentalXml).join("")}</ornaments></notations>`);
+              for (const accidental of accidentals2.filter((a) => a.printObject === false)) emit(`<notations print-object="no">${ornamentAccidentalXml(accidental)}</notations>`);
+            }
+            if (!ni) for (const glyph of e.techniqueGlyphs ?? []) {
+              if (!Object.hasOwn(techniqueGlyphNames, glyph.smufl)) refuse("writer-technique-glyph", "Unverified performer technique glyph.", glyph.source);
+              emit(`<notations${glyph.printObject === false ? ' print-object="no"' : ""}><technical><other-technical smufl="${glyph.smufl}"${anchorXml(glyph.anchor)}>${esc5(techniqueGlyphNames[glyph.smufl])}</other-technical></technical></notations>`);
+            }
+            if (!ni && (e.fermata || e.breath || e.articulations?.length || e.chordLines?.length)) {
+              emit("<notations>");
+              if (e.fermata?.printObject !== false && e.fermata) emit(`<fermata type="${e.fermata.inverted ? "inverted" : "upright"}">${e.fermata.shape === "normal" ? "" : e.fermata.shape}</fermata>`);
+              if (e.breath) {
+                if (e.breath.placement && !["above", "below"].includes(e.breath.placement.value)) refuse("writer-breath-placement", "Unverified breath placement.", e.breath.placement.source);
+                emit(`<articulations><${e.breath.kind}${e.breath.placement ? ` placement="${e.breath.placement.value}"` : ""}${e.breath.printObject === false ? ' color="#00000000"' : ""}>${e.breath.shape ?? ""}</${e.breath.kind}></articulations>`);
+              }
+              if (e.chordLines?.length) {
+                for (const line of e.chordLines) if (!["falloff", "doit", "plop", "scoop"].includes(line.kind)) refuse("writer-chord-line", "Unknown chord-line articulation.", line.source);
+                emit(`<articulations>${e.chordLines.map((line) => `<${line.kind}${line.straight !== void 0 ? ` line-shape="${line.straight ? "straight" : "curved"}"` : ""}${line.wavy ? ' line-type="wavy"' : ""}${line.printObject === false ? ' color="#00000000"' : ""}/>`).join("")}</articulations>`);
+              }
+              if (e.articulations?.length) {
+                emit(articulationsXml(e.articulations, e.source, e.strongAccentDirections, e.articulationAnchors));
+              }
+              emit("</notations>");
+            }
+            if (!ni && e.fermata?.printObject === false) emit(`<notations print-object="no"><fermata type="${e.fermata.inverted ? "inverted" : "upright"}">${e.fermata.shape === "normal" ? "" : e.fermata.shape}</fermata></notations>`);
+            const arpeggios = e.arpeggioGroups ?? (e.arpeggio ? [e.arpeggio] : []);
+            if (arpeggios.length > 16) refuse("writer-arpeggio-budget", "Too many independently numbered arpeggio groups on one component.", e.source);
+            for (const arpeggio of ni < e.notes.length ? arpeggios : []) {
+              const endpoints = arpeggio.noteEndpoints?.filter((endpoint) => endpoint.noteId === n?.id);
+              const number = arpeggio.number ? ` number="${arpeggio.number}"` : "";
+              const content = arpeggio.nonArpeggiate ? endpoints ? endpoints.map((endpoint) => `<non-arpeggiate type="${endpoint.type}"${number}/>`).join("") : ni === 0 || ni === e.notes.length - 1 ? `<non-arpeggiate type="${ni === 0 ? "bottom" : "top"}"${number}/>` : "" : `<arpeggiate${arpeggio.direction ? ` direction="${arpeggio.direction}"` : ""}${number}/>`;
+              if (content) emit(`<notations${arpeggio.printObject === false ? ' print-object="no"' : ""}>${content}</notations>`);
+            }
+            const captions = n?.lyrics ?? (!n ? e.lyrics : void 0) ?? [], stops = !ni ? lyricStops.get(e.id) ?? [] : [];
+            if (captions.length || stops.length) {
+              const lane = (lyric) => `${lyric.number}:${lyric.placement ?? "below"}`;
+              const captionsByLane = /* @__PURE__ */ new Map(), stopsByLane = /* @__PURE__ */ new Map();
+              for (const lyric of captions) captionsByLane.set(lane(lyric), (captionsByLane.get(lane(lyric)) ?? 0) + 1);
+              for (const lyric of stops) {
+                const key = lane(lyric), values2 = stopsByLane.get(key) ?? [];
+                values2.push(lyric);
+                stopsByLane.set(key, values2);
+              }
+              const consumed = /* @__PURE__ */ new Set();
+              for (const lyric of captions) {
+                const alignment = lyric.textAlignment;
+                if (alignment && (alignment.halign && !["left", "center", "right"].includes(alignment.halign) || alignment.justify && !["left", "center", "right"].includes(alignment.justify) || alignment.valign && !["top", "middle", "bottom", "baseline"].includes(alignment.valign))) refuse("writer-lyric-alignment", "Uninterpreted standard lyric alignment.", alignment.source);
+                const incoming = stopsByLane.get(lane(lyric)) ?? [], stop = incoming[0];
+                const coalesced = incoming.length === 1 && captionsByLane.get(lane(lyric)) === 1 && !lyric.extend && !lyric.melisma && lyric.printObject !== false === (stop.printObject !== false) && colorXml2(lyric.sourceColor, true) === colorXml2(stop.sourceColor, true);
+                if (coalesced) consumed.add(stop);
+                emit(`<lyric number="${lyric.number}"${colorXml2(lyric.sourceColor, true)}${lyric.placement ? ` placement="${lyric.placement}"` : ""}${lyric.textAlignment?.justify || lyric.justify ? ` justify="${lyric.textAlignment?.justify ?? lyric.justify}"` : ""}${lyric.printObject === false ? ' print-object="no"' : ""}>${lyric.syllabic ? tag3("syllabic", lyric.syllabic) : ""}${lyricTextXml(lyric)}${lyric.extend ? lyric.extendTo?.eventId ? '<extend type="start"/>' : "<extend/>" : coalesced ? '<extend type="stop"/>' : ""}</lyric>`);
+              }
+              if (!ni) {
+                for (const lyric of stops) if (!consumed.has(lyric)) emit(`<lyric number="${lyric.number}"${colorXml2(lyric.sourceColor, true)}${lyric.placement ? ` placement="${lyric.placement}"` : ""}${lyric.printObject === false ? ' print-object="no"' : ""}><extend type="stop"/></lyric>`);
+              }
+            }
+            if (!ni) lyricStops.delete(e.id);
             emit("</note>");
           }
+          cursor = ticks(add(e.start, e.duration));
         }
+        const span = ticks(m.duration);
+        if (cursor < span) {
+          emit(`<forward>${tag3("duration", span - cursor)}</forward>`);
+          cursor = span;
+        }
+        if (cursor > span) refuse("writer-measure-clock", "Source voice exceeds its declared measure span.", m.source);
       }
-      if (m.repeatEnd) emit(`<barline location="right"><repeat direction="backward" times="${m.repeatEnd}"/></barline>`);
+      if (!cursor && ticks(m.duration)) emit(`<forward>${tag3("duration", ticks(m.duration))}</forward>`);
+      boundary("right", m.repeatEnd ? `<repeat direction="backward" times="${m.repeatEnd}"/>` : "");
       emit("</measure>");
     }
     emit("</part>");
   }
+  if (lyricStops.size) refuse("writer-lyric-endpoint", "Lyric extension lacks its resolved serialized endpoint.", lyricStops.values().next().value[0].source);
+  for (const relation of relations) if (relation.kind === "glissando" && emittedEndpoints.get(relation.id) !== 2) refuse("writer-relation-endpoints", "Source glissando lacks two actual emitted components.", relation.source);
+  if (openNumbers.size) {
+    const id = openNumbers.keys().next().value;
+    refuse("writer-relation-endpoints", "Source relation lacks its second serialized endpoint.", relationsById.get(id).source);
+  }
+  if (projectedOpenNumbers.size) {
+    const id = projectedOpenNumbers.keys().next().value;
+    refuse("writer-relation-endpoints", "Source dotted pedal lacks its second serialized bracket endpoint.", relationsById.get(id).source);
+  }
+  for (const relation of relations) if (relation.kind === "trill" && emittedEndpoints.get(relation.id) !== (relation.projection ? 1 : 2)) refuse("writer-relation-endpoints", "Trill lacks its actual emitted source event attachments.", relation.source);
   emit("</score-partwise>\n");
   return out;
 }
@@ -2310,7 +4788,7 @@ var limits = Object.freeze({
   xmlNodeText: 65536,
   xmlPath: 4096,
   xmlPathTotal: 8 * 1024 * 1024,
-  tracks: 8,
+  tracks: 32,
   measures: 512,
   occurrences: 2e4,
   binaryRecords: 2e5,
@@ -2335,41 +4813,41 @@ function parseXml(bytes, member = "Content/score.gpif", expectedRoot = "GPIF") {
   parser.on("xmldecl", (d) => {
     if (d.version !== "1.0" || d.encoding && d.encoding.toLowerCase() !== "utf-8") fail("Only XML 1.0 UTF-8 is admitted.");
   });
-  parser.on("opentagstart", (tag2) => {
-    if (tag2.name.length > limits.xmlName) fail("XML name budget exceeded.");
+  parser.on("opentagstart", (tag4) => {
+    if (tag4.name.length > limits.xmlName) fail("XML name budget exceeded.");
   });
   parser.on("attribute", (attribute) => {
     if (attribute.name.length > limits.xmlName || attribute.value.length > limits.xmlAttributeValue) fail("XML attribute name/value budget exceeded.");
   });
-  parser.on("opentag", (tag2) => {
-    if (++nodes > limits.xmlNodes || stack.length >= limits.xmlDepth || Object.keys(tag2.attributes).length > limits.xmlAttributes)
+  parser.on("opentag", (tag4) => {
+    if (++nodes > limits.xmlNodes || stack.length >= limits.xmlDepth || Object.keys(tag4.attributes).length > limits.xmlAttributes)
       fail("XML structure budget exceeded.");
-    if (tag2.name.includes(":") || Object.keys(tag2.attributes).some((n) => n.includes(":") || n === "xmlns")) fail("GPIF namespaces are outside the profile.");
-    const counts = siblings.at(-1), number = (counts.get(tag2.name) ?? 0) + 1;
-    counts.set(tag2.name, number);
+    if (tag4.name.includes(":") || Object.keys(tag4.attributes).some((n) => n.includes(":") || n === "xmlns")) fail("GPIF namespaces are outside the profile.");
+    const counts = siblings.at(-1), number = (counts.get(tag4.name) ?? 0) + 1;
+    counts.set(tag4.name, number);
     const parent = stack.at(-1);
-    const suffix = `/${tag2.name}[${number}]`, pathLength = (parent?.location.path?.length ?? 0) + suffix.length;
+    const suffix = `/${tag4.name}[${number}]`, pathLength = (parent?.location.path?.length ?? 0) + suffix.length;
     if (pathLength > limits.xmlPath || (pathChars += pathLength) > limits.xmlPathTotal) fail("XML path budget exceeded.");
     const path = (parent?.location.path ?? "") + suffix;
-    const node = {
-      name: tag2.name,
-      attrs: { ...tag2.attributes },
+    const node2 = {
+      name: tag4.name,
+      attrs: { ...tag4.attributes },
       text: "",
       children: [],
-      location: { member, path, line: parser.line, column: parser.column, ...tag2.attributes.id ? { id: String(tag2.attributes.id) } : {} }
+      location: { member, path, line: parser.line, column: parser.column, ...tag4.attributes.id ? { id: String(tag4.attributes.id) } : {} }
     };
-    if (parent) parent.children.push(node);
-    else root = node;
-    stack.push(node);
+    if (parent) parent.children.push(node2);
+    else root = node2;
+    stack.push(node2);
     siblings.push(/* @__PURE__ */ new Map());
   });
   const append = (s) => {
     text += s.length;
     if (text > limits.xmlText) fail("XML text budget exceeded.");
     if (stack.length) {
-      const node = stack.at(-1);
-      if (node.text.length + s.length > limits.xmlNodeText) fail("XML element text budget exceeded.");
-      node.text += s;
+      const node2 = stack.at(-1);
+      if (node2.text.length + s.length > limits.xmlNodeText) fail("XML element text budget exceeded.");
+      node2.text += s;
     }
   };
   parser.on("text", append);
@@ -2393,407 +4871,6 @@ var value = (e, name, required = true) => child(e, name, required)?.text.trim() 
 function integer(s, min, max, e) {
   if (!/^-?\d{1,6}$/.test(s) || Number(s) < min || Number(s) > max) refuse("number", `Expected an integer in ${min}..${max}.`, e.location);
   return Number(s);
-}
-
-// src/adapters/guitar-pro/gp8.ts
-function rebuilt(e, elements, text = e.text) {
-  return { ...e, text, children: elements };
-}
-function leaf(e, name, text, attrs2 = {}) {
-  return { name, text, attrs: attrs2, children: [], location: e.location };
-}
-function shape(e, allowed, attrs2 = [], repeated = []) {
-  if (allowed.length && e.text.trim()) refuse("mixed-content", "Mixed structural content is unsupported.", e.location);
-  for (const a of Object.keys(e.attrs)) if (!attrs2.includes(a)) refuse("unknown-attribute", `Unreviewed ${e.name} attribute ${a}.`, e.location);
-  const seen = /* @__PURE__ */ new Set();
-  for (const c of e.children) {
-    if (!allowed.includes(c.name)) refuse("unknown-element", `Unreviewed ${e.name}/${c.name} before reader projection.`, c.location);
-    if (seen.has(c.name) && !repeated.includes(c.name)) refuse("structure", `Duplicate ${e.name}/${c.name}.`, c.location);
-    seen.add(c.name);
-  }
-}
-function scalar(e) {
-  shape(e, []);
-}
-function marker(e) {
-  scalar(e);
-  if (e.text.trim()) refuse("marker-content", "Expected an empty marker.", e.location);
-}
-function defined(root, group, kind) {
-  const result = /* @__PURE__ */ new Map();
-  const container = child(root, group);
-  shape(container, [kind], [], [kind]);
-  for (const e of container.children) {
-    for (const a of Object.keys(e.attrs)) if (a !== "id") refuse("unknown-attribute", `Unreviewed ${kind} attribute ${a}.`, e.location);
-    if (!/^\d{1,6}$/.test(e.attrs.id) || result.has(e.attrs.id)) refuse("identity", `Invalid/duplicate ${kind} identity.`, e.location);
-    result.set(e.attrs.id, e);
-  }
-  return result;
-}
-var ids = (e, name, required = true) => {
-  const field = child(e, name, required);
-  if (!field) return [];
-  scalar(field);
-  return field.text.trim().split(/\s+/).filter(Boolean);
-};
-function named(e, permitted, findings, keep, translated = []) {
-  shape(e, permitted, ["Track", "Beat", "Bar"].includes(e.name) ? ["id"] : []);
-  const result = [];
-  for (const c of e.children) {
-    if (!permitted.includes(c.name)) refuse("unknown-element", `Unreviewed ${e.name}/${c.name} in the selected GP8 scope.`, c.location);
-    if (keep.includes(c.name)) result.push(c);
-    else if (!translated.includes(c.name)) findings.push({ disposition: "omitted", code: "gp8-metadata", message: "Preserved in original source; capture is delivered only on success; layout, view, synth/timbre or non-score metadata is not reapplied to ordinary staff output.", location: c.location });
-  }
-  return result;
-}
-function checkDefaultArticulation(track) {
-  const set = child(track, "InstrumentSet");
-  shape(set, ["Name", "Type", "LineCount", "Elements"]);
-  for (const c of set.children.filter((e) => e.name !== "Elements")) scalar(c);
-  const type = value(set, "Type");
-  if (!["electricBass", "electricGuitar"].includes(type) || child(set, "LineCount", false) && value(set, "LineCount") !== "5")
-    refuse("instrument-profile", "The fretted source profile admits electricBass/electricGuitar on five ordinary staff lines only.", set.location);
-  const container = child(set, "Elements");
-  shape(container, ["Element"], [], ["Element"]);
-  const elements = container.children;
-  if (elements.length !== 1) refuse("articulation-profile", "One pitched instrument element is required.", set.location);
-  const element = elements[0];
-  shape(element, ["Name", "Type", "SoundbankName", "Articulations"]);
-  for (const c of element.children.filter((e) => e.name !== "Articulations")) scalar(c);
-  if (value(element, "Type") !== "pitched") refuse("articulation-profile", "Only pitched instrument elements are exercised.", element.location);
-  const arts = child(element, "Articulations");
-  shape(arts, ["Articulation"], [], ["Articulation"]);
-  if (arts.children.length !== 1) refuse("articulation-profile", "One default instrument articulation is required.", arts.location);
-  const art = arts.children[0];
-  shape(art, ["Name", "StaffLine", "Noteheads", "TechniquePlacement", "TechniqueSymbol", "InputMidiNumbers", "OutputRSESound", "OutputMidiNumber"]);
-  for (const c of art.children) scalar(c);
-  marker(child(art, "TechniqueSymbol"));
-  marker(child(art, "InputMidiNumbers"));
-  if (value(art, "OutputMidiNumber") !== "0" || child(art, "StaffLine", false) && value(art, "StaffLine") !== "0" || child(art, "Noteheads", false) && value(art, "Noteheads") !== "noteheadBlack noteheadHalf noteheadWhole" || child(art, "TechniquePlacement", false) && value(art, "TechniquePlacement") !== "outside" || value(art, "OutputRSESound", false))
-    refuse("articulation-profile", "Nondefault instrument articulations need an exercised mapping.", art.location);
-  return type;
-}
-function prepareDirectTrack(track, findings) {
-  const keep = named(track, ["Name", "ShortName", "Color", "SystemsDefautLayout", "SystemsLayout", "PalmMute", "PlayingStyle", "Instrument", "PartSounding", "Transpose", "RSE", "GeneralMidi", "PlaybackState", "Lyrics", "Properties", "Automations"], findings, ["Name", "Instrument"], ["PartSounding", "Transpose", "GeneralMidi", "Properties"]);
-  const midi = child(track, "GeneralMidi");
-  shape(midi, ["Program", "Port", "PrimaryChannel", "SecondaryChannel", "ForeOneChannelPerString"], ["table"]);
-  midi.children.forEach(scalar);
-  const program = integer(value(midi, "Program"), 0, 127, midi);
-  if (midi.attrs.table !== "Instrument" || program < 24 || program > 39) refuse("instrument-profile", "Selected GP6 staff requires an explicit guitar/bass MIDI program 24\u201339.", midi.location);
-  const playing = child(track, "PlayingStyle", false), palm = child(track, "PalmMute", false), state = child(track, "PlaybackState", false);
-  if (playing && !["Default", ...program < 32 ? ["StringedPick"] : []].includes(playing.text.trim()) || palm && palm.text.trim() !== "0" || state && state.text.trim() !== "Default")
-    refuse("track-technique", "Active track-wide playing style, mute or nondefault playback state requires mapping.", track.location);
-  if (playing?.text.trim() === "StringedPick") findings.push({ disposition: "omitted", code: "source-playing-style", message: "Explicit track playing style StringedPick is retained in source but not reapplied as individual note articulations or performing-hand assignments.", location: playing.location, fact: "StringedPick" });
-  for (const name of ["Lyrics", "Automations"]) {
-    const field = child(track, name, false);
-    if (name === "Automations" && field?.children.length) refuse("track-automation", "Selected GP6 track automation requires mapping.", field.location);
-    if (name === "Lyrics" && field) {
-      shape(field, ["Line"], ["dispatched"], ["Line"]);
-      for (const line of field.children) {
-        shape(line, ["Text", "Offset"]);
-        line.children.forEach(scalar);
-        if (value(line, "Text")) refuse("lyrics", "Nonempty lyrics need an export mapping.", line.location);
-      }
-    }
-  }
-  const properties2 = child(track, "Properties");
-  shape(properties2, ["Property"], [], ["Property"]);
-  const canonical = [], names = /* @__PURE__ */ new Set();
-  for (const p of properties2.children) {
-    if (names.has(p.attrs.name)) refuse("structure", "Duplicate track property.", p.location);
-    names.add(p.attrs.name);
-    const name = p.attrs.name;
-    if (name === "Tuning") {
-      shape(p, ["Pitches"], ["name"]);
-      scalar(child(p, "Pitches"));
-      canonical.push(p);
-    } else if (name === "CapoFret") {
-      shape(p, ["Fret"], ["name"]);
-      scalar(child(p, "Fret"));
-      canonical.push(p);
-    } else if (["DiagramCollection", "DiagramWorkingSet", "ChordCollection", "ChordWorkingSet"].includes(name)) {
-      shape(p, ["Items"], ["name"]);
-      marker(child(p, "Items"));
-      findings.push({ disposition: "omitted", code: "empty-diagrams", message: "Empty source diagram collection retained.", location: p.location });
-    } else refuse("staff-property", "Unreviewed GP6 staff property.", p.location);
-  }
-  const sourceTranspose = child(track, "Transpose", false), sounding = child(track, "PartSounding", false);
-  if (sourceTranspose && sounding || !sourceTranspose && !sounding) refuse("transpose", "Exactly one explicit GP6 transposition representation is required.", track.location);
-  let trans = sourceTranspose;
-  if (sounding) {
-    shape(sounding, ["NominalKey", "TranspositionPitch"]);
-    sounding.children.forEach(scalar);
-    const amount = integer(value(sounding, "TranspositionPitch"), -24, 24, sounding);
-    if (amount % 12 || value(sounding, "NominalKey") !== "C") refuse("transpose", "Only octave GP6 PartSounding with nominal C is admitted.", sounding.location);
-    trans = leaf(sounding, "Transpose", "");
-    trans.children = [leaf(child(sounding, "TranspositionPitch"), "Octave", String(amount / 12)), leaf(sounding, "Chromatic", "0")];
-    findings.push({ disposition: "preserved", code: "gp6-transpose-alias", message: "Explicit PartSounding semitone octave is translated to the common octave representation without an additional physical sounding-pitch shift.", location: sounding.location, fact: { encodedSemitones: amount } });
-  }
-  return rebuilt(track, [...keep, trans, rebuilt(properties2, canonical), rebuilt(midi, [child(midi, "Program")])]);
-}
-function validateGpifHeader(root, family, findings) {
-  const version = value(root, "GPVersion", false), revision = child(root, "GPRevision"), encoding = child(root, "Encoding", false);
-  if (family === 6 ? version && !/^6(?:\.\d{1,3}){0,2}$/.test(version) : !new RegExp(`^${family}(?:\\.\\d{1,3}){0,2}$`).test(version))
-    refuse("version-profile", "Embedded GPIF version conflicts with the identified GP family.", root.location);
-  if (!/^\d{1,5}$/.test(revision.text.trim()) || Number(revision.text.trim()) < 1 || Number(revision.text.trim()) > 13007) refuse("version-profile", "GPIF revision exceeds the reviewed reader revision ceiling13007 or is invalid.", revision.location);
-  for (const name of Object.keys(revision.attrs)) {
-    if (!["required", "recommended"].includes(name)) refuse("version-profile", "Unknown revision attribute.", revision.location);
-    integer(revision.attrs[name], 0, 13007, revision);
-  }
-  if (encoding && value(encoding, "EncodingDescription") !== `GP${family}`)
-    refuse("version-profile", "Encoding description conflicts with embedded version; a label alone never establishes pitch semantics.", encoding.location);
-  findings.push({ disposition: "preserved", code: "gpif-family", message: "Version/revision/container identifiers are retained separately from strict selected-feature admission and physical pitch corroboration. This does not authenticate a producing application.", location: root.location, fact: { family, version: version || null, revision: revision.text.trim(), encoding: encoding ? value(encoding, "EncodingDescription") : null } });
-}
-function discoverGpifGraph(root) {
-  const tracks = defined(root, "Tracks", "Track"), bars = defined(root, "Bars", "Bar"), voices = defined(root, "Voices", "Voice");
-  const beats = defined(root, "Beats", "Beat"), notes = defined(root, "Notes", "Note"), rhythms = defined(root, "Rhythms", "Rhythm");
-  const masterTrack = child(root, "MasterTrack"), order = ids(masterTrack, "Tracks");
-  if (!order.length || order.length > limits.tracks || order.length !== tracks.size || new Set(order).size !== order.length || order.some((id) => !tracks.has(id)))
-    refuse("track-scope", "Master track order must exactly identify all defined tracks within the bounded profile.", masterTrack.location);
-  const masterBars = child(root, "MasterBars");
-  shape(masterBars, ["MasterBar"], [], ["MasterBar"]);
-  if (!masterBars.children.length || masterBars.children.length > limits.measures) refuse("measure-budget", "Measure count outside profile.", masterBars.location);
-  const all = { bars: /* @__PURE__ */ new Set(), voices: /* @__PURE__ */ new Set(), beats: /* @__PURE__ */ new Set(), notes: /* @__PURE__ */ new Set(), rhythms: /* @__PURE__ */ new Set() };
-  for (const master of masterBars.children) {
-    const barIds = ids(master, "Bars");
-    if (barIds.length !== order.length) refuse("bar-scope", "Every master bar must identify each source track.", master.location);
-    for (const id of barIds) {
-      if (!bars.has(id)) refuse("reference", "Unresolved master-bar reference.", master.location);
-      all.bars.add(id);
-    }
-  }
-  for (const b of bars.values()) for (const id of ids(b, "Voices")) if (id !== "-1") {
-    if (!voices.has(id)) refuse("reference", "Unresolved voice reference.", b.location);
-    if (all.bars.has(b.attrs.id)) all.voices.add(id);
-  }
-  for (const v of voices.values()) for (const id of ids(v, "Beats")) {
-    if (!beats.has(id)) refuse("reference", "Unresolved beat reference.", v.location);
-    if (all.voices.has(v.attrs.id)) all.beats.add(id);
-  }
-  for (const b of beats.values()) {
-    const ref = child(b, "Rhythm");
-    shape(ref, [], ["ref"]);
-    if (ref.text.trim()) refuse("marker-content", "Rhythm reference must be empty.", ref.location);
-    if (!rhythms.has(ref.attrs.ref)) refuse("reference", "Unresolved rhythm reference.", b.location);
-    if (all.beats.has(b.attrs.id)) all.rhythms.add(ref.attrs.ref);
-    for (const id of ids(b, "Notes", false)) {
-      if (!notes.has(id)) refuse("reference", "Unresolved note reference.", b.location);
-      if (all.beats.has(b.attrs.id)) all.notes.add(id);
-    }
-  }
-  for (const [name, definitions] of [["bars", bars], ["voices", voices], ["beats", beats], ["notes", notes], ["rhythms", rhythms]])
-    if (all[name].size !== definitions.size) refuse("unreferenced", `Orphan ${name} definition outside all declared track scopes.`, child(root, name[0].toUpperCase() + name.slice(1)).location);
-  return { tracks, bars, voices, beats, notes, rhythms, order, all, masterBars };
-}
-function prepareGp8(root, requested, findings, family = 8) {
-  validateGpifHeader(root, family, findings);
-  const { tracks, bars, voices, beats, notes, rhythms, order, all, masterBars } = discoverGpifGraph(root);
-  const masterTrack = child(root, "MasterTrack");
-  const selected = requested ?? order;
-  if (!selected.length || new Set(selected).size !== selected.length || selected.some((id) => !tracks.has(id)))
-    refuse("track-selection", "Select existing unique source track IDs.", masterTrack.location);
-  const selectedOrder = order.filter((id) => selected.includes(id));
-  const trackIndexes = selectedOrder.map((id) => order.indexOf(id));
-  const kept = { bars: /* @__PURE__ */ new Set(), voices: /* @__PURE__ */ new Set(), beats: /* @__PURE__ */ new Set(), notes: /* @__PURE__ */ new Set(), rhythms: /* @__PURE__ */ new Set() };
-  const masters = masterBars.children.map((master) => {
-    const barIds = ids(master, "Bars");
-    if (barIds.length !== order.length) refuse("bar-scope", "Each master bar must identify every source track.", master.location);
-    for (const id of barIds) {
-      if (!bars.has(id)) refuse("reference", "Unresolved master-bar reference, including excluded tracks.", master.location);
-      all.bars.add(id);
-    }
-    const chosen = trackIndexes.map((i) => barIds[i]);
-    chosen.forEach((id) => kept.bars.add(id));
-    const keep2 = named(master, ["Time", "Key", "Bars", "Repeat", "XProperties", "Section"], findings, ["Time", "Key", "Repeat"], ["Bars", "XProperties"]);
-    if (child(master, "XProperties", false)) {
-      const x = child(master, "XProperties");
-      if (value(master, "Time") !== "4/4") refuse("beaming-profile", "Explicit eighth grouping is exercised only in 4/4.", x.location);
-      const allowed = /* @__PURE__ */ new Map([["1124139010", "8"], ["1124139264", "2"], ["1124139265", "2"], ["1124139266", "2"], ["1124139267", "2"]]);
-      shape(x, ["XProperty"], [], ["XProperty"]);
-      const seen = /* @__PURE__ */ new Set();
-      for (const p of x.children) {
-        shape(p, ["Int"], ["id"]);
-        scalar(child(p, "Int"));
-        if (!allowed.has(p.attrs.id) || seen.has(p.attrs.id) || value(p, "Int") !== allowed.get(p.attrs.id))
-          refuse("beaming-profile", "Master-bar beaming override is outside the exercised 4/4 eighth-group profile.", p.location);
-        seen.add(p.attrs.id);
-      }
-      if (seen.size !== allowed.size) refuse("beaming-profile", "Incomplete source beaming-group tuple.", x.location);
-      findings.push({ disposition: "omitted", code: "source-beaming", message: "Explicit source eighth-note grouping observed in source; capture is delivered only on success; MusicXML beam grouping export is not exercised.", location: x.location, fact: { unit: "eighth", groups: [2, 2, 2, 2] } });
-    }
-    const key = child(master, "Key");
-    const keyFields = named(key, ["AccidentalCount", "Mode", "TransposeAs"], findings, ["AccidentalCount", "Mode"], ["TransposeAs"]);
-    const keyAlias = child(key, "TransposeAs", false);
-    if (keyAlias) scalar(keyAlias);
-    if (keyAlias && !["Sharps", "Flats"].includes(keyAlias.text.trim())) refuse("key-transpose", "Unreviewed key spelling preference.", keyAlias.location);
-    if (keyAlias) findings.push({ disposition: "omitted", code: "key-preference", message: "Source key spelling preference is retained but not reapplied. Explicit key count/mode and corroborated note spellings are exported; only octave display transpose is admitted.", location: keyAlias.location, fact: keyAlias.text.trim() });
-    return rebuilt(master, [...keep2.filter((e) => e.name !== "Key"), rebuilt(key, keyFields), leaf(child(master, "Bars"), "Bars", chosen.join(" "))]);
-  });
-  const preparedBars = [...kept.bars].map((id) => {
-    const bar = bars.get(id), all2 = ids(bar, "Voices");
-    const firstAbsent = all2.indexOf("-1");
-    if (firstAbsent >= 0 && all2.slice(firstAbsent).some((id2) => id2 !== "-1")) refuse("voice-profile", "Only trailing absent voice slots are exercised.", bar.location);
-    const active = all2.filter((id2) => id2 !== "-1");
-    if (!active.length) refuse("voice-profile", "A selected bar requires an explicit active voice.", bar.location);
-    active.forEach((id2) => kept.voices.add(id2));
-    if (active.length !== all2.length) findings.push({ disposition: "preserved", code: "absent-voice-slots", message: "Trailing -1 slots declare absent voices; no written notes or active voice identities are removed.", location: bar.location, fact: { absent: all2.length - active.length } });
-    const keep2 = named(bar, ["Clef", "Voices"], findings, ["Clef"], ["Voices"]);
-    return rebuilt(bar, [...keep2, leaf(child(bar, "Voices"), "Voices", active.join(" "))]);
-  });
-  for (const id of kept.voices) ids(voices.get(id), "Beats").forEach((id2) => kept.beats.add(id2));
-  for (const id of kept.beats) {
-    const b = beats.get(id);
-    ids(b, "Notes", false).forEach((id2) => kept.notes.add(id2));
-    kept.rhythms.add(child(b, "Rhythm").attrs.ref);
-  }
-  const preparedTracks = selectedOrder.map((id) => {
-    const track = tracks.get(id);
-    if (family === 6) return prepareDirectTrack(track, findings);
-    const keep2 = named(track, ["Name", "ShortName", "Color", "SystemsDefautLayout", "SystemsLayout", "AutoBrush", "AutoAccentuation", "PalmMute", "PlayingStyle", "UseOneChannelPerString", "IconId", "InstrumentSet", "Transpose", "RSE", "ForcedSound", "Sounds", "MidiConnection", "PlaybackState", "AudioEngineState", "Lyrics", "Staves", "Automations"], findings, ["Name", "Transpose"], ["InstrumentSet", "Sounds", "Staves", "AutoBrush", "AutoAccentuation", "PalmMute"]);
-    const type = checkDefaultArticulation(track);
-    const playing = child(track, "PlayingStyle", false), palm = child(track, "PalmMute", false), state = child(track, "PlaybackState", false);
-    if (playing && !["Default", ...type === "electricGuitar" ? ["StringedPick"] : []].includes(playing.text.trim()) || state && state.text.trim() !== "Default") refuse("track-technique", "Active track-wide style or playback state requires mapping.", track.location);
-    for (const parameter of [palm, child(track, "AutoAccentuation", false)].filter((p) => !!p)) {
-      scalar(parameter);
-      if (!/^(?:0(?:\.\d{1,6})?|1(?:\.0{1,6})?)$/.test(parameter.text.trim())) refuse("track-playback", "Playback interpretation parameter must be a bounded decimal0\u20131.", parameter.location);
-      findings.push({ disposition: "omitted", code: "track-playback-interpretation", message: parameter.name === "PalmMute" ? "Source palm-mute intensity parameter is retained, not applied. Selected notes with active palm-mute technique still refuse; this parameter alone does not mark notes or performing hands." : "Source automatic strong-beat accentuation is retained but playback emphasis is not reproduced or invented as written accents/dynamics. No complete playback equivalence is claimed.", location: { ...parameter.location, trackId: id }, fact: { parameter: parameter.name, value: parameter.text.trim() } });
-    }
-    const autoBrush = child(track, "AutoBrush", false);
-    if (autoBrush) {
-      marker(autoBrush);
-      findings.push({ disposition: "omitted", code: "source-auto-brush", message: "Source automatic chord strum delay is retained but not reproduced. Conversion requires no overlapping selected notes across logical voices; written clocks stay exact.", location: { ...autoBrush.location, trackId: id }, fact: { enabled: true } });
-    }
-    if (playing?.text.trim() === "StringedPick") findings.push({ disposition: "omitted", code: "source-playing-style", message: "Explicit track playing style StringedPick is retained in source but not reapplied as individual note articulations or performing-hand assignments.", location: playing.location, fact: "StringedPick" });
-    findings.push({ disposition: "omitted", code: "instrument-sound-metadata", message: "Instrument/sound names, labels, bank/timbre metadata and default articulation appearance are observed in source; capture is delivered only on success; exported meaning uses the validated pitched articulation and zero-bank MIDI program, without asserting recorded technique.", location: track.location });
-    const automation = child(track, "Automations", false);
-    const lyrics = child(track, "Lyrics", false);
-    if (lyrics) {
-      shape(lyrics, ["Line"], ["dispatched"], ["Line"]);
-      if (lyrics.attrs.dispatched !== void 0 && lyrics.attrs.dispatched !== "true") refuse("lyrics", "Unreviewed lyric dispatch convention.", lyrics.location);
-      for (const line of lyrics.children) {
-        shape(line, ["Text", "Offset"]);
-        line.children.forEach(scalar);
-        if (value(line, "Text").trim()) refuse("lyrics", "Nonempty lyrics require an exercised export mapping.", line.location);
-      }
-    }
-    const staveContainer = child(track, "Staves");
-    shape(staveContainer, ["Staff"], [], ["Staff"]);
-    const staves = staveContainer.children;
-    if (staves.length !== 1) refuse("staff-profile", "One explicitly fretted staff per selected bass track is required.", track.location);
-    shape(staves[0], ["Properties"]);
-    const properties2 = child(staves[0], "Properties"), canonical = [];
-    shape(properties2, ["Property", "Name"], [], ["Property"]);
-    const propertyNames = /* @__PURE__ */ new Set();
-    for (const property of properties2.children) {
-      if (property.name === "Name") {
-        scalar(property);
-        findings.push({ disposition: "omitted", code: "staff-name", message: "Source display name retained; ordinary source staff clef is exported.", location: property.location });
-        continue;
-      }
-      if (property.name !== "Property") refuse("unknown-property", "Unknown staff property container.", property.location);
-      const name = property.attrs.name;
-      if (propertyNames.has(name)) refuse("structure", "Duplicate staff property identity.", property.location);
-      propertyNames.add(name);
-      const fields = { Tuning: ["Pitches", "Flat", "Instrument", "Label", "LabelVisible"], TuningFlat: ["Enable"], CapoFret: ["Fret"], PartialCapoFret: ["Fret"], PartialCapoStringFlags: ["Bitset", "Flags"], FretCount: ["Number"], ChordCollection: ["Items"], ChordWorkingSet: ["Items"], DiagramCollection: ["Items"], DiagramWorkingSet: ["Items"] };
-      shape(property, fields[name] ?? [], ["name"]);
-      property.children.forEach(scalar);
-      if (name === "Tuning") {
-        if (property.children.some((e) => !["Pitches", "Flat", "Instrument", "Label", "LabelVisible"].includes(e.name))) refuse("tuning-property", "Unreviewed tuning field.", property.location);
-        if (child(property, "Flat", false)) {
-          marker(child(property, "Flat"));
-          findings.push({ disposition: "omitted", code: "tuning-flat-preference", message: "Encoded tuning flat-spelling preference is retained separately from MIDI values. Generated MusicXML reference tuning spelling remains explicitly inferred.", location: child(property, "Flat").location });
-        }
-        const visible = child(property, "LabelVisible", false);
-        if (visible && !["true", "false"].includes(visible.text.trim())) refuse("tuning-property", "Tuning label visibility must be explicit boolean.", visible.location);
-        canonical.push(rebuilt(property, [child(property, "Pitches")]));
-      } else if (name === "TuningFlat") {
-        marker(child(property, "Enable"));
-        findings.push({ disposition: "omitted", code: "tuning-flat-preference", message: "Encoded enabled tuning flat-spelling preference is retained separately from MIDI values. Generated MusicXML reference tuning spelling remains explicitly inferred.", location: property.location });
-      } else if (name === "CapoFret") canonical.push(property);
-      else if (name === "PartialCapoFret" && value(property, "Fret") === "0" || name === "PartialCapoStringFlags" && property.children.length === 1 && /^0+$/.test(property.children[0].text.trim())) {
-        findings.push({ disposition: "preserved", code: "no-partial-capo", message: "Explicitly inactive partial capo retained.", location: property.location });
-      } else if (name === "FretCount") integer(value(property, "Number"), 1, 36, property);
-      else if (["ChordCollection", "ChordWorkingSet", "DiagramCollection", "DiagramWorkingSet"].includes(name) && !child(property, "Items").children.length) {
-        findings.push({ disposition: "omitted", code: "empty-diagrams", message: "Empty diagram container retained; no musical chord data dropped.", location: property.location });
-      } else refuse("staff-property", `Staff property ${name} is unsupported or active.`, property.location);
-    }
-    const soundContainer = child(track, "Sounds");
-    shape(soundContainer, ["Sound"], [], ["Sound"]);
-    const sounds = soundContainer.children;
-    if (sounds.length !== 1) refuse("sound-profile", "One explicit sound program is required; sound changes are unsupported.", track.location);
-    shape(sounds[0], ["Name", "Label", "Path", "Role", "MIDI", "RSE"]);
-    sounds[0].children.filter((e) => !["MIDI", "RSE"].includes(e.name)).forEach(scalar);
-    if (child(sounds[0], "RSE", false)) findings.push({ disposition: "omitted", code: "sound-rse", message: "Source synth setup is captured but not recreated.", location: child(sounds[0], "RSE").location });
-    const midi = child(sounds[0], "MIDI");
-    shape(midi, ["MSB", "LSB", "Program"]);
-    midi.children.forEach(scalar);
-    if (integer(value(midi, "MSB"), 0, 127, midi) || integer(value(midi, "LSB"), 0, 127, midi)) refuse("sound-bank", "Nonzero sound-bank interpretation needs separate coverage.", midi.location);
-    const program = child(midi, "Program");
-    const programNumber = integer(program.text.trim(), 0, 127, program);
-    if (type === "electricBass" ? programNumber < 32 || programNumber > 39 : programNumber < 24 || programNumber > 31)
-      refuse("instrument-profile", "Encoded instrument family and zero-bank MIDI program disagree.", program.location);
-    if (automation) {
-      shape(automation, ["Automation"], [], ["Automation"]);
-      if (automation.children.length > 1) refuse("track-automation", "Only one initial matching sound declaration is admitted; sound changes require mapping.", automation.location);
-      if (automation.children.length) {
-        const initial = automation.children[0];
-        shape(initial, ["Type", "Linear", "Bar", "Position", "Visible", "Value"]);
-        initial.children.forEach(scalar);
-        const expected = [value(sounds[0], "Path"), value(sounds[0], "Name"), value(sounds[0], "Role")].join(";");
-        if (value(initial, "Type") !== "Sound" || value(initial, "Linear") !== "false" || value(initial, "Bar") !== "0" || value(initial, "Position") !== "0" || !["true", "false"].includes(value(initial, "Visible")) || value(initial, "Value") !== expected)
-          refuse("track-automation", "Initial sound must exactly name the one serialized sound at bar zero/position zero.", initial.location);
-        findings.push({ disposition: "preserved", code: "initial-sound-alias", message: "Initial Sound declaration exactly names the sole serialized Path/Name/Role. It selects the already validated source program, not a later sound change; synth timbre remains omitted.", location: initial.location, fact: { path: value(sounds[0], "Path"), name: value(sounds[0], "Name"), role: value(sounds[0], "Role"), program: programNumber } });
-      }
-    }
-    return rebuilt(track, [
-      ...keep2,
-      leaf(child(track, "InstrumentSet"), "Instrument", "", { ref: type }),
-      rebuilt(properties2, canonical),
-      { ...midi, name: "GeneralMidi", attrs: { table: "Instrument" }, children: [program] }
-    ]);
-  });
-  for (const id of order.filter((id2) => !selected.includes(id2))) findings.push({ disposition: "excluded-by-scope", code: "track-excluded", message: "Track deliberately excluded by the requested source IDs; its facts remain in original source; capture is delivered only on success.", location: { ...tracks.get(id).location, trackId: id }, fact: { trackId: id } });
-  const preparedBeats = [...kept.beats].map((id) => {
-    const b = beats.get(id);
-    const keep2 = named(b, ["Rhythm", "Notes", "Dynamic", "FreeText", "Properties", "TransposedPitchStemOrientation", "ConcertPitchStemOrientation"], findings, ["Rhythm", "Notes", "Dynamic", "FreeText"]);
-    const properties2 = child(b, "Properties", false);
-    if (properties2) shape(properties2, ["Property"], [], ["Property"]);
-    const names = /* @__PURE__ */ new Set();
-    for (const p of properties2?.children ?? []) {
-      shape(p, ["Float"], ["name"]);
-      scalar(child(p, "Float"));
-      if (names.has(p.attrs.name)) refuse("structure", "Duplicate beat pickup-control property.", p.location);
-      names.add(p.attrs.name);
-      if (p.name !== "Property" || !["PrimaryPickupVolume", "PrimaryPickupTone"].includes(p.attrs.name)) refuse("beat-property", "Unreviewed selected beat sound property.", p.location);
-      const amount = value(p, "Float");
-      if (!/^\d{1,2}(?:\.\d{1,16})?$/.test(amount) || Number(amount) > 10) refuse("pickup-tone", "Invalid bounded synth pickup control.", p.location);
-      findings.push({ disposition: "omitted", code: "pickup-tone", message: "Synth pickup tone/volume observed in source; capture is delivered only on success; instrument timbre recreation is not exercised.", location: p.location });
-    }
-    return rebuilt(b, keep2);
-  });
-  const score = child(root, "Score");
-  const preparedScore = rebuilt(score, named(score, ["Title", "SubTitle", "Artist", "Album", "Words", "Music", "WordsAndMusic", "Copyright", "Tabber", "Instructions", "Notices", "FirstPageHeader", "FirstPageFooter", "PageHeader", "PageFooter", "ScoreSystemsDefaultLayout", "ScoreSystemsLayout", "ScoreZoomPolicy", "ScoreZoom", "MultiVoice", "PageSetup"], findings, ["Title"]));
-  const preparedMaster = rebuilt(masterTrack, named(masterTrack, ["Tracks", "Automations", "Anacrusis", "RSE"], findings, ["Automations", "Anacrusis"], ["Tracks"]).concat(leaf(child(masterTrack, "Tracks"), "Tracks", selectedOrder.join(" "))));
-  const audio = child(root, "AudioTracks", false);
-  if (audio && (audio.children.length || audio.text.trim())) refuse("audio-track", "Audio tracks require a separate timing/media contract.", audio.location);
-  const keep = named(root, ["GPVersion", "GPRevision", "Encoding", "Score", "MasterTrack", "Tracks", "MasterBars", "Bars", "Voices", "Beats", "Notes", "Rhythms", "ScoreViews", "AudioTracks"], findings, ["GPVersion", "GPRevision", "Encoding"], ["Score", "MasterTrack", "Tracks", "MasterBars", "Bars", "Voices", "Beats", "Notes", "Rhythms"]);
-  const group = (name, elements) => rebuilt(child(root, name), elements);
-  return freeze(rebuilt(root, [
-    ...keep,
-    preparedScore,
-    preparedMaster,
-    group("Tracks", preparedTracks),
-    group("MasterBars", masters),
-    group("Bars", preparedBars),
-    group("Voices", [...kept.voices].map((id) => voices.get(id))),
-    group("Beats", preparedBeats),
-    group("Notes", [...kept.notes].map((id) => notes.get(id))),
-    group("Rhythms", [...kept.rhythms].map((id) => rhythms.get(id)))
-  ]));
-}
-function serialize(e) {
-  const escape = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-  return `<${e.name}${Object.entries(e.attrs).map(([k, v]) => ` ${k}="${escape(v)}"`).join("")}>${escape(e.text)}${e.children.map(serialize).join("")}</${e.name}>`;
 }
 
 // src/adapters/guitar-pro/container-facts.ts
@@ -2881,7 +4958,7 @@ function captureContainer(members, gp8, findings, captureRaw = true) {
       if (root.name !== "MISC" || root.text.trim() || Object.keys(root.attrs).length || root.children.length !== 1 || root.children[0].name !== "TracksView") refuse("container-metadata", "Unreviewed GP6 miscellaneous configuration.", root.location);
       const view = child(root, "TracksView"), count = child(view, "PreferredTrackCount");
       if (view.text.trim() || Object.keys(view.attrs).length || view.children.length !== 1 || Object.keys(count.attrs).length || count.children.length) refuse("container-metadata", "Unreviewed GP6 track-view configuration.", view.location);
-      fact.records = { preferredTrackCount: integer(value(view, "PreferredTrackCount"), 1, 8, count) };
+      fact.records = { preferredTrackCount: integer(value(view, "PreferredTrackCount"), 0, 999999, count) };
     } else if (member === "Content/Preferences.json" || member === "meta.json") {
       const parsed = JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(b));
       if (member === "meta.json" && parsed !== null && !(typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length === 0)) refuse("container-metadata", "Only empty object/null meta.json is exercised.", { member });
@@ -2897,6 +4974,622 @@ function captureContainer(members, gp8, findings, captureRaw = true) {
   return { facts, display };
 }
 
+// src/adapters/guitar-pro/structure.ts
+var masterFields = ["Section", "AlternateEndings", "Directions", "TripletFeel", "DoubleBar", "FreeTime", "Fermatas"];
+var scoreTextFields = ["Title", "SubTitle", "Artist", "Album", "Words", "Music", "WordsAndMusic", "Copyright", "Tabber", "Instructions", "Notices"];
+var structuralBeatFields = ["Lyrics", "GraceNotes", "Legato", "Hairpin", "Ottavia", "Fadding"];
+function scoreTexts(source, partId) {
+  const metadata2 = [], credits = [];
+  for (const name of scoreTextFields) {
+    const field = child(source, name, false);
+    if (!field?.text.trim()) continue;
+    metadata2.push({ source: field.location, name, value: field.text });
+    const role = { Title: "title", SubTitle: "subtitle", Music: "composer", Words: "lyricist" }[name];
+    credits.push({ source: field.location, text: field.text, ...role ? { role } : {}, frame: "VBox", partId, staff: 1, beforeMeasure: 0 });
+  }
+  return { metadata: metadata2, credits };
+}
+var targets = {
+  Segno: { label: "segno", kind: "segno" },
+  SegnoSegno: { label: "segno-segno", kind: "segno", text: "double segno" },
+  Coda: { label: "coda", kind: "coda" },
+  DoubleCoda: { label: "double-coda", kind: "coda", text: "double coda" },
+  Fine: { label: "fine", kind: "words", text: "Fine" }
+};
+function masterStructure(source, measure, part, index, relations) {
+  const free = child(source, "FreeTime", false);
+  if (free) measure.time = { ...measure.time, senzaMisura: { source: free.location } };
+  const endpoint = (position) => ({ partId: part.id, measure: index, position, staff: 1 });
+  const section = child(source, "Section", false);
+  if (section) {
+    const letter = value(section, "Letter", false), text = value(section, "Text", false);
+    if (letter || text) (measure.directions ??= []).push({ source: section.location, position: q(0), staff: 1, kind: "rehearsal", text: [letter, text].filter(Boolean).join(" \u2014 "), system: true });
+  }
+  if (child(source, "DoubleBar", false)) (measure.barlines ??= []).push({ source: child(source, "DoubleBar").location, position: measure.duration, location: "right", style: "light-light", origin: "source" });
+  const endings = child(source, "AlternateEndings", false);
+  if (endings?.text.trim()) {
+    const numbers = endings.text.trim().split(/\s+/).map((raw) => integer(raw, 1, 32, endings));
+    if (new Set(numbers).size !== numbers.length) refuse("repeat-ending", "Duplicate source ending number.", endings.location);
+    const previous = relations.at(-1);
+    if (previous?.kind === "ending" && previous.start.partId === part.id && !previous.closed && previous.end.measure === index - 1 && previous.numbers.join(",") === numbers.join(",")) {
+      previous.end = endpoint(measure.duration);
+      previous.closed = !!measure.repeatEnd;
+    } else relations.push({ source: endings.location, id: `gp-ending:${part.id}:${index}`, kind: "ending", numbers, sourceNumbers: { source: endings.location, values: numbers }, closed: !!measure.repeatEnd, start: endpoint(q(0)), end: endpoint(measure.duration) });
+  }
+  const feel = child(source, "TripletFeel", false);
+  if (feel && feel.text.trim() !== "NoTripletFeel") {
+    const match = /^(Triplet|Dotted|Scottish)(8th|16th)$/.exec(feel.text.trim());
+    if (!match) refuse("rhythmic-feel", "Unknown source rhythmic feel.", feel.location);
+    (measure.directions ??= []).push({ source: feel.location, position: q(0), staff: 1, kind: "words", text: `${match[1].toLowerCase()} ${match[2]} feel`, rhythmicFeel: { source: feel.location, kind: match[1].toLowerCase(), unit: match[2] === "8th" ? "eighth" : "16th" } });
+  }
+  for (const item of child(source, "Directions", false)?.children ?? []) {
+    const name = item.text.trim();
+    if (item.name === "Target") {
+      const target = targets[name];
+      if (!target) refuse("navigation", "Unknown navigation target.", item.location);
+      const at = name === "Fine" ? measure.duration : q(0);
+      (measure.directions ??= []).push({ source: item.location, position: at, staff: 1, kind: target.kind, text: target.text, navigation: { source: item.location, kind: "marker", label: target.label, markerType: { source: item.location, value: name } } });
+    } else if (item.name === "Jump") {
+      const jump = /^(DaCapo|DaSegnoSegno|DaSegno)(AlCoda|AlDoubleCoda|AlFine)?$/.exec(name);
+      if (name === "DaCoda" || name === "DaDoubleCoda") {
+        const target = name === "DaCoda" ? "coda" : "double-coda";
+        (measure.directions ??= []).push({ source: item.location, position: measure.duration, staff: 1, kind: "words", text: name === "DaCoda" ? "To Coda" : "To Double Coda", navigation: { source: item.location, kind: "jump", label: target === "coda" ? "to-coda" : "to-double-coda", jumpTo: target, targetKind: "coda" } });
+      } else {
+        if (!jump) refuse("navigation", "Unknown navigation jump.", item.location);
+        const jumpTo = jump[1] === "DaCapo" ? "start" : jump[1] === "DaSegno" ? "segno" : "segno-segno";
+        const suffix = jump[2], playUntil = suffix === "AlFine" ? "fine" : suffix === "AlCoda" ? "to-coda" : suffix === "AlDoubleCoda" ? "to-double-coda" : void 0;
+        (measure.directions ??= []).push({ source: item.location, position: measure.duration, staff: 1, kind: "words", text: name.replace(/([a-z])([A-Z])/g, "$1 $2"), navigation: { source: item.location, kind: "jump", jumpTo, ...playUntil ? { playUntil } : {}, ...suffix === "AlCoda" ? { continueAt: "coda" } : suffix === "AlDoubleCoda" ? { continueAt: "double-coda" } : {} } });
+      }
+    } else refuse("navigation", "Unknown source navigation field.", item.location);
+  }
+  for (const fermata of child(source, "Fermatas", false)?.children ?? []) {
+    const raw = value(fermata, "Offset").split("/");
+    if (raw.length !== 2) refuse("fermata", "Expected exact fermata offset.", fermata.location);
+    const position = q(integer(raw[0], 0, 1e5, fermata), integer(raw[1], 1, 1e5, fermata));
+    const shape5 = { Short: "angled", Medium: "normal", Long: "square" }[value(fermata, "Type")];
+    if (!shape5) refuse("fermata", "Unknown source fermata shape.", fermata.location);
+    const hosts = measure.voices.flat().filter((event) => equal(event.start, position) && !event.grace);
+    if (!hosts.length) refuse("fermata", "Fermata offset has no printed event owner.", fermata.location);
+    for (const event of hosts) event.fermata = { source: fermata.location, shape: shape5, inverted: false };
+  }
+}
+function beatStructure(source, event) {
+  const lyrics = child(source, "Lyrics", false);
+  if (lyrics) (event.notes[0] ?? event).lyrics = lyrics.children.flatMap((line, index) => line.text ? [{ source: line.location, number: index + 1, text: line.text }] : []);
+  const fade = child(source, "Fadding", false);
+  if (fade) {
+    const text = { FadeIn: "fade in", FadeOut: "fade out", VolumeSwell: "volume swell" }[fade.text.trim()];
+    if (!text) refuse("fade", "Unknown source volume gesture.", fade.location);
+    event.text = [event.text, text].filter(Boolean).join(" \u2014 ");
+  }
+}
+function trackLyrics(source, part, applyTrack = true) {
+  const continuingByVoice = /* @__PURE__ */ new Map();
+  for (const measure of part.measures) for (const [voiceIndex, voice] of measure.voices.entries()) for (const event of voice) {
+    for (const lyric of [...event.lyrics ?? [], ...event.notes.flatMap((note) => note.lyrics ?? [])]) {
+      const key = `${voiceIndex}:${lyric.number}`, trailing = /-+$/.test(lyric.text), continuing = continuingByVoice.get(key) ?? false;
+      lyric.text = lyric.text.replace(/-+$/, "");
+      lyric.syllabic = continuing ? trailing ? "middle" : "end" : trailing ? "begin" : "single";
+      if (lyric.text) continuingByVoice.set(key, trailing);
+    }
+  }
+  const lyrics = child(source, "Lyrics", false);
+  if (!lyrics || !applyTrack) return;
+  const hasBeatLyrics = part.measures.some((m) => m.voices.some((v) => v.some((e) => e.lyrics?.length || e.notes.some((n) => n.lyrics?.length))));
+  if (hasBeatLyrics) return;
+  for (const [index, line] of lyrics.children.entries()) {
+    const text = value(line, "Text", false);
+    if (!text.trim()) continue;
+    const offset = integer(value(line, "Offset"), 0, part.measures.length - 1, line);
+    if (/\[[^\]]*$/.test(text) || /\]/.test(text.replace(/\[[^\]]*\]/g, ""))) refuse("lyrics", "Unbalanced source lyric comment.", line.location);
+    const clean = text.replace(/\[[^\]]*\]/g, "").replace(/[\r\n\t]+/g, " "), chunks = [];
+    let token = "";
+    for (let i = 0; i < clean.length; i++) {
+      const character = clean[i];
+      if (character === " ") {
+        chunks.push(token);
+        token = "";
+      } else {
+        token += character;
+        if (character === "-") {
+          chunks.push(token);
+          token = "";
+          if (clean[i + 1] === " ") i++;
+        }
+      }
+    }
+    if (token) chunks.push(token);
+    const hosts = part.measures.slice(offset).flatMap((m) => m.voices[0] ?? []).filter((e) => e.notes.length && !e.grace);
+    if (chunks.length > hosts.length) refuse("lyrics", "Source lyric syllables exceed available written attacks.", line.location);
+    let continuing = false;
+    chunks.forEach((raw, i) => {
+      const trailing = /-+$/.test(raw), caption = raw.replace(/-+$/, "").replaceAll("+", " ");
+      if (!caption) return;
+      (hosts[i].notes[0].lyrics ??= []).push({ source: line.location, number: index + 1, text: caption, syllabic: continuing ? trailing ? "middle" : "end" : trailing ? "begin" : "single" });
+      continuing = trailing;
+    });
+  }
+}
+function beatRelations(part, sources, relations) {
+  const maximum = Math.max(...part.measures.map((measure) => measure.voices.length));
+  for (let voice = 0; voice < maximum; voice++) {
+    const events = part.measures.flatMap((measure, mi) => (measure.voices[voice] ?? []).map((event) => ({ event, mi, source: sources.get(event.source.id ?? event.id) })));
+    const endpoint = (entry, release = false) => ({ partId: part.id, measure: entry.mi, position: release ? add(entry.event.start, entry.event.duration) : entry.event.start, staff: entry.event.staff ?? 1, voiceId: entry.event.voiceId ?? String(voice + 1), ...!release ? { eventId: entry.event.id } : {}, ...entry.event.grace ? { graceIndex: entry.event.grace.index } : {} });
+    for (const name of ["Hairpin", "Ottavia"]) for (let index = 0; index < events.length; index++) {
+      const field = child(events[index].source, name, false);
+      if (!field) continue;
+      const kind = field.text.trim();
+      let end = index;
+      while (end + 1 < events.length && value(events[end + 1].source, name, false) === kind) end++;
+      const common = { source: field.location, id: `gp-${name}:${part.id}:${voice}:${index}`, start: endpoint(events[index]), end: endpoint(events[end], true) };
+      if (name === "Hairpin") {
+        if (!["Crescendo", "Decrescendo"].includes(kind)) refuse("hairpin", "Unknown encoded hairpin.", field.location);
+        relations.push({ ...common, kind: "wedge", diminuendo: kind === "Decrescendo" });
+        for (const [where, action] of [[common.start, kind === "Decrescendo" ? "diminuendo" : "crescendo"], [common.end, "stop"]]) (part.measures[where.measure].directions ??= []).push({ source: field.location, position: where.position, staff: where.staff, voiceId: where.voiceId, kind: "wedge", action, relationId: common.id });
+      } else {
+        const octaves = { "8va": 1, "8vb": -1, "15ma": 2, "15mb": -2 }[kind];
+        if (!octaves) refuse("ottava", "Unknown encoded ottava.", field.location);
+        relations.push({ ...common, kind: "ottava", octaves });
+      }
+      index = end;
+    }
+    let origin, last;
+    const finishLegato = () => {
+      if (!origin) return;
+      if (!last || last === origin) refuse("legato", "Explicit legato origin has no destination-bearing source event.", origin.source.location);
+      const id = `gp-legato:${part.id}:${voice}:${origin.event.id}`;
+      relations.push({ source: child(origin.source, "Legato").location, id, kind: "slur", start: endpoint(origin), end: endpoint(last) });
+      (origin.event.slurs ??= []).push({ type: "start", number: 1, relationId: id });
+      (last.event.slurs ??= []).push({ type: "stop", number: 1, relationId: id });
+      origin = void 0;
+      last = void 0;
+    };
+    for (const entry of events) {
+      const legato = child(entry.source, "Legato", false);
+      if (!legato) {
+        finishLegato();
+        continue;
+      }
+      for (const flag2 of Object.values(legato.attrs)) if (!["true", "false"].includes(flag2)) refuse("legato", "Expected source legato boolean.", legato.location);
+      const starts = legato.attrs.origin === "true", arrives = legato.attrs.destination === "true";
+      if (arrives) {
+        if (!origin) refuse("legato", "Unpaired explicit legato destination.", legato.location);
+        last = entry;
+        if (!starts) finishLegato();
+      } else if (starts) {
+        finishLegato();
+        origin = entry;
+      } else finishLegato();
+    }
+    finishLegato();
+  }
+}
+
+// src/adapters/guitar-pro/techniques.ts
+var noteTechniqueFields = {
+  ShowStringNumber: "Enable",
+  Harmonic: "Enable",
+  PalmMuted: "Enable",
+  Tapped: "Enable",
+  LeftHandTapped: "Enable",
+  HarmonicType: "HType",
+  HarmonicFret: "HFret",
+  Bended: "Enable",
+  BendOriginValue: "Float",
+  BendOriginOffset: "Float",
+  BendMiddleValue: "Float",
+  BendMiddleOffset1: "Float",
+  BendMiddleOffset2: "Float",
+  BendDestinationValue: "Float",
+  BendDestinationOffset: "Float",
+  Slide: "Flags"
+};
+var noteTechniqueElements = ["AntiAccent", "LetRing", "Accent", "Vibrato", "LeftFingering", "RightFingering", "Trill", "Ornament"];
+var beatTechniqueFields = {
+  BarreFret: "Fret",
+  BarreString: "String",
+  Rasgueado: "Rasgueado",
+  Brush: "Direction",
+  PickStroke: "Direction",
+  Slapped: "Enable",
+  Popped: "Enable",
+  VibratoWTremBar: "Strength",
+  WhammyBar: "Enable",
+  WhammyBarOriginValue: "Float",
+  WhammyBarOriginOffset: "Float",
+  WhammyBarMiddleValue: "Float",
+  WhammyBarMiddleOffset1: "Float",
+  WhammyBarMiddleOffset2: "Float",
+  WhammyBarDestinationValue: "Float",
+  WhammyBarDestinationOffset: "Float"
+};
+var beatTechniqueElements = ["Tremolo", "Arpeggio", "Whammy", "Timer", "Wah"];
+function propertyMap(e) {
+  return new Map((child(e, "Properties", false)?.children ?? []).map((p) => [p.attrs.name, p]));
+}
+function harmonicKind(source) {
+  const property = propertyMap(source).get("HarmonicType");
+  if (!property) return void 0;
+  const type = value(property, "HType").toLowerCase();
+  if (type === "noharmonic") return void 0;
+  if (!["natural", "artificial", "pinch", "tap", "semi", "feedback"].includes(type)) refuse("harmonic-type", "Unknown encoded harmonic type.", property.location);
+  return type;
+}
+function harmonicResult(source, physicalMidi, openMidi, fret) {
+  const kind = harmonicKind(source);
+  if (!kind) return void 0;
+  const hfret = propertyMap(source).get("HarmonicFret");
+  const node2 = hfret ? signedDecimal(value(hfret, "HFret"), hfret.location) : kind === "natural" ? q(fret) : void 0;
+  if (!node2) return void 0;
+  const interval = harmonicInterval(node2.n / node2.d);
+  return interval === void 0 ? void 0 : (kind === "natural" ? openMidi : physicalMidi) + interval;
+}
+function harmonicInterval(node2) {
+  const partials = [[2, [12]], [3, [7, 19]], [4, [5, 24]], [5, [3.9, 4, 9, 16]], [6, [3.2]], [7, [2.7, 5.8, 9.6, 14.7, 21.7]], [8, [2.3, 2.4, 8.2, 17]], [9, [2]], [10, [1.8]]];
+  const partial = partials.find(([, nodes]) => nodes.includes(node2))?.[0];
+  if (!partial) return void 0;
+  return Math.round(12 * Math.log2(partial));
+}
+function signedDecimal(text, source) {
+  if (!/^-?\d{1,4}(?:\.\d{1,6})?$/.test(text)) refuse("technique-number", "Expected an exact bounded technique decimal.", source);
+  return mul(decimal(text.replace(/^-/, "")), q(text.startsWith("-") ? -1 : 1));
+}
+function curve(properties2, prefix, owner) {
+  const amount = (suffix, fallback) => {
+    const p = properties2.get(prefix + suffix);
+    return p ? signedDecimal(value(p, "Float"), p.location) : q(fallback);
+  };
+  const point = (which, offsetSuffix, fallback) => ({
+    source: properties2.get(prefix + offsetSuffix)?.location ?? properties2.get(prefix + which + "Value")?.location ?? owner.location,
+    offset: mul(amount(offsetSuffix, fallback), q(1, 100)),
+    semitones: mul(amount(which + "Value", 0), q(1, 50))
+  });
+  const origin = point("Origin", "OriginOffset", 0), destination = point("Destination", "DestinationOffset", 100);
+  const points = [origin];
+  if (properties2.has(prefix + "MiddleValue")) {
+    if (properties2.has(prefix + "MiddleOffset1")) points.push(point("Middle", "MiddleOffset1", 50));
+    if (properties2.has(prefix + "MiddleOffset2")) points.push(point("Middle", "MiddleOffset2", 50));
+    if (!properties2.has(prefix + "MiddleOffset1") && !properties2.has(prefix + "MiddleOffset2")) points.push(point("Middle", "MiddleOffset1", 50));
+  }
+  const active = points.filter((p, index) => index === 0 || compare(p.offset, origin.offset) >= 0 && compare(p.offset, destination.offset) < 0);
+  active.push(destination);
+  points.splice(0, points.length, ...active);
+  for (let i = 0; i < points.length; i++) {
+    if (compare(points[i].offset, q(0)) < 0 || compare(points[i].offset, q(1)) > 0 || i && compare(points[i].offset, points[i - 1].offset) < 0)
+      refuse("bend-curve", "Bend offsets must preserve source order within the note.", points[i].source);
+  }
+  const sourceCurveFields = [...properties2].filter(([name]) => name.startsWith(prefix) && name !== "WhammyBar" && name !== "Bended").map(([name, field]) => ({ source: field.location, name, value: signedDecimal(value(field, "Float"), field.location) }));
+  return { source: owner.location, points, sourceCurveFields, ...prefix === "WhammyBar" ? { withBar: { source: owner.location } } : {} };
+}
+function noteTechniques(source, note, writtenPitch) {
+  const properties2 = propertyMap(source);
+  const shownString = properties2.get("ShowStringNumber");
+  if (shownString) {
+    child(shownString, "Enable");
+    if (note.string === void 0) refuse("string-number", "An explicit printed string number needs its source physical string.", shownString.location);
+    note.sourceStringNumber = { source: shownString.location, value: note.string };
+  }
+  const harmonicEnabled = properties2.get("Harmonic");
+  if (harmonicEnabled) child(harmonicEnabled, "Enable");
+  const kind = harmonicKind(source), harmonicFret = properties2.get("HarmonicFret");
+  if (kind && !note.harmonic) refuse("harmonic-pitch", "Harmonic roles must be recovered before technique projection.", source.location);
+  if (harmonicFret) {
+    const position = signedDecimal(value(harmonicFret, "HFret"), harmonicFret.location);
+    if (!note.harmonic && position.n !== 0 || compare(position, q(0)) < 0) refuse("harmonic-fret", "Touch-node parameter requires a harmonic and a bounded nonnegative coordinate.", harmonicFret.location);
+    if (note.harmonic) note.harmonic.harmonicFret = { source: harmonicFret.location, value: position };
+  }
+  const gesture = (owner, kind2, hand) => {
+    (note.gestures ??= []).push({ source: owner.location, kind: kind2, ...hand ? { hand } : {} });
+  };
+  for (const [name, kind2, hand] of [["PalmMuted", "palm-mute"], ["Tapped", "tap", "right"], ["LeftHandTapped", "tap", "left"]]) {
+    const p = properties2.get(name);
+    if (p) {
+      child(p, "Enable");
+      gesture(p, kind2, hand);
+    }
+  }
+  const ring = child(source, "LetRing", false);
+  if (ring) gesture(ring, "let-ring");
+  const vibrato = child(source, "Vibrato", false);
+  if (vibrato) {
+    if (!["None", "Slight", "Wide"].includes(vibrato.text.trim())) refuse("vibrato", "Unknown source vibrato strength.", vibrato.location);
+    if (vibrato.text.trim() !== "None") gesture(vibrato, vibrato.text.trim() === "Wide" ? "wide-vibrato" : "vibrato");
+  }
+  const ghost = child(source, "AntiAccent", false);
+  if (ghost) {
+    if (ghost.text.trim() !== "Normal") refuse("ghost-note", "Unknown anti-accent subtype.", ghost.location);
+    note.noteheadParentheses = { source: ghost.location, value: true, origin: "source" };
+  }
+  const accent = child(source, "Accent", false);
+  if (accent) {
+    const bits2 = integer(accent.text.trim(), 0, 31, accent);
+    if (bits2 & 2) refuse("accent", "Unmapped accent flag.", accent.location);
+    note.articulations = [[1, "staccato"], [4, "strong-accent"], [8, "accent"], [16, "tenuto"]].filter(([bit]) => bits2 & Number(bit)).map(([, name]) => String(name));
+  }
+  for (const [name, hand] of [["LeftFingering", "left"], ["RightFingering", "right"]]) {
+    const field = child(source, name, false);
+    if (!field) continue;
+    const raw = field.text.trim(), left = { P: "T", I: "1", M: "2", A: "3", C: "4" };
+    if (raw === "Open") {
+      (note.technical ??= []).push({ source: field.location, kind: "open-string" });
+      continue;
+    }
+    if (!(raw in left)) refuse("fingering", "Unknown encoded source finger.", field.location);
+    (note.fingerings ??= []).push({ source: field.location, hand, value: hand === "left" ? left[raw] : raw.toLowerCase() });
+  }
+  const ornament = child(source, "Ornament", false);
+  if (ornament) {
+    const kind2 = { Turn: "turn", InvertedTurn: "inverted-turn", UpperMordent: "inverted-mordent", LowerMordent: "mordent" }[ornament.text.trim()];
+    if (!kind2) refuse("ornament", "Unknown source ornament.", ornament.location);
+    (note.ornaments ??= []).push({ source: ornament.location, kind: kind2 });
+  }
+  const trill = child(source, "Trill", false);
+  if (trill) {
+    if (!writtenPitch) refuse("trill-pitch", "Trill source MIDI requires an explicit written-register context.", trill.location);
+    note.trill = { source: trill.location, target: writtenPitch(integer(trill.text.trim(), 0, 127, trill)) };
+  }
+  const bend = properties2.get("Bended");
+  if (bend) note.bend = curve(properties2, "Bend", bend);
+  else if ([...properties2.keys()].some((name) => name.startsWith("Bend"))) refuse("bend-curve", "Bend curve fields lack the source bend marker.", source.location);
+  const slide = properties2.get("Slide");
+  if (!slide) return 0;
+  const bits = integer(value(slide, "Flags"), 0, 255, slide);
+  if ([bits & 15, bits & 48, bits & 192].some((group) => group && group & group - 1)) refuse("slide-flags", "Conflicting simultaneous source slide subtypes.", slide.location);
+  for (const [bit, kind2] of [[4, "out-down"], [8, "out-up"], [16, "into-from-below"], [32, "into-from-above"], [64, "pick-slide-down"], [128, "pick-slide-up"]])
+    if (bits & bit) (note.slides ??= []).push({ source: slide.location, kind: kind2 });
+  return bits & 3;
+}
+function beatTechniques(source, event) {
+  const properties2 = propertyMap(source);
+  const instruction = (owner, kind, text, nativeValue) => (event.performerInstructions ??= []).push({ source: owner.location, kind, text, nativeValue });
+  const barre = properties2.get("BarreFret"), shape5 = properties2.get("BarreString");
+  if (barre) {
+    const fret = integer(value(barre, "Fret"), 0, 100, barre), half = shape5 ? integer(value(shape5, "String"), 0, 1, shape5) === 1 : false;
+    const roman = (n) => {
+      let result = "";
+      for (const [amount, glyph] of [[100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]]) while (n >= amount) {
+        result += glyph;
+        n -= amount;
+      }
+      return result || "0";
+    };
+    instruction(barre, "barre", `${half ? "\xBDB" : "B"} ${roman(fret)}`, JSON.stringify({ fret, shape: shape5 ? Number(value(shape5, "String")) : void 0 }));
+  } else if (shape5) refuse("barre", "Barre shape has no encoded fret.", shape5.location);
+  const rasgueado = properties2.get("Rasgueado");
+  if (rasgueado) {
+    const motif = value(rasgueado, "Rasgueado");
+    if (!/^(?:ii_1|mi_1|mii_[12]|pmp_[12]|pei_[12]|pai_[12]|ami_[12]|ppp_1|amii_1|amip_1|eami_1|eamii_1|peami_1)$/.test(motif)) refuse("rasgueado", "Unknown source rasgueado motif.", rasgueado.location);
+    instruction(rasgueado, "rasgueado", `rasg. (${motif})`, motif);
+  }
+  const wah = child(source, "Wah", false);
+  if (wah) {
+    const state = wah.text.trim();
+    if (!["Open", "Closed"].includes(state)) refuse("wah", "Unknown source wah instruction.", wah.location);
+    instruction(wah, "wah", `wah ${state.toLowerCase()}`, state);
+  }
+  const timer = child(source, "Timer", false);
+  if (timer) {
+    const encoded = integer(timer.text.trim(), 0, 2147483647, timer);
+    instruction(timer, "timer", `Timer: ${encoded}`, timer.text.trim());
+  }
+  const whammy = properties2.get("WhammyBar");
+  if (whammy) event.whammy = curve(properties2, "WhammyBar", whammy);
+  else if ([...properties2.keys()].some((name) => name.startsWith("WhammyBar"))) refuse("bend-curve", "Whammy curve lacks its source marker.", source.location);
+  const encodedWhammy = child(source, "Whammy", false);
+  if (encodedWhammy) {
+    const attributes = /* @__PURE__ */ new Map();
+    for (const [name, text] of Object.entries(encodedWhammy.attrs)) attributes.set("WhammyBar" + name[0].toUpperCase() + name.slice(1), { ...encodedWhammy, name: "Property", attrs: { name }, text: "", children: [{ ...encodedWhammy, name: "Float", attrs: {}, children: [], text }] });
+    const mapped = curve(attributes, "WhammyBar", encodedWhammy);
+    if (event.whammy?.sourceCurveFields?.length) {
+      const signature = (bend) => JSON.stringify(bend.points.map((p) => [p.offset, p.semitones]));
+      if (signature(event.whammy) !== signature(mapped)) refuse("bend-curve", "Competing authored whammy curves disagree.", encodedWhammy.location);
+      mapped.sourceCurveFields = [...event.whammy.sourceCurveFields, ...mapped.sourceCurveFields ?? []];
+    }
+    event.whammy = mapped;
+  }
+  const vibrato = properties2.get("VibratoWTremBar");
+  if (vibrato) {
+    const strength = value(vibrato, "Strength");
+    if (!["Slight", "Wide"].includes(strength)) refuse("vibrato", "Unknown bar vibrato strength.", vibrato.location);
+    for (const note of event.notes) (note.gestures ??= []).push({ source: vibrato.location, kind: strength === "Wide" ? "wide-vibrato" : "vibrato", text: strength === "Wide" ? "wide vibrato with bar" : "vibrato with bar" });
+  }
+  const pick = properties2.get("PickStroke");
+  if (pick) {
+    const direction = value(pick, "Direction");
+    if (!["Up", "Down"].includes(direction)) refuse("pick-stroke", "Unknown pick direction.", pick.location);
+    for (const note of event.notes) (note.technical ??= []).push({ source: pick.location, kind: direction === "Up" ? "up-bow" : "down-bow" });
+  }
+  for (const [name, kind] of [["Slapped", "slap"], ["Popped", "pop"]]) {
+    const p = properties2.get(name);
+    if (p) {
+      child(p, "Enable");
+      for (const note of event.notes) (note.gestures ??= []).push({ source: p.location, kind });
+    }
+  }
+  const brush = properties2.get("Brush"), arpeggio = child(source, "Arpeggio", false);
+  if (brush || arpeggio) {
+    const owner = arpeggio ?? brush, direction = arpeggio ? arpeggio.text.trim() : value(brush, "Direction");
+    if (!["Up", "Down"].includes(direction)) refuse("arpeggio", "Unknown source arpeggiation direction.", owner.location);
+    event.arpeggio = { source: owner.location, direction: direction === "Up" ? "up" : "down", ...brush ? { straight: true } : {} };
+  }
+  const tremolo = child(source, "Tremolo", false);
+  if (tremolo) {
+    const strokes = { "1/2": 1, "1/4": 2, "1/8": 3 }[tremolo.text.trim()];
+    if (!strokes) refuse("tremolo", "Unknown source tremolo picking duration.", tremolo.location);
+    (event.ornaments ??= []).push({ source: tremolo.location, kind: "tremolo", type: "single", strokes });
+  }
+}
+function connectSlides(part, slides, relations) {
+  const maximum = Math.max(...part.measures.map((m) => m.voices.length));
+  for (let voice = 0; voice < maximum; voice++) {
+    let absolute = q(0);
+    const events = part.measures.flatMap((measure, index) => {
+      const entries = (measure.voices[voice] ?? []).map((event) => ({ event, measure: index, absolute: add(absolute, event.start) }));
+      absolute = add(absolute, measure.duration);
+      return entries;
+    });
+    const destinations = /* @__PURE__ */ new Map();
+    const nextByString = /* @__PURE__ */ new Map();
+    for (let index = events.length - 1; index >= 0; index--) {
+      const entry = events[index];
+      for (const note of entry.event.notes) {
+        const key = `${entry.event.staff ?? 1}:${note.string}`;
+        const next = nextByString.get(key);
+        if (slides.has(note) && next) destinations.set(note, next);
+      }
+      for (const note of entry.event.notes) if (note.string !== void 0)
+        nextByString.set(`${entry.event.staff ?? 1}:${note.string}`, { entry, note });
+    }
+    for (let index = 0; index < events.length; index++) for (const note of events[index].event.notes) {
+      const kind = slides.get(note);
+      if (!kind) continue;
+      const current = events[index], destination = destinations.get(note), next = destination?.entry, target = destination?.note;
+      if (!next || !target)
+        refuse("slide-endpoint", "Connected slide needs a subsequent source destination on the same voice, staff and string.", note.source);
+      const endpoint = (entry, n) => ({ partId: part.id, measure: entry.measure, position: entry.event.start, staff: entry.event.staff ?? 1, voiceId: entry.event.voiceId ?? String(voice + 1), eventId: entry.event.id, noteId: n.id });
+      const id = `gp-slide:${part.id}:${voice}:${index}:${note.string}`;
+      relations.push({ source: note.source, id, kind: "glissando", form: "slide", formFact: { source: note.source, origin: "source" }, label: { source: note.source, value: "", show: false, origin: "source" }, slideTechnique: { source: note.source, kind: kind === 2 ? "legato" : "shift" }, start: endpoint(current, note), end: endpoint(next, target) });
+      if (kind === 2) {
+        relations.push({ source: note.source, id: id + ":legato", kind: "slur", start: endpoint(current, note), end: endpoint(next, target) });
+        (note.slurs ??= []).push({ type: "start", number: 1, relationId: id + ":legato" });
+        (target.slurs ??= []).push({ type: "stop", number: 1, relationId: id + ":legato" });
+      }
+    }
+  }
+}
+function connectSustainMarks(part, relations) {
+  for (let voice = 0; voice < Math.max(...part.measures.map((m) => m.voices.length)); voice++) {
+    let absolute = q(0);
+    const events = part.measures.flatMap((measure, index) => {
+      const list = (measure.voices[voice] ?? []).map((event) => ({ event, measure: index, absolute: add(absolute, event.start) }));
+      absolute = add(absolute, measure.duration);
+      return list;
+    });
+    for (const kind of ["palm-mute", "let-ring"]) for (let string = 1; string <= part.tuning.length; string++) {
+      let run = [];
+      const finish = () => {
+        if (run.length > 1) {
+          const first = run[0], last = run.at(-1);
+          const gesture = first.note.gestures.find((g) => g.kind === kind);
+          relations.push({
+            id: `gp-${kind}:${part.id}:${voice}:${string}:${first.entry.measure}:${first.entry.event.id}`,
+            source: gesture.source,
+            kind: "text-line",
+            line: "dashes",
+            lineType: "dashed",
+            beginText: kind === "palm-mute" ? "P.M." : "let ring",
+            textFacts: { beginText: { source: gesture.source, value: kind === "palm-mute" ? "P.M." : "let ring", origin: "native-default" } },
+            start: { partId: part.id, measure: first.entry.measure, position: first.entry.event.start, staff: 1, voiceId: String(voice + 1), eventId: first.entry.event.id, noteId: first.note.id },
+            end: { partId: part.id, measure: last.entry.measure, position: add(last.entry.event.start, last.entry.event.duration), staff: 1, voiceId: String(voice + 1) }
+          });
+          for (const item of run) item.note.gestures.find((g) => g.kind === kind).printObject = false;
+        }
+        run = [];
+      };
+      for (const entry of events) {
+        const note = entry.event.notes.find((note2) => note2.string === string), marked = note?.gestures?.some((g) => g.kind === kind);
+        if (!marked || run.length && !equal(add(run.at(-1).entry.absolute, run.at(-1).entry.event.duration), entry.absolute)) finish();
+        if (marked) run.push({ entry, note });
+      }
+      finish();
+    }
+  }
+}
+function numberHopo(part) {
+  const pairs = [];
+  for (let voice = 0; voice < Math.max(...part.measures.map((m) => m.voices.length)); voice++) {
+    let absolute = q(0);
+    const events = part.measures.flatMap((measure) => {
+      const list = (measure.voices[voice] ?? []).map((event) => ({ event, absolute: add(absolute, event.start) }));
+      absolute = add(absolute, measure.duration);
+      return list;
+    });
+    const nextByString = /* @__PURE__ */ new Map();
+    for (let i = events.length - 1; i >= 0; i--) {
+      for (const origin of events[i].event.notes) if (origin.hopoStart) {
+        const target = nextByString.get(`${events[i].event.staff ?? 1}:${origin.string}`);
+        if (!target || target.note.hopoStop !== origin.hopoStart) refuse("hopo-conflict", "Recovered H/P pair has no destination.", origin.source);
+        pairs.push({ origin, target: target.note, start: events[i].absolute, end: target.clock });
+      }
+      for (const note of events[i].event.notes) nextByString.set(`${events[i].event.staff ?? 1}:${note.string}`, { note, clock: events[i].absolute });
+    }
+  }
+  const parents = /* @__PURE__ */ new Map();
+  const root = (note) => {
+    if (!parents.has(note)) parents.set(note, note);
+    let result = note;
+    while (parents.get(result) !== result) result = parents.get(result);
+    while (parents.get(note) !== note) {
+      const next = parents.get(note);
+      parents.set(note, result);
+      note = next;
+    }
+    return result;
+  };
+  for (const pair of pairs) parents.set(root(pair.target), root(pair.origin));
+  const chains = /* @__PURE__ */ new Map();
+  for (const pair of pairs) {
+    const key = root(pair.origin), chain = chains.get(key);
+    if (!chain) chains.set(key, { pairs: [pair], start: pair.start, end: pair.end });
+    else {
+      chain.pairs.push(pair);
+      if (compare(pair.start, chain.start) < 0) chain.start = pair.start;
+      if (compare(pair.end, chain.end) > 0) chain.end = pair.end;
+    }
+  }
+  const ordered = [...chains.values()].sort((a, b) => compare(a.start, b.start));
+  const active = [];
+  for (let index = 0; index < ordered.length; ) {
+    let end = index + 1;
+    while (end < ordered.length && equal(ordered[end].start, ordered[index].start)) end++;
+    for (let i = active.length - 1; i >= 0; i--) if (compare(active[i].end, ordered[index].start) <= 0) active.splice(i, 1);
+    const used = new Set(active.map((item) => item.number));
+    for (const chain of ordered.slice(index, end)) {
+      const number = Array.from({ length: 16 }, (_, i) => i + 1).find((number2) => !used.has(number2));
+      if (!number) refuse("hopo-number-limit", "Simultaneous H/P relations exceed MusicXML numbered levels.", chain.pairs[0].origin.source);
+      for (const pair of chain.pairs) pair.origin.hopoNumber = pair.target.hopoNumber = number;
+      active.push({ end: chain.end, number });
+      used.add(number);
+    }
+    index = end;
+  }
+}
+function binaryTechniques(facts, source, note, version, locate) {
+  const flags = facts["note-flags"] ?? 0, first = facts["note-effect-flags"] ?? 0, second = facts["note-effect-flags2"] ?? 0;
+  if (flags & 4) note.noteheadParentheses = { source: locate("note-flags"), value: true, origin: "source" };
+  const articulations = [...version >= 500 && flags & 2 ? ["strong-accent"] : flags & 64 ? ["accent"] : [], ...second & 1 ? ["staccato"] : []];
+  if (articulations.length) note.articulations = articulations;
+  for (const [active, kind, field] of [[first & 8, "let-ring", "note-effect-flags"], [second & 2, "palm-mute", "note-effect-flags2"], [second & 64, "vibrato", "note-effect-flags2"]])
+    if (active) (note.gestures ??= []).push({ source: locate(field), kind });
+  for (const hand of ["left", "right"]) if (facts[hand + "-fingering"] !== void 0 && facts[hand + "-fingering"] !== -1) {
+    const finger = facts[hand + "-fingering"];
+    if (finger < 0 || finger > 4) refuse("fingering", "Unknown binary finger value.", locate(hand + "-fingering"));
+    (note.fingerings ??= []).push({ source: locate(hand + "-fingering"), hand, value: hand === "left" ? finger === 0 ? "T" : String(finger) : ["p", "i", "m", "a", "c"][finger] });
+  }
+  if (first & 1) {
+    const count = facts["bend-point-count"];
+    if (!Number.isSafeInteger(count) || count < 1 || count > 60) refuse("bend-curve", "A marked bend needs a bounded encoded curve.", source);
+    const points = Array.from({ length: count }, (_, i) => {
+      const offset = facts[`bend-offset:${i}`], alter = facts[`bend-alter:${i}`], vibrato = facts[`bend-vibrato:${i}`];
+      if (offset < 0 || offset > 60 || !Number.isSafeInteger(alter) || ![0, 1, 2, 3].includes(vibrato) || i && offset < facts[`bend-offset:${i - 1}`]) refuse("bend-curve", "Malformed binary bend point.", locate(`bend-offset:${i}`));
+      return { source: locate(`bend-offset:${i}`), offset: q(offset, 60), semitones: q(alter, 50), vibrato: { source: locate(`bend-vibrato:${i}`), value: !!vibrato, ...vibrato ? { speed: ["fast", "average", "slow"][vibrato - 1] } : {} } };
+    });
+    note.bend = { source: locate("bend-type"), points };
+  }
+  let slide = facts["slide-type"];
+  if (version < 400 && first & 4) slide = 1;
+  if (slide === void 0) return 0;
+  if (version < 500) {
+    const mapped = { 0: 0, 1: 1, 2: 2, 3: 4, 4: 8, [-1]: 16, [-2]: 32 };
+    if (!(slide in mapped)) refuse("slide-flags", "Unknown legacy slide subtype.", locate("slide-type"));
+    slide = mapped[slide];
+  }
+  if (slide < 0 || slide > 63 || [slide & 15, slide & 48].some((group) => group && group & group - 1)) refuse("slide-flags", "Contradictory binary slide subtype.", locate("slide-type"));
+  for (const [bit, kind] of [[4, "out-down"], [8, "out-up"], [16, "into-from-below"], [32, "into-from-above"]])
+    if (slide & bit) (note.slides ??= []).push({ source: locate("slide-type"), kind });
+  return slide & 3;
+}
+
 // src/adapters/guitar-pro/profile.ts
 var vocabulary = {
   GPIF: "GPVersion GPRevision Encoding Score MasterTrack Tracks MasterBars Bars Voices Beats Notes Rhythms",
@@ -2904,28 +5597,37 @@ var vocabulary = {
   Score: "Title SubTitle Artist Album Words Music WordsAndMusic Copyright Tabber Instructions Notices ScoreSystemsDefaultLayout ScoreSystemsLayout",
   MasterTrack: "Tracks Automations Anacrusis",
   Tracks: "Track",
-  Track: "Name ShortName Instrument GeneralMidi Properties Transpose Color SystemsDefautLayout SystemsLayout",
+  Track: "Name ShortName Instrument GeneralMidi Properties Transpose Color SystemsDefautLayout SystemsLayout Lyrics",
   GeneralMidi: "Program Port PrimaryChannel SecondaryChannel",
   Transpose: "Chromatic Octave",
   Automations: "Automation",
   Automation: "Type Linear Bar Position Value Visible Text",
   MasterBars: "MasterBar",
-  MasterBar: "Time Bars Key Repeat",
+  MasterBar: "Time Bars Key Repeat XProperties " + masterFields.join(" "),
   Key: "AccidentalCount Mode",
   Bars: "Bar",
-  Bar: "Voices Clef",
+  Bar: "Voices Clef Ottavia XProperties",
   Voices: "Voice",
   Voice: "Beats",
   Beats: "Beat",
-  Beat: "Rhythm Notes FreeText",
+  Beat: "Rhythm Notes FreeText Properties XProperties TransposedPitchStemOrientation UserTransposedPitchStemOrientation " + [...beatTechniqueElements, ...structuralBeatFields].join(" "),
   Notes: "Note",
-  Note: "Properties Tie",
+  Note: "Properties Tie " + noteTechniqueElements.join(" "),
   Rhythms: "Rhythm",
   Rhythm: "NoteValue AugmentationDot PrimaryTuplet",
+  XProperties: "XProperty",
+  XProperty: "Int",
   Properties: "Property",
-  Pitch: "Step Accidental Octave"
+  Pitch: "Step Accidental Octave",
+  Lyrics: "Line",
+  Line: "Text Offset",
+  Section: "Letter Text",
+  Directions: "Target Jump",
+  Fermatas: "Fermata",
+  Fermata: "Type Length Offset"
 };
 var attrs = {
+  XProperty: "id",
   GPRevision: "required recommended",
   Track: "id",
   GeneralMidi: "table",
@@ -2935,45 +5637,49 @@ var attrs = {
   Beat: "id",
   Note: "id",
   Rhythm: "id ref",
+  Lyrics: "dispatched",
   Property: "name",
   Tie: "origin destination",
   Repeat: "start end count",
   AugmentationDot: "count",
-  PrimaryTuplet: "num den"
+  PrimaryTuplet: "num den",
+  Legato: "origin destination",
+  Whammy: "originValue originOffset middleValue middleOffset1 middleOffset2 destinationValue destinationOffset"
 };
-var leaf2 = new Set("GPVersion GPRevision EncodingDescription Title SubTitle Artist Album Words Music WordsAndMusic Copyright Tabber Instructions Notices ScoreSystemsDefaultLayout ScoreSystemsLayout Anacrusis Name ShortName Color SystemsDefautLayout SystemsLayout Instrument Program Port PrimaryChannel SecondaryChannel Chromatic Octave Type Linear Position Value Visible Text Time AccidentalCount Mode Clef FreeText NoteValue AugmentationDot PrimaryTuplet Tie Repeat Pitches Fret String Step Accidental".split(" "));
+var leaf = new Set("Bitset Int TransposedPitchStemOrientation UserTransposedPitchStemOrientation GPVersion GPRevision EncodingDescription Title SubTitle Artist Album Words Music WordsAndMusic Copyright Tabber Instructions Notices ScoreSystemsDefaultLayout ScoreSystemsLayout Anacrusis Name ShortName Color SystemsDefautLayout SystemsLayout Instrument Program Port PrimaryChannel SecondaryChannel Chromatic Octave Type Linear Position Value Visible Text Time AccidentalCount Mode Clef FreeText NoteValue AugmentationDot PrimaryTuplet Tie Repeat Pitches Fret String Step Accidental".split(" "));
 var properties = {
-  Track: { Tuning: "Pitches", CapoFret: "Fret" },
-  Note: { String: "String", Fret: "Fret", ConcertPitch: "Pitch", TransposedPitch: "Pitch" }
+  Track: { Tuning: "Pitches", CapoFret: "Fret", PartialCapoFret: "Fret", PartialCapoStringFlags: "Bitset Flags" },
+  Note: { String: "String", Fret: "Fret", ConcertPitch: "Pitch", TransposedPitch: "Pitch", ...noteTechniqueFields },
+  Beat: beatTechniqueFields
 };
 var techniqueNames = new Set("Muted PalmMuted Tapped LeftHandTapped HarmonicType HarmonicFret Bended BendOriginValue BendOriginOffset BendMiddleValue BendMiddleOffset1 BendMiddleOffset2 BendDestinationValue BendDestinationOffset HopoOrigin HopoDestination Slide LetRing Trill Vibrato AntiAccent Accent LeftFingering RightFingering GraceNotes Legato Whammy Ottavia Dynamic Tremolo Hairpin Arpeggio Fadding".split(" "));
-var metadata = new Set("SubTitle Artist Album Words Music WordsAndMusic Copyright Tabber Instructions Notices ScoreSystemsDefaultLayout ScoreSystemsLayout Color SystemsDefautLayout SystemsLayout ShortName Port PrimaryChannel SecondaryChannel".split(" "));
+var metadata = new Set("SubTitle Artist Album Words Music WordsAndMusic Copyright Tabber Instructions Notices ScoreSystemsDefaultLayout ScoreSystemsLayout Color SystemsDefautLayout SystemsLayout Port PrimaryChannel SecondaryChannel".split(" "));
 function inventory(root, findings, mode = "constructed") {
-  const visit = (node, parent, grandparent) => {
-    if (node.children.length && node.text.trim()) refuse("mixed-content", "Mixed GPIF element content is unsupported.", node.location);
-    let allowed = vocabulary[node.name]?.split(" ") ?? [];
-    if (mode !== "constructed" && node.name === "Note") allowed = [...allowed, "InstrumentArticulation"];
-    if (mode !== "constructed" && node.name === "Beat") allowed = [...allowed, "Dynamic"];
-    if (node.name === "Tracks" && parent?.name === "MasterTrack" || node.name === "Bars" && parent?.name === "MasterBar" || node.name === "Voices" && parent?.name === "Bar" || node.name === "Beats" && parent?.name === "Voice" || node.name === "Notes" && parent?.name === "Beat") allowed = [];
-    if (node.name === "Property") {
-      const name = node.attrs.name;
-      const extra = { Midi: "Number", Muted: "Enable", HopoOrigin: "Enable", HopoDestination: "Enable" };
+  const visit = (node2, parent, grandparent) => {
+    if (node2.children.length && node2.text.trim()) refuse("mixed-content", "Mixed GPIF element content is unsupported.", node2.location);
+    let allowed = vocabulary[node2.name]?.split(" ") ?? [];
+    if (mode !== "constructed" && node2.name === "Note") allowed = [...allowed, "InstrumentArticulation"];
+    if (mode !== "constructed" && node2.name === "Beat") allowed = [...allowed, "Dynamic"];
+    if (node2.name === "Tracks" && parent?.name === "MasterTrack" || node2.name === "Bars" && parent?.name === "MasterBar" || node2.name === "Voices" && parent?.name === "Bar" || node2.name === "Beats" && parent?.name === "Voice" || node2.name === "Notes" && parent?.name === "Beat") allowed = [];
+    if (node2.name === "Property") {
+      const name = node2.attrs.name;
+      const extra = { Midi: "Number", Octave: "Number", Tone: "Step", Element: "Element", Variation: "Variation", Muted: "Enable", HopoOrigin: "Enable", HopoDestination: "Enable" };
       const entry = properties[grandparent?.name ?? ""]?.[name] ?? (mode !== "constructed" && grandparent?.name === "Note" ? extra[name] : void 0);
-      if (!entry) refuse(techniqueNames.has(name) ? "technique" : "unknown-property", `Property ${name} is outside the exercised musical profile.`, node.location);
+      if (!entry) refuse(techniqueNames.has(name) ? "technique" : "unknown-property", `Property ${name} is outside the exercised musical profile.`, node2.location);
       allowed = entry.split(" ");
     }
-    if (["Instrument", "Anacrusis", "Tie", "Repeat", "AugmentationDot", "PrimaryTuplet", "Enable"].includes(node.name) && node.text.trim())
-      refuse("marker-content", "Unexpected scalar content in an encoded marker.", node.location);
-    if (mode === "constructed" && node.name === "GPRevision" && (node.attrs.required !== "0" || node.attrs.recommended !== "0"))
-      refuse("version-profile", "Only revision0 with required0/recommended0 is exercised.", node.location);
-    const permitted = (attrs[node.name] ?? "").split(" ");
-    for (const name of Object.keys(node.attrs)) if (!permitted.includes(name)) refuse("unknown-attribute", `Unreviewed attribute ${name}.`, node.location);
-    for (const c of node.children) {
+    if (["Instrument", "Anacrusis", "Tie", "Repeat", "AugmentationDot", "PrimaryTuplet", "Enable"].includes(node2.name) && node2.text.trim())
+      refuse("marker-content", "Unexpected scalar content in an encoded marker.", node2.location);
+    if (mode === "constructed" && node2.name === "GPRevision" && (node2.attrs.required !== "0" || node2.attrs.recommended !== "0"))
+      refuse("version-profile", "Only revision0 with required0/recommended0 is exercised.", node2.location);
+    const permitted = (attrs[node2.name] ?? "").split(" ");
+    for (const name of Object.keys(node2.attrs)) if (!permitted.includes(name)) refuse("unknown-attribute", `Unreviewed attribute ${name}.`, node2.location);
+    for (const c of node2.children) {
       if (!allowed.includes(c.name)) refuse(techniqueNames.has(c.name) ? "technique" : "unknown-element", `Element ${c.name} is outside the exercised musical profile.`, c.location);
-      visit(c, node, parent);
+      visit(c, node2, parent);
     }
-    if (!vocabulary[node.name] && !leaf2.has(node.name) && node.name !== "Property" && !(mode !== "constructed" && ["InstrumentArticulation", "Dynamic", "Number", "Enable"].includes(node.name))) refuse("unknown-element", `Unreviewed element ${node.name}.`, node.location);
-    if (metadata.has(node.name)) findings.push({ disposition: "omitted", code: "metadata", message: "Retained in original input (capture delivered only on success); not rendered in this MusicXML proof.", location: node.location, fact: node.text });
+    if (!vocabulary[node2.name] && !leaf.has(node2.name) && node2.name !== "Property" && ![...noteTechniqueElements, ...beatTechniqueElements, ...Object.values(noteTechniqueFields).flatMap((fields) => fields.split(" ")), ...Object.values(beatTechniqueFields).flatMap((fields) => fields.split(" ")), "Float", "Flags", "HType", "HFret", "Direction", "Strength", "Line", ...masterFields, ...structuralBeatFields, "Letter", "Target", "Jump", "Length", "Offset"].includes(node2.name) && !(mode !== "constructed" && ["InstrumentArticulation", "Dynamic", "Number", "Enable", "Element", "Variation"].includes(node2.name))) refuse("unknown-element", `Unreviewed element ${node2.name}.`, node2.location);
+    if (metadata.has(node2.name) && !scoreTextFields.includes(node2.name)) findings.push({ disposition: "omitted", code: "metadata", message: "Retained in original input (capture delivered only on success); not rendered in this MusicXML proof.", location: node2.location, fact: node2.text });
   };
   visit(root);
   if (mode === "constructed" && (value(root, "GPVersion") !== "7.0" || value(root, "GPRevision") !== "0"))
@@ -2986,6 +5692,110 @@ function inventory(root, findings, mode = "constructed") {
     message: mode === "constructed" ? "Container and embedded headers are separate identifiers; fixture profile is not authentic producer acceptance." : "GP8 header tuple retained separately from exercised musical feature and scientific-pitch corroboration profile; it does not identify the producing application.",
     location: root.location,
     fact: { gpVersion: value(root, "GPVersion", false), revision: value(root, "GPRevision"), encoding: encoding ? value(encoding, "EncodingDescription") : void 0, revisionAttributes: child(root, "GPRevision").attrs }
+  });
+}
+
+// src/adapters/guitar-pro/gpif-hopo.ts
+function gpifHopo(part, relations, findings) {
+  for (let voice = 0; voice < Math.max(...part.measures.map((m) => m.voices.length)); voice++) {
+    const entries = part.measures.flatMap((measure, index) => (measure.voices[voice] ?? []).map((event) => ({ event, measure: index })));
+    const next = /* @__PURE__ */ new Map(), paired = /* @__PURE__ */ new Set();
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const entry = entries[index];
+      const endpoint = (item, note) => ({ partId: part.id, measure: item.measure, position: item.event.start, staff: item.event.staff ?? 1, voiceId: item.event.voiceId ?? String(voice + 1), eventId: item.event.id, noteId: note.id });
+      for (const origin of entry.event.notes) if (origin.sourceHopoOrigin) {
+        const target = next.get(`${entry.event.staff ?? 1}:${origin.string}`);
+        if (!target?.note.sourceHopoDestination) return refuse("hopo-conflict", "HOPO requires an explicit destination at the next source-ordered same-string or left-tapped candidate in the same voice and staff.", origin.source);
+        if (paired.has(target.note)) return refuse("hopo-conflict", "Multiple H/P origins claim one explicitly marked destination.", target.note.source);
+        paired.add(target.note);
+        if (target.note.string === origin.string && target.note.fret !== origin.fret) {
+          const kind = target.note.fret > origin.fret ? "hammer-on" : "pull-off";
+          origin.hopoStart = kind;
+          target.note.hopoStop = kind;
+          findings.push({ disposition: "inferred", code: "hopo-classification", message: "Paired source HOPO flags follow the next same-string attack and are classified by physical fret direction. Standard endpoints and a derived connection slur retain the exact event clocks without inventing phrasing or intervening notes (source-hopo/1).", location: origin.source, fact: { kind, destination: target.note.source } });
+        } else {
+          const crossString = target.note.string !== origin.string;
+          (entry.event.performerInstructions ??= []).push({ source: origin.source, kind: "hammer-on-pull-off", text: `Hammer-on/pull-off (string ${origin.string}${crossString ? ` to ${target.note.string}` : ""})`, nativeValue: JSON.stringify({ origin: origin.source, destination: target.note.source, originFlag: true, destinationFlag: true }) });
+          const id = `gpif-hopo:${origin.id}`;
+          relations.push({ source: origin.source, id, kind: "slur", sourceTechnique: { source: origin.source, kind: "hammer-on-pull-off" }, start: endpoint(entry, origin), end: endpoint(target.entry, target.note) });
+          (origin.slurs ??= []).push({ type: "start", number: 1, relationId: id });
+          (target.note.slurs ??= []).push({ type: "stop", number: 1, relationId: id });
+          findings.push({ disposition: "preserved", code: "gpif-hopo-undirected", message: "Explicit H/P endpoints establish a connection but not a directional same-string fret change. The combined instruction, connection slur and any left-hand tap survive without inventing a hammer-on or pull-off direction.", location: origin.source, fact: { destination: target.note.source, reason: crossString ? "cross-string-left-tap" : "unchanged-fret" } });
+        }
+      }
+      const byString = new Map(entry.event.notes.map((note) => [note.string, note]));
+      const leftTap = (note) => note.gestures?.some((g) => g.kind === "tap" && g.hand === "left");
+      for (let string = 1; string <= part.tuning.length; string++) {
+        let candidate = byString.get(string);
+        if (!candidate) for (let lower = string - 1; lower >= 1; lower--) {
+          const note = byString.get(lower);
+          if (note) {
+            if (leftTap(note)) candidate = note;
+            break;
+          }
+        }
+        if (!candidate) for (let higher = string + 1; higher <= part.tuning.length; higher++) {
+          const note = byString.get(higher);
+          if (note) {
+            if (leftTap(note)) candidate = note;
+            break;
+          }
+        }
+        if (candidate) next.set(`${entry.event.staff ?? 1}:${string}`, { entry, note: candidate });
+      }
+    }
+    for (const { event } of entries) for (const note of event.notes) if (note.sourceHopoDestination && !paired.has(note)) refuse("hopo-conflict", "Unpaired explicit HOPO destination.", note.source);
+  }
+}
+
+// src/adapters/guitar-pro/keys.ts
+function transposeWrittenKeys(part, findings) {
+  const interval = part.transpose;
+  if (!interval?.chromatic) return;
+  const modulo = (n, d) => (n % d + d) % d;
+  for (const measure of part.measures) {
+    const sourceFifths = measure.key.fifths;
+    const targetPitch = modulo(sourceFifths * 7 - interval.chromatic, 12), targetLetter = modulo(sourceFifths * 4 - interval.diatonic, 7);
+    const matches = Array.from({ length: 71 }, (_, i) => i - 35).filter((f) => modulo(f * 7, 12) === targetPitch && modulo(f * 4, 7) === targetLetter);
+    if (matches.length !== 1) refuse("key-transpose", "Source instrument interval cannot establish one bounded written key signature.", measure.source);
+    measure.key = { ...measure.key, fifths: matches[0] };
+    findings.push({ disposition: "inferred", code: "written-key-transposition", message: "Concert master key is transposed by the independently established sounding-from-written instrument interval. Source fifths and spelling interval remain separate from the derived standard written key.", location: measure.source, fact: { sourceFifths, writtenFifths: matches[0], mode: measure.key.mode, chromatic: interval.chromatic, diatonic: interval.diatonic } });
+  }
+}
+
+// src/adapters/guitar-pro/partial-capo.ts
+function readPartialCapo(properties2, stringCount) {
+  const fret = properties2.get("PartialCapoFret"), flags = properties2.get("PartialCapoStringFlags");
+  if (!fret && !flags) return void 0;
+  if (fret && !flags && fret.children.length === 1 && value(fret, "Fret") === "0") return void 0;
+  if (!fret && flags && flags.children.length === 1 && ["Bitset", "Flags"].includes(flags.children[0].name) && /^0+$/.test(flags.children[0].text.trim())) return void 0;
+  if (fret && flags && fret.children.length === 1 && value(fret, "Fret") === "0" && flags.children.length === 1 && child(flags, "Flags", false) && value(flags, "Flags") === "0") return void 0;
+  if (!fret || !flags || fret.children.length !== 1 || !child(fret, "Fret", false) || flags.children.length !== 1 || !child(flags, "Bitset", false)) refuse("partial-capo", "Partial capo requires one explicit fret and bitset tuple.", (fret ?? flags).location);
+  const number = integer(value(fret, "Fret"), 0, 999999, fret), bits = value(flags, "Bitset");
+  if (number === 0 && /^0{1,16}$/.test(bits)) return void 0;
+  if (!/^[01]{1,16}$/.test(bits) || bits.length !== stringCount) refuse("partial-capo", "Partial capo bitset must match every explicitly ordered source string.", flags.location);
+  return { source: fret.location, fret: number, flags: bits };
+}
+function partialOpenOffset(capo, partial, stringIndex) {
+  return Math.max(capo, partial?.flags[stringIndex] === "1" ? partial.fret : 0);
+}
+function physicalFret(capo, partial, stringIndex, fret) {
+  return fret === 0 ? partialOpenOffset(capo, partial, stringIndex) : capo + fret;
+}
+function partialCapoInstruction(part, partial, findings) {
+  const strings = [...partial.flags].flatMap((bit, index) => bit === "1" ? [partial.flags.length - index] : []);
+  const source = { ...partial.source, trackId: part.id };
+  findings.push({ disposition: "preserved", code: "partial-capo", message: "Source partial capo flags follow native tuning order. Open strings use the higher full/partial capo; positive source frets keep their full-capo reference. The partial capo is a standard performer instruction, not a false full-staff capo or retuning.", location: source, fact: { fret: partial.fret, flags: partial.flags, strings, fullCapo: part.capo?.fret ?? 0 } });
+  if (!partial.fret || !strings.length) return;
+  (part.capoChanges ??= []).push({
+    source,
+    measure: 0,
+    position: { n: 0, d: 1 },
+    staff: 1,
+    active: true,
+    fret: partial.fret,
+    ignoredStrings: { source, values: [...partial.flags].flatMap((bit, index) => bit === "0" ? [partial.flags.length - index] : []) },
+    text: `Partial capo ${partial.fret} (strings ${strings.join(", ")}; positive frets relative to ${part.capo?.fret ? `full capo ${part.capo.fret}` : "nut"})`
   });
 }
 
@@ -5366,8 +8176,8 @@ var ModelUtils = class _ModelUtils {
   /**
    * @internal
    */
-  static toArticulationId(plain) {
-    return plain.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  static toArticulationId(plain3) {
+    return plain3.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
   }
   static minBoundingBox(a, b) {
     if (Number.isNaN(a)) {
@@ -5609,9 +8419,9 @@ var ModelUtils = class _ModelUtils {
     let spelling = preferred;
     if (!Number.isNaN(desiredOffset)) {
       const candidates = _ModelUtils._spellingCandidates[chroma];
-      const exact = candidates.find((c) => c.accidentalOffset === desiredOffset);
-      if (exact) {
-        spelling = exact;
+      const exact2 = candidates.find((c) => c.accidentalOffset === desiredOffset);
+      if (exact2) {
+        spelling = exact2;
       }
     }
     const baseSemitone = _ModelUtils._degreeSemitones[spelling.degree] + spelling.accidentalOffset;
@@ -5715,6 +8525,296 @@ var ModelUtils = class _ModelUtils {
     return keySignatureType === 1 /* Minor */ ? _ModelUtils._minorKeySignatureTonicDegrees[ksi] : _ModelUtils._majorKeySignatureTonicDegrees[ksi];
   }
 };
+
+// third_party/alphatab/src/model/MusicFontSymbol.ts
+var MusicFontSymbol = /* @__PURE__ */ ((MusicFontSymbol2) => {
+  MusicFontSymbol2[MusicFontSymbol2["None"] = -1] = "None";
+  MusicFontSymbol2[MusicFontSymbol2["Space"] = 32] = "Space";
+  MusicFontSymbol2[MusicFontSymbol2["Brace"] = 57344] = "Brace";
+  MusicFontSymbol2[MusicFontSymbol2["BracketTop"] = 57347] = "BracketTop";
+  MusicFontSymbol2[MusicFontSymbol2["BracketBottom"] = 57348] = "BracketBottom";
+  MusicFontSymbol2[MusicFontSymbol2["SystemDivider"] = 57351] = "SystemDivider";
+  MusicFontSymbol2[MusicFontSymbol2["GClef"] = 57424] = "GClef";
+  MusicFontSymbol2[MusicFontSymbol2["GClef15mb"] = 57425] = "GClef15mb";
+  MusicFontSymbol2[MusicFontSymbol2["GClef8vb"] = 57426] = "GClef8vb";
+  MusicFontSymbol2[MusicFontSymbol2["GClef8va"] = 57427] = "GClef8va";
+  MusicFontSymbol2[MusicFontSymbol2["GClef15ma"] = 57428] = "GClef15ma";
+  MusicFontSymbol2[MusicFontSymbol2["CClef"] = 57436] = "CClef";
+  MusicFontSymbol2[MusicFontSymbol2["CClef8vb"] = 57437] = "CClef8vb";
+  MusicFontSymbol2[MusicFontSymbol2["FClef"] = 57442] = "FClef";
+  MusicFontSymbol2[MusicFontSymbol2["FClef15mb"] = 57443] = "FClef15mb";
+  MusicFontSymbol2[MusicFontSymbol2["FClef8vb"] = 57444] = "FClef8vb";
+  MusicFontSymbol2[MusicFontSymbol2["FClef8va"] = 57445] = "FClef8va";
+  MusicFontSymbol2[MusicFontSymbol2["FClef15ma"] = 57446] = "FClef15ma";
+  MusicFontSymbol2[MusicFontSymbol2["UnpitchedPercussionClef1"] = 57449] = "UnpitchedPercussionClef1";
+  MusicFontSymbol2[MusicFontSymbol2["SixStringTabClef"] = 57453] = "SixStringTabClef";
+  MusicFontSymbol2[MusicFontSymbol2["FourStringTabClef"] = 57454] = "FourStringTabClef";
+  MusicFontSymbol2[MusicFontSymbol2["Clef8"] = 57469] = "Clef8";
+  MusicFontSymbol2[MusicFontSymbol2["Clef15"] = 57470] = "Clef15";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig0"] = 57472] = "TimeSig0";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig1"] = 57473] = "TimeSig1";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig2"] = 57474] = "TimeSig2";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig3"] = 57475] = "TimeSig3";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig4"] = 57476] = "TimeSig4";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig5"] = 57477] = "TimeSig5";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig6"] = 57478] = "TimeSig6";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig7"] = 57479] = "TimeSig7";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig8"] = 57480] = "TimeSig8";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSig9"] = 57481] = "TimeSig9";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSigCommon"] = 57482] = "TimeSigCommon";
+  MusicFontSymbol2[MusicFontSymbol2["TimeSigCutCommon"] = 57483] = "TimeSigCutCommon";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDoubleWholeSquare"] = 57505] = "NoteheadDoubleWholeSquare";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDoubleWhole"] = 57504] = "NoteheadDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadWhole"] = 57506] = "NoteheadWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadHalf"] = 57507] = "NoteheadHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadBlack"] = 57508] = "NoteheadBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadNull"] = 57509] = "NoteheadNull";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadXOrnate"] = 57514] = "NoteheadXOrnate";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadPlusDoubleWhole"] = 57516] = "NoteheadPlusDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadPlusWhole"] = 57517] = "NoteheadPlusWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadPlusHalf"] = 57518] = "NoteheadPlusHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadPlusBlack"] = 57519] = "NoteheadPlusBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSquareWhite"] = 57528] = "NoteheadSquareWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSquareBlack"] = 57529] = "NoteheadSquareBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleUpDoubleWhole"] = 57530] = "NoteheadTriangleUpDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleUpWhole"] = 57531] = "NoteheadTriangleUpWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleUpHalf"] = 57532] = "NoteheadTriangleUpHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleUpBlack"] = 57534] = "NoteheadTriangleUpBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleRightWhite"] = 57537] = "NoteheadTriangleRightWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleRightBlack"] = 57538] = "NoteheadTriangleRightBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleDownDoubleWhole"] = 57548] = "NoteheadTriangleDownDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleDownWhole"] = 57540] = "NoteheadTriangleDownWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleDownHalf"] = 57541] = "NoteheadTriangleDownHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadTriangleDownBlack"] = 57543] = "NoteheadTriangleDownBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondDoubleWhole"] = 57559] = "NoteheadDiamondDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondWhole"] = 57560] = "NoteheadDiamondWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondHalf"] = 57561] = "NoteheadDiamondHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondBlack"] = 57563] = "NoteheadDiamondBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondBlackWide"] = 57564] = "NoteheadDiamondBlackWide";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondWhite"] = 57565] = "NoteheadDiamondWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadDiamondWhiteWide"] = 57566] = "NoteheadDiamondWhiteWide";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircleXDoubleWhole"] = 57520] = "NoteheadCircleXDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircleXWhole"] = 57521] = "NoteheadCircleXWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircleXHalf"] = 57522] = "NoteheadCircleXHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircleX"] = 57523] = "NoteheadCircleX";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadXDoubleWhole"] = 57510] = "NoteheadXDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadXWhole"] = 57511] = "NoteheadXWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadXHalf"] = 57512] = "NoteheadXHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadXBlack"] = 57513] = "NoteheadXBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadParenthesis"] = 57550] = "NoteheadParenthesis";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedBlack1"] = 57551] = "NoteheadSlashedBlack1";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedBlack2"] = 57552] = "NoteheadSlashedBlack2";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedHalf1"] = 57553] = "NoteheadSlashedHalf1";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedHalf2"] = 57554] = "NoteheadSlashedHalf2";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedWhole1"] = 57555] = "NoteheadSlashedWhole1";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedWhole2"] = 57556] = "NoteheadSlashedWhole2";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedDoubleWhole1"] = 57557] = "NoteheadSlashedDoubleWhole1";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashedDoubleWhole2"] = 57558] = "NoteheadSlashedDoubleWhole2";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircledBlack"] = 57572] = "NoteheadCircledBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircledHalf"] = 57573] = "NoteheadCircledHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircledWhole"] = 57574] = "NoteheadCircledWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircledDoubleWhole"] = 57575] = "NoteheadCircledDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadCircleSlash"] = 57591] = "NoteheadCircleSlash";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadHeavyX"] = 57592] = "NoteheadHeavyX";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadHeavyXHat"] = 57593] = "NoteheadHeavyXHat";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashHorizontalEnds"] = 57601] = "NoteheadSlashHorizontalEnds";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashWhiteWhole"] = 57602] = "NoteheadSlashWhiteWhole";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSlashWhiteHalf"] = 57603] = "NoteheadSlashWhiteHalf";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadRoundWhiteWithDot"] = 57621] = "NoteheadRoundWhiteWithDot";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSquareBlackLarge"] = 57626] = "NoteheadSquareBlackLarge";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadSquareBlackWhite"] = 57627] = "NoteheadSquareBlackWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadClusterDoubleWhole3rd"] = 57640] = "NoteheadClusterDoubleWhole3rd";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadClusterWhole3rd"] = 57641] = "NoteheadClusterWhole3rd";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadClusterHalf3rd"] = 57642] = "NoteheadClusterHalf3rd";
+  MusicFontSymbol2[MusicFontSymbol2["NoteheadClusterQuarter3rd"] = 57643] = "NoteheadClusterQuarter3rd";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeRoundWhite"] = 57776] = "NoteShapeRoundWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeRoundBlack"] = 57777] = "NoteShapeRoundBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeSquareWhite"] = 57778] = "NoteShapeSquareWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeSquareBlack"] = 57779] = "NoteShapeSquareBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleRightWhite"] = 57780] = "NoteShapeTriangleRightWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleRightBlack"] = 57781] = "NoteShapeTriangleRightBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleLeftWhite"] = 57782] = "NoteShapeTriangleLeftWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleLeftBlack"] = 57783] = "NoteShapeTriangleLeftBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeDiamondWhite"] = 57784] = "NoteShapeDiamondWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeDiamondBlack"] = 57785] = "NoteShapeDiamondBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleUpWhite"] = 57786] = "NoteShapeTriangleUpWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleUpBlack"] = 57787] = "NoteShapeTriangleUpBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeMoonWhite"] = 57788] = "NoteShapeMoonWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeMoonBlack"] = 57789] = "NoteShapeMoonBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleRoundWhite"] = 57790] = "NoteShapeTriangleRoundWhite";
+  MusicFontSymbol2[MusicFontSymbol2["NoteShapeTriangleRoundBlack"] = 57791] = "NoteShapeTriangleRoundBlack";
+  MusicFontSymbol2[MusicFontSymbol2["NoteQuarterUp"] = 57813] = "NoteQuarterUp";
+  MusicFontSymbol2[MusicFontSymbol2["Note8thUp"] = 57815] = "Note8thUp";
+  MusicFontSymbol2[MusicFontSymbol2["MetNoteQuarterUp"] = 60581] = "MetNoteQuarterUp";
+  MusicFontSymbol2[MusicFontSymbol2["MetNote8thUp"] = 60583] = "MetNote8thUp";
+  MusicFontSymbol2[MusicFontSymbol2["MetAugmentationDot"] = 60599] = "MetAugmentationDot";
+  MusicFontSymbol2[MusicFontSymbol2["ArrowheadBlackUp"] = 60280] = "ArrowheadBlackUp";
+  MusicFontSymbol2[MusicFontSymbol2["ArrowheadBlackDown"] = 60284] = "ArrowheadBlackDown";
+  MusicFontSymbol2[MusicFontSymbol2["AugmentationDot"] = 57831] = "AugmentationDot";
+  MusicFontSymbol2[MusicFontSymbol2["TextBlackNoteLongStem"] = 57841] = "TextBlackNoteLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextBlackNoteFrac8thLongStem"] = 57843] = "TextBlackNoteFrac8thLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextBlackNoteFrac16thLongStem"] = 57845] = "TextBlackNoteFrac16thLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextBlackNoteFrac32ndLongStem"] = 57846] = "TextBlackNoteFrac32ndLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextCont8thBeamLongStem"] = 57848] = "TextCont8thBeamLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextCont16thBeamLongStem"] = 57850] = "TextCont16thBeamLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextCont32ndBeamLongStem"] = 57851] = "TextCont32ndBeamLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextAugmentationDot"] = 57852] = "TextAugmentationDot";
+  MusicFontSymbol2[MusicFontSymbol2["TextTupletBracketStartLongStem"] = 57857] = "TextTupletBracketStartLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextTuplet3LongStem"] = 57858] = "TextTuplet3LongStem";
+  MusicFontSymbol2[MusicFontSymbol2["TextTupletBracketEndLongStem"] = 57859] = "TextTupletBracketEndLongStem";
+  MusicFontSymbol2[MusicFontSymbol2["Tremolo1"] = 57888] = "Tremolo1";
+  MusicFontSymbol2[MusicFontSymbol2["Tremolo2"] = 57889] = "Tremolo2";
+  MusicFontSymbol2[MusicFontSymbol2["Tremolo3"] = 57890] = "Tremolo3";
+  MusicFontSymbol2[MusicFontSymbol2["Tremolo4"] = 57891] = "Tremolo4";
+  MusicFontSymbol2[MusicFontSymbol2["Tremolo5"] = 57892] = "Tremolo5";
+  MusicFontSymbol2[MusicFontSymbol2["BuzzRoll"] = 57898] = "BuzzRoll";
+  MusicFontSymbol2[MusicFontSymbol2["Flag8thUp"] = 57920] = "Flag8thUp";
+  MusicFontSymbol2[MusicFontSymbol2["Flag8thDown"] = 57921] = "Flag8thDown";
+  MusicFontSymbol2[MusicFontSymbol2["Flag16thUp"] = 57922] = "Flag16thUp";
+  MusicFontSymbol2[MusicFontSymbol2["Flag16thDown"] = 57923] = "Flag16thDown";
+  MusicFontSymbol2[MusicFontSymbol2["Flag32ndUp"] = 57924] = "Flag32ndUp";
+  MusicFontSymbol2[MusicFontSymbol2["Flag32ndDown"] = 57925] = "Flag32ndDown";
+  MusicFontSymbol2[MusicFontSymbol2["Flag64thUp"] = 57926] = "Flag64thUp";
+  MusicFontSymbol2[MusicFontSymbol2["Flag64thDown"] = 57927] = "Flag64thDown";
+  MusicFontSymbol2[MusicFontSymbol2["Flag128thUp"] = 57928] = "Flag128thUp";
+  MusicFontSymbol2[MusicFontSymbol2["Flag128thDown"] = 57929] = "Flag128thDown";
+  MusicFontSymbol2[MusicFontSymbol2["Flag256thUp"] = 57930] = "Flag256thUp";
+  MusicFontSymbol2[MusicFontSymbol2["Flag256thDown"] = 57931] = "Flag256thDown";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalFlat"] = 57952] = "AccidentalFlat";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalNatural"] = 57953] = "AccidentalNatural";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalSharp"] = 57954] = "AccidentalSharp";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalDoubleSharp"] = 57955] = "AccidentalDoubleSharp";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalDoubleFlat"] = 57956] = "AccidentalDoubleFlat";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalQuarterToneFlatArrowUp"] = 57968] = "AccidentalQuarterToneFlatArrowUp";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalQuarterToneSharpNaturalArrowUp"] = 57970] = "AccidentalQuarterToneSharpNaturalArrowUp";
+  MusicFontSymbol2[MusicFontSymbol2["AccidentalThreeQuarterTonesSharpArrowUp"] = 57972] = "AccidentalThreeQuarterTonesSharpArrowUp";
+  MusicFontSymbol2[MusicFontSymbol2["RepeatDot"] = 57412] = "RepeatDot";
+  MusicFontSymbol2[MusicFontSymbol2["Segno"] = 57415] = "Segno";
+  MusicFontSymbol2[MusicFontSymbol2["Coda"] = 57416] = "Coda";
+  MusicFontSymbol2[MusicFontSymbol2["ArticAccentAbove"] = 58528] = "ArticAccentAbove";
+  MusicFontSymbol2[MusicFontSymbol2["ArticAccentBelow"] = 58529] = "ArticAccentBelow";
+  MusicFontSymbol2[MusicFontSymbol2["ArticStaccatoAbove"] = 58530] = "ArticStaccatoAbove";
+  MusicFontSymbol2[MusicFontSymbol2["ArticStaccatoBelow"] = 58531] = "ArticStaccatoBelow";
+  MusicFontSymbol2[MusicFontSymbol2["ArticTenutoAbove"] = 58532] = "ArticTenutoAbove";
+  MusicFontSymbol2[MusicFontSymbol2["ArticTenutoBelow"] = 58533] = "ArticTenutoBelow";
+  MusicFontSymbol2[MusicFontSymbol2["ArticMarcatoAbove"] = 58540] = "ArticMarcatoAbove";
+  MusicFontSymbol2[MusicFontSymbol2["ArticMarcatoBelow"] = 58541] = "ArticMarcatoBelow";
+  MusicFontSymbol2[MusicFontSymbol2["FermataAbove"] = 58560] = "FermataAbove";
+  MusicFontSymbol2[MusicFontSymbol2["FermataShortAbove"] = 58564] = "FermataShortAbove";
+  MusicFontSymbol2[MusicFontSymbol2["FermataLongAbove"] = 58566] = "FermataLongAbove";
+  MusicFontSymbol2[MusicFontSymbol2["RestLonga"] = 58593] = "RestLonga";
+  MusicFontSymbol2[MusicFontSymbol2["RestDoubleWhole"] = 58594] = "RestDoubleWhole";
+  MusicFontSymbol2[MusicFontSymbol2["RestWhole"] = 58595] = "RestWhole";
+  MusicFontSymbol2[MusicFontSymbol2["RestHalf"] = 58596] = "RestHalf";
+  MusicFontSymbol2[MusicFontSymbol2["RestQuarter"] = 58597] = "RestQuarter";
+  MusicFontSymbol2[MusicFontSymbol2["Rest8th"] = 58598] = "Rest8th";
+  MusicFontSymbol2[MusicFontSymbol2["Rest16th"] = 58599] = "Rest16th";
+  MusicFontSymbol2[MusicFontSymbol2["Rest32nd"] = 58600] = "Rest32nd";
+  MusicFontSymbol2[MusicFontSymbol2["Rest64th"] = 58601] = "Rest64th";
+  MusicFontSymbol2[MusicFontSymbol2["Rest128th"] = 58602] = "Rest128th";
+  MusicFontSymbol2[MusicFontSymbol2["Rest256th"] = 58603] = "Rest256th";
+  MusicFontSymbol2[MusicFontSymbol2["RestHBarLeft"] = 58607] = "RestHBarLeft";
+  MusicFontSymbol2[MusicFontSymbol2["RestHBarMiddle"] = 58608] = "RestHBarMiddle";
+  MusicFontSymbol2[MusicFontSymbol2["RestHBarRight"] = 58609] = "RestHBarRight";
+  MusicFontSymbol2[MusicFontSymbol2["Repeat1Bar"] = 58624] = "Repeat1Bar";
+  MusicFontSymbol2[MusicFontSymbol2["Repeat2Bars"] = 58625] = "Repeat2Bars";
+  MusicFontSymbol2[MusicFontSymbol2["Ottava"] = 58640] = "Ottava";
+  MusicFontSymbol2[MusicFontSymbol2["OttavaAlta"] = 58641] = "OttavaAlta";
+  MusicFontSymbol2[MusicFontSymbol2["OttavaBassaVb"] = 58652] = "OttavaBassaVb";
+  MusicFontSymbol2[MusicFontSymbol2["Quindicesima"] = 58644] = "Quindicesima";
+  MusicFontSymbol2[MusicFontSymbol2["QuindicesimaAlta"] = 58645] = "QuindicesimaAlta";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPPPPPP"] = 58663] = "DynamicPPPPPP";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPPPPP"] = 58664] = "DynamicPPPPP";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPPPP"] = 58665] = "DynamicPPPP";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPPP"] = 58666] = "DynamicPPP";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPP"] = 58667] = "DynamicPP";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPiano"] = 58656] = "DynamicPiano";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicMP"] = 58668] = "DynamicMP";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicMF"] = 58669] = "DynamicMF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicPF"] = 58670] = "DynamicPF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicForte"] = 58658] = "DynamicForte";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicFF"] = 58671] = "DynamicFF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicFFF"] = 58672] = "DynamicFFF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicFFFF"] = 58673] = "DynamicFFFF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicFFFFF"] = 58674] = "DynamicFFFFF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicFFFFFF"] = 58675] = "DynamicFFFFFF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicFortePiano"] = 58676] = "DynamicFortePiano";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicNiente"] = 58662] = "DynamicNiente";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicSforzando1"] = 58678] = "DynamicSforzando1";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicSforzandoPiano"] = 58679] = "DynamicSforzandoPiano";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicSforzandoPianissimo"] = 58680] = "DynamicSforzandoPianissimo";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicSforzato"] = 58681] = "DynamicSforzato";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicSforzatoPiano"] = 58682] = "DynamicSforzatoPiano";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicSforzatoFF"] = 58683] = "DynamicSforzatoFF";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicRinforzando1"] = 58684] = "DynamicRinforzando1";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicRinforzando2"] = 58685] = "DynamicRinforzando2";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicForzando"] = 58677] = "DynamicForzando";
+  MusicFontSymbol2[MusicFontSymbol2["DynamicCrescendoHairpin"] = 58686] = "DynamicCrescendoHairpin";
+  MusicFontSymbol2[MusicFontSymbol2["GraceNoteSlashStemUp"] = 58724] = "GraceNoteSlashStemUp";
+  MusicFontSymbol2[MusicFontSymbol2["GraceNoteSlashStemDown"] = 58725] = "GraceNoteSlashStemDown";
+  MusicFontSymbol2[MusicFontSymbol2["OrnamentTrill"] = 58726] = "OrnamentTrill";
+  MusicFontSymbol2[MusicFontSymbol2["OrnamentTurn"] = 58727] = "OrnamentTurn";
+  MusicFontSymbol2[MusicFontSymbol2["OrnamentTurnInverted"] = 58728] = "OrnamentTurnInverted";
+  MusicFontSymbol2[MusicFontSymbol2["OrnamentShortTrill"] = 58732] = "OrnamentShortTrill";
+  MusicFontSymbol2[MusicFontSymbol2["OrnamentMordent"] = 58733] = "OrnamentMordent";
+  MusicFontSymbol2[MusicFontSymbol2["StringsDownBow"] = 58896] = "StringsDownBow";
+  MusicFontSymbol2[MusicFontSymbol2["StringsUpBow"] = 58898] = "StringsUpBow";
+  MusicFontSymbol2[MusicFontSymbol2["KeyboardPedalPed"] = 58960] = "KeyboardPedalPed";
+  MusicFontSymbol2[MusicFontSymbol2["KeyboardPedalUp"] = 58965] = "KeyboardPedalUp";
+  MusicFontSymbol2[MusicFontSymbol2["PictEdgeOfCymbal"] = 59177] = "PictEdgeOfCymbal";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString0"] = 59443] = "GuitarString0";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString1"] = 59444] = "GuitarString1";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString2"] = 59445] = "GuitarString2";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString3"] = 59446] = "GuitarString3";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString4"] = 59447] = "GuitarString4";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString5"] = 59448] = "GuitarString5";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString6"] = 59449] = "GuitarString6";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString7"] = 59450] = "GuitarString7";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString8"] = 59451] = "GuitarString8";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarString9"] = 59452] = "GuitarString9";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarOpenPedal"] = 59453] = "GuitarOpenPedal";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarClosePedal"] = 59455] = "GuitarClosePedal";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarGolpe"] = 59458] = "GuitarGolpe";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarFadeIn"] = 59459] = "GuitarFadeIn";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarFadeOut"] = 59460] = "GuitarFadeOut";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarVolumeSwell"] = 59461] = "GuitarVolumeSwell";
+  MusicFontSymbol2[MusicFontSymbol2["FretboardFilledCircle"] = 59480] = "FretboardFilledCircle";
+  MusicFontSymbol2[MusicFontSymbol2["FretboardX"] = 59481] = "FretboardX";
+  MusicFontSymbol2[MusicFontSymbol2["FretboardO"] = 59482] = "FretboardO";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet0"] = 59520] = "Tuplet0";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet1"] = 59521] = "Tuplet1";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet2"] = 59522] = "Tuplet2";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet3"] = 59523] = "Tuplet3";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet4"] = 59524] = "Tuplet4";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet5"] = 59525] = "Tuplet5";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet6"] = 59526] = "Tuplet6";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet7"] = 59527] = "Tuplet7";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet8"] = 59528] = "Tuplet8";
+  MusicFontSymbol2[MusicFontSymbol2["Tuplet9"] = 59529] = "Tuplet9";
+  MusicFontSymbol2[MusicFontSymbol2["TupletColon"] = 59530] = "TupletColon";
+  MusicFontSymbol2[MusicFontSymbol2["WiggleTrill"] = 60068] = "WiggleTrill";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarVibratoStroke"] = 60082] = "GuitarVibratoStroke";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarWideVibratoStroke"] = 60083] = "GuitarWideVibratoStroke";
+  MusicFontSymbol2[MusicFontSymbol2["WiggleVibratoMediumFast"] = 60126] = "WiggleVibratoMediumFast";
+  MusicFontSymbol2[MusicFontSymbol2["WiggleSawtoothNarrow"] = 60090] = "WiggleSawtoothNarrow";
+  MusicFontSymbol2[MusicFontSymbol2["WiggleSawtooth"] = 60091] = "WiggleSawtooth";
+  MusicFontSymbol2[MusicFontSymbol2["OctaveBaselineM"] = 60565] = "OctaveBaselineM";
+  MusicFontSymbol2[MusicFontSymbol2["OctaveBaselineB"] = 60563] = "OctaveBaselineB";
+  MusicFontSymbol2[MusicFontSymbol2["GuitarLeftHandTapping"] = 59456] = "GuitarLeftHandTapping";
+  MusicFontSymbol2[MusicFontSymbol2["Fingering0"] = 60688] = "Fingering0";
+  MusicFontSymbol2[MusicFontSymbol2["Fingering1"] = 60689] = "Fingering1";
+  MusicFontSymbol2[MusicFontSymbol2["Fingering2"] = 60690] = "Fingering2";
+  MusicFontSymbol2[MusicFontSymbol2["Fingering3"] = 60691] = "Fingering3";
+  MusicFontSymbol2[MusicFontSymbol2["Fingering4"] = 60692] = "Fingering4";
+  MusicFontSymbol2[MusicFontSymbol2["Fingering5"] = 60693] = "Fingering5";
+  MusicFontSymbol2[MusicFontSymbol2["FingeringPLower"] = 60695] = "FingeringPLower";
+  MusicFontSymbol2[MusicFontSymbol2["FingeringTLower"] = 60696] = "FingeringTLower";
+  MusicFontSymbol2[MusicFontSymbol2["FingeringILower"] = 60697] = "FingeringILower";
+  MusicFontSymbol2[MusicFontSymbol2["FingeringMLower"] = 60698] = "FingeringMLower";
+  MusicFontSymbol2[MusicFontSymbol2["FingeringALower"] = 60699] = "FingeringALower";
+  MusicFontSymbol2[MusicFontSymbol2["FingeringCLower"] = 60700] = "FingeringCLower";
+  return MusicFontSymbol2;
+})(MusicFontSymbol || {});
 
 // third_party/alphatab/src/model/InstrumentArticulation.ts
 var InstrumentArticulation = class _InstrumentArticulation {
@@ -10050,11 +13150,11 @@ var XmlNode = class _XmlNode {
       }
     }
   }
-  addChild(node) {
-    this.childNodes.push(node);
-    this.firstChild = node;
-    if (node.nodeType === 1 /* Element */ || node.nodeType === 3 /* CDATA */) {
-      this.firstElement = node;
+  addChild(node2) {
+    this.childNodes.push(node2);
+    this.firstChild = node2;
+    if (node2.nodeType === 1 /* Element */ || node2.nodeType === 3 /* CDATA */) {
+      this.firstElement = node2;
     }
   }
   getAttribute(name, defaultValue = "") {
@@ -10411,10 +13511,10 @@ var XmlParser = class _XmlParser {
           } else if (c === _XmlParser.CharCodeBrackedClose) {
             nbrackets--;
           } else if (c === _XmlParser.CharCodeGreaterThan && nbrackets === 0) {
-            const node = new XmlNode();
-            node.nodeType = 5 /* DocumentType */;
-            node.value = str.substr(start, p - start);
-            parent.addChild(node);
+            const node2 = new XmlNode();
+            node2.nodeType = 5 /* DocumentType */;
+            node2.value = str.substr(start, p - start);
+            parent.addChild(node2);
             state = 1 /* Begin */;
           }
           break;
@@ -10455,20 +13555,20 @@ var XmlParser = class _XmlParser {
     if (state === 13 /* Pcdata */) {
       if (p !== start) {
         buf += str.substr(start, p - start);
-        const node = new XmlNode();
-        node.nodeType = 2 /* Text */;
-        node.value = buf;
-        parent.addChild(node);
+        const node2 = new XmlNode();
+        node2.nodeType = 2 /* Text */;
+        node2.value = buf;
+        parent.addChild(node2);
       }
       return p;
     }
     if (state === 18 /* Escape */ && escapeNext === 13 /* Pcdata */) {
       buf += "&";
       buf += str.substr(start, p - start);
-      const node = new XmlNode();
-      node.nodeType = 2 /* Text */;
-      node.value = buf;
-      parent.addChild(node);
+      const node2 = new XmlNode();
+      node2.nodeType = 2 /* Text */;
+      node2.value = buf;
+      parent.addChild(node2);
       return p;
     }
     throw new XmlError("Unexpected end", str, p);
@@ -10905,12 +14005,12 @@ var GpifParser = class _GpifParser {
   //
   // <BackingTrack>...</BackingTrack>
   //
-  _parseBackingTrackNode(node) {
+  _parseBackingTrackNode(node2) {
     const backingTrack = new BackingTrack();
     let enabled = false;
     let source = "";
     let assetId = "";
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Enabled":
           enabled = c.innerText === "true";
@@ -10934,8 +14034,8 @@ var GpifParser = class _GpifParser {
   //
   // <MasterTrack>...</MasterTrack>
   //
-  _parseMasterTrackNode(node) {
-    for (const c of node.childElements()) {
+  _parseMasterTrackNode(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Automations":
           this._parseAutomations(c, this._masterTrackAutomations, null, null);
@@ -10949,8 +14049,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseAutomations(node, automations, sounds, sustainPedals) {
-    for (const c of node.childElements()) {
+  _parseAutomations(node2, automations, sounds, sustainPedals) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Automation":
           this._parseAutomation(c, automations, sounds, sustainPedals);
@@ -10958,7 +14058,7 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseAutomation(node, automations, sounds, sustainPedals) {
+  _parseAutomation(node2, automations, sounds, sustainPedals) {
     let type = null;
     let isLinear = false;
     let barIndex = -1;
@@ -10969,7 +14069,7 @@ var GpifParser = class _GpifParser {
     let text = null;
     let syncPointValue = void 0;
     let isVisible = true;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Type":
           type = c.innerText;
@@ -11098,8 +14198,8 @@ var GpifParser = class _GpifParser {
   //
   // <Tracks>...</Tracks>
   //
-  _parseTracksNode(node) {
-    for (const c of node.childElements()) {
+  _parseTracksNode(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Track":
           this._parseTrack(c);
@@ -11107,14 +14207,14 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseTrack(node) {
+  _parseTrack(node2) {
     this._articulationByName = /* @__PURE__ */ new Map();
     const track = new Track();
     track.ensureStaveCount(1);
     const staff = track.staves[0];
     staff.showStandardNotation = true;
-    const trackId = node.getAttribute("id");
-    for (const c of node.childElements()) {
+    const trackId = node2.getAttribute("id");
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Name":
           track.name = c.innerText;
@@ -11195,8 +14295,8 @@ var GpifParser = class _GpifParser {
     this._sustainPedalsPerTrackIdAndBarIndex.set(trackId, sustainPedals);
     this._parseAutomations(c, trackAutomations, this._soundsByTrack.get(trackId), sustainPedals);
   }
-  _parseNotationPatch(track, node) {
-    for (const c of node.childElements()) {
+  _parseNotationPatch(track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "LineCount":
           const lineCount = _GpifParser._parseIntSafe(c.innerText, 5);
@@ -11210,8 +14310,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseInstrumentSet(track, node) {
-    for (const c of node.childElements()) {
+  _parseInstrumentSet(track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Type":
           if (c.innerText === "drumKit") {
@@ -11232,8 +14332,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseElements(track, node, isInstrumentSet) {
-    for (const c of node.childElements()) {
+  _parseElements(track, node2, isInstrumentSet) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Element":
           this._parseElement(track, c, isInstrumentSet);
@@ -11241,9 +14341,9 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseElement(track, node, isInstrumentSet) {
-    const name = node.findChildElement("Name")?.innerText ?? "";
-    for (const c of node.childElements()) {
+  _parseElement(track, node2, isInstrumentSet) {
+    const name = node2.findChildElement("Name")?.innerText ?? "";
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Name":
         case "Articulations":
@@ -11252,8 +14352,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseArticulations(track, node, isInstrumentSet, elementName) {
-    for (const c of node.childElements()) {
+  _parseArticulations(track, node2, isInstrumentSet, elementName) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Articulation":
           this._parseArticulation(track, c, isInstrumentSet, elementName);
@@ -11261,12 +14361,12 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseArticulation(track, node, isInstrumentSet, elementName) {
+  _parseArticulation(track, node2, isInstrumentSet, elementName) {
     const articulation = new InstrumentArticulation();
     articulation.outputMidiNumber = -1;
     articulation.elementType = elementName;
     let name = "";
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       const txt = c.innerText;
       switch (c.localName) {
         case "Name":
@@ -11407,9 +14507,9 @@ var GpifParser = class _GpifParser {
         return -1 /* None */;
     }
   }
-  _parseStaves(track, node) {
+  _parseStaves(track, node2) {
     let staffIndex = 0;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Staff":
           track.ensureStaveCount(staffIndex + 1);
@@ -11420,8 +14520,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseStaff(staff, node) {
-    for (const c of node.childElements()) {
+  _parseStaff(staff, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Properties":
           this._parseStaffProperties(staff, c);
@@ -11429,8 +14529,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseStaffProperties(staff, node) {
-    for (const c of node.childElements()) {
+  _parseStaffProperties(staff, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Property":
           this._parseStaffProperty(staff, c);
@@ -11438,15 +14538,15 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseStaffProperty(staff, node) {
-    const propertyName = node.getAttribute("name");
+  _parseStaffProperty(staff, node2) {
+    const propertyName = node2.getAttribute("name");
     switch (propertyName) {
       case "Tuning":
-        for (const c of node.childElements()) {
+        for (const c of node2.childElements()) {
           switch (c.localName) {
             case "Pitches":
               const tuningParts = _GpifParser._splitSafe(
-                node.findChildElement("Pitches")?.innerText
+                node2.findChildElement("Pitches")?.innerText
               );
               const tuning = new Array(tuningParts.length);
               for (let i = 0; i < tuning.length; i++) {
@@ -11465,17 +14565,17 @@ var GpifParser = class _GpifParser {
         break;
       case "DiagramCollection":
       case "ChordCollection":
-        this._parseDiagramCollectionForStaff(staff, node);
+        this._parseDiagramCollectionForStaff(staff, node2);
         break;
       case "CapoFret":
-        const capo = _GpifParser._parseIntSafe(node.findChildElement("Fret")?.innerText, 0);
+        const capo = _GpifParser._parseIntSafe(node2.findChildElement("Fret")?.innerText, 0);
         staff.capo = capo;
         break;
     }
   }
-  _parseLyrics(trackId, node) {
+  _parseLyrics(trackId, node2) {
     const tracks = [];
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Line":
           tracks.push(this._parseLyricsLine(c));
@@ -11484,9 +14584,9 @@ var GpifParser = class _GpifParser {
     }
     this._lyricsByTrack.set(trackId, tracks);
   }
-  _parseLyricsLine(node) {
+  _parseLyricsLine(node2) {
     const lyrics = new Lyrics();
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Offset":
           lyrics.startBar = _GpifParser._parseIntSafe(c.innerText, 0);
@@ -11498,8 +14598,8 @@ var GpifParser = class _GpifParser {
     }
     return lyrics;
   }
-  _parseDiagramCollectionForTrack(track, node) {
-    const items = node.findChildElement("Items");
+  _parseDiagramCollectionForTrack(track, node2) {
+    const items = node2.findChildElement("Items");
     if (items) {
       for (const c of items.childElements()) {
         switch (c.localName) {
@@ -11510,8 +14610,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseDiagramCollectionForStaff(staff, node) {
-    const items = node.findChildElement("Items");
+  _parseDiagramCollectionForStaff(staff, node2) {
+    const items = node2.findChildElement("Items");
     if (items) {
       for (const c of items.childElements()) {
         switch (c.localName) {
@@ -11522,23 +14622,23 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseDiagramItemForTrack(track, node) {
+  _parseDiagramItemForTrack(track, node2) {
     const chord = new Chord();
-    const chordId = node.getAttribute("id");
+    const chordId = node2.getAttribute("id");
     for (const staff of track.staves) {
       staff.addChord(chordId, chord);
     }
-    this._parseDiagramItemForChord(chord, node);
+    this._parseDiagramItemForChord(chord, node2);
   }
-  _parseDiagramItemForStaff(staff, node) {
+  _parseDiagramItemForStaff(staff, node2) {
     const chord = new Chord();
-    const chordId = node.getAttribute("id");
+    const chordId = node2.getAttribute("id");
     staff.addChord(chordId, chord);
-    this._parseDiagramItemForChord(chord, node);
+    this._parseDiagramItemForChord(chord, node2);
   }
-  _parseDiagramItemForChord(chord, node) {
-    chord.name = node.getAttribute("name");
-    const diagram = node.findChildElement("Diagram");
+  _parseDiagramItemForChord(chord, node2) {
+    chord.name = node2.getAttribute("name");
+    const diagram = node2.findChildElement("Diagram");
     if (!diagram) {
       chord.showDiagram = false;
       chord.showFingering = false;
@@ -11609,8 +14709,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseTrackProperties(track, node) {
-    for (const c of node.childElements()) {
+  _parseTrackProperties(track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Property":
           this._parseTrackProperty(track, c);
@@ -11618,11 +14718,11 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseTrackProperty(track, node) {
-    const propertyName = node.getAttribute("name");
+  _parseTrackProperty(track, node2) {
+    const propertyName = node2.getAttribute("name");
     switch (propertyName) {
       case "Tuning":
-        const tuningParts = _GpifParser._splitSafe(node.findChildElement("Pitches")?.innerText);
+        const tuningParts = _GpifParser._splitSafe(node2.findChildElement("Pitches")?.innerText);
         const tuning = new Array(tuningParts.length);
         for (let i = 0; i < tuning.length; i++) {
           tuning[tuning.length - 1 - i] = _GpifParser._parseIntSafe(tuningParts[i], 0);
@@ -11635,18 +14735,18 @@ var GpifParser = class _GpifParser {
         break;
       case "DiagramCollection":
       case "ChordCollection":
-        this._parseDiagramCollectionForTrack(track, node);
+        this._parseDiagramCollectionForTrack(track, node2);
         break;
       case "CapoFret":
-        const capo = _GpifParser._parseIntSafe(node.findChildElement("Fret")?.innerText, 0);
+        const capo = _GpifParser._parseIntSafe(node2.findChildElement("Fret")?.innerText, 0);
         for (const staff of track.staves) {
           staff.capo = capo;
         }
         break;
     }
   }
-  _parseGeneralMidi(track, node) {
-    for (const c of node.childElements()) {
+  _parseGeneralMidi(track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Program":
           track.playbackInfo.program = _GpifParser._parseIntSafe(c.innerText, 0);
@@ -11662,15 +14762,15 @@ var GpifParser = class _GpifParser {
           break;
       }
     }
-    const isPercussion = node.getAttribute("table") === "Percussion";
+    const isPercussion = node2.getAttribute("table") === "Percussion";
     if (isPercussion) {
       for (const staff of track.staves) {
         staff.isPercussion = true;
       }
     }
   }
-  _parseSounds(trackId, track, node) {
-    for (const c of node.childElements()) {
+  _parseSounds(trackId, track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Sound":
           this._parseSound(trackId, track, c);
@@ -11678,9 +14778,9 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseSound(trackId, track, node) {
+  _parseSound(trackId, track, node2) {
     const sound = new GpifSound();
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Name":
           sound.name = c.innerText;
@@ -11703,10 +14803,10 @@ var GpifParser = class _GpifParser {
     }
     this._soundsByTrack.get(trackId).set(sound.uniqueId, sound);
   }
-  _parseSoundMidi(sound, node) {
+  _parseSoundMidi(sound, node2) {
     let bankMsb = 0;
     let bankLsb = 0;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Program":
           sound.program = _GpifParser._parseIntSafe(c.innerText, 0);
@@ -11721,8 +14821,8 @@ var GpifParser = class _GpifParser {
     }
     sound.bank = (bankMsb & 127) << 7 | bankLsb;
   }
-  _parsePartSounding(trackId, track, node) {
-    for (const c of node.childElements()) {
+  _parsePartSounding(trackId, track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "TranspositionPitch":
           for (const staff of track.staves) {
@@ -11737,10 +14837,10 @@ var GpifParser = class _GpifParser {
     }
   }
   _transposeKeySignaturePerTrack = /* @__PURE__ */ new Map();
-  _parseTranspose(trackId, track, node) {
+  _parseTranspose(trackId, track, node2) {
     let octave = 0;
     let chromatic = 0;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Chromatic":
           chromatic = _GpifParser._parseIntSafe(c.innerText, 0);
@@ -11757,8 +14857,8 @@ var GpifParser = class _GpifParser {
     const transposeIndex = ModelUtils.flooredDivision(pitch2, 12);
     this._transposeKeySignaturePerTrack.set(trackId, transposeIndex);
   }
-  _parseRSE(track, node) {
-    for (const c of node.childElements()) {
+  _parseRSE(track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "ChannelStrip":
           this._parseChannelStrip(track, c);
@@ -11766,8 +14866,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseChannelStrip(track, node) {
-    for (const c of node.childElements()) {
+  _parseChannelStrip(track, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Parameters":
           this._parseChannelStripParameters(track, c);
@@ -11775,9 +14875,9 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseChannelStripParameters(track, node) {
-    if (node.firstChild && node.firstChild.value) {
-      const parameters = _GpifParser._splitSafe(node.firstChild.value);
+  _parseChannelStripParameters(track, node2) {
+    if (node2.firstChild && node2.firstChild.value) {
+      const parameters = _GpifParser._splitSafe(node2.firstChild.value);
       if (parameters.length >= 12) {
         track.playbackInfo.balance = Math.floor(_GpifParser._parseFloatSafe(parameters[11], 0.5) * 16);
         track.playbackInfo.volume = Math.floor(_GpifParser._parseFloatSafe(parameters[12], 0.9) * 16);
@@ -11787,8 +14887,8 @@ var GpifParser = class _GpifParser {
   //
   // <MasterBars>...</MasterBars>
   //
-  _parseMasterBarsNode(node) {
-    for (const c of node.childElements()) {
+  _parseMasterBarsNode(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "MasterBar":
           this._parseMasterBar(c);
@@ -11796,12 +14896,12 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseMasterBar(node) {
+  _parseMasterBar(node2) {
     const masterBar = new MasterBar();
     if (this._masterBars.length === 0 && this._hasAnacrusis) {
       masterBar.isAnacrusis = true;
     }
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Time":
           const timeParts = c.innerText.split("/");
@@ -11896,8 +14996,8 @@ var GpifParser = class _GpifParser {
     }
     this._masterBars.push(masterBar);
   }
-  _parseDirections(masterBar, node) {
-    for (const c of node.childElements()) {
+  _parseDirections(masterBar, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Target":
           switch (c.innerText) {
@@ -11968,8 +15068,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseFermatas(masterBar, node) {
-    for (const c of node.childElements()) {
+  _parseFermatas(masterBar, node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Fermata":
           this._parseFermata(masterBar, c);
@@ -11977,10 +15077,10 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseFermata(masterBar, node) {
+  _parseFermata(masterBar, node2) {
     let offset = 0;
     const fermata = new Fermata();
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Type":
           switch (c.innerText) {
@@ -12013,8 +15113,8 @@ var GpifParser = class _GpifParser {
   //
   // <Bars>...</Bars>
   //
-  _parseBars(node) {
-    for (const c of node.childElements()) {
+  _parseBars(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Bar":
           this._parseBar(c);
@@ -12022,10 +15122,10 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseBar(node) {
+  _parseBar(node2) {
     const bar = new Bar();
-    const barId = node.getAttribute("id");
-    for (const c of node.childElements()) {
+    const barId = node2.getAttribute("id");
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Voices":
           this._voicesOfBar.set(barId, _GpifParser._splitSafe(c.innerText));
@@ -12088,8 +15188,8 @@ var GpifParser = class _GpifParser {
   //
   // <Voices>...</Voices>
   //
-  _parseVoices(node) {
-    for (const c of node.childElements()) {
+  _parseVoices(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Voice":
           this._parseVoice(c);
@@ -12097,10 +15197,10 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseVoice(node) {
+  _parseVoice(node2) {
     const voice = new Voice();
-    const voiceId = node.getAttribute("id");
-    for (const c of node.childElements()) {
+    const voiceId = node2.getAttribute("id");
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Beats":
           this._beatsOfVoice.set(voiceId, _GpifParser._splitSafe(c.innerText));
@@ -12112,8 +15212,8 @@ var GpifParser = class _GpifParser {
   //
   // <Beats>...</Beats>
   //
-  _parseBeats(node) {
-    for (const c of node.childElements()) {
+  _parseBeats(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Beat":
           this._parseBeat(c);
@@ -12121,10 +15221,10 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseBeat(node) {
+  _parseBeat(node2) {
     const beat = new Beat();
-    const beatId = node.getAttribute("id");
-    for (const c of node.childElements()) {
+    const beatId = node2.getAttribute("id");
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Notes":
           this._notesOfBeat.set(beatId, _GpifParser._splitSafe(c.innerText));
@@ -12343,9 +15443,9 @@ var GpifParser = class _GpifParser {
     }
     this._beatById.set(beatId, beat);
   }
-  _parseBeatLyrics(node) {
+  _parseBeatLyrics(node2) {
     const lines = [];
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Line":
           lines.push(c.innerText);
@@ -12354,8 +15454,8 @@ var GpifParser = class _GpifParser {
     }
     return lines;
   }
-  _parseBeatXProperties(node, beat) {
-    for (const c of node.childElements()) {
+  _parseBeatXProperties(node2, beat) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "XProperty":
           const id = c.getAttribute("id");
@@ -12395,8 +15495,8 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseBarXProperties(node, bar) {
-    for (const c of node.childElements()) {
+  _parseBarXProperties(node2, bar) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "XProperty":
           const id = c.getAttribute("id");
@@ -12410,10 +15510,10 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseMasterBarXProperties(masterBar, node) {
+  _parseMasterBarXProperties(masterBar, node2) {
     let beamingRuleDuration = Number.NaN;
     let beamingRuleGroups = void 0;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "XProperty":
           const id = c.getAttribute("id");
@@ -12457,14 +15557,14 @@ var GpifParser = class _GpifParser {
       masterBar.beamingRules = rules;
     }
   }
-  _parseBeatProperties(node, beat) {
+  _parseBeatProperties(node2, beat) {
     let isWhammy = false;
     let whammyOrigin = null;
     let whammyMiddleValue = null;
     let whammyMiddleOffset1 = null;
     let whammyMiddleOffset2 = null;
     let whammyDestination = null;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Property":
           const name = c.getAttribute("name");
@@ -12653,8 +15753,8 @@ var GpifParser = class _GpifParser {
   //
   // <Notes>...</Notes>
   //
-  _parseNotes(node) {
-    for (const c of node.childElements()) {
+  _parseNotes(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Note":
           this._parseNote(c);
@@ -12662,10 +15762,10 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseNote(node) {
+  _parseNote(node2) {
     const note = new Note();
-    const noteId = node.getAttribute("id");
-    for (const c of node.childElements()) {
+    const noteId = node2.getAttribute("id");
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Properties":
           this._parseNoteProperties(c, note, noteId);
@@ -12773,7 +15873,7 @@ var GpifParser = class _GpifParser {
     }
     this._noteById.set(noteId, note);
   }
-  _parseNoteProperties(node, note, noteId) {
+  _parseNoteProperties(node2, note, noteId) {
     let isBended = false;
     let bendOrigin = null;
     let bendMiddleValue = null;
@@ -12783,7 +15883,7 @@ var GpifParser = class _GpifParser {
     let element = -1;
     let variation = -1;
     let hasTransposedPitch = false;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Property":
           const name = c.getAttribute("name");
@@ -12983,8 +16083,8 @@ var GpifParser = class _GpifParser {
       note.percussionArticulation = PercussionMapper.articulationFromElementVariation(element, variation);
     }
   }
-  _parseConcertPitch(node, note) {
-    const pitch2 = node.findChildElement("Pitch");
+  _parseConcertPitch(node2, note) {
+    const pitch2 = node2.findChildElement("Pitch");
     if (pitch2) {
       for (const c of pitch2.childElements()) {
         switch (c.localName) {
@@ -13017,8 +16117,8 @@ var GpifParser = class _GpifParser {
   _toBendOffset(gpxOffset) {
     return gpxOffset * _GpifParser._bendPointPositionFactor;
   }
-  _parseRhythms(node) {
-    for (const c of node.childElements()) {
+  _parseRhythms(node2) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "Rhythm":
           this._parseRhythm(c);
@@ -13026,11 +16126,11 @@ var GpifParser = class _GpifParser {
       }
     }
   }
-  _parseRhythm(node) {
+  _parseRhythm(node2) {
     const rhythm = new GpifRhythm();
-    const rhythmId = node.getAttribute("id");
+    const rhythmId = node2.getAttribute("id");
     rhythm.id = rhythmId;
-    for (const c of node.childElements()) {
+    for (const c of node2.childElements()) {
       switch (c.localName) {
         case "NoteValue":
           switch (c.innerText) {
@@ -13294,24 +16394,370 @@ var Settings = class {
 };
 
 // src/adapters/guitar-pro/admission.ts
-var refs = { bass: "bass", "electric-bass": "bass", electricBass: "bass", guitar: "guitar", electricGuitar: "guitar", "s-gtr6": "guitar" };
+var refs = {
+  banjo: "other",
+  "e-bass4": "bass",
+  "e-bass5": "bass",
+  bass: "bass",
+  "electric-bass": "bass",
+  electricBass: "bass",
+  acousticBass: "bass",
+  fretlessBass: "bass",
+  "e-gtr6": "guitar",
+  "s-gtr7": "guitar",
+  "n-gtr6": "guitar",
+  guitar: "guitar",
+  electricGuitar: "guitar",
+  steelGuitar: "guitar",
+  nylonGuitar: "guitar",
+  acousticGuitar: "guitar",
+  "s-gtr6": "guitar",
+  "a-piano-gs": "keyboard",
+  "a-piano-ss": "keyboard",
+  "a-piano": "keyboard",
+  "piano-gs": "keyboard",
+  "k-piano": "keyboard",
+  "k-piano-gs": "keyboard",
+  PianoGrandStaff: "keyboard",
+  acousticPiano: "keyboard",
+  electricPiano: "keyboard",
+  piano: "keyboard",
+  keyboard: "keyboard",
+  organ: "keyboard",
+  harpsichord: "keyboard",
+  voice: "vocal",
+  vocals: "vocal",
+  choir: "vocal",
+  vocal: "vocal",
+  drumKit: "percussion",
+  percussion: "percussion"
+};
 var observedFamily = (ref) => Object.hasOwn(refs, ref) ? refs[ref] : void 0;
+var isFrettedReference = (ref) => ["guitar", "bass"].includes(observedFamily(ref) ?? "") || ref === "banjo";
+function midiFamily(program, percussion = false) {
+  return percussion ? "percussion" : program >= 24 && program <= 31 ? "guitar" : program >= 32 && program <= 39 ? "bass" : program <= 7 || program >= 16 && program <= 23 ? "keyboard" : program >= 52 && program <= 54 ? "vocal" : "other";
+}
 function admittedFamily(ref, program, location) {
-  const family = observedFamily(ref);
-  if (!family || (family === "bass" ? program < 32 || program > 39 : program < 24 || program > 31))
-    refuse("instrument-profile", "Reviewed source instrument reference and encoded guitar/bass MIDI family must agree; names and tuning alone cannot authorize an instrument.", location);
-  return family;
+  if (!Number.isInteger(program) || program < 0 || program > 127 || !/^[A-Za-z0-9_.-]{1,128}$/.test(ref)) return refuse("instrument-profile", "Instrument admission requires an encoded catalog identity and bounded MIDI program.", location);
+  const family = observedFamily(ref), encoded = midiFamily(program);
+  if (!family && (encoded === "guitar" || encoded === "bass") && ref !== `gm-program-${program}`) return refuse("instrument-profile", "A fretted MIDI sound does not establish an unknown source instrument family.", location);
+  return family ?? (ref === `gm-program-${program}` && !["guitar", "bass"].includes(encoded) ? encoded : "other");
+}
+
+// src/adapters/guitar-pro/arrangements.ts
+var sourceIds = (owner, name, required = true) => {
+  const field = child(owner, name, required);
+  if (!field) return [];
+  if (field.children.length || Object.keys(field.attrs).length || !/^(?:-1|\d{1,6})(?:\s+(?:-1|\d{1,6}))*$/.test(field.text.trim()) && field.text.trim()) refuse("reference", "Expected an exact bounded source reference list.", field.location);
+  return field.text.trim().split(/\s+/).filter(Boolean);
+};
+var sourceProperties = (owner) => {
+  const result = /* @__PURE__ */ new Map(), group = child(owner, "Properties", false);
+  if (group?.text.trim() || group && Object.keys(group.attrs).length) refuse("property", "Malformed source property container.", group.location);
+  for (const property of group?.children ?? []) {
+    if (property.name !== "Property" || !property.attrs.name || Object.keys(property.attrs).some((key) => key !== "name") || result.has(property.attrs.name)) refuse("property", "Duplicate or malformed source property.", property.location);
+    result.set(property.attrs.name, property);
+  }
+  return result;
+};
+function sourceStaves(track) {
+  const staves = child(track, "Staves", false);
+  if (staves) {
+    if (staves.text.trim() || Object.keys(staves.attrs).length || staves.children.some((e) => e.name !== "Staff") || !staves.children.length || staves.children.length > 8) refuse("staff-scope", "Expected one through eight ordered source staves.", staves.location);
+    return staves.children;
+  }
+  const ref = child(track, "Instrument", false)?.attrs.ref ?? "";
+  return ref.endsWith("-gs") || ref.endsWith("GrandStaff") ? [track, track] : [track];
+}
+function definitions(root, group, kind) {
+  const container = child(root, group), map = /* @__PURE__ */ new Map();
+  if (container.text.trim() || Object.keys(container.attrs).length) refuse("structure", "Invalid source definition container.", container.location);
+  for (const e of container.children) {
+    if (e.name !== kind || !/^\d{1,6}$/.test(e.attrs.id) || Object.keys(e.attrs).some((key) => key !== "id") || map.has(e.attrs.id)) refuse("identity", "Invalid or duplicate source definition.", e.location);
+    map.set(e.attrs.id, e);
+  }
+  return map;
+}
+function discoverArrangementGraph(root) {
+  const tracks = definitions(root, "Tracks", "Track"), bars = definitions(root, "Bars", "Bar"), voices = definitions(root, "Voices", "Voice"), beats = definitions(root, "Beats", "Beat"), notes = definitions(root, "Notes", "Note"), rhythms = definitions(root, "Rhythms", "Rhythm");
+  const order = sourceIds(child(root, "MasterTrack"), "Tracks");
+  if (!order.length || order.length > limits.tracks || order.length !== tracks.size || new Set(order).size !== order.length || order.some((id) => !tracks.has(id))) refuse("track-scope", "Master track order must exactly identify defined source tracks.", root.location);
+  const slots = order.flatMap((trackId) => sourceStaves(tracks.get(trackId)).map((staff, index) => ({ trackId, staff, number: index + 1 })));
+  const masterBars = child(root, "MasterBars");
+  if (!masterBars.children.length || masterBars.children.length > limits.measures || masterBars.children.some((e) => e.name !== "MasterBar")) refuse("measure-budget", "Source measure count or shape is invalid.", masterBars.location);
+  const reached = { bars: /* @__PURE__ */ new Set(), voices: /* @__PURE__ */ new Set(), beats: /* @__PURE__ */ new Set(), notes: /* @__PURE__ */ new Set(), rhythms: /* @__PURE__ */ new Set() };
+  for (const master of masterBars.children) {
+    const ids2 = sourceIds(master, "Bars");
+    if (ids2.length !== slots.length || new Set(ids2).size !== ids2.length) refuse("bar-scope", "Every master bar must identify one distinct bar for each ordered source staff.", master.location);
+    for (const id of ids2) {
+      if (!bars.has(id)) refuse("reference", "Unresolved staff bar.", master.location);
+      reached.bars.add(id);
+    }
+  }
+  for (const bar of bars.values()) for (const id of sourceIds(bar, "Voices")) if (id !== "-1") {
+    if (!voices.has(id)) refuse("reference", "Unresolved source voice.", bar.location);
+    if (reached.bars.has(bar.attrs.id)) reached.voices.add(id);
+  }
+  for (const voice of voices.values()) for (const id of sourceIds(voice, "Beats")) {
+    if (!beats.has(id)) refuse("reference", "Unresolved source beat.", voice.location);
+    if (reached.voices.has(voice.attrs.id)) reached.beats.add(id);
+  }
+  for (const beat of beats.values()) {
+    const rhythm = child(beat, "Rhythm");
+    if (rhythm.children.length || rhythm.text.trim() || Object.keys(rhythm.attrs).join(",") !== "ref" || !rhythms.has(rhythm.attrs.ref)) refuse("reference", "Unresolved or malformed source rhythm.", rhythm.location);
+    if (reached.beats.has(beat.attrs.id)) reached.rhythms.add(rhythm.attrs.ref);
+    for (const id of sourceIds(beat, "Notes", false)) {
+      if (!notes.has(id)) refuse("reference", "Unresolved source note.", beat.location);
+      if (reached.beats.has(beat.attrs.id)) reached.notes.add(id);
+    }
+  }
+  for (const [name, map] of [["bars", bars], ["voices", voices], ["beats", beats], ["notes", notes], ["rhythms", rhythms]]) if (reached[name].size !== map.size) refuse("unreferenced", `Unreferenced ${name} definitions cannot disappear through part selection.`, root.location);
+  return { tracks, bars, voices, beats, notes, rhythms, order, slots, masterBars, all: reached };
+}
+function projectSourceStaff(root, graph, trackId, staffNumber) {
+  const slot = graph.slots.findIndex((s) => s.trackId === trackId && s.number === staffNumber);
+  if (slot < 0) return refuse("staff-scope", "Requested source staff is absent.", root.location);
+  const rebuild = (e, children3, text = e.text) => ({ ...e, children: children3, text });
+  const track = graph.tracks.get(trackId), source = graph.slots[slot].staff;
+  const group = child(track, "Staves", false);
+  const projectedTrack = group ? rebuild(track, track.children.map((e) => e === group ? rebuild(group, [source]) : e)) : rebuild(track, track.children.map((e) => e.name === "Instrument" && (e.attrs.ref.endsWith("-gs") || e.attrs.ref.endsWith("GrandStaff")) ? { ...e, attrs: { ...e.attrs, ref: e.attrs.ref.endsWith("GrandStaff") ? e.attrs.ref.slice(0, -10) || "piano" : e.attrs.ref.slice(0, -3) } } : e));
+  const masters = graph.masterBars.children.map((master) => rebuild(master, master.children.map((e) => e.name === "Bars" ? rebuild(e, [], sourceIds(master, "Bars")[slot]) : e)));
+  const selectedBars = masters.map((master) => graph.bars.get(sourceIds(master, "Bars")[0]));
+  const voiceIds = new Set(selectedBars.flatMap((bar) => sourceIds(bar, "Voices").filter((id) => id !== "-1")));
+  const beatIds = new Set([...voiceIds].flatMap((id) => sourceIds(graph.voices.get(id), "Beats")));
+  const noteIds = new Set([...beatIds].flatMap((id) => sourceIds(graph.beats.get(id), "Notes", false)));
+  const rhythmIds = new Set([...beatIds].map((id) => child(graph.beats.get(id), "Rhythm").attrs.ref));
+  const groups = { Tracks: [projectedTrack], MasterBars: masters, Bars: [...new Map(selectedBars.map((bar) => [bar.attrs.id, bar])).values()], Voices: [...voiceIds].map((id) => graph.voices.get(id)), Beats: [...beatIds].map((id) => graph.beats.get(id)), Notes: [...noteIds].map((id) => graph.notes.get(id)), Rhythms: [...rhythmIds].map((id) => graph.rhythms.get(id)) };
+  return rebuild(root, root.children.map((e) => e.name === "MasterTrack" ? rebuild(e, e.children.map((field) => field.name === "Tracks" ? rebuild(field, [], trackId) : field)) : groups[e.name] ? rebuild(e, groups[e.name]) : e));
+}
+function arrangementTrack(track) {
+  const source = { ...track.location, trackId: track.attrs.id }, set = child(track, "InstrumentSet", false), midi = child(track, "GeneralMidi", false);
+  const soundList = children(child(track, "Sounds", false) ?? { ...track, children: [] }, "Sound");
+  const sound = soundList[0], programOwner = midi ?? (sound ? child(sound, "MIDI") : void 0);
+  if (!programOwner) return refuse("instrument", "Instrument needs an encoded MIDI program.", source);
+  const program = integer(value(programOwner, "Program"), 0, 127, programOwner);
+  const reference = set ? value(set, "Type") : child(track, "Instrument", false)?.attrs.ref ?? (midi?.attrs.table === "Percussion" ? "percussion" : midi?.attrs.table === "Instrument" ? `gm-program-${program}` : "");
+  const percussion = reference === "drumKit" || reference === "percussion" || midi?.attrs.table === "Percussion";
+  const family = admittedFamily(percussion ? "percussion" : reference, program, source);
+  const trans = child(track, "Transpose", false), sounding = child(track, "PartSounding", false);
+  if (trans && sounding) refuse("transpose", "Competing source transpose representations.", source);
+  const amount = sounding ? integer(value(sounding, "TranspositionPitch"), -60, 60, sounding) : void 0;
+  const octave = trans ? integer(value(trans, "Octave"), -4, 4, trans) : amount === void 0 ? 0 : Math.trunc(amount / 12);
+  const chromatic = trans ? integer(value(trans, "Chromatic"), -24, 24, trans) : amount === void 0 ? 0 : amount - octave * 12;
+  return { source, id: track.attrs.id, reference, family, program, percussion, fretted: isFrettedReference(reference), staves: sourceStaves(track), octave, chromatic, ...sounding ? { nominalKey: value(sounding, "NominalKey") } : {} };
+}
+function isFrettedScore(score) {
+  return score.parts.every((part) => part.midiProgram !== void 0 && !!part.tuning?.length && part.measures.every((measure) => measure.voices.every((voice) => voice.every((event) => event.notes.every((note) => note.kind !== "unpitched" && note.string !== void 0 && note.fret !== void 0)))));
+}
+function mergeStaffParts(parts, track) {
+  if (!parts.length || parts.length !== track.staves.length) return refuse("staff-scope", "Recovered source staff count differs.", track.source);
+  const part = { ...parts[0], source: track.source, id: track.id, instrument: track.reference, midiProgram: track.program };
+  if (parts.length === 1) return part;
+  delete part.tuning;
+  delete part.capo;
+  part.staves = parts.map((staffPart, index) => ({ source: track.staves[index].location, number: index + 1, kind: track.percussion ? "percussion" : "pitched", lines: 5, clef: staffPart.measures[0].clef, ...staffPart.tuning ? { tuning: staffPart.tuning } : {}, ...staffPart.capo ? { capo: staffPart.capo } : {} }));
+  part.measures = parts[0].measures.map((measure, index) => {
+    const incoming = parts.map((p) => p.measures[index]);
+    if (incoming.some((m) => !m || m.duration.n * measure.duration.d !== measure.duration.n * m.duration.d)) refuse("staff-duration", "Physical staves disagree about exact measure span.", measure.source);
+    return {
+      ...measure,
+      voices: incoming.flatMap((m, si) => m.voices.map((voice, vi) => voice.map((event) => ({ ...event, staff: si + 1, voiceId: String(si * 4 + vi + 1) })))),
+      measureRepeats: incoming.flatMap((m, si) => (m.measureRepeats ?? []).map((r) => ({ ...r, staff: si + 1 }))),
+      staffs: incoming.map((m, si) => ({ ...part.staves[si], source: m.source, clef: m.clef })),
+      changes: incoming.flatMap((m, si) => (m.changes ?? []).map((a) => ({ ...a, staff: si + 1 }))),
+      directions: incoming.flatMap((m, si) => (m.directions ?? []).map((d) => ({ ...d, staff: si + 1, ...d.voiceId ? { voiceId: String(si * 4 + Number(d.voiceId)) } : {} })))
+    };
+  });
+  part.capoChanges = parts.flatMap((p, si) => (p.capoChanges ?? []).map((c) => ({ ...c, staff: si + 1 })));
+  part.percussionInstruments = parts.flatMap((p) => p.percussionInstruments ?? []);
+  return part;
+}
+
+// src/adapters/guitar-pro/gp6-percussion.ts
+var selectors = {
+  hclap: { "0:0": 39 },
+  cngKit: { "0:0": 64, "0:1": 108, "0:2": 109, "1:0": 63, "1:1": 110, "1:2": 62 },
+  tmblKit: { "0:0": 66, "1:0": 65 },
+  agogoKit: { "0:0": 67, "1:0": 68 },
+  cbs: { "0:0": 69, "0:1": 69, "0:2": 117 },
+  mrcs: { "0:0": 70, "0:2": 118 },
+  whstlKit: { "0:0": 71, "1:0": 72 },
+  bngKit: { "0:0": 61, "0:1": 107, "0:2": 106, "1:0": 60, "1:1": 105, "1:2": 104, "2:0": 64, "2:1": 108, "2:2": 109, "3:0": 63, "3:1": 110, "3:2": 62 },
+  vbrslp: { "0:0": 58 },
+  tmbrn: { "0:0": 54, "0:2": 111, "0:3": 112, "0:4": 113 },
+  cuicaKit: { "0:0": 78, "1:0": 79 },
+  trngl: { "0:0": 81, "0:1": 80 },
+  clvs: { "0:0": 75, "5:0": 75 },
+  shkr: { "0:0": 82, "0:1": 82, "0:2": 122 },
+  "jngl-bell": { "0:0": 83 },
+  "bell-tree": { "0:0": 84, "0:2": 123 },
+  wdblckKit: { "0:0": 76, "1:0": 77 },
+  guiro: { "0:0": 73, "0:1": 73, "0:2": 74 },
+  cstnt: { "0:0": 85 },
+  surdo: { "0:0": 86, "0:1": 86 },
+  snr: { "0:0": 37, "1:0": 38 },
+  cowbell: { "0:0": 102 },
+  africaKit: { "4:0": 63, "2:0": 73, "2:2": 74, "3:2": 109, "4:1": 110 },
+  latinoKit: { "2:1": 87, "3:0": 54, "3:1": 54, "3:3": 112 },
+  sambaKit: { "0:0": 51, "0:1": 93, "0:2": 53, "1:0": 102, "2:0": 56, "3:0": 99, "4:0": 77, "5:0": 76, "6:0": 66, "7:0": 65 },
+  "2Mrcs": { "0:0": 119 }
+};
+selectors.conbon = selectors.bngKit;
+function gp6LocalPercussion(reference, element, variation, source) {
+  const number = selectors[reference]?.[`${element}:${variation}`];
+  if (number === void 0) refuse("gp6-percussion-instrument-profile", "No verified instrument-local percussion selector exists; a drum-kit or GM fallback would invent identity.", source);
+  return number;
+}
+
+// src/adapters/guitar-pro/percussion.ts
+function shape(e, allowed, repeated = []) {
+  if (Object.keys(e.attrs).length || e.text.trim()) refuse("percussion-field", "Malformed percussion structure.", e.location);
+  const seen = /* @__PURE__ */ new Set();
+  for (const field of e.children) {
+    if (!allowed.includes(field.name) || seen.has(field.name) && !repeated.includes(field.name)) refuse("percussion-field", "Uninterpreted or duplicate percussion field.", field.location);
+    seen.add(field.name);
+  }
+}
+var plain = (e) => {
+  if (e.children.length || Object.keys(e.attrs).length) refuse("percussion-field", "Percussion field requires plain source data.", e.location);
+};
+function percussionCatalog(track) {
+  const set = child(track, "InstrumentSet", false);
+  if (!set) return [];
+  const elements = child(set, "Elements"), results = [], identities = /* @__PURE__ */ new Map();
+  shape(elements, ["Element"], ["Element"]);
+  for (const element of children(elements, "Element")) {
+    shape(element, ["Name", "Type", "SoundbankName", "Articulations"]);
+    for (const e of element.children.filter((e2) => e2.name !== "Articulations")) plain(e);
+    shape(child(element, "Articulations"), ["Articulation"], ["Articulation"]);
+    const elementName = value(element, "Name");
+    for (const articulation of children(child(element, "Articulations"), "Articulation")) {
+      shape(articulation, ["Name", "StaffLine", "Noteheads", "TechniquePlacement", "TechniqueSymbol", "InputMidiNumbers", "OutputRSESound", "OutputMidiNumber"]);
+      if (results.length >= 256) refuse("percussion-budget", "Too many source instrument articulations.", articulation.location);
+      for (const field of articulation.children) {
+        if (!["Name", "StaffLine", "Noteheads", "TechniquePlacement", "TechniqueSymbol", "InputMidiNumbers", "OutputRSESound", "OutputMidiNumber"].includes(field.name)) refuse("percussion-field", "Uninterpreted source drum articulation.", field.location);
+        plain(field);
+      }
+      const name = value(articulation, "Name"), key = `${elementName}\0${name}`;
+      if (identities.has(key)) refuse("percussion-identity", "Ambiguous source articulation identity.", articulation.location);
+      const heads = value(articulation, "Noteheads").split(/\s+/);
+      if (heads.length !== 3 || heads.some((name2) => !/^notehead[A-Za-z0-9]+$/.test(name2))) refuse("percussion-notehead", "Explicit default/half/whole drum heads are required.", articulation.location);
+      const fact = { source: articulation.location, id: `gp-drum:${track.attrs.id}:${results.length}`, name: name ? `${elementName}: ${name}` : elementName, midi: integer(value(articulation, "OutputMidiNumber"), 0, 127, articulation), line: integer(value(articulation, "StaffLine"), -32, 48, articulation), heads, ...value(articulation, "TechniqueSymbol", false) ? { technique: value(articulation, "TechniqueSymbol") } : {} };
+      results.push(fact);
+      identities.set(key, fact);
+    }
+  }
+  const patch = child(track, "NotationPatch", false);
+  if (patch) {
+    shape(patch, ["Name", "LineCount", "Elements"]);
+    for (const field of patch.children.filter((e) => e.name !== "Elements")) plain(field);
+    if (child(patch, "LineCount", false) && value(patch, "LineCount") !== "5") refuse("percussion-lines", "Percussion notation patch must declare the supported five-line source coordinate system.", patch.location);
+    shape(child(patch, "Elements"), ["Element"], ["Element"]);
+    const patched = /* @__PURE__ */ new Set();
+    for (const element of children(child(patch, "Elements"), "Element")) {
+      shape(element, ["Name", "Articulations"]);
+      plain(child(element, "Name"));
+      shape(child(element, "Articulations"), ["Articulation"], ["Articulation"]);
+      const elementName = value(element, "Name");
+      for (const articulation of children(child(element, "Articulations"), "Articulation")) {
+        shape(articulation, ["Name", "StaffLine"]);
+        const key = `${elementName}\0${value(articulation, "Name")}`, target = identities.get(key);
+        if (!target || patched.has(key)) refuse("percussion-patch", "Notation patch must target one unique declared drum articulation.", articulation.location);
+        patched.add(key);
+        for (const field of articulation.children) {
+          if (!["Name", "StaffLine"].includes(field.name)) refuse("percussion-patch", "Uninterpreted source notation override.", field.location);
+          plain(field);
+        }
+        target.line = integer(value(articulation, "StaffLine"), -32, 48, articulation);
+      }
+    }
+  }
+  return results;
+}
+function nativePercussion(number, source, trackId) {
+  const native = PercussionMapper.getArticulationById(number);
+  if (!native) return refuse("percussion-identity", "Encoded percussion identity has no verified native definition; no GM/default pitch is substituted.", source);
+  const name = (symbol) => {
+    const text = MusicFontSymbol[symbol];
+    if (!text || text === "None") return "noteheadBlack";
+    return text[0].toLowerCase() + text.slice(1);
+  };
+  return {
+    source,
+    id: `gp-drum:${trackId}:${number}`,
+    name: native.elementType,
+    midi: native.outputMidiNumber,
+    line: native.staffLine,
+    heads: [name(native.noteHeadDefault), name(native.noteHeadHalf), name(native.noteHeadWhole)],
+    ...native.techniqueSymbol !== -1 /* None */ ? { technique: name(native.techniqueSymbol) } : {}
+  };
+}
+function sourcePercussion(source, catalog, trackId, findings, instrumentReference = "drmkt") {
+  const encoded = child(source, "InstrumentArticulation", false), properties2 = sourceProperties(source);
+  const element = properties2.get("Element"), variation = properties2.get("Variation");
+  if (encoded) {
+    const index = integer(encoded.text.trim(), 0, 255, encoded);
+    if (element || variation) refuse("percussion-identity", "Conflicting indexed and element/variation percussion encodings.", source.location);
+    if (!catalog[index]) refuse("percussion-unresolved-articulation", "The positive source articulation index has no established catalog entry; its identity remains an unresolved source capability.", encoded.location);
+    return { fact: catalog[index], articulation: index };
+  }
+  if (!element || !variation) return refuse("percussion-identity", "GP6 percussion requires both encoded element and variation.", source.location);
+  const elementNumber = integer(value(element, "Element"), 0, 16, element), variationNumber = integer(value(variation, "Variation"), 0, 4, variation);
+  const kit = ["drmkt", "drumKit", "percussion"].includes(instrumentReference);
+  if (kit && variationNumber > 2) refuse("percussion-identity", "Drum-kit variation is outside the verified selector table.", variation.location);
+  const articulation = kit ? PercussionMapper.articulationFromElementVariation(elementNumber, variationNumber) : gp6LocalPercussion(instrumentReference, elementNumber, variationNumber, source.location);
+  const fact = nativePercussion(articulation, source.location, trackId);
+  fact.midi = articulation;
+  findings.push({ disposition: "inferred", code: "gp6-percussion-definition", message: "Encoded GP6 element/variation selects an exact pinned native drum definition; its notation is a format default, not an inferred definite pitch.", location: source.location, fact: { element: elementNumber, variation: variationNumber, articulation, midi: fact.midi, line: fact.line } });
+  return { fact, articulation };
+}
+function percussionNote(fact, identity, type) {
+  const diatonic = 38 - fact.line, octave = Math.floor(diatonic / 7);
+  if (octave < 0 || octave > 9) refuse("percussion-register", "Encoded drum staff position exceeds MusicXML display register.", fact.source);
+  const note = { ...identity, kind: "unpitched", sounding: null, unpitched: { displayStep: "CDEFGAB"[(diatonic % 7 + 7) % 7], displayOctave: octave, midi: fact.midi, instrumentId: fact.id } };
+  const head = fact.heads[type === "whole" ? 2 : type === "half" ? 1 : 0];
+  if (["noteheadBlack", "noteheadHalf", "noteheadWhole"].includes(head)) {
+    note.notehead = "normal";
+    note.noteheadFilled = head === "noteheadBlack";
+  } else if (/^noteheadX(?:Black|Half|Whole)$/.test(head)) {
+    note.notehead = "x";
+    note.noteheadFilled = head === "noteheadXBlack";
+  } else if (/^noteheadTriangleUp(?:Black|Half|Whole)$/.test(head)) {
+    note.notehead = "triangle";
+    note.noteheadFilled = head.endsWith("Black");
+  } else if (["noteheadDiamondWhite", "noteheadDiamondWhiteWide", "noteheadDiamondBlackWide"].includes(head)) {
+    note.notehead = "diamond";
+    note.noteheadFilled = head === "noteheadDiamondBlackWide";
+  } else if (head === "noteheadCircleX") note.notehead = "circle-x";
+  else if (head === "noteheadNull") note.notehead = "none";
+  else {
+    note.notehead = "other";
+    note.noteheadSmufl = { source: fact.source, name: head };
+  }
+  note.sourceNotehead = { source: fact.source, value: head };
+  if (fact.technique === "articStaccatoAbove") note.articulations = ["staccato"];
+  else if (fact.technique === "stringsUpBow" || fact.technique === "stringsDownBow") note.technical = [{ source: fact.source, kind: fact.technique === "stringsUpBow" ? "up-bow" : "down-bow" }];
+  else if (fact.technique === "noteheadParenthesis") note.noteheadParentheses = { source: fact.source, value: true, origin: "source" };
+  else if (fact.technique) note.symbols = [{ source: fact.source, id: `${identity.id}:percussion-technique`, name: fact.technique }];
+  return note;
+}
+function percussionInstrument(fact) {
+  return { source: fact.source, id: fact.id, name: fact.name, midi: fact.midi, line: fact.line, notehead: "normal", defaultVoice: 1 };
 }
 
 // src/adapters/guitar-pro/recover.ts
 var values = {
+  Long: [-4, "long"],
+  DoubleWhole: [-2, "breve"],
   Whole: [1, "whole"],
   Half: [2, "half"],
   Quarter: [4, "quarter"],
   Eighth: [8, "eighth"],
   "16th": [16, "16th"],
   "32nd": [32, "32nd"],
-  "64th": [64, "64th"]
+  "64th": [64, "64th"],
+  "128th": [128, "128th"],
+  "256th": [256, "256th"]
 };
 function idmap(root, group, kind) {
   const result = /* @__PURE__ */ new Map();
@@ -13320,13 +16766,13 @@ function idmap(root, group, kind) {
     if (!/^[0-9]{1,6}$/.test(id) || result.has(id)) refuse("identity", `Invalid/duplicate ${kind} ID.`, e.location);
     result.set(id, e);
   }
-  if (!result.size) refuse("structure", `Empty ${group} are unsupported in this proof.`, root.location);
+  if (!result.size && !["Notes", "Beats", "Rhythms", "Voices"].includes(group)) refuse("structure", `Empty ${group} are unsupported in this proof.`, root.location);
   return result;
 }
 function refs2(e, name, required = true) {
   const s = value(e, name, required);
   if (!s) return [];
-  if (!/^[0-9]{1,6}(?:\s+[0-9]{1,6})*$/.test(s)) refuse("reference", `Invalid ${name} reference list; missing placeholder scopes require a separate profile.`, e.location);
+  if (!(name === "Voices" ? /^(?:-1|[0-9]{1,6})(?:\s+(?:-1|[0-9]{1,6}))*$/ : /^[0-9]{1,6}(?:\s+[0-9]{1,6})*$/).test(s)) refuse("reference", `Invalid ${name} reference list; missing placeholder scopes require a separate profile.`, e.location);
   return s.split(/\s+/);
 }
 function lookup(map, id, at) {
@@ -13363,7 +16809,7 @@ function pitch(property, expected, convention = "midi-octave") {
   if (midi !== expected) refuse("pitch-conflict", `Encoded pitch ${step}${acc}${octave} (${midi}) disagrees with physical/transposition pitch ${expected}.`, p.location);
   return { step, alter, octave: octave - (convention === "scientific" ? 0 : 1), midi, origin: "source" };
 }
-function recover(root, xml, findings, mode = "constructed") {
+function recover(root, xml, findings, mode = "constructed", context) {
   const tracks = idmap(root, "Tracks", "Track"), bars = idmap(root, "Bars", "Bar"), voices = idmap(root, "Voices", "Voice");
   const beats = idmap(root, "Beats", "Beat"), notes = idmap(root, "Notes", "Note"), rhythms = idmap(root, "Rhythms", "Rhythm");
   const trackIds = refs2(child(root, "MasterTrack"), "Tracks");
@@ -13373,9 +16819,12 @@ function recover(root, xml, findings, mode = "constructed") {
   if (!masters.length || masters.length > limits.measures) refuse("measure-budget", "Measure count outside profile.", root.location);
   const used = { bars: /* @__PURE__ */ new Set(), voices: /* @__PURE__ */ new Set(), beats: /* @__PURE__ */ new Set(), notes: /* @__PURE__ */ new Set(), rhythms: /* @__PURE__ */ new Set() };
   const expectedOccurrences = [];
+  const readerPhysicalFrets = /* @__PURE__ */ new Map();
+  const drumArticulations = /* @__PURE__ */ new Map();
+  const slideOrigins = /* @__PURE__ */ new Map(), relations = [];
   let eventCount = 0, noteCount = 0;
   const pickup = !!child(child(root, "MasterTrack"), "Anacrusis", false);
-  let repeatOpen = false;
+  let repeatDepth = 0;
   const common = masters.map((master, index) => {
     const time = value(master, "Time").split("/");
     if (time.length !== 2) refuse("meter", "Expected n/d meter.", master.location);
@@ -13387,40 +16836,47 @@ function recover(root, xml, findings, mode = "constructed") {
     if (ids2.length !== tracks.size || new Set(ids2).size !== ids2.length) refuse("bar-scope", "One unique staff bar per track is required.", master.location);
     const repeat = child(master, "Repeat", false);
     const start = repeat ? flag(repeat.attrs.start, repeat) : false, end = repeat ? flag(repeat.attrs.end, repeat) : false;
-    if (start && repeatOpen) refuse("repeat", "Nested repeats are not supported.", master.location);
-    if (start) repeatOpen = true;
-    if (end && !repeatOpen) refuse("repeat", "An explicit repeat start is required.", master.location);
-    const count = end ? integer(repeat.attrs.count, 2, 8, repeat) : 0;
-    if (repeat?.attrs.count) integer(repeat.attrs.count, 2, 8, repeat);
+    if (start) repeatDepth++;
+    const count = end ? integer(repeat.attrs.count, 2, 255, repeat) : 0;
+    if (repeat?.attrs.count) integer(repeat.attrs.count, end ? 2 : 0, 255, repeat);
     if (repeat && !end && repeat.attrs.count) findings.push({ disposition: "omitted", code: "inactive-repeat-count", message: "Inactive repeat count does not specify playback without an end flag; retained in original input (capture delivered only on success).", location: repeat.location, fact: repeat.attrs.count });
-    if (end) repeatOpen = false;
-    return { time: { beats: numerator, unit }, key: { fifths, mode: mode2.toLowerCase() }, duration: q(numerator * 4, unit), ids: ids2, start, count, pickup: index === 0 && pickup };
+    if (end && repeatDepth) repeatDepth--;
+    return { time: { beats: numerator, unit }, key: { fifths, mode: mode2.toLowerCase() }, duration: q(numerator * 4, unit), ids: ids2, start, count, free: !!child(master, "FreeTime", false), pickup: index === 0 && pickup };
   });
-  if (repeatOpen) refuse("repeat", "Unclosed repeat start.", masters.at(-1).location);
+  if (repeatDepth) refuse("repeat", "Unclosed repeat start.", masters.at(-1).location);
   const parts = trackIds.map((trackId, trackIndex) => {
     const t = lookup(tracks, trackId, root), properties2 = props(t), tuningProperty = properties2.get("Tuning");
-    if (!tuningProperty) refuse("tuning", "Explicit tuning is required; no instrument-name defaults.", t.location);
-    const tuningText = value(tuningProperty, "Pitches");
-    const tuning = tuningText.split(/\s+/).map((s) => integer(s, 12, 108, tuningProperty));
-    if (tuning.length < 4 || tuning.length > 8 || tuning.some((n, i) => i > 0 && n <= tuning[i - 1]))
-      refuse("tuning", "This profile requires 4\u20138 explicitly ordered ascending strings.", tuningProperty.location);
-    const capo = properties2.get("CapoFret");
-    if (capo && integer(value(capo, "Fret"), 0, 24, capo) !== 0) refuse("capo", "Nonzero/partial capo needs a separately exercised pitch convention.", capo.location);
+    const descriptor = context?.track ?? arrangementTrack(t), percussion = descriptor.percussion, fretted = descriptor.fretted;
+    const percussionUsed = /* @__PURE__ */ new Map();
+    if (fretted && !tuningProperty) refuse("tuning", "Explicit tuning is required; no instrument-name defaults.", t.location);
+    const tuningText = tuningProperty && !percussion ? value(tuningProperty, "Pitches") : "";
+    const tuning = tuningText ? tuningText.split(/\s+/).map((s) => integer(s, 0, 127, tuningProperty)) : [];
+    if (tuningProperty && !percussion && (tuning.length < 1 || tuning.length > 16))
+      refuse("tuning", "Source tuning requires 1\u201316 explicitly ordered strings; pitch order is not assumed.", tuningProperty.location);
+    const capoProperty = properties2.get("CapoFret");
+    const capo = capoProperty ? { source: { ...child(capoProperty, "Fret").location, trackId }, fret: integer(value(capoProperty, "Fret"), 0, 999999, capoProperty) } : void 0;
+    if (capo) findings.push({ disposition: "preserved", code: "full-capo", message: "Full capo is retained separately from non-capo open-string tuning and capo-relative source fret. Its semitone shift is applied once to physical pitch, independently of written octave transposition.", location: capo.source, fact: { fret: capo.fret } });
+    const partialCapo = readPartialCapo(properties2, tuning.length);
+    const openOffset = (stringIndex) => partialOpenOffset(capo?.fret ?? 0, partialCapo, stringIndex);
+    const physicalOffset = (stringIndex, fret) => physicalFret(capo?.fret ?? 0, partialCapo, stringIndex, fret);
     const trans = child(t, "Transpose", false);
     const octaves = trans ? integer(value(trans, "Octave"), -2, 2, trans) : 0;
-    if (trans && integer(value(trans, "Chromatic"), -12, 12, trans) !== 0) refuse("transpose", "Only explicitly encoded octave transposition is exercised.", trans.location);
+    const chromatic = trans ? integer(value(trans, "Chromatic"), -24, 24, trans) : 0, semitoneTranspose = octaves * 12 + chromatic;
+    let diatonicTranspose;
+    const inferredDiatonic = Math.sign(chromatic) * (Math.floor(Math.abs(chromatic) / 12) * 7 + [0, 0, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6][Math.abs(chromatic) % 12]);
     const midi = child(t, "GeneralMidi");
-    if (midi.attrs.table !== "Instrument") refuse("instrument", "Non-string/percussion tables require another profile.", midi.location);
+    if (!["Instrument", "Percussion"].includes(midi.attrs.table)) refuse("instrument", "Non-string/percussion tables require another profile.", midi.location);
     const program = integer(value(midi, "Program"), 0, 127, midi);
     const instrument = child(t, "Instrument");
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(instrument.attrs.ref ?? "")) refuse("instrument", "An explicit nonempty instrument reference is required.", instrument.location);
     admittedFamily(instrument.attrs.ref, program, instrument.location);
+    if (descriptor.family !== midiFamily(program, percussion)) findings.push({ disposition: "preserved", code: "playback-timbre-role", message: "Explicit source instrument identity and independently checked notation/physical facts determine the part family. Its separately encoded MIDI program is retained as playback timbre without overriding that performer role.", location: instrument.location, fact: { sourceFamily: descriptor.family, midiProgram: program } });
     if (instrument.attrs.ref === "s-gtr6" && tuning.length !== 6) refuse("instrument-profile", "The reviewed s-gtr6 source reference requires six explicit strings.", instrument.location);
     let convention = mode === "gp8-scientific" ? "scientific-physical" : "midi-octave-written";
-    if (mode === "gpif-physical") {
+    if (mode === "gpif-physical" && !percussion) {
       let midiOctave = true, scientific = true, explicit = 0, absent = 0;
       const reachable = /* @__PURE__ */ new Set();
-      for (const c of common) for (const voiceId of refs2(lookup(bars, c.ids[trackIndex], t), "Voices"))
+      for (const c of common) for (const voiceId of refs2(lookup(bars, c.ids[trackIndex], t), "Voices").filter((id) => id !== "-1"))
         for (const beatId of refs2(lookup(voices, voiceId, t), "Beats"))
           for (const noteId of refs2(lookup(beats, beatId, t), "Notes", false)) reachable.add(noteId);
       for (const id of reachable) {
@@ -13431,9 +16887,11 @@ function recover(root, xml, findings, mode = "constructed") {
         }
         if (!concert || !transposed || !sourceMidi) refuse("pitch-corroboration", "Encoded pitch profile requires complete ConcertPitch/TransposedPitch/Midi triplets, or wholly absent GP6 spelling.", n.location);
         const string = p.get("String"), fret = p.get("Fret");
-        if (!string || !fret) refuse("physical-pitch", "Explicit source string/fret required.", n.location);
-        const physical = tuning[integer(value(string, "String"), 0, tuning.length - 1, string)] + integer(value(fret, "Fret"), 0, 36, fret);
-        if (integer(value(sourceMidi, "Number"), 0, 127, sourceMidi) !== physical) refuse("pitch-conflict", "Source MIDI disagrees with physical tuning plus fret.", sourceMidi.location);
+        if (fretted && (!string || !fret) || !!string !== !!fret) refuse("physical-pitch", "Fretted notes require paired explicit string/fret.", n.location);
+        const hasGrid = !!string && !!fret && !!tuning.length;
+        const physical = hasGrid ? tuning[integer(value(string, "String"), 0, tuning.length - 1, string)] + physicalOffset(integer(value(string, "String"), 0, tuning.length - 1, string), integer(value(fret, "Fret"), 0, 999999, fret)) : integer(value(sourceMidi, "Number"), 0, 127, sourceMidi);
+        const harmonic = harmonicKind(n), actualMidi = integer(value(sourceMidi, "Number"), 0, 127, sourceMidi);
+        if (!harmonic && actualMidi !== physical) refuse("pitch-conflict", "Source MIDI disagrees with non-capo tuning plus full capo plus source fret.", sourceMidi.location);
         const raw = (property) => {
           const field = child(property, "Pitch"), step = value(field, "Step"), acc = value(field, "Accidental");
           const alter = { "": 0, "#": 1, b: -1, x: 2, bb: -2 }[acc];
@@ -13441,8 +16899,13 @@ function recover(root, xml, findings, mode = "constructed") {
           return integer(value(field, "Octave"), 0, 10, field) * 12 + semitones[step] + alter;
         };
         const cp = raw(concert), tp = raw(transposed);
-        midiOctave &&= cp === physical && tp === physical - octaves * 12;
-        scientific &&= cp + 12 === physical && tp + 12 === physical;
+        const stringIndex = hasGrid ? integer(value(string, "String"), 0, tuning.length - 1, string) : 0;
+        if (harmonic && !hasGrid) refuse("harmonic-source", "Harmonic source requires its encoded physical reference.", n.location);
+        const result = hasGrid ? harmonicResult(n, physical, tuning[stringIndex] + openOffset(stringIndex), integer(value(fret, "Fret"), 0, 999999, fret)) : void 0;
+        if (harmonic && actualMidi !== physical && actualMidi !== result) refuse("harmonic-pitch-conflict", "Encoded MIDI contradicts both source physical reference and established harmonic-node result.", sourceMidi.location);
+        const displayed = harmonic === "natural" && result !== void 0 ? result : physical;
+        midiOctave &&= cp === physical && [physical - semitoneTranspose, displayed - semitoneTranspose].includes(tp);
+        scientific &&= cp + 12 === physical && [physical, displayed].includes(tp + 12);
         explicit++;
       }
       const gp6 = !value(root, "GPVersion", false) || /^6(?:\.|$)/.test(value(root, "GPVersion", false));
@@ -13456,11 +16919,15 @@ function recover(root, xml, findings, mode = "constructed") {
       const barId = c.ids[trackIndex], b = lookup(bars, barId, masters[measureIndex]);
       if (used.bars.has(barId)) refuse("bar-reuse", "Reused staff bar objects require distinct occurrence construction.", b.location);
       used.bars.add(barId);
-      const clef = value(b, "Clef");
-      if (!["G2", "F4", "C3", "C4"].includes(clef)) refuse("clef", "Unsupported clef.", b.location);
+      const clef = value(b, "Clef"), clefOctave = value(b, "Ottavia", false);
+      if (clefOctave && !["8va", "8vb", "15ma", "15mb"].includes(clefOctave)) refuse("clef-octave", "Unknown source clef octave decoration.", b.location);
+      if (clefOctave && clef === "Neutral") refuse("clef-octave", "Unpitched clef cannot carry a pitched octave decoration.", b.location);
+      const outputClef = clef === "Neutral" ? "PERC" : clefOctave ? (clef === "G2" ? "G" : clef === "F4" ? "F" : clef) + clefOctave : clef;
+      if (!["G2", "F4", "C3", "C4", "Neutral"].includes(clef)) refuse("clef", "Unsupported clef.", b.location);
       const voiceIds = refs2(b, "Voices");
-      if (!voiceIds.length || voiceIds.length > 4 || new Set(voiceIds).size !== voiceIds.length) refuse("voice-scope", "Expected 1\u20134 distinct voices.", b.location);
+      if (!voiceIds.length || voiceIds.length > 4 || new Set(voiceIds.filter((id) => id !== "-1")).size !== voiceIds.filter((id) => id !== "-1").length) refuse("voice-scope", "Expected 1\u20134 distinct voices.", b.location);
       const recoveredVoices = voiceIds.map((voiceId, voiceIndex) => {
+        if (voiceId === "-1") return [];
         const v = lookup(voices, voiceId, b);
         if (used.voices.has(voiceId)) refuse("voice-reuse", "Reused voice objects require a separate reader patch; beat/note reuse is supported.", v.location);
         used.voices.add(voiceId);
@@ -13474,53 +16941,124 @@ function recover(root, xml, findings, mode = "constructed") {
           const r = lookup(rhythms, rhythmRef, be);
           used.rhythms.add(rhythmRef);
           const type = value(r, "NoteValue"), item = values[type];
-          if (!item) refuse("rhythm", "Written duration outside whole\u201364th profile.", r.location);
-          const dot = child(r, "AugmentationDot", false), dots = dot ? integer(dot.attrs.count, 0, 2, dot) : 0;
+          if (!item) refuse("rhythm", "Unrecognized native written duration.", r.location);
+          const dot = child(r, "AugmentationDot", false), dots = dot ? integer(dot.attrs.count, 0, 3, dot) : 0;
           const tuple = child(r, "PrimaryTuplet", false);
-          const tuplet = tuple ? { actual: integer(tuple.attrs.num, 2, 16, tuple), normal: integer(tuple.attrs.den, 1, 16, tuple) } : void 0;
-          let duration = q(4, item[0]);
+          const tuplet = tuple ? { actual: integer(tuple.attrs.num, 2, 64, tuple), normal: integer(tuple.attrs.den, 1, 64, tuple) } : void 0;
+          let duration = item[0] < 0 ? q(-4 * item[0]) : q(4, item[0]);
           duration = mul(duration, q(2 ** (dots + 1) - 1, 2 ** dots));
           if (tuplet) duration = mul(duration, q(tuplet.normal, tuplet.actual));
-          const location = { ...be.location, trackId, measure: measureIndex + 1, voice: voiceIndex + 1, beat: beatIndex + 1 };
+          const grace = child(be, "GraceNotes", false), writtenDuration = duration;
+          if (grace) {
+            if (!["BeforeBeat", "OnBeat"].includes(grace.text.trim())) refuse("grace", "Unknown grace timing.", grace.location);
+            duration = q(0);
+          }
+          const location = { ...be.location, trackId, staff: context?.staffNumber ?? 1, measure: measureIndex + 1, voice: voiceIndex + 1, beat: beatIndex + 1 };
           const noteIds = refs2(be, "Notes", false);
-          if (new Set(noteIds).size !== noteIds.length || noteIds.length > tuning.length) refuse("chord", "Duplicate/oversized chord.", location);
+          if (new Set(noteIds).size !== noteIds.length || noteIds.length > (fretted ? tuning.length : 64)) refuse("chord", "Duplicate/oversized chord.", location);
           if ((noteCount += noteIds.length) > limits.occurrences) refuse("occurrence-budget", "Expanded note occurrence budget exceeded.", location);
           const sourceNotes = noteIds.map((noteId) => {
             used.notes.add(noteId);
             const n = lookup(notes, noteId, be), np = props(n);
+            const noteSource = { ...location, ...n.location, trackId, staff: context?.staffNumber ?? 1, measure: measureIndex + 1, voice: voiceIndex + 1, beat: beatIndex + 1 };
+            const outputId = `gp:${trackId}:${context?.staffNumber ?? 1}:${measureIndex}:${voiceIndex}:${beatIndex}:note:${noteId}`;
+            const sourceTie = child(n, "Tie", false);
+            const identity = { source: noteSource, id: outputId, tieStart: sourceTie ? flag(sourceTie.attrs.origin, sourceTie) : false, tieStop: sourceTie ? flag(sourceTie.attrs.destination, sourceTie) : false };
+            if (percussion) {
+              const raw = context?.sourceNotes?.get(noteId) ?? n, encodedArticulation = child(raw, "InstrumentArticulation", false);
+              if (encodedArticulation?.text.trim() === "-1") {
+                const rawProperties = props(raw);
+                if (rawProperties.has("Element") || rawProperties.has("Variation")) refuse("percussion-identity", "Conflicting indexed and element/variation percussion encodings.", raw.location);
+                const fact3 = { ...identity, kind: "unpitched", sounding: null, unpitched: { displayUnspecified: { source: encodedArticulation.location, reason: "unassigned-source-articulation" } } };
+                noteTechniques(n, fact3);
+                drumArticulations.set(fact3, -1);
+                findings.push({ disposition: "inferred", code: "unassigned-percussion-source", message: "Source percussion articulation is explicitly unassigned (-1). No drum identity, sound or authored staff position is invented. Standard empty unpitched preserves the note; its consumer-default middle-line display is a projection, not evidence of source placement. Literal source pitch/editor fields remain auxiliary data.", location: noteSource, fact: { articulation: -1, properties: [...props(raw)].map(([name, property]) => ({ name, fields: property.children.map((field) => ({ name: field.name, text: field.text, children: field.children.map((c2) => ({ name: c2.name, text: c2.text })) })) })) } });
+                return fact3;
+              }
+              const selected = sourcePercussion(context?.sourceNotes?.get(noteId) ?? n, context?.percussion ?? [], trackId, findings, descriptor.reference);
+              percussionUsed.set(selected.fact.id, selected.fact);
+              const fact2 = percussionNote(selected.fact, identity, item[1]);
+              noteTechniques(n, fact2);
+              drumArticulations.set(fact2, selected.articulation);
+              return fact2;
+            }
+            if (!np.has("String") && !np.has("Fret")) {
+              if (fretted) refuse("physical-pitch", "Fretted source note lacks physical string/fret.", n.location);
+              const midiField = np.get("Midi"), concert2 = np.get("ConcertPitch"), transposed2 = np.get("TransposedPitch");
+              const tone = np.get("Tone"), octave = np.get("Octave");
+              let sounding2, written2;
+              if (convention === "absent" && tone && octave) {
+                const soundingMidi2 = integer(value(octave, "Number"), 0, 10, octave) * 12 + integer(value(tone, "Step"), 0, 11, tone);
+                if (soundingMidi2 > 127 || soundingMidi2 - semitoneTranspose < 12 || soundingMidi2 - semitoneTranspose > 131) refuse("pitch-range", "Source traditional pitch exceeds reference register.", n.location);
+                sounding2 = inferPitch(soundingMidi2);
+                written2 = inferPitch(soundingMidi2 - semitoneTranspose);
+                findings.push({ disposition: "inferred", code: "gp6-traditional-spelling", message: "GP6 Octave/Tone fixes definite sounding pitch. Absent note spelling receives a labelled sharp reference spelling; written register follows explicit source display transposition.", location: n.location, fact: { octave: value(octave, "Number"), tone: value(tone, "Step") } });
+              } else {
+                if (!midiField || !concert2 || !transposed2) refuse("pitch-corroboration", "Traditional source note requires its complete authored pitch tuple or complete GP6 Octave/Tone.", n.location);
+                const soundingMidi2 = integer(value(midiField, "Number"), 0, 127, midiField);
+                sounding2 = pitch(concert2, soundingMidi2, convention === "scientific-physical" ? "scientific" : "midi-octave");
+                written2 = pitch(transposed2, soundingMidi2 - semitoneTranspose);
+                if (tone || octave) {
+                  if (!tone || !octave || integer(value(octave, "Number"), 0, 10, octave) * 12 + integer(value(tone, "Step"), 0, 11, tone) !== soundingMidi2) refuse("pitch-conflict", "Source or reader Octave/Tone contradicts independently encoded MIDI.", n.location);
+                }
+              }
+              const diatonic = convention === "absent" ? inferredDiatonic : (sounding2.octave - written2.octave) * 7 + "CDEFGAB".indexOf(sounding2.step) - "CDEFGAB".indexOf(written2.step) - octaves * 7;
+              if (diatonicTranspose !== void 0 && diatonicTranspose !== diatonic) refuse("transpose-conflict", "Authored spellings disagree on the diatonic instrument transposition.", n.location);
+              diatonicTranspose = diatonic;
+              const dead2 = np.has("Muted");
+              if (dead2 && !child(np.get("Muted"), "Enable", false)) refuse("technique", "Muted requires its explicit enable marker.", n.location);
+              const fact2 = { ...identity, kind: dead2 ? "dead" : "pitched", sounding: dead2 ? null : sounding2, written: written2, ...dead2 ? { referenceSounding: sounding2 } : {} };
+              noteTechniques(n, fact2, (midi2) => inferPitch(midi2 - semitoneTranspose));
+              return fact2;
+            }
             const stringProp = np.get("String"), fretProp = np.get("Fret");
             if (!stringProp || !fretProp) refuse("physical-pitch", "Explicit string and fret are required.", n.location);
             const stringIndex = integer(value(stringProp, "String"), 0, tuning.length - 1, stringProp);
-            const fret = integer(value(fretProp, "Fret"), 0, 36, fretProp);
-            const soundingMidi = tuning[stringIndex] + fret;
-            const writtenMidi = soundingMidi - octaves * 12;
-            if (soundingMidi > 127 || writtenMidi < 12 || writtenMidi > 127) refuse("pitch-range", "Pitch outside MIDI/reference range.", n.location);
+            const fret = integer(value(fretProp, "Fret"), 0, 999999, fretProp);
+            const physicalMidi = tuning[stringIndex] + physicalOffset(stringIndex, fret), harmonic = harmonicKind(n);
+            const resultMidi = harmonicResult(n, physicalMidi, tuning[stringIndex] + openOffset(stringIndex), fret);
+            const soundingMidi = harmonic && resultMidi !== void 0 ? resultMidi : physicalMidi;
+            const displayedMidi = harmonic === "natural" && resultMidi !== void 0 ? soundingMidi : physicalMidi;
+            const writtenMidi = displayedMidi - semitoneTranspose;
+            if (soundingMidi > 127 || writtenMidi < 12 || writtenMidi > 131) refuse("pitch-range", "Pitch outside MIDI/reference range.", n.location);
             const concert = np.get("ConcertPitch"), transposed = np.get("TransposedPitch");
             let sounding, written;
             if (convention === "scientific-physical" && mode !== "constructed") {
               const sourceMidi = np.get("Midi");
               if (!concert || !transposed || !sourceMidi) refuse("pitch-corroboration", "GP8 admission requires both full pitch fields and Midi/Number.", n.location);
-              if (integer(value(sourceMidi, "Number"), 0, 127, sourceMidi) !== soundingMidi)
+              if (![physicalMidi, soundingMidi].includes(integer(value(sourceMidi, "Number"), 0, 127, sourceMidi)))
                 refuse("pitch-conflict", "Midi/Number differs from independently derived tuning plus fret.", sourceMidi.location);
-              sounding = pitch(concert, soundingMidi, "scientific");
-              const rawDisplay = pitch(transposed, soundingMidi, "scientific");
-              if (rawDisplay.step !== sounding.step || rawDisplay.alter !== sounding.alter)
+              const sourcePhysical = pitch(concert, physicalMidi, "scientific");
+              sounding = harmonic ? inferPitch(soundingMidi) : sourcePhysical;
+              const displayField = child(transposed, "Pitch"), displayValue = (integer(value(displayField, "Octave"), 0, 10, displayField) + 1) * 12 + semitones[value(displayField, "Step")] + { "": 0, "#": 1, b: -1, x: 2, bb: -2 }[value(displayField, "Accidental")];
+              if (![physicalMidi, displayedMidi].includes(displayValue)) refuse("harmonic-pitch-conflict", "Display pitch contradicts physical or harmonic source roles.", transposed.location);
+              const rawDisplay = harmonic && displayValue !== displayedMidi ? inferPitch(displayedMidi) : pitch(transposed, displayedMidi, "scientific");
+              if (!harmonic && (rawDisplay.step !== sounding.step || rawDisplay.alter !== sounding.alter))
                 refuse("pitch-conflict", "Both encoded pitch spellings must corroborate the observed sounding-pitch convention.", n.location);
-              written = { ...rawDisplay, midi: writtenMidi, octave: rawDisplay.octave - octaves, origin: "inferred" };
+              written = chromatic ? inferPitch(writtenMidi) : { ...rawDisplay, midi: writtenMidi, octave: rawDisplay.octave - octaves, origin: "inferred" };
               findings.push({ disposition: "inferred", code: "gp8-written-register", message: "Observed raw pitch fields encode sounding register. Written register is calculated from corroborated physical/MIDI pitch and explicit source octave display transpose; raw fields stay untouched (gp8-scientific-physical/0).", location: { ...n.location, ...location, path: n.location.path, id: noteId }, fact: { rawConcert: sounding, rawTransposed: rawDisplay, transposeOctaves: octaves } });
             } else {
-              sounding = concert ? pitch(concert, soundingMidi) : inferPitch(soundingMidi);
-              written = transposed ? pitch(transposed, writtenMidi) : inferPitch(writtenMidi);
+              if (concert) pitch(concert, physicalMidi);
+              sounding = harmonic ? inferPitch(soundingMidi) : concert ? pitch(concert, soundingMidi) : inferPitch(soundingMidi);
+              if (harmonic && transposed) {
+                const field = child(transposed, "Pitch"), valueMidi = integer(value(field, "Octave"), 0, 10, field) * 12 + semitones[value(field, "Step")] + { "": 0, "#": 1, b: -1, x: 2, bb: -2 }[value(field, "Accidental")];
+                if (![physicalMidi - semitoneTranspose, writtenMidi].includes(valueMidi)) refuse("harmonic-pitch-conflict", "Display pitch contradicts physical or harmonic source roles.", transposed.location);
+                written = valueMidi === writtenMidi ? pitch(transposed, writtenMidi) : inferPitch(writtenMidi);
+              } else written = transposed ? pitch(transposed, writtenMidi) : inferPitch(writtenMidi);
             }
-            if (mode !== "constructed" && child(n, "InstrumentArticulation", false) && integer(value(n, "InstrumentArticulation"), 0, 127, n) !== 0) refuse("articulation-profile", "Only default pitched articulation0 is admitted.", n.location);
+            if (chromatic && transposed && convention === "midi-octave-written") {
+              const diatonic = (sounding.octave - written.octave) * 7 + "CDEFGAB".indexOf(sounding.step) - "CDEFGAB".indexOf(written.step) - octaves * 7;
+              if (diatonicTranspose !== void 0 && diatonicTranspose !== diatonic) refuse("transpose-conflict", "Source spelling contradicts instrument diatonic transposition.", n.location);
+              diatonicTranspose = diatonic;
+            }
             const dead = np.has("Muted");
             if (dead && !child(np.get("Muted"), "Enable", false)) refuse("technique", "Muted property requires an explicit Enable marker.", n.location);
             const tie = child(n, "Tie", false);
             if (tie && (!("origin" in tie.attrs) || !("destination" in tie.attrs))) refuse("tie", "Both tie endpoint flags must be explicit.", tie.location);
             if (!concert || !transposed) findings.push({ disposition: "inferred", code: "pitch-spelling", message: "Absent spelling uses an explicit sharp-based reference spelling; physical pitch and encoded octave transposition are retained.", location: { ...n.location, ...location, path: n.location.path, id: noteId }, fact: { concertPresent: !!concert, transposedPresent: !!transposed } });
-            return {
-              source: { ...location, ...n.location, trackId, measure: measureIndex + 1, voice: voiceIndex + 1, beat: beatIndex + 1 },
-              id: noteId,
+            const fact = {
+              source: { ...location, ...n.location, trackId, staff: context?.staffNumber ?? 1, measure: measureIndex + 1, voice: voiceIndex + 1, beat: beatIndex + 1 },
+              id: outputId,
               string: tuning.length - stringIndex,
               fret,
               kind: dead ? "dead" : "pitched",
@@ -13532,11 +17070,31 @@ function recover(root, xml, findings, mode = "constructed") {
               tieStart: tie ? flag(tie.attrs.origin, tie) : false,
               tieStop: tie ? flag(tie.attrs.destination, tie) : false
             };
+            if (harmonic) {
+              if (dead) refuse("harmonic-dead", "Simultaneous definite harmonic and dead-note marking needs source clarification.", n.location);
+              const base = harmonic === "natural" ? inferPitch(tuning[stringIndex] + openOffset(stringIndex)) : concert ? pitch(concert, physicalMidi, convention === "scientific-physical" ? "scientific" : "midi-octave") : inferPitch(physicalMidi);
+              fact.harmonic = {
+                source: np.get("HarmonicType").location,
+                type: harmonic,
+                base,
+                pitchRole: harmonic === "natural" ? resultMidi !== void 0 ? "sounding" : "touching" : "base",
+                ...harmonic === "natural" ? { touch: concert ? pitch(concert, physicalMidi, convention === "scientific-physical" ? "scientific" : "midi-octave") : inferPitch(physicalMidi) } : {},
+                ...resultMidi !== void 0 ? { result: sounding } : {}
+              };
+              if (resultMidi === void 0) fact.sounding = null;
+              findings.push({ disposition: resultMidi !== void 0 ? "inferred" : "preserved", code: "harmonic-roles", message: "Harmonic result is derived only from an established source node/partial rule, separately from literal physical pitch tuples and absent artificial touch pitch. No borrowed default supplies a missing node.", location: fact.source, fact: { type: harmonic, definiteResult: resultMidi !== void 0, resultOrigin: resultMidi === void 0 ? "unestablished" : "source-node-partial/1" } });
+            }
+            readerPhysicalFrets.set(fact, physicalOffset(stringIndex, fret) - (capo?.fret ?? 0));
+            const slide = noteTechniques(n, fact, (midi2) => inferPitch(midi2 - octaves * 12));
+            if (slide) slideOrigins.set(fact, slide);
+            return fact;
           });
-          if (new Set(sourceNotes.map((n) => n.string)).size !== sourceNotes.length) refuse("chord-string", "One chord cannot occupy the same string twice.", location);
+          if (fretted && new Set(sourceNotes.map((n) => n.string)).size !== sourceNotes.length) refuse("chord-string", "One chord cannot occupy the same string twice.", location);
           const event = {
             source: location,
-            id: beatId,
+            voiceId: String(voiceIndex + 1),
+            staff: 1,
+            id: `gp:${trackId}:${context?.staffNumber ?? 1}:${measureIndex}:${voiceIndex}:${beatIndex}:beat:${beatId}`,
             start: position,
             duration,
             type: item[1],
@@ -13547,22 +17105,35 @@ function recover(root, xml, findings, mode = "constructed") {
             fullMeasureRest: !noteIds.length && ids2.length === 1 && equal(duration, c.duration),
             ...child(be, "FreeText", false) ? { text: value(be, "FreeText") } : {}
           };
+          if (grace) {
+            const remaining = ids2.slice(beatIndex + 1), hostId = remaining.find((id) => !child(lookup(beats, id, v), "GraceNotes", false));
+            if (!hostId) refuse("grace-host", "Grace group requires a following ordinary source host.", grace.location);
+            let groupStart = beatIndex;
+            while (groupStart > 0 && child(lookup(beats, ids2[groupStart - 1], v), "GraceNotes", false)) groupStart--;
+            event.grace = { source: grace.location, before: grace.text.trim() === "BeforeBeat", slash: grace.text.trim() === "BeforeBeat", index: beatIndex - groupStart, hostId: `gp:${trackId}:${context?.staffNumber ?? 1}:${measureIndex}:${voiceIndex}:${ids2.indexOf(hostId)}:beat:${hostId}` };
+            event.writtenDuration = writtenDuration;
+          }
+          beatTechniques(be, event);
+          beatStructure(be, event);
           for (const note of sourceNotes) expectedOccurrences.push({ note, event, rhythmId: rhythmRef });
           position = add(position, duration);
           return event;
         });
       });
       const totals = recoveredVoices.filter((v) => v.length).map((v) => v.reduce((s, e) => add(s, e.duration), q(0)));
-      if (!totals.length) refuse("empty-measure", "At least one voice must explicitly encode its silence/music span.", b.location);
-      const actualDuration = c.pickup ? totals[0] : c.duration;
-      if (!totals.every((t2) => equal(t2, actualDuration)) || c.pickup && actualDuration.n * c.duration.d >= c.duration.n * actualDuration.d)
-        refuse("measure-duration", "Voices must fill the exact common measure span; pickup voices must agree and be shorter than meter.", b.location);
+      if (!totals.length && (c.pickup || c.free)) refuse("empty-measure", "An entirely empty pickup or free-time staff needs an independently established exact master-bar span.", b.location);
+      const actualDuration = totals[0] ?? c.duration;
+      if (!totals.every((t2) => equal(t2, actualDuration)) || !c.free && c.pickup && actualDuration.n * c.duration.d >= c.duration.n * actualDuration.d)
+        refuse("measure-duration", "Active voices must establish one exact source measure extent; an explicit pickup must be shorter than its meter.", b.location);
+      const irregular = !equal(actualDuration, c.duration);
+      if (irregular && !c.pickup && !c.free) findings.push({ disposition: "inferred", code: "source-irregular-measure", message: "All active source voices establish this exact underfull or overfull extent. The literal meter and every written value remain unchanged; ordinary MusicXML marks an implicit measure without adding notes/rests or calling an interior bar a pickup.", location: b.location, fact: { declaredMeter: c.time, declaredSpan: c.duration, writtenExtent: actualDuration } });
       return {
-        source: { ...b.location, trackId, measure: measureIndex + 1 },
+        source: { ...b.location, trackId, staff: context?.staffNumber ?? 1, measure: measureIndex + 1 },
         time: c.time,
         key: c.key,
-        clef,
+        clef: outputClef,
         pickup: c.pickup,
+        ...irregular ? { implicit: true } : {},
         duration: actualDuration,
         voices: recoveredVoices,
         repeatStart: c.start,
@@ -13575,9 +17146,8 @@ function recover(root, xml, findings, mode = "constructed") {
       for (let vi = 0; vi < m.voices.length; vi++) for (const e of m.voices[vi]) {
         const start = add(absolute, e.start);
         for (const n of e.notes) {
-          const key = `${vi}:${n.string}`, previous = pending.get(key);
-          if (n.kind === "dead" && (n.tieStart || n.tieStop || n.sourceHopoOrigin || n.sourceHopoDestination)) refuse("dead-relation", "Dead-note tie/HOPO semantics are outside this profile.", n.source);
-          if (n.tieStop && (!previous || !equal(previous.end, start) || previous.note.sounding?.midi !== n.sounding?.midi || previous.note.written.midi !== n.written.midi || previous.note.fret !== n.fret || previous.note.written.step !== n.written.step || previous.note.written.alter !== n.written.alter))
+          const key = `${vi}:${n.string ?? (n.kind === "unpitched" ? n.unpitched.instrumentId : n.written.midi)}`, previous = pending.get(key);
+          if (n.tieStop && (!previous || previous.note.kind !== n.kind || !equal(previous.end, start) || previous.note.sounding?.midi !== n.sounding?.midi || previous.note.written?.midi !== n.written?.midi || previous.note.fret !== n.fret || previous.note.written?.step !== n.written?.step || previous.note.written?.alter !== n.written?.alter))
             refuse("tie-conflict", "Tie destination has no contiguous, identical explicit origin; no source pitch/fret repair is permitted.", n.source);
           if (!n.tieStop && previous) refuse("tie-conflict", "Explicit tie origin reaches an ordinary attack.", n.source);
           pending.delete(key);
@@ -13586,53 +17156,49 @@ function recover(root, xml, findings, mode = "constructed") {
       }
       absolute = add(absolute, m.duration);
     }
-    for (let vi = 0; vi < Math.max(...measures.map((m) => m.voices.length)); vi++) {
-      const events = [];
-      let barStart = q(0);
-      for (const m of measures) {
-        for (const e of m.voices[vi] ?? []) events.push({ e, absolute: add(barStart, e.start) });
-        barStart = add(barStart, m.duration);
-      }
-      const paired = /* @__PURE__ */ new Set();
-      for (let ei = 0; ei < events.length; ei++) for (const origin of events[ei].e.notes) {
-        if (!origin.sourceHopoOrigin) continue;
-        const next = events[ei + 1], target = next?.e.notes.find((n) => n.string === origin.string);
-        if (!next || !target?.sourceHopoDestination || !equal(add(events[ei].absolute, events[ei].e.duration), next.absolute) || target.fret === origin.fret || origin.kind !== "pitched" || target.kind !== "pitched")
-          refuse("hopo-conflict", "HOPO requires explicit paired same-string contiguous endpoints with a changed fret.", origin.source);
-        const kind = target.fret > origin.fret ? "hammer-on" : "pull-off";
-        if (events[ei].e.notes.filter((n) => n.sourceHopoOrigin).length > 1) refuse("hopo-polyphony", "Concurrent same-voice HOPO pairs need additional notation numbering coverage.", origin.source);
-        origin.hopoStart = kind;
-        target.hopoStop = kind;
-        origin.hopoNumber = target.hopoNumber = vi + 1;
-        paired.add(target);
-        findings.push({ disposition: "inferred", code: "hopo-classification", message: "Paired source HOPO flags classified by same-string fret direction; exported as standard hammer-on/pull-off endpoints with a derived short connection slur. This is performance-connection notation, not separately sourced phrasing (source-hopo/0).", location: origin.source, fact: { kind, destination: target.source } });
-      }
-      for (const { e } of events) for (const n of e.notes) if (n.sourceHopoDestination && !paired.has(n)) refuse("hopo-conflict", "Unpaired explicit HOPO destination.", n.source);
-    }
     for (const m of measures) for (const v of m.voices) for (const e of v) {
       if (e.dynamic && !["PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"].includes(e.dynamic)) refuse("dynamic", "Unknown dynamic value.", e.source);
       for (const n of e.notes) if (n.kind === "dead") findings.push({ disposition: "omitted", code: "dead-playback-timbre", message: "Dead note exports as standard unpitched x notehead with dead-note technical meaning and hidden physical guidance. Original reference pitch is retained; playback timbre is not assigned or verified.", location: n.source, fact: { physicalReference: n.referenceSounding } });
     }
     if (pending.size) refuse("tie-conflict", "Explicit tie origin has no destination.", [...pending.values()][0].note.source);
-    return {
+    const part = {
       source: t.location,
       id: trackId,
       name: value(t, "Name"),
+      ...child(t, "ShortName", false) ? { abbreviation: value(t, "ShortName") } : {},
       instrument: instrument.attrs.ref,
       midiProgram: program,
-      tuning,
+      ...tuning.length ? { tuning } : {},
+      ...capo ? { capo } : {},
       transposeOctaves: octaves,
+      ...chromatic ? { transpose: { diatonic: diatonicTranspose ?? inferredDiatonic, chromatic, octaveChange: octaves } } : {},
+      ...percussion ? { staves: [{ source: t.location, number: 1, kind: "percussion", clef: "PERC", lines: 5 }], percussionInstruments: [...percussionUsed.values()].map(percussionInstrument) } : {},
       measures
     };
+    transposeWrittenKeys(part, findings);
+    if (partialCapo) partialCapoInstruction(part, partialCapo, findings);
+    for (let mi = 0; mi < part.measures.length; mi++) masterStructure(masters[mi], part.measures[mi], part, mi, relations);
+    beatRelations(part, beats, relations);
+    trackLyrics(t, part, (context?.staffNumber ?? 1) === 1);
+    if (fretted) {
+      gpifHopo(part, relations, findings);
+      connectSlides(part, slideOrigins, relations);
+    }
+    if (fretted) {
+      connectSustainMarks(part, relations);
+      numberHopo(part);
+    }
+    return part;
   });
   if (parts.some((p) => !equal(p.measures[0].duration, parts[0].measures[0].duration)))
     refuse("pickup-span", "All tracks must share one exact master-bar pickup span; no implicit padding.", root.location);
   for (const [name, map] of Object.entries({ bars, voices, beats, notes, rhythms })) {
     for (const [id, e] of map) if (!used[name].has(id)) refuse("unreferenced", `Unreferenced ${name} source object ${id}.`, e.location);
   }
-  const tempos = [];
+  const tempos = [], tempoChanges = [];
   for (const a of child(child(root, "MasterTrack"), "Automations", false)?.children ?? []) {
-    if (value(a, "Type") !== "Tempo" || flag(value(a, "Linear"), a)) refuse("automation", "Only discrete tempo automations are exercised.", a.location);
+    if (value(a, "Type") !== "Tempo") refuse("automation", "Unreviewed master automation type.", a.location);
+    const linear = flag(value(a, "Linear"), a);
     const measure = integer(value(a, "Bar"), 0, masters.length - 1, a);
     const position = decimal(value(a, "Position"));
     if (position.n >= position.d) refuse("tempo-position", "Tempo ratio position must be in [0,1).", a.location);
@@ -13653,14 +17219,41 @@ function recover(root, xml, findings, mode = "constructed") {
       quarterRate: rate.n / rate.d * ref[2],
       visible: flag(value(a, "Visible"), a)
     });
+    tempoChanges.push({ tempo: tempos.at(-1), linear, source: a.location });
     findings.push({ disposition: "preserved", code: "tempo-unit", message: "Original tempo rate, unit, visibility and exact position preserved.", location: a.location, fact: { rate: partsValue[0], reference, ratioPosition: position, visible: value(a, "Visible") } });
-    if (child(a, "Text", false)) findings.push({ disposition: "omitted", code: "tempo-text", message: "Tempo annotation text retained in original input (capture delivered only on success); notation export not exercised.", location: child(a, "Text").location, fact: value(a, "Text") });
+    const text = child(a, "Text", false);
+    if (text?.text.trim()) {
+      (parts[0].measures[measure].directions ??= []).push({ source: text.location, kind: "words", staff: 1, position: mul(position, actual), text: text.text, printObject: flag(value(a, "Visible"), a) });
+      findings.push({ disposition: "preserved", code: "tempo-text", message: "Authored tempo words retain exact position and visibility as standard text.", location: text.location, fact: text.text });
+    }
+  }
+  tempoChanges.sort((a, b) => a.tempo.measure - b.tempo.measure || a.tempo.position.n * b.tempo.position.d - b.tempo.position.n * a.tempo.position.d);
+  for (const [index, point] of tempoChanges.entries()) {
+    const next = tempoChanges[index + 1];
+    if (next && point.tempo.measure === next.tempo.measure && equal(point.tempo.position, next.tempo.position)) refuse("tempo-conflict", "Two tempo points cannot own the same exact source clock.", next.source);
+    if (!point.linear) continue;
+    if (!next) {
+      findings.push({ disposition: "preserved", code: "linear-tempo", message: "A terminal source gradual-tempo flag has no target tempo; its literal instruction is retained without inventing an endpoint or rate.", location: point.source, fact: { linear: true, terminal: true } });
+      (parts[0].measures[point.tempo.measure].directions ??= []).push({ source: point.source, kind: "words", staff: 1, position: point.tempo.position, text: "gradual tempo change", printObject: point.tempo.visible });
+      continue;
+    }
+    const text = next.tempo.quarterRate > point.tempo.quarterRate ? "accel." : next.tempo.quarterRate < point.tempo.quarterRate ? "rall." : "steady tempo";
+    if ((context?.staffNumber ?? 1) === 1) relations.push({
+      source: point.source,
+      id: `gp-tempo:${parts[0].id}:${index}`,
+      kind: "text-line",
+      line: "dashes",
+      beginText: text,
+      printObject: point.tempo.visible,
+      start: { partId: parts[0].id, measure: point.tempo.measure, position: point.tempo.position, staff: 1 },
+      end: { partId: parts[0].id, measure: next.tempo.measure, position: next.tempo.position, staff: 1 }
+    });
+    findings.push({ disposition: "inferred", code: "linear-tempo", message: "Source linear interpolation connects this exact tempo point to the next. Its direction is derived from the two explicit rates and preserved as a standard gradual-tempo instruction; continuous audio interpolation is not synthesized.", location: point.source, fact: { linear: true, start: point.tempo, end: next.tempo, instruction: text } });
   }
   if (!tempos.length) findings.push({ disposition: "omitted", code: "no-tempo", message: "No encoded tempo exists; no upstream playback default is printed.", location: root.location });
-  freeze(parts);
   freeze(tempos);
   const occurrenceKey = (location, noteId) => `${location.trackId}:${location.measure}:${location.voice}:${location.beat}:${noteId}`;
-  const expectedByKey = new Map(expectedOccurrences.map((e) => [occurrenceKey(e.note.source, e.note.id), e]));
+  const expectedByKey = new Map(expectedOccurrences.map((e) => [occurrenceKey(e.note.source, e.note.source.id), e]));
   const capturedKeys = /* @__PURE__ */ new Set();
   const parser = new GpifParser(), captures = [], normalized = [];
   const capturedExpected = [];
@@ -13670,15 +17263,17 @@ function recover(root, xml, findings, mode = "constructed") {
     const expected = expectedByKey.get(key);
     if (capturedKeys.has(key)) refuse("reader-identity", "Duplicate borrowed source occurrence.", root.location);
     capturedKeys.add(key);
-    if (!expected || s.noteId !== expected.note.id || s.beatId !== expected.event.id || s.rhythmId !== expected.rhythmId || s.trackId !== expected.note.source.trackId || s.measure + 1 !== expected.note.source.measure || s.voice + 1 !== expected.note.source.voice || s.beat + 1 !== expected.note.source.beat)
+    if (!expected || s.noteId !== expected.note.source.id || s.beatId !== expected.event.source.id || s.rhythmId !== expected.rhythmId || s.trackId !== expected.note.source.trackId || s.measure + 1 !== expected.note.source.measure || s.voice + 1 !== expected.note.source.voice || s.beat + 1 !== expected.note.source.beat)
       refuse("reader-identity", "Borrowed reader occurrence identity differs from the complete source traversal.", root.location);
-    captures.push({
-      source: expected.note.source,
-      rhythmId: s.rhythmId,
-      noteId: s.noteId,
-      before: freeze({ fret: note.fret, string: note.string, tieDestination: note.isTieDestination }),
-      after: { fret: 0, string: 0, tieDestination: false, soundingMidi: 0, playbackTicks: 0 }
-    });
+    const commonCapture = { source: expected.note.source, rhythmId: s.rhythmId, noteId: s.noteId };
+    if (expected.note.kind === "unpitched") captures.push({ ...commonCapture, kind: "unpitched", before: freeze({ articulation: note.percussionArticulation, tieDestination: note.isTieDestination }), after: { articulation: 0, tieDestination: false, playbackTicks: 0 } });
+    else if (expected.note.string === void 0) captures.push({ ...commonCapture, kind: "pitched", before: freeze({ soundingMidi: (expected.note.sounding ?? expected.note.referenceSounding).midi, writtenMidi: expected.note.written.midi, tieDestination: note.isTieDestination }), after: { soundingMidi: 0, tieDestination: false, playbackTicks: 0 } });
+    else captures.push({ ...commonCapture, before: freeze({ fret: note.fret, string: note.string, tieDestination: note.isTieDestination }), after: { fret: 0, string: 0, tieDestination: false, soundingMidi: 0, playbackTicks: 0 } });
+    const projectedFret = readerPhysicalFrets.get(expected.note);
+    if (projectedFret !== void 0 && projectedFret !== note.fret) {
+      findings.push({ disposition: "preserved", code: "partial-capo-reader-alias", message: "After exact raw occurrence capture, the borrowed reader receives the independently established effective open-string fret. Original source tab fret remains unchanged in the output model.", location: expected.note.source, fact: { sourceFret: note.fret, readerFret: projectedFret } });
+      note.fret = projectedFret;
+    }
     normalized.push(note);
     capturedExpected.push(expected);
   };
@@ -13692,9 +17287,20 @@ function recover(root, xml, findings, mode = "constructed") {
     refuse("reader-coverage", "Borrowed reader did not recover the complete requested source scope.", root.location);
   for (let i = 0; i < captures.length; i++) {
     const n = normalized[i], expected = capturedExpected[i];
-    captures[i].after = { fret: n.fret, string: n.string, tieDestination: n.isTieDestination, soundingMidi: n.realValue, playbackTicks: n.beat.playbackDuration };
-    if (n.realValue !== (expected.note.sounding ?? expected.note.referenceSounding).midi || n.fret !== expected.note.fret || n.string !== parts.find((p) => p.id === expected.note.source.trackId).tuning.length - expected.note.string + 1 || n.isTieDestination !== expected.note.tieStop || n.isDead !== (expected.note.kind === "dead"))
-      refuse("reader-reconciliation", "Normalized pitch, physical choice or tie disagrees with immutable source facts.", expected.note.source);
+    const capture = captures[i], sourceNote = expected.note;
+    if (capture.kind === "dead") refuse("reader-reconciliation", "Unexpected binary-only dead capture in GPIF recovery.", capture.source);
+    if (capture.kind === "unpitched") {
+      capture.after = { articulation: n.percussionArticulation, tieDestination: n.isTieDestination, playbackTicks: n.beat.playbackDuration };
+      if (n.percussionArticulation !== drumArticulations.get(sourceNote) || n.isTieDestination !== sourceNote.tieStop) refuse("reader-reconciliation", "Borrowed percussion identity or tie differs from immutable source.", sourceNote.source);
+    } else if (capture.kind === "pitched") {
+      capture.after = { soundingMidi: n.realValue, tieDestination: n.isTieDestination, playbackTicks: n.beat.playbackDuration };
+      if (n.realValue !== (sourceNote.sounding ?? sourceNote.referenceSounding)?.midi || n.isTieDestination !== sourceNote.tieStop) refuse("reader-reconciliation", "Borrowed traditional pitch or tie differs from authored source.", sourceNote.source);
+    } else {
+      capture.after = { fret: n.fret, string: n.string, tieDestination: n.isTieDestination, soundingMidi: n.realValue, playbackTicks: n.beat.playbackDuration };
+      const part = parts.find((p) => p.id === sourceNote.source.trackId), tuning = part.tuning;
+      const expectedPhysical = tuning[tuning.length - sourceNote.string] + (part.capo?.fret ?? 0) + (readerPhysicalFrets.get(sourceNote) ?? sourceNote.fret);
+      if ((sourceNote.harmonic ? n.realValueWithoutHarmonic !== expectedPhysical : n.realValue !== (sourceNote.sounding ?? sourceNote.referenceSounding).midi) || n.fret !== (readerPhysicalFrets.get(sourceNote) ?? sourceNote.fret) || n.string !== tuning.length - sourceNote.string + 1 || n.isTieDestination !== sourceNote.tieStop || n.isDead !== (sourceNote.kind === "dead")) refuse("reader-reconciliation", "Normalized pitch, physical choice or tie disagrees with immutable source facts.", sourceNote.source);
+    }
   }
   for (let pi = 0; pi < parts.length; pi++) {
     const track = parser.score.tracks[pi];
@@ -13708,14 +17314,27 @@ function recover(root, xml, findings, mode = "constructed") {
         if (voice.beats.length !== measure.voices[vi].length) refuse("reader-scope", "Borrowed beat scope differs.", measure.source);
         for (let bi = 0; bi < voice.beats.length; bi++) {
           const be = voice.beats[bi], source = measure.voices[vi][bi];
-          if (be.notes.length !== source.notes.length || be.dots !== source.dots || be.duration !== values[Object.keys(values).find((k) => values[k][1] === source.type)][0])
+          if (source.grace && (be.dots !== source.dots || be.duration !== values[Object.keys(values).find((k) => values[k][1] === source.type)][0])) findings.push({ disposition: "preserved", code: "grace-written-rhythm", message: "Borrowed reader normalized grace written duration; output retains the independently encoded source rhythm and zero ordinary elapsed clock.", location: source.source });
+          if (be.notes.length !== source.notes.length || !source.grace && (be.dots !== source.dots || be.duration !== values[Object.keys(values).find((k) => values[k][1] === source.type)][0]))
             refuse("reader-rhythm", "Borrowed written rhythm/chord disagrees with source.", source.source);
         }
       }
     }
   }
+  for (const part of parts) {
+    const descriptor = context?.track ?? arrangementTrack(tracks.get(part.id));
+    if (!descriptor.fretted) {
+      if (part.tuning) findings.push({ disposition: "preserved", code: "editor-pitch-grid", message: "Encoded string/fret grid corroborates source pitch but the declared traditional instrument does not acquire guitar tablature or a performing-hand assignment. Raw editor coordinates remain in source and occurrence capture.", location: part.source });
+      delete part.tuning;
+      delete part.capo;
+      for (const measure of part.measures) for (const voice of measure.voices) for (const event of voice) for (const note of event.notes) {
+        delete note.string;
+        delete note.fret;
+      }
+    }
+  }
   findings.push({ disposition: "preserved", code: "source-reconciled", message: "Complete source definitions, cloned occurrence IDs and normalized pitch/voice/rhythm/tie scope reconciled; exact source clocks replace truncated playback ticks.", location: root.location, fact: { noteOccurrences: captures.length, events: eventCount } });
-  return { score: freeze({ title: value(child(root, "Score"), "Title"), parts, tempos }), occurrences: freeze(captures) };
+  return { score: freeze({ title: value(child(root, "Score"), "Title"), ...scoreTexts(child(root, "Score"), parts[0].id), parts, tempos, ...relations.length ? { relations } : {} }), occurrences: freeze(captures) };
 }
 
 // third_party/alphatab/src/midi/GeneralMidi.ts
@@ -14258,8 +17877,9 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     this._score = new Score();
     this.readScoreInformation();
     if (this._versionNumber < 500) {
-      this._globalTripletFeel = GpBinaryHelpers.gpReadBool(this.data) ? 2 /* Triplet8th */ : 0 /* NoTripletFeel */;
-      this.sourceField("global-triplet-feel", this._globalTripletFeel);
+      const globalTripletFeel = this.data.readByte();
+      this.sourceField("global-triplet-feel", globalTripletFeel);
+      this._globalTripletFeel = globalTripletFeel !== 0 ? 2 /* Triplet8th */ : 0 /* NoTripletFeel */;
     }
     if (this._versionNumber >= 400) {
       this.readLyrics();
@@ -14335,7 +17955,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
   }
   _readDirection(direction) {
     let directionIndex = IOHelper.readInt16LE(this.data);
-    this.sourceField("navigation", directionIndex, 2);
+    this.sourceField(`navigation:${direction}`, directionIndex, 2);
     if (directionIndex === -1) {
       return;
     }
@@ -14447,6 +18067,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     for (let i = 0; i < 5; i++) {
       const lyrics = new Lyrics();
       lyrics.startBar = IOHelper.readInt32LE(this.data) - 1;
+      this.sourceField(`lyrics-start:${i}`, lyrics.startBar + 1, 4);
       const textStart = this.data.position;
       lyrics.text = GpBinaryHelpers.gpReadStringInt(
         this.data,
@@ -14584,6 +18205,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       }
       let repeatAlternative = 0;
       const repeatMask = this.data.readByte();
+      this.sourceField("alternate-ending-count", repeatMask);
       for (let i = 0; i < 8; i++) {
         const repeating = 1 << i;
         if (repeatMask > i && (existentAlternatives & repeating) === 0) {
@@ -14611,7 +18233,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       this._keySignatures.set(this._score.masterBars.length, [key, mode]);
     }
     if (this._versionNumber >= 500 && (flags & 3) !== 0) {
-      this.data.skip(4);
+      for (let i = 0; i < 4; i++) this.sourceField(`beam-group:${i}`, this.data.readByte());
     }
     if (this._versionNumber >= 500) {
       newMasterBar.alternateEndings = this.data.readByte();
@@ -14789,7 +18411,11 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     for (let v = 0; v < voiceCount; v++) {
       this.readVoice(track, newBar);
     }
-    if (this._versionNumber >= 500) this.sourceField("bar-line-break", this.data.readByte());
+    if (this._versionNumber >= 500) {
+      if (this.data.position === this.data.length && newBar.index === this._barCount - 1 && track.index === this._trackCount - 1) {
+        this.sourceField("final-layout-absent", 1, 0);
+      } else this.sourceField("bar-line-break", this.data.readByte());
+    }
   }
   readVoice(track, bar) {
     const beatCount = IOHelper.readInt32LE(this.data);
@@ -14950,7 +18576,9 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
         newBeat.ottava = 4 /* _15mb */;
       }
       if ((flags2 & 2048) !== 0) {
-        const breakSecondaryBeams = this.data.readByte() !== 0;
+        const breakSecondaryValue = this.data.readByte();
+        this.sourceField("break-secondary-beams", breakSecondaryValue);
+        const breakSecondaryBeams = breakSecondaryValue !== 0;
         if (newBeat.index > 0 && breakSecondaryBeams) {
           voice.beats[newBeat.index - 1].beamingMode = 3 /* ForceSplitOnSecondaryToNext */;
         }
@@ -14968,19 +18596,30 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       chord.name = GpBinaryHelpers.gpReadStringByteLength(this.data, 21, this.settings.importer.encoding);
       this.data.skip(4);
       chord.firstFret = IOHelper.readInt32LE(this.data);
+      this.sourceField("chord-first-fret", chord.firstFret, 4);
       for (let i = 0; i < 7; i++) {
         const fret = IOHelper.readInt32LE(this.data);
+        this.sourceField(`chord-fret:${i}`, fret, 4);
         if (i < beat.voice.bar.staff.tuning.length) {
           chord.strings.push(fret);
         }
       }
       const numberOfBarres = this.data.readByte();
+      this.sourceField("chord-barre-count", numberOfBarres);
       const barreFrets = new Uint8Array(5);
-      this.data.read(barreFrets, 0, barreFrets.length);
+      for (let i = 0; i < barreFrets.length; i++) {
+        barreFrets[i] = this.data.readByte();
+        this.sourceField(`chord-barre-fret:${i}`, barreFrets[i]);
+      }
       for (let i = 0; i < numberOfBarres; i++) {
         chord.barreFrets.push(barreFrets[i]);
       }
-      this.data.skip(26);
+      for (let i = 0; i < 5; i++) this.sourceField(`chord-barre-start:${i}`, this.data.readByte());
+      for (let i = 0; i < 5; i++) this.sourceField(`chord-barre-end:${i}`, this.data.readByte());
+      for (let i = 0; i < 7; i++) this.sourceField(`chord-omission:${i}`, this.data.readByte());
+      this.data.skip(1);
+      for (let i = 0; i < 7; i++) this.sourceField(`chord-finger:${i}`, IOHelper.readSInt8(this.data));
+      this.sourceField("chord-show-fingering", this.data.readByte());
     } else {
       if (this.data.readByte() !== 0) {
         if (this._versionNumber >= 400) {
@@ -14988,30 +18627,50 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
           chord.name = GpBinaryHelpers.gpReadStringByteLength(this.data, 21, this.settings.importer.encoding);
           this.data.skip(4);
           chord.firstFret = IOHelper.readInt32LE(this.data);
+          this.sourceField("chord-first-fret", chord.firstFret, 4);
           for (let i = 0; i < 7; i++) {
             const fret = IOHelper.readInt32LE(this.data);
+            this.sourceField(`chord-fret:${i}`, fret, 4);
             if (i < beat.voice.bar.staff.tuning.length) {
               chord.strings.push(fret);
             }
           }
           const numberOfBarres = this.data.readByte();
+          this.sourceField("chord-barre-count", numberOfBarres);
           const barreFrets = new Uint8Array(5);
-          this.data.read(barreFrets, 0, barreFrets.length);
+          for (let i = 0; i < barreFrets.length; i++) {
+            barreFrets[i] = this.data.readByte();
+            this.sourceField(`chord-barre-fret:${i}`, barreFrets[i]);
+          }
           for (let i = 0; i < numberOfBarres; i++) {
             chord.barreFrets.push(barreFrets[i]);
           }
-          this.data.skip(26);
+          for (let i = 0; i < 5; i++) this.sourceField(`chord-barre-start:${i}`, this.data.readByte());
+          for (let i = 0; i < 5; i++) this.sourceField(`chord-barre-end:${i}`, this.data.readByte());
+          for (let i = 0; i < 7; i++) this.sourceField(`chord-omission:${i}`, this.data.readByte());
+          this.data.skip(1);
+          for (let i = 0; i < 7; i++) this.sourceField(`chord-finger:${i}`, IOHelper.readSInt8(this.data));
+          this.sourceField("chord-show-fingering", this.data.readByte());
         } else {
-          this.data.skip(25);
-          chord.name = GpBinaryHelpers.gpReadStringByteLength(this.data, 34, this.settings.importer.encoding);
+          this.sourceField("chord-analysis-sharp", this.data.readByte());
+          this.data.skip(3);
+          for (const name of ["root", "type", "extension", "bass", "tonality"]) this.sourceField(`chord-analysis:${name}`, IOHelper.readInt32LE(this.data), 4);
+          this.sourceField("chord-analysis-add", this.data.readByte());
+          chord.name = GpBinaryHelpers.gpReadStringByteLength(this.data, 22, this.settings.importer.encoding);
+          for (const name of ["fifth", "ninth", "eleventh"]) this.sourceField(`chord-analysis:${name}`, IOHelper.readInt32LE(this.data), 4);
           chord.firstFret = IOHelper.readInt32LE(this.data);
+          this.sourceField("chord-first-fret", chord.firstFret, 4);
           for (let i = 0; i < 6; i++) {
             const fret = IOHelper.readInt32LE(this.data);
+            this.sourceField(`chord-fret:${i}`, fret, 4);
             if (i < beat.voice.bar.staff.tuning.length) {
               chord.strings.push(fret);
             }
           }
-          this.data.skip(36);
+          this.sourceField("chord-barre-count", IOHelper.readInt32LE(this.data), 4);
+          for (const field of ["fret", "start", "end"]) for (let i = 0; i < 2; i++) this.sourceField(`chord-barre-${field}:${i}`, IOHelper.readInt32LE(this.data), 4);
+          for (let i = 0; i < 7; i++) this.sourceField(`chord-omission:${i}`, this.data.readByte());
+          this.data.skip(1);
         }
       } else {
         const strings = this._versionNumber >= 406 ? 7 : 6;
@@ -15021,9 +18680,11 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
           this.settings.importer.maxDecodingBufferSize
         );
         chord.firstFret = IOHelper.readInt32LE(this.data);
+        this.sourceField("chord-first-fret", chord.firstFret, 4);
         if (chord.firstFret > 0) {
           for (let i = 0; i < strings; i++) {
             const fret = IOHelper.readInt32LE(this.data);
+            this.sourceField(`chord-fret:${i}`, fret, 4);
             if (i < beat.voice.bar.staff.tuning.length) {
               chord.strings.push(fret);
             }
@@ -15038,9 +18699,11 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
   }
   readBeatEffects(beat) {
     const flags = this.data.readByte();
+    this.sourceField("beat-effect-flags", flags);
     let flags2 = 0;
     if (this._versionNumber >= 400) {
       flags2 = this.data.readByte();
+      this.sourceField("beat-effect-flags2", flags2);
     }
     if ((flags & 16) !== 0) {
       beat.fade = 1 /* FadeIn */;
@@ -15053,6 +18716,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     }
     if ((flags & 32) !== 0 && this._versionNumber >= 400) {
       const slapPop = IOHelper.readSInt8(this.data);
+      this.sourceField("slap-pop", slapPop);
       switch (slapPop) {
         case 1:
           beat.tap = true;
@@ -15066,6 +18730,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       }
     } else if ((flags & 32) !== 0) {
       const slapPop = IOHelper.readSInt8(this.data);
+      this.sourceField("slap-pop", slapPop);
       switch (slapPop) {
         case 1:
           beat.tap = true;
@@ -15087,10 +18752,14 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       let strokeDown = 0;
       if (this._versionNumber < 500) {
         strokeDown = this.data.readByte();
+        this.sourceField("strokeDown", strokeDown);
         strokeUp = this.data.readByte();
+        this.sourceField("strokeUp", strokeUp);
       } else {
         strokeUp = this.data.readByte();
+        this.sourceField("strokeUp", strokeUp);
         strokeDown = this.data.readByte();
+        this.sourceField("strokeDown", strokeDown);
       }
       if (strokeUp > 0) {
         beat.brushType = 1 /* BrushUp */;
@@ -15101,7 +18770,9 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       }
     }
     if ((flags2 & 2) !== 0) {
-      switch (IOHelper.readSInt8(this.data)) {
+      const pick = IOHelper.readSInt8(this.data);
+      this.sourceField("pick-stroke", pick);
+      switch (pick) {
         case 0:
           beat.pickStroke = 0 /* None */;
           break;
@@ -15124,16 +18795,20 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     return 0 /* None */;
   }
   readTremoloBarEffect(beat) {
-    this.data.readByte();
-    IOHelper.readInt32LE(this.data);
+    this.sourceField("whammy-type", this.data.readByte());
+    this.sourceField("whammy-value", IOHelper.readInt32LE(this.data), 4);
     const pointCount = IOHelper.readInt32LE(this.data);
+    this.sourceField("whammy-point-count", pointCount, 4);
     this._ensureLoopBoundary(pointCount, _Gp3To5Importer._maxBendPointCount, "tremolo bar point count");
     if (pointCount > 0) {
       for (let i = 0; i < pointCount; i++) {
         const point = new BendPoint(0, 0);
         point.offset = IOHelper.readInt32LE(this.data);
-        point.value = IOHelper.readInt32LE(this.data) / _Gp3To5Importer._bendStep | 0;
-        GpBinaryHelpers.gpReadBool(this.data);
+        this.sourceField(`whammy-offset:${i}`, point.offset, 4);
+        const rawValue = IOHelper.readInt32LE(this.data);
+        this.sourceField(`whammy-alter:${i}`, rawValue, 4);
+        point.value = rawValue / _Gp3To5Importer._bendStep | 0;
+        this.sourceField(`whammy-vibrato:${i}`, this.data.readByte());
         beat.addWhammyBarPoint(point);
       }
     }
@@ -15309,7 +18984,9 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     }
     if ((flags & 128) !== 0) {
       newNote.leftHandFinger = IOHelper.readSInt8(this.data);
+      this.sourceField("left-fingering", newNote.leftHandFinger);
       newNote.rightHandFinger = IOHelper.readSInt8(this.data);
+      this.sourceField("right-fingering", newNote.rightHandFinger);
     }
     let swapAccidentals = false;
     if (this._versionNumber >= 500) {
@@ -15406,16 +19083,20 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
   }
   static _bendStep = 25;
   readBend(note) {
-    this.data.readByte();
-    IOHelper.readInt32LE(this.data);
+    this.sourceField("bend-type", this.data.readByte());
+    this.sourceField("bend-value", IOHelper.readInt32LE(this.data), 4);
     const pointCount = IOHelper.readInt32LE(this.data);
+    this.sourceField("bend-point-count", pointCount, 4);
     this._ensureLoopBoundary(pointCount, _Gp3To5Importer._maxBendPointCount, "note bend point count");
     if (pointCount > 0) {
       for (let i = 0; i < pointCount; i++) {
         const point = new BendPoint(0, 0);
         point.offset = IOHelper.readInt32LE(this.data);
-        point.value = IOHelper.readInt32LE(this.data) / _Gp3To5Importer._bendStep | 0;
-        GpBinaryHelpers.gpReadBool(this.data);
+        this.sourceField(`bend-offset:${i}`, point.offset, 4);
+        const rawValue = IOHelper.readInt32LE(this.data);
+        this.sourceField(`bend-alter:${i}`, rawValue, 4);
+        point.value = rawValue / _Gp3To5Importer._bendStep | 0;
+        this.sourceField(`bend-vibrato:${i}`, this.data.readByte());
         note.addBendPoint(point);
       }
     }
@@ -15425,9 +19106,13 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     const graceNote = new Note();
     graceNote.string = note.string;
     graceNote.fret = IOHelper.readSInt8(this.data);
+    this.sourceField("grace-fret", graceNote.fret);
     graceBeat.duration = 32 /* ThirtySecond */;
-    graceBeat.dynamics = this.toDynamicValue(IOHelper.readSInt8(this.data));
+    const dynamic = IOHelper.readSInt8(this.data);
+    this.sourceField("grace-dynamic", dynamic);
+    graceBeat.dynamics = this.toDynamicValue(dynamic);
     const transition = IOHelper.readSInt8(this.data);
+    this.sourceField("grace-transition", transition);
     switch (transition) {
       case 0:
         break;
@@ -15442,11 +19127,12 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
         break;
     }
     graceNote.dynamics = graceBeat.dynamics;
-    this.data.skip(1);
+    this.sourceField("grace-duration", this.data.readByte());
     if (this._versionNumber < 500) {
       graceBeat.graceType = 2 /* BeforeBeat */;
     } else {
       const flags = this.data.readByte();
+      this.sourceField("grace-flags", flags);
       graceNote.isDead = (flags & 1) !== 0;
       graceBeat.graceType = (flags & 2) !== 0 ? 1 /* OnBeat */ : 2 /* BeforeBeat */;
     }
@@ -15457,10 +19143,12 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     const effect = new TremoloPickingEffect();
     beat.tremoloPicking = effect;
     effect.marks = this.data.readByte();
+    this.sourceField("tremolo-marks", effect.marks);
   }
   readSlide(note) {
     if (this._versionNumber >= 500) {
       const type = IOHelper.readSInt8(this.data);
+      this.sourceField("slide-type", type);
       if ((type & 1) !== 0) {
         note.slideOutType = 1 /* Shift */;
       } else if ((type & 2) !== 0) {
@@ -15477,6 +19165,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
       }
     } else {
       const type = IOHelper.readSInt8(this.data);
+      this.sourceField("slide-type", type);
       switch (type) {
         case 1:
           note.slideOutType = 1 /* Shift */;
@@ -15501,6 +19190,7 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
   }
   readArtificialHarmonic(note) {
     const type = this.data.readByte();
+    this.sourceField("harmonic-type", type);
     if (this._versionNumber >= 500) {
       switch (type) {
         case 1:
@@ -15509,11 +19199,14 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
           break;
         case 2:
           const harmonicTone = this.data.readByte();
+          this.sourceField("harmonic-tone", harmonicTone);
           let harmonicKey = this.data.readByte();
+          this.sourceField("harmonic-key", harmonicKey);
           if (harmonicKey === 255) {
             harmonicKey = -1;
           }
           const harmonicOctaveOffset = this.data.readByte();
+          this.sourceField("harmonic-octave", harmonicOctaveOffset);
           const harmonicPitch = harmonicTone + harmonicKey;
           const playedPitch = (note.fret + note.stringTuning) % 12;
           let targetHarmonic = harmonicPitch + harmonicOctaveOffset * 12;
@@ -15526,7 +19219,9 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
           break;
         case 3:
           note.harmonicType = 4 /* Tap */;
-          note.harmonicValue = ModelUtils.deltaFretToHarmonicValue(this.data.readByte());
+          const tapFret = this.data.readByte();
+          this.sourceField("harmonic-tap-fret", tapFret);
+          note.harmonicValue = ModelUtils.deltaFretToHarmonicValue(tapFret);
           break;
         case 4:
           note.harmonicType = 3 /* Pinch */;
@@ -15571,8 +19266,12 @@ var Gp3To5Importer = class _Gp3To5Importer extends ScoreImporter {
     }
   }
   readTrill(note) {
-    note.trillValue = this.data.readByte() + note.stringTuning;
-    switch (this.data.readByte()) {
+    const fret = this.data.readByte();
+    this.sourceField("trill-fret", fret);
+    note.trillValue = fret + note.stringTuning;
+    const speed = this.data.readByte();
+    this.sourceField("trill-speed", speed);
+    switch (speed) {
       case 1:
         note.trillSpeed = 16 /* Sixteenth */;
         break;
@@ -15763,6 +19462,1095 @@ var ByteBuffer = class _ByteBuffer {
   }
 };
 
+// src/adapters/guitar-pro/binary-empty-slots.ts
+function binaryEmptySlot(frame, host, version, locate, findings, makeGrace, mainDead = false, targetName = (value2) => `fret ${value2}`) {
+  const { facts, source } = frame;
+  if (!mainDead) findings.push({ disposition: "preserved", code: "binary-empty-note-slot", message: "The source string slot omits both note type and fret. It supplies no main attack; independently encoded grace and instruction operands remain at the source beat clock. Reader defaults are not source pitches.", location: source, fact: { string: facts["source-string"], flags: facts["note-flags"] } });
+  const instruction = (text, owner = source) => {
+    (host.performerInstructions ??= []).push({ source: owner, kind: "empty-slot-technique", text, nativeValue: JSON.stringify(facts) });
+  };
+  const details = { source, id: source.id, tieStart: false, tieStop: false }, slide = binaryTechniques(facts, source, details, version, locate);
+  const labels = mainDead ? [] : [...details.articulations ?? [], ...(details.gestures ?? []).map((g) => g.kind), ...(details.slides ?? []).map((s) => "slide " + s.kind), ...(details.fingerings ?? []).map((f) => `${f.hand} fingering ${f.value}`)];
+  if (!mainDead && details.noteheadParentheses) labels.push("ghost note");
+  if (details.bend) labels.push("bend");
+  if (slide && !mainDead) labels.push(slide === 1 ? "shift slide" : "legato slide");
+  if (facts["note-effect-flags"] & 2) labels.push("hammer-on / pull-off");
+  const harmonic = facts["harmonic-type"];
+  if (harmonic) {
+    const names2 = { 1: "natural", 2: "artificial", 3: "tapped", 4: "pinch", 5: "semi", 15: "artificial", 17: "artificial", 22: "artificial" };
+    if (!names2[harmonic] || version >= 500 && harmonic > 5 || version >= 400 && version < 500 && harmonic === 2) refuse("harmonic-type", "Unknown harmonic on empty source slot.", locate("harmonic-type"));
+    labels.push(names2[harmonic] + " harmonic");
+  }
+  if (facts["trill-fret"] !== void 0) {
+    if (![1, 2, 3].includes(facts["trill-speed"])) refuse("trill", "Unknown trill speed on empty source slot.", locate("trill-speed"));
+    labels.push(`trill to ${targetName(facts["trill-fret"], locate("trill-fret"))} (${["", "16th", "32nd", "64th"][facts["trill-speed"]]})`);
+  }
+  if (facts["tremolo-marks"] !== void 0) {
+    if (![1, 2, 3].includes(facts["tremolo-marks"])) refuse("tremolo", "Unknown tremolo value on empty source slot.", locate("tremolo-marks"));
+    labels.push("tremolo picking");
+  }
+  if (labels.length) instruction(labels.join("; "));
+  if (!mainDead && facts["note-dynamic"] !== void 0) {
+    const level = ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"][facts["note-dynamic"]];
+    if (host.dynamic && host.dynamic !== level) refuse("dynamic", "Conflicting empty-slot and attack dynamics.", locate("note-dynamic"));
+    host.dynamic = level;
+  }
+  const fret = facts["grace-fret"];
+  if (fret === void 0) return [];
+  const code = facts["grace-duration"], flags = facts["grace-flags"] ?? 0, transition = facts["grace-transition"], dynamic = facts["grace-dynamic"];
+  if (![1, 2, 3].includes(code) || flags & ~3 || ![0, 1, 2, 3].includes(transition) || dynamic < 1 || dynamic > 8 || fret < (version < 500 ? -1 : 0) || fret > 127) refuse("grace", "Invalid grace payload on empty source slot.", locate("grace-fret"));
+  const dead = fret === -1 || !!(flags & 1), graceSource = { ...locate("grace-fret"), id: source.id + ":grace" }, before = version < 500 || !(flags & 2);
+  const note = makeGrace(fret === -1 ? void 0 : fret, dead, graceSource);
+  if (dead) note.sourceDead = { source: locate(fret === -1 ? "grace-fret" : "grace-flags"), value: true };
+  if (fret === -1) findings.push({ disposition: "inferred", code: "binary-empty-slot-dead-grace-placement", message: note.string !== void 0 ? "The dead grace has a source string but no fret or pitch. Its staff position uses the declared open-string register only as derived placement; it has no sounding pitch or physical fret." : "The dead grace omits its percussion identity. A middle-line X head provides derived placement without inventing a drum identity or sounding pitch.", location: graceSource });
+  const event = { source: graceSource, id: source.id + ":grace-event", start: host.start, duration: q(0), writtenDuration: q(4, 2 ** (7 - code)), type: { 1: "64th", 2: "32nd", 3: "16th" }[code], dots: 0, notes: [note], fullMeasureRest: false, grace: { source: graceSource, before, slash: before, index: 0, hostId: host.id }, dynamic: ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"][dynamic] };
+  if (transition) {
+    (event.performerInstructions ??= []).push({ source: locate("grace-transition"), kind: "empty-slot-technique", text: ["", "slide", "bend", "hammer-on / pull-off"][transition], nativeValue: JSON.stringify({ transition, targetSlot: source }) });
+    findings.push({ disposition: "inferred", code: "binary-empty-slot-grace-transition", message: "A grace transition whose main slot has no pitch retains its literal technique as an instruction. No destination pitch, interval or paired endpoint is invented.", location: locate("grace-transition") });
+  }
+  return [event];
+}
+
+// src/adapters/guitar-pro/binary-performer.ts
+function binaryHarmonic(facts, note, version, open, infer, locate, findings, beatFlags = 0, writtenShift = 12) {
+  const code = facts["harmonic-type"] ?? (version < 400 ? beatFlags & 4 ? 1 : beatFlags & 8 ? 2 : 0 : 0);
+  if (!code) return;
+  const kinds2 = { 1: "natural", 2: "artificial", 3: "tap", 4: "pinch", 5: "semi", 15: "artificial", 17: "artificial", 22: "artificial" };
+  if (!kinds2[code] || version >= 500 && code > 5 || version >= 400 && version < 500 && code === 2) refuse("harmonic-type", "Unknown encoded binary harmonic subtype.", locate("harmonic-type"));
+  const source = locate("harmonic-type"), physical = open + note.fret, kind = kinds2[code];
+  let result, touching, node2;
+  if (kind === "natural") {
+    node2 = note.fret;
+    const interval = harmonicInterval(node2);
+    if (interval !== void 0) result = open + interval;
+    touching = physical;
+  } else if (version >= 500 && code === 2) {
+    const tone = facts["harmonic-tone"], rawKey = facts["harmonic-key"], octave = facts["harmonic-octave"];
+    if (![0, 2, 4, 5, 7, 9, 11].includes(tone) || ![255, 0, 1].includes(rawKey) || ![0, 1, 2].includes(octave)) refuse("harmonic-pitch", "Invalid explicit artificial harmonic pitch tuple.", source);
+    const pitchClass = tone + (rawKey === 255 ? -1 : rawKey), baseClass = physical % 12;
+    let interval = pitchClass + octave * 12 - baseClass;
+    if (interval < 0) interval += 12;
+    result = physical + interval;
+  } else if (version >= 500 && code === 3) {
+    const tap = facts["harmonic-tap-fret"];
+    if (tap < 0 || tap > 255) refuse("harmonic-fret", "Tapped harmonic touch fret outside its encoded unsigned-byte range.", source);
+    touching = open + tap;
+    node2 = tap - note.fret;
+    const interval = harmonicInterval(node2);
+    if (interval !== void 0) result = physical + interval;
+  } else if (version >= 400 && version < 500 && [15, 17].includes(code)) {
+    node2 = code === 15 ? 5 : 7;
+    touching = physical + node2;
+    result = physical + (code === 15 ? 24 : 19);
+  } else if (version >= 400 && version < 500 && code === 3 || code === 22) {
+    node2 = 12;
+    touching = physical + 12;
+    result = physical + 12;
+  }
+  note.harmonic = {
+    source,
+    type: kind,
+    base: infer(kind === "natural" ? open : physical),
+    pitchRole: kind === "natural" ? result === void 0 ? "touching" : "sounding" : "base",
+    ...touching !== void 0 ? { touch: infer(touching) } : {},
+    ...result !== void 0 ? { result: infer(result) } : {},
+    ...node2 !== void 0 ? { harmonicFret: { source, value: q(node2) } } : {}
+  };
+  note.sounding = result === void 0 ? null : infer(result);
+  if (kind === "natural" && result !== void 0) note.written = infer(result + writtenShift);
+  findings.push({
+    disposition: result === void 0 ? "preserved" : "inferred",
+    code: "binary-harmonic-roles",
+    message: result === void 0 ? "Encoded harmonic technique and known base/touch roles are retained; this encoding supplies no independently established definite result. No default octave is invented." : "Known harmonic result derives from the explicit pitch tuple or established source node convention; physical fret remains separate.",
+    location: source,
+    fact: { code, type: kind, definiteResult: result !== void 0 }
+  });
+}
+function binaryTrill(facts, note, open, infer, locate, writtenShift = 12) {
+  if (facts["trill-fret"] === void 0) return;
+  const fret = facts["trill-fret"], speed = facts["trill-speed"];
+  if (fret < 0 || fret > 255 || ![1, 2, 3].includes(speed)) refuse("trill", "Unknown binary trill fret or period.", locate("trill-fret"));
+  note.trill = { source: locate("trill-fret"), fret, target: infer(open + fret + writtenShift), speed: ["", "16th", "32nd", "64th"][speed] };
+}
+function binaryBeatTechniques(facts, event, version, locate) {
+  const flags = facts["beat-effect-flags"] ?? 0, second = facts["beat-effect-flags2"] ?? 0;
+  if (flags & 16) event.text = [event.text, "fade in"].filter(Boolean).join(" \u2014 ");
+  if (second & 1) event.text = [event.text, "rasgueado"].filter(Boolean).join(" \u2014 ");
+  const tap = facts["slap-pop"];
+  if (tap !== void 0 && ![0, 1, 2, 3].includes(tap)) refuse("technique", "Unknown tap/slap/pop value.", locate("slap-pop"));
+  const vibrato = !!(flags & 2 || version < 400 && flags & 1);
+  for (const note of event.notes) {
+    if (tap) (note.gestures ??= []).push({ source: locate("slap-pop"), kind: ["tap", "slap", "pop"][tap - 1] });
+    if (vibrato) (note.gestures ??= []).push({ source: locate("beat-effect-flags"), kind: "vibrato" });
+    const pick = facts["pick-stroke"];
+    if (pick !== void 0 && ![0, 1, 2].includes(pick)) refuse("pick-stroke", "Unknown encoded pick stroke.", locate("pick-stroke"));
+    if (pick) (note.technical ??= []).push({ source: locate("pick-stroke"), kind: pick === 1 ? "up-bow" : "down-bow" });
+  }
+  if (flags & 64) {
+    const up = facts.strokeUp, down = facts.strokeDown;
+    if (up < 0 || up > 6 || down < 0 || down > 6 || up && down) refuse("arpeggio", "Contradictory encoded brush directions.", locate("strokeUp"));
+    if (up || down) event.arpeggio = { source: locate(up ? "strokeUp" : "strokeDown"), direction: up ? "up" : "down", straight: true };
+  }
+  if (second & 4) {
+    const count = facts["whammy-point-count"];
+    if (!Number.isSafeInteger(count) || count < 1 || count > 60) refuse("bend-curve", "Whammy marking needs a bounded encoded curve.", event.source);
+    event.whammy = { source: locate("whammy-type"), withBar: { source: locate("whammy-type") }, points: Array.from({ length: count }, (_, i) => {
+      const offset = facts[`whammy-offset:${i}`], amount = facts[`whammy-alter:${i}`], vibrato2 = facts[`whammy-vibrato:${i}`];
+      if (offset < 0 || offset > 60 || !Number.isSafeInteger(amount) || ![0, 1, 2, 3].includes(vibrato2) || i && offset < facts[`whammy-offset:${i - 1}`]) refuse("bend-curve", "Malformed encoded whammy point.", locate(`whammy-offset:${i}`));
+      return { source: locate(`whammy-offset:${i}`), offset: q(offset, 60), semitones: q(amount, 50), vibrato: { source: locate(`whammy-vibrato:${i}`), value: !!vibrato2, ...vibrato2 ? { speed: ["fast", "average", "slow"][vibrato2 - 1] } : {} } };
+    }) };
+  }
+}
+function binaryUnfrettedDeadGraces(owners, host, findings) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const { fact: target, facts, locate } of owners) {
+    const code = facts["grace-duration"], dynamic = facts["grace-dynamic"], transition = facts["grace-transition"];
+    if (facts["grace-fret"] !== -1 || ![1, 2, 3].includes(code) || dynamic < 1 || dynamic > 8) refuse("grace", "Invalid legacy dead grace.", locate("grace-fret"));
+    if (transition !== 0) refuse("grace-transition", "A fretless dead grace cannot establish a definite pitch transition.", locate("grace-transition"));
+    const source = { ...locate("grace-fret"), id: target.id + ":grace" }, key = `${code}:${dynamic}`;
+    let event = groups.get(key);
+    if (!event) {
+      event = { source, id: host.id + ":dead-grace:" + groups.size, start: host.start, duration: q(0), writtenDuration: q(4, 2 ** (7 - code)), type: { 1: "64th", 2: "32nd", 3: "16th" }[code], dots: 0, notes: [], fullMeasureRest: false, grace: { source, before: true, slash: true, index: 0, hostId: host.id }, dynamic: ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"][dynamic] };
+      groups.set(key, event);
+    }
+    event.notes.push({ source, id: source.id, string: target.string, kind: "dead", written: { ...target.written, origin: "inferred" }, sounding: null, sourceDead: { source, value: true }, tieStart: false, tieStop: false });
+    findings.push({ disposition: "inferred", code: "binary-dead-grace-placement", message: "Legacy dead grace encodes a string and dead stroke but no fret or definite pitch. Its X head uses the host note staff position as qualified guidance; source string is retained without an invented fret.", location: source, fact: { sourceFret: -1, string: target.string, referenceHost: target.source } });
+  }
+  return [...groups.values()];
+}
+function binaryGraces(owners, host, version, open, infer, relations, findings, writtenShift = 12) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const { fact: target, facts, locate } of owners) {
+    if (facts["grace-fret"] === void 0) continue;
+    const fret = facts["grace-fret"], code = facts["grace-duration"], flags = facts["grace-flags"] ?? 0, transition = facts["grace-transition"], dynamic = facts["grace-dynamic"];
+    if (fret < 0 || fret > 127) refuse("grace-fret", "Dead grace without an encoded physical fret requires generic-note recovery.", locate("grace-fret"));
+    if (![1, 2, 3].includes(code) || flags & ~3 || ![0, 1, 2, 3].includes(transition) || dynamic < 1 || dynamic > 8) refuse("grace", "Unknown binary grace parameter.", locate("grace-fret"));
+    const before = version < 500 || !(flags & 2), dead = !!(flags & 1), source = { ...locate("grace-fret"), id: target.id + ":grace" };
+    const pitch2 = infer(open(target.string) + fret), note = { source, id: source.id, string: target.string, fret, kind: dead ? "dead" : "pitched", written: infer(pitch2.midi + writtenShift), sounding: dead ? null : pitch2, ...dead ? { referenceSounding: pitch2 } : {}, tieStart: false, tieStop: false };
+    const key = `${before}:${code}:${dynamic}`, index = groups.size;
+    let event = groups.get(key);
+    if (!event) {
+      event = { source, id: host.id + ":grace:" + index, start: host.start, duration: q(0), writtenDuration: q(4, 2 ** (7 - code)), type: { 1: "64th", 2: "32nd", 3: "16th" }[code], dots: 0, notes: [], fullMeasureRest: false, grace: { source, before, slash: before, index: 0, hostId: host.id }, dynamic: ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"][dynamic] };
+      groups.set(key, event);
+    }
+    event.notes.push(note);
+    const endpoint = (e, n) => ({ partId: host.source.trackId, measure: host.source.measure - 1, position: host.start, staff: 1, voiceId: String(host.source.voice), eventId: e.id, noteId: n.id, ...e.grace ? { graceIndex: 0 } : {} });
+    const start = endpoint(event, note), end = endpoint(host, target), id = note.id + ":transition";
+    if (transition && dead) refuse("grace-transition", "Definite pitch transition conflicts with dead grace.", source);
+    if (transition === 1) {
+      relations.push({ source: locate("grace-transition"), id, kind: "glissando", form: "slide", formFact: { source: locate("grace-transition"), origin: "source" }, label: { source: locate("grace-transition"), value: "", show: false, origin: "source" }, slideTechnique: { source: locate("grace-transition"), kind: "legato" }, start, end });
+      const slurId = id + ":legato";
+      relations.push({ source: locate("grace-transition"), id: slurId, kind: "slur", start, end });
+      (note.slurs ??= []).push({ type: "start", number: 1, relationId: slurId });
+      (target.slurs ??= []).push({ type: "stop", number: 1, relationId: slurId });
+    }
+    if (transition === 2) {
+      note.bendTransition = { source: locate("grace-transition"), semitones: q(target.fret - fret), targetSource: target.source, origin: "derived-source-pitches" };
+      relations.push({ source: locate("grace-transition"), id, kind: "slur", sourceTechnique: { source: locate("grace-transition"), kind: "bend-continuation" }, start, end });
+      (note.slurs ??= []).push({ type: "start", number: 1, relationId: id });
+      (target.slurs ??= []).push({ type: "stop", number: 1, relationId: id });
+    }
+    if (transition === 3) {
+      if (target.fret === fret) refuse("grace-transition", "Hammer/pull grace needs changed source fret.", source);
+      const kind = target.fret > fret ? "hammer-on" : "pull-off";
+      note.hopoStart = kind;
+      target.hopoStop = kind;
+      note.hopoNumber = target.hopoNumber = target.string;
+    }
+  }
+  const events = [...groups.values()];
+  if (events.length > 1) {
+    events.forEach((event, index) => {
+      event.voiceId = `${host.source.voice}:grace-projection:${index + 1}`;
+    });
+    findings.push({ disposition: "inferred", code: "grace-parallel-projection", message: "Different simultaneous per-note grace parameters use independent MusicXML serialization lanes at the same source host clock; these are not additional source performing voices.", location: host.source, fact: { groups: events.length } });
+  }
+  return events;
+}
+
+// src/adapters/guitar-pro/binary-empty-annotations.ts
+function emptyAnnotationAnchor(source, text) {
+  return { source, id: source.path, start: q(0), duration: q(0), type: "quarter", dots: 0, notes: [], fullMeasureRest: false, ...text ? { text } : {} };
+}
+function binaryEmptyAnnotations(part, event, version, effects, locations, findings) {
+  const metadata2 = [], words = [];
+  if (effects) {
+    const at = (name) => locations.get(effects.source.path + "/" + name) ?? effects.source, facts = effects.facts;
+    binaryBeatTechniques(facts, event, version, at);
+    if (facts["beat-effect-flags"] & (version < 400 ? 3 : 2)) words.push({ source: at("beat-effect-flags"), text: "vibrato" });
+    if (facts["slap-pop"]) words.push({ source: at("slap-pop"), text: ["", "tap", "slap", "pop"][facts["slap-pop"]] });
+    if (facts["pick-stroke"]) words.push({ source: at("pick-stroke"), text: facts["pick-stroke"] === 1 ? "Upstroke" : "Downstroke" });
+    if (event.arpeggio) words.push({ source: event.arpeggio.source, text: `Brush ${event.arpeggio.direction}` });
+    if (event.whammy) words.push({ source: event.whammy.source, text: "Whammy bar" });
+    if (version < 400 && facts["beat-effect-flags"] & 12) words.push({ source: at("beat-effect-flags"), text: facts["beat-effect-flags"] & 4 ? "Natural harmonic" : "Artificial harmonic" });
+    metadata2.push({ source: effects.source, name: "source-empty-beat-effects:" + event.id, value: JSON.stringify(facts) });
+  }
+  if (event.text) words.unshift({ source: event.source, text: event.text });
+  for (const word of words) (part.measures[event.source.measure - 1].directions ??= []).push({ ...word, kind: "words", position: q(0), staff: 1, voiceId: String(event.source.voice ?? 1), positionOrigin: "native-measure-start" });
+  if (words.length || effects) findings.push({ disposition: "inferred", code: "binary-empty-voice-instruction-position", message: "Instructions on an entirely empty source voice retain their source measure start without manufacturing a rhythmic event, attack or additional performing voice. Exact beat-effect operands remain metadata.", location: event.source });
+  return metadata2;
+}
+
+// src/adapters/guitar-pro/binary-percussion-techniques.ts
+function percussionInstruction(event, source, text, native, findings) {
+  (event.performerInstructions ??= []).push({ source, kind: "percussion-technique", text, nativeValue: JSON.stringify(native) });
+  findings.push({ disposition: "preserved", code: "binary-percussion-technique-instruction", message: "The located source technique retains an instrument-qualified standard instruction without inventing a pitched endpoint, acoustic interval or extra attack.", location: source });
+}
+function binaryPercussionTechniques(facts, note, event, name, version, slide, locate, findings, beatFlags = 0) {
+  if (slide) percussionInstruction(event, locate("slide-type"), `${name}: ${slide === 1 ? "shift" : "legato"} slide`, { noteSource: note.source, slide }, findings);
+  if (facts["note-effect-flags"] & 2) percussionInstruction(event, locate("note-effect-flags"), `${name}: hammer-on / pull-off`, { noteSource: note.source, hammerPull: true }, findings);
+  const harmonic = facts["harmonic-type"] ?? (version < 400 ? beatFlags & 4 ? 1 : beatFlags & 8 ? 2 : 0 : 0);
+  if (harmonic) {
+    const types3 = { 1: "natural", 2: "artificial", 3: "tap", 4: "pinch", 5: "semi", 15: "artificial", 17: "artificial", 22: "artificial" };
+    if (!types3[harmonic] || version >= 500 && harmonic > 5 || version >= 400 && version < 500 && harmonic === 2) refuse("harmonic-type", "Unknown binary harmonic subtype.", locate("harmonic-type"));
+    if (version >= 500 && harmonic === 2 && (![0, 2, 4, 5, 7, 9, 11].includes(facts["harmonic-tone"]) || ![255, 0, 1].includes(facts["harmonic-key"]) || ![0, 1, 2].includes(facts["harmonic-octave"]))) refuse("harmonic-pitch", "Invalid source harmonic tuple.", locate("harmonic-type"));
+    if (version >= 500 && harmonic === 3 && (facts["harmonic-tap-fret"] < 0 || facts["harmonic-tap-fret"] > 255)) refuse("harmonic-fret", "Invalid source harmonic touch operand.", locate("harmonic-tap-fret"));
+    note.harmonic = { source: locate("harmonic-type"), type: types3[harmonic] };
+    percussionInstruction(event, locate("harmonic-type"), `${name}: ${types3[harmonic]} harmonic`, { noteSource: note.source, ...Object.fromEntries(Object.entries(facts).filter(([key]) => key.startsWith("harmonic-"))), type: harmonic }, findings);
+  }
+}
+
+// src/adapters/guitar-pro/binary-structure.ts
+function binaryMeasureExtent(totals, nominal, index, count, source, findings) {
+  if (!totals.length || totals.some((total) => total.n <= 0 || !equal(total, totals[0]))) refuse("measure-duration", "Active binary voices must agree about their exact encoded measure extent.", source);
+  const short = totals[0].n * nominal.d < nominal.n * totals[0].d, pickup = index === 0 && short, final = index === count - 1 && short;
+  if (final && !pickup) findings.push({ disposition: "inferred", code: "binary-incomplete-final-measure", message: "All active source voices establish a shorter final measure. Exact encoded extent and nominal meter remain separate; no trailing attack or rest is added.", location: source, fact: { nominal, encoded: totals[0] } });
+  if (short && !pickup && !final) findings.push({ disposition: "inferred", code: "binary-incomplete-measure", message: "All active source voices establish the same incomplete interior measure. Exact encoded extent and nominal meter remain separate; it is not labelled a pickup and no trailing attack or rest is added.", location: source, fact: { nominal, encoded: totals[0] } });
+  if (!short && !equal(totals[0], nominal)) findings.push({ disposition: "inferred", code: "binary-overfull-measure", message: "All active source voices establish the same overfull measure. Its exact encoded extent and nominal meter remain separate without deleting or retiming source notes.", location: source, fact: { nominal, encoded: totals[0] } });
+  return { duration: totals[0], pickup };
+}
+var node = (name, source, text = "", children3 = []) => ({ name, location: source, text, children: children3, attrs: {} });
+var decode = (bytes) => new TextDecoder(bytes.length > 2 && bytes[0] === 254 && bytes[1] === 255 ? "utf-16be" : bytes.length > 2 && bytes[0] === 255 && bytes[1] === 254 ? "utf-16le" : "windows-1252").decode(bytes);
+var navigation = ["Fine", "Segno", "SegnoSegno", "Coda", "DoubleCoda", "DaCapo", "DaCapoAlCoda", "DaCapoAlDoubleCoda", "DaCapoAlFine", "DaSegno", "DaSegnoAlCoda", "DaSegnoAlDoubleCoda", "DaSegnoAlFine", "DaSegnoSegno", "DaSegnoSegnoAlCoda", "DaSegnoSegnoAlDoubleCoda", "DaSegnoSegnoAlFine", "DaCoda", "DaDoubleCoda"];
+function binaryMasterStructure(score, masters, globals, locations, parts, relations, version) {
+  const endings = [], sources = [];
+  for (let index = 0; index < masters.length; index++) {
+    const frame = masters[index], fields = [], master = score.masterBars[index];
+    const at = (name) => locations.get(frame.source.path + "/" + name) ?? frame.source;
+    let mask = frame.facts["alternate-endings"] ?? 0;
+    const count = frame.facts["alternate-ending-count"];
+    if (count !== void 0) {
+      if (count < 1 || count > 8) refuse("repeat-ending", "Invalid cumulative binary ending count.", at("alternate-ending-count"));
+      let used = 0;
+      for (let previous = index - 1; previous >= 0; previous--) {
+        if (score.masterBars[previous].isRepeatStart || score.masterBars[previous].repeatCount && previous !== index - 1) break;
+        used |= endings[previous];
+      }
+      mask = (1 << count) - 1 & ~used;
+      if (!mask) refuse("repeat-ending", "Cumulative binary ending adds no remaining pass.", at("alternate-ending-count"));
+    }
+    endings.push(mask);
+    if (master.alternateEndings !== mask) refuse("repeat-ending", "Reader ending interpretation contradicts source fields.", frame.source);
+    if (mask) fields.push(node("AlternateEndings", at(count === void 0 ? "alternate-endings" : "alternate-ending-count"), Array.from({ length: 8 }, (_, i) => i + 1).filter((i) => mask & 1 << i - 1).join(" ")));
+    const feel = version >= 500 ? frame.facts["triplet-feel"] : globals["global-triplet-feel"];
+    if (feel) fields.push(node("TripletFeel", version >= 500 ? at("triplet-feel") : locations.get("/header/global-triplet-feel"), feel === 1 ? "Triplet8th" : "Triplet16th"));
+    if (master.section) fields.push(node("Section", frame.source, "", [node("Text", frame.source, master.section.text)]));
+    if (frame.facts["master-flags"] & 128) fields.push(node("DoubleBar", at("master-flags")));
+    const directions = [];
+    for (const [key, value2] of Object.entries(globals)) if (key.startsWith("navigation:") && value2 !== -1) {
+      const source = locations.get("/header/" + key);
+      if (value2 < 1 || value2 > masters.length) refuse("navigation", "Navigation measure lies outside the encoded score.", source);
+      const kind = Number(key.slice(11));
+      if (value2 === index + 1) directions.push(node(kind < 5 ? "Target" : "Jump", source, navigation[kind]));
+    }
+    if (directions.length) fields.push(node("Directions", frame.source, "", directions));
+    sources.push(node("MasterBar", frame.source, "", fields));
+  }
+  for (const part of parts) sources.forEach((source, index) => masterStructure(source, part.measures[index], part, index, relations));
+}
+function binaryScoreTexts(score, source, partId) {
+  const values2 = { Title: score.title, SubTitle: score.subTitle, Artist: score.artist, Album: score.album, Words: score.words, Music: score.music, Copyright: score.copyright, Tabber: score.tab, Instructions: score.instructions, Notices: score.notices };
+  return scoreTexts(node("Score", source, "", Object.entries(values2).map(([name, text]) => node(name, source, text))), partId);
+}
+function binaryLyrics(bytes, frame, locations, parts) {
+  if (!frame) return;
+  const part = parts.find((part2) => part2.id === String(frame.facts["lyrics-track"]));
+  if (!part) return;
+  const lines = [];
+  for (let i = 0; i < 5; i++) {
+    const source = locations.get(`/lyrics/lyrics-present:${i}`);
+    const length = bytes.readUInt32LE(source.byteOffset);
+    if (source.byteLength !== length + 4) refuse("lyrics", "Lyric byte length contradicts captured field.", source);
+    const text = decode(bytes.subarray(source.byteOffset + 4, source.byteOffset + 4 + length));
+    lines.push(node("Line", source, "", [node("Text", source, text), node("Offset", locations.get(`/lyrics/lyrics-start:${i}`), String(frame.facts[`lyrics-start:${i}`] - 1))]));
+  }
+  trackLyrics(node("Track", frame.source, "", [node("Lyrics", frame.source, "", lines)]), part);
+}
+function binaryChord(bytes, version, frame, event, part, measure, locations, findings, sourceStringCount) {
+  const offset = frame.source.byteOffset, enhanced = version >= 500 || bytes[offset] !== 0;
+  const fixed = version >= 400 ? 21 : 22;
+  const start = offset + (version >= 500 ? 17 : enhanced ? version >= 400 ? 17 : 26 : 1);
+  const length = enhanced ? bytes[start] : bytes.readUInt32LE(start) - 1;
+  if (length < 0 || enhanced && length > fixed) refuse("chord", "Invalid encoded chord caption length.", frame.source);
+  const textStart = start + (enhanced ? 1 : 5);
+  const caption = decode(bytes.subarray(textStart, textStart + length));
+  const at = (name) => locations.get(frame.source.path + "/" + name) ?? frame.source;
+  const strings = sourceStringCount ?? part.tuning.length, first = frame.facts["chord-first-fret"];
+  const notes = [], markers = [];
+  for (let i = 0; i < strings; i++) {
+    const fret = frame.facts[`chord-fret:${i}`];
+    if (fret === void 0) continue;
+    if (!Number.isSafeInteger(fret) || fret < -1) refuse("chord", "Diagram fret is outside its encoded nonnegative or muted domain.", at(`chord-fret:${i}`));
+    if (fret === -1) markers.push({ source: at(`chord-fret:${i}`), string: i + 1, kind: "muted" });
+    else {
+      const finger = frame.facts[`chord-finger:${i}`];
+      if (finger !== void 0 && (finger < -2 || finger > 4)) refuse("chord", "Unknown source diagram fingering.", at(`chord-finger:${i}`));
+      notes.push({ source: at(`chord-fret:${i}`), string: i + 1, fret, ...finger !== void 0 && finger >= 0 ? { fingering: finger === 0 ? "T" : String(finger), fingeringVisible: !!frame.facts["chord-show-fingering"] } : {} });
+    }
+  }
+  const barres = frame.facts["chord-barre-count"] ?? 0;
+  if (barres < 0 || barres > (version < 400 ? 2 : 5)) refuse("chord", "Diagram barre count exceeds encoded capacity.", at("chord-barre-count"));
+  for (let i = 0; i < barres; i++) {
+    const fret = frame.facts[`chord-barre-fret:${i}`], a = frame.facts[`chord-barre-start:${i}`], b = frame.facts[`chord-barre-end:${i}`];
+    if (!Number.isSafeInteger(fret) || fret < 1 || a < 1 || b < 1 || a > strings || b > strings || a === b) refuse("chord", "Invalid source diagram barre endpoints.", at(`chord-barre-fret:${i}`));
+    for (const [string, barre] of [[Math.max(a, b), "start"], [Math.min(a, b), "stop"]]) {
+      const existing = notes.find((note) => note.string === string && note.fret === fret && !note.barre);
+      if (existing) existing.barre = barre;
+      else notes.push({ source: at(`chord-barre-fret:${i}`), string, fret, barre });
+    }
+  }
+  const present = notes.length || markers.length;
+  if (present && (!Number.isSafeInteger(first) || first < 0)) refuse("chord", "Invalid diagram first fret.", at("chord-first-fret"));
+  if (!notes.length && markers.length) {
+    const text = [caption, `Mute strings ${markers.map((marker2) => marker2.string).join(", ")}`].filter(Boolean).join(" \u2014 ");
+    (part.measures[measure].directions ??= []).push({ source: frame.source, position: event.start, staff: 1, kind: "words", text });
+    findings.push({ disposition: "preserved", code: "binary-empty-frame-text", message: "MusicXML requires a played frame-note. This all-muted source diagram is preserved as explicit string instructions without inventing a fret.", location: frame.source, fact: { caption, markers } });
+    return;
+  }
+  const frameFact = present ? { source: frame.source, strings, firstFret: Math.max(1, first), frets: Math.max(4, ...notes.map((note) => note.fret - Math.max(1, first) + 1)), notes, markers } : void 0;
+  const sourceAnalysis = Object.entries(frame.facts).filter(([name]) => name.startsWith("chord-analysis") || name.startsWith("chord-omission")).map(([name, value2]) => ({ source: at(name), name, value: value2 }));
+  if (caption || frameFact) (part.measures[measure].directions ??= []).push({ source: frame.source, position: event.start, staff: 1, kind: "harmony", harmony: { source: frame.source, value: caption, role: "chord-symbol", ...sourceAnalysis.length ? { sourceAnalysis } : {}, ...frameFact ? { frame: frameFact } : {} } });
+}
+
+// src/adapters/guitar-pro/binary-percussion.ts
+var names = { 27: "High Q", 28: "Slap", 29: "Scratch Push", 30: "Scratch Pull", 31: "Sticks", 32: "Square Click", 33: "Metronome Click", 34: "Metronome Bell", 82: "Shaker", 83: "Jingle Bell", 84: "Bell Tree", 85: "Castanets", 86: "Mute Surdo", 87: "Open Surdo" };
+var types = { 1: "whole", 2: "half", 4: "quarter", 8: "eighth", 16: "16th", 32: "32nd", 64: "64th" };
+function binaryPercussion(track, score, frame, context, findings) {
+  const id = String(track.index), instruments = /* @__PURE__ */ new Map(), expected = [], previous = /* @__PURE__ */ new Map();
+  let absolute = q(0);
+  const define = (number, source) => {
+    if (number < 27 || number > 87) refuse("percussion-identity", "Legacy drum number is outside the documented source table.", source);
+    let fact = instruments.get(number);
+    if (fact) return fact;
+    fact = names[number] ? { source, id: `gp-legacy-drum:${id}:${number}`, name: names[number], midi: number, line: 4, heads: ["noteheadBlack", "noteheadHalf", "noteheadWhole"] } : { ...nativePercussion(number, source, id), midi: number };
+    instruments.set(number, fact);
+    return fact;
+  };
+  const measures = track.staves[0].bars.map((bar, index) => {
+    const master = score.masterBars[index], source = { ...context.masters[index].source, trackId: id };
+    if (master.timeSignatureNumerator < 1 || master.timeSignatureNumerator > 255 || master.timeSignatureDenominator < 1 || master.timeSignatureDenominator > 128 || master.timeSignatureDenominator & master.timeSignatureDenominator - 1) refuse("meter", "Invalid binary percussion meter.", source);
+    const span = q(master.timeSignatureNumerator * 4, master.timeSignatureDenominator);
+    const voices = bar.voices.map((voice, vi) => {
+      let position = q(0);
+      const encoded = voice.beats.filter((beat) => context.beats.has(beat));
+      if (encoded.length && encoded.every((beat) => context.beats.get(beat).facts["beat-status"] === 0)) {
+        if (encoded.some((beat) => beat.notes.length)) refuse("empty-voice", "Empty source drum voice contains attacks.", source);
+        for (const beat of encoded) {
+          const event = emptyAnnotationAnchor(context.beats.get(beat).source, beat.text);
+          context.emptyEvents.set(beat, event);
+          context.sourceEvents.set(beat, event);
+        }
+        return [];
+      }
+      return voice.beats.filter((beat) => context.beats.has(beat)).flatMap((beat) => {
+        const raw = context.beats.get(beat), denominator = 2 ** (raw.facts["duration-exponent"] + 2), actual = raw.facts.tuplet, normal = actual === 3 ? 2 : actual && actual <= 7 ? 4 : 8, dots = raw.facts["beat-flags"] & 1 ? 1 : 0;
+        const duration2 = mul(mul(q(4, denominator), q(dots ? 3 : 1, dots ? 2 : 1)), q(actual ? normal : 1, actual ?? 1));
+        const event = { source: raw.source, id: raw.source.path, start: position, duration: duration2, type: types[denominator], dots, ...raw.facts["beat-status"] === 0 ? { printObject: false } : {}, ...actual ? { tuplet: { actual, normal } } : {}, notes: [], fullMeasureRest: !beat.notes.length && equal(duration2, span), ...beat.text ? { text: beat.text } : {} };
+        const dynamics2 = /* @__PURE__ */ new Set(), graces = /* @__PURE__ */ new Map();
+        for (const note of beat.notes) {
+          const source2 = context.notes.get(note), facts = source2.facts, slot = `${vi}:${facts["source-string"]}`, prior = previous.get(slot), tie = facts["note-type"] === 2;
+          const locate = (name) => context.fieldLocations.get(source2.source.path + "/" + name) ?? source2.source;
+          const dynamic = facts["note-dynamic"];
+          if (dynamic !== void 0 && facts["note-flags"] & 32) dynamics2.add(dynamic);
+          const ownDynamic = (fact2) => {
+            if (dynamic !== void 0) fact2.dynamic = { source: locate("note-dynamic"), value: ["", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"][dynamic] };
+          };
+          const slotGrace = (fret, dead, graceSource) => {
+            if (fret === void 0) return { source: graceSource, id: graceSource.id, kind: "dead", written: { step: "B", alter: 0, octave: 4, midi: 71, origin: "inferred" }, sounding: null, tieStart: false, tieStop: false };
+            const identity2 = define(fret, graceSource), fact2 = percussionNote(identity2, { source: graceSource, id: graceSource.id, tieStart: false, tieStop: false }, event.type);
+            if (dead) {
+              fact2.sourceDead = { source: graceSource, value: true };
+              fact2.notehead = "x";
+            }
+            return fact2;
+          };
+          const unknownDead = facts["note-type"] === 3 && facts["note-fret"] === -1;
+          if (!(facts["note-flags"] & 32) || unknownDead) {
+            if (unknownDead) {
+              const fact2 = slotGrace(void 0, true, source2.source);
+              fact2.sourceDead = { source: locate("note-type"), value: true };
+              binaryTechniques(facts, source2.source, fact2, context.version, locate);
+              delete fact2.bend;
+              ownDynamic(fact2);
+              event.notes.push(fact2);
+              event.fullMeasureRest = false;
+              expected.push({ note, fact: fact2, event, raw: -1, articulation: -1, unknownDead: true });
+              findings.push({ disposition: "inferred", code: "binary-unfretted-dead-placement", message: "A source dead drum stroke omits its drum identity. A middle-line X head preserves the attack with derived placement and no fabricated instrument or pitch.", location: source2.source });
+            }
+            const extra = binaryEmptySlot(source2, event, context.version, locate, findings, slotGrace, unknownDead, (value2, source3) => define(value2, source3).name);
+            for (const grace of extra) graces.set(grace.id, grace);
+            continue;
+          }
+          const articulation = tie ? prior?.articulation : facts["note-fret"];
+          if (articulation === void 0 || tie && !equal(prior.end, add(absolute, position))) refuse("tie-conflict", "Drum tie needs a contiguous matching source input slot.", source2.source);
+          const identity = define(articulation, source2.source), fact = percussionNote(identity, { source: source2.source, id: source2.source.id, tieStart: false, tieStop: tie }, event.type);
+          ownDynamic(fact);
+          if (tie) prior.note.tieStart = true;
+          const slide = binaryTechniques(facts, source2.source, fact, context.version, locate);
+          binaryPercussionTechniques(facts, fact, event, identity.name, context.version, slide, locate, findings, context.effects.get(beat)?.facts["beat-effect-flags"]);
+          if (facts["trill-fret"] !== void 0) {
+            const speed = facts["trill-speed"];
+            if (![1, 2, 3].includes(speed)) refuse("trill", "Unknown encoded trill period.", locate("trill-speed"));
+            const target = define(facts["trill-fret"], locate("trill-fret"));
+            fact.trill = { source: locate("trill-fret"), speed: ["", "16th", "32nd", "64th"][speed] };
+            percussionInstruction(event, locate("trill-fret"), `${identity.name}: trill toward ${target.name} (${fact.trill.speed})`, { noteSource: fact.source, target: target.midi, speed }, findings);
+          }
+          const marks = facts["tremolo-marks"];
+          if (marks !== void 0) {
+            if (marks < 1 || marks > 3 || event.ornaments?.some((mark) => mark.kind === "tremolo" && mark.strokes !== marks)) refuse("tremolo", "Conflicting or unknown drum tremolo value.", source2.source);
+            event.ornaments = [{ source: locate("tremolo-marks"), kind: "tremolo", type: "single", strokes: marks }];
+          }
+          if (facts["grace-fret"] !== void 0) {
+            const code = facts["grace-duration"], flags = facts["grace-flags"] ?? 0, dynamic2 = facts["grace-dynamic"];
+            if (![1, 2, 3].includes(code) || flags & ~3 || ![0, 1, 2, 3].includes(facts["grace-transition"]) || dynamic2 < 1 || dynamic2 > 8) refuse("percussion-grace", "Unsupported drum grace parameter or pitched transition.", locate("grace-fret"));
+            const graceIdentity = define(facts["grace-fret"], locate("grace-fret")), before = context.version < 500 || !(flags & 2), key = `${before}:${code}:${dynamic2}`, graceSource = { ...locate("grace-fret"), id: fact.id + ":grace" };
+            let grace = graces.get(key);
+            if (!grace) {
+              grace = { source: graceSource, id: event.id + ":grace:" + graces.size, start: position, duration: q(0), writtenDuration: q(4, 2 ** (7 - code)), type: types[2 ** (7 - code)], dots: 0, notes: [], fullMeasureRest: false, grace: { source: graceSource, before, slash: before, index: 0, hostId: event.id }, dynamic: ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"][dynamic2] };
+              graces.set(key, grace);
+            }
+            const graceNote = percussionNote(graceIdentity, { source: graceSource, id: graceSource.id, tieStart: false, tieStop: false }, grace.type);
+            if (facts["grace-transition"]) {
+              const transition = facts["grace-transition"];
+              percussionInstruction(grace, locate("grace-transition"), `${graceIdentity.name}: ${["", "slide", "bend", "hammer-on / pull-off"][transition]} to ${identity.name}`, { source: graceSource, target: fact.source, transition }, findings);
+            }
+            if (flags & 1) {
+              graceNote.sourceDead = { source: locate("grace-flags"), value: true };
+              graceNote.notehead = "x";
+            }
+            grace.notes.push(graceNote);
+          }
+          if (facts["note-type"] === 3) {
+            fact.sourceDead = { source: locate("note-type"), value: true };
+            fact.notehead = "x";
+          }
+          if (names[articulation]) event.text = [event.text, identity.name].filter(Boolean).join(" \u2014 ");
+          if (facts["note-dynamic"] !== void 0) dynamics2.add(facts["note-dynamic"]);
+          event.notes.push(fact);
+          expected.push({ note, fact, event, raw: facts["note-fret"], articulation });
+          previous.set(slot, { note: fact, articulation, end: add(absolute, add(position, duration2)) });
+        }
+        if (dynamics2.size === 1) {
+          const mark = ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"][[...dynamics2][0]];
+          if (event.dynamic && event.dynamic !== mark) refuse("dynamic", "Conflicting empty-slot and drum attack dynamics.", raw.source);
+          event.dynamic = mark;
+          for (const note of event.notes) delete note.dynamic;
+        }
+        context.sourceEvents.set(beat, event);
+        position = add(position, duration2);
+        const graceEvents = [...graces.values()];
+        if (graceEvents.length > 1) {
+          graceEvents.forEach((grace, index2) => grace.voiceId = `${vi + 1}:grace-projection:${index2 + 1}`);
+          findings.push({ disposition: "inferred", code: "grace-parallel-projection", message: "Different simultaneous drum grace values use derived serialization lanes at the common source host clock.", location: event.source });
+        }
+        return [...graceEvents, event];
+      });
+    });
+    const totals = voices.filter((voice) => voice.length).map((voice) => voice.reduce((sum, event) => add(sum, event.duration), q(0)));
+    if (!totals.length) {
+      voices[0] = [{ source, id: `${id}:${index}:empty-measure`, start: q(0), duration: span, type: "whole", dots: 0, notes: [], fullMeasureRest: true }];
+      totals.push(span);
+      findings.push({ disposition: "inferred", code: "binary-empty-measure-rest", message: "An empty source drum measure projects one standard measure rest.", location: source });
+    }
+    const { pickup, duration } = binaryMeasureExtent(totals, span, index, track.staves[0].bars.length, source, findings);
+    absolute = add(absolute, duration);
+    return { source, time: { beats: master.timeSignatureNumerator, unit: master.timeSignatureDenominator }, key: { fifths: 0, mode: "major" }, clef: "PERC", pickup, duration, voices, repeatStart: master.isRepeatStart, repeatEnd: master.repeatCount };
+  });
+  findings.push({ disposition: "inferred", code: "binary-percussion-notation", message: "Original legacy MIDI drum numbers select their documented identities without modern-reader substitutions. Standard staff positions and heads use qualified conventional notation; legacy GS identities without established historical glyphs use middle-line notes with explicit instrument labels.", location: frame.source, fact: { identities: [...instruments].map(([raw, fact]) => ({ raw, name: fact.name, midi: fact.midi, derivedLine: fact.line })) } });
+  return { part: { source: frame.source, id, name: track.name, instrument: "percussion", midiProgram: track.playbackInfo.program, transposeOctaves: 0, staves: [{ source: frame.source, number: 1, kind: "percussion", clef: "PERC", lines: 5 }], percussionInstruments: [...instruments.values()].map(percussionInstrument), measures }, expected };
+}
+function reconcileBinaryDrums(expected) {
+  return expected.map(({ note, fact, event, raw, articulation, unknownDead }) => {
+    if (unknownDead) {
+      if (!note.isDead || note.isTieDestination || note.fret !== -1) refuse("reader-reconciliation", "Reader disagrees with source dead drum stroke.", fact.source);
+      return { kind: "dead", source: fact.source, rhythmId: event.id + "/rhythm", noteId: fact.id, before: { rawFret: -1, tieDestination: false }, after: { rawFret: -1, tieDestination: false, playbackTicks: note.beat.playbackDuration } };
+    }
+    const alias = { 27: 42, 28: 60, 29: 29, 30: 30, 32: 31 }[articulation] ?? articulation;
+    if (note.percussionArticulation !== alias || note.isTieDestination !== fact.tieStop) refuse("reader-reconciliation", "Drum reader disagrees with encoded identity and its known normalization boundary.", fact.source);
+    return { kind: "unpitched", source: fact.source, rhythmId: event.id + "/rhythm", noteId: fact.id, before: { articulation: raw, tieDestination: fact.tieStop }, after: { articulation: note.percussionArticulation, tieDestination: note.isTieDestination, playbackTicks: note.beat.playbackDuration } };
+  });
+}
+
+// src/adapters/guitar-pro/binary-mix.ts
+var compare2 = (a, b) => a.n * b.d - b.n * a.d;
+function binaryCaption(bytes, source) {
+  const start = source.byteOffset, length = source.byteLength;
+  if (length < 5 || bytes.readUInt32LE(start) !== length - 4) refuse("binary-text", "Inconsistent captured caption length.", source);
+  const data = bytes.subarray(start + 5, start + length);
+  return new TextDecoder(data[0] === 254 && data[1] === 255 ? "utf-16be" : data[0] === 255 && data[1] === 254 ? "utf-16le" : "windows-1252").decode(data);
+}
+function binaryMix(parts, mixes, bytes, locations, findings) {
+  const metadata2 = [], patches = /* @__PURE__ */ new Map();
+  for (const mix of mixes) {
+    const at = (name) => locations.get(mix.source.path + "/" + name) ?? mix.source, part = parts.find((part2) => part2.id === mix.source.trackId);
+    const captionSource = locations.get(mix.source.path + "/mix-tempo-name");
+    if (captionSource) {
+      const text = binaryCaption(bytes, captionSource);
+      if (text) {
+        metadata2.push({ source: captionSource, name: "source-tempo-caption:" + mix.source.path, value: text });
+        const tempo = mix.facts["mix-tempo"] >= 0 ? { visible: !mix.facts["mix-hide-tempo"] } : void 0;
+        if (tempo && parts[0]) (parts[0].measures[mix.measure].directions ??= []).push({ source: captionSource, kind: "words", staff: 1, position: mix.position, text, printObject: tempo.visible });
+      }
+    }
+    if (mix.facts["mix-duration"] > 0) {
+      metadata2.push({ source: at("mix-duration"), name: "source-tempo-transition:" + mix.source.path, value: JSON.stringify({ beats: mix.facts["mix-duration"], target: mix.facts["mix-tempo"], hidden: !!mix.facts["mix-hide-tempo"] }) });
+      findings.push({ disposition: "excluded-by-scope", code: "binary-tempo-playback-transition", message: "Mixer transition length remains exact source metadata in native beats. The printed target and caption retain source visibility; no performer ramp words or linear time curve are invented.", location: at("mix-duration") });
+    }
+    if (!part) continue;
+    const program = mix.facts["mix-instrument"];
+    if (program >= 0) {
+      const source = at("mix-instrument"), changes = part.instrumentChanges ??= [];
+      const key = `${part.id}:${mix.measure}:${mix.position.n}/${mix.position.d}`, previous = patches.get(key);
+      if (previous && previous.midiProgram !== program) refuse("instrument-conflict", "Concurrent source voices encode conflicting instrument patches.", source);
+      if (!previous) {
+        const change = { source, id: "binary-mix:" + mix.source.path, measure: mix.measure, position: mix.position, staff: 1, midiProgram: program, defaultClefs: [] };
+        changes.push(change);
+        patches.set(key, change);
+      }
+    }
+    const wah = mix.facts["mix-wah"];
+    if (wah !== void 0 && wah !== -1) {
+      const source = at("mix-wah"), visible = !!(mix.facts["mix-flags"] & 128);
+      metadata2.push({ source, name: "source-wah:" + mix.source.path, value: JSON.stringify({ value: wah, visible }) });
+      (part.measures[mix.measure].directions ??= []).push({ source, kind: "words", staff: 1, position: mix.position, text: wah === -2 ? "Wah off" : wah === 0 ? "Wah open" : wah === 100 ? "Wah closed" : `Wah position ${wah}/100`, printObject: visible });
+      findings.push({ disposition: "preserved", code: "binary-wah-instruction", message: "Exact source Wah position and display flag retain a standard readable instruction, including hidden source instructions.", location: source });
+    }
+  }
+  for (const part of parts) if (part.instrumentChanges?.length) {
+    part.instrumentChanges.sort((a, b) => a.measure - b.measure || compare2(a.position, b.position));
+    let cursor = 0, active;
+    for (let measure = 0; measure < part.measures.length; measure++) for (const event of part.measures[measure].voices.flat().sort((a, b) => compare2(a.start, b.start))) {
+      while (cursor < part.instrumentChanges.length) {
+        const next = part.instrumentChanges[cursor];
+        if (next.measure > measure || next.measure === measure && compare2(next.position, event.start) > 0) break;
+        active = next;
+        cursor++;
+      }
+      if (active) event.instrumentContextId = active.id;
+    }
+    findings.push({ disposition: "preserved", code: "binary-instrument-context", message: "Encoded MIDI patches become timed instrument contexts without changing the source performing instrument, strings or written pitch register.", location: part.instrumentChanges[0].source });
+  }
+  return metadata2;
+}
+
+// src/adapters/guitar-pro/binary-ties.ts
+function binaryTies(part, durations, relations, findings) {
+  for (let voice = 0; voice < Math.max(...part.measures.map((measure) => measure.voices.length)); voice++) {
+    const previous = /* @__PURE__ */ new Map();
+    let clock = q(0);
+    const endpoint = (event, note, measure) => ({ partId: part.id, measure, position: event.start, staff: event.staff ?? 1, voiceId: event.voiceId ?? String(voice + 1), eventId: event.id, noteId: note.id });
+    for (let measure = 0; measure < part.measures.length; measure++) {
+      for (const event of part.measures[measure].voices[voice] ?? []) if (!event.grace) for (const note of event.notes) {
+        if (note.string === void 0) continue;
+        const onset = add(clock, event.start), prior = previous.get(note.string);
+        if (note.tieStop) {
+          if (!prior || prior.note.kind !== "pitched" || note.kind !== "pitched" || prior.note.fret !== note.fret || prior.note.sounding?.midi !== note.sounding?.midi) refuse("tie-conflict", "Source tie needs a matching prior same-string pitched origin.", note.source);
+          const origin = prior.note, id = `binary-tie:${note.id}`, gap = add(onset, mul(prior.release, q(-1)));
+          origin.tieStart = true;
+          (origin.tieNotations ??= []).push({ type: "start", relationId: id });
+          (note.tieNotations ??= []).push({ type: "stop", relationId: id });
+          relations.push({ kind: "tie", source: note.source, id, start: endpoint(prior.event, origin, prior.measure), end: endpoint(event, note, measure), ...!equal(gap, q(0)) ? { clockGap: gap } : {} });
+          if (!equal(gap, q(0))) {
+            origin.tieSound = { ...origin.tieSound, start: false, reason: "source-clock-gap" };
+            note.tieSound = { ...note.tieSound, stop: false, reason: "source-clock-gap" };
+            findings.push({ disposition: "preserved", code: "binary-gapped-tie", message: "The encoded tie follows the preceding source note on its string. Exact written durations and the visual tied arc are retained; no sounding tie or sustained duration is fabricated across the calculated clock gap.", location: note.source, fact: { origin: origin.source, gap } });
+          } else findings.push({ disposition: "inferred", code: "binary-tie-origin", message: "Destination-only tie resolves to the preceding same-string source note at its exact release.", location: note.source, fact: { origin: origin.source } });
+        }
+        previous.set(note.string, { note, event, measure, release: add(onset, durations.get(note) ?? event.duration) });
+      }
+      clock = add(clock, part.measures[measure].duration);
+    }
+  }
+}
+
+// src/adapters/guitar-pro/binary-curve-segments.ts
+var subtract = (a, b) => add(a, q(-b.n, b.d));
+var divide = (a, b) => mul(a, q(b.d, b.n));
+function binaryCurveSegment(curve2, start, end) {
+  if (compare(start, q(0)) < 0 || compare(end, q(1)) > 0 || compare(start, end) >= 0 || !curve2.points.length) refuse("binary-curve-segment", "Invalid exact curve segment.", curve2.source);
+  const original = curve2.points, points = original[0].offset.n === 0 ? original : [{ source: curve2.source, offset: q(0), semitones: q(0) }, ...original];
+  const at = (offset) => {
+    const exact2 = points.filter((point) => equal(point.offset, offset)).at(-1);
+    if (exact2) return exact2;
+    const after = points.findIndex((point) => compare(point.offset, offset) > 0);
+    if (after < 0) return { source: curve2.source, offset, semitones: points.at(-1).semitones };
+    const left = points[after - 1], right = points[after];
+    if (!left) refuse("binary-curve-segment", "Curve lacks a qualified initial base.", curve2.source);
+    const fraction = divide(subtract(offset, left.offset), subtract(right.offset, left.offset));
+    return { source: curve2.source, offset, semitones: add(left.semitones, mul(subtract(right.semitones, left.semitones), fraction)) };
+  };
+  const selected = [at(start), ...points.filter((point) => compare(point.offset, start) > 0 && compare(point.offset, end) < 0), at(end)], span = subtract(end, start);
+  return { ...curve2, points: selected.map((point) => ({ ...point, offset: divide(subtract(point.offset, start), span) })), sourceCurve: { source: curve2.source, points: original, segment: { start, end }, origin: "derived-duration-segment" } };
+}
+
+// src/adapters/guitar-pro/binary-note-durations.ts
+var types2 = { 1: "whole", 2: "half", 4: "quarter", 8: "eighth", 16: "16th", 32: "32nd", 64: "64th" };
+function binaryNoteValue(frame, event) {
+  const exponent = frame.facts["independent-duration-exponent"], actual = frame.facts["independent-duration-tuplet"], dots = frame.facts["note-flags"] & 2 ? 1 : 0;
+  if (exponent === void 0) return { duration: mul(event.duration, event.dots ? q(1) : q(3, 2)), type: event.type, dots: 1, ...event.tuplet ? { tuplet: event.tuplet } : {} };
+  if (exponent < -2 || exponent > 4 || ![0, 1, 3, 5, 6, 7, 9, 10, 11, 12, 13].includes(actual)) refuse("binary-note-duration", "Unknown independent source note duration or tuplet.", frame.source);
+  const denominator = 2 ** (exponent + 2), normal = actual === 3 ? 2 : actual <= 7 ? 4 : 8, tuplet = actual > 1 ? { actual, normal } : void 0;
+  return { duration: mul(q(4 * (dots ? 3 : 1), denominator * (dots ? 2 : 1)), q(tuplet?.normal ?? 1, tuplet?.actual ?? 1)), type: types2[denominator], dots, ...tuplet ? { tuplet } : {} };
+}
+function notation2(duration, original) {
+  if (equal(duration, original.duration)) return original;
+  for (const denominator of [1, 2, 4, 8, 16, 32, 64]) for (const dots of [0, 1, 2, 3]) {
+    const value2 = mul(q(4 * (2 ** (dots + 1) - 1), denominator * 2 ** dots), q(original.tuplet?.normal ?? 1, original.tuplet?.actual ?? 1));
+    if (equal(value2, duration)) return { duration, type: types2[denominator], dots, ...original.tuplet ? { tuplet: original.tuplet } : {} };
+  }
+  return { duration, type: "quarter", dots: 0, tuplet: { actual: duration.d, normal: duration.n } };
+}
+function binaryNoteDurations(parts, frames, relations, findings) {
+  const metadata2 = [];
+  let projectedEvents = 0;
+  const eventsByNote = new Map(parts.flatMap((part) => part.measures.flatMap((measure) => measure.voices.flatMap((voice) => voice.flatMap((event) => event.notes.map((note) => [note.id, event]))))));
+  const durations = new Map(frames.filter((frame) => eventsByNote.has(frame.source.id) && (frame.facts["independent-duration-exponent"] !== void 0 || frame.facts["note-flags"] & 2)).map((original) => {
+    const independent = original.facts["independent-duration-exponent"] !== void 0, frame = { ...original, source: { ...original.source, path: original.source.path + (independent ? "/independent-duration" : "/note-flags"), byteOffset: original.source.byteOffset + (independent ? 2 : 0), byteLength: independent ? 2 : 1 } };
+    return [frame.source.id, { frame, written: binaryNoteValue(frame, eventsByNote.get(frame.source.id)) }];
+  }));
+  if (!durations.size) return metadata2;
+  for (const part of parts) {
+    if (!part.measures.some((measure) => measure.voices.some((voice) => voice.some((event) => event.notes.some((note) => durations.has(note.id)))))) continue;
+    const offsets = [];
+    let total = q(0);
+    for (const measure of part.measures) {
+      offsets.push(total);
+      total = add(total, measure.duration);
+    }
+    const original = part.measures.map((measure) => measure.voices), output = part.measures.map(() => []), noteOwners = /* @__PURE__ */ new Map(), eventOwners = /* @__PURE__ */ new Map();
+    let nextLane = 0;
+    const originalRelease = /* @__PURE__ */ new Map();
+    for (let vi = 0; vi < Math.max(...original.map((voices) => voices.length)); vi++) {
+      const previous = /* @__PURE__ */ new Map();
+      for (let mi = 0; mi < original.length; mi++) for (const event of original[mi][vi] ?? []) if (!event.grace) for (const note of event.notes) {
+        const key = note.string ?? (note.kind === "unpitched" ? note.unpitched.instrumentId ?? note.id : note.id), start = add(offsets[mi], event.start), duration = durations.get(note.id)?.written.duration ?? event.duration, prior = previous.get(key);
+        if (note.tieStop && note.tieSound?.stop !== false && (!prior || !equal(prior.release, start))) refuse("tie-conflict", "Independent note duration contradicts the contiguous release required by its source tie destination.", note.source);
+        previous.set(key, { release: add(start, duration), note });
+        originalRelease.set(note.id, { event, measure: mi, voice: vi });
+      }
+    }
+    for (let vi = 0; vi < Math.max(...original.map((voices) => voices.length)); vi++) {
+      const lanes = [];
+      const events = original.flatMap((voices, mi) => (voices[vi] ?? []).filter((event) => !event.grace).map((event) => ({ event, mi })));
+      for (const { event, mi } of events) {
+        const groups = /* @__PURE__ */ new Map();
+        for (const note of event.notes) {
+          const fact = durations.get(note.id), value2 = fact?.written ?? event, key = `${value2.duration.n}/${value2.duration.d}:${value2.type}:${value2.dots}:${value2.tuplet?.actual ?? 0}:${value2.tuplet?.normal ?? 0}`;
+          let group = groups.get(key);
+          if (!group) {
+            group = { notes: [], written: value2, source: fact?.frame.source };
+            groups.set(key, group);
+          }
+          group.notes.push(note);
+          if (fact) findings.push({ disposition: "preserved", code: "binary-independent-note-duration", message: "Legacy source note duration is retained independently from the containing beat spacing. Separate standard serialization lanes are derived only where duration overlap requires them.", location: fact.frame.source, fact: { exponent: fact.frame.facts["independent-duration-exponent"], tuplet: fact.frame.facts["independent-duration-tuplet"], dots: value2.dots, noteDuration: value2.duration, beatDuration: event.duration, sourceBeat: event.source } });
+        }
+        if (!groups.size) groups.set("rest", { notes: [], written: event });
+        const whammyOwner = event.whammy ? [...groups.values()].find((group) => equal(group.written.duration, event.duration)) : void 0;
+        if (event.whammy && !whammyOwner) {
+          const ratio = (value2) => value2.d === 1 ? String(value2.n) : `${value2.n}/${value2.d}`;
+          const text = `Whammy bar over ${ratio(event.duration)} quarter-note beats: ` + event.whammy.points.map((point) => `${ratio(point.semitones)} semitones at ${ratio(mul(point.offset, q(100)))}%${point.vibrato?.value ? ` (${point.vibrato.speed ? point.vibrato.speed + " " : ""}vibrato)` : ""}`).join("; ");
+          (part.measures[mi].directions ??= []).push({ source: event.whammy.source, kind: "words", position: event.start, staff: event.staff ?? 1, text });
+          metadata2.push({ source: event.whammy.source, name: `source-whammy-independent-beat:${part.id}:${event.id}`, value: JSON.stringify({ curve: event.whammy, measure: mi, start: event.start, duration: event.duration }) });
+          findings.push({ disposition: "inferred", code: "binary-whammy-duration-projection", message: "The beat-owned bar curve has no note with the same independent duration. Standard bend/with-bar timing is note-relative, so a precise ordinary words instruction retains the source beat span and control points; exact curve facts remain auxiliary. No note or rest is invented.", location: event.whammy.source, fact: { beatDuration: event.duration, points: event.whammy.points } });
+        }
+        let ordinal = 0;
+        for (const group of groups.values()) {
+          const absolute = add(offsets[mi], event.start), release = add(absolute, group.written.duration);
+          if (compare(release, total) > 0) refuse("binary-note-duration", "Independent note release exceeds the encoded score extent.", group.source ?? event.source);
+          let lane = lanes.find((lane2) => compare(lane2.end, absolute) <= 0);
+          if (!lane) {
+            lane = { index: nextLane++, end: q(0) };
+            lanes.push(lane);
+            if (nextLane * part.measures.length > limits.occurrences) refuse("occurrence-budget", "Independent note serialization exceeds the bounded voice-grid budget.", event.source);
+          }
+          lane.end = release;
+          let current = mi, start = event.start, remaining = group.written.duration, segment = 0, first, last;
+          while (remaining.n > 0) {
+            if (++projectedEvents > limits.occurrences) refuse("occurrence-budget", "Independent note continuation expansion exceeds the bounded occurrence budget.", event.source);
+            const available = add(part.measures[current].duration, mul(start, q(-1))), span = compare(remaining, available) <= 0 ? remaining : available;
+            if (span.n <= 0) refuse("binary-note-duration", "Independent note has no positive serialization span.", event.source);
+            const continues = compare(remaining, span) > 0, value2 = notation2(span, group.written), id = ordinal === 0 && segment === 0 ? event.id : `${event.id}:duration:${ordinal}:${segment}`;
+            const notes = group.notes.map((note) => segment === 0 && !continues ? note : { ...note, tieNotations: note.tieNotations?.filter((tie) => tie.type === "stop" ? segment === 0 : !continues), id: segment === 0 ? note.id : `${note.id}:duration:${segment}`, tieStop: segment > 0 || note.tieStop, tieStart: continues || note.tieStart, tieSound: note.tieSound ? { reason: note.tieSound.reason, ...!continues && note.tieSound.start === false ? { start: false } : {}, ...segment === 0 && note.tieSound.stop === false ? { stop: false } : {} } : void 0, ...segment > 0 ? { articulations: void 0, technical: void 0, fingerings: void 0, gestures: void 0, bend: void 0, bendTransition: void 0, trill: void 0, slides: void 0, hopoStart: void 0, hopoStop: void 0, hopoNotations: void 0 } : {} });
+            if (continues || segment) {
+              for (let ni = 0; ni < notes.length; ni++) if (group.notes[ni].bend) {
+                const elapsed = add(group.written.duration, mul(remaining, q(-1))), inverse = q(group.written.duration.d, group.written.duration.n);
+                notes[ni].bend = binaryCurveSegment(group.notes[ni].bend, mul(elapsed, inverse), mul(add(elapsed, span), inverse));
+              }
+            }
+            const piece = { ...event, ...value2, id, start, voiceId: `${vi + 1}:duration:${lane.index + 1}`, notes, fullMeasureRest: !notes.length && event.fullMeasureRest && equal(span, part.measures[current].duration), tuplet: value2.tuplet, beams: void 0, tupletBoundary: void 0, ...ordinal || segment ? { text: void 0, dynamic: void 0, lyrics: void 0, whammy: void 0, arpeggio: void 0, ornaments: void 0, slurs: void 0 } : {}, whammy: segment === 0 && group === whammyOwner ? event.whammy : void 0 };
+            if (last) {
+              for (let ni = 0; ni < notes.length; ni++) if (group.notes[ni].tieNotations) {
+                const prior = last.notes[ni], note = notes[ni], relationId = `binary-duration-tie:${note.id}`;
+                (prior.tieNotations ??= []).push({ type: "start", relationId });
+                (note.tieNotations ??= []).unshift({ type: "stop", relationId });
+                relations.push({ kind: "tie", id: relationId, source: note.source, start: { partId: part.id, measure: current - 1, position: last.start, staff: last.staff ?? 1, voiceId: last.voiceId, eventId: last.id, noteId: prior.id }, end: { partId: part.id, measure: current, position: piece.start, staff: piece.staff ?? 1, voiceId: piece.voiceId, eventId: piece.id, noteId: note.id } });
+              }
+            }
+            (output[current][lane.index] ??= []).push(piece);
+            first ??= piece;
+            last = piece;
+            remaining = add(remaining, mul(span, q(-1)));
+            if (remaining.n) {
+              current++;
+              start = q(0);
+              segment++;
+            }
+          }
+          if (!ordinal) eventOwners.set(event.id, first);
+          for (const note of group.notes) noteOwners.set(note.id, { event: first, measure: mi, last, lastMeasure: current });
+          if (segment) {
+            for (let measure = mi; measure <= current; measure++) for (const piece of output[measure][lane.index] ?? []) for (const note of piece.notes) if (note.bend?.sourceCurve && group.notes.some((original2) => note.id === original2.id || note.id.startsWith(original2.id + ":duration:"))) {
+              note.bend.sourceEndpoints = { start: { partId: part.id, measure: mi, position: event.start, staff: event.staff ?? 1, voiceId: first.voiceId, eventId: first.id }, end: { partId: part.id, measure: current, position: add(last.start, last.duration), staff: event.staff ?? 1, voiceId: last.voiceId } };
+            }
+          }
+          if (segment && group.notes.some((note) => note.bend)) findings.push({ disposition: "inferred", code: "binary-duration-bend-segments", message: "Exact linear interpolation divides a source note bend at source bar boundaries. Original control points and the complete note span remain separate from the derived fragment points.", location: group.source ?? event.source });
+          if (segment) findings.push({ disposition: "inferred", code: "binary-note-duration-continuation", message: "An independently notated note crosses source bar boundaries. Exact continuation pieces and ties are calculated without adding an attack or changing its source release.", location: group.source ?? event.source, fact: { duration: group.written.duration, pieces: segment + 1 } });
+          ordinal++;
+        }
+      }
+    }
+    for (let mi = 0; mi < original.length; mi++) for (const voice of original[mi]) for (const event of voice.filter((event2) => event2.grace)) {
+      const groups = /* @__PURE__ */ new Map();
+      for (const note of event.notes) {
+        const owner = noteOwners.get(note.id.replace(/:grace$/, ""))?.event ?? eventOwners.get(event.grace.hostId);
+        if (!owner) refuse("binary-note-duration", "Grace host disappeared during duration projection.", event.source);
+        const notes = groups.get(owner) ?? [];
+        notes.push(note);
+        groups.set(owner, notes);
+      }
+      let ordinal = 0;
+      for (const [owner, notes] of groups) {
+        const lane = output[mi].findIndex((events) => events?.includes(owner));
+        const projected = { ...event, id: ordinal++ ? `${event.id}:duration:${ordinal}` : event.id, voiceId: owner.voiceId, notes, grace: { ...event.grace, hostId: owner.id } };
+        (output[mi][lane] ??= []).push(projected);
+        eventOwners.set(event.id, projected);
+        for (const note of notes) noteOwners.set(note.id, { event: projected, measure: mi, last: projected, lastMeasure: mi });
+      }
+    }
+    for (const relation of relations) if (relation.start.partId === part.id && relation.kind === "text-line" && /^gp-(?:palm-mute|let-ring):/.test(relation.id) && relation.start.noteId) {
+      const first = originalRelease.get(relation.start.noteId), note = first?.event.notes.find((note2) => note2.id === relation.start.noteId);
+      const last = first && [...originalRelease.entries()].find(([id, owner2]) => owner2.voice === first.voice && owner2.measure === relation.end.measure && equal(add(owner2.event.start, owner2.event.duration), relation.end.position) && owner2.event.notes.find((candidate) => candidate.id === id)?.string === note?.string);
+      const owner = last && noteOwners.get(last[0]);
+      if (owner) {
+        relation.end.measure = owner.lastMeasure;
+        relation.end.position = add(owner.last.start, owner.last.duration);
+        relation.end.voiceId = owner.last.voiceId;
+      }
+    }
+    for (const relation of relations) for (const endpoint of [relation.start, relation.end]) if (endpoint.partId === part.id) {
+      const owner = endpoint.noteId ? noteOwners.get(endpoint.noteId)?.event : endpoint.eventId ? eventOwners.get(endpoint.eventId) : void 0;
+      if (owner) {
+        endpoint.eventId = owner.id;
+        endpoint.voiceId = owner.voiceId;
+      }
+      if (relation.kind === "tie" && relation.id.startsWith("binary-tie:") && endpoint === relation.start && endpoint.noteId) {
+        const pieces = noteOwners.get(endpoint.noteId);
+        if (pieces && pieces.last !== pieces.event) {
+          const lastNote = pieces.last.notes.find((note) => note.id.startsWith(endpoint.noteId + ":duration:"));
+          endpoint.noteId = lastNote.id;
+          endpoint.eventId = pieces.last.id;
+          endpoint.voiceId = pieces.last.voiceId;
+          endpoint.measure = pieces.lastMeasure;
+          endpoint.position = pieces.last.start;
+        }
+      }
+    }
+    for (let mi = 0; mi < output.length; mi++) part.measures[mi].voices = Array.from({ length: nextLane }, (_, lane) => (output[mi][lane] ?? []).sort((a, b) => compare(a.start, b.start) || Number(!a.grace) - Number(!b.grace)));
+    findings.push({ disposition: "inferred", code: "binary-note-duration-voices", message: "Legacy independent note values are serialized into nonoverlapping standard voices. These lanes do not claim source voice or performing-hand identity; source beat clocks and raw duration operands remain separately retained.", location: part.source, fact: { lanes: nextLane } });
+  }
+  return metadata2;
+}
+
+// src/adapters/guitar-pro/beams.ts
+var levels = { eighth: 1, "16th": 2, "32nd": 3, "64th": 4, "128th": 5, "256th": 6, "512th": 7, "1024th": 8 };
+var depth = (event) => levels[event.type] ?? 0;
+function groupAt(position, rule) {
+  let end = q(0);
+  for (let index = 0; index < rule.groups.length; index++) {
+    end = add(end, q(4 * rule.groups[index], rule.unit));
+    if (compare(position, end) < 0) return index;
+  }
+  const remainder = add(position, q(-end.n, end.d));
+  return rule.groups.length + Math.floor(remainder.n * rule.unit / (remainder.d * 4));
+}
+function defaultGrouping(measure) {
+  const { beats, unit } = measure.time;
+  if (unit >= 8) {
+    const groups = beats % 3 === 0 ? Array.from({ length: beats / 3 }, () => 3) : beats === 5 ? [3, 2] : beats === 7 ? [4, 3] : beats === 8 ? [3, 3, 2] : Array.from({ length: Math.ceil(beats / 2) }, (_, index) => Math.min(2, beats - 2 * index));
+    return { source: measure.source, unit, groups };
+  }
+  return { source: measure.source, unit, groups: Array.from({ length: beats }, () => 1) };
+}
+function validateGrouping(group) {
+  if (!Number.isSafeInteger(group.unit) || group.unit < 1 || group.unit > 1024 || group.unit & group.unit - 1 || !group.groups.length || group.groups.length > 32 || group.groups.some((value2) => !Number.isSafeInteger(value2) || value2 < 0 || value2 > 255))
+    refuse("gp-beam-groups", "Beam grouping requires a power-of-two unit and at most 32 bounded source counts.", group.source);
+  while (group.groups.at(-1) === 0) group.groups.pop();
+  if (!group.groups.length) refuse("gp-beam-groups", "An all-zero source tuple does not establish an authored beam-group span.", group.source);
+  if (group.groups.some((value2) => value2 === 0)) refuse("gp-beam-groups", "An interior zero does not establish a source beam-group span.", group.source);
+}
+function tupletOwners(events) {
+  const result = /* @__PURE__ */ new Map();
+  let owner = 0, signature = "", elapsed = q(0), expected = q(0);
+  for (const event of events) {
+    if (!event.tuplet) {
+      signature = "";
+      continue;
+    }
+    const key = `${event.tuplet.actual}:${event.tuplet.normal}`;
+    if (signature !== key || compare(elapsed, expected) >= 0) {
+      signature = key;
+      owner++;
+      elapsed = q(0);
+      expected = q(4 * event.tuplet.normal, 4 * 2 ** depth(event));
+    }
+    result.set(event, owner);
+    elapsed = add(elapsed, event.duration);
+  }
+  return result;
+}
+function automaticDirection(events, measure, voice) {
+  if (voice > 0) return "down";
+  if (measure.voices.some((events2, index) => index > 0 && events2.some((event) => event.notes.length))) return "up";
+  if (events[0].grace) return "up";
+  const clef = measure.clef.replace(/(?:8v[ab]|15m[ab])$/, "");
+  let middle = { G: 4 * 7 + 6, G2: 4 * 7 + 6, F: 3 * 7 + 1, F4: 3 * 7 + 1, C1: 4 * 7 + 4, C2: 4 * 7 + 2, C3: 4 * 7, C4: 3 * 7 + 5, C5: 3 * 7 + 3, PERC: 4 * 7 + 6 }[clef];
+  if (middle === void 0) return void 0;
+  if (/8va$/.test(measure.clef)) middle += 7;
+  if (/8vb$/.test(measure.clef)) middle -= 7;
+  if (/15ma$/.test(measure.clef)) middle += 14;
+  if (/15mb$/.test(measure.clef)) middle -= 14;
+  if (events.some((event) => event.notes.some((note) => note.kind === "unpitched" && note.unpitched.displayStep === void 0))) return void 0;
+  const positions = events.flatMap((event) => event.notes.map((note) => {
+    const step = note.kind === "unpitched" ? note.unpitched.displayStep : note.written.step;
+    const octave = note.kind === "unpitched" ? note.unpitched.displayOctave : note.written.octave;
+    return octave * 7 + "CDEFGAB".indexOf(step);
+  }));
+  if (!positions.length) return void 0;
+  const low = positions.reduce((a, b) => Math.min(a, b)), high = positions.reduce((a, b) => Math.max(a, b));
+  return low + high < middle * 2 ? "up" : "down";
+}
+function applyGpBeams(part, source, findings) {
+  for (const [measureIndex, measure] of part.measures.entries()) {
+    const supplied = source.groups?.get(measureIndex);
+    const rule = supplied ? { ...supplied, groups: [...supplied.groups] } : defaultGrouping(measure);
+    validateGrouping(rule);
+    for (const [voiceIndex, voice] of measure.voices.entries()) {
+      const touched = supplied || voice.some((event) => source.controls.has(event));
+      if (!touched) continue;
+      const buckets = /* @__PURE__ */ new Map();
+      for (const event of voice) {
+        const key = event.grace ? `grace:${event.grace.hostId}:${event.grace.before}` : "ordinary";
+        const bucket = buckets.get(key) ?? [];
+        bucket.push(event);
+        buckets.set(key, bucket);
+        const control = source.controls.get(event);
+        if (control?.secondaryBreak !== void 0 && (!Number.isSafeInteger(control.secondaryBreak) || control.secondaryBreak < 0 || control.secondaryBreak > 8))
+          refuse("gp-beam-control", "A secondary beam cut must identify a bounded number of levels.", control.source);
+        if (control?.stem) {
+          event.sourceStem = { source: control.stemSource ?? control.source, value: control.stem };
+          event.stem = control.stem;
+          event.stemOrigin = { source: control.stemSource ?? control.source, origin: "source-chord" };
+        }
+        if (control && (control.primary || control.secondaryBreak)) event.beam = {
+          source: control.source,
+          mode: control.primary === "split" ? "begin" : control.primary === "join" ? "mid" : control.secondaryBreak ? "begin16" : "auto"
+        };
+        if (control) findings.push({ disposition: "preserved", code: "gp-source-beam-control", message: "Source boundary and stem controls retained separately from calculated standard beam endpoints.", location: control.source, fact: control });
+      }
+      for (const events of buckets.values()) {
+        events.sort((a, b) => compare(a.start, b.start) || (a.grace?.index ?? 0) - (b.grace?.index ?? 0));
+        const tuplets = tupletOwners(events);
+        let group = [];
+        const finish = () => {
+          if (!group.length) return;
+          while (group.length && !group[0].notes.length) group.shift();
+          while (group.length && !group.at(-1).notes.length) group.pop();
+          if (!group.length) return;
+          const authored = group.find((event) => source.controls.get(event)?.stem);
+          const inversion = group.find((event) => source.controls.get(event)?.invert);
+          let direction = authored ? source.controls.get(authored).stem : void 0;
+          const owner = authored ?? inversion;
+          if (!direction && inversion) {
+            const baseline = automaticDirection(group, measure, voiceIndex);
+            if (!baseline) refuse("gp-beam-direction", "Relative stem inversion requires a qualified source clef and note placement.", source.controls.get(inversion).source);
+            direction = baseline === "up" ? "down" : "up";
+            findings.push({ disposition: "inferred", code: "gp-relative-stem-direction", message: "Absolute stem direction derives from the encoded inversion and source clef, voice, and written staff positions.", location: source.controls.get(inversion).invertSource ?? source.controls.get(inversion).source, fact: { baseline, direction } });
+          }
+          if (direction && owner) {
+            for (const event of group) if (event.notes.length) {
+              event.stem = direction;
+              const control = source.controls.get(owner);
+              event.stemOrigin = { source: (authored ? control.stemSource : control.invertSource) ?? control.source, origin: authored === event ? "source-chord" : "derived-source-beam" };
+            }
+          }
+          if (group.length > 1) for (let level = 1; level <= group.reduce((maximum, event) => Math.max(maximum, depth(event)), 0); level++) {
+            const eligible = group.map((event) => depth(event) >= level);
+            const joins = group.map((event, index) => {
+              if (!index || !eligible[index] || !eligible[index - 1]) return false;
+              const count = source.controls.get(event)?.secondaryBreak ?? 0;
+              const shared = Math.min(depth(group[index - 1]), depth(event));
+              return level === 1 || !count || level <= Math.max(1, shared - count);
+            });
+            for (const [index, event] of group.entries()) if (eligible[index]) {
+              const left = joins[index], right = joins[index + 1] ?? false;
+              const value2 = left ? right ? "continue" : "end" : right ? "begin" : index === group.length - 1 ? "backward hook" : "forward hook";
+              (event.beams ??= []).push({ number: level, value: value2 });
+            }
+          }
+          group = [];
+        };
+        for (const event of events) {
+          const previous = group.at(-1), control = source.controls.get(event);
+          if (!depth(event)) {
+            finish();
+            group = [event];
+            finish();
+            continue;
+          }
+          let join = !!previous && depth(previous) > 0;
+          if (join && previous) {
+            join = !!event.grace || equal(add(previous.start, previous.duration), event.start);
+            if (control?.primary === "split") join = false;
+            else if (control?.primary !== "join") {
+              join &&= !!event.grace || (tuplets.has(event) || tuplets.has(previous) ? tuplets.get(event) === tuplets.get(previous) : groupAt(previous.start, rule) === groupAt(event.start, rule));
+            }
+          }
+          if (!join) finish();
+          group.push(event);
+        }
+        finish();
+      }
+      if (!supplied) findings.push({ disposition: "inferred", code: "gp-default-beam-boundaries", message: "An explicit beam edit is resolved against conventional meter/tuplet groups; no source-authored group list is claimed.", location: measure.source, fact: { unit: rule.unit, groups: rule.groups, voice: voiceIndex + 1 } });
+    }
+    if (supplied) findings.push({ disposition: "preserved", code: "gp-source-beam-groups", message: "Explicit source grouping is projected at its exact rational boundaries; original counts remain inspectable.", location: supplied.source, fact: supplied });
+  }
+}
+
+// src/adapters/guitar-pro/binary-engraving.ts
+function binaryBeams(parts, beats, masters, locations, findings) {
+  const controls = /* @__PURE__ */ new Map();
+  const groups = /* @__PURE__ */ new Map();
+  let inherited;
+  for (const [index, master] of masters.entries()) {
+    if (master.facts["beam-group:0"] !== void 0) {
+      const values2 = Array.from({ length: 4 }, (_, i) => master.facts[`beam-group:${i}`]), source = locations.get(master.source.path + "/beam-group:0") ?? master.source;
+      if (values2.every((value2) => value2 === 0)) refuse("gp-beam-groups", "An all-zero binary grouping does not establish musical spans.", source);
+      inherited = { source: { ...source, byteLength: 4 }, unit: 8, groups: values2 };
+    }
+    if (inherited) groups.set(index, inherited);
+  }
+  for (const { event, source: beatSource, facts } of beats) {
+    const flags = facts["beat-flags2"] ?? 0, source = locations.get(beatSource.path + "/beat-flags2") ?? beatSource;
+    if (flags & (15 | 2048)) controls.set(event, { source, ...flags & 4 ? { primary: "join" } : flags & 1 ? { primary: "split" } : {}, ...flags & 8 ? { stem: "up" } : flags & 2 ? { stem: "down" } : {}, ...flags & 2048 ? { secondaryBreak: facts["break-secondary-beams"], secondarySource: locations.get(beatSource.path + "/break-secondary-beams") ?? source } : {} });
+  }
+  for (const part of parts) applyGpBeams(part, { controls, groups }, findings);
+}
+function binaryTuplets(parts, beats, locations, findings) {
+  const raw = new Map(beats.map((beat) => [beat.event, beat]));
+  const flags = (event) => raw.get(event)?.facts["beat-flags2"] ?? 0;
+  const at = (event) => locations.get(raw.get(event)?.source.path + "/beat-flags2") ?? event.source;
+  for (const part of parts) for (const measure of part.measures) for (const voice of measure.voices) {
+    const events = voice.filter((event) => !event.grace);
+    let group = [], explicit = false;
+    const close = (encodedEnd = false) => {
+      if (!group.length) return;
+      if (explicit && !encodedEnd) refuse("binary-tuplet-bracket", "Explicit tuplet bracket start has no matching end in its ratio run.", at(group[0]));
+      const first = group[0], last = group.at(-1), ratio = first.tuplet, force = group.find((event) => flags(event) & 8192);
+      (first.tupletBoundary ??= []).push({ type: "start", number: 1, source: at(first), actual: ratio.actual, normal: ratio.normal, ...force ? { bracketType: { source: at(force), value: "yes" } } : {} });
+      (last.tupletBoundary ??= []).push({ type: "stop", number: 1, source: at(last) });
+      findings.push({ disposition: explicit ? "preserved" : "inferred", code: "binary-tuplet-bracket", message: explicit ? "Encoded tuplet bracket anchors retain their exact source events; the ratio and attack clocks are unchanged." : "Tuplet notation groups are calculated from contiguous equal source ratios and exact written units; source clocks and ratios are unchanged.", location: at(first), fact: { events: group.map((event) => event.source), actual: ratio.actual, normal: ratio.normal, forceBracket: !!force } });
+      group = [];
+      explicit = false;
+    };
+    for (const event of events) {
+      const f = flags(event);
+      if (!event.tuplet) {
+        close();
+        if (f & 9728) refuse("binary-tuplet-bracket", "Tuplet display control has no source tuplet ratio.", at(event));
+        continue;
+      }
+      if (group.length && (group[0].tuplet.actual !== event.tuplet.actual || group[0].tuplet.normal !== event.tuplet.normal || f & 512)) close();
+      if (f & 512) explicit = true;
+      group.push(event);
+      if (f & 1024) {
+        explicit = true;
+        close(true);
+        continue;
+      }
+      if (!explicit) {
+        const values2 = group.map((value2) => mul(value2.duration, q(value2.tuplet.actual, value2.tuplet.normal))), minimum = values2.reduce((a, b) => compare(a, b) < 0 ? a : b), total = values2.reduce(add, q(0));
+        if (equal(total, mul(minimum, q(event.tuplet.actual)))) close();
+      }
+    }
+    if (explicit) refuse("binary-tuplet-bracket", "Explicit tuplet bracket start has no end before its source measure boundary.", at(group[0]));
+    close();
+  }
+}
+function binaryOttavas(parts, beats, locations, relations, findings) {
+  const raw = new Map(beats.map((beat) => [beat.event, beat]));
+  const amount = (event) => {
+    const flags = (raw.get(event)?.facts["beat-flags2"] ?? 0) & 368;
+    if (flags && flags & flags - 1) refuse("binary-ottava", "Conflicting octave-line flags on one source beat.", event.source);
+    return { 16: 1, 32: -1, 64: 2, 256: -2 }[flags];
+  };
+  for (const part of parts) for (let voice = 0; voice < Math.max(...part.measures.map((measure) => measure.voices.length)); voice++) {
+    const entries = part.measures.flatMap((measure, mi) => (measure.voices[voice] ?? []).filter((event) => !event.grace).map((event) => ({ event, mi })));
+    for (let index = 0; index < entries.length; index++) {
+      const octaves = amount(entries[index].event);
+      if (!octaves) continue;
+      let end = index;
+      while (end + 1 < entries.length && amount(entries[end + 1].event) === octaves) end++;
+      const first = entries[index], last = entries[end], source = locations.get(raw.get(first.event)?.source.path + "/beat-flags2") ?? first.event.source;
+      const scoped = part.measures.slice(first.mi, last.mi + 1).some((measure) => measure.voices.some((events, vi) => vi !== voice && events.some((event) => !event.grace && event.notes.length)));
+      const label = `${Math.abs(octaves) === 1 ? "8" : "15"}${octaves > 0 ? Math.abs(octaves) === 1 ? "va" : "ma" : Math.abs(octaves) === 1 ? "vb" : "mb"}`;
+      relations.push({ source, id: `binary-ottava:${part.id}:${voice}:${index}`, kind: "ottava", octaves, start: { partId: part.id, measure: first.mi, position: first.event.start, staff: first.event.staff ?? 1, voiceId: first.event.voiceId ?? String(voice + 1), eventId: first.event.id }, end: { partId: part.id, measure: last.mi, position: add(last.event.start, last.event.duration), staff: last.event.staff ?? 1, voiceId: last.event.voiceId ?? String(voice + 1) }, ...scoped ? { beginText: `${label} (voice ${voice + 1})`, projection: { source, kind: "words-bracket", reason: "voice-local-scope" } } : {} });
+      findings.push({ disposition: scoped ? "inferred" : "preserved", code: "binary-ottava", message: scoped ? "The source voice-local octave line uses an explicit voice-labelled standard bracket to avoid shifting unrelated staff voices. Exact interval, endpoints and source flags remain retained." : "Per-beat source octave-line flags become a standard octave-shift span without changing physical or written pitch data.", location: source, fact: { octaves, voice: voice + 1, first: first.event.source, last: last.event.source } });
+      index = end;
+    }
+  }
+}
+
+// src/adapters/guitar-pro/binary-hopo.ts
+function binaryHopo(part, relations, findings) {
+  for (let voice = 0; voice < Math.max(...part.measures.map((m) => m.voices.length)); voice++) {
+    const entries = part.measures.flatMap((measure, index) => (measure.voices[voice] ?? []).map((event) => ({ event, measure: index })));
+    const next = /* @__PURE__ */ new Map();
+    for (let index = entries.length - 1; index >= 0; index--) {
+      const entry = entries[index];
+      const endpoint = (item, note) => ({ partId: part.id, measure: item.measure, position: item.event.start, staff: item.event.staff ?? 1, voiceId: item.event.voiceId ?? String(voice + 1), eventId: item.event.id, noteId: note.id });
+      for (const note of entry.event.notes) if (note.sourceHopoOrigin) {
+        const target = next.get(`${entry.event.staff ?? 1}:${note.string}`);
+        if (target && note.kind === "pitched" && target.note.kind === "pitched" && target.note.fret !== note.fret) {
+          const kind = target.note.fret > note.fret ? "hammer-on" : "pull-off";
+          note.hopoStart = kind;
+          target.note.hopoStop = kind;
+          findings.push({ disposition: "inferred", code: "binary-hopo-endpoint", message: "The combined source H/P flag follows the next note on the same voice, staff and string; direction derives from the physical frets.", location: note.source, fact: { destination: target.note.source, kind } });
+        } else {
+          (entry.event.performerInstructions ??= []).push({ source: note.source, kind: "hammer-on-pull-off", text: `Hammer-on/pull-off (string ${note.string})`, nativeValue: JSON.stringify({ origin: note.source, destination: target?.note.source ?? null, flag: 2 }) });
+          if (target) {
+            const id = `binary-hopo:${note.id}`;
+            relations.push({ source: note.source, id, kind: "slur", sourceTechnique: { source: note.source, kind: "hammer-on-pull-off" }, start: endpoint(entry, note), end: endpoint(target.entry, target.note) });
+            (note.slurs ??= []).push({ type: "start", number: 1, relationId: id });
+            (target.note.slurs ??= []).push({ type: "stop", number: 1, relationId: id });
+          }
+          findings.push({ disposition: "preserved", code: "binary-hopo-undirected", message: "The encoded combined H/P instruction is retained without inventing pitch direction. A known same-string endpoint retains its slur; absent endpoints do not create notes.", location: note.source, fact: { destination: target?.note.source ?? null, reason: !target ? "absent-endpoint" : note.kind === "dead" || target.note.kind === "dead" ? "dead-stroke" : "unchanged-fret" } });
+        }
+      }
+      for (const note of entry.event.notes) next.set(`${entry.event.staff ?? 1}:${note.string}`, { entry, note });
+    }
+  }
+}
+
 // src/adapters/guitar-pro/work-budgets.ts
 function jsonBytes(value2, maximum, code = "message-budget", location) {
   let bytes = 0;
@@ -15827,23 +20615,30 @@ var headers = {
 };
 var rhythmTypes = { 1: "whole", 2: "half", 4: "quarter", 8: "eighth", 16: "16th", 32: "32nd", 64: "64th" };
 var dynamics = ["", "PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"];
-function inferredPitch(midi) {
-  if (midi < 12 || midi > 127) refuse("pitch-range", "Binary pitch outside the written/reference MIDI profile.");
-  const [step, alter] = [
-    ["C", 0],
-    ["C", 1],
-    ["D", 0],
-    ["D", 1],
-    ["E", 0],
-    ["F", 0],
-    ["F", 1],
-    ["G", 0],
-    ["G", 1],
-    ["A", 0],
-    ["A", 1],
-    ["B", 0]
-  ][midi % 12];
-  return { step, alter, octave: Math.floor(midi / 12) - 1, midi, origin: "inferred" };
+function inferredPitch(midi, fifths = 0, swap = false) {
+  if (!Number.isInteger(midi) || midi < 0 || midi > 255) refuse("pitch-range", "Binary source pitch exceeds the bounded numeric domain.");
+  const natural = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }, signature = {};
+  for (const step2 of (fifths < 0 ? "BEADGCF" : "FCGDAEB").slice(0, Math.abs(fifths))) signature[step2] = Math.sign(fifths);
+  const pc = midi % 12, diatonic = Object.entries(natural).find(([step2, value2]) => (value2 + (signature[step2] ?? 0) + 12) % 12 === pc);
+  let step, alter;
+  if (diatonic) {
+    step = diatonic[0];
+    alter = signature[step] ?? 0;
+  } else [step, alter] = (fifths < 0 ? [["C", 0], ["D", -1], ["D", 0], ["E", -1], ["E", 0], ["F", 0], ["G", -1], ["G", 0], ["A", -1], ["A", 0], ["B", -1], ["B", 0]] : [["C", 0], ["C", 1], ["D", 0], ["D", 1], ["E", 0], ["F", 0], ["F", 1], ["G", 0], ["G", 1], ["A", 0], ["A", 1], ["B", 0]])[pc];
+  if (swap && alter !== 0) {
+    const opposite = Object.entries(natural).find(([, value2]) => (value2 - alter + 12) % 12 === pc);
+    if (opposite) {
+      step = opposite[0];
+      alter = -alter;
+    } else {
+      const unaltered = Object.entries(natural).find(([, value2]) => value2 === pc);
+      if (unaltered) {
+        step = unaltered[0];
+        alter = 0;
+      }
+    }
+  }
+  return { step, alter, octave: (midi - natural[step] - alter) / 12 - 1, midi, origin: "inferred" };
 }
 var BoundedInput = class extends ThrowingReadable {
   constructor(bytes, at) {
@@ -15883,9 +20678,10 @@ var CapturingReader = class extends Gp3To5Importer {
     this.onSourceField = (name, value2, byteOffset, byteLength) => {
       const source = { ...this.frame.source, path: `${this.frame.source.path}/${name}`, byteOffset, byteLength };
       this.frame.facts[name] = value2;
-      if (this.frame.facts === this.globals || /^\/tracks\/\d$/.test(this.frame.source.path ?? "")) this.fieldLocations.set(source.path, source);
+      this.fieldLocations.set(source.path, source);
       if (!discovery) this.record({ kind: "field", source, dataBase64: bytes.subarray(byteOffset, byteOffset + byteLength).base64(), facts: { value: value2 } });
       this.guard(name, value2, source);
+      if (name === "initial-tempo" && this.initialTempoNameStart !== void 0) this.onSourceField?.("initial-tempo-name", byteOffset - this.initialTempoNameStart, this.initialTempoNameStart, byteOffset - this.initialTempoNameStart);
     };
   }
   records = [];
@@ -15894,6 +20690,9 @@ var CapturingReader = class extends Gp3To5Importer {
   beats = /* @__PURE__ */ new Map();
   notes = /* @__PURE__ */ new Map();
   mixes = /* @__PURE__ */ new Map();
+  effects = /* @__PURE__ */ new Map();
+  chords = /* @__PURE__ */ new Map();
+  lyricsFrame;
   globals = {};
   fieldLocations = /* @__PURE__ */ new Map();
   frame = { source: { member: "input", path: "/header" }, facts: this.globals };
@@ -15901,7 +20700,9 @@ var CapturingReader = class extends Gp3To5Importer {
   masterOrdinal = 0;
   totalBeats = 0;
   totalNotes = 0;
+  beatOrdinals = /* @__PURE__ */ new WeakMap();
   captureBytes = 2;
+  initialTempoNameStart;
   get position() {
     return this.data.position;
   }
@@ -15927,10 +20728,7 @@ var CapturingReader = class extends Gp3To5Importer {
     if (name === "string-count" && (value2 < 1 || value2 > 7)) reject("Binary string count is outside its encoded capacity.", "tuning");
     if (name === "channel" && (value2 < 1 || value2 > 64)) reject("Unresolved MIDI channel.", "instrument");
     if (this.discovery) return;
-    if (name.startsWith("lyrics-present:") && value2 && (!this.selected || this.selected.has(String(this.frame.facts["lyrics-track"])))) reject("Nonempty selected-track lyrics require an export mapping.", "lyrics");
-    if (name === "navigation" && value2 !== -1) reject("Navigation jumps/targets are outside the simple-repeat profile.");
-    if (["global-triplet-feel", "triplet-feel", "alternate-endings", "initial-octave"].includes(name) && value2 !== 0)
-      reject("Swing/endings/global octave interpretation requires an exercised mapping.");
+    if (name === "global-triplet-feel" && ![0, 1].includes(value2) || name === "triplet-feel" && ![0, 1, 2].includes(value2)) reject("Unknown encoded rhythmic feel.", "rhythmic-feel");
     if (name === "initial-tempo" && (value2 < 1 || value2 > 1e3)) reject("Initial quarter tempo outside the profile.", "tempo-rate");
     if (name === "initial-key" && (value2 < -7 || value2 > 7)) reject("Initial key outside the profile.", "key");
     if (name === "key-fifths" && (value2 < -7 || value2 > 7) || name === "key-mode" && ![0, 1].includes(value2)) reject("Encoded key outside profile.", "key");
@@ -15940,31 +20738,27 @@ var CapturingReader = class extends Gp3To5Importer {
     if (name === "string-count" && (value2 < 1 || value2 > 7)) reject("Binary string count is outside its encoded capacity.", "tuning");
     if (name === "channel" && (value2 < 1 || value2 > 64)) reject("Unresolved MIDI channel.", "instrument");
     if (name === "mix-tempo" && value2 !== -1 && (value2 < 1 || value2 > 1e3)) reject("Mixer tempo outside profile.", "tempo-rate");
-    if (name === "mix-duration" && value2 !== 0) reject("Global tempo ramp requires a mapping, including in an excluded track.", "automation");
+    if (name === "mix-duration" && value2 < 0) reject("Negative mixer transition duration.", "automation");
     if (name === "mix-hide-tempo" && ![0, 1].includes(value2)) reject("Mixer visibility requires a boolean.", "boolean");
     if (!this.requested(source)) return;
-    if (name === "track-flags" && value2 & 119) reject("Percussion/doubled strings, solo/mute or unknown track flags are outside the bass profile.");
-    if (name === "string-count" && value2 < 4) reject("Selected bass requires 4\u20137 explicit strings.", "tuning");
-    if (name === "capo" && value2) reject("Active capo requires a separate pitch convention.", "capo");
-    if (name === "automatic-midi" && value2 & ~1) reject("Automatic let-ring/brush changes attacks or sustain.");
-    if (["automatic-accent", "humanize", "sound-bank"].includes(name) && value2) reject("Active automatic accent/humanize or nonzero sound-bank requires a mapping.", "playback-profile");
-    if (name === "clef-mode" && value2 !== 0 && value2 !== 12) reject("Unreviewed encoded clef mode.", "clef");
-    if (name === "secondary-clef-mode" && value2 !== this.frame.facts["clef-mode"]) reject("Different primary/secondary clefs declare an unadmitted dual-staff layout.", "clef");
-    if (name === "master-flags" && value2 & 16) reject("Alternate endings are outside the simple-repeat profile.", "repeat");
+    if (name === "track-flags" && value2 & (this.version >= 500 ? 0 : 64)) reject("Short-string banjo or unknown track flags need their explicit physical mapping.");
+    if (name === "capo" && value2 < 0) reject("Full capo fret must be nonnegative.", "capo");
+    if (name === "automatic-midi" && value2 & ~7) reject("Unknown automatic-MIDI flag; the documented playback let-ring/brush bits are already admitted.");
+    if (name === "automatic-accent" && value2 > 5 || name === "humanize" && value2 > 100) reject("Invalid playback interpretation parameter.", "playback-profile");
     if (name === "beat-flags" && value2 & 128) reject("Unknown beat flag.");
-    if (name === "beat-status" && value2 !== 2) reject("Encoded empty/unknown beat status needs explicit silence semantics.");
+    if (name === "beat-status" && ![0, 2].includes(value2)) reject("Unknown encoded beat status.");
     if (name === "duration-exponent" && (value2 < -2 || value2 > 4)) reject("Written rhythm outside whole\u201364th notes.", "rhythm");
     if (name === "tuplet" && ![3, 5, 6, 7, 9, 10, 11, 12, 13].includes(value2)) reject("Unexercised binary tuplet mapping.", "rhythm");
-    if (name === "beat-flags2" && value2 & ~8207) reject("Ottava/unknown/secondary-beaming flags require a mapping.");
-    if (name === "note-flags" && (value2 & ~56 || !(value2 & 32))) reject("Source note needs explicit type/fret; override/ghost/accent/fingers are unexercised.");
+    if (name === "beat-flags2" && value2 & ~16255) reject("Unknown secondary beat flags require a mapping.");
     if (name === "note-type" && ![1, 2, 3].includes(value2)) reject("Unknown source note type.");
-    if (name === "note-fret" && this.frame.facts["note-type"] !== 2 && (value2 < 0 || value2 > 36)) reject("Fret outside the physical profile.", "physical-pitch");
+    if (name === "note-fret" && this.frame.facts["note-type"] !== 2 && !(this.frame.facts["note-type"] === 3 && value2 === -1) && (value2 < 0 || value2 > 127)) reject("Source fret must be a nonnegative signed-byte value.", "physical-pitch");
     if (name === "note-dynamic" && (value2 < 1 || value2 > 8)) reject("Unknown encoded dynamic.", "dynamic");
-    if (name === "note-flags2" && value2) reject("Unknown or unexercised accidental-swap note flag.");
-    if (name === "note-effect-flags" && value2 & ~2) reject("Unexercised bend/slide/harmonic/mute/grace note effect.", "technique");
-    if (name === "note-effect-flags2" && value2) reject("Unexercised note effect.", "technique");
-    if (name.startsWith("mix-") && ["mix-instrument", "mix-volume", "mix-balance", "mix-chorus", "mix-reverb", "mix-phaser", "mix-tremolo", "mix-wah"].includes(name) && value2 !== -1) reject("Active non-tempo mixer changes require a mapping.", "automation");
-    if (name === "mix-flags" && value2 & 192) reject("Unreviewed mixer wah/flag convention.", "automation");
+    if (name === "note-flags2" && value2 & ~2) reject("Unknown source note spelling flag.");
+    if (name === "note-effect-flags" && value2 & ~31) reject("Unknown note effect.", "technique");
+    if (name === "note-effect-flags2" && value2 & ~127) reject("Unknown note effect.", "technique");
+    if (name === "mix-instrument" && (value2 < -1 || value2 > 127)) reject("Invalid mixer instrument program.", "instrument");
+    if (name === "mix-wah" && (value2 < -2 || value2 > 100)) reject("Unknown source Wah position.", "technique");
+    if (name === "mix-flags" && value2 & (this.version >= 500 ? 0 : 192)) reject("Unreviewed mixer wah/flag convention.", "automation");
   }
   scope(kind, coordinates, body) {
     const previous = this.frame, start = this.data.position;
@@ -15988,10 +20782,11 @@ var CapturingReader = class extends Gp3To5Importer {
     this.scope("metadata", { path: "/score-information" }, () => super.readScoreInformation());
   }
   readLyrics() {
-    this.scope("metadata", { path: "/lyrics" }, () => super.readLyrics());
+    this.lyricsFrame = this.scope("metadata", { path: "/lyrics" }, () => super.readLyrics()).frame;
   }
   readPageSetup() {
     this.scope("metadata", { path: "/page-setup" }, () => super.readPageSetup());
+    this.initialTempoNameStart = this.position;
   }
   readMasterBar() {
     const measure = ++this.masterOrdinal;
@@ -16013,7 +20808,9 @@ var CapturingReader = class extends Gp3To5Importer {
     this.scope("voice", { path: `${this.frame.source.path}/voices/${bar.voices.length + 1}`, voice: bar.voices.length + 1 }, () => super.readVoice(track, bar));
   }
   readBeat(track, bar, voice) {
-    const captured = this.scope("beat", { path: `${this.frame.source.path}/beats/${voice.beats.length + 1}`, beat: voice.beats.length + 1 }, () => super.readBeat(track, bar, voice));
+    const ordinal = (this.beatOrdinals.get(voice) ?? 0) + 1;
+    this.beatOrdinals.set(voice, ordinal);
+    const captured = this.scope("beat", { path: `${this.frame.source.path}/beats/${ordinal}`, beat: ordinal }, () => super.readBeat(track, bar, voice));
     if (!this.discovery) this.beats.set(voice.beats.at(-1), captured.frame);
     const mask = captured.frame.facts["string-mask"], count = bar.staff.stringTuning.tunings.length;
     if (mask & ~((1 << count) - 1 << 7 - count)) refuse("physical-pitch", "String mask addresses absent strings.", captured.frame.source);
@@ -16023,37 +20820,58 @@ var CapturingReader = class extends Gp3To5Importer {
     const captured = this.scope(
       "note",
       { path: `${this.frame.source.path}/strings/${stringIndex + 1}`, id: `${this.frame.source.path}/strings/${stringIndex + 1}` },
-      () => super.readNote(track, bar, voice, beat, stringIndex)
+      () => {
+        const result = super.readNote(track, bar, voice, beat, stringIndex);
+        if (this.version < 500 && this.frame.facts["note-flags"] & 1) {
+          const offset = this.fieldLocations.get(this.frame.source.path + "/note-flags").byteOffset + 1 + (this.frame.facts["note-flags"] & 32 ? 1 : 0);
+          for (const [name, index] of [["independent-duration-exponent", 0], ["independent-duration-tuplet", 1]]) {
+            const byte = this.bytes[offset + index];
+            this.onSourceField?.(name, byte > 127 ? byte - 256 : byte, offset + index, 1);
+          }
+        }
+        return result;
+      }
     );
     captured.frame.facts["source-string"] = stringIndex + 1;
     if (!this.discovery) this.notes.set(captured.result, captured.frame);
     return captured.result;
   }
   readBeatEffects(beat) {
-    if (this.requested() && (this.bytes[this.data.position] || this.version >= 400 && this.bytes[this.data.position + 1]))
-      refuse("technique", "Beat-level attack/sustain effects require a mapping.", { ...this.frame.source, byteOffset: this.data.position });
-    return this.scope("beat-effects", { path: `${this.frame.source.path}/effects` }, () => super.readBeatEffects(beat)).result;
+    const captured = this.scope("beat-effects", { path: `${this.frame.source.path}/effects` }, () => super.readBeatEffects(beat));
+    if (!this.discovery) this.effects.set(beat, captured.frame);
+    return captured.result;
   }
   readChord(beat) {
-    this.scope("chord-diagram", { path: `${this.frame.source.path}/chord-diagram` }, () => super.readChord(beat));
+    const captured = this.scope("chord-diagram", { path: `${this.frame.source.path}/chord-diagram` }, () => super.readChord(beat));
+    if (!this.discovery) this.chords.set(beat, captured.frame);
   }
   readMixTableChange(beat) {
-    const captured = this.scope("mix-table", { path: `${this.frame.source.path}/mix-table` }, () => super.readMixTableChange(beat));
+    const captured = this.scope("mix-table", { path: `${this.frame.source.path}/mix-table` }, () => {
+      super.readMixTableChange(beat);
+      if (this.version >= 500) {
+        const start = this.fieldLocations.get(this.frame.source.path + "/mix-tremolo").byteOffset + 1, end = this.fieldLocations.get(this.frame.source.path + "/mix-tempo").byteOffset;
+        this.onSourceField?.("mix-tempo-name", end - start, start, end - start);
+      }
+    });
     if (!this.discovery) this.mixes.set(beat, captured.frame);
   }
 };
 function recoverBeforeFinish(score, reader, findings) {
   const expected = [];
-  let repeatOpen = false;
+  const dead = [], deadNotes = /* @__PURE__ */ new Map();
+  const slideOrigins = /* @__PURE__ */ new Map(), relations = [];
+  let repeatOpen = 0;
+  const emptyEvents = /* @__PURE__ */ new Map();
+  const sourceEvents = /* @__PURE__ */ new Map(), drums = [];
+  const deadGraces = /* @__PURE__ */ new Map();
   for (let mi = 0; mi < score.masterBars.length; mi++) {
     const master = score.masterBars[mi], source = reader.masters[mi].source;
-    if (master.isRepeatStart && repeatOpen || master.repeatCount && !repeatOpen && !master.isRepeatStart) refuse("repeat", "Simple repeats need an explicit unnested start.", source);
-    if (master.isRepeatStart) repeatOpen = true;
+    if (master.isRepeatStart) repeatOpen++;
     if (master.repeatCount) {
-      if (master.repeatCount < 2 || master.repeatCount > 8) refuse("repeat", "Repeat count outside 2\u20138.", source);
-      repeatOpen = false;
+      if (master.repeatCount < 1 || master.repeatCount > 256) refuse("repeat", "Repeat count exceeds the exact encoded byte convention.", source);
+      repeatOpen = Math.max(0, repeatOpen - 1);
     }
-    if (master.directions?.size || master.alternateEndings || master.isFreeTime) refuse("repeat", "Unadmitted navigation/free-time.", source);
+    if (master.isFreeTime) refuse("meter", "Binary free-time requires an encoded source marker.", source);
   }
   if (repeatOpen) refuse("repeat", "Unclosed repeat.", reader.masters.at(-1).source);
   const parts = [];
@@ -16064,61 +20882,114 @@ function recoverBeforeFinish(score, reader, findings) {
       findings.push({ disposition: "excluded-by-scope", code: "track-excluded", message: "Encoded track is excluded from requested output; original bytes and spans remain captured.", location: frame.source, fact: { trackId: id, name: track.name } });
       continue;
     }
+    if (frame.facts["track-flags"] & 2) findings.push({ disposition: "excluded-by-scope", code: "binary-twelve-string-simulation", message: "The source twelve-string sound simulation flag remains captured; its encoded tuning vector is preserved without inventing doubled physical courses.", location: reader.fieldLocations.get(frame.source.path + "/track-flags") ?? frame.source });
+    if (reader.version >= 500 && frame.facts["track-flags"] & 64) findings.push({ disposition: "excluded-by-scope", code: "binary-rse-playback", message: "Encoded RSE synthesis selection remains captured; source instrument and performer notation are preserved independently.", location: reader.fieldLocations.get(frame.source.path + "/track-flags") ?? frame.source });
+    if (frame.facts["track-flags"] & 1) {
+      const recovered = binaryPercussion(track, score, frame, { version: reader.version, beats: reader.beats, notes: reader.notes, masters: reader.masters, fieldLocations: reader.fieldLocations, sourceEvents, emptyEvents, effects: reader.effects, chords: reader.chords }, findings);
+      parts.push(recovered.part);
+      drums.push(...recovered.expected);
+      continue;
+    }
     const staff = track.staves[0], highToLow = staff.stringTuning.tunings;
     const program = track.playbackInfo.program;
-    if (track.staves.length !== 1 || staff.isPercussion || program < 24 || program > 39) refuse("instrument", "Binary admission requires an explicit fretted guitar/bass MIDI program 24\u201339.", frame.source);
-    if (highToLow.length < 4 || highToLow.length > 7 || highToLow.some((pitch2, i) => pitch2 < 12 || pitch2 > 108 || i > 0 && pitch2 >= highToLow[i - 1]))
-      refuse("tuning", "Expected complete descending high-to-low binary string tuning.", frame.source);
+    if (track.staves.length !== 1 || staff.isPercussion || program < 0 || program > 127) refuse("instrument", "Binary pitched admission requires one source staff and an explicit MIDI program.", frame.source);
+    const banjo = !!(frame.facts["track-flags"] & 4);
+    if (banjo && highToLow.length !== 5) refuse("banjo-strings", "The source short-fifth-string flag requires five encoded strings.", frame.source);
+    const family = banjo ? "banjo" : midiFamily(program), fretted = banjo || family === "guitar" || family === "bass", writtenShift = fretted ? 12 : 0;
+    if (highToLow.length < 1 || highToLow.length > 7 || highToLow.some((pitch2) => pitch2 < 0 || pitch2 > 127))
+      refuse("tuning", "Expected complete binary tuning in its encoded string order.", frame.source);
     const tuning = highToLow.slice().reverse();
+    const capo = { source: reader.fieldLocations.get(frame.source.path + "/capo"), fret: frame.facts.capo };
+    if (fretted) findings.push({ disposition: "preserved", code: "full-capo", message: "Full capo is retained separately from non-capo open-string tuning and capo-relative source fret. Its semitone shift is applied once to physical pitch, independently of written octave transposition.", location: capo.source, fact: { fret: capo.fret } });
     let key = { fifths: reader.globals["initial-key"], mode: "major" };
     let measureStart = q(0);
     const previousEvents = /* @__PURE__ */ new Map();
+    const previousStrings = /* @__PURE__ */ new Map(), sourceNoteDurations = /* @__PURE__ */ new Map();
     const measures = staff.bars.map((bar, mi) => {
       const master = score.masterBars[mi], source = { ...reader.masters[mi].source, trackId: id };
+      const masterFields2 = reader.masters[mi].facts;
+      if (masterFields2["key-fifths"] !== void 0) key = { fifths: masterFields2["key-fifths"], mode: masterFields2["key-mode"] ? "minor" : "major" };
       const beats = master.timeSignatureNumerator, unit = master.timeSignatureDenominator;
-      if (beats < 1 || beats > 32 || unit < 1 || unit > 64 || unit & unit - 1) refuse("meter", "Binary meter outside profile.", source);
+      if (beats < 1 || beats > 255 || unit < 1 || unit > 128 || unit & unit - 1) refuse("meter", "Binary meter outside profile.", source);
       const span = q(beats * 4, unit);
       const voices = bar.voices.map((voice, vi) => {
         let position = q(0);
-        return voice.beats.map((beat) => {
+        const encoded = voice.beats.filter((beat) => reader.beats.has(beat));
+        if (encoded.length && encoded.every((beat) => reader.beats.get(beat).facts["beat-status"] === 0)) {
+          if (encoded.some((beat) => beat.notes.length)) refuse("empty-voice", "Empty source voice contains note attacks.", source);
+          for (const beat of encoded) {
+            const event = emptyAnnotationAnchor(reader.beats.get(beat).source, beat.text);
+            emptyEvents.set(beat, event);
+            sourceEvents.set(beat, event);
+          }
+          findings.push({ disposition: "preserved", code: "binary-empty-voice", message: "Encoded empty beat placeholders preserve a silent voice slot without creating rhythmic attacks.", location: reader.beats.get(encoded[0]).source });
+          return [];
+        }
+        return voice.beats.filter((beat) => reader.beats.has(beat)).flatMap((beat) => {
           const raw = reader.beats.get(beat);
-          if (!raw || beat.isEmpty) refuse("empty-voice", "Empty encoded beats need explicit silence semantics.", source);
+          if (!raw || beat.isEmpty && beat.notes.length) refuse("empty-voice", "Empty source beat contradicts its encoded notes.", source);
           const dots = raw.facts["beat-flags"] & 1 ? 1 : 0;
           const denominator = 2 ** (raw.facts["duration-exponent"] + 2);
           const actual = raw.facts.tuplet;
           const normal = actual === 3 ? 2 : actual && actual <= 7 ? 4 : 8;
           const tuplet = actual ? { actual, normal } : void 0;
           const duration2 = mul(mul(q(4, denominator), q(dots ? 3 : 1, dots ? 2 : 1)), q(tuplet?.normal ?? 1, tuplet?.actual ?? 1));
-          const sourceNotes = beat.notes.map((note) => {
+          const deadSlots = beat.notes.filter((note) => {
+            const facts = reader.notes.get(note).facts;
+            return facts["note-type"] === 3 && facts["note-fret"] === -1;
+          });
+          const emptySlots = beat.notes.filter((note) => !(reader.notes.get(note).facts["note-flags"] & 32));
+          const sourceNotes = beat.notes.filter((note) => !emptySlots.includes(note) && !deadSlots.includes(note)).map((note) => {
             const rawNote = reader.notes.get(note);
             const string = rawNote.facts["source-string"], placeholder = rawNote.facts["note-fret"];
             let fret = placeholder;
             if (rawNote.facts["note-type"] === 2) {
-              const previous = previousEvents.get(vi), origin = previous?.event.notes.find((n) => n.string === string);
-              if (!origin || origin.kind !== "pitched" || !equal(previous.end, add(measureStart, position))) refuse("tie-conflict", "Binary tie destination needs an immediately preceding contiguous same-string pitched source origin.", rawNote.source);
+              const prior = previousStrings.get(`${vi}:${string}`), origin = prior?.note;
+              if (!origin || origin.kind !== "pitched" || origin.fret === void 0) refuse("tie-conflict", "Binary tie destination needs a prior same-string pitched source origin.", rawNote.source);
               fret = origin.fret;
+              note.tieOrigin = prior.borrowed;
               findings.push({ disposition: "preserved", code: "binary-tie-fret", message: "Binary note-type2 inherits the preceding same-string effective fret; its serialized signed-byte fret is an unused placeholder, retained unchanged. This derives source encoding semantics, not a musical repair.", location: rawNote.source, fact: { rawPlaceholder: placeholder, effectiveFret: fret, origin: origin.source } });
             }
-            const midi = highToLow[string - 1] + fret;
-            const reference = inferredPitch(midi), written = inferredPitch(midi + 12);
-            const dead = rawNote.facts["note-type"] === 3;
+            const midi = highToLow[string - 1] + capo.fret + fret;
+            const reference = inferredPitch(midi), written = inferredPitch(midi + writtenShift, key.fifths);
+            const dead2 = rawNote.facts["note-type"] === 3;
             const fact = {
               source: rawNote.source,
               id: rawNote.source.id,
               string,
               fret,
-              kind: dead ? "dead" : "pitched",
-              sounding: dead ? null : reference,
+              kind: dead2 ? "dead" : "pitched",
+              sounding: dead2 ? null : reference,
               written,
-              ...dead ? { referenceSounding: reference } : {},
+              ...dead2 ? { referenceSounding: reference } : {},
               tieStart: false,
               tieStop: rawNote.facts["note-type"] === 2,
               ...rawNote.facts["note-effect-flags"] & 2 ? { sourceHopoOrigin: true } : {}
             };
+            const slide = binaryTechniques(rawNote.facts, rawNote.source, fact, reader.version, (name) => reader.fieldLocations.get(rawNote.source.path + "/" + name) ?? rawNote.source);
+            if (slide) slideOrigins.set(fact, slide);
+            const locate = (name) => reader.fieldLocations.get(rawNote.source.path + "/" + name) ?? rawNote.source;
+            binaryHarmonic(rawNote.facts, fact, reader.version, highToLow[string - 1] + capo.fret, inferredPitch, locate, findings, reader.effects.get(beat)?.facts["beat-effect-flags"], writtenShift);
+            const swap = !!(rawNote.facts["note-flags2"] & 2);
+            fact.written = inferredPitch(fact.written.midi, key.fifths, swap);
+            if (swap) {
+              if (fact.written.alter) {
+                fact.accidental = fact.written.alter < 0 ? "flat" : "sharp";
+                fact.accidentalRole = "user";
+              }
+              findings.push({ disposition: "inferred", code: "binary-accidental-swap", message: "The encoded sharp/flat swap is applied to the generated key-aware spelling without changing pitch, physical fret, or tuning. The literal flag remains in source capture.", location: locate("note-flags2"), fact: { keyFifths: key.fifths, written: fact.written } });
+            }
+            binaryTrill(rawNote.facts, fact, highToLow[string - 1] + capo.fret, inferredPitch, locate, writtenShift);
+            if (fact.written.octave < 0 || fact.written.octave > 9) {
+              findings.push({ disposition: "preserved", code: "source-pitch-format-limit-facts", message: "Exact source pitch facts exceed the MusicXML4 octave0\u20139 domain; they are not clipped or folded.", location: rawNote.source, fact: { tuning: highToLow[string - 1], capo: capo.fret, fret, soundingMidi: fact.sounding?.midi, written: fact.written } });
+              refuse("source-pitch-format-limit", `Source written ${fact.written.step}${fact.written.alter ? " altered " + fact.written.alter : ""}${fact.written.octave} (MIDI ${fact.written.midi}) exceeds MusicXML4 octave0\u20139.`, rawNote.source);
+            }
             return { note, fact, dynamic: rawNote.facts["note-dynamic"] };
           });
-          const levels = [...new Set(sourceNotes.map((note) => note.dynamic).filter((value2) => value2 !== void 0))];
-          if (levels.length > 1) refuse("dynamic", "Conflicting per-note chord dynamics cannot become one mark.", raw.source);
+          const levels2 = [...new Set(beat.notes.filter((note) => !emptySlots.includes(note)).map((note) => reader.notes.get(note).facts["note-dynamic"]).filter((value2) => value2 !== void 0))];
+          if (levels2.length > 1) {
+            for (const { fact, dynamic } of sourceNotes) if (dynamic !== void 0) fact.dynamic = { source: reader.fieldLocations.get(fact.source.path + "/note-dynamic") ?? fact.source, value: dynamics[dynamic].toLowerCase() };
+          }
           const event = {
             source: raw.source,
             id: raw.source.path,
@@ -16127,27 +20998,73 @@ function recoverBeforeFinish(score, reader, findings) {
             type: rhythmTypes[denominator],
             dots,
             ...tuplet ? { tuplet } : {},
+            ...raw.facts["beat-status"] === 0 ? { printObject: false } : {},
             notes: sourceNotes.map((note) => note.fact),
             fullMeasureRest: !sourceNotes.length && voice.beats.length === 1 && equal(duration2, span),
-            ...levels.length ? { dynamic: dynamics[levels[0]] } : {},
+            ...levels2.length === 1 ? { dynamic: dynamics[levels2[0]] } : {},
             ...beat.text ? { text: beat.text } : {}
           };
+          sourceEvents.set(beat, event);
+          for (const note of deadSlots) {
+            const slot = reader.notes.get(note), string = slot.facts["source-string"], fact = { source: slot.source, id: slot.source.id, string, kind: "dead", written: inferredPitch(highToLow[string - 1] + capo.fret + writtenShift, key.fifths), sounding: null, sourceDead: { source: reader.fieldLocations.get(slot.source.path + "/note-type"), value: true }, tieStart: false, tieStop: false };
+            const locate = (name) => reader.fieldLocations.get(slot.source.path + "/" + name) ?? slot.source;
+            const slide = binaryTechniques(slot.facts, slot.source, fact, reader.version, locate);
+            if (slide) slideOrigins.set(fact, slide);
+            if (fact.bend) delete fact.bend;
+            if (levels2.length > 1 && slot.facts["note-dynamic"] !== void 0) fact.dynamic = { source: locate("note-dynamic"), value: dynamics[slot.facts["note-dynamic"]].toLowerCase() };
+            previousStrings.set(`${vi}:${string}`, { note: fact, borrowed: note, end: add(measureStart, add(position, duration2)) });
+            const pending = deadNotes.get(event.id) ?? [];
+            pending.push(fact);
+            deadNotes.set(event.id, pending);
+            dead.push({ note, fact, event });
+            event.fullMeasureRest = false;
+            findings.push({ disposition: "inferred", code: "binary-unfretted-dead-placement", message: "Explicit dead type with fret\u22121 is a dead attack without physical fret or sounding pitch. Source string is retained; the declared open-string register supplies only derived staff placement.", location: slot.source });
+          }
+          for (const note of sourceNotes) {
+            const rawNote = reader.notes.get(note.note), marks = rawNote.facts["tremolo-marks"];
+            if (marks !== void 0) {
+              if (marks < 1 || marks > 3) refuse("tremolo", "Unknown binary tremolo picking value.", rawNote.source);
+              if (event.ornaments?.some((o) => o.kind === "tremolo" && o.strokes !== marks)) refuse("tremolo", "Conflicting chord tremolo values.", rawNote.source);
+              if (!event.ornaments?.length) event.ornaments = [{ source: reader.fieldLocations.get(rawNote.source.path + "/tremolo-marks"), kind: "tremolo", type: "single", strokes: marks }];
+            }
+          }
+          const effects = reader.effects.get(beat);
+          if (effects) binaryBeatTechniques(effects.facts, event, reader.version, (name) => reader.fieldLocations.get(effects.source.path + "/" + name) ?? effects.source);
           const mix = reader.mixes.get(beat);
           if (mix && mix.facts["mix-tempo"] >= 0) tempos.push({ source: mix.source, measure: mi, position, rate: String(mix.facts["mix-tempo"]), reference: 2, unit: "quarter", dots: 0, quarterRate: mix.facts["mix-tempo"], visible: !mix.facts["mix-hide-tempo"] });
           for (const note of sourceNotes) expected.push({ note: note.note, fact: note.fact, event });
           previousEvents.set(vi, { event, end: add(measureStart, add(position, duration2)) });
+          for (const { note, fact } of sourceNotes) {
+            const frame2 = reader.notes.get(note), own = reader.version < 500 && frame2.facts["note-flags"] & 3 ? binaryNoteValue(frame2, event).duration : duration2;
+            sourceNoteDurations.set(fact, own);
+            previousStrings.set(`${vi}:${fact.string}`, { note: fact, borrowed: note, end: add(measureStart, add(position, own)) });
+          }
+          const graceOwners = sourceNotes.map(({ note, fact }) => ({ fact, facts: reader.notes.get(note).facts, locate: (name) => reader.fieldLocations.get(reader.notes.get(note).source.path + "/" + name) ?? reader.notes.get(note).source }));
+          const unknownDead = graceOwners.filter((owner) => reader.version < 500 && owner.facts["grace-fret"] === -1);
+          const slotGraces = [...emptySlots, ...deadSlots].flatMap((note) => {
+            const slot = reader.notes.get(note);
+            return binaryEmptySlot(slot, event, reader.version, (name) => reader.fieldLocations.get(slot.source.path + "/" + name) ?? slot.source, findings, (fret, dead2, source2) => {
+              const string = slot.facts["source-string"], reference = inferredPitch(highToLow[string - 1] + capo.fret + (fret ?? 0)), written = inferredPitch(reference.midi + writtenShift, key.fifths);
+              if (written.octave < 0 || written.octave > 9) refuse("source-pitch-format-limit", "Source grace pitch exceeds MusicXML4 octave0\u20139.", source2);
+              return { source: source2, id: source2.id, string, ...fret !== void 0 ? { fret } : {}, kind: dead2 ? "dead" : "pitched", written, sounding: dead2 ? null : reference, ...dead2 && fret !== void 0 ? { referenceSounding: reference } : {}, tieStart: false, tieStop: false };
+            }, deadSlots.includes(note));
+          });
+          const genericGraces = [...binaryUnfrettedDeadGraces(unknownDead, event, findings), ...slotGraces];
+          if (genericGraces.length) deadGraces.set(event.id, genericGraces);
+          const graces = binaryGraces(graceOwners.filter((owner) => !unknownDead.includes(owner)), event, reader.version, (string) => highToLow[string - 1] + capo.fret, inferredPitch, relations, findings, writtenShift);
           position = add(position, duration2);
-          return event;
+          return [...graces, event];
         });
       });
       const populated = voices.filter((voice) => voice.length);
-      if (!populated.length) refuse("empty-measure", "An entirely empty binary measure needs explicit silence admission.", source);
+      if (!populated.length) {
+        const event = { source, id: `${id}:${mi}:empty-measure`, start: q(0), duration: span, type: "whole", dots: 0, notes: [], fullMeasureRest: true };
+        voices[0] = [event];
+        populated.push(voices[0]);
+        findings.push({ disposition: "inferred", code: "binary-empty-measure-rest", message: "An entirely empty encoded measure is projected as one standard measure rest; silent source voice slots remain separate.", location: source });
+      }
       const totals = populated.map((voice) => voice.reduce((sum, event) => add(sum, event.duration), q(0)));
-      const pickup = mi === 0 && totals[0].n * span.d < span.n * totals[0].d;
-      const duration = pickup ? totals[0] : span;
-      if (!totals.every((total) => equal(total, duration))) refuse("measure-duration", "Active binary voices must fill the exact common span.", source);
-      const masterFields = reader.masters[mi].facts;
-      if (masterFields["key-fifths"] !== void 0) key = { fifths: masterFields["key-fifths"], mode: masterFields["key-mode"] ? "minor" : "major" };
+      const { pickup, duration } = binaryMeasureExtent(totals, span, mi, staff.bars.length, source, findings);
       const encodedClef = frame.facts["clef-mode"];
       const clef = encodedClef === 0 ? "G2" : encodedClef === 12 ? "F4" : program < 32 ? "G2" : highToLow.at(-1) < 35 ? "F4" : "G2";
       measureStart = add(measureStart, duration);
@@ -16163,49 +21080,32 @@ function recoverBeforeFinish(score, reader, findings) {
         repeatEnd: master.repeatCount
       };
     });
-    for (let vi = 0; vi < Math.max(...measures.map((measure) => measure.voices.length)); vi++) {
-      const timeline = [];
-      let start = q(0);
-      for (const measure of measures) {
-        for (const event of measure.voices[vi] ?? []) timeline.push({ event, start: add(start, event.start) });
-        start = add(start, measure.duration);
-      }
-      for (let i = 0; i < timeline.length; i++) {
-        const current = timeline[i], previous = timeline[i - 1], next = timeline[i + 1];
-        for (const note of current.event.notes) {
-          if (note.kind === "dead" && (note.tieStop || note.sourceHopoOrigin)) refuse("dead-relation", "Dead tie/HOPO is outside the profile.", note.source);
-          if (note.tieStop) {
-            const origin = previous?.event.notes.find((candidate) => candidate.string === note.string);
-            if (!origin || origin.kind !== "pitched" || origin.fret !== note.fret || origin.sounding?.midi !== note.sounding?.midi || !equal(add(previous.start, previous.event.duration), current.start)) refuse("tie-conflict", "Raw binary tie destination has no matching contiguous physical origin; reader repairs are refused.", note.source);
-            origin.tieStart = true;
-            findings.push({ disposition: "inferred", code: "binary-tie-origin", message: "Destination-only encoded tie implies the validated contiguous same-string origin; raw destination type/fret bytes remain unchanged.", location: note.source, fact: { origin: origin.source } });
-          }
-          if (note.sourceHopoOrigin) {
-            const target = next?.event.notes.find((candidate) => candidate.string === note.string);
-            if (!target || target.kind !== "pitched" || target.fret === note.fret || !equal(add(current.start, current.event.duration), next.start) || current.event.notes.filter((candidate) => candidate.sourceHopoOrigin).length > 1)
-              refuse("hopo-conflict", "Binary HOPO origin needs one contiguous same-string changed-fret destination.", note.source);
-            const kind = target.fret > note.fret ? "hammer-on" : "pull-off";
-            note.hopoStart = kind;
-            target.hopoStop = kind;
-            note.hopoNumber = target.hopoNumber = vi + 1;
-            findings.push({ disposition: "inferred", code: "binary-hopo-endpoint", message: "Encoded origin-only HOPO supplies a validated next-beat endpoint and fret-direction classification; source flags remain separate.", location: note.source, fact: { destination: target.source, kind } });
-          }
-        }
-      }
-    }
-    const family = program < 32 ? "guitar" : "bass", rule = `gp3-5-${family}-register/0`;
-    findings.push({ disposition: "inferred", code: "binary-written-register", message: `GP3\u20135 ${family} notation convention writes one octave above physical sounding MIDI, with MusicXML octave transpose -1. This is generated versioned representation (${rule}), not encoded chromatic transpose or another actual-pitch shift; producer display fidelity remains unverified.`, location: frame.source, fact: { program, transposeOctaves: -1, rule } });
-    findings.push({ disposition: "inferred", code: "binary-pitch-spelling", message: "Binary tuning/fret supplies sounding MIDI, not full spelling. Sharp-based written/reference spelling is generated; raw key and clef fields remain separate.", location: frame.source });
+    const rule = `gp3-5-${family}-register/0`;
+    findings.push({ disposition: "inferred", code: "binary-written-register", message: `GP3\u20135 ${family} notation convention writes ${writtenShift} semitones above the encoded pitch grid, with corresponding MusicXML octave transpose. This is generated versioned representation (${rule}), not encoded chromatic transpose or another actual-pitch shift; producer display fidelity remains unverified.`, location: frame.source, fact: { program, transposeOctaves: -writtenShift / 12, rule } });
+    findings.push({ disposition: "inferred", code: "binary-pitch-spelling", message: "Binary tuning/fret supplies pitch, not complete written spelling. Written spelling follows the active source key, with conventional chromatic sharps in nonflat keys and flats in flat keys; an encoded swap reverses that chromatic spelling. Physical reference spelling is generated separately.", location: frame.source });
     if (reader.version < 500) findings.push({ disposition: "inferred", code: "binary-clef", message: "No explicit main clef field is encoded in this profile; guitar uses conventional treble, while bass uses a located low-tuning reference-clef rule. It is not source staff/hand identity.", location: frame.source, fact: { family } });
     findings.push({ disposition: "preserved", code: "binary-voice-slots", message: "Encoded voice slots, including zero-beat secondary voices, are retained without generating rests or attacks.", location: frame.source, fact: { voiceCounts: measures.map((measure) => measure.voices.map((voice) => voice.length)) } });
-    parts.push({ source: frame.source, id, name: track.name, instrument: family, midiProgram: program, tuning, transposeOctaves: -1, measures });
+    const recoveredPart = { source: frame.source, id, name: track.name, instrument: family === "other" ? `gm-program-${program}` : family, midiProgram: program, tuning, capo, transposeOctaves: -writtenShift / 12, measures };
+    for (const measure of recoveredPart.measures) for (const voice of measure.voices) for (const event of voice) {
+      const pending = deadNotes.get(event.id);
+      if (pending) event.notes.push(...pending);
+    }
+    binaryTies(recoveredPart, sourceNoteDurations, relations, findings);
+    binaryHopo(recoveredPart, relations, findings);
+    connectSlides(recoveredPart, slideOrigins, relations);
+    connectSustainMarks(recoveredPart, relations);
+    numberHopo(recoveredPart);
+    parts.push(recoveredPart);
   }
   if (!parts.length || reader.selected && [...reader.selected].some((id) => !reader.tracks.has(Number(id)))) refuse("track-selection", "Requested binary track ID is absent.", { member: "input" });
-  if (parts.some((part) => !equal(part.measures[0].duration, parts[0].measures[0].duration))) refuse("pickup-span", "Selected tracks need one exact pickup span.", { member: "input" });
-  for (const [beat, mix] of reader.mixes) if (reader.selected && !reader.selected.has(mix.source.trackId) && mix.facts["mix-tempo"] >= 0) {
+  for (let index = 0; index < parts[0].measures.length; index++) if (parts.some((part) => !equal(part.measures[index].duration, parts[0].measures[index].duration))) refuse(index === 0 ? "pickup-span" : "measure-duration", "Selected tracks need one exact common encoded measure span.", { member: "input", measure: index });
+  const mixClocks = /* @__PURE__ */ new Map();
+  for (const [beat, event] of sourceEvents) mixClocks.set(beat, { measure: event.source.measure - 1, position: event.start });
+  for (const [beat, mix] of reader.mixes) if ((!sourceEvents.has(beat) || emptyEvents.has(beat) || reader.selected && !reader.selected.has(mix.source.trackId)) && (mix.facts["mix-tempo"] >= 0 || !reader.selected || reader.selected.has(mix.source.trackId))) {
     let position = q(0);
     for (const prior of beat.voice.beats) {
       if (prior === beat) break;
+      if (!reader.beats.has(prior) || emptyEvents.has(prior)) continue;
       const raw = reader.beats.get(prior), exponent = raw.facts["duration-exponent"], actual = raw.facts.tuplet;
       if (!raw || prior.isEmpty || exponent < -2 || exponent > 4 || actual && ![3, 5, 6, 7, 9, 10, 11, 12, 13].includes(actual)) refuse("tempo-source-clock", "Excluded track global tempo needs an admitted exact written prefix clock.", mix.source);
       const normal = actual === 3 ? 2 : actual && actual <= 7 ? 4 : 8;
@@ -16213,9 +21113,54 @@ function recoverBeforeFinish(score, reader, findings) {
     }
     const measure = mix.source.measure - 1, span = parts[0].measures[measure].duration;
     if (position.n * span.d >= span.n * position.d) refuse("tempo-position", "Global tempo in excluded track lies outside the selected common measure.", mix.source);
-    tempos.push({ source: mix.source, measure, position, rate: String(mix.facts["mix-tempo"]), reference: 2, unit: "quarter", dots: 0, quarterRate: mix.facts["mix-tempo"], visible: !mix.facts["mix-hide-tempo"] });
-    findings.push({ disposition: "preserved", code: "binary-excluded-global-tempo", message: "Global tempo is retained even though its containing track is excluded from musical output; position is reconstructed from original written prefix fields.", location: mix.source });
+    mixClocks.set(beat, { measure, position });
+    if (mix.facts["mix-tempo"] >= 0) tempos.push({ source: mix.source, measure, position, rate: String(mix.facts["mix-tempo"]), reference: 2, unit: "quarter", dots: 0, quarterRate: mix.facts["mix-tempo"], visible: !mix.facts["mix-hide-tempo"] });
+    if (mix.facts["mix-tempo"] >= 0) findings.push({ disposition: "preserved", code: "binary-excluded-global-tempo", message: "Global tempo is retained even when its containing track is excluded or its voice has no printed attacks; position is reconstructed from original written prefix fields.", location: mix.source });
   }
+  for (const [beat, event] of sourceEvents) if (!emptyEvents.has(beat) && parts.find((part) => part.id === event.source.trackId)?.instrument === "percussion") {
+    const effects = reader.effects.get(beat);
+    if (effects) binaryBeatTechniques(effects.facts, event, reader.version, (name) => reader.fieldLocations.get(effects.source.path + "/" + name) ?? effects.source);
+    const mix = reader.mixes.get(beat);
+    if (mix && mix.facts["mix-tempo"] >= 0) tempos.push({ source: mix.source, measure: event.source.measure - 1, position: event.start, rate: String(mix.facts["mix-tempo"]), reference: 2, unit: "quarter", dots: 0, quarterRate: mix.facts["mix-tempo"], visible: !mix.facts["mix-hide-tempo"] });
+  }
+  binaryMasterStructure(score, reader.masters, reader.globals, reader.fieldLocations, parts, relations, reader.version);
+  if (reader.lyricsFrame && Object.entries(reader.lyricsFrame.facts).some(([name, value2]) => name.startsWith("lyrics-present:") && value2) && !reader.tracks.has(reader.lyricsFrame.facts["lyrics-track"])) refuse("lyrics", "Active lyrics name an absent source track.", reader.lyricsFrame.source);
+  binaryLyrics(reader.bytes, reader.lyricsFrame, reader.fieldLocations, parts);
+  for (const part of parts) for (const measure of part.measures) measure.voices = measure.voices.map((voice) => {
+    const output = [];
+    for (const event of voice) {
+      const extra = deadGraces.get(event.id);
+      if (extra) {
+        for (const grace of extra) {
+          const match = output.find((previous) => previous.grace?.hostId === event.id && previous.grace.before === grace.grace.before && previous.type === grace.type && previous.dynamic === grace.dynamic);
+          if (match) match.notes.push(...grace.notes);
+          else output.push(grace);
+        }
+        const groups = output.filter((previous) => previous.grace?.hostId === event.id);
+        if (groups.length > 1) {
+          groups.forEach((grace, index) => grace.voiceId = `${event.source.voice}:grace-projection:${index + 1}`);
+          findings.push({ disposition: "inferred", code: "grace-parallel-projection", message: "Unlike simultaneous dead/pitched grace groups use derived serialization lanes at their common source host clock.", location: event.source });
+        }
+      }
+      output.push(event);
+    }
+    return output;
+  });
+  for (const [beat, frame] of reader.chords) {
+    const event = sourceEvents.get(beat), part = parts.find((part2) => part2.id === frame.source.trackId);
+    if (event && part) binaryChord(reader.bytes, reader.version, frame, event, part, frame.source.measure - 1, reader.fieldLocations, findings, reader.tracks.get(Number(part.id)).facts["string-count"]);
+  }
+  const emptyMetadata = [...emptyEvents].flatMap(([beat, event]) => binaryEmptyAnnotations(parts.find((part) => part.id === event.source.trackId), event, reader.version, reader.effects.get(beat), reader.fieldLocations, findings));
+  const engravingBeats = [...sourceEvents].map(([beat, event]) => ({ event, ...reader.beats.get(beat) }));
+  binaryBeams(parts, engravingBeats, reader.masters, reader.fieldLocations, findings);
+  const unknownEngravingMetadata = engravingBeats.filter(({ facts }) => facts["beat-flags2"] & 4096 && (!(facts["beat-flags2"] & 2048) || facts.tuplet)).map(({ source, facts }) => {
+    const at = reader.fieldLocations.get(source.path + "/beat-flags2") ?? source;
+    findings.push({ disposition: "preserved", code: "binary-unqualified-tuplet-display", message: "The exact secondary-tuplet display flag remains source metadata. Its bracket role is not independently qualified; no nested ratio, timing change or performer wording is invented.", location: at, fact: { flags: facts["beat-flags2"], tuplet: facts.tuplet ?? null } });
+    return { source: at, name: "source-unqualified-tuplet-display:" + source.path, value: JSON.stringify({ flags: facts["beat-flags2"], tuplet: facts.tuplet ?? null }) };
+  });
+  const durationMetadata = reader.version < 500 ? binaryNoteDurations(parts, [...reader.notes.values()], relations, findings) : [];
+  binaryTuplets(parts, engravingBeats, reader.fieldLocations, findings);
+  binaryOttavas(parts, engravingBeats, reader.fieldLocations, relations, findings);
   const tempo = reader.globals["initial-tempo"];
   const initial = {
     source: reader.records.find((record) => record.source.path === "/header/initial-tempo").source,
@@ -16237,15 +21182,54 @@ function recoverBeforeFinish(score, reader, findings) {
     if (previous && previous !== initial && previous.visible !== change.visible) refuse("tempo-conflict", "Concurrent tempo records disagree about visibility.", change.source);
     unique.set(key, change);
   }
-  const neutral = { title: score.title, parts, tempos: [...unique.values()].sort((a, b) => a.measure - b.measure || a.position.n * b.position.d - b.position.n * a.position.d) };
-  return { score: neutral, expected };
+  const mixMetadata = binaryMix(parts, [...reader.mixes].flatMap(([beat, frame]) => {
+    const clock = mixClocks.get(beat);
+    return clock ? [{ ...frame, ...clock }] : [];
+  }), reader.bytes, reader.fieldLocations, findings);
+  const initialCaptionSource = reader.fieldLocations.get("/header/initial-tempo-name");
+  if (initialCaptionSource) {
+    const text = binaryCaption(reader.bytes, initialCaptionSource);
+    if (text) {
+      (parts[0].measures[0].directions ??= []).push({ source: initialCaptionSource, kind: "words", staff: 1, position: q(0), text, printObject: initial.visible });
+      mixMetadata.push({ source: initialCaptionSource, name: "source-initial-tempo-caption", value: text });
+    }
+  }
+  const reservedMetadata = [];
+  const reserve = (source, name, value2) => {
+    reservedMetadata.push({ source, name, value: String(value2) });
+    findings.push({ disposition: "preserved", code: "binary-reserved-context", message: "The exact reserved or unqualified source context is retained without inventing transposition, a staff or a printed instruction.", location: source, fact: { name, value: value2 } });
+  };
+  const selectedIds = new Set(parts.map((part) => part.id));
+  for (const frame of reader.effects.values()) if (selectedIds.has(frame.source.trackId)) {
+    for (const [name, mask] of [["beat-effect-flags", reader.version < 400 ? 128 : 141], ["beat-effect-flags2", 248]]) {
+      const value2 = frame.facts[name];
+      if (value2 !== void 0 && value2 & mask)
+        reserve(reader.fieldLocations.get(frame.source.path + "/" + name) ?? frame.source, `source-reserved-${name}:${frame.source.path}`, value2);
+    }
+  }
+  if (reader.globals["initial-octave"]) reserve(reader.fieldLocations.get("/header/initial-octave"), "source-reserved-initial-octave", reader.globals["initial-octave"]);
+  for (const part of parts) {
+    const frame = reader.tracks.get(Number(part.id));
+    for (const name of ["clef-mode", "secondary-clef-mode"]) if (frame.facts[name] !== void 0 && (![0, 12].includes(frame.facts[name]) || name === "secondary-clef-mode" && frame.facts[name] !== frame.facts["clef-mode"])) reserve(reader.fieldLocations.get(frame.source.path + "/" + name), `source-unqualified-${name}:${part.id}`, frame.facts[name]);
+  }
+  const texts = binaryScoreTexts(score, reader.records.find((record) => record.source.path === "/score-information").source, parts[0].id);
+  const neutral = { title: score.title, ...texts, metadata: [...texts.metadata ?? [], ...durationMetadata, ...mixMetadata, ...unknownEngravingMetadata, ...reservedMetadata, ...emptyMetadata], parts, tempos: [...unique.values()].sort((a, b) => a.measure - b.measure || a.position.n * b.position.d - b.position.n * a.position.d), ...relations.length ? { relations } : {} };
+  for (const part of parts) for (const measure of part.measures) for (const event of measure.voices.flat()) for (const note of event.notes) if (note.kind !== "unpitched") {
+    const shift = -(part.transposeOctaves ?? 0) * 12;
+    const pitches = [{ role: "written", pitch: note.written }, ...Object.entries(note.harmonic ?? {}).filter(([role]) => ["base", "touch", "result"].includes(role)).map(([role, pitch2]) => ({ role, pitch: { ...pitch2, octave: pitch2.octave + shift / 12, midi: pitch2.midi + shift } }))];
+    for (const { role, pitch: pitch2 } of pitches) if (pitch2.octave < 0 || pitch2.octave > 9) {
+      findings.push({ disposition: "preserved", code: "source-pitch-format-limit-facts", message: "Exact note role exceeds the MusicXML4 octave0\u20139 domain.", location: note.source, fact: { role, written: pitch2 } });
+      refuse("source-pitch-format-limit", `Source ${role} role at octave${pitch2.octave} (MIDI${pitch2.midi}) exceeds MusicXML4 octave0\u20139.`, note.source);
+    }
+  }
+  return { score: neutral, expected, drums, dead };
 }
 function loadBinary(input, findings, trackIds, discovery = false) {
   const bytes = Bytes.view(input);
   if (bytes.length < 31 || bytes[0] > 30) refuse("binary-header", "Expected a complete fixed-width Guitar Pro header.", { member: "input", byteOffset: 0 });
   const header = bytes.subarray(1, 1 + bytes[0]).ascii(), version = headers[header];
   if (!version) refuse("version-profile", "Only documented whole-score GP3.00/GP4.00/GP4.06/L4.06/GP5.00/GP5.10 binary headers are admitted; clipboard/unknown versions require explicit support.", { member: "input", byteOffset: 0, byteLength: 31 });
-  if (trackIds && (!trackIds.length || new Set(trackIds).size !== trackIds.length || trackIds.some((id) => !/^[0-7]$/.test(id)))) refuse("track-selection", "Expected distinct zero-based encoded track ordinals0\u20137.");
+  if (trackIds && (!trackIds.length || new Set(trackIds).size !== trackIds.length || trackIds.some((id) => !/^(?:0|[1-9][0-9]*)$/.test(id) || !Number.isSafeInteger(Number(id)) || Number(id) >= limits.tracks))) refuse("track-selection", "Expected distinct canonical encoded track ordinals within the track resource budget.");
   const reader = new CapturingReader(bytes, version, trackIds ? new Set(trackIds) : void 0, discovery);
   reader.init(new BoundedInput(bytes, () => reader.location), new Settings());
   let prepared;
@@ -16264,9 +21248,18 @@ function loadBinary(input, findings, trackIds, discovery = false) {
     else refuse("binary-truncated", "Binary reader encountered truncated or malformed bounded input.", { member: "input" });
   }
   if (!rawScore || !discovery && !prepared) refuse("reader", "Binary reader did not provide pre-normalization source capture.");
+  if (!discovery && version >= 500) {
+    for (const frame of reader.notes.values()) if (frame.facts["note-flags"] & 1) {
+      const next = reader.fieldLocations.get(frame.source.path + "/note-flags2");
+      findings.push({ disposition: "excluded-by-scope", code: "binary-playback-duration", message: "The eight source bytes for GP5 playback-duration scaling remain captured without interpreting the playback multiplier. Written rhythm and performer instructions are unchanged.", location: { ...next, path: frame.source.path + "/playback-duration", byteOffset: next.byteOffset - 8, byteLength: 8 } });
+    }
+  }
+  if (!discovery) {
+    for (const [path, location] of reader.fieldLocations) if (path.endsWith("/final-layout-absent")) findings.push({ disposition: "excluded-by-scope", code: "final-layout-absent", message: "The complete GP5 score omits only its terminal page-layout byte; no byte or musical fact was synthesized.", location });
+  }
   if (reader.position > bytes.length) refuse("binary-truncated", "Reader cursor exceeded binary input.", { member: "input", byteOffset: bytes.length });
   if (reader.position !== bytes.length) {
-    const expectedPadding = version === 300 ? 4 : 0;
+    const expectedPadding = version < 500 ? 4 : 0;
     const tail = bytes.subarray(reader.position);
     if (tail.length !== expectedPadding || tail.some((byte) => byte !== 0)) refuse("binary-trailing", "Unaccounted bytes follow the complete binary score.", { member: "input", byteOffset: reader.position });
     if (!discovery) reader.records.push({ kind: "serialization-padding", source: { member: "input", byteOffset: reader.position, byteLength: tail.length }, dataBase64: tail.base64(), facts: {} });
@@ -16279,11 +21272,13 @@ var DiscoveryComplete = class {
 function readBinary(input, findings, trackIds) {
   const { reader, header, version, prepared } = loadBinary(input, findings, trackIds);
   const occurrences = prepared.expected.map(({ note, fact, event }) => {
-    const reference = fact.sounding ?? fact.referenceSounding;
+    const reference = fact.sounding ?? fact.referenceSounding ?? fact.harmonic?.base;
     const sourceCount = reader.tracks.get(Number(fact.source.trackId)).facts["string-count"];
     const beforeString = sourceCount - fact.string + 1;
-    if (note.fret !== fact.fret || note.string !== beforeString || note.realValue !== reference.midi || note.isDead !== (fact.kind === "dead") || note.isTieDestination !== fact.tieStop)
+    if (note.fret !== fact.fret || note.string !== beforeString || (fact.harmonic ? note.realValueWithoutHarmonic !== note.stringTuning + fact.fret : note.realValue !== reference.midi) || note.isDead !== (fact.kind === "dead") || note.isTieDestination !== fact.tieStop)
       refuse("reader-reconciliation", "Normalized binary reader disagrees with immutable physical/type/tie facts.", fact.source);
+    const family = midiFamily(prepared.score.parts.find((part) => part.id === fact.source.trackId).midiProgram);
+    if (prepared.score.parts.find((part) => part.id === fact.source.trackId).instrument !== "banjo" && family !== "guitar" && family !== "bass") return { kind: "pitched", source: fact.source, rhythmId: event.id + "/rhythm", noteId: fact.id, before: { soundingMidi: reference.midi, writtenMidi: fact.written.midi, tieDestination: fact.tieStop }, after: { soundingMidi: reference.midi, tieDestination: note.isTieDestination, playbackTicks: note.beat.playbackDuration } };
     return {
       source: fact.source,
       rhythmId: event.id + "/rhythm",
@@ -16292,9 +21287,30 @@ function readBinary(input, findings, trackIds) {
       after: { fret: note.fret, string: note.string, tieDestination: note.isTieDestination, soundingMidi: reference.midi, playbackTicks: note.beat.playbackDuration }
     };
   });
-  findings.push({ disposition: "preserved", code: "binary-source-reconciled", message: "Original numeric flags/spans are captured before normalization; exact written clocks and physical/type/tie facts reconcile with the borrowed reader. Track IDs are stable encoded ordinals, not inferred performing roles.", location: { member: "input" }, fact: { header, version, noteOccurrences: occurrences.length } });
-  findings.push({ disposition: "omitted", code: "binary-metadata-playback", message: "Original metadata/page/lyrics/chord-diagram and playback setup bytes remain captured. Synth timbre, page appearance and inactive display settings are not reapplied; unknown selected musical meaning is refused.", location: { member: "input" } });
-  return freeze({ score: prepared.score, occurrences, capture: { header, version, sourceEncoding: "windows-1252-with-explicit-BOM-detection", records: reader.records } });
+  occurrences.push(...reconcileBinaryDrums(prepared.drums));
+  for (const { note, fact, event } of prepared.dead) {
+    const count = reader.tracks.get(Number(fact.source.trackId)).facts["string-count"], string = count - fact.string + 1;
+    if (note.fret !== -1 || note.string !== string || !note.isDead || note.isTieDestination) refuse("reader-reconciliation", "Reader disagrees with explicit fretless dead stroke.", fact.source);
+    occurrences.push({ kind: "dead", source: fact.source, noteId: fact.id, rhythmId: event.id + "/rhythm", before: { string, rawFret: -1, tieDestination: false }, after: { string, rawFret: -1, tieDestination: false, playbackTicks: note.beat.playbackDuration } });
+  }
+  const score = { ...prepared.score, parts: prepared.score.parts.map((part) => {
+    if (part.instrument === "banjo") {
+      const source = reader.fieldLocations.get(part.source.path + "/track-flags");
+      findings.push({ disposition: "inferred", code: "binary-banjo-short-string", message: "The source fifth string uses local-nut fret coordinates. Its pitch keeps encoded tuning plus source fret and capo; positive displayed fret adds the established five-fret nut offset. Raw chord-frame coordinates remain their independent literal source fields.", location: source, fact: { string: 5, startFret: 5 } });
+      return { ...part, measures: part.measures.map((measure) => ({ ...measure, voices: measure.voices.map((voice) => voice.map((event) => ({ ...event, notes: event.notes.map((note) => note.string === 5 && note.fret !== void 0 ? { ...note, fretDisplay: { source, value: note.fret === 0 ? 0 : note.fret + 5, startFret: 5, origin: "short-string-notation" } } : note) }))) })) };
+    }
+    const family = midiFamily(part.midiProgram);
+    if (part.instrument === "percussion" || family === "guitar" || family === "bass") return part;
+    const { tuning, capo, ...pitched } = part;
+    findings.push({ disposition: "preserved", code: "binary-pitched-editor-grid", message: "Source MIDI program identifies a nonfretted pitched part. Encoded string/fret input slots remain captured but do not become physical performer guidance or a TAB staff.", location: part.source, fact: { program: part.midiProgram, sourceTuning: tuning, sourceCapo: capo } });
+    return { ...pitched, measures: pitched.measures.map((measure) => ({ ...measure, voices: measure.voices.map((voice) => voice.map((event) => ({ ...event, notes: event.notes.map((note) => {
+      const { string, fret, ...pitchedNote } = note;
+      return pitchedNote;
+    }) }))) })) };
+  }) };
+  findings.push({ disposition: "preserved", code: "binary-source-reconciled", message: "Original numeric flags/spans are captured before normalization; beat spacing and physical/type/tie facts reconcile with the borrowed reader. Legacy independent note duration remains separately source-authoritative. Track IDs are stable encoded ordinals, not inferred performing roles.", location: { member: "input" }, fact: { header, version, noteOccurrences: occurrences.length } });
+  findings.push({ disposition: "omitted", code: "binary-metadata-playback", message: "Original page and playback setup bytes remain captured. Musical metadata, lyrics and chord instructions are projected separately; synth timbre and exact native page geometry are not reapplied.", location: { member: "input" } });
+  return freeze({ score, occurrences, capture: { header, version, sourceEncoding: "windows-1252-with-explicit-BOM-detection", records: reader.records } });
 }
 function readBinaryMetadata(input, findings) {
   const { reader, header, version, rawScore } = loadBinary(input, findings, void 0, true);
@@ -16310,6 +21326,7 @@ function readBinaryMetadata(input, findings) {
       programLocation: reader.fieldLocations.get("/header/channel-program:" + channel),
       tuning: Array.from({ length: frame.facts["string-count"] }, (_, i) => frame.facts["tuning:" + i]),
       tuningLocation: { ...first, byteLength: frame.facts["string-count"] * 4 },
+      capoLocation: reader.fieldLocations.get(path + "/capo"),
       facts: frame.facts
     };
   }) };
@@ -16557,7 +21574,8 @@ function readGpx(input, captureRaw = true) {
   const fail = (message, byteOffset = 0) => refuse("gpx", message, { member: "container", byteOffset });
   if (b.length > limits.inputBytes || b.length < 4) fail("GPX input size outside the profile.");
   const format = b.subarray(0, 4).ascii();
-  let decoded = b, literalBlocks = 0, backreferenceBlocks = 0, finalZeroPaddingBytes = 0;
+  let decoded = b, literalBlocks = 0, backreferenceBlocks = 0, finalZeroPaddingBytes = 0, omittedSectorPaddingBytes = 0;
+  let incompleteFinalLiteralPaddingBits;
   if (format === "BCFZ") {
     if (b.length < 8) fail("Truncated GPX length.");
     const size = b.readUInt32LE(4);
@@ -16577,7 +21595,17 @@ function readGpx(input, captureRaw = true) {
       }
       return value2;
     };
+    const zeroTail = () => {
+      if (b.length * 8 - bit > 7) return false;
+      for (let cursor = bit; cursor < b.length * 8; cursor++) if (b[cursor >> 3] >> 7 - cursor % 8 & 1) return false;
+      return true;
+    };
     while (written < size) {
+      if (size - written <= 2 && zeroTail()) {
+        omittedSectorPaddingBytes = size - written;
+        bit = b.length * 8;
+        break;
+      }
       if (++blocks > limits.decodedBytes) fail("GPX compressed-block work exceeds the budget.", bit >> 3);
       if (readBit()) {
         const width = readBits(4), offset = readBits(width, true), length = readBits(width, true);
@@ -16591,6 +21619,16 @@ function readGpx(input, captureRaw = true) {
         const count = readBits(2, true);
         if (!count) fail("Invalid zero-progress GPX literal block.", bit >> 3);
         for (let i = 0; i < count; i++) {
+          if (written < size && size - written <= 2 && zeroTail()) {
+            omittedSectorPaddingBytes = size - written;
+            bit = b.length * 8;
+            break;
+          }
+          if (written >= size && zeroTail()) {
+            incompleteFinalLiteralPaddingBits = b.length * 8 - bit;
+            bit = b.length * 8;
+            break;
+          }
           const value2 = readBits(8);
           if (written < size) decoded[written++] = value2;
           else {
@@ -16608,10 +21646,11 @@ function readGpx(input, captureRaw = true) {
   if (decoded.length > limits.decodedBytes || body.length < 8192 || body.length % sectorSize)
     fail("Truncated or oversized GPX sector storage.");
   const sectorCount = body.length / sectorSize, owned = /* @__PURE__ */ new Set([0]);
-  const names = /* @__PURE__ */ new Set(), members = /* @__PURE__ */ new Map(), captures = [];
+  const names2 = /* @__PURE__ */ new Set(), members = /* @__PURE__ */ new Map(), captures = [];
   let sector = 1, total = 0;
   let rootDirectorySectors;
   const fileDirectories = [];
+  let omittedBytesArePadding = false;
   while (sector < sectorCount) {
     if (owned.has(sector)) {
       sector++;
@@ -16637,6 +21676,7 @@ function readGpx(input, captureRaw = true) {
     if (type !== 2) {
       const unused = body.subarray(at, at + sectorSize);
       if (!unused.every((byte) => byte === 0) && !unused.every((byte) => byte === 255)) fail("Unreviewed GPX directory/sector type.", at + 4);
+      if (sector === sectorCount - 1 && unused.every((byte) => byte === 0)) omittedBytesArePadding = true;
       sector++;
       continue;
     }
@@ -16644,10 +21684,10 @@ function readGpx(input, captureRaw = true) {
     const field = body.subarray(at + 4, at + 131), end = field.indexOf(0);
     if (end < 1) fail("GPX member name lacks a bounded terminator.", at + 8);
     const name = field.subarray(0, end).ascii();
-    if (field.subarray(0, end).some((byte) => byte > 127) || !/^[A-Za-z0-9_.-]{1,120}$/.test(name) || name === "." || name === ".." || names.has(name.toLowerCase()))
+    if (field.subarray(0, end).some((byte) => byte > 127) || !/^[A-Za-z0-9_.-]{1,120}$/.test(name) || name === "." || name === ".." || names2.has(name.toLowerCase()))
       fail("Unsafe, duplicate or ambiguous GPX member name.", at + 8);
     fileDirectories.push(sector);
-    names.add(name.toLowerCase());
+    names2.add(name.toLowerCase());
     const bytes = body.readUInt32LE(at + 140);
     total += bytes;
     if (bytes > limits.memberBytes || total > limits.decodedBytes) fail("GPX member/total decoded bytes exceed the profile.", at + 144);
@@ -16669,6 +21709,8 @@ function readGpx(input, captureRaw = true) {
       last = pointer;
     }
     if (body.readUInt32LE(at + 148 + count * 4) !== 0) fail("GPX pointer count differs from declared file length.", at + 152 + count * 4);
+    const lastPayloadBytes = bytes % sectorSize || sectorSize;
+    if (pointers.at(-1) === sectorCount - 1 && 4 + pointers.at(-1) * sectorSize + lastPayloadBytes <= decoded.length - omittedSectorPaddingBytes) omittedBytesArePadding = true;
     const data = new Bytes(bytes);
     for (let i = 0; i < pointers.length; i++) body.copy(data, i * sectorSize, pointers[i] * sectorSize, pointers[i] * sectorSize + Math.min(sectorSize, bytes - i * sectorSize));
     members.set(name, data);
@@ -16686,8 +21728,9 @@ function readGpx(input, captureRaw = true) {
   if (rootDirectorySectors && (rootDirectorySectors.length !== fileDirectories.length || rootDirectorySectors.some((pointer) => !fileDirectories.includes(pointer)))) fail("GPX root table does not account for every payload directory.");
   if (!members.has("score.gpif") || [...members.keys()].some((name) => /score\.gpif$/i.test(name) && name !== "score.gpif"))
     fail("GPX requires one unambiguous score.gpif member.");
+  if (omittedSectorPaddingBytes && !omittedBytesArePadding) fail("Truncated GPX bytes overlap a declared member or filesystem metadata.");
   const reader = new GpxFileSystem();
-  reader.load(ByteBuffer.fromBuffer(decoded));
+  reader.load(ByteBuffer.fromBuffer(omittedSectorPaddingBytes || incompleteFinalLiteralPaddingBits !== void 0 ? b : decoded));
   if (reader.files.length !== members.size || reader.files.some((file) => !members.has(file.fileName) || !Bytes.view(file.data ?? new Uint8Array()).equals(members.get(file.fileName))))
     fail("Borrowed GPX filesystem differs from independently validated members.");
   const capture = freeze({
@@ -16697,10 +21740,982 @@ function readGpx(input, captureRaw = true) {
     literalBlocks,
     backreferenceBlocks,
     finalZeroPaddingBytes,
+    ...omittedSectorPaddingBytes ? { omittedSectorPaddingBytes } : {},
+    ...incompleteFinalLiteralPaddingBits !== void 0 ? { incompleteFinalLiteralPaddingBits } : {},
     rootDirectorySectors: rootDirectorySectors ?? [],
     members: captures
   });
   return { members, capture };
+}
+
+// src/adapters/guitar-pro/gpif-beams.ts
+function readGpifBeamFields(owner) {
+  const result = { consumed: /* @__PURE__ */ new Set() }, groups = /* @__PURE__ */ new Map();
+  const container = child(owner, "XProperties", false);
+  let unit;
+  if (container) for (const property of container.children) {
+    const id = property.attrs.id;
+    const index = Number(id) - 1124139264;
+    const master = owner.name === "MasterBar" && (id === "1124139010" || index >= 0 && index < 32 && Number.isInteger(index));
+    const beat = owner.name === "Beat" && ["1124204545", "1124204546", "1124204552"].includes(id);
+    if (!master && !beat) continue;
+    if (result.consumed.has(id)) refuse("gp-beam-property", "Duplicate source beam property.", property.location);
+    if (property.name !== "XProperty" || Object.keys(property.attrs).some((name) => name !== "id") || property.text.trim() || property.children.length !== 1 || property.children[0].name !== "Int" || property.children[0].children.length || Object.keys(property.children[0].attrs).length)
+      refuse("gp-beam-property", "A source beam property requires one literal Int and its exact identifier.", property.location);
+    const number = integer(value(property, "Int"), 0, master ? 1024 : id === "1124204546" ? 2 : 1, property);
+    result.consumed.add(id);
+    if (master) {
+      if (id === "1124139010") unit = number;
+      else groups.set(index, number);
+    } else if (id === "1124204545") result.invert = { source: property.location, invertSource: property.location, invert: number === 1 };
+    else {
+      result.after ??= { source: property.location };
+      if (id === "1124204546" && number) {
+        result.after.primary = number === 1 ? "join" : "split";
+        result.after.primarySource = property.location;
+      }
+      if (id === "1124204552") {
+        result.after.secondaryBreak = number;
+        result.after.secondarySource = property.location;
+      }
+    }
+  }
+  if (unit !== void 0 || groups.size) {
+    if (unit === void 0 || !groups.size || !unit || unit > 1024 || unit & unit - 1)
+      refuse("gp-beam-groups", "Explicit beam grouping requires both a power-of-two duration unit and source group counts.", container.location);
+    const counts = [...groups].sort(([a], [b]) => a - b);
+    if (counts.some(([index, count], at) => index !== at || count > 255)) refuse("gp-beam-groups", "Explicit beam group indices must be contiguous and counts bounded.", container.location);
+    result.grouping = { source: container.location, unit, groups: counts.map(([, count]) => count) };
+  }
+  const automaticStem = child(owner, "TransposedPitchStemOrientation", false), userStem = child(owner, "UserTransposedPitchStemOrientation", false);
+  for (const field of [automaticStem, userStem]) if (field && (field.children.length || Object.keys(field.attrs).length || !["Upward", "Downward", "Automatic", "Undefined"].includes(field.text.trim()))) refuse("gp-beam-direction", "Unknown explicit source stem orientation.", field.location);
+  const stem = userStem && ["Upward", "Downward"].includes(userStem.text.trim()) ? userStem : automaticStem;
+  if (stem && ["Upward", "Downward"].includes(stem.text.trim())) result.stem = { source: stem.location, stemSource: stem.location, stem: stem.text.trim() === "Upward" ? "up" : "down" };
+  return result;
+}
+function applyGpifBeams(part, source, findings) {
+  const groups = /* @__PURE__ */ new Map(), controls = /* @__PURE__ */ new Map();
+  let inherited;
+  for (const [index, measure] of part.measures.entries()) {
+    const master = source.masterBars[index];
+    if (!master) refuse("gp-beam-source", "Missing source master bar for beam grouping.", measure.source);
+    const fields = readGpifBeamFields(master);
+    if (fields.grouping) inherited = fields.grouping;
+    if (inherited) groups.set(index, inherited);
+    for (const voice of measure.voices) {
+      const byGrace = /* @__PURE__ */ new Map();
+      for (const event of voice) {
+        const key = event.grace ? `grace:${event.grace.hostId}:${event.grace.before}` : "ordinary";
+        const list = byGrace.get(key) ?? [];
+        list.push(event);
+        byGrace.set(key, list);
+      }
+      for (const events of byGrace.values()) for (const [eventIndex, event] of events.entries()) {
+        const beat = source.beats.get(event.source.id ?? "");
+        if (!beat) refuse("gp-beam-source", "Missing source beat definition for a beam occurrence.", event.source);
+        const fields2 = readGpifBeamFields(beat);
+        const own = fields2.stem ?? fields2.invert;
+        if (own) controls.set(event, { ...controls.get(event), ...own, ...fields2.invert ? { invert: fields2.invert.invert, invertSource: fields2.invert.invertSource } : {} });
+        if (fields2.after) {
+          const next = events[eventIndex + 1];
+          if (next) controls.set(next, { ...controls.get(next), ...fields2.after });
+          else findings.push({ disposition: "preserved", code: "gp-terminal-beam-boundary", message: "A source beam edit after the final beat has no following beam member in this source voice.", location: fields2.after.source, fact: fields2.after });
+        }
+      }
+    }
+  }
+  applyGpBeams(part, { groups, controls }, findings);
+}
+
+// src/adapters/guitar-pro/pitched-articulations.ts
+function structure(owner, allowed, repeated = []) {
+  if (Object.keys(owner.attrs).length || owner.text.trim()) refuse("articulation-profile", "Malformed instrument articulation structure.", owner.location);
+  const seen = /* @__PURE__ */ new Set();
+  for (const field of owner.children) {
+    if (!allowed.includes(field.name) || seen.has(field.name) && !repeated.includes(field.name)) refuse("unknown-element", "Unreviewed or duplicate instrument articulation field.", field.location);
+    seen.add(field.name);
+  }
+}
+function plain2(owner) {
+  if (Object.keys(owner.attrs).length || owner.children.length) refuse("unknown-element", "Instrument articulation field must be plain source text.", owner.location);
+}
+function createPitchedArticulations(track, findings) {
+  const set = child(track, "InstrumentSet", false), catalog = [];
+  if (set) {
+    const elements = child(set, "Elements");
+    structure(elements, ["Element"], ["Element"]);
+    for (const element of elements.children) {
+      structure(element, ["Name", "Type", "SoundbankName", "Articulations"]);
+      element.children.filter((e) => e.name !== "Articulations").forEach(plain2);
+      if (value(element, "Type") !== "pitched") refuse("articulation-profile", "A pitched instrument must retain explicit pitched catalog elements.", element.location);
+      const arts = child(element, "Articulations");
+      structure(arts, ["Articulation"], ["Articulation"]);
+      for (const art of arts.children) {
+        structure(art, ["Name", "StaffLine", "Noteheads", "TechniquePlacement", "TechniqueSymbol", "InputMidiNumbers", "OutputRSESound", "OutputMidiNumber"]);
+        art.children.forEach(plain2);
+        if (catalog.length >= 256) refuse("articulation-budget", "Pitched articulation catalog exceeds256 entries.", art.location);
+        const name = value(art, "Name", false), heads = child(art, "Noteheads", false), technique = value(art, "TechniqueSymbol", false);
+        const names2 = heads?.text.trim().split(/\s+/);
+        if (names2 && (names2.length !== 3 || names2.some((n) => !/^notehead[A-Za-z0-9]{1,120}$/.test(n)))) refuse("articulation-noteheads", "Pitched articulation requires three canonical notehead names.", heads.location);
+        if (child(art, "StaffLine", false)) integer(value(art, "StaffLine"), -32, 48, art);
+        if (child(art, "OutputMidiNumber", false)) integer(value(art, "OutputMidiNumber"), 0, 127, art);
+        const inputs = value(art, "InputMidiNumbers", false);
+        if (inputs) for (const token of inputs.split(/\s+/)) integer(token, 0, 127, art);
+        const placement = value(art, "TechniquePlacement", false);
+        if (placement && !["inside", "outside"].includes(placement)) refuse("articulation-placement", "Unknown source technique placement.", art.location);
+        if (technique && !/^[a-zA-Z][a-zA-Z0-9]{0,127}$/.test(technique)) refuse("articulation-symbol", "Malformed source technique glyph name.", art.location);
+        catalog.push({ source: art.location, name, ...names2 ? { heads: names2 } : {}, ...technique ? { technique } : {} });
+        findings.push({ disposition: "preserved", code: "pitched-articulation-source", message: "Pitched source catalog appearance is separate from actual note pitch. Literal catalog labels, placement and engine mappings remain auxiliary facts; selected source noteheads and established technique glyphs are projected on their actual notes.", location: art.location, fact: { index: catalog.length - 1, fields: Object.fromEntries(art.children.map((c) => [c.name, c.text])) } });
+      }
+    }
+    if (!catalog.length) refuse("articulation-profile", "Explicit pitched catalog cannot be empty.", set.location);
+    const patch = child(track, "NotationPatch", false);
+    if (patch) {
+      structure(patch, ["Name", "LineCount", "Elements"]);
+      patch.children.filter((c) => c.name !== "Elements").forEach(plain2);
+      if (child(patch, "LineCount", false) && value(patch, "LineCount") !== "5") refuse("articulation-lines", "Pitched notation patch requires five traditional staff lines.", patch.location);
+      const elements2 = child(patch, "Elements");
+      structure(elements2, ["Element"], ["Element"]);
+      for (const element of elements2.children) {
+        structure(element, ["Name", "Articulations"]);
+        plain2(child(element, "Name"));
+        const arts = child(element, "Articulations");
+        structure(arts, ["Articulation"], ["Articulation"]);
+        for (const art of arts.children) {
+          structure(art, ["Name", "StaffLine"]);
+          art.children.forEach(plain2);
+          integer(value(art, "StaffLine"), -32, 48, art);
+          findings.push({ disposition: "preserved", code: "pitched-articulation-source", message: "Pitched notation-patch catalog coordinates remain auxiliary; authored written pitch and clef own pitched note placement.", location: art.location, fact: { element: value(element, "Name"), name: value(art, "Name"), staffLine: value(art, "StaffLine") } });
+        }
+      }
+    }
+  }
+  return { apply(note, raw, type) {
+    const encoded = child(raw, "InstrumentArticulation", false);
+    if (!encoded) return;
+    const index = integer(encoded.text.trim(), 0, 255, encoded), art = catalog[index];
+    if (!art) refuse("articulation-profile", "Pitched note articulation must resolve within its actual source catalog.", encoded.location);
+    const heads = art.heads ?? ["noteheadBlack", "noteheadHalf", "noteheadWhole"];
+    const technique = art.technique;
+    const mapped = percussionNote({ source: art.source, id: "visual", name: art.name, midi: 0, line: 0, heads, ...technique && (["stringsUpBow", "stringsDownBow", "noteheadParenthesis"].includes(technique) || symbolVocabulary.has(technique)) ? { technique } : {} }, note, type);
+    if (heads.some((head, i) => head !== ["noteheadBlack", "noteheadHalf", "noteheadWhole"][i])) for (const key of ["notehead", "noteheadFilled", "sourceNotehead", "noteheadSmufl"]) Object.assign(note, { [key]: mapped[key] });
+    if (mapped.articulations) note.articulations = [...note.articulations ?? [], ...mapped.articulations];
+    if (mapped.technical) note.technical = [...note.technical ?? [], ...mapped.technical];
+    if (mapped.symbols) note.symbols = [...note.symbols ?? [], ...mapped.symbols];
+    if (mapped.noteheadParentheses) note.noteheadParentheses = mapped.noteheadParentheses;
+  } };
+}
+
+// src/adapters/guitar-pro/track-automations.ts
+function shape2(owner, names2, repeated = []) {
+  if (Object.keys(owner.attrs).length || owner.text.trim()) refuse("track-automation", "Malformed source automation structure.", owner.location);
+  const seen = /* @__PURE__ */ new Set();
+  for (const field of owner.children) {
+    if (!names2.includes(field.name) || seen.has(field.name) && !repeated.includes(field.name)) refuse("track-automation", "Unknown or duplicate source automation field.", field.location);
+    seen.add(field.name);
+  }
+}
+function scalar(field) {
+  if (Object.keys(field.attrs).length || field.children.length) refuse("track-automation", "Automation field requires plain encoded data.", field.location);
+}
+function boolean(owner, name) {
+  const text = value(owner, name);
+  if (!["true", "false"].includes(text)) refuse("track-automation", "Automation visibility and interpolation must be explicit booleans.", owner.location);
+  return text === "true";
+}
+function createTrackAutomations(track, findings) {
+  const sounds = child(track, "Sounds", false), palette = /* @__PURE__ */ new Map();
+  if (sounds) {
+    shape2(sounds, ["Sound"], ["Sound"]);
+    if (!sounds.children.length || sounds.children.length > 256) refuse("sound-profile", "Source sound palette must contain one to 256 bounded definitions.", sounds.location);
+    for (const sound of sounds.children) {
+      shape2(sound, ["Name", "Label", "Path", "Role", "MIDI", "RSE"]);
+      sound.children.filter((field) => !["MIDI", "RSE"].includes(field.name)).forEach(scalar);
+      const midi = child(sound, "MIDI");
+      shape2(midi, ["MSB", "LSB", "Program"]);
+      midi.children.forEach(scalar);
+      const program = integer(value(midi, "Program"), 0, 127, midi), msb = integer(value(midi, "MSB"), 0, 127, midi), lsb = integer(value(midi, "LSB"), 0, 127, midi);
+      const key = ["Path", "Name", "Role"].map((name) => value(sound, name, false)).join(";");
+      if (palette.has(key)) refuse("sound-profile", "Sound identities must be unique before resolving any change.", sound.location);
+      palette.set(key, { source: sound, program, caption: child(sound, "Label", false) ?? child(sound, "Name", false) });
+      findings.push({ disposition: "omitted", code: "source-sound-preset", message: "Encoded sound-bank and synthesizer preset data remain in source. They do not change the source instrument family or create unencoded performer instructions.", location: sound.location, fact: { key, program, msb, lsb } });
+    }
+  }
+  const container = child(track, "Automations", false), changes = [];
+  if (container) {
+    shape2(container, ["Automation"], ["Automation"]);
+    if (container.children.length > 4096) refuse("track-automation-budget", "Too many track automation points.", container.location);
+    for (const automation of container.children) {
+      shape2(automation, ["Type", "Linear", "Bar", "Position", "Visible", "Value", "Text"]);
+      automation.children.forEach(scalar);
+      const type = value(automation, "Type");
+      if (!["Sound", "SustainPedal"].includes(type)) refuse("track-automation", "Track automation type needs an established performer interpretation.", automation.location);
+      const linear = boolean(automation, "Linear");
+      boolean(automation, "Visible");
+      integer(value(automation, "Bar"), 0, 511, automation);
+      const position = decimal(value(automation, "Position"));
+      if (position.n < 0 || position.n > position.d) refuse("track-automation-position", "Automation ratio position must be in [0,1].", automation.location);
+      if (type === "Sound") {
+        if (!palette.has(value(automation, "Value"))) refuse("sound-reference", "A source sound change must resolve its exact Path/Name/Role identity.", automation.location);
+        if (value(automation, "Bar") === "0" && position.n === 0) findings.push({ disposition: "preserved", code: "initial-sound-alias", message: "Initial sound names an exact encoded Path/Name/Role identity; playback preset selection does not invent a performing instruction.", location: automation.location, fact: { sound: value(automation, "Value") } });
+      } else {
+        const fields = value(automation, "Value").split(/\s+/);
+        if (linear || fields.length !== 2 || !/^(?:0|1)(?:\.0+)?$/.test(fields[0]) || !["1", "3"].includes(fields[1])) refuse("pedal-value", "Sustain-pedal points require the source discrete down/up references 1 and 3.", automation.location);
+      }
+      changes.push(automation);
+    }
+  }
+  return {
+    firstSound: sounds?.children[0],
+    apply(part) {
+      const occupied = /* @__PURE__ */ new Set();
+      for (const automation of changes) {
+        const index = integer(value(automation, "Bar"), 0, part.measures.length - 1, automation), measure = part.measures[index];
+        const position = mul(decimal(value(automation, "Position")), measure.duration), visible = boolean(automation, "Visible"), type = value(automation, "Type");
+        const key = `${type}:${index}:${position.n}/${position.d}`;
+        if (occupied.has(key)) refuse("track-automation-conflict", "Competing automation states occupy the same exact source time.", automation.location);
+        occupied.add(key);
+        const directions = measure.directions ??= [], source = { ...automation.location, trackId: track.attrs.id, measure: index + 1 };
+        if (type === "SustainPedal") directions.push({ source, position, staff: 1, scope: "part", kind: "pedal", action: value(automation, "Value").split(/\s+/)[1] === "1" ? "start" : "stop", line: false, sign: true, printObject: visible });
+        else findings.push({ disposition: "omitted", code: "source-sound-change", message: "Source sound change is retained as playback preset data; separately authored annotation text is preserved at the exact score position.", location: source, fact: { sound: value(automation, "Value"), position, visible } });
+        const text = child(automation, "Text", false);
+        if (type === "Sound") {
+          const caption = palette.get(value(automation, "Value")).caption;
+          if (caption?.text && caption.text !== text?.text) {
+            directions.push({ source: { ...caption.location, trackId: track.attrs.id, measure: index + 1 }, position, staff: 1, scope: "part", kind: "words", text: caption.text, printObject: visible });
+            findings.push({ disposition: "preserved", code: "source-sound-caption", message: "The source sound-change score label is preserved as a performer caption, independently of excluded synthesizer settings. An absent Label uses the documented source Name default; an explicit empty Label stays empty.", location: source, fact: { caption: caption.text, captionSource: caption.location, position, visible } });
+          }
+        }
+        if (text) directions.push({ source: text.location, position, staff: 1, kind: "words", text: text.text, printObject: visible });
+      }
+    }
+  };
+}
+
+// src/adapters/guitar-pro/gp8.ts
+function rebuilt(e, elements, text = e.text) {
+  return { ...e, text, children: elements };
+}
+function leaf2(e, name, text, attrs2 = {}) {
+  return { name, text, attrs: attrs2, children: [], location: e.location };
+}
+function shape3(e, allowed, attrs2 = [], repeated = []) {
+  if (allowed.length && e.text.trim()) refuse("mixed-content", "Mixed structural content is unsupported.", e.location);
+  for (const a of Object.keys(e.attrs)) if (!attrs2.includes(a)) refuse("unknown-attribute", `Unreviewed ${e.name} attribute ${a}.`, e.location);
+  const seen = /* @__PURE__ */ new Set();
+  for (const c of e.children) {
+    if (!allowed.includes(c.name)) refuse("unknown-element", `Unreviewed ${e.name}/${c.name} before reader projection.`, c.location);
+    if (seen.has(c.name) && !repeated.includes(c.name)) refuse("structure", `Duplicate ${e.name}/${c.name}.`, c.location);
+    seen.add(c.name);
+  }
+}
+function scalar2(e) {
+  shape3(e, []);
+}
+function marker(e) {
+  scalar2(e);
+  if (e.text.trim()) refuse("marker-content", "Expected an empty marker.", e.location);
+}
+var ids = (e, name, required = true) => {
+  const field = child(e, name, required);
+  if (!field) return [];
+  scalar2(field);
+  return field.text.trim().split(/\s+/).filter(Boolean);
+};
+function named(e, permitted, findings, keep, translated = []) {
+  shape3(e, permitted, ["Track", "Beat", "Bar"].includes(e.name) ? ["id"] : []);
+  const result = [];
+  for (const c of e.children) {
+    if (!permitted.includes(c.name)) refuse("unknown-element", `Unreviewed ${e.name}/${c.name} in the selected GP8 scope.`, c.location);
+    if (keep.includes(c.name)) result.push(c);
+    else if (!translated.includes(c.name)) findings.push({ disposition: "omitted", code: "gp8-metadata", message: "Preserved in original source; capture is delivered only on success; layout, view, synth/timbre or non-score metadata is not reapplied to ordinary staff output.", location: c.location });
+  }
+  return result;
+}
+function beamProperties(owner, findings) {
+  const fields = readGpifBeamFields(owner), container = child(owner, "XProperties", false);
+  if (!container) return [];
+  shape3(container, ["XProperty"], [], ["XProperty"]);
+  const kept = [], seen = /* @__PURE__ */ new Set();
+  for (const property of container.children) {
+    if (seen.has(property.attrs.id)) refuse("structure", "Duplicate source XProperty identifier.", property.location);
+    seen.add(property.attrs.id);
+    if (fields.consumed.has(property.attrs.id)) {
+      kept.push(property);
+      continue;
+    }
+    const playback = owner.name === "Beat" && ["687931393", "687935489"].includes(property.attrs.id) || owner.name === "Note" && property.attrs.id === "688062467";
+    const auxiliary = owner.name === "Beat" && ["687931394", "687935490"].includes(property.attrs.id) || owner.name === "Bar" && property.attrs.id === "1124139521";
+    if (playback || auxiliary) {
+      const field = auxiliary ? owner.name === "Bar" ? "Double" : "Float" : "Int";
+      shape3(property, [field], ["id"]);
+      if (property.children.length !== 1) refuse("source-xproperty", "Source interpretation field requires one scalar.", property.location);
+      scalar2(property.children[0]);
+      const text = value(property, field);
+      if (playback) integer(text, 0, 1048576, property);
+      else if (!/^-?\d{1,7}(?:\.\d{1,16})?$/.test(text)) refuse("source-xproperty", "Invalid bounded source interpretation scalar.", property.location);
+      findings.push({ disposition: playback ? "omitted" : "preserved", code: "source-interpretation-field", message: playback ? "Source arpeggio, brush or trill playback timing is retained as auxiliary data; the separately authored performer notation and written clocks remain unchanged." : "Unresolved observed source scalar is preserved exactly as standard auxiliary data without inventing a musical meaning.", location: property.location, fact: { id: property.attrs.id, field, value: text, role: playback ? "playback-only" : "unresolved-auxiliary" } });
+      continue;
+    }
+    if (owner.name === "Bar" && property.attrs.id === "1124139520") {
+      shape3(property, ["Double", "Float"], ["id"]);
+      if (property.children.length !== 1) refuse("layout-scale", "Display scale needs one source number.", property.location);
+      scalar2(property.children[0]);
+      const text = property.children[0].text.trim();
+      if (!/^\d{1,4}(?:\.\d{1,16})?$/.test(text) || Number(text) <= 0) refuse("layout-scale", "Invalid source bar display scale.", property.location);
+      findings.push({ disposition: "omitted", code: "bar-display-scale", message: "Source bar display scale is exact native page geometry; musical beaming is preserved separately.", location: property.location, fact: text });
+    } else refuse("unknown-property", "Unreviewed source XProperty identifier.", property.location);
+  }
+  return kept.length ? [rebuilt(container, kept)] : [];
+}
+function checkDefaultArticulation(track, findings) {
+  const set = child(track, "InstrumentSet");
+  shape3(set, ["Name", "Type", "LineCount", "Elements"]);
+  for (const c of set.children.filter((e) => e.name !== "Elements")) scalar2(c);
+  const type = value(set, "Type");
+  if (!/^[A-Za-z0-9_.-]{1,128}$/.test(type) || child(set, "LineCount", false) && value(set, "LineCount") !== "5")
+    refuse("instrument-profile", "The fretted source profile admits electricBass/electricGuitar on five ordinary staff lines only.", set.location);
+  if (type === "drumKit" || type === "percussion") {
+    percussionCatalog(track);
+    return type;
+  }
+  createPitchedArticulations(track, findings);
+  return type;
+}
+function prepareDirectTrack(track, findings, harmony) {
+  const keep = named(track, ["Name", "ShortName", "Color", "SystemsDefautLayout", "SystemsLayout", "PalmMute", "PlayingStyle", "Instrument", "PartSounding", "Transpose", "RSE", "GeneralMidi", "PlaybackState", "Lyrics", "Properties", "Automations"], findings, ["Name", "ShortName", "Instrument", "Lyrics"], ["PartSounding", "Transpose", "GeneralMidi", "Properties"]);
+  const midi = child(track, "GeneralMidi");
+  shape3(midi, ["Program", "Port", "PrimaryChannel", "SecondaryChannel", "ForeOneChannelPerString"], ["table"]);
+  midi.children.forEach(scalar2);
+  const program = integer(value(midi, "Program"), 0, 127, midi);
+  if (!["Instrument", "Percussion"].includes(midi.attrs.table)) refuse("instrument-profile", "Selected GP6 staff requires an explicit guitar/bass MIDI program 24\u201339.", midi.location);
+  const playing = child(track, "PlayingStyle", false), palm = child(track, "PalmMute", false), state = child(track, "PlaybackState", false);
+  if (playing && !["Default", "StringedPick", "StringedFinger", "BassSlap"].includes(playing.text.trim()))
+    refuse("track-technique", "Active track-wide playing style, mute or nondefault playback state requires mapping.", track.location);
+  if (playing && playing.text.trim() !== "Default") findings.push({ disposition: "omitted", code: "source-playing-style", message: "Source track playing style selects automatic engine interpretation; separately notated picking/slapping instructions remain musical facts. The engine preset is not invented as an instruction on every note.", location: playing.location, fact: playing.text.trim() });
+  for (const name of ["Lyrics", "Automations"]) {
+    const field = child(track, name, false);
+    if (name === "Automations" && field?.children.length) createTrackAutomations(track, findings);
+    if (name === "Lyrics" && field) {
+      shape3(field, ["Line"], ["dispatched"], ["Line"]);
+      for (const line of field.children) {
+        shape3(line, ["Text", "Offset"]);
+        line.children.forEach(scalar2);
+      }
+    }
+  }
+  const properties2 = child(track, "Properties", false) ?? leaf2(track, "Properties", "");
+  shape3(properties2, ["Property"], [], ["Property"]);
+  const canonical = [], names2 = /* @__PURE__ */ new Set();
+  for (const p of properties2.children) {
+    if (names2.has(p.attrs.name)) refuse("structure", "Duplicate track property.", p.location);
+    names2.add(p.attrs.name);
+    const name = p.attrs.name;
+    if (name === "Tuning") {
+      shape3(p, ["Pitches"], ["name"]);
+      scalar2(child(p, "Pitches"));
+      canonical.push(p);
+    } else if (name === "AutoBrush") {
+      shape3(p, ["Enable"], ["name"]);
+      marker(child(p, "Enable"));
+      findings.push({ disposition: "omitted", code: "source-auto-brush", message: "Encoded automatic playback strumming is retained without inventing written arpeggiation.", location: p.location });
+    } else if (name === "CapoFret") {
+      shape3(p, ["Fret"], ["name"]);
+      scalar2(child(p, "Fret"));
+      canonical.push(p);
+    } else if (["DiagramCollection", "DiagramWorkingSet", "ChordCollection", "ChordWorkingSet"].includes(name)) {
+      if (harmony) {
+        harmony.validateProperty(p);
+        continue;
+      }
+      shape3(p, ["Items"], ["name"]);
+      marker(child(p, "Items"));
+      findings.push({ disposition: "omitted", code: "empty-diagrams", message: "Empty source diagram collection retained.", location: p.location });
+    } else refuse("staff-property", "Unreviewed GP6 staff property.", p.location);
+  }
+  const sourceTranspose = child(track, "Transpose", false), sounding = child(track, "PartSounding", false);
+  if (sourceTranspose && sounding || !sourceTranspose && !sounding && midi.attrs.table !== "Percussion") refuse("transpose", "Exactly one explicit GP6 transposition representation is required.", track.location);
+  let trans = sourceTranspose;
+  if (sounding) {
+    shape3(sounding, ["NominalKey", "TranspositionPitch"]);
+    sounding.children.forEach(scalar2);
+    const amount = integer(value(sounding, "TranspositionPitch"), -24, 24, sounding);
+    if (!/^[A-G](?:#|b)?$/.test(value(sounding, "NominalKey")) && !(midi.attrs.table === "Percussion" && value(sounding, "NominalKey") === "Neutral" && amount === 0)) refuse("transpose", "Invalid encoded nominal key.", sounding.location);
+    trans = leaf2(sounding, "Transpose", "");
+    trans.children = [leaf2(child(sounding, "TranspositionPitch"), "Octave", String(Math.trunc(amount / 12))), leaf2(sounding, "Chromatic", String(amount % 12))];
+    findings.push({ disposition: "preserved", code: "gp6-transpose-alias", message: "Explicit PartSounding semitone octave is translated to the common octave representation without an additional physical sounding-pitch shift.", location: sounding.location, fact: { encodedSemitones: amount } });
+  }
+  return rebuilt(track, [...keep, ...!child(track, "Instrument", false) ? [leaf2(midi, "Instrument", "", { ref: midi.attrs.table === "Percussion" ? "percussion" : `gm-program-${program}` })] : [], ...trans ? [trans] : [], rebuilt(properties2, canonical), rebuilt(midi, [child(midi, "Program")])]);
+}
+function validateGpifHeader(root, family, findings) {
+  const version = value(root, "GPVersion", false), revision = child(root, "GPRevision"), encoding = child(root, "Encoding", false);
+  if (family === 6 ? version && !/^6(?:\.\d{1,3}){0,2}$/.test(version) : !new RegExp(`^${family}(?:\\.\\d{1,3}){0,2}$`).test(version))
+    refuse("version-profile", "Embedded GPIF version conflicts with the identified GP family.", root.location);
+  if (!/^\d{1,5}$/.test(revision.text.trim()) || Number(revision.text.trim()) < 1 || Number(revision.text.trim()) > 13007) refuse("version-profile", "GPIF revision exceeds the reviewed reader revision ceiling13007 or is invalid.", revision.location);
+  for (const name of Object.keys(revision.attrs)) {
+    if (!["required", "recommended"].includes(name)) refuse("version-profile", "Unknown revision attribute.", revision.location);
+    integer(revision.attrs[name], 0, 13007, revision);
+  }
+  if (encoding && value(encoding, "EncodingDescription") !== `GP${family}`)
+    refuse("version-profile", "Encoding description conflicts with embedded version; a label alone never establishes pitch semantics.", encoding.location);
+  findings.push({ disposition: "preserved", code: "gpif-family", message: "Version/revision/container identifiers are retained separately from strict selected-feature admission and physical pitch corroboration. This does not authenticate a producing application.", location: root.location, fact: { family, version: version || null, revision: revision.text.trim(), encoding: encoding ? value(encoding, "EncodingDescription") : null } });
+}
+var discoverGpifGraph = discoverArrangementGraph;
+function prepareGp8(root, requested, findings, family = 8, context) {
+  validateGpifHeader(root, family, findings);
+  const { tracks, bars, voices, beats, notes, rhythms, order, all, masterBars } = discoverGpifGraph(root);
+  const masterTrack = child(root, "MasterTrack");
+  const selected = requested ?? order;
+  if (!selected.length || new Set(selected).size !== selected.length || selected.some((id) => !tracks.has(id)))
+    refuse("track-selection", "Select existing unique source track IDs.", masterTrack.location);
+  const selectedOrder = order.filter((id) => selected.includes(id));
+  const trackIndexes = selectedOrder.map((id) => order.indexOf(id));
+  const kept = { bars: /* @__PURE__ */ new Set(), voices: /* @__PURE__ */ new Set(), beats: /* @__PURE__ */ new Set(), notes: /* @__PURE__ */ new Set(), rhythms: /* @__PURE__ */ new Set() };
+  const masters = masterBars.children.map((master) => {
+    const barIds = ids(master, "Bars");
+    if (barIds.length !== order.length) refuse("bar-scope", "Each master bar must identify every source track.", master.location);
+    for (const id of barIds) {
+      if (!bars.has(id)) refuse("reference", "Unresolved master-bar reference, including excluded tracks.", master.location);
+      all.bars.add(id);
+    }
+    const chosen = trackIndexes.map((i) => barIds[i]);
+    chosen.forEach((id) => kept.bars.add(id));
+    const keep2 = named(master, ["Time", "Key", "Bars", "Repeat", "XProperties", ...masterFields], findings, ["Time", "Key", "Repeat", ...masterFields], ["Bars", "XProperties"]);
+    keep2.push(...beamProperties(master, findings));
+    const key = child(master, "Key");
+    const keyFields = named(key, ["AccidentalCount", "Mode", "TransposeAs"], findings, ["AccidentalCount", "Mode"], ["TransposeAs"]);
+    const keyAlias = child(key, "TransposeAs", false);
+    if (keyAlias) scalar2(keyAlias);
+    if (keyAlias && !["Sharps", "Flats"].includes(keyAlias.text.trim())) refuse("key-transpose", "Unreviewed key spelling preference.", keyAlias.location);
+    if (keyAlias) findings.push({ disposition: "preserved", code: "key-preference", message: "Source key spelling preference is retained as auxiliary data. Concert key count/mode and the independently established written-pitch interval determine the standard written key.", location: keyAlias.location, fact: keyAlias.text.trim() });
+    return rebuilt(master, [...keep2.filter((e) => e.name !== "Key"), rebuilt(key, keyFields), leaf2(child(master, "Bars"), "Bars", chosen.join(" "))]);
+  });
+  const slotCount = Math.max(1, ...[...kept.bars].map((id) => ids(bars.get(id), "Voices").length));
+  const preparedBars = [...kept.bars].map((id) => {
+    const bar = bars.get(id), all2 = ids(bar, "Voices");
+    if (!all2.length || all2.length > 4) refuse("voice-profile", "A source bar requires one to four encoded voice slots.", bar.location);
+    const active = all2.filter((id2) => id2 !== "-1");
+    if (new Set(active).size !== active.length) refuse("voice-profile", "One voice definition cannot occupy multiple slots of the same bar.", bar.location);
+    const slots = [...all2, ...Array(slotCount - all2.length).fill("-1")];
+    active.forEach((id2) => kept.voices.add(id2));
+    if (active.length !== all2.length) findings.push({ disposition: "preserved", code: "absent-voice-slots", message: "Leading and internal absent slots preserve the original voice numbers. Trailing absent slots carry no music; a bounded empty-slot reader padding keeps voice chains stable across bars. An entirely absent staff remains silent for its master-bar span.", location: bar.location, fact: { slots: all2 } });
+    const keep2 = named(bar, ["Clef", "Ottavia", "Voices", "SimileMark", "XProperties"], findings, ["Clef", "Ottavia"], ["Voices", "XProperties"]);
+    return rebuilt(bar, [...keep2, ...beamProperties(bar, findings), leaf2(child(bar, "Voices"), "Voices", slots.join(" "))]);
+  });
+  for (const id of kept.voices) ids(voices.get(id), "Beats").forEach((id2) => kept.beats.add(id2));
+  for (const id of kept.beats) {
+    const b = beats.get(id);
+    ids(b, "Notes", false).forEach((id2) => kept.notes.add(id2));
+    kept.rhythms.add(child(b, "Rhythm").attrs.ref);
+  }
+  const preparedTracks = selectedOrder.map((id) => {
+    const track = tracks.get(id);
+    if (family === 6) return prepareDirectTrack(track, findings, context?.harmony);
+    const keep2 = named(track, ["Name", "ShortName", "Color", "SystemsDefautLayout", "SystemsLayout", "AutoBrush", "AutoAccentuation", "PalmMute", "PlayingStyle", "UseOneChannelPerString", "IconId", "InstrumentSet", "NotationPatch", "Transpose", "RSE", "ForcedSound", "Sounds", "MidiConnection", "PlaybackState", "AudioEngineState", "Lyrics", "Staves", "Automations"], findings, ["Name", "ShortName", "Transpose", "Lyrics"], ["InstrumentSet", "NotationPatch", "Sounds", "Staves", "AutoBrush", "AutoAccentuation", "PalmMute"]);
+    const type = checkDefaultArticulation(track, findings);
+    const playing = child(track, "PlayingStyle", false), palm = child(track, "PalmMute", false), state = child(track, "PlaybackState", false);
+    if (playing && !["Default", "StringedPick", "StringedFinger", "BassSlap"].includes(playing.text.trim())) refuse("track-technique", "Active track-wide style or playback state requires mapping.", track.location);
+    for (const parameter of [palm, child(track, "AutoAccentuation", false)].filter((p) => !!p)) {
+      scalar2(parameter);
+      if (!/^(?:0(?:\.\d{1,6})?|1(?:\.0{1,6})?)$/.test(parameter.text.trim())) refuse("track-playback", "Playback interpretation parameter must be a bounded decimal0\u20131.", parameter.location);
+      findings.push({ disposition: "omitted", code: "track-playback-interpretation", message: parameter.name === "PalmMute" ? "Source playback palm-mute intensity is retained separately from recovered per-note palm-mute instructions; this parameter alone does not mark notes or performing hands." : "Source automatic strong-beat accentuation is retained but playback emphasis is not reproduced or invented as written accents/dynamics. No complete playback equivalence is claimed.", location: { ...parameter.location, trackId: id }, fact: { parameter: parameter.name, value: parameter.text.trim() } });
+    }
+    const autoBrush = child(track, "AutoBrush", false);
+    if (autoBrush) {
+      marker(autoBrush);
+      findings.push({ disposition: "omitted", code: "source-auto-brush", message: "Source automatic playback strum delay is retained but not reproduced. Written attacks and clocks stay unchanged; this playback-only setting does not block performer conversion.", location: { ...autoBrush.location, trackId: id }, fact: { enabled: true } });
+    }
+    if (playing && playing.text.trim() !== "Default") findings.push({ disposition: "omitted", code: "source-playing-style", message: "Source track playing style selects automatic engine interpretation; separately notated picking/slapping instructions remain musical facts. The engine preset is not invented as an instruction on every note.", location: playing.location, fact: playing.text.trim() });
+    findings.push({ disposition: "omitted", code: "instrument-sound-metadata", message: "Instrument/sound catalog and bank/timbre metadata remain source facts. Selected articulation appearance and score-visible sound-change labels are recovered separately; engine settings alone do not assert a performer technique.", location: track.location });
+    const automation = child(track, "Automations", false);
+    const lyrics = child(track, "Lyrics", false);
+    if (lyrics) {
+      shape3(lyrics, ["Line"], ["dispatched"], ["Line"]);
+      if (lyrics.attrs.dispatched !== void 0 && !["true", "false"].includes(lyrics.attrs.dispatched)) refuse("lyrics", "Unreviewed lyric dispatch convention.", lyrics.location);
+      for (const line of lyrics.children) {
+        shape3(line, ["Text", "Offset"]);
+        line.children.forEach(scalar2);
+      }
+    }
+    const staveContainer = child(track, "Staves");
+    shape3(staveContainer, ["Staff"], [], ["Staff"]);
+    const staves = staveContainer.children;
+    if (staves.length !== 1) refuse("staff-profile", "One explicitly fretted staff per selected bass track is required.", track.location);
+    shape3(staves[0], ["Properties"]);
+    const properties2 = child(staves[0], "Properties"), canonical = [];
+    shape3(properties2, ["Property", "Name"], [], ["Property"]);
+    const propertyNames = /* @__PURE__ */ new Set();
+    for (const property of properties2.children) {
+      if (property.name === "Name") {
+        scalar2(property);
+        findings.push({ disposition: "omitted", code: "staff-name", message: "Source display name retained; ordinary source staff clef is exported.", location: property.location });
+        continue;
+      }
+      if (property.name !== "Property") refuse("unknown-property", "Unknown staff property container.", property.location);
+      const name = property.attrs.name;
+      if (propertyNames.has(name)) refuse("structure", "Duplicate staff property identity.", property.location);
+      propertyNames.add(name);
+      if (context?.harmony && ["DiagramCollection", "DiagramWorkingSet", "ChordCollection", "ChordWorkingSet"].includes(name)) {
+        context.harmony.validateProperty(property);
+        continue;
+      }
+      const fields = { Tuning: ["Pitches", "Flat", "Instrument", "Label", "LabelVisible"], TuningFlat: ["Enable"], CapoFret: ["Fret"], PartialCapoFret: ["Fret"], PartialCapoStringFlags: ["Bitset", "Flags"], FretCount: ["Number"], ChordCollection: ["Items"], ChordWorkingSet: ["Items"], DiagramCollection: ["Items"], DiagramWorkingSet: ["Items"] };
+      shape3(property, fields[name] ?? [], ["name"]);
+      property.children.forEach(scalar2);
+      if (name === "Tuning") {
+        if (property.children.some((e) => !["Pitches", "Flat", "Instrument", "Label", "LabelVisible"].includes(e.name))) refuse("tuning-property", "Unreviewed tuning field.", property.location);
+        if (child(property, "Flat", false)) {
+          marker(child(property, "Flat"));
+          findings.push({ disposition: "omitted", code: "tuning-flat-preference", message: "Encoded tuning flat-spelling preference is retained separately from MIDI values. Generated MusicXML reference tuning spelling remains explicitly inferred.", location: child(property, "Flat").location });
+        }
+        const visible = child(property, "LabelVisible", false);
+        if (visible && !["true", "false"].includes(visible.text.trim())) refuse("tuning-property", "Tuning label visibility must be explicit boolean.", visible.location);
+        canonical.push(rebuilt(property, [child(property, "Pitches")]));
+      } else if (name === "TuningFlat") {
+        marker(child(property, "Enable"));
+        findings.push({ disposition: "omitted", code: "tuning-flat-preference", message: "Encoded enabled tuning flat-spelling preference is retained separately from MIDI values. Generated MusicXML reference tuning spelling remains explicitly inferred.", location: property.location });
+      } else if (name === "CapoFret") canonical.push(property);
+      else if (name === "PartialCapoFret" || name === "PartialCapoStringFlags") {
+        canonical.push(property);
+      } else if (name === "FretCount") integer(value(property, "Number"), 1, 999999, property);
+      else if (["ChordCollection", "ChordWorkingSet", "DiagramCollection", "DiagramWorkingSet"].includes(name) && !child(property, "Items").children.length) {
+        findings.push({ disposition: "omitted", code: "empty-diagrams", message: "Empty diagram container retained; no musical chord data dropped.", location: property.location });
+      } else refuse("staff-property", `Staff property ${name} is unsupported or active.`, property.location);
+    }
+    const sound = createTrackAutomations(track, findings).firstSound;
+    const midi = child(sound, "MIDI"), program = child(midi, "Program");
+    admittedFamily(type, integer(program.text.trim(), 0, 127, program), program.location);
+    return rebuilt(track, [
+      ...keep2,
+      leaf2(child(track, "InstrumentSet"), "Instrument", "", { ref: type }),
+      rebuilt(properties2, canonical),
+      { ...midi, name: "GeneralMidi", attrs: { table: type === "drumKit" || type === "percussion" ? "Percussion" : "Instrument" }, children: [program] }
+    ]);
+  });
+  for (const id of order.filter((id2) => !selected.includes(id2))) findings.push({ disposition: "excluded-by-scope", code: "track-excluded", message: "Track deliberately excluded by the requested source IDs; its facts remain in original source; capture is delivered only on success.", location: { ...tracks.get(id).location, trackId: id }, fact: { trackId: id } });
+  const preparedBeats = [...kept.beats].map((id) => {
+    const b = beats.get(id);
+    const keep2 = named(b, ["Rhythm", "Notes", "Dynamic", "FreeText", "Chord", "Bank", "Properties", "XProperties", "TransposedPitchStemOrientation", "UserTransposedPitchStemOrientation", "ConcertPitchStemOrientation", ...beatTechniqueElements, ...structuralBeatFields], findings, ["Rhythm", "Notes", "Dynamic", "FreeText", "TransposedPitchStemOrientation", "UserTransposedPitchStemOrientation", ...beatTechniqueElements, ...structuralBeatFields], ["Properties", "Chord", "XProperties"]);
+    keep2.push(...beamProperties(b, findings));
+    const bank = child(b, "Bank", false);
+    if (bank) scalar2(bank);
+    const properties2 = child(b, "Properties", false);
+    if (properties2) shape3(properties2, ["Property"], [], ["Property"]);
+    const names2 = /* @__PURE__ */ new Set();
+    const musical = [];
+    for (const p of properties2?.children ?? []) {
+      if (names2.has(p.attrs.name)) refuse("structure", "Duplicate beat property.", p.location);
+      names2.add(p.attrs.name);
+      if (beatTechniqueFields[p.attrs.name]) {
+        shape3(p, beatTechniqueFields[p.attrs.name].split(" "), ["name"]);
+        p.children.forEach(scalar2);
+        musical.push(p);
+        continue;
+      }
+      shape3(p, ["Float"], ["name"]);
+      scalar2(child(p, "Float"));
+      if (p.name !== "Property" || !["PrimaryPickupVolume", "PrimaryPickupTone"].includes(p.attrs.name)) refuse("beat-property", "Unreviewed selected beat sound property.", p.location);
+      const amount = value(p, "Float");
+      if (!/^\d{1,2}(?:\.\d{1,16})?$/.test(amount) || Number(amount) > 10) refuse("pickup-tone", "Invalid bounded synth pickup control.", p.location);
+      findings.push({ disposition: "omitted", code: "pickup-tone", message: "Synth pickup tone/volume observed in source; capture is delivered only on success; instrument timbre recreation is not exercised.", location: p.location });
+    }
+    if (musical.length) keep2.push(rebuilt(properties2, musical));
+    return rebuilt(b, keep2);
+  });
+  const score = child(root, "Score");
+  const preparedScore = rebuilt(score, named(score, ["Title", "SubTitle", "Artist", "Album", "Words", "Music", "WordsAndMusic", "Copyright", "Tabber", "Instructions", "Notices", "FirstPageHeader", "FirstPageFooter", "PageHeader", "PageFooter", "ScoreSystemsDefaultLayout", "ScoreSystemsLayout", "ScoreZoomPolicy", "ScoreZoom", "MultiVoice", "PageSetup"], findings, scoreTextFields));
+  const preparedMaster = rebuilt(masterTrack, named(masterTrack, ["Tracks", "Automations", "Anacrusis", "RSE"], findings, ["Automations", "Anacrusis"], ["Tracks"]).concat(leaf2(child(masterTrack, "Tracks"), "Tracks", selectedOrder.join(" "))));
+  const audio = child(root, "AudioTracks", false);
+  if (audio && (audio.children.length || audio.text.trim())) refuse("audio-track", "Audio tracks require a separate timing/media contract.", audio.location);
+  const keep = named(root, ["GPVersion", "GPRevision", "Encoding", "Score", "MasterTrack", "Tracks", "MasterBars", "Bars", "Voices", "Beats", "Notes", "Rhythms", "ScoreViews", "AudioTracks"], findings, ["GPVersion", "GPRevision", "Encoding"], ["Score", "MasterTrack", "Tracks", "MasterBars", "Bars", "Voices", "Beats", "Notes", "Rhythms"]);
+  const group = (name, elements) => rebuilt(child(root, name), elements);
+  return freeze(rebuilt(root, [
+    ...keep,
+    preparedScore,
+    preparedMaster,
+    group("Tracks", preparedTracks),
+    group("MasterBars", masters),
+    group("Bars", preparedBars),
+    group("Voices", [...kept.voices].map((id) => voices.get(id))),
+    group("Beats", preparedBeats),
+    group("Notes", [...kept.notes].map((id) => {
+      const note = notes.get(id);
+      const fields = beamProperties(note, findings);
+      return rebuilt(note, [...note.children.filter((c) => c.name !== "XProperties"), ...fields]);
+    })),
+    group("Rhythms", [...kept.rhythms].map((id) => rhythms.get(id)))
+  ]));
+}
+function serialize(e) {
+  const escape = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  return `<${e.name}${Object.entries(e.attrs).map(([k, v]) => ` ${k}="${escape(v)}"`).join("")}>${escape(e.text)}${e.children.map(serialize).join("")}</${e.name}>`;
+}
+
+// src/adapters/guitar-pro/harmony.ts
+var collections = /* @__PURE__ */ new Set(["ChordCollection", "DiagramCollection"]);
+var workingSets = /* @__PURE__ */ new Set(["ChordWorkingSet", "DiagramWorkingSet"]);
+var accidentals = { DoubleFlat: -2, Flat: -1, Natural: 0, Sharp: 1, DoubleSharp: 2 };
+var intervals = { Second: 2, Third: 3, Fourth: 4, Fifth: 5, Sixth: 6, Seventh: 7, Ninth: 9, Eleventh: 11, Thirteenth: 13 };
+var fingers = { None: "", Thumb: "T", Index: "1", Middle: "2", Ring: "3", Rank: "3", Pinky: "4" };
+function shape4(e, fields, attrs2, repeated = []) {
+  if (e.text.trim() || Object.keys(e.attrs).some((a) => !attrs2.includes(a))) refuse("gp-harmony-shape", "Uninterpreted chord or diagram structure.", e.location);
+  const seen = /* @__PURE__ */ new Set();
+  for (const c of e.children) {
+    if (!fields.includes(c.name) || seen.has(c.name) && !repeated.includes(c.name)) refuse("gp-harmony-shape", "Unknown or duplicate chord field.", c.location);
+    seen.add(c.name);
+  }
+}
+function boolean2(text, e) {
+  if (!["true", "false"].includes(text)) refuse("gp-harmony-boolean", "Chord visibility must be an explicit boolean.", e.location);
+  return text === "true";
+}
+function createGpHarmony(track, staff, findings) {
+  const items = /* @__PURE__ */ new Map(), validated = /* @__PURE__ */ new Set();
+  const validateProperty = (property) => {
+    if (validated.has(property)) return;
+    const name = property.attrs.name;
+    if (!collections.has(name) && !workingSets.has(name)) refuse("gp-harmony-collection", "Not a source chord collection.", property.location);
+    shape4(property, ["Items"], ["name"]);
+    const owner = child(property, "Items");
+    shape4(owner, ["Item"], [], ["Item"]);
+    if (workingSets.has(name)) {
+      findings.push({ disposition: "omitted", code: "gp-chord-editor-working-set", message: "The chord editor working set is retained in source; beat references use the staff chord/diagram collection.", location: property.location });
+      validated.add(property);
+      return;
+    }
+    if (owner.children.length > 2048) refuse("gp-harmony-budget", "Too many source chord definitions.", owner.location);
+    for (const item of owner.children) {
+      shape4(item, ["Diagram", "Chord"], ["id", "name"]);
+      if (!/^\d{1,6}$/.test(item.attrs.id) || item.attrs.name === void 0) refuse("gp-harmony-identity", "Chord definition requires a bounded ID and literal source name.", item.location);
+      const previous = items.get(item.attrs.id);
+      if (previous && previous !== item) refuse("gp-harmony-identity", "Chord references have conflicting source collection definitions.", item.location);
+      items.set(item.attrs.id, item);
+    }
+    validated.add(property);
+  };
+  const properties2 = child(staff, "Properties", false) ?? (staff === track ? child(track, "Properties", false) : void 0);
+  for (const property of properties2?.children ?? []) if (collections.has(property.attrs.name) || workingSets.has(property.attrs.name)) validateProperty(property);
+  const readBeat = (beat, at) => {
+    const reference = child(beat, "Chord", false);
+    if (!reference) return void 0;
+    if (reference.children.length || Object.keys(reference.attrs).length) refuse("gp-harmony-reference", "Beat chord reference must be a plain source ID.", reference.location);
+    const item = items.get(value(beat, "Chord"));
+    if (!item) return refuse("gp-harmony-reference", "Beat references an absent staff chord definition.", reference.location);
+    const harmony = { source: reference.location, value: item.attrs.name, role: "chord-symbol" };
+    const direction = { source: reference.location, kind: "harmony", ...at, harmony };
+    const chord = child(item, "Chord", false);
+    if (chord) {
+      shape4(chord, ["KeyNote", "BassNote", "Degree"], [], ["Degree"]);
+      const tone = (e) => {
+        shape4(e, [], ["step", "accidental"]);
+        if (!/^[A-G]$/.test(e.attrs.step) || !Object.hasOwn(accidentals, e.attrs.accidental)) refuse("gp-harmony-pitch", "Chord pitch requires a source spelling.", e.location);
+        return { step: e.attrs.step, alter: accidentals[e.attrs.accidental] };
+      };
+      const root = child(chord, "KeyNote", false), bass = child(chord, "BassNote", false), degrees = children(chord, "Degree");
+      const rootPitch = root && tone(root), bassPitch = bass && tone(bass);
+      const values2 = [];
+      for (const degree of degrees) {
+        shape4(degree, [], ["interval", "alteration", "omitted"]);
+        const number = intervals[degree.attrs.interval], perfect = [4, 5, 11].includes(number);
+        const alteration = degree.attrs.alteration;
+        const alter = alteration === "Perfect" && perfect || alteration === "Major" && !perfect ? 0 : alteration === "Minor" && !perfect ? -1 : alteration === "Augmented" ? 1 : alteration === "Diminished" ? perfect ? -1 : -2 : void 0;
+        if (!number || alter === void 0 || values2.some((d) => d.value === number)) return refuse("gp-harmony-degree", "Unknown or repeated explicit chord interval.", degree.location);
+        values2.push({ source: degree.location, value: number, alter, type: boolean2(degree.attrs.omitted, degree) ? "subtract" : "add" });
+      }
+      if (rootPitch && values2.length) {
+        harmony.root = rootPitch;
+        harmony.rootText = "";
+        harmony.kind = "other";
+        harmony.kindText = item.attrs.name;
+        harmony.degrees = values2;
+        if (bassPitch && (bassPitch.step !== rootPitch.step || bassPitch.alter !== rootPitch.alter)) {
+          harmony.bass = bassPitch;
+          harmony.bassText = "";
+        }
+      } else if (root || bass) findings.push({ disposition: "preserved", code: "gp-unanalysed-chord-label", message: "A source label without defined intervals remains literal performer text; placeholder catalog root/bass do not establish its analysis.", location: item.location, fact: { label: item.attrs.name, root: rootPitch, bass: bassPitch } });
+    }
+    const diagram = child(item, "Diagram", false);
+    if (diagram) {
+      shape4(diagram, ["Fret", "Fingering", "Property"], ["stringCount", "fretCount", "baseFret", "barsStates"], ["Fret", "Property"]);
+      const strings = integer(diagram.attrs.stringCount, 1, 32, diagram), frets = integer(diagram.attrs.fretCount, 1, 48, diagram), base = integer(diagram.attrs.baseFret ?? "0", 0, 47, diagram);
+      let showFrame = true, showFingering = true, showName = true;
+      const seenProperties = /* @__PURE__ */ new Set();
+      for (const property of children(diagram, "Property")) {
+        shape4(property, [], ["name", "type", "value"]);
+        const name = property.attrs.name;
+        if (!["ShowName", "ShowDiagram", "ShowFingering"].includes(name) || seenProperties.has(name) || property.attrs.type !== void 0 && property.attrs.type !== "bool") refuse("gp-frame-property", "Uninterpreted source diagram presentation.", property.location);
+        seenProperties.add(name);
+        const enabled = boolean2(property.attrs.value, property);
+        if (name === "ShowName") showName = enabled;
+        else if (name === "ShowDiagram") showFrame = enabled;
+        else showFingering = enabled;
+      }
+      direction.printObject = showName;
+      const notes = [], byString = /* @__PURE__ */ new Map();
+      for (const position of children(diagram, "Fret")) {
+        shape4(position, [], ["string", "fret"]);
+        const string = strings - integer(position.attrs.string, 0, strings - 1, position), fret = integer(position.attrs.fret, 0, frets, position) + base;
+        if (fret > 48 || byString.has(string)) refuse("gp-frame-position", "Invalid or duplicate source diagram position.", position.location);
+        const note = { source: position.location, string, fret };
+        notes.push(note);
+        byString.set(string, note);
+      }
+      const fingering = child(diagram, "Fingering", false), barres = /* @__PURE__ */ new Map();
+      if (fingering) {
+        shape4(fingering, ["Position"], [], ["Position"]);
+        const seen = /* @__PURE__ */ new Set();
+        for (const position of fingering.children) {
+          shape4(position, [], ["finger", "fret", "string"]);
+          const string = strings - integer(position.attrs.string, 0, strings - 1, position), finger = fingers[position.attrs.finger];
+          if (seen.has(string) || finger === void 0) refuse("gp-frame-fingering", "Duplicate string or unknown source finger.", position.location);
+          seen.add(string);
+          const note = byString.get(string);
+          if (position.attrs.fret === "4294967295") {
+            if (note || finger) refuse("gp-frame-fingering", "Muted source fingering contradicts a played position.", position.location);
+            continue;
+          }
+          const fret = integer(position.attrs.fret, 0, frets, position) + base;
+          if (!note || note.fret !== fret) return refuse("gp-frame-fingering", "Fingering does not match the source diagram position.", position.location);
+          if (finger) {
+            note.fingering = finger;
+            note.fingeringVisible = showFingering;
+            const key = `${finger}:${fret}`, group = barres.get(key) ?? [];
+            group.push(note);
+            barres.set(key, group);
+          }
+        }
+      }
+      for (const group of barres.values()) if (group.length > 1) {
+        group.sort((a, b) => b.string - a.string);
+        group[0].barre = "start";
+        group.at(-1).barre = "stop";
+        findings.push({ disposition: "inferred", code: "gp-frame-fingering-barre", message: "Equal source finger and fret across strings establish a barre between those positions; no additional sounded strings are invented.", location: fingering.location, fact: { finger: group[0].fingering, fret: group[0].fret, strings: group.map((n) => n.string) } });
+      }
+      const barStates = diagram.attrs.barsStates;
+      if (barStates !== void 0 && !/^\d{1,3}(?: \d{1,3}){0,47}$/.test(barStates)) refuse("gp-frame-bar-states", "Diagram bar states require a bounded source scalar list.", diagram.location);
+      if (barStates !== void 0) harmony.sourceBarStates = { source: diagram.location, value: barStates };
+      if (notes.length) harmony.frame = { source: diagram.location, strings, frets, firstFret: base + 1, unplayed: "x", printObject: showFrame, notes };
+      else findings.push({ disposition: "omitted", code: "gp-empty-frame", message: "An empty diagram has no played frame-note required by MusicXML; the source chord label is preserved without inventing a position.", location: diagram.location });
+    }
+    return direction;
+  };
+  return { readBeat, validateProperty };
+}
+
+// src/adapters/guitar-pro/source-occurrences.ts
+function materializeStaffOccurrences(root, findings) {
+  const graph = discoverArrangementGraph(root);
+  if (graph.slots.length !== 1) refuse("occurrence-scope", "Occurrence materialization requires one selected physical staff.", root.location);
+  const bars = new Map(graph.bars), voices = new Map(graph.voices), seenBars = /* @__PURE__ */ new Set(), seenVoices = /* @__PURE__ */ new Set();
+  const nextIds = /* @__PURE__ */ new Map();
+  const allocate = (map) => {
+    let candidate = nextIds.get(map) ?? 0;
+    while (map.has(String(candidate))) candidate++;
+    if (candidate > 999999) refuse("identity-budget", "Source occurrence expansion exceeds bounded definition identities.", root.location);
+    nextIds.set(map, candidate + 1);
+    return String(candidate);
+  };
+  const masters = graph.masterBars.children.map((master) => {
+    const rawBarId = sourceIds(master, "Bars")[0], rawBar = graph.bars.get(rawBarId);
+    const barId = seenBars.has(rawBarId) ? allocate(bars) : rawBarId;
+    seenBars.add(rawBarId);
+    if (barId !== rawBarId) bars.set(barId, { ...rawBar, attrs: { ...rawBar.attrs, id: barId } });
+    const rawSlots = sourceIds(rawBar, "Voices");
+    if (new Set(rawSlots.filter((id) => id !== "-1")).size !== rawSlots.filter((id) => id !== "-1").length) refuse("voice-profile", "One source voice cannot occupy two slots in one bar.", rawBar.location);
+    const slots = rawSlots.map((id) => {
+      if (id === "-1") return id;
+      const raw = graph.voices.get(id);
+      if (!seenVoices.has(id)) {
+        seenVoices.add(id);
+        return id;
+      }
+      const generated = allocate(voices);
+      voices.set(generated, { ...raw, attrs: { ...raw.attrs, id: generated } });
+      findings.push({ disposition: "preserved", code: "source-definition-occurrence", message: "Repeated immutable source voice is projected into an independent borrowed-reader occurrence; source locations and raw beat/note identities remain unchanged.", location: raw.location, fact: { kind: "voice", sourceId: id, readerId: generated } });
+      return generated;
+    });
+    bars.set(barId, { ...rawBar, attrs: { ...rawBar.attrs, id: barId }, children: rawBar.children.map((c) => c.name === "Voices" ? { ...c, text: slots.join(" ") } : c) });
+    if (barId !== rawBarId) findings.push({ disposition: "preserved", code: "source-definition-occurrence", message: "Repeated immutable source bar receives an independent borrowed-reader occurrence while retaining its original source location.", location: rawBar.location, fact: { kind: "bar", sourceId: rawBarId, readerId: barId } });
+    return { ...master, children: master.children.map((c) => c.name === "Bars" ? { ...c, text: barId } : c) };
+  });
+  return { ...root, children: root.children.map((c) => c.name === "MasterBars" ? { ...c, children: masters } : c.name === "Bars" ? { ...c, children: [...bars.values()] } : c.name === "Voices" ? { ...c, children: [...voices.values()] } : c) };
+}
+
+// src/adapters/guitar-pro/measure-repeats.ts
+function expandMeasureRepeats(root, findings) {
+  const graph = discoverArrangementGraph(root);
+  if (graph.slots.length !== 1) refuse("measure-repeat-scope", "Measure-repeat recovery operates on one original physical staff.", root.location);
+  const ordered = graph.masterBars.children.map((master) => graph.bars.get(sourceIds(master, "Bars")[0]));
+  const definitions2 = new Map(graph.voices), recoveredBars = [];
+  const groups = [];
+  let nextId = 0;
+  for (const [index, bar] of ordered.entries()) {
+    const mark = child(bar, "SimileMark", false);
+    if (!mark) {
+      recoveredBars.push(bar);
+      groups.push(void 0);
+      continue;
+    }
+    if (mark.children.length || Object.keys(mark.attrs).length) refuse("measure-repeat", "Simile mark requires a plain source subtype.", mark.location);
+    const kind = mark.text.trim(), count = kind === "Simple" ? 1 : 2;
+    if (!["Simple", "FirstOfDouble", "SecondOfDouble"].includes(kind)) refuse("measure-repeat", "Unknown source measure-repeat mark.", mark.location);
+    if (kind === "FirstOfDouble" && (index < 2 || value(ordered[index + 1] ?? bar, "SimileMark", false) !== "SecondOfDouble") || kind === "SecondOfDouble" && (index < 3 || value(ordered[index - 1], "SimileMark", false) !== "FirstOfDouble") || index < count)
+      refuse("measure-repeat", "Measure-repeat group requires the complete previous source pattern and matching double-mark endpoints.", mark.location);
+    const from = index - count;
+    const sameMeter2 = (i) => value(graph.masterBars.children[i], "Time");
+    if (sameMeter2(index) !== sameMeter2(from)) refuse("measure-repeat-meter", "A repeated source pattern cannot silently acquire a different measure duration.", mark.location);
+    const slots = sourceIds(bar, "Voices"), hasMusic = slots.filter((id) => id !== "-1").some((id) => sourceIds(definitions2.get(id), "Beats").length);
+    groups.push({ source: mark.location, count, from, derived: !hasMusic });
+    if (hasMusic) {
+      recoveredBars.push(bar);
+      continue;
+    }
+    const pattern = recoveredBars[from];
+    const voices = sourceIds(pattern, "Voices").map((id) => {
+      if (id === "-1") return id;
+      while (definitions2.has(String(nextId))) nextId++;
+      if (nextId > 999999) refuse("identity-budget", "No bounded voice identity remains for source repeat expansion.", mark.location);
+      const original = definitions2.get(id), alias = String(nextId++);
+      definitions2.set(alias, { ...original, attrs: { ...original.attrs, id: alias } });
+      return alias;
+    });
+    recoveredBars.push({ ...bar, children: bar.children.map((field) => field.name === "Voices" ? { ...field, text: voices.join(" ") } : field) });
+    findings.push({ disposition: "inferred", code: "source-measure-repeat-expansion", message: "An explicit source simile mark repeats the previous one/two-bar pattern. Its MusicXML projection includes that performed music and a standard measure-repeat style; no new authored attacks are claimed.", location: mark.location, fact: { fromMeasure: from + 1, targetMeasure: index + 1, count } });
+  }
+  const usedVoices = new Set(recoveredBars.flatMap((bar) => sourceIds(bar, "Voices").filter((id) => id !== "-1")));
+  const projected = { ...root, children: root.children.map((container) => container.name === "Bars" ? { ...container, children: recoveredBars } : container.name === "Voices" ? { ...container, children: [...usedVoices].map((id) => definitions2.get(id)) } : container) };
+  return {
+    root: projected,
+    apply(part) {
+      let previous;
+      for (const [index, measure] of part.measures.entries()) {
+        const group = groups[index], count = group?.count;
+        if (group && !group.derived) {
+          const signature = (m) => JSON.stringify(m.voices.map((voice) => voice.map((event) => [event.start, event.duration, event.type, event.dots, event.notes.map((note) => [note.kind, note.written ? [note.written.step, note.written.alter, note.written.octave] : void 0, note.sounding?.midi, note.string, note.fret, note.tieStart, note.tieStop, note.kind === "unpitched" ? note.unpitched.midi : void 0])])));
+          if (signature(measure) !== signature(part.measures[group.from])) refuse("measure-repeat-conflict", "Explicit underlying music contradicts the source repeat pattern.", group.source);
+        }
+        if (previous !== count) {
+          if (previous) (measure.measureRepeats ??= []).push({ source: group?.source ?? ordered[index].location, staff: 1, type: "stop", count: previous });
+          if (group) (measure.measureRepeats ??= []).push({ source: group.source, staff: 1, type: "start", count: group.count, slashes: group.count });
+        }
+        if (group?.derived) for (const voice of measure.voices) for (const event of voice) event.measureRepeatProjection = { source: group.source, sourceMeasure: group.from + 1 };
+        previous = count;
+      }
+    }
+  };
+}
+
+// src/adapters/guitar-pro/arrange-recovery.ts
+function readerPitchAliases(root, descriptor, findings) {
+  const percussion = descriptor.percussion;
+  const notes = child(root, "Notes");
+  const replacement = notes.children.map((note) => {
+    const properties2 = child(note, "Properties", false);
+    if (!properties2) return note;
+    let values2 = properties2.children;
+    let sourceNote = note;
+    if (percussion && !child(note, "InstrumentArticulation", false)) {
+      const resolved = sourcePercussion(note, [], descriptor.id, findings, descriptor.reference);
+      sourceNote = { ...note, children: [...note.children, { name: "InstrumentArticulation", attrs: {}, text: String(resolved.articulation), children: [], location: note.location }] };
+      values2 = values2.filter((p) => !["Element", "Variation"].includes(p.attrs.name));
+    }
+    if (percussion) values2 = values2.filter((p) => !["String", "Fret"].includes(p.attrs.name));
+    else if (!values2.some((p) => p.attrs.name === "String")) {
+      const midi = values2.find((p) => p.attrs.name === "Midi");
+      if (midi && !values2.some((p) => ["Octave", "Tone"].includes(p.attrs.name))) {
+        const number = integer(value(midi, "Number"), 0, 127, midi);
+        const alias = (name, field, text) => ({ ...midi, attrs: { name }, children: [{ name: field, attrs: {}, children: [], text: String(text), location: midi.location }] });
+        values2 = [...values2, alias("Octave", "Number", Math.floor(number / 12)), alias("Tone", "Step", number % 12)];
+        findings.push({ disposition: "preserved", code: "traditional-pitch-reader-alias", message: "Encoded MIDI is split into the borrowed reader's Octave/Tone fields. Complete source pitch tuples independently determine output spelling and transposition; no physical string or fret is supplied.", location: midi.location, fact: { midi: number } });
+      }
+    }
+    return { ...sourceNote, children: sourceNote.children.map((e) => e === properties2 ? { ...e, children: values2 } : e) };
+  });
+  return { ...root, children: root.children.map((e) => e === notes ? { ...e, children: replacement } : e) };
+}
+function recoverArrangement(root, requested, findings, family) {
+  const graph = discoverArrangementGraph(root), selected = requested ?? graph.order;
+  if (!selected.length || new Set(selected).size !== selected.length || selected.some((id) => !graph.tracks.has(id))) refuse("track-selection", "Select existing unique source track IDs.", root.location);
+  let expandedEvents = 0, expandedNotes = 0;
+  for (const master of graph.masterBars.children) for (const [slot, id] of sourceIds(master, "Bars").entries()) if (selected.includes(graph.slots[slot].trackId)) {
+    const bar = graph.bars.get(id);
+    for (const voiceId of sourceIds(bar, "Voices").filter((id2) => id2 !== "-1")) for (const beatId of sourceIds(graph.voices.get(voiceId), "Beats")) {
+      expandedEvents++;
+      expandedNotes += sourceIds(graph.beats.get(beatId), "Notes", false).length;
+      if (expandedEvents > limits.occurrences || expandedNotes > limits.occurrences) refuse("occurrence-budget", "Complete selected arrangement exceeds the shared expanded occurrence budget.", bar.location);
+    }
+  }
+  const parts = [], occurrences = [], relations = [];
+  let first, eventCount = 0;
+  for (const trackId of graph.order) {
+    if (!selected.includes(trackId)) {
+      findings.push({ disposition: "excluded-by-scope", code: "track-excluded", message: "Source track deliberately excluded by selected IDs.", location: { ...graph.tracks.get(trackId).location, trackId }, fact: { trackId } });
+      continue;
+    }
+    const sourceTrack = graph.tracks.get(trackId), descriptor = arrangementTrack(sourceTrack), percussion = descriptor.percussion ? percussionCatalog(sourceTrack) : [];
+    const pitchedArticulations = !descriptor.percussion ? createPitchedArticulations(sourceTrack, findings) : void 0;
+    const staffParts = [];
+    for (let si = 0; si < descriptor.staves.length; si++) {
+      const harmony = createGpHarmony(sourceTrack, descriptor.staves[si], findings);
+      const repeatProjection = expandMeasureRepeats(materializeStaffOccurrences(projectSourceStaff(root, graph, trackId, si + 1), findings), findings);
+      const projection = repeatProjection.root;
+      const prepared = readerPitchAliases(prepareGp8(projection, void 0, findings, family, { harmony }), descriptor, findings);
+      inventory(prepared, findings, "gpif-physical");
+      const recovered = recover(prepared, serialize(prepared), findings, "gpif-physical", { track: descriptor, percussion, staffNumber: si + 1, sourceNotes: graph.notes });
+      eventCount += recovered.score.parts[0].measures.reduce((total, measure) => total + measure.voices.reduce((sum, voice) => sum + voice.length, 0), 0);
+      if (eventCount > limits.occurrences || occurrences.length + recovered.occurrences.length > limits.occurrences) refuse("occurrence-budget", "Complete selected arrangement exceeds the shared expanded occurrence budget.", sourceTrack.location);
+      first ??= recovered.score;
+      const part = structuredClone(recovered.score.parts[0]);
+      repeatProjection.apply(part);
+      const tuning = child(descriptor.staves[si], "Properties", false)?.children.find((p) => p.name === "Property" && p.attrs.name === "Tuning"), label = tuning && child(tuning, "Label", false);
+      if (label?.text.trim()) (part.measures[0].directions ??= []).push({ source: label.location, kind: "words", staff: 1, position: { n: 0, d: 1 }, text: label.text, printObject: !tuning || value(tuning, "LabelVisible", false) !== "false" });
+      const projectedGraph = discoverArrangementGraph(projection);
+      for (const [mi, measure] of part.measures.entries()) {
+        const sourceBar = projectedGraph.bars.get(sourceIds(projectedGraph.masterBars.children[mi], "Bars")[0]);
+        const sourceSlots = sourceIds(sourceBar, "Voices");
+        const lastPresent = sourceSlots.reduce((last, id, i) => id !== "-1" ? i : last, -1);
+        measure.voices = measure.voices.slice(0, Math.max(1, lastPresent + 1));
+      }
+      applyGpifBeams(part, { masterBars: projectedGraph.masterBars.children, bars: [...projectedGraph.bars.values()], beats: projectedGraph.beats, rhythms: projectedGraph.rhythms }, findings);
+      for (const measure of part.measures) for (const [vi, voice] of measure.voices.entries()) for (const event of voice) {
+        for (const note of event.notes) pitchedArticulations?.apply(note, graph.notes.get(note.source.id), event.type);
+        const direction = harmony.readBeat(graph.beats.get(event.source.id), { position: event.start, staff: 1, voiceId: String(vi + 1) });
+        if (direction) (measure.directions ??= []).push(direction);
+      }
+      const relationIds = new Map((recovered.score.relations ?? []).map((r) => [r.id, `${r.id}:staff:${si + 1}`]));
+      const remap = (input) => {
+        if (!input || typeof input !== "object") return;
+        if (Array.isArray(input)) {
+          input.forEach(remap);
+          return;
+        }
+        const item = input;
+        if (typeof item.relationId === "string" && relationIds.has(item.relationId)) item.relationId = relationIds.get(item.relationId);
+        Object.values(item).forEach(remap);
+      };
+      remap(part);
+      staffParts.push(part);
+      occurrences.push(...recovered.occurrences);
+      for (const original of recovered.score.relations ?? []) {
+        const relation = structuredClone(original);
+        relation.id = relationIds.get(relation.id);
+        for (const endpoint of [relation.start, relation.end]) {
+          endpoint.staff = si + 1;
+          endpoint.voiceId = String(si * 4 + Number(endpoint.voiceId ?? 1));
+        }
+        relations.push(relation);
+      }
+    }
+    const merged = mergeStaffParts(staffParts, descriptor);
+    createTrackAutomations(sourceTrack, findings).apply(merged);
+    parts.push(merged);
+  }
+  for (const part of parts) for (let mi = 0; mi < part.measures.length; mi++) {
+    const a = part.measures[mi].duration, b = parts[0].measures[mi].duration;
+    if (a.n * b.d !== b.n * a.d) refuse("arrangement-span", "All selected physical staves must agree on each exact master-bar span.", part.measures[mi].source);
+  }
+  const auxiliary = findings.filter((f) => ["source-interpretation-field", "partial-capo", "source-playing-style", "linear-tempo", "pitched-articulation-source", "written-key-transposition", "key-preference", "source-irregular-measure", "unassigned-percussion-source"].includes(f.code)).map((f, index) => ({ source: f.location, name: `gp-source:${f.code}:${index + 1}`, value: JSON.stringify(f.fact) }));
+  return { score: freeze({ ...first, metadata: [...first.metadata ?? [], ...auxiliary], parts, ...relations.length ? { relations } : {} }), occurrences: freeze(occurrences) };
 }
 
 // src/adapters/guitar-pro/zip-core.ts
@@ -16708,6 +22723,20 @@ function scanContainer(bytes) {
   if (bytes.byteLength > limits.inputBytes) refuse("input-size", "Input exceeds the 8 MiB profile.");
   const b = Bytes.view(bytes);
   const fail = (message) => refuse("zip", message, { member: "container" });
+  const validateExtra = (start, length, central) => {
+    const seen = /* @__PURE__ */ new Set();
+    let at = start;
+    while (at < start + length) {
+      if (at + 4 > start + length) fail("Truncated ZIP extra field header.");
+      const id = b.readUInt16LE(at), size2 = b.readUInt16LE(at + 2), end2 = at + 4 + size2;
+      if (end2 > start + length || seen.has(id)) fail("Truncated or duplicate ZIP extra field.");
+      seen.add(id);
+      if (id === 10) {
+        if (size2 !== 32 || b.readUInt32LE(at + 4) !== 0 || b.readUInt16LE(at + 8) !== 1 || b.readUInt16LE(at + 10) !== 24) fail("Malformed or unreviewed NTFS timestamp extra field.");
+      } else if (!(central && id === 21589 && size2 === 5 && [1, 3].includes(b[at + 4]))) fail("Unreviewed ZIP extra field; only timestamp metadata is admitted.");
+      at = end2;
+    }
+  };
   if (b.length < 22 || b.readUInt32LE(0) !== 67324752) fail("Expected a local ZIP container. GP3\u20136 are separate profiles.");
   let end = -1;
   for (let i = b.length - 22; i >= Math.max(0, b.length - 65557); i--) {
@@ -16724,7 +22753,7 @@ function scanContainer(bytes) {
     fail("Directory bounds, entry count or ZIP comments exceed the profile.");
   let pos = offset, total = 0;
   const entries = [];
-  const names = /* @__PURE__ */ new Map(), pathSpellings = /* @__PURE__ */ new Map();
+  const names2 = /* @__PURE__ */ new Map(), pathSpellings = /* @__PURE__ */ new Map();
   for (let i = 0; i < count; i++) {
     if (pos + 46 > end || b.readUInt32LE(pos) !== 33639248) fail("Malformed central directory.");
     const flags = b.readUInt16LE(pos + 8), method = b.readUInt16LE(pos + 10);
@@ -16734,16 +22763,15 @@ function scanContainer(bytes) {
     if (pos + 46 + nl + xl + cl > end || flags & ~2056 || method !== 0 && method !== 8 || b.readUInt16LE(pos + 34))
       fail("Unsupported ZIP flags, method, encryption or disk.");
     if (cl) fail("ZIP member comments are outside this profile.");
-    if (xl && (xl !== 9 || b.readUInt16LE(pos + 46 + nl) !== 21589 || b.readUInt16LE(pos + 48 + nl) !== 5 || ![1, 3].includes(b[pos + 50 + nl])))
-      fail("Unreviewed ZIP extra fields; only the exercised central timestamp is admitted.");
+    validateExtra(pos + 46 + nl, xl, true);
     const rawName = b.subarray(pos + 46, pos + 46 + nl);
     const name = rawName.text();
     const directory = name.endsWith("/"), path = directory ? name.slice(0, -1) : name;
     if (!/^[A-Za-z0-9_.\/-]{1,120}$/.test(name) || name.startsWith("/") || path.split("/").some((p) => !p || p === "." || p === ".."))
       fail("Unsafe or ambiguous member path.");
     const folded = path.toLowerCase();
-    if (names.has(folded)) fail("Duplicate or case-ambiguous member paths.");
-    names.set(folded, directory);
+    if (names2.has(folded)) fail("Duplicate or case-ambiguous member paths.");
+    names2.set(folded, directory);
     const components = path.split("/");
     for (let n = 1; n <= components.length; n++) {
       const spelling = components.slice(0, n).join("/"), key = spelling.toLowerCase();
@@ -16781,13 +22809,14 @@ function scanContainer(bytes) {
     const localCrc = b.readUInt32LE(start + 14), localCompressed = b.readUInt32LE(start + 18), localDecoded = b.readUInt32LE(start + 22);
     const emptyLocal = descriptor && localCrc === 0 && localCompressed === 0 && localDecoded === 0;
     const matchingLocal = localCrc === crc && localCompressed === compressed && localDecoded === decoded;
-    if (dataEnd > offset || localXl || localNl !== nl || !b.subarray(start + 30, start + 30 + nl).equals(rawName) || b.readUInt16LE(start + 6) !== flags || b.readUInt16LE(start + 8) !== method || !(emptyLocal || matchingLocal))
+    if (dataEnd > offset || localNl !== nl || !b.subarray(start + 30, start + 30 + nl).equals(rawName) || b.readUInt16LE(start + 6) !== flags || b.readUInt16LE(start + 8) !== method || !(emptyLocal || matchingLocal))
       fail("Local and central ZIP identity/length/CRC disagree.");
+    validateExtra(start + 30 + localNl, localXl, false);
     entries.push({ name, directory, start, end: memberEnd, dataStart, compressed, decoded, crc, method, ...descriptorFact ? { descriptor: descriptorFact } : {} });
     pos += 46 + nl + xl + cl;
   }
   if (pos !== end) fail("Unaccounted central-directory content.");
-  for (const [name, directory] of names) if (!directory && [...names.keys()].some((other) => other.startsWith(name + "/")))
+  for (const [name, directory] of names2) if (!directory && [...names2.keys()].some((other) => other.startsWith(name + "/")))
     fail("A payload file cannot be a parent directory.");
   const spans = entries.slice().sort((a, c) => a.start - c.start);
   let next = 0;
@@ -16802,10 +22831,12 @@ function admitDescriptors(members, root, findings) {
   const descriptors = members.zipDescriptors ?? [];
   if (descriptors.some((d) => d.order === "crc-decoded-compressed")) {
     const revision = child(root, "GPRevision"), encoding = child(root, "Encoding", false);
-    if (value(root, "GPVersion", false) !== "8.1.1" || revision.text.trim() !== "13007" || revision.attrs.required !== "12024" || revision.attrs.recommended !== "13000" || !encoding || value(encoding, "EncodingDescription") !== "GP8")
-      refuse("zip-source-profile", "Reversed unsigned descriptor sizes require the independently observed GP8.1.1/revision13007 source encoding profile.", root.location);
+    const gp8 = value(root, "GPVersion", false) === "8.1.1" && revision.text.trim() === "13007" && revision.attrs.required === "12024" && revision.attrs.recommended === "13000" && encoding && value(encoding, "EncodingDescription") === "GP8";
+    const gp7Revision = ["12017", "12020"].includes(revision.text.trim()) && Object.keys(revision.attrs).length === 0 || revision.text.trim() === "12025" && Object.keys(revision.attrs).length === 2 && revision.attrs.required === "12021" && revision.attrs.recommended === "12023";
+    const gp7 = value(root, "GPVersion", false) === "7" && gp7Revision && encoding && value(encoding, "EncodingDescription") === "GP7";
+    if (!gp8 && !gp7) refuse("zip-source-profile", "Reversed unsigned descriptor sizes require an independently observed GP7/revision12017 or12020, GP7/revision12025 or GP8.1.1/revision13007 encoding profile.", root.location);
   }
-  for (const descriptor of descriptors) findings.push({ disposition: "preserved", code: descriptor.order === "crc-decoded-compressed" ? "zip-source-descriptor-order" : "zip-descriptor", message: descriptor.order === "crc-decoded-compressed" ? "Observed GP8.1.1 unsigned descriptor stores decoded size before compressed size. Exact original bytes/order are retained; central/local spans, CRC and actual decode lengths still agree. This serialization alias does not authenticate a producer or alter music." : "Standard signed/unsigned descriptor framing, original bytes, CRC and lengths are retained after exact container validation.", location: { member: "container", byteOffset: descriptor.byteOffset, byteLength: descriptor.byteLength }, fact: descriptor });
+  for (const descriptor of descriptors) findings.push({ disposition: "preserved", code: descriptor.order === "crc-decoded-compressed" ? "zip-source-descriptor-order" : "zip-descriptor", message: descriptor.order === "crc-decoded-compressed" ? "Observed source unsigned descriptor stores decoded size before compressed size. Exact original bytes/order are retained; central/local spans, CRC and actual decode lengths still agree. This serialization alias does not authenticate a producer or alter music." : "Standard signed/unsigned descriptor framing, original bytes, CRC and lengths are retained after exact container validation.", location: { member: "container", byteOffset: descriptor.byteOffset, byteLength: descriptor.byteLength }, fact: descriptor });
 }
 var zipFail = (message) => refuse("zip", message, { member: "container" });
 function checkMember(entry, bytes) {
@@ -16848,6 +22879,7 @@ function convertPortable(bytes, options, readContainer) {
         gpxSource = decoded.capture;
         members = new Map([...decoded.members].map(([name, data]) => ["Content/" + name, data]));
         report.findings.push({ disposition: "inferred", code: "gpx-reader-member-alias", message: "Flat GPX member names receive a generated Content/ prefix only in the shared reader view. GPX capture retains original names and decoded BCFS offsets; those offsets do not address compressed input bytes.", location: { member: "container" }, fact: { aliases: [...decoded.members.keys()].map((name) => ({ source: name, reader: "Content/" + name })) } });
+        if (decoded.capture.omittedSectorPaddingBytes || decoded.capture.incompleteFinalLiteralPaddingBits !== void 0) report.findings.push({ disposition: "inferred", code: "gpx-terminal-sector-padding", message: "The source encoder ends in unused terminal sector/literal padding. Filesystem ownership and an independent decoder establish every member byte; only unused zeros complete the sector buffer, whose normalized hash is separate from the exact input hash.", location: { member: "container" }, fact: { omittedSectorPaddingBytes: decoded.capture.omittedSectorPaddingBytes ?? 0, incompleteFinalLiteralPaddingBits: decoded.capture.incompleteFinalLiteralPaddingBits ?? 0 } });
         if (decoded.capture.finalZeroPaddingBytes) report.findings.push({ disposition: "preserved", code: "gpx-final-zero-padding", message: "The final literal atom contains at most two zero bytes beyond declared decoded length. These are validated serialization padding, retained in original input but excluded from the decoded filesystem; no missing bytes are synthesized.", location: { member: "container" }, fact: { bytes: decoded.capture.finalZeroPaddingBytes } });
       } else members = readContainer();
       const { xml, root } = parseXml(members.get("Content/score.gpif"), gpx ? "score.gpif" : "Content/score.gpif");
@@ -16858,32 +22890,23 @@ function convertPortable(bytes, options, readContainer) {
       const family = gpx && !constructed ? 6 : /^8(?:\.|$)/.test(version ?? "") ? 8 : 7;
       report.profile = constructed ? gpx ? "gpx-constructed-gpif7-fretted/0" : "constructed-gp7-fretted/0" : `gp${family}-physical-fretted/0`;
       container = captureContainer(members, !constructed || gpx, report.findings);
-      const readerRoot = constructed ? root : prepareGp8(root, options.trackIds, report.findings, family);
       if (constructed && options.trackIds) throw new Refusal("track-selection", "Track selection requires a source family profile.", root.location);
-      const mode = constructed ? "constructed" : "gpif-physical";
-      inventory(readerRoot, report.findings, mode);
-      recovery = recover(readerRoot, constructed ? xml : serialize(readerRoot), report.findings, mode);
-      if (family === 8 && report.findings.filter((f) => f.code === "gpif-pitch-profile").every((f) => f.fact.convention === "scientific-physical")) report.profile = "gp8-scientific-physical/0";
+      if (constructed) {
+        inventory(root, report.findings, "constructed");
+        recovery = recover(root, xml, report.findings, "constructed");
+      } else recovery = recoverArrangement(root, options.trackIds, report.findings, family);
+      if (family === 8 && isFrettedScore(recovery.score) && report.findings.some((f) => f.code === "gpif-pitch-profile") && report.findings.filter((f) => f.code === "gpif-pitch-profile").every((f) => f.fact.convention === "scientific-physical")) report.profile = "gp8-scientific-physical/0";
     }
-    for (const finding2 of report.findings.filter((f) => f.code === "source-auto-brush")) {
-      const part = recovery.score.parts.find((p) => p.id === finding2.location.trackId);
-      for (const measure of part.measures) {
-        const events = measure.voices.flatMap((voice) => voice.filter((event) => event.notes.length)).sort((a, b) => a.start.n * b.start.d - b.start.n * a.start.d);
-        let end = { n: 0, d: 1 };
-        for (const event of events) {
-          if (event.notes.length > 1 || event.start.n * end.d < end.n * event.start.d) throw new Refusal("auto-brush-polyphony", "Enabled source AutoBrush with overlapping notes/chords requires a playback mapping; selected logical voices cannot conceal simultaneous notes.", event.source);
-          end = add(event.start, event.duration);
-        }
-      }
-    }
-    const families = new Map(recovery.score.parts.map((part) => [part.id, admittedFamily(part.instrument, part.midiProgram, part.source)]));
+    const families = new Map(recovery.score.parts.map((part) => [part.id, part.staves?.some((staff) => staff.kind === "percussion") ? "percussion" : admittedFamily(part.instrument, part.midiProgram, part.source)]));
+    if (!isFrettedScore(recovery.score)) report.profile = report.profile.replace(/-(?:physical-)?fretted\//, "-arrangement/");
     if (!report.profile.includes("constructed")) {
       if ([...families.values()].every((family) => family === "guitar")) report.profile = report.profile.replace("-fretted/", "-guitar/");
       else if ([...families.values()].every((family) => family === "bass")) report.profile = report.profile.replace("-fretted/", "-bass/");
     }
     for (const part of recovery.score.parts) {
-      report.findings.push({ disposition: "preserved", code: "instrument-admitted", message: "Reviewed encoded instrument identity, MIDI family, complete physical tuning and the selected source musical graph passed admission and reader reconciliation. This is conversion admission, independent of labels or metadata eligibility.", location: part.source, fact: { sourceTrackId: part.id, instrumentReference: part.instrument, midiProgram: part.midiProgram, instrumentFamily: families.get(part.id), profile: report.profile } });
-      report.findings.push({ disposition: "preserved", code: "tuning-export", message: "Complete ordered source open-string MIDI tuning and string count are retained as standard staff-lines/staff-tuning on a hidden alternate TAB staff. Tuning remains sounding pitch, independent of written octave transpose.", location: part.source, fact: { tuning: part.tuning, stringCount: part.tuning.length, sourceOrder: "low-to-high", musicxmlLineOrder: "bottom-to-top" } });
+      report.findings.push({ disposition: "preserved", code: "instrument-admitted", message: "Encoded instrument identity, notation role and the selected source musical graph passed admission and reader reconciliation. This is conversion admission, independent of labels or metadata eligibility.", location: part.source, fact: { sourceTrackId: part.id, instrumentReference: part.instrument, midiProgram: part.midiProgram, instrumentFamily: families.get(part.id), profile: report.profile } });
+      if (!part.tuning) continue;
+      report.findings.push({ disposition: "preserved", code: "tuning-export", message: part.tuning.some((midi) => midi < 12) ? "Complete ordered source tuning is retained in the model and exact auxiliary metadata. MusicXML cannot encode tuning octaves below zero; readable standard words preserve those pitches and representable entries remain staff-tuning." : "Complete ordered source open-string MIDI tuning and string count are retained as standard staff-lines/staff-tuning on a hidden alternate TAB staff. Tuning remains sounding pitch, independent of written octave transpose.", location: part.source, fact: { tuning: part.tuning, stringCount: part.tuning.length, sourceOrder: "source-string-order", musicxmlLineOrder: "bottom-to-top" } });
       report.findings.push({ disposition: "inferred", code: "tuning-spelling", message: "Source tuning encodes MIDI values, not note spelling. MusicXML tuning step/alter/octave uses generated sharp-based reference spelling (midi-sharp-reference/0); the source MIDI values remain unchanged.", location: part.source, fact: { tuning: part.tuning, rule: "midi-sharp-reference/0" } });
       report.findings.push({ disposition: "inferred", code: "tuning-carrier-staff", message: "A nonprinting alternate TAB staff is generated only to serialize tuning and string count. It shares the ordinary staff music and is excluded from playback; no notes/rests are copied to it. It is not a source staff, performing hand or retuning instruction.", location: part.source, fact: { ordinaryStaff: 1, tuningStaff: 2, staffType: "alternate", printObject: false, printSpacing: false } });
       report.findings.push({ disposition: "preserved", code: "hidden-physical-guidance", message: "Standard MusicXML string/fret facts are retained in hidden technical notations; the score displays ordinary notes without TAB or physical numbers.", location: part.source });
@@ -16904,6 +22927,7 @@ function convertPortable(bytes, options, readContainer) {
       containerSource: container.facts,
       occurrences: recovery.occurrences,
       score: recovery.score,
+      scoreKind: isFrettedScore(recovery.score) ? "fretted" : "arrangement",
       inputSource: { bytes: bytes.length, sha256: report.inputSha256, dataBase64: Bytes.view(bytes).base64() },
       ...binarySource ? { binarySource } : {},
       ...gpxSource ? { gpxSource } : {}
@@ -16927,33 +22951,33 @@ function eligibility(program, tuning, source, profile, ref, binary = false) {
   if (program === void 0 || !Number.isInteger(program) || program < 0 || program > 127) {
     status = "unknown";
     findings.push(finding("instrument-unknown", "No unambiguous encoded MIDI program establishes metadata eligibility.", source));
-  } else if (program < 24 || program > 39) {
-    status = "ineligible";
-    findings.push(finding("instrument-profile", "Observed instrument is outside the currently admitted guitar/bass program24\u201339 profile.", source));
-  } else if (!binary) {
-    const family = ref && observedFamily(ref);
-    if (!family) {
-      status = "unknown";
-      findings.push(finding("instrument-unknown", "No reviewed encoded family/reference establishes metadata eligibility; labels and tuning cannot authorize one.", source));
-    } else if (family === "guitar" ? program > 31 : program < 32) {
+  } else {
+    let family;
+    try {
+      family = binary ? midiFamily(program, ref === "percussion") : ref ? admittedFamily(ref, program, source) : void 0;
+    } catch {
       status = "ineligible";
-      findings.push(finding("instrument-profile", "Encoded family/reference and MIDI family disagree.", source));
+      findings.push(finding("instrument-profile", "Encoded instrument family and MIDI program family disagree.", source));
     }
-  }
-  if (!tuning || tuning.stringCount < 4 || tuning.stringCount > (profile.startsWith("gp3-5") ? 7 : 8) || tuning.pitches.some((p, i) => p < 12 || p > 108 || i > 0 && p <= tuning.pitches[i - 1])) {
-    if (status === "eligible") status = "ineligible";
-    findings.push(finding("tuning-profile", "A complete strictly ascending4\u20138string tuning (binary4\u20137) is required for metadata eligibility.", tuning?.sourceLocation ?? source));
+    if (!family && status === "eligible") {
+      status = "unknown";
+      findings.push(finding("instrument-unknown", "Missing source instrument identity.", source));
+    }
+    if ((family === "guitar" || family === "bass" || ref && isFrettedReference(ref)) && (!tuning || tuning.stringCount < 1 || tuning.stringCount > (profile.startsWith("gp3-5") ? 7 : 16) || tuning.pitches.some((p, i) => p < 0 || p > 127))) {
+      status = "ineligible";
+      findings.push(finding("tuning-profile", "Fretted source instrument requires complete ordered string tuning.", tuning?.sourceLocation ?? source));
+    }
   }
   return { status, profile: program !== void 0 && program >= 24 && program <= 31 ? profile.replace("-bass/", "-guitar/") : profile, findings };
 }
-function scalar2(e) {
+function scalar3(e) {
   if (e.children.length || Object.keys(e.attrs).length) refuse("structure", `Expected unambiguous scalar ${e.name}.`, e.location);
 }
 function gpifTrack(track, profile) {
   const info = { sourceId: track.attrs.id, sourceLocation: { ...track.location, trackId: track.attrs.id }, instrument: { observations: [] }, metadataEligibility: { status: "unknown", profile, findings: [] } };
   const name = child(track, "Name", false);
   if (name) {
-    scalar2(name);
+    scalar3(name);
     if (name.text.length > 4096) refuse("metadata-size", "Source track name exceeds compact inventory bounds.", name.location);
     info.sourceName = { value: name.text, sourceLocation: name.location };
   }
@@ -16964,45 +22988,78 @@ function gpifTrack(track, profile) {
   }
   const set = child(track, "InstrumentSet", false), type = set && child(set, "Type", false);
   if (type) {
-    scalar2(type);
+    scalar3(type);
     info.instrument.observations.push({ kind: "family", value: type.text.trim(), sourceLocation: type.location, provenance: "encoded" });
   }
   const directMidi = child(track, "GeneralMidi", false), sounds = child(track, "Sounds", false);
   const soundList = sounds ? children(sounds, "Sound") : [];
   if (directMidi && soundList.length) refuse("instrument-ambiguity", "Multiple instrument-program encodings prevent useful inventory.", track.location);
   const programNodes = directMidi ? [child(directMidi, "Program")] : soundList.map((sound) => child(child(sound, "MIDI"), "Program"));
-  const programs = programNodes.map((node) => {
-    scalar2(node);
-    if (!/^\d{1,3}$/.test(node.text.trim()) || Number(node.text.trim()) > 127) refuse("number", "Malformed MIDI program.", node.location);
-    const program2 = Number(node.text.trim());
-    info.instrument.observations.push({ kind: "midi-program", value: program2, sourceLocation: node.location, provenance: "encoded" });
+  const programs = programNodes.map((node2) => {
+    scalar3(node2);
+    if (!/^\d{1,3}$/.test(node2.text.trim()) || Number(node2.text.trim()) > 127) refuse("number", "Malformed MIDI program.", node2.location);
+    const program2 = Number(node2.text.trim());
+    info.instrument.observations.push({ kind: "midi-program", value: program2, sourceLocation: node2.location, provenance: "encoded" });
     return program2;
   });
   const staves = child(track, "Staves", false), properties2 = child(track, "Properties", false);
   if (staves && properties2) refuse("staff-ambiguity", "Competing direct and grouped staff encodings prevent useful inventory.", track.location);
-  const propertyGroups = properties2 ? [properties2] : staves ? children(staves, "Staff").map((staff) => child(staff, "Properties", false)).filter((e) => !!e) : [];
+  const propertyGroups = properties2 ? [properties2] : staves ? children(staves, "Staff").map((staff) => child(staff, "Properties", false) ?? { ...staff, children: [] }) : [];
   const tuningNodes = [];
-  for (const group of propertyGroups) {
-    const names = /* @__PURE__ */ new Set();
+  const capoNodes = [];
+  for (const [index, group] of propertyGroups.entries()) {
+    const names2 = /* @__PURE__ */ new Set();
     for (const property of children(group, "Property")) {
-      if (!property.attrs.name || names.has(property.attrs.name)) refuse("structure", "Ambiguous staff property identity.", property.location);
-      names.add(property.attrs.name);
-      if (property.attrs.name === "Tuning") tuningNodes.push(child(property, "Pitches"));
+      if (!property.attrs.name || names2.has(property.attrs.name)) refuse("structure", "Ambiguous staff property identity.", property.location);
+      names2.add(property.attrs.name);
+      if (property.attrs.name === "Tuning") tuningNodes.push({ node: child(property, "Pitches"), index });
+      if (property.attrs.name === "CapoFret") capoNodes.push({ node: child(property, "Fret"), index });
     }
   }
-  if (tuningNodes.length > 1) refuse("tuning-ambiguity", "Multiple source tunings need a separately shaped inventory contract.", track.location);
-  if (tuningNodes.length) {
-    const node = tuningNodes[0];
-    scalar2(node);
-    const fields = node.text.trim().split(/\s+/);
-    if (!fields.length || fields.length > 8 || fields.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 127)) refuse("tuning", "Malformed or oversized source tuning.", node.location);
-    info.tuning = { pitches: fields.map(Number), order: "low-to-high", stringCount: fields.length, sourceLocation: node.location, encodedOrder: "low-to-high" };
+  info.staves = sourceStaves(track).map((staff, index) => ({ number: index + 1, sourceLocation: staff.location }));
+  for (const { index, node: node2 } of tuningNodes) {
+    scalar3(node2);
+    const fields = node2.text.trim().split(/\s+/);
+    if (!fields.length || fields.length > 16 || fields.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 127)) refuse("tuning", "Malformed or oversized source tuning.", node2.location);
+    const tuning = { pitches: fields.map(Number), order: "low-to-high", stringCount: fields.length, sourceLocation: node2.location, encodedOrder: "low-to-high" };
+    if (info.staves[index]) info.staves[index].tuning = tuning;
+    if (tuningNodes.length === 1) info.tuning = tuning;
   }
-  const program = new Set(programs).size === 1 ? programs[0] : void 0;
-  info.metadataEligibility = eligibility(program, info.tuning, info.sourceLocation, profile, type?.text.trim() ?? ref?.attrs.ref);
-  if (soundList.length > 1) {
-    info.metadataEligibility.status = "ineligible";
-    info.metadataEligibility.findings.push(finding("sound-profile", "Multiple source sounds require musical sound-change admission.", sounds.location));
+  const program = programs[0];
+  info.metadataEligibility = eligibility(program, info.tuning ?? info.staves[0]?.tuning, info.sourceLocation, profile, directMidi?.attrs.table === "Percussion" ? "percussion" : type?.text.trim() ?? ref?.attrs.ref);
+  if (program !== void 0) {
+    try {
+      info.instrument.family = admittedFamily(directMidi?.attrs.table === "Percussion" ? "percussion" : type?.text.trim() ?? ref?.attrs.ref ?? "", program, info.sourceLocation);
+    } catch {
+    }
+  }
+  for (const { index, node: node2 } of capoNodes) {
+    scalar3(node2);
+    if (!/^-?\d{1,6}$/.test(node2.text.trim()) || Number(node2.text.trim()) < 0) {
+      info.metadataEligibility.status = "ineligible";
+      info.metadataEligibility.findings.push(finding("capo", "Full capo fret must be a nonnegative encoded integer.", node2.location));
+    } else {
+      const capo = { fret: Number(node2.text.trim()), sourceLocation: { ...node2.location, trackId: track.attrs.id } };
+      if (info.staves[index]) info.staves[index].capo = capo;
+      if (capoNodes.length === 1) info.capo = capo;
+    }
+  }
+  for (const [index, group] of propertyGroups.entries()) {
+    try {
+      readPartialCapo(new Map(children(group, "Property").map((property) => [property.attrs.name, property])), info.staves[index]?.tuning?.stringCount ?? 0);
+    } catch (error) {
+      if (!(error instanceof Refusal)) throw error;
+      info.metadataEligibility.status = "ineligible";
+      info.metadataEligibility.findings.push(finding(error.code, error.message, error.location));
+    }
+  }
+  if (info.instrument.family && !isFrettedReference(type?.text.trim() ?? ref?.attrs.ref ?? "")) {
+    delete info.tuning;
+    delete info.capo;
+    for (const staff of info.staves ?? []) {
+      delete staff.tuning;
+      delete staff.capo;
+    }
   }
   return info;
 }
@@ -17017,10 +23074,31 @@ function inspectPortable(bytes, readContainer) {
       report.profile = "gp3-5-binary-inventory/0";
       tracks = source.tracks.map((t) => {
         const tuning = { pitches: t.tuning.slice().reverse(), order: "low-to-high", encodedOrder: "high-to-low", stringCount: t.tuning.length, sourceLocation: t.tuningLocation };
-        const info = { sourceId: t.sourceId, sourceLocation: t.sourceLocation, sourceName: { value: t.name, sourceLocation: t.nameLocation }, instrument: { observations: [{ kind: "midi-program", value: t.program, sourceLocation: t.programLocation, provenance: "derived-from-encoded-channel" }] }, tuning, metadataEligibility: eligibility(t.program, tuning, t.sourceLocation, "gp3-5-binary-bass/0", void 0, true) };
-        if (t.facts["track-flags"] & 119 || t.facts.capo || t.facts["automatic-midi"] & ~1 || t.facts["automatic-accent"] || t.facts.humanize || t.facts["sound-bank"]) {
+        const info = { sourceId: t.sourceId, sourceLocation: t.sourceLocation, sourceName: { value: t.name, sourceLocation: t.nameLocation }, instrument: { observations: [{ kind: "midi-program", value: t.program, sourceLocation: t.programLocation, provenance: "derived-from-encoded-channel" }] }, tuning, metadataEligibility: eligibility(t.program, tuning, t.sourceLocation, "gp3-5-binary-bass/0", t.facts["track-flags"] & 1 ? "percussion" : void 0, true) };
+        info.instrument.family = midiFamily(t.program, !!(t.facts["track-flags"] & 1));
+        const shortBanjo = !(t.facts["track-flags"] & 1) && !!(t.facts["track-flags"] & 4);
+        if (shortBanjo) {
+          info.instrument.observations.push({ kind: "ref", value: "banjo", sourceLocation: t.sourceLocation, provenance: "encoded" });
+          if (tuning.stringCount !== 5) {
+            info.metadataEligibility.status = "ineligible";
+            info.metadataEligibility.findings.push(finding("banjo-strings", "Short-fifth-string banjo requires five encoded strings.", t.tuningLocation));
+          }
+        }
+        if (t.facts.capo < 0) {
           info.metadataEligibility.status = "ineligible";
-          info.metadataEligibility.findings.push(finding("track-profile", "Encoded percussion/doubled/mute/capo/automatic playback or sound-bank fields exceed selected metadata scope.", t.sourceLocation));
+          info.metadataEligibility.findings.push(finding("capo", "Full capo fret must be a nonnegative encoded integer.", t.capoLocation));
+        } else info.capo = { fret: t.facts.capo, sourceLocation: t.capoLocation };
+        if (source.version < 500 && t.facts["track-flags"] & 64 || t.facts["automatic-midi"] & ~7 || t.facts["automatic-accent"] > 5 || t.facts.humanize > 100) {
+          info.metadataEligibility.status = "ineligible";
+          info.metadataEligibility.findings.push(finding("track-profile", "Unknown track flag or invalid playback operand prevents metadata eligibility.", t.sourceLocation));
+        }
+        if (!shortBanjo && info.instrument.family && !["guitar", "bass"].includes(info.instrument.family)) {
+          delete info.tuning;
+          delete info.capo;
+          for (const staff of info.staves ?? []) {
+            delete staff.tuning;
+            delete staff.capo;
+          }
         }
         return info;
       });
@@ -17033,7 +23111,7 @@ function inspectPortable(bytes, readContainer) {
       const version = value(root, "GPVersion", false), constructed = version === "7.0" && value(root, "GPRevision") === "0";
       const family = gpx && !constructed ? 6 : /^8(?:\.|$)/.test(version) ? 8 : 7;
       if (!constructed) validateGpifHeader(root, family, report.findings);
-      const graph = discoverGpifGraph(root);
+      const graph = discoverArrangementGraph(root);
       captureContainer(members, !constructed || gpx, [], false);
       report.profile = constructed ? "constructed-gpif-inventory/0" : `gp${family}-inventory/0`;
       tracks = graph.order.map((id) => gpifTrack(graph.tracks.get(id), constructed ? "constructed-gp7-fretted/0" : `gp${family}-physical-bass/0`));
@@ -17050,7 +23128,10 @@ function inspectPortable(bytes, readContainer) {
   }
 }
 
-// src/adapters/guitar-pro/zip-webview.ts
+// src/core/webview-inflate.ts
+function checkWork(deadline) {
+  if (performance.now() >= deadline.at) throw deadline.work();
+}
 var framing = /* @__PURE__ */ new WeakMap();
 async function supportsFraming(ctor, deadline) {
   let checked = framing.get(ctor);
@@ -17080,9 +23161,6 @@ async function supportsFraming(ctor, deadline) {
   }
   return checked;
 }
-function checkWork(deadline) {
-  if (performance.now() >= deadline) refuse("work-budget", "Worker exceeded 5 seconds; no musical output is admitted.", { member: "container" });
-}
 async function inflate(ctor, payload, maximum, deadline) {
   checkWork(deadline);
   const stream = new ctor("deflate-raw"), writer = stream.writable.getWriter(), reader = stream.readable.getReader();
@@ -17107,7 +23185,7 @@ async function inflate(ctor, payload, maximum, deadline) {
   })();
   try {
     await Promise.race([Promise.all([reading, writing]), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Refusal("work-budget", "Native stream exceeded the Worker deadline.", { member: "container" })), Math.max(0, deadline - performance.now()));
+      timer = setTimeout(() => reject(new Refusal("work-budget", "Native stream exceeded the Worker deadline.", { member: "container" })), Math.max(0, deadline.at - performance.now()));
     })]);
     checkWork(deadline);
     const output = new Uint8Array(total);
@@ -17126,7 +23204,10 @@ async function inflate(ctor, payload, maximum, deadline) {
     writer.releaseLock();
   }
 }
-async function readWebViewContainer(bytes, deadline) {
+
+// src/adapters/guitar-pro/zip-webview.ts
+async function readWebViewContainer(bytes, deadlineAt) {
+  const deadline = { at: deadlineAt, work: () => new Refusal("work-budget", "Worker exceeded 5 seconds; no musical output is admitted.", { member: "container" }) };
   const entries = scanContainer(bytes), result = /* @__PURE__ */ new Map();
   result.zipDescriptors = entries.flatMap((entry) => entry.descriptor ? [entry.descriptor] : []);
   let retained = 0;

@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "bfd999fd12fd227f82b94c014f6f33163381099d",
-    "tree": "91dc7682aee601742062efde4feee7b17f12fb96",
-    "timestamp": "2026-10-14T06:20:51.000Z"
+    "revision": "ba35e574ff39d96ee0fa3f3b0ebf64abe515f218",
+    "tree": "f52892de51c61c5382c8248527088875e84e9b35",
+    "timestamp": "2026-10-16T10:28:51.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
-    "revision": "b3fb5faa4297f92500f53513cdfee8496ab14d93"
+    "revision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351"
   },
   "nativeFiles": {
     ".cargo/config.toml": {
@@ -37,11 +37,11 @@
       "size": 2252
     },
     "package-lock.json": {
-      "sha256": "84873f41f5cff67e1eeb83945670690109275b9270089935cd31d424e2b8e3c8",
+      "sha256": "cb081ba3a917bd9ca2a298fe83b6c0db2d614c1cfd1de50b5ed205d42e817f3e",
       "size": 64822
     },
     "package.json": {
-      "sha256": "39b3fae2ad89821ee868953a88b5a266f04ec37aef308c5028851b109d81aa32",
+      "sha256": "8430e9a428a282151b3837e8060c65d45e821963446e0608adaebb70fbdd8067",
       "size": 1093
     },
     "src-tauri/.gitattributes": {
@@ -57,12 +57,12 @@
       "size": 191
     },
     "src-tauri/Cargo.lock": {
-      "sha256": "a874cde3042b17487a149e05ae749034978a1c18b434537b23781cfe00c419d3",
-      "size": 129702
+      "sha256": "251aab68e75168a3292410ea26d24d094f24d380a876eb93248f689fdaacb057",
+      "size": 129719
     },
     "src-tauri/Cargo.toml": {
-      "sha256": "ec6ddf80164c8c3d1dc1f60150a953dbc04a7c6df7d9aac1f23acf5ca380beba",
-      "size": 1167
+      "sha256": "25801aacac1f7d30bcd51f3b52f8b348acf6d727960bb2239a9161fe08ffe2c3",
+      "size": 1267
     },
     "src-tauri/icons/icon.icns": {
       "sha256": "3d5c2657184d4bed5665712fdf51c7e723590d7798875d4d128e7163cc336af4",
@@ -249,8 +249,8 @@
       "size": 5071
     },
     "src-tauri/src/main.rs": {
-      "sha256": "5019de9d50e8acfb8ae347ba9195155507060a102011f85aeac38c09b2986e61",
-      "size": 6034
+      "sha256": "7383609e56818a868822e47efd7312ca9c2c0d8e6e24839d194fed2a87b857c4",
+      "size": 6812
     },
     "src-tauri/src/managed_files.rs": {
       "sha256": "19d60916542fdf228e8655e978e72ed9f80322956dd5cc40c3413c31403c22a4",
@@ -303,6 +303,10 @@
     "src-tauri/src/practice_audio.rs": {
       "sha256": "fc562138cda31f070c02dd0367e3a86a8933e80511633eef8c566748f40c098e",
       "size": 34450
+    },
+    "src-tauri/src/score_pdf.rs": {
+      "sha256": "9d8d57d79ced12ba7943c77e5b45c641eac19ad4077a2641470ab217d0cacd56",
+      "size": 3117
     },
     "src-tauri/src/score_save.rs": {
       "sha256": "99f36a83040eb12ed1c16cfa1e16f9a9e46842983c8de8ce1fe08f3c5d8cbdf4",
@@ -7605,8 +7609,8 @@
       "size": 19194
     },
     "vendor/score-converter/score-converter-proof-0.0.0.tgz": {
-      "sha256": "2cace1ed51280a406051f195f71fc99d7b2e166e798df89e677ed47283adf044",
-      "size": 719891
+      "sha256": "66ee9317ff47e0ded6d42535921d54474af5a0bdf6d8cf3bd6a10f4affc06d25",
+      "size": 2338904
     }
   },
   "frontend": {
@@ -7615,9 +7619,9 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-Dd-ZdSsp.js": {
-        "sha256": "55fc38e578bcc354434c0213ccc18fbb074d27ae1bcd0ed2832993263016914a",
-        "size": 8468
+      "assets/footer-ink-probe-DksgJgnZ.js": {
+        "sha256": "fa6b6caaae20df95932d8f8cf6fe26bcd98ae108f191e166cc4e78f93e0a45cd",
+        "size": 8471
       },
       "assets/fretted-preparation-assets-D_5Ay36F.js": {
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
@@ -7627,9 +7631,9 @@
         "sha256": "7f611354dfbc49462ddd04ab9308d45efa225073a375fcd82d6cbee5a91983e0",
         "size": 44852
       },
-      "assets/index-CNce-XlG.js": {
-        "sha256": "c14ca574a4ffbc7518ea2f790c151d2c5f424b7ca7b77ab02d6a04d7a85a08ba",
-        "size": 599681
+      "assets/index-DHgVSElV.js": {
+        "sha256": "1418e50b20ff4539a62fbb51482e531dc53f67c2622c5fe04708bd9d0cd0c710",
+        "size": 606310
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7639,52 +7643,60 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/piano-readiness-job-CRczGRIC.js": {
-        "sha256": "ca36a72f75227006534e3599d918ce0625416e86b63451e82a8a46aaef608fd4",
-        "size": 2349276
+      "assets/musescore-import-hlZ-7BiN.js": {
+        "sha256": "e99385fcb326aec6d8a7a1a55d15418f400136a66939fbcd50a017eb05fd9a33",
+        "size": 3947
       },
-      "assets/piano-readiness.worker-iKps8P9k.js": {
-        "sha256": "ff1457079cce367a2c085defce16082fad17d6c92f75a2830b2670e479685ea6",
-        "size": 2262022
+      "assets/musicxml-import-6uNr-UVD.js": {
+        "sha256": "602b8a4651b59af6e3864f43296284e5e9ce704d7a2fe3c4c0129d10b5841a0c",
+        "size": 3805
+      },
+      "assets/piano-readiness-job-C3LP_QmV.js": {
+        "sha256": "90bf2bc6f6937629cc529b0c1a2fc78dc5ddbc058d12032b5ed73813277463b9",
+        "size": 2366616
+      },
+      "assets/piano-readiness.worker-CicK2kPb.js": {
+        "sha256": "50809394b689ac0b0ebb00bf260eeb8c355cf830bc7bb54dc4c6905a8d36636f",
+        "size": 2262902
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
         "size": 83580
       },
       "converter/gp/guitar-pro.worker.js": {
-        "sha256": "5bc42c6b5b89eeaf57c8e1e3dc299f183653dba3a392e8cb681b9531986da051",
-        "size": 637085
+        "sha256": "60ce64fba6a059fe4bc5667b5286e08078cf90fb85daa1681b981cc314588154",
+        "size": 1184143
       },
       "converter/gp/guitar-pro.worker.js.LEGAL.txt": {
         "sha256": "7c8f23d0a40e5fda506e55c252e9aa93d489882a419bb9f3aff3f70c42dab276",
         "size": 656
       },
       "converter/gp/index.js": {
-        "sha256": "983a57d5d34da7cd5e8c190e37fd81dc6a8f91f74fa719d743f49aa27ce74499",
-        "size": 12256
+        "sha256": "12a75c582af3be42cd9c30e1938772a251c72a4c4194bb80bc695b1848f653d8",
+        "size": 12374
       },
       "converter/gp/NOTICE.txt": {
         "sha256": "f571f4b0ad228008ad24e68b681c3e44e67ec78b53ad1d6d7c304822849b2a0b",
         "size": 21551
       },
       "converter/gp/SOURCE-NOTICE.txt": {
-        "sha256": "d84bc93338f8e4569197377b1a7111d14231bee58d1c776a0bb65e8c68693a3d",
+        "sha256": "cb5cefb8f3285a73a315b65828401d1ff1b50e5f2a22edf2e9e7758bdb60a965",
         "size": 484
       },
       "converter/gp/source-package-identity.json": {
-        "sha256": "a18a58fd3a05e1e1289d74c934b256c33727bba90b2044dff32f53d681f8eb02",
-        "size": 1871
+        "sha256": "1a35e039ba43f9b1a038d59a1aa43a1d59203f8a956a8cdfca1be4fea5d36c3e",
+        "size": 3084
       },
       "converter/gp/source-package.tgz": {
-        "sha256": "2cace1ed51280a406051f195f71fc99d7b2e166e798df89e677ed47283adf044",
-        "size": 719891
+        "sha256": "66ee9317ff47e0ded6d42535921d54474af5a0bdf6d8cf3bd6a10f4affc06d25",
+        "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "503d2457aa95800c2838bd043d0423beb1f0fe155cbec8cddcdf39a251fb65eb",
+        "sha256": "8044f5492432519532dc203850e923921af235a64fd716992e035de87319c571",
         "size": 327
       },
       "index.html": {
-        "sha256": "4dfad397674652d5bd9efe4b34a7808a28d76b2846a932d0310b8c81f758c79c",
+        "sha256": "74680975bd9a117928a155e5bcc7c733e29b3224a6deb974cc0410b260ebd5e4",
         "size": 728
       },
       "review/schumann-no14-conventional-20261006.isoscore": {
@@ -7692,11 +7704,11 @@
         "size": 423909
       }
     },
-    "digest": "c3900f2fc28170c2a42bb88052a8b2d98ab30b5fea206a4dc55d7d4447296f5c"
+    "digest": "1ff2419734bf3558f0c0334fe08d79e60a7bd654276305e0b13d60a9923bab74"
   },
   "checks": {
-    "sha256": "74fff554ed51a5a7b088460c81dd7f92f23bbbb7656697d18ec2731a0ffce2bd",
-    "size": 2059
+    "sha256": "c78a400ca941e1be24eeb62c1e6a1ef831f88cd85a895b9f20b8901d39b1f20c",
+    "size": 2442
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v1",
