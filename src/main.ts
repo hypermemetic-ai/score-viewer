@@ -41,7 +41,7 @@ import {ReadingPresentationController} from './reading-presentation';
 import {manualReaderView,retainManualReaderView} from './manual-reader-presentation';
 import {readingNotationControl} from './reading-notation-control';
 import {selectReadingNotation,prepareDualReadingPacket,type ReadingNotation} from './dual-reading-package';
-import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
+import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,guitarProPreparedByEarlierConverter,EARLIER_GUITAR_PRO_CONVERTER,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
 import {ReadingPartCatalog} from './reading-part-catalog';
 import {guitarProTracksMarkup} from './guitar-pro-tracks';
 import {scoreImportKind,MUSICXML_IMPORT_ENABLED} from './score-import-kind';
@@ -141,7 +141,8 @@ async function admitReading(bytes:Uint8Array,op:ReadingOperation){
  await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
  readingProgress(op,'Checking saved score…');
  const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
- if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
+ if(p.manifest.files[GUITAR_PRO_FILES.descriptor]&&guitarProPreparedByEarlierConverter(p))notify(EARLIER_GUITAR_PRO_CONVERTER);
+ else if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
  return p;
 }
 function readingProgress(op:ReadingOperation,text:string){checkReadingOwner(op);op.running.progress=text;if(op.dialog)updateLoading(op.dialog,text);}

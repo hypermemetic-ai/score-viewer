@@ -18,3 +18,10 @@ test('supported public export retains all exact local Worker and legal/source as
  assert.equal(fileURLToPath(import.meta.resolve('score-converter-proof/guitar-pro/webview')).endsWith('/dist/webview/index.js'),true);
  assert.match(new TextDecoder().decode(files[prefix+'SOURCE-NOTICE.txt']),/package\/third_party\/alphatab/);
 });
+test('vendored identity is exactly what the derivation reads from the archive',async()=>{
+ const {converterPackageIdentity}=await import('../scripts/converter-package-identity.mjs');
+ const archive=readFileSync(new URL('../vendor/score-converter/score-converter-proof-0.0.0.tgz',import.meta.url));
+ assert.deepEqual(converterPackageIdentity(archive,{sourceHead:identity.sourceHead,sourceTree:identity.sourceTree,path:identity.archive.path}),identity);
+ assert.equal(identity.sourceHead,'2146166bd2ccfa135652c92fc477f8579ecb9479');
+ assert.deepEqual(identity.exports['./musescore/webview'],{types:'./dist/src/webview/musescore.d.ts',import:'./dist/webview/musescore.js'});
+});
