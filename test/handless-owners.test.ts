@@ -26,6 +26,9 @@ const mixedKey=`<?xml version="1.0" encoding="UTF-8"?><score-partwise version="4
 <part id="P1"><measure number="1"><attributes><divisions>2</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
 <direction placement="below"><direction-type><words>m.d.</words></direction-type><voice>1</voice><staff>1</staff></direction>
 ${note('C','1')}${note('E','1')}<backup><duration>8</duration></backup>${note('C','2')}${note('G','2')}<barline location="right"><bar-style>light-heavy</bar-style></barline></measure></part></score-partwise>`;
+// The same bar twice: two keys with a hand on one voice only.
+const twoMixedKeys=mixedKey.replace('<barline location="right"><bar-style>light-heavy</bar-style></barline></measure>',`</measure><measure number="2"><direction placement="below"><direction-type><words>m.d.</words></direction-type><voice>1</voice><staff>1</staff></direction>
+${note('C','1')}${note('E','1')}<backup><duration>8</duration></backup>${note('C','2')}${note('G','2')}<barline location="right"><bar-style>light-heavy</bar-style></barline></measure>`);
 const open=async(text:string)=>importPackage((await prepareMusicXmlScore(strToU8(text),assets)).bytes,{allowLegacyTempo:true});
 const seatOf=(p:ScorePackage,id:string)=>p.seats.find(s=>s.ownerIds.includes(id))!;
 
@@ -76,6 +79,14 @@ test('a hand choice elsewhere waits until a half-handed key has its hand',async(
  const s=assigned(p,assigned(p,initialPersonal(p),seatOf(p,'P1:m1:n1'),{hand:'RH'}),seatOf(p,'P1:m1:n2'),{hand:'RH'});
  assert.equal(handFor(p,s,'P1:m1:n2'),'RH');
  await new PersonalPresentationSession(p).project(s);
+});
+
+test('with several half-handed keys no single choice can be drawn, so every hand choice is refused before it is saved',async()=>{
+ const p=await open(twoMixedKeys),refusal='Bars 1 and 2 have 2 keys written as two notes where only one note has a hand. The viewer can\'t draw hand choices for this score yet.';
+ await new PersonalPresentationSession(p).warm();
+ for(const seat of p.seats)assert.throws(()=>assigned(p,initialPersonal(p),seat,{hand:'RH'}),{message:refusal});
+ // Fingers need no hand change and are still saved.
+ assert.equal(assigned(p,initialPersonal(p),p.seats[0],{finger:1}).assignments!.choices[p.seats[0].ownerIds[0]].finger,1);
 });
 
 test('ISO\'s refusal of a half-handed key reaches the player in plain words, keeping its diagnosis',async()=>{

@@ -91,18 +91,26 @@ export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:
   next.assignments.choices[id]={ownerId:id,guard:guard(n),original:old?.original??{hand:n.hand??null,...(baseFinger(p,s,id)===undefined?{}:{finger:baseFinger(p,s,id)})},...(hand===undefined?{}:{hand}),intent,
    ...(finger===undefined?{}:{finger}),createdAt:old?.createdAt??new Date().toISOString()};
  }
- if(choice.hand!==undefined){const mixed=halfHandedKey(p,next);if(mixed)throw Error(`${mixed.bar===undefined?'This score':`Bar ${mixed.bar}`} has a key written as two notes, and only one of them has a hand. Choose a hand for that key first (L or R).`);}
+ if(choice.hand!==undefined)requireDrawableHands(p,next);
  next.view.fingerSet='yours';readPersonalAssignments(next.assignments,p);return next;
 }
-/** The pages draw one head per struck key, so personal hands cannot be drawn
- * while a key still mixes a hand with no hand. The source's own pages already
- * draw such a key; only a changed hand needs the whole key resolved. */
-function halfHandedKey(p:ScorePackage,s:PersonalState):{bar?:number}|undefined {
- const hand=(n:ScorePackage['score']['notes'][number])=>s.assignments?.choices[n.id]?.hand??n.hand??null,notes=p.score.notes.filter(isPitchedEvent);
+/** The pages draw one head per struck key, and ISO draws changed hands only
+ * when no key still mixes a hand with no hand. The source's own pages already
+ * draw such keys, so only a changed hand is refused, before it is saved. */
+function requireDrawableHands(p:ScorePackage,s:PersonalState):void {
+ const notes=p.score.notes.filter(isPitchedEvent),hand=(n:typeof notes[number])=>s.assignments?.choices[n.id]?.hand??n.hand??null;
  if(notes.every(n=>hand(n)===(n.hand??null)))return;
  const keys=new Map<string,typeof notes>();for(const n of notes){const k=`${n.startTick}:${pitch(n)}`;keys.set(k,[...keys.get(k)??[],n]);}
- for(const key of keys.values())if(key.some(n=>hand(n)===null)&&key.some(n=>hand(n)!==null))return {bar:p.seats.find(seat=>seat.ownerIds.some(id=>key.some(n=>n.id===id)))?.writtenBar};
+ const mixed=(of:(n:typeof notes[number])=>PersonalHand|null)=>[...keys.values()].filter(key=>key.some(n=>of(n)===null)&&key.some(n=>of(n)!==null));
+ const remaining=mixed(hand);if(!remaining.length)return;
+ const bars=(list:typeof remaining)=>[...new Set(list.map(key=>p.seats.find(seat=>seat.ownerIds.some(id=>key.some(n=>n.id===id)))?.writtenBar).filter(bar=>bar!==undefined))].sort((a,b)=>a-b);
+ const source=mixed(n=>n.hand??null);
+ // A choice resolves one key, so with several such keys no single choice can be drawn.
+ if(source.length>1)throw Error(`${listBars(bars(source))} ${source.length} keys written as two notes where only one note has a hand. The viewer can't draw hand choices for this score yet.`);
+ const [bar]=bars(remaining);
+ throw Error(`${bar===undefined?'This score has':`Bar ${bar} has`} a key written as two notes, and only one of them has a hand. Choose a hand for that key first (L or R).`);
 }
+const listBars=(bars:number[])=>!bars.length?'This score has':bars.length===1?`Bar ${bars[0]} has`:`Bars ${bars.slice(0,-1).join(', ')} and ${bars.at(-1)} have`;
 export function restorePersonalAssignment(p:ScorePackage,s:PersonalState,seat:Seat):PersonalState {
  const next=structuredClone(s);for(const id of seat.ownerIds.flatMap(id=>aliases(p,id)))if(next.assignments)delete next.assignments.choices[id];
  if(next.assignments&&!Object.keys(next.assignments.choices).length)delete next.assignments;
