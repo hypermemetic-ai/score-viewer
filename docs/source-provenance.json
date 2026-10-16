@@ -1424,19 +1424,28 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "95703f060b38e733f5fe2927aad304f191a4315a",
+  "dependencyRevision": "3cf3a1783a7b8f8eec4947cab83cce3e91028d63",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/376",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/377",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/378",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/379",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/380"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/381",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/382"
     ],
-    "previousRevision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351",
-    "scope": "MusicXML piano stages 2a and 2b plus hand-less personal owners. #376 adds the Schumann Op. 68 No. 13 MusicXML specimen. #377 admits pedal lines, so MuseScore and MusicXML files that refused only for pedals now pass the reader (the piano-and-clarinet fixture now refuses for its two instruments). #378 lets a note with no source hand stay hand-less: PersonalOwnerHand.hand is Hand|null, personal projections carry null seats and owners, and HandPresentationError refuses null for a source-handed owner (authority), null in derived or archive ledgers (ownership), one struck key mixing handed and hand-less notes (unsupported-fit) and a grace note with partly handed hosts (unsupported-grace-hand). #379 admits MusicXML grace notes, hairpins and text dynamics; articulations are retained but not drawn, and GraceGroup.source becomes a union. #380 prints one rest where independent voices rest together and removes the wholeRestCoincidence option, which the viewer never set. Merged without GitHub review records. The viewer adopts them behind the development-only MusicXML gate and wires hand-less owners into its personal ledger."
+    "previousRevision": "95703f060b38e733f5fe2927aad304f191a4315a",
+    "scope": "MusicXML piano stage 2c. #381 retains fermatas, the ornament vocabulary, breath marks, caesuras and other-notation without drawing them; admits normal noteheads, measure rests written without a type, left barlines and the heavy-light, none, dotted and dashed barline styles; and admits sequential repeat sections with voltas. writtenPresentation.repeats becomes RepeatSection[] (optional endings with passes), occurrences carry their pass, and a new repeat-end-start barline marks back-to-back sections; nested or overlapping repeats refuse. The hand and finger calculators refuse more than one repeat section or any volta (reason repeat-sections); source-owned hands are unaffected. Volta brackets are not yet drawn. #382 is No. 13 engine work with no API change: more slurs fit and stems sit better, a slur written from a grace note starts at the grace (PhraseOverlay.fromGrace), an editorial [p] draws bracketed (DynamicOverlay.bracketed), ffz, fz and rf draw as bold italic text (DynamicOverlay mark 'unglyphed'), and in a part that writes beams anywhere a flagged note without <beam> is unbeamed; reference ink is unchanged and No. 13 still does not open. The viewer reads none of these fields. Merged without GitHub review records. The viewer adopts it behind the development-only MusicXML gate; the practice bar crop gives a repeat-end-start boundary's rule and end dots to the ending bar and its start dots to the next, so a passage beginning there opens with dots alone."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "95703f060b38e733f5fe2927aad304f191a4315a",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/376",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/377",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/378",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/379",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/380"
+      ],
+      "previousRevision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351",
+      "scope": "MusicXML piano stages 2a and 2b plus hand-less personal owners. #376 adds the Schumann Op. 68 No. 13 MusicXML specimen. #377 admits pedal lines, so MuseScore and MusicXML files that refused only for pedals now pass the reader (the piano-and-clarinet fixture now refuses for its two instruments). #378 lets a note with no source hand stay hand-less: PersonalOwnerHand.hand is Hand|null, personal projections carry null seats and owners, and HandPresentationError refuses null for a source-handed owner (authority), null in derived or archive ledgers (ownership), one struck key mixing handed and hand-less notes (unsupported-fit) and a grace note with partly handed hosts (unsupported-grace-hand). #379 admits MusicXML grace notes, hairpins and text dynamics; articulations are retained but not drawn, and GraceGroup.source becomes a union. #380 prints one rest where independent voices rest together and removes the wholeRestCoincidence option, which the viewer never set. Merged without GitHub review records. The viewer adopts them behind the development-only MusicXML gate and wires hand-less owners into its personal ledger."
+    },
     {
       "revision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351",
       "pullRequest": "https://github.com/hypermemetic-ai/iso-notation/pull/375",
