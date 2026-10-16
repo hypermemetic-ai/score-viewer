@@ -19,7 +19,7 @@ import {workingSpeedArrow} from './practice-shortcuts';
 import {PackageAdmissionSession} from './package-admission-session';
 import {optionsSectionsMarkup,type OptionsSection} from './options-sections';
 import {ReaderPageCache,createReaderPage,mountReaderPages,type ReaderPage} from './reader-page-cache';
-import {mountScorePrint,pdfSaveMessage,scorePdfFilename,svgPageSize} from './score-pdf';
+import {mountScorePrint,pdfSaveMessage,scorePageSize,scorePdfFilename} from './score-pdf';
 import {navigationHint} from './navigation-hint';
 import {ControlResolver,readControlBindings,actionControlLabel,practiceControlBindings,controlActionAllowed,editorControlBindings,readerControlBindings,isEditorAction,type ControlBindings} from './control-bindings';
 import {freeViewControlBindings,readFreeViewControlOverrides,changeScopedControls,type FreeViewControlOverrides} from './free-view-controls';
@@ -379,13 +379,17 @@ function paintReaderSeats(page:ReaderPage,base:ScorePackage,p:ScorePackage,s:Per
 /** Save every page as the reader currently reads it: this edition, keyboard
  * layout, personal hands/fingers and label mode. Editing selection and advice
  * marks are not score ink and stay out. Nothing is written to managed data. */
+let pdfSaving=false;
 async function savePdf(){
- if(!current||practice)return;
- const target=current,p=readerPackage(),s={...(livePersonalEditors.get(target)?.visiblePersonal??target.personal),view:target.personal.view},mode=labelMode(),positions=annotationPositions(p);
- await document.fonts.ready;
- const svgs=p.pages.map((_,index)=>{const page=createReaderPage(p,index);paintReaderSeats(page,target.package,p,s,mode,positions,false);return page.element.querySelector('svg')!;});
- const size=svgPageSize(svgs[0]),filename=scorePdfFilename(target.entry.metadata.title),unmount=mountScorePrint(document,svgs,size);
- try{notify(pdfSaveMessage(await host.savePdf(filename,size),filename,svgs.length,mode));}finally{unmount();}
+ // One export at a time: the save dialog leaves the reader clickable.
+ if(!current||practice||pdfSaving)return;pdfSaving=true;
+ try{
+  const target=current,p=readerPackage(),s={...(livePersonalEditors.get(target)?.visiblePersonal??target.personal),view:target.personal.view},mode=labelMode(),indices=p.pages.map((_,index)=>index),positions=annotationPositions(p,indices);
+  await document.fonts.ready;
+  const svgs=indices.map(index=>{const page=createReaderPage(p,index);paintReaderSeats(page,target.package,p,s,mode,positions,false);return page.element.querySelector('svg')!;});
+  const size=scorePageSize(svgs),filename=scorePdfFilename(target.entry.metadata.title),unmount=mountScorePrint(document,svgs,size);
+  try{notify(pdfSaveMessage(await host.savePdf(filename,size),filename,svgs.length,mode));}finally{unmount();}
+ }finally{pdfSaving=false;}
 }
 function renderToolbar(){if(practice)return;if(!current)return;syncControls();renderEditorNavigation();const {personal:s}=current,p=readerPackage(),v=s.view,layer=activeLayer(current.package,s),capabilities=scoreCapabilities(p);const bar=app.querySelector<HTMLElement>('.toolbar')!,focused=bar.contains(document.activeElement)?document.activeElement as HTMLElement:undefined,focusSelector=focused?.dataset.action?`[data-action="${focused.dataset.action}"]`:focused?.dataset.optionsKey?`[data-options-key="${CSS.escape(focused.dataset.optionsKey)}"]`:focused?.dataset.option?`[data-options-key="${focused.dataset.option}"]`:undefined;toolbarNavigation?.dispose();bar.className=`toolbar${toolbarVisible?' visible':''}`;bar.innerHTML=`${button('Back','library','Esc')}${button('Previous','previous',actionControlLabel(controls.bindings,'previous'),v.page===0)}<small>${v.page+1} / ${p.pages.length}</small>${button('Next','next',actionControlLabel(controls.bindings,'next'),v.page===p.pages.length-1)}${capabilities.pianoPreparation?`${button(toggleLabel(),'toggle',actionControlLabel(controls.bindings,'toggle'),!fingerDisplayAvailable(p,s,currentFingerPresentation(p)))}<small data-label-mode>${labelMode()==='finger'?'Fingers':'Pitch'}</small><select aria-label="Finger choices" data-option="fingerSet"><option value="yours" ${v.fingerSet==='yours'?'selected':''}>Yours · ${personalCorrectionCount(s)}</option><option value="calculated" ${v.fingerSet==='calculated'?'selected':''}>Calculated</option></select>`:''}<select aria-label="Visible pages" data-option="count">${[1,2,3].map(n=>`<option value="${n}" ${v.count===n?'selected':''}>${n} page${n>1?'s':''}</option>`).join('')}</select>${v.count>1?`<select aria-label="Page advancement" data-option="advance"><option value="slide" ${v.advance==='slide'?'selected':''}>Slide pages</option><option value="group" ${v.advance==='group'?'selected':''}>Replace group</option></select>`:''}<select aria-label="Score scale" data-option="scale">${[1,.9,.75,.5].map(n=>`<option value="${n}" ${v.scale===n?'selected':''}>${Math.round(n*100)}%</option>`).join('')}</select>${capabilities.pianoPreparation?`${button(selection?'Done editing':'Edit hands / fingers',selection?'end-edit':'edit',selection?'Esc':actionControlLabel(controls.bindings,'edit'))}`:''}${button('Rotate','rotate',rotationHint())}${capabilities.pianoPractice||!!readingPresentation&&capabilities.manualPractice?button('Practice','practice','P'):''}${keyboardControl(p)}${readingNotationControl(p)}${button('Share score','share')}${button('Save as PDF','pdf')}${button('Options','practiceSettings',actionControlLabel(controls.bindings,'practiceSettings'))}${button('Hide','hide','H')}`;arrangeBottomNavigation(bar,bar.querySelector<HTMLButtonElement>('[data-action=library]'),bar.querySelector<HTMLButtonElement>('[data-action=practiceSettings]'));toolbarNavigation=new OptionsNavigation(bar,()=>{},()=>false,{horizontal:true,focusOnPrepare:false});if(focusSelector)bar.querySelector<HTMLElement>(focusSelector)?.focus();}
 function reveal(focus=false){const changed=!toolbarVisible;toolbarVisible=true;if(current&&changed)renderToolbar();clearTimeout(timer);timer=window.setTimeout(()=>{if(!dialog&&!app.querySelector('.toolbar')?.contains(document.activeElement)){toolbarVisible=false;if(current)renderToolbar();}},3500);if(focus)app.querySelector<HTMLElement>('.toolbar button')?.focus();}

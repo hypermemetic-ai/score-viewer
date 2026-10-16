@@ -5,7 +5,7 @@ import {DOMParser} from '@xmldom/xmldom';
 import {importPackage} from '../src/package';
 import {initialPersonal,collectionId} from '../src/state';
 import {scoreOptionsMarkup} from '../src/score-options';
-import {pdfSaveMessage,scorePdfFilename,svgPageSize} from '../src/score-pdf';
+import {pdfSaveMessage,scorePageSize,scorePdfFilename,svgPageSize} from '../src/score-pdf';
 
 const svg=(attributes:string)=>new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" ${attributes}/>`,'image/svg+xml').documentElement as unknown as Element;
 
@@ -17,6 +17,9 @@ test('PDF pages take the engraved page size in points',async()=>{
  const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
  const page=new DOMParser().parseFromString(p.pages[0],'image/svg+xml').documentElement as unknown as Element,size=svgPageSize(page);
  assert.ok(Math.abs(size.widthPoints-595.28)<.01&&Math.abs(size.heightPoints-841.89)<.01,JSON.stringify(size));
+ const a4=svg('width="595.28pt" height="841.89pt"');
+ assert.deepEqual(scorePageSize([a4,a4]),{widthPoints:595.28,heightPoints:841.89});
+ assert.throws(()=>scorePageSize([a4,svg('width="612pt" height="792pt"')]),/different sizes/);assert.throws(()=>scorePageSize([]),/no pages/);
 });
 
 test('PDF filenames follow the shared score filename rules',()=>{

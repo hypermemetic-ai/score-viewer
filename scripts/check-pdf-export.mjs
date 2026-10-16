@@ -92,13 +92,13 @@ try{
   readerPages.push({index,shot,storedShot,seats:hands.length,handChanges:hands.filter(h=>storedHands.get(h.owner)!==h.hand).length});
  }
  await page.keyboard.press('ArrowLeft');
- async function exportPdf(name,holdFingers){
+ async function exportPdf(name,holdFingers,clickCount=1){
   pending=name;await page.locator('.reader').focus();
   if(holdFingers)await page.keyboard.down('KeyF');
   // Page turns save the reading position; let those settle so only the export is measured.
   await page.waitForTimeout(2500);await page.mouse.move(700,600);await page.mouse.move(720,page.viewportSize().height-5);await page.locator('.toolbar.visible [data-action=pdf]').waitFor();
   const callsBefore=await page.evaluate(()=>{const toast=document.querySelector('.toast');if(toast)toast.textContent='';return window.__calls.length;});
-  await page.locator('[data-action=pdf]').click();
+  await page.locator('[data-action=pdf]').click({clickCount});
   await page.waitForFunction(()=>/PDF saved/.test(document.querySelector('.toast')?.textContent??''),null,{timeout:120000});
   if(holdFingers)await page.keyboard.up('KeyF');
   const result=await page.evaluate(n=>({toast:document.querySelector('.toast').textContent,pdf:window.__pdf.at(-1),calls:window.__calls.slice(n),leftover:document.querySelectorAll('.score-print,[data-score-print]').length}),callsBefore);
@@ -111,6 +111,8 @@ try{
   return result.pdf.path;
  }
  const pitchPdf=await exportPdf('pitch',false),fingerPdf=await exportPdf('finger',true);
+ // A double click must still make one export of each page once.
+ await exportPdf('double-click',false,2);
  // Pixel comparison happens in a blank page: reader vs PDF, and reader vs the stored (pre-edit) page.
  const compare=await context.newPage();
  // Compare ink coverage in 8×8 device-pixel blocks: robust to renderer antialiasing, sensitive to any moved, added or missing mark.

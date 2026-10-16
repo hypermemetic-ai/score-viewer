@@ -20,6 +20,12 @@ export function svgPageSize(svg:Element):PdfPageSize {
  if(!widthPoints||!heightPoints||[widthPoints,heightPoints].some(n=>!Number.isFinite(n)||n<MIN_PDF_PAGE_POINTS||n>MAX_PDF_PAGE_POINTS))throw Error('This score page has no printable size.');
  return {widthPoints,heightPoints};
 }
+/** One PDF page size for the whole score; engraved pages share theirs. */
+export function scorePageSize(pages:ReadonlyArray<Element>):PdfPageSize {
+ const sizes=pages.map(svgPageSize),first=sizes[0];if(!first)throw Error('This score has no pages to save.');
+ if(sizes.some(s=>Math.abs(s.widthPoints-first.widthPoints)>.01||Math.abs(s.heightPoints-first.heightPoints)>.01))throw Error('This score has pages of different sizes, so it cannot be saved as one PDF.');
+ return first;
+}
 export function scorePdfFilename(title:string):string {return scoreFilename(title).slice(0,-TUNA_EXTENSION.length)+'.pdf';}
 
 /** Mount finished reader pages as the document's only printed content. The
@@ -27,15 +33,16 @@ export function scorePdfFilename(title:string):string {return scoreFilename(titl
 export function mountScorePrint(doc:Document,pages:ReadonlyArray<SVGSVGElement>,size:PdfPageSize):()=>void {
  if(!pages.length)throw Error('This score has no pages to save.');
  const w=`${size.widthPoints}pt`,h=`${size.heightPoints}pt`,style=doc.createElement('style'),root=doc.createElement('div');
+ for(const old of doc.querySelectorAll('.score-print,style[data-score-print]'))old.remove();
  style.dataset.scorePrint='';root.className='score-print';root.setAttribute('aria-hidden','true');
  style.textContent=`.score-print{display:none}
 @media print{@page{size:${w} ${h};margin:0}
 html,body{margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important;width:auto!important;height:auto!important}
 body>:not(.score-print){display:none!important}
 .score-print{display:block}
-.score-print-sheet{width:${w};height:${h};overflow:hidden;break-after:page;break-inside:avoid;background:#fff}
+.score-print-sheet{width:${w};height:calc(${h} - .5pt);overflow:hidden;break-after:page;break-inside:avoid;background:#fff}
 .score-print-sheet:last-child{break-after:auto}
-.score-print-sheet>svg{display:block;width:100%;height:100%}}`;
+.score-print-sheet>svg{display:block;width:${w};height:${h}}}`;
  root.replaceChildren(...pages.map(svg=>{const sheet=doc.createElement('div');sheet.className='score-print-sheet';sheet.append(svg);return sheet;}));
  doc.head.append(style);doc.body.append(root);
  return ()=>{root.remove();style.remove();};
