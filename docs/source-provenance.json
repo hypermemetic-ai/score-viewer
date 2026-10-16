@@ -1424,13 +1424,14 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "e8ca0c9daefd1b125308620907c5d6e692b1995a",
+  "dependencyRevision": "3cf3a1783a7b8f8eec4947cab83cce3e91028d63",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/381"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/381",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/382"
     ],
     "previousRevision": "95703f060b38e733f5fe2927aad304f191a4315a",
-    "scope": "MusicXML piano stage 2c. #381 retains fermatas, the ornament vocabulary, breath marks, caesuras and other-notation without drawing them; admits normal noteheads, measure rests written without a type, left barlines and the heavy-light, none, dotted and dashed barline styles; and admits sequential repeat sections with voltas. writtenPresentation.repeats becomes RepeatSection[] (optional endings with passes), occurrences carry their pass, and a new repeat-end-start barline marks back-to-back sections; nested or overlapping repeats refuse. The hand and finger calculators refuse more than one repeat section or any volta (reason repeat-sections); source-owned hands are unaffected. Volta brackets are not yet drawn. Merged without GitHub review records. The viewer adopts it behind the development-only MusicXML gate; the practice bar crop gives a repeat-end-start boundary's end half to the ending bar and its start half to the next."
+    "scope": "MusicXML piano stage 2c. #381 retains fermatas, the ornament vocabulary, breath marks, caesuras and other-notation without drawing them; admits normal noteheads, measure rests written without a type, left barlines and the heavy-light, none, dotted and dashed barline styles; and admits sequential repeat sections with voltas. writtenPresentation.repeats becomes RepeatSection[] (optional endings with passes), occurrences carry their pass, and a new repeat-end-start barline marks back-to-back sections; nested or overlapping repeats refuse. The hand and finger calculators refuse more than one repeat section or any volta (reason repeat-sections); source-owned hands are unaffected. Volta brackets are not yet drawn. #382 is No. 13 engine work with no API change: more slurs fit and stems sit better, a slur written from a grace note starts at the grace (PhraseOverlay.fromGrace), an editorial [p] draws bracketed (DynamicOverlay.bracketed), ffz, fz and rf draw as bold italic text (DynamicOverlay mark 'unglyphed'), and in a part that writes beams anywhere a flagged note without <beam> is unbeamed; reference ink is unchanged and No. 13 still does not open. The viewer reads none of these fields. Merged without GitHub review records. The viewer adopts it behind the development-only MusicXML gate; the practice bar crop gives a repeat-end-start boundary's end half to the ending bar and its start half to the next."
   },
   "previousDependencyReviews": [
     {
