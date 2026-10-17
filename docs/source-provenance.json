@@ -1424,14 +1424,16 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "8bb6fa2769a7ba318afdf478e5cfd4c863a01cf4",
+  "dependencyRevision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8",
   "dependencyReview": {
     "pullRequests": [
       "https://github.com/hypermemetic-ai/iso-notation/pull/383",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/384"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/384",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/385",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/386"
     ],
     "previousRevision": "3cf3a1783a7b8f8eec4947cab83cce3e91028d63",
-    "scope": "Hand-change beams. #383 splits a beam whose notes change hand into one beam per hand, each with its own stems and rhythm, and joins the last head of one hand to the first of the other with a 0.45pt cue; the diagonal opposite-hand connector is retired. A saved calculated edition drawn with that connector refuses with HandPresentationError code incompatible-recipe; the viewer opens the newest drawable earlier edition with the score's own hands instead (PR 118). Saved fitted-rail calculated editions with a hand change inside a source beam may instead fail replay with the generic reproduction error; none of the user's editions are of that kind (checked 2026-10-17 on a copy of the complete library). #383 also made system breaks keep short phrases whole; #384 makes that rule opt-in (phraseSystemBreaks: 'short-phrase-v1'), which recipe factories never add, so saved approved-v3 and calculated-hands-v1 recipes reproduce their 3cf3a17 pages, and drops 'Choose Calculate fingers' from the incompatible-recipe message. The viewer does not opt in. Merged without GitHub review records."
+    "scope": "Hand-change beams. #383 splits a beam whose notes change hand into one beam per hand, each with its own stems and rhythm, and joins the last head of one hand to the first of the other with a 0.45pt cue; the diagonal opposite-hand connector is retired. A saved calculated edition drawn with that connector refuses with HandPresentationError code incompatible-recipe; the viewer engraves that edition again from its own source, hands and fingers (docs/saved-edition-reengraving.md), replacing the PR 118 earlier-edition fallback. Saved fitted-rail calculated editions with a hand change inside a source beam may instead fail replay with the generic reproduction error; none of the user's editions are of that kind (checked 2026-10-17 on a copy of the complete library). #383 also made system breaks keep short phrases whole; #384 makes that rule opt-in (phraseSystemBreaks: 'short-phrase-v1'), which recipe factories never add, so saved approved-v3 and calculated-hands-v1 recipes reproduce their 3cf3a17 pages, and drops 'Choose Calculate fingers' from the incompatible-recipe message. #385 gives active Bach Var. 1 m. 32's bach-var1-551 to the right hand. #386 makes Schumann No. 13 engrave with 0 violations through approvedProductionIsoOptions(), which now carries performingHandPolicy 'source-owned-v1', openingHeadMask 'ordinary-v1' and phraseSystemBreaks 'short-phrase-v1' as approved policy (sourceOwnedProductionIsoOptions is retired); validateScoreRenderingRecipe refuses saved approved-v3 and calculated-hands-v1 recipes without those keys with 'This saved engraving does not match the current shared engraving policy. Open the score again to engrave it afresh.' Retained v1, v2 and no14-recovery recipes are unchanged. The viewer engraves such editions again from their content with approvedProductionIsoOptions() and default tokens. Merged without GitHub review records."
   },
   "previousDependencyReviews": [
     {
