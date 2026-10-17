@@ -41,7 +41,7 @@ export interface PersonalMemorySessionOptions {
 /** A staged consolidation names a score whose saved edition must be engraved
  * again before its choices can be read. The request stays pending, unchanged. */
 export class ConsolidationDeferred extends Error {
- constructor(readonly entryIds:readonly string[]){super('A saved fingering update waits until its score is opened once with the current engraving. Your choices are unchanged.');this.name='ConsolidationDeferred';}
+ constructor(readonly entryIds:readonly string[]){super('A saved fingering update was not applied: its score’s saved engraving is out of date and is engraved again when the score is opened. Your choices are unchanged.');this.name='ConsolidationDeferred';}
 }
 export interface PersonalMemoryAccepted {
  intent:CapturedPersonalMemoryIntent;personal:PersonalState;memory:PersonalFingeringMemory;saved:Promise<void>;

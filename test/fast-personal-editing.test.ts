@@ -1,6 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {undrawableHandOwners} from '../src/personal-presentation';
-import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext,runInContext} from 'node:vm';
 import {scoreCapabilities} from '../src/score-capabilities';
 import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {importPackage} from '../src/package';import {initialPersonal,readPersonal,viewportFit,personalStorageName} from '../src/state';
@@ -8,6 +8,8 @@ import {assigned,effectiveAssignmentKey} from '../src/personal-assignments';impo
 import {PersonalMemorySession,rawMemoryPersonal,personalMemoryDocument} from '../src/personal-memory-session';
 import {browserAssistanceStore,type AssistanceStore} from '../src/durable-assistance-store';
 import {withResolvedMemory} from '../src/personal-assistance';
+import {handFor} from '../src/personal-assignments';
+import {HandChoiceQueue,abandonedChoicesText,waitingOutcomeText} from '../src/hand-editing-wait';
 const source=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),body=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
@@ -24,7 +26,9 @@ async function fixture(){
  const context:any={structuredClone,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}async project(personal:any){return {...p,projection:personal.assignments};}},personalStorageName,personalMemory,memoryInput,rawMemoryPersonal,
   resolveMemory:(owner:any)=>withResolvedMemory(memoryInput(owner),personalMemory.resolve(memoryInput(owner)),personalMemory.memory.revision),effectiveAssignmentKey,
-  adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){}};
+  adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){},
+  handFor,HandChoiceQueue,abandonedChoicesText,waitingOutcomeText,app:{querySelector:()=>null},
+  HandPreparationStatus:class{queued:any[]=[];closed=false;stage(){}queue(list:any[]){this.queued=[...list];}show(){}close(){this.closed=true;}}};
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
  runInNewContext(body('async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
@@ -72,4 +76,36 @@ test('a late navigation projection cannot replace another application session’
  assert.equal(durable.assignments?.choices[firstOwner].hand,'RH');assert.equal(durable.assignments?.choices[otherOwner].finger,5);
  assert.equal(durable.assignments?.choices[otherOwner].intent?.finger?.decisionId,'other-window-choice');
  assert.equal(durable.editContactId,f.units[0].contactId);
+});
+
+/** A score whose engraver is still settling for hand editing. */
+function preparing(f:Awaited<ReturnType<typeof fixture>>){
+ const gate=deferred();let pending:Promise<boolean>|undefined=gate.promise.then(ready=>{pending=undefined;return ready;});
+ Object.assign(f.editor.session,{handChoiceCheck:()=>pending,preparationStage:'layout',onPreparationStage:()=>()=>{}});
+ return {ready(value=true){gate.resolve(value);}};
+}
+const handWait=(f:Awaited<ReturnType<typeof fixture>>)=>runInContext('handWait',f.context);
+const settle=async(f:Awaited<ReturnType<typeof fixture>>,count=1)=>{for(let i=0;i<200&&f.messages.length<count;i++)await new Promise(r=>setTimeout(r,1));};
+test('hand choices pressed while hand editing is prepared are shown waiting, then applied in order to their own notes',async()=>{
+ const f=await fixture(),prep=preparing(f),[a,b]=[f.units[0],f.units[1]];
+ await f.context.saveHandChoice('RH');f.context.selection=b;await f.context.saveHandChoice('LH');
+ assert.equal(f.target.personal.assignments,undefined,'nothing is saved while it waits');
+ assert.deepEqual(handWait(f).status.queued.map((c:any)=>[c.key,c.hand]),[[a.ownerIds[0],'RH'],[b.ownerIds[0],'LH']]);
+ f.disk.resolve();prep.ready();await settle(f);
+ assert.equal(handFor(p,f.target.personal,a.ownerIds[0]),'RH');assert.equal(handFor(p,f.target.personal,b.ownerIds[0]),'LH');
+ assert.match(f.messages.at(-1)!,/^Hand editing is ready\. 2 hand choices applied in bar/);assert.equal(f.context.selection,b,'the selection stays where the player left it');
+ assert.equal(handWait(f),undefined);
+});
+test('waiting hand choices are said to be not applied when the score closes first, and nothing is saved for them',async()=>{
+ const f=await fixture(),prep=preparing(f);
+ await f.context.saveHandChoice('RH');const status=handWait(f).status;f.context.current={package:p,personal:initialPersonal(p)};
+ f.disk.resolve();prep.ready();await settle(f);
+ assert.match(f.messages.at(-1)!,/^Right hand for the note in bar \d+ was not applied: the score was closed or changed before hand editing was ready\. Nothing was saved for it\.$/);
+ assert.equal(f.target.personal.assignments,undefined);assert.equal(status.closed,true);
+});
+test('leaving the score says at once that its waiting choices were not applied',async()=>{
+ const f=await fixture(),prep=preparing(f);
+ await f.context.saveHandChoice('LH');f.context.leaveHandEditingWait();
+ assert.equal(f.messages.length,1);assert.match(f.messages[0],/^Left hand for the note in bar \d+ was not applied/);
+ f.disk.resolve();prep.ready();await new Promise(r=>setTimeout(r,20));assert.equal(f.messages.length,1,'said once');assert.equal(f.target.personal.assignments,undefined);
 });

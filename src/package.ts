@@ -265,9 +265,10 @@ export function importPackage(bytes:Uint8Array,options:PackageReadOptions={}):Pr
  * checked. Unlike importPackage it does not replay a calculated edition's
  * pages, so the result is for re-engraving only and is never displayed. */
 export function readEditionContent(bytes:Uint8Array,options:PackageReadOptions={}):Promise<ScorePackage>{return admitPackage(bytes,options,true);}
-/** A saved edition the reader refused only because its pages no longer
- * reproduce under the pinned engraving (an earlier shared engraving policy,
- * say) is engraved again when the player opens it. Work that walks other
+/** A saved edition the reader refused (most often because its pages no
+ * longer reproduce under the pinned engraving: an earlier shared engraving
+ * policy, say) is engraved again when the player opens it, as long as its
+ * content still reads with every member hash, source, seat and hand check. Work that walks other
  * scores than the one asked for must not fail because of it. Returns the
  * edition's content when `refusal` is such a refusal: a linked edition whose
  * members, source and hands still read. Anything else (damaged, foreign,

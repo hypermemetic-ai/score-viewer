@@ -36,15 +36,24 @@ export function waitingChoicesText(choices:readonly WaitingHandChoice[]):string 
  if(choices.length===1)return `${handName(choices[0].hand)} for the note in ${bars(choices)} applies once this is ready.`;
  return `${choices.length} hand choices (${bars(choices)}) apply once this is ready.`;
 }
-/** Said when waiting choices land. */
-export function appliedChoicesText(choices:readonly WaitingHandChoice[]):string {
- if(choices.length===1)return `Hand editing is ready. ${handName(choices[0].hand)} applied to the note in ${bars(choices)}.`;
- return `Hand editing is ready. ${choices.length} hand choices applied in ${bars(choices)}.`;
+/** A reason sentence read as the clause after a colon. */
+const clause=(reason:string)=>reason.trim().replace(/[.!?]$/,'').replace(/^[A-Z](?=[a-z])/,c=>c.toLowerCase());
+const notes=(choices:readonly WaitingHandChoice[])=>choices.length===1?`${handName(choices[0].hand)} for the note in ${bars(choices)}`:`${choices.length} hand choices (${bars(choices)})`;
+/** What became of the waiting choices once hand editing is ready: applied,
+ * kept as they were because the engraver cannot draw that hand yet, or not
+ * applied with the reason. */
+export function waitingOutcomeText(outcome:{applied:readonly WaitingHandChoice[];kept?:readonly WaitingHandChoice[];unapplied?:readonly WaitingHandChoice[];reason?:string}):string {
+ const {applied,kept=[],unapplied=[]}=outcome,parts=['Hand editing is ready.'];
+ if(applied.length)parts.push(applied.length===1?`${handName(applied[0].hand)} applied to the note in ${bars(applied)}.`:`${applied.length} hand choices applied in ${bars(applied)}.`);
+ if(kept.length)parts.push(kept.length===1?`The note in ${bars(kept)} keeps the hand it had: that hand can’t be drawn on the page yet.`:`The notes in ${bars(kept)} keep the hands they had: those hands can’t be drawn on the page yet.`);
+ if(unapplied.length)parts.push(`${notes(unapplied)} ${unapplied.length===1?'was':'were'} not applied${outcome.reason?`: ${clause(outcome.reason)}`:''}.`);
+ return parts.join(' ');
 }
-/** Said when the score closed before its waiting choices could land. */
-export function abandonedChoicesText(choices:readonly WaitingHandChoice[]):string {
- if(choices.length===1)return `The hand choice for ${bars(choices)} was not applied: the score closed before hand editing was ready. Nothing was saved for it.`;
- return `${choices.length} hand choices (${bars(choices)}) were not applied: the score closed before hand editing was ready. Nothing was saved for them.`;
+/** Said when waiting choices land. */
+export function appliedChoicesText(choices:readonly WaitingHandChoice[]):string {return waitingOutcomeText({applied:choices});}
+/** Said when the score was closed or changed before its waiting choices could land. */
+export function abandonedChoicesText(choices:readonly WaitingHandChoice[],reason='the score was closed or changed before hand editing was ready'):string {
+ return `${notes(choices)} ${choices.length===1?'was':'were'} not applied: ${clause(reason)}. Nothing was saved for ${choices.length===1?'it':'them'}.`;
 }
 
 /**
@@ -55,19 +64,22 @@ export function abandonedChoicesText(choices:readonly WaitingHandChoice[]):strin
 export class HandPreparationStatus {
  readonly loading=new LoadingProgress('Preparing hand editing',['hand-editing'],{compact:true});
  private queued='';
+ /** Only this status's own panels: another score's wait keeps its own. */
+ private readonly asides=new Set<HTMLElement>();
  constructor(stage?:PreparationStage){this.loading.step('hand-editing',stage?stageDetail(stage):'');}
  /** The worker reports each stage once, so pages are not counted here. */
  stage(stage:PreparationStage){this.loading.detail(stageDetail(stage));}
  queue(choices:readonly WaitingHandChoice[]){
   this.queued=waitingChoicesText(choices);
-  for(const line of document.querySelectorAll<HTMLElement>('[data-hand-preparation] .viewer-hand-preparation-queue')){line.textContent=this.queued;line.hidden=!this.queued;}
+  for(const aside of this.asides){const line=aside.querySelector<HTMLElement>('.viewer-hand-preparation-queue');if(line){line.textContent=this.queued;line.hidden=!this.queued;}}
  }
  markup(){return `${this.loading.markup()}<p class="viewer-hand-preparation-queue"${this.queued?'':' hidden'}>${this.queued.replaceAll('&','&amp;').replaceAll('<','&lt;')}</p>`;}
  /** Show the status on a reader surface; a redrawn surface is given it again. */
  show(surface:Element|null){
   if(!surface||surface.querySelector(':scope > [data-hand-preparation]'))return;
   const aside=document.createElement('aside');aside.className='viewer-hand-preparation';aside.dataset.handPreparation='';aside.innerHTML=this.markup();
-  surface.append(aside);this.loading.attach(aside);
+  for(const old of this.asides)if(!old.isConnected)this.asides.delete(old);
+  surface.append(aside);this.asides.add(aside);this.loading.attach(aside);
  }
- close(){this.loading.stop();for(const aside of document.querySelectorAll('[data-hand-preparation]'))aside.remove();}
+ close(){this.loading.stop();for(const aside of this.asides)aside.remove();this.asides.clear();}
 }
