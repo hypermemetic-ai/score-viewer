@@ -363,6 +363,9 @@ async function keepDrawableHands(target:NonNullable<typeof current>,attempted:Pe
 }
 async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat){
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
+ // Actions that can give a note a personal hand are refused on a score whose own engraving is refused.
+ if(['hand','reference','calculated','undoRestore'].includes(action.kind)&&scoreCapabilities(target.package).pianoPreparation){
+  if(!await personalEditor(target).session.ensureHandChoicesDrawable()||current!==target)throw Error('Another score opened before this choice was saved.');}
  const receipt=personalMemory.accept(memoryInput(target),action);
  await presentPersonalChange(target,receipt.personal,receipt.saved,nextSeat);return receipt;
 }
@@ -1122,7 +1125,10 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  if(!current||!selection)return;
  const chosenScore=current,chosenSeat=selection;
  // The choice belongs to the note it was made on, even if the check below takes time.
- if(choice.hand&&scoreCapabilities(chosenScore.package).pianoPreparation){await personalEditor(chosenScore).session.ensureHandChoicesDrawable();if(current!==chosenScore)return;}
+ if(choice.hand&&scoreCapabilities(chosenScore.package).pianoPreparation){
+  // One hand choice waits for the engraving to settle; presses made meanwhile are not queued behind it.
+  const session=personalEditor(chosenScore).session;if(session.checkingHandChoices)return;
+  if(!await session.ensureHandChoicesDrawable()||current!==chosenScore)return;}
  const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=units.findIndex(s=>s.contactId===seat.contactId),nextSeat=advance?units[Math.min(units.length-1,index+1)]??seat:seat;
  const decisionId=crypto.randomUUID(),authoredAt=new Date().toISOString(),ownerId=seat.ownerIds[0];
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');

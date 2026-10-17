@@ -134,7 +134,9 @@ export function undrawableHandOwners(error:unknown):readonly string[]|undefined 
 }
 /** At most one background preparation runs; a newer one, or opening another score, stops it. */
 let prefetching:AbortController|undefined;
-export function cancelPersonalPrefetch(){prefetching?.abort();prefetching=undefined;}
+/** Edit-time engraving checks belong to the open score; opening another stops them. */
+let scoreWork:AbortController|undefined;
+export function cancelPersonalPrefetch(){prefetching?.abort();prefetching=undefined;scoreWork?.abort();scoreWork=undefined;}
 export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;cacheWriteDelayMs?:number}
 const CANNOT_DRAW="This score can't be displayed yet: the viewer can't draw its pages.";
 /** A refusal of the score's own engraving, rather than of a hand choice. A
@@ -191,25 +193,31 @@ export class PersonalPresentationSession {
   * except that a score whose own engraving is refused is remembered as such. */
  prefetch():void {
   if(this.prefetched||this.baseline||!this.worker?.available||!this.base.renderingRecipe||!this.base.sourceSha256)return;
-  this.prefetched=true;cancelPersonalPrefetch();
+  this.prefetched=true;prefetching?.abort();
   const controller=new AbortController();prefetching=controller;
   void this.use((core,e)=>core.warm(e,true),{signal:controller.signal}).then(settled=>{if(settled)this.baseline??=true;else this.prefetched=false;},error=>{
    this.prefetched=false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});
   }).finally(()=>{if(prefetching===controller)prefetching=undefined;});
  }
- private checking?:Promise<void>;
+ private checking?:Promise<boolean>;
+ get checkingHandChoices(){return !!this.checking;}
  /** Before a hand choice is saved: a score whose own engraving is refused
   * takes no hand choices, so a saved choice can never stop it opening. The
   * check settles the engraving where hand drawing runs (the worker, or
   * cooperatively here), which the first drawn choice needs anyway. */
- async ensureHandChoicesDrawable():Promise<void>{
+ async ensureHandChoicesDrawable():Promise<boolean>{
+  let checked=true;
   if(this.baseline===undefined&&this.base.renderingRecipe&&this.base.sourceSha256)
-   await (this.checking??=this.settleBaseline().finally(()=>{this.checking=undefined;}));
+   checked=await (this.checking??=this.settleBaseline().finally(()=>{this.checking=undefined;}));
   if(this.baseline instanceof Error)throw this.baseline;
+  // False when opening another score stopped the check: nothing was settled.
+  return checked;
  }
- private async settleBaseline(){
-  try{if(await this.use((core,e)=>core.warm(e),{}))this.baseline??=true;}
-  catch(error){if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});else if(!(error instanceof HandPresentationError))throw error;}
+ private async settleBaseline():Promise<boolean>{
+  // Opening another score stops this check; an unfinished check settles nothing.
+  try{if(await this.use((core,e)=>core.warm(e),{signal:(scoreWork??=new AbortController()).signal}))this.baseline??=true;}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')return false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});else if(!(error instanceof HandPresentationError))throw error;}
+  return true;
  }
  /** A projection was refused. When the score's own engraving is what fails,
   * say so: no hand choice is at fault, so none is returned to the score. */

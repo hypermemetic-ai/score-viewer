@@ -8,7 +8,7 @@ import {createProjectionHost,createHostedCore,type HostedProjectionCore} from '.
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,type ProjectionWorkerLike} from '../src/personal-projection-client';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse} from '../src/personal-projection-protocol';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
-import {PersonalPresentationSession,undrawableHandOwners} from '../src/personal-presentation';
+import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -198,7 +198,12 @@ test('a score whose own engraving is refused says so instead of blaming a hand c
  // A hand choice is refused before it is saved.
  await assert.rejects(new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache:null}).ensureHandChoicesDrawable(),/can't be displayed yet/);
  const drawable=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore).spawn),cache:null});
- await drawable.ensureHandChoicesDrawable();await drawable.ensureHandChoicesDrawable();
+ assert.equal(await drawable.ensureHandChoicesDrawable(),true);assert.equal(await drawable.ensureHandChoicesDrawable(),true);
+ // Opening another score stops a running check; it settles nothing and admits no choice.
+ const stalled=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(()=>({warmAsync:()=>new Promise(()=>{}),async projectAsync(){throw refuse();}})).spawn),cache:null});
+ const stopped=stalled.ensureHandChoicesDrawable();await new Promise(r=>setTimeout(r,20));
+ assert.equal(stalled.checkingHandChoices,true);cancelPersonalPrefetch();
+ assert.equal(await stopped,false);assert.equal(stalled.checkingHandChoices,false);
  const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!;
  await assert.rejects(session.project(assigned(p,initialPersonal(p),seat,{hand:'RH'})),
   (e:unknown)=>e instanceof Error&&/can't be displayed yet/.test(e.message)&&undrawableHandOwners(e)===undefined);
