@@ -52,7 +52,7 @@ import {practicePercent,requirePracticeHands} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
 import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
 import type {ReadingExecution} from './reading-execution';
-import {hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
+import {useReadingAdmissionReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
@@ -85,7 +85,10 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,undrawableHandOwners} from './personal-presentation';
+import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
+import {DerivedFileCache} from './derived-file-cache';
+import {readingAdmissionReceipt} from './reading-package';
+import {isTauri} from '@tauri-apps/api/core';
 import {PracticeClock} from './practice-clock';
 import {practiceAudio} from './host';
 import {readMidiMapping,readMidiBindings,type MidiBindings,type MidiMapping,type MidiCC,type MidiNote} from './midi';
@@ -101,6 +104,14 @@ let selection:Seat|undefined,selectionPitchToggle=false;let editNavigation:'note
 let transposeControls:ManualTempoControls|undefined;const pitchInput=new PitchInputEpoch();
 // This reader owns bounded exact-byte admission across revisits; library and Worker receivers own separate sessions.
 const readerAdmission=new PackageAdmissionSession({maxEntries:2,maxRetainedBytes:64*1024*1024});
+// Derived results this build already made are kept in bounded managed slots:
+// native builds only. The browser's local storage is too small for pages, and
+// a development server's source can change under one identity.
+if(isTauri()&&!import.meta.env.DEV){
+ const derived=new DerivedFileCache(host);
+ usePersonalProjectionCache(derived);
+ useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
+}
 type ReadingJob=NonNullable<typeof job>;
 interface ReadingOperation {
  controller:AbortController;running:ReadingJob;dialog?:HTMLDialogElement;
@@ -146,7 +157,7 @@ function beginReading(entryId:string,loading?:LoadingProgress){
  const carried=carriedLoading;carriedLoading=undefined;
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
  libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
- job?.cancel();
+ job?.cancel();cancelPersonalPrefetch();
  loading??=carried??openingLoading(entryId);
  // A surface carried past its save stays uncancellable: the new edition is
  // already in the library, so Esc must not leave the reader on the old one.
@@ -352,6 +363,9 @@ async function keepDrawableHands(target:NonNullable<typeof current>,attempted:Pe
 }
 async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat){
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
+ // Actions that can give a note a personal hand are refused on a score whose own engraving is refused.
+ if(['hand','reference','calculated','undoRestore'].includes(action.kind)&&scoreCapabilities(target.package).pianoPreparation){
+  const check=personalEditor(target).session.handChoiceCheck();if(check&&(!await check||current!==target))throw cancelledReading();}
  const receipt=personalMemory.accept(memoryInput(target),action);
  await presentPersonalChange(target,receipt.personal,receipt.saved,nextSeat);return receipt;
 }
@@ -380,7 +394,7 @@ let resolvedMain=mainControls,resolvedLocal=preferences.freeViewControls,resolve
 function syncControls(){const inPractice=practice instanceof PracticeView?'piano':practice?'manual':selection?'editor':'reader';if(resolvedMain===mainControls&&resolvedLocal===preferences.freeViewControls&&resolvedPractice===inPractice)return;const next=effectiveControls();resolvedMain=mainControls;resolvedLocal=preferences.freeViewControls;resolvedPractice=inPractice;if(JSON.stringify(next)===JSON.stringify(controls.bindings))return;const fingers=controls.fingersHeld;controls.configure(next);if(fingers)refreshPresentation();}
 function resetInput(){practice?.cancelTempoHold();const keys=input.clear(),pedal=controls.clear();syncControls();if(keys||pedal)refreshPresentation();}
 function focusSelection(){if(selection&&!dialog)app.querySelector<SVGTextElement>(`[data-viewer-seat="${selection.id}"]`)?.focus();}
-function selectFinger(step?:number){editSequence.reset();if(!current)return;requirePianoCapability(current.package,'pianoPreparation');const shownPackage=readerPackage(),units=editUnits(shownPackage),index=selection?units.findIndex(s=>s.contactId===selection!.contactId):-1;if(!selection){selectionPitchToggle=false;editNavigation='notes';resetInput();}selection=step===undefined?selectionOnPage(shownPackage,selection?.contactId??current.personal.editContactId,current.personal.view.page):units[moveSelection(index,step,units.length)];if(!selection){notify('No editable notes on this page.');return;}current.personal.editContactId=selection.contactId;const shown=viewportFit(innerWidth,innerHeight,effectiveView(current.personal.view),readerPackage().pages.length).pages;if(!shown.includes(selection.page))current.personal.view.page=selection.page;savePersonalQuietly();renderPages();renderToolbar();focusSelection();}
+function selectFinger(step?:number){editSequence.reset();if(!current)return;requirePianoCapability(current.package,'pianoPreparation');const shownPackage=readerPackage(),units=editUnits(shownPackage),index=selection?units.findIndex(s=>s.contactId===selection!.contactId):-1;if(!selection){selectionPitchToggle=false;editNavigation='notes';resetInput();personalEditor(current).session.prefetch();}selection=step===undefined?selectionOnPage(shownPackage,selection?.contactId??current.personal.editContactId,current.personal.view.page):units[moveSelection(index,step,units.length)];if(!selection){notify('No editable notes on this page.');return;}current.personal.editContactId=selection.contactId;const shown=viewportFit(innerWidth,innerHeight,effectiveView(current.personal.view),readerPackage().pages.length).pages;if(!shown.includes(selection.page))current.personal.view.page=selection.page;savePersonalQuietly();renderPages();renderToolbar();focusSelection();}
 function selectFingerSystem(direction:-1|1){
  if(!current||!selection)return;
  const next=systemSelection(readerPackage(),selection,direction);
@@ -638,7 +652,10 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(scoreCapabilities(next.package).pianoPreparation){next.personal=await personalMemory.loadPersonalCurrent(next.entry,next.package,async()=>rawMemoryPersonal(next.personal));check();next.personal=resolveMemory(next);}
  // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
  let keptHands=0;
- const nextEditor=personalEditor(next);await nextEditor.session.warm(readingExecution(op));check();nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
+ // Opening draws only what this score shows: its own pages, or the saved
+ // hand choices' projection. With a projection worker the engraver settles
+ // for editing in the worker after opening; without one it settles here, as before.
+ cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
@@ -651,6 +668,8 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
+ // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
+ if(!context&&scoreCapabilities(next.package).pianoPreparation)personalEditor(next).session.prefetch();
  if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
 }
@@ -1106,7 +1125,13 @@ function onMidiNote(event:MidiNote){
 
 async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},advance:boolean){
  if(!current||!selection)return;
- const target=current,seat=selection,units=editUnits(readerPackage()),index=units.findIndex(s=>s.contactId===seat.contactId),nextSeat=advance?units[Math.min(units.length-1,index+1)]??seat:seat;
+ const chosenScore=current,chosenSeat=selection;
+ // The choice belongs to the note it was made on, even if the check below takes time.
+ if(choice.hand&&scoreCapabilities(chosenScore.package).pianoPreparation){
+  // One hand choice waits for the engraving to settle; presses made meanwhile are not queued behind it.
+  const session=personalEditor(chosenScore).session;if(session.checkingHandChoices)return;
+  const check=session.handChoiceCheck();if(check&&(!await check||current!==chosenScore))return;}
+ const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=units.findIndex(s=>s.contactId===seat.contactId),nextSeat=advance?units[Math.min(units.length-1,index+1)]??seat:seat;
  const decisionId=crypto.randomUUID(),authoredAt=new Date().toISOString(),ownerId=seat.ownerIds[0];
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');
  const action:PersonalMemoryAction=choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};

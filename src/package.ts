@@ -1,4 +1,4 @@
-import {admitReadingContent,type ReadingDescriptor,type ReadingContent} from './reading-package';
+import {admitReadingContent,type ReadingDescriptor,type ReadingContent,type ReadingAdmissionReceipt} from './reading-package';
 import {selectReadingNotation,admitDualReadingContentAsync} from './dual-reading-package';
 import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
 import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
@@ -266,6 +266,11 @@ export function importPackage(bytes:Uint8Array,options:PackageReadOptions={}):Pr
  * pages, so the result is for re-engraving only and is never displayed. */
 export function readEditionContent(bytes:Uint8Array,options:PackageReadOptions={}):Promise<ScorePackage>{return admitPackage(bytes,options,true);}
 export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
+/** Receipts for reading archives this build already replayed, keyed by
+ * archive digest. Derived only: a missing or refused receipt replays again. */
+export interface ReadingAdmissionReceipts {get(archiveSha256:string):Promise<ReadingAdmissionReceipt|undefined>;put(archiveSha256:string,receipt:ReadingAdmissionReceipt):void}
+let readingReceipts:ReadingAdmissionReceipts|undefined;
+export function useReadingAdmissionReceipts(receipts:ReadingAdmissionReceipts|undefined){readingReceipts=receipts;}
 async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentOnly:boolean):Promise<ScorePackage>{
  options={...options};const execution=options.execution?capturedReadingExecution(options.execution):undefined;checkReadingExecution(execution);
  if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;const members=new Set<string>();
@@ -276,6 +281,8 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  // Unzip and this owned digest capture happen before the first member await.
  // A later caller mutation cannot bind different bytes to admitted dual ink.
  const dualArchiveSha256=m.version===3&&m.reading?.version==='instrument-reading-package-v2'?await hashBytes(new Uint8Array(bytes)):undefined;
+ const receipts=m.version===3&&m.reading?.version==='instrument-reading-package-v1'?readingReceipts:undefined,
+  receiptArchiveSha256=receipts?await hashBytes(new Uint8Array(bytes)):undefined;
  checkReadingExecution(execution);if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
  for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);checkReadingExecution(execution);}
  let referenceMidi:Uint8Array|undefined;
@@ -283,7 +290,8 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  if(m.semanticSha256!==m.files['score.json']||m.revision!==m.semanticSha256)fail('Semantic revision mismatch');
  if(m.version===3){
   if(options.keyboardLayout)fail('This score has no piano keyboard presentation.');
-  const admitted=execution&&m.reading?.version==='instrument-reading-package-v2'?await admitDualReadingContentAsync(m,files,execution):admitReadingContent(m,files),{score,pages,reading}=admitted;
+  const receipt=receiptArchiveSha256?await receipts!.get(receiptArchiveSha256).catch(()=>undefined):undefined;checkReadingExecution(execution);
+  const admitted=execution&&m.reading?.version==='instrument-reading-package-v2'?await admitDualReadingContentAsync(m,files,execution):admitReadingContent(m,files,receipt),{score,pages,reading}=admitted;
   if('manifest' in admitted)m=admitted.manifest as Manifest;checkReadingExecution(execution);
   function* passiveChecks():Generator<PreparationStage,void,void>{
    if(reading.dual){for(const view of Object.values(reading.dual.views))for(const[page,svg]of view.pages.entries()){passiveSvg(svg,[],page);yield 'paint';}}
@@ -292,7 +300,8 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   }
   if(execution)await drainReadingChecks(passiveChecks(),execution);else for(const _ of passiveChecks()){}
   freezeSource(score);
-  const archiveSha256=dualArchiveSha256??await hashBytes(bytes);
+  const archiveSha256=dualArchiveSha256??receiptArchiveSha256??await hashBytes(bytes);
+  if(receiptArchiveSha256&&!receipt)receipts!.put(receiptArchiveSha256,{version:'reading-admission-receipt-v1',geometryEvidence:reading.geometryEvidence});
   checkReadingExecution(execution);if(reading.dual)admittedDualArchives.set(m,{score,sha256:archiveSha256});
   return {manifest:m,score,seats:[],pages,files,reading,archiveSha256,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};

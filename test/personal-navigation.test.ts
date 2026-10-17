@@ -13,7 +13,7 @@ function fixture(basePages=2,projectedPages=basePages){
  const projected={...p,pages:Array.from({length:projectedPages},()=>'<svg/>'),seats:[seats[0],{...seats[1],id:'projected-b',contactId:'projected-contact-b',page:projectedPages-1}]},writes:any[]=[],frames:any[]=[],errors:any[]=[];let disk:any=structuredClone(target.personal),persist=Promise.resolve(),project=async(_s:any)=>projected;
  const context:any={structuredClone,PersonalEditQueue,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),
   personalBinding:()=>undefined,initialPersonal:()=>target.personal,readPersonalAssignments:(v:any)=>v,isPitchedEvent:()=>true,
-  PersonalPresentationSession:class{project(s:any){return project(structuredClone(s));}},
+  PersonalPresentationSession:class{handChoiceCheck(){return undefined;}project(s:any){return project(structuredClone(s));}},
   personalStorageName:()=> 'source-journal',personalContext:async(owner:any)=>({entry:owner.entry,p:owner.package,file:'source-journal'}),
   enqueue(fn:()=>Promise<any>){const pending=persist.then(fn);persist=pending.then(()=>{},()=>{});return pending;},
   writeJson:async(_file:string,s:any)=>{disk=structuredClone(s);writes.push(structuredClone(s));},loadPersonalJournal:async()=>structuredClone(disk),host:{},

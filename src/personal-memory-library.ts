@@ -3,6 +3,14 @@ import {loadPersonalJournal} from './personal-journal';
 import {scoreCapabilities} from './score-capabilities';
 import {personalStorageName,type Entry} from './state';
 import type {MemoryScoreInput} from './personal-fingering-memory';
+import {strFromU8,unzipSync} from 'fflate';
+
+/** A musical reading package (manifest version 3) never has piano preparation.
+ * Its manifest alone says so, without replaying its engraving to find out. */
+export function readingOnlyArchive(bytes:Uint8Array):boolean {
+ try{const manifest=unzipSync(bytes,{filter:f=>f.name==='manifest.json'&&f.originalSize<=1_000_000})['manifest.json'];
+  return !!manifest&&JSON.parse(strFromU8(manifest))?.version===3;}catch{return false;}
+}
 
 /** Captures only active archives and their declared current personal journals.
  * Historical packages, undo buffers and calculated layers are never new donors. */
@@ -17,6 +25,7 @@ export class PersonalMemoryLibrary {
   const inputs:MemoryScoreInput[]=[];
   for(const entry of [...this.entries()].sort((a,b)=>a.id.localeCompare(b.id))){
    const bytes=await read(entry.file);if(!bytes)throw Error('An active score is missing; personal fingering indexing has not changed your choices.');
+   if(readingOnlyArchive(bytes))continue;
    const archive=await this.admit(bytes);if(!scoreCapabilities(archive).pianoPreparation)continue;
    const presentations=archive.availablePresentations?.length?await Promise.all(archive.availablePresentations.map(layout=>selectPresentation(archive,layout))):[archive];
    for(const p of presentations){const personal=await loadPersonalJournal({read},entry,p);inputs.push({entryId:entry.id,importedAt:entry.importedAt,p,personal});}

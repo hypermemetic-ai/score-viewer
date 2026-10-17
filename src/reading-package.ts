@@ -46,10 +46,21 @@ function parse(files:Record<string,Uint8Array>,name:string):unknown {
   catch{throw Error('Invalid reading JSON: '+name);}
 }
 
+/** Proof that this viewer build replayed one exact reading archive through the
+ * shared engine and found it equal. It carries only the derived geometry
+ * evidence the archive does not store; it is never written into a package. */
+export interface ReadingAdmissionReceipt {version:'reading-admission-receipt-v1';geometryEvidence:ReadingContent['geometryEvidence']}
+export function readingAdmissionReceipt(value:unknown):ReadingAdmissionReceipt {
+  const r=value as ReadingAdmissionReceipt;
+  if(!object(r)||r.version!=='reading-admission-receipt-v1'||Object.keys(r).length!==2||!object(r.geometryEvidence)||r.geometryEvidence.ok!==true||
+    !Array.isArray(r.geometryEvidence.violations)||r.geometryEvidence.violations.length)throw Error('Invalid reading admission receipt');
+  return r;
+}
+
 /** Canonical musical admission does not grant physical practice capabilities.
  * Pages and ownership replay through the exact shared engine authority before
  * the application exposes the archive or writes any library pointer. */
-export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):{
+export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,receipt?:ReadingAdmissionReceipt):{
   score:QuantizedGridScore;pages:string[];reading:ReadingContent
 } {
   const d=m.reading;
@@ -69,6 +80,14 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>):
   if(score.id!==m.scoreId||score.title!==m.metadata.title||score.composer!==m.metadata.composer||
     JSON.stringify(score.readingPolicy)!==JSON.stringify(d.policy)||strFromU8(files['seats.json']??strToU8('null'))!=='[]')
     throw Error('Reading source identity or policy differs.');
+  if(receipt){
+    // This build already replayed exactly these archive bytes: owners, layout
+    // and pages are the archive's own members, bound by its digest.
+    const owners=parse(files,d.owners) as ReadingOwner[],layout=parse(files,d.layout) as ReadingContent['layoutMetadata'];
+    if(!Array.isArray(owners)||owners.length!==score.notes.length||!Array.isArray(layout))throw Error('Reading event ownership or geometry differs from its musical source.');
+    const pages=m.pages.map(name=>{if(!files[name])throw Error('Missing reading page: '+name);return strFromU8(files[name]);});
+    return {score,pages,reading:{owners,layoutMetadata:layout,geometryEvidence:receipt.geometryEvidence}};
+  }
   const result=checkedPreparation(score,d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
   if(result.engineId!==d.engineId)throw Error('Reading preparation authority differs from its musical source.');
   if(result.pages.length!==m.pages.length||JSON.stringify(result.owners)!==JSON.stringify(owners)||
