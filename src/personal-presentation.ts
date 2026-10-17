@@ -1,4 +1,4 @@
-import {createPersonalHandProjection,HandPresentationError,type PersonalOwnerHand} from '../vendor/iso-notation/src/score-presentation';
+import {createPersonalHandProjection,HandPresentationError,type PersonalOwnerHand,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {calculatedRecipeForRequest} from './calculated-hand-edition';
 import {PERSONAL_ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from './annotation-ink-policy';
@@ -168,6 +168,12 @@ export class PersonalPresentationSession {
  /** Without a projection worker the engraving settles cooperatively while the
   * score opens, as before, so a first hand choice never freezes the reader. */
  get settlesOnOpen(){return !this.worker?.available;}
+ /** The engraver's latest stage while it settles for hand editing, so a
+  * waiting hand choice can say what is happening rather than wait silently. */
+ preparationStage?:PreparationStage;
+ private stageListeners=new Set<(stage:PreparationStage)=>void>();
+ onPreparationStage(listener:(stage:PreparationStage)=>void):()=>void{this.stageListeners.add(listener);return ()=>{this.stageListeners.delete(listener);};}
+ private readonly noteStage=(stage:PreparationStage)=>{this.preparationStage=stage;for(const listener of this.stageListeners)try{listener(stage);}catch{/* a listener never stops the engraving */}};
  private prepare(){return this.preparation??=capture(this.base,this.worker).catch(error=>{this.preparation=undefined;throw error;});}
  private async use<V>(action:(core:Core,execution?:ReadingExecution)=>V|Promise<V>,execution?:ReadingExecution):Promise<V>{
   const request=await this.prepare();checkReadingExecution(execution);
@@ -195,7 +201,7 @@ export class PersonalPresentationSession {
   if(this.prefetched||this.baseline||!this.worker?.available||!this.base.renderingRecipe||!this.base.sourceSha256)return;
   this.prefetched=true;prefetching?.abort();
   const controller=new AbortController();prefetching=controller;
-  void this.use((core,e)=>core.warm(e,true),{signal:controller.signal}).then(settled=>{if(settled)this.baseline??=true;else this.prefetched=false;},error=>{
+  void this.use((core,e)=>core.warm(e,true),{signal:controller.signal,onCheckpoint:this.noteStage}).then(settled=>{if(settled)this.baseline??=true;else this.prefetched=false;},error=>{
    this.prefetched=false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});
   }).finally(()=>{if(prefetching===controller)prefetching=undefined;});
  }
@@ -219,7 +225,7 @@ export class PersonalPresentationSession {
  }
  private async settleBaseline():Promise<boolean>{
   // Opening another score stops this check; an unfinished check settles nothing.
-  try{if(await this.use((core,e)=>core.warm(e),{signal:(scoreWork??=new AbortController()).signal}))this.baseline??=true;}
+  try{if(await this.use((core,e)=>core.warm(e),{signal:(scoreWork??=new AbortController()).signal,onCheckpoint:this.noteStage}))this.baseline??=true;}
   catch(error){if(error instanceof DOMException&&error.name==='AbortError')return false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});else if(!(error instanceof HandPresentationError))throw error;}
   return true;
  }

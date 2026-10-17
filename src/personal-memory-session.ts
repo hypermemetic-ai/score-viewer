@@ -34,7 +34,14 @@ export interface PersonalMemorySessionOptions {
  scanLibrary():Promise<readonly MemoryScoreInput[]>;
  /** Verify archive and legacy personal bytes observed by scanLibrary. */
  validateInputs?(inputs:readonly MemoryScoreInput[]):Promise<boolean>;
+ /** Entries the last scan skipped because their saved edition must be engraved again first. */
+ awaitingEngraving?():ReadonlySet<string>;
  playerId?:string;
+}
+/** A staged consolidation names a score whose saved edition must be engraved
+ * again before its choices can be read. The request stays pending, unchanged. */
+export class ConsolidationDeferred extends Error {
+ constructor(readonly entryIds:readonly string[]){super('A saved fingering update was not applied: its score’s saved engraving is out of date and is engraved again when the score is opened. Your choices are unchanged.');this.name='ConsolidationDeferred';}
 }
 export interface PersonalMemoryAccepted {
  intent:CapturedPersonalMemoryIntent;personal:PersonalState;memory:PersonalFingeringMemory;saved:Promise<void>;
@@ -323,6 +330,8 @@ export class PersonalMemorySession {
     if(memory.receipts[request.receiptId]){this.rebase(current);return clone(memory.receipts[request.receiptId]);}
     if(!await request.isSafe())throw Error('Consolidation waits until practice and pending edits have stopped.');
     const scanned=frozenInputs(await this.options.scanLibrary());this.remember(scanned);
+    const awaiting=request.entryIds.filter(id=>this.options.awaitingEngraving?.().has(id));
+    if(awaiting.length)throw new ConsolidationDeferred(awaiting);
     const inputs=scanned.filter(input=>!request.entryIds.includes(input.entryId)||!request.personalKeys||request.personalKeys.includes(inputKey(input))).map(input=>({...input,personal:this.personalAt(current,input)})),targets=inputs.filter(input=>request.entryIds.includes(input.entryId));
     if(request.sourceRevisions&&targets.some(input=>request.sourceRevisions![input.entryId]!==source(input.p)))throw Error('Consolidation source changed; current personal choices retained.');
     const hashes=await inputHashes(targets),prepared=await consolidatePersonalFingeringMemory(memory,inputs,request.entryIds,request.receiptId);
