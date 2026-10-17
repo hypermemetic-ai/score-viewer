@@ -18,7 +18,7 @@ function fixture(){
  const phases:string[]=[],warnings:string[]=[],reads:string[]=[],classes=new Set<string>();let rendered=0;
  const context:any={startupReady:false,startupFailed:false,entries:[],pianoSettings:defaultPianoPreferences(),pianoWarning:'',preferences:{version:1,libraryRotation:0,bindings:defaultBindings()},
   app:{innerHTML:'',classList:{add:(s:string)=>classes.add(s),remove:(s:string)=>classes.delete(s)},querySelector:()=>null},
-  loadingMarkup:(_title:string,message:string)=>message,updateLoading:(_root:any,message:string)=>phases.push(message),paintCheckpoint:async()=>{},
+  LoadingProgress:class {title='';constructor(title:string){this.title=title;}markup(){return this.title;}attach(){return this;}stop(){}step(id:string){phases.push(id);}fail(){}},paintCheckpoint:async()=>{},
   readJson:async(file:string)=>{reads.push(file);assert.ok(['library.json','preferences.json'].includes(file));return file==='preferences.json'?{version:1,libraryRotation:0,keyboardLayout:'conventional-piano',bindings:defaultBindings(),piano:{...defaultPianoPreferences(),enabled:true},retainedUnknown:{value:'keep'}}:null;},
   keyboardPreference:(value:any)=>value,readBindings:(value:any)=>value,fingerPreferences:()=>({}),readMidiMapping:()=>undefined,readMidiBindings:()=>undefined,
   readFingeringAdviceSettings,pendingPersonalConsolidation,readPianoPreferences,defaultPianoPreferences,ViewerOrientation,InputController:class {},readControlBindings:()=>({}),readFreeViewControlOverrides:()=>({}),controls:{configure(){}},
