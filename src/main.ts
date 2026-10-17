@@ -60,7 +60,8 @@ import {runPianoReadiness} from './piano-readiness-job';
 import type {PianoPrepared} from './piano-readiness';
 interface PreparedScore {packageBytes:Uint8Array;package:ScorePackage;personal?:PersonalState}
 import {stagePresentationInstall,rebindPersonalPresentation} from './presentation-install';
-import {prepareRetainedEdition} from './retained-editions';
+import {prepareRetainedEdition,drawableEarlierEdition} from './retained-editions';
+import {UNDRAWABLE_CALCULATED_EDITION,undrawableCalculatedEdition} from './undrawable-edition';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 
 import {editUnits,moveSelection,selectionOnPage,systemSelection,measureSelection} from './selection';
@@ -656,7 +657,8 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
 }
 
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id);try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
- const prior=await admitReading(data,op);if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);const selected=prior.availablePresentations?.includes(op.keyboard)?await selectPresentation(prior,op.keyboard):undefined,
+ let prior:ScorePackage;try{prior=await admitReading(data,op);}catch(error){if(!undrawableCalculatedEdition(error))throw error;await openEarlierEdition(entry,op);return;}
+ if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);const selected=prior.availablePresentations?.includes(op.keyboard)?await selectPresentation(prior,op.keyboard):undefined,
   personal=selected?await loadPersonal(entry,selected):prior.manifest.version===3?await loadPersonal(entry,prior):undefined,{q,running}=await prepareScore(data,op.keyboard,entry.id,personal,prior,op);
  const loadedPersonal=q.personal??await loadPersonal(entry,q.package),
   // An admitted retained view needs no new package or personal-journal version.
@@ -666,6 +668,30 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
  }catch(error){finishReading(op,false);throw error;}
+}
+
+/** A saved calculated edition the engraving can no longer draw opens its newest
+ * drawable earlier edition instead. Like Earlier editions, this changes only
+ * which saved edition is current; every edition and journal stays saved. */
+async function openEarlierEdition(entry:Entry,op:ReadingOperation){
+ readingProgress(op,'Opening an earlier edition…');
+ // The library switches only to an edition whose editing session replays its saved pages.
+ const opens=async(edition:{package:ScorePackage;personal:PersonalState})=>{try{const session=new PersonalPresentationSession(edition.package);await session.warm(readingExecution(op));await session.project(edition.personal,readingExecution(op));return true;}catch{checkReading(op);return false;}},
+  retained=await drawableEarlierEdition(host,entry,[op.keyboard,'janko-four-row'],opens);await readingCheckpoint(op);
+ if(!retained)throw Error(`${UNDRAWABLE_CALCULATED_EDITION} No earlier edition of this score can be opened either.`);
+ const installed=await enqueue(async()=>{
+  checkReading(op);const latest=entries.find(e=>e.id===entry.id);
+  if(!latest||latest.file!==entry.file)throw Error('The library changed while opening; every edition is retained.');
+  const result=await stagePresentationInstall(host,{entry:latest,entries,packageBytes:retained.packageBytes,
+   personalBytes:new TextEncoder().encode(JSON.stringify(retained.personal)),personalKey:personalStorageName(latest.id,retained.package),
+   personalFiles:retained.personalFiles,...(latest.transposition||getScoreTransposition(retained.package)!==0?{transposition:{steps:getScoreTransposition(retained.package),layout:retained.package.keyboardLayout??preferences.keyboardLayout,originalPackageBytes:getOriginalScorePackageBytes(retained.package),originalLayouts:retained.package.transpositionOriginal?.availablePresentations}}:{}),
+   canCommit:()=>{try{checkReading(op);}catch{return false;}return entries.find(e=>e.id===entry.id)?.file===entry.file;},
+   onCommitStarted:()=>{op.running.state='installing';op.dialog?.setAttribute('aria-busy','true');const cancel=op.dialog?.querySelector<HTMLButtonElement>('[data-action="cancel-job"]');if(cancel)cancel.disabled=true;}});
+  entries=result.entries;return result;
+ });
+ await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
+ finishReading(op,true);
+ notify('The calculated edition of this score can no longer be drawn, so it opened from its earlier edition with the score’s own hands. The calculated edition stays saved under Earlier editions.');
 }
 
 async function chooseGuitarProTracks(inspection:GuitarProInspection,op:ReadingOperation):Promise<string[]|undefined>{
