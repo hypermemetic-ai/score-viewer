@@ -157,7 +157,7 @@ function beginReading(entryId:string,loading?:LoadingProgress){
  const carried=carriedLoading;carriedLoading=undefined;
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
  libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
- job?.cancel();
+ job?.cancel();cancelPersonalPrefetch();
  loading??=carried??openingLoading(entryId);
  // A surface carried past its save stays uncancellable: the new edition is
  // already in the library, so Esc must not leave the reader on the old one.
@@ -654,7 +654,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  let keptHands=0;
  // Opening draws only what this score shows: its own pages, or the saved
  // hand choices' projection. With a projection worker the engraver settles
- // for editing when editing begins; without one it settles here, as before.
+ // for editing in the worker after opening; without one it settles here, as before.
  cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
@@ -668,6 +668,8 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
+ // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
+ if(!context&&scoreCapabilities(next.package).pianoPreparation)personalEditor(next).session.prefetch();
  if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
 }
