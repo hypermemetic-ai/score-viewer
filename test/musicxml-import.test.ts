@@ -9,6 +9,8 @@ import {requirePianoEvent} from '../src/piano-event';
 import {PersonalPresentationSession} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
+import {transposeScore} from '../src/score-transposition';
+const linear=(p:{octave:number;pitchClass:number})=>p.octave*12+p.pitchClass;
 
 const fixture=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url)),xml=fixture.toString('utf8');
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
@@ -28,6 +30,8 @@ test('import routing reads content, not filenames',()=>{
  assert.equal(scoreImportKind(zipSync({'manifest.json':strToU8('{}'),'META-INF/container.xml':container('x.musicxml')})),'score');
  assert.equal(scoreImportKind(strToU8('FICHIER GUITAR PRO v5.00')),'guitar-pro');
  assert.equal(scoreImportKind(strToU8('<GPIF/>')),'guitar-pro');
+ // Released pickers offer .xml, so another XML document is named for what it is, not sent to Guitar Pro.
+ assert.throws(()=>scoreImportKind(strToU8('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>')),/isn't a MusicXML score/);
  assert.equal(scoreImportKind(strToU8(xml.replace('<score-partwise','<!--'+' '.repeat(5000)+'-->\n<score-partwise'))),'musicxml');
 });
 
@@ -106,4 +110,15 @@ test('an engraving refusal reaches the player in plain words, keeping its diagno
   refusal=new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.'),
   pool={use:async()=>{throw refusal;}} as unknown as PersonalPreparationPool<never>;
  await assert.rejects(new PersonalPresentationSession(p,pool).warm(),(err:Error)=>err.message==="This score can't be displayed yet: the viewer can't draw its pages."&&err.cause===refusal);
+});
+
+test('a MusicXML piano part with a MIDI program transposes; the program and channel are not pitches',async()=>{
+ const p=await importPackage((await prepareMusicXmlScore(fixture,assets)).bytes,{allowLegacyTempo:true}),source=p.sourceScore??p.score;
+ assert.equal(source.parts?.[0].instruments[0].midiProgram,0);
+ const q=transposeScore(source,2);
+ assert.deepEqual(q.parts,source.parts,'instrument identity is unchanged');
+ assert.deepEqual(q.notes.map(n=>linear(requirePianoEvent(n).pitch)),source.notes.map(n=>linear(requirePianoEvent(n).pitch)+2));
+ // Any other MIDI-looking field still refuses rather than keeping a stale pitch.
+ const odd=structuredClone(source);(odd.parts![0].instruments[0] as any).midiPitch=60;
+ assert.throws(()=>transposeScore(odd,2),/unsupported pitch-bearing field at source\/parts\/0\/instruments\/0\/midiPitch/);
 });

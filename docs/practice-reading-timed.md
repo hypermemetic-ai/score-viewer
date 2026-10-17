@@ -133,6 +133,24 @@ own journal, so switching outside Practice asks again; switching while Practice
 is open carries the tempo across. Library progress for such a score appears once
 a tempo is set and counts toward that tempo.
 
+## Grace notes
+
+Written grace notes (Schumann Op. 68 No. 13 has sixteen) are ornaments of the
+note they lead into. They stay on the page in Reading and Timed, but they are
+not timed onsets: they carry no written duration, and how far before or on the
+beat to play them is the player's interpretation. A key that belongs to a grace
+group is accepted, without moving on, while its host onset is still to be
+played and at most one beat ahead. This applies to Timed onsets in the passage
+being assessed and to the current Reading step. Grace keys are not counted, so
+striking one again inside that window is also accepted. A grace on its host's
+own key is a second strike of that key: the first strike plays the host, and one
+more strike of it, within half a second of the host's beat in Timed or before the
+next note in Reading, is accepted; lifting the key between the two strikes is not
+releasing the host early. A grace may be left out; it is never counted as
+missed. Played after its host, or more than a beat early, it is a different note
+like any other. Graces are matched by key and time, not by hand. Graces do not
+enter passage identity, so earned progress is unchanged.
+
 ## Passive viewing and editing
 
 The full-score reader, editor, selector and Free view do not match played notes, highlight matches, advance selection or turn pages automatically. Only section Reading/Timed and their preparation interpret notes. Free view retains physical held-key state for explicit practice re-entry without counting passive-view attacks as successful playing. MIDI reset, focus loss or connection replacement clears that state. Explicit keyboard/pedal commands, independent piano sound and Options diagnostics remain available. The former full-score Performance start and grading controls are retired; existing records remain stored.

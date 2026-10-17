@@ -46,11 +46,11 @@ import {selectReadingNotation,prepareDualReadingPacket,type ReadingNotation} fro
 import {inspectGuitarProSource,stageGuitarProParts,admitGuitarProContext,guitarProContext,guitarProPreparedByEarlierConverter,EARLIER_GUITAR_PRO_CONVERTER,GUITAR_PRO_FILES,type GuitarProInspection} from './guitar-pro-provider';
 import {ReadingPartCatalog} from './reading-part-catalog';
 import {guitarProTracksMarkup} from './guitar-pro-tracks';
-import {scoreImportKind,MUSICXML_IMPORT_ENABLED} from './score-import-kind';
+import {scoreImportKind,MUSESCORE_IMPORT_ENABLED} from './score-import-kind';
 import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
-import {practicePercent,requirePerformedGraceTiming,requirePracticeHands} from './practice';
+import {practicePercent,requirePracticeHands} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
-import {loadingMarkup,updateLoading,preparationMessage} from './viewer-loading';
+import {loadingMarkup,updateLoading,updateLoadingElapsed,preparationMessage,engravingMessage} from './viewer-loading';
 import type {ReadingExecution} from './reading-execution';
 import {hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
@@ -85,7 +85,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession} from './personal-presentation';
+import {PersonalPresentationSession,undrawableHandOwners} from './personal-presentation';
 import {PracticeClock} from './practice-clock';
 import {practiceAudio} from './host';
 import {readMidiMapping,readMidiBindings,type MidiBindings,type MidiMapping,type MidiCC,type MidiNote} from './midi';
@@ -106,6 +106,8 @@ interface ReadingOperation {
  controller:AbortController;running:ReadingJob;dialog?:HTMLDialogElement;
  previous:typeof current;keyboard:PhysicalKeyboardId;generation:number;
  options?:string;optionsFocus?:string;
+ /** Elapsed-time clock for long preparation, with what the player can expect. */
+ started:number;clock:number;expectation:string;
 }
 let readingOperation:ReadingOperation|undefined,readingGeneration=0;
 const cancelledReading=()=>Error('Opening cancelled. Your score and choices are retained.');
@@ -129,7 +131,17 @@ async function readingCheckpoint(op:ReadingOperation){checkReading(op);await pai
 function readingDialog(op:ReadingOperation){
  checkReading(op);
  const d=showDialog(`${loadingMarkup('Opening score',op.running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'score-reading');
- op.dialog=d;d.addEventListener('close',()=>{if(op.dialog===d&&op.running.state==='working')op.running.cancel();},{once:true});return d;
+ op.dialog=d;d.addEventListener('close',()=>{if(op.dialog===d&&op.running.state==='working')op.running.cancel();},{once:true});paintReadingClock(op);return d;
+}
+/** A long score can take a minute or more to engrave or prepare. After a few
+ * seconds the dialog shows how long it has been working; there is no limit. */
+const READING_CLOCK_AFTER_SECONDS=3;
+function paintReadingClock(op:ReadingOperation){
+ if(readingOperation!==op){window.clearInterval(op.clock);return;}
+ if(!op.dialog)return;const seconds=(performance.now()-op.started)/1000;
+ if(seconds<READING_CLOCK_AFTER_SECONDS){updateLoadingElapsed(op.dialog);return;}
+ const cancellable=op.running.state==='working'&&!!op.dialog.querySelector('[data-action=cancel-job]:not([disabled])');
+ updateLoadingElapsed(op.dialog,seconds,`${op.expectation}${cancellable?' Cancel stops without changing your library.':''}`);
 }
 function beginReading(entryId:string){
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
@@ -137,8 +149,9 @@ function beginReading(entryId:string){
  job?.cancel();
  const controller=new AbortController(),running:ReadingJob={cancel:()=>controller.abort(),entryId,state:'working',progress:'Opening score…'},
   op:ReadingOperation={controller,running,previous:current,keyboard:preferences.keyboardLayout,generation:++readingGeneration,
-   options:dialog?.dataset.kind==='options'?optionsSection:undefined,optionsFocus:(document.activeElement as HTMLElement)?.dataset.optionsKey};
- readingOperation=op;job=running;practice?.pause();readingDialog(op);return op;
+   options:dialog?.dataset.kind==='options'?optionsSection:undefined,optionsFocus:(document.activeElement as HTMLElement)?.dataset.optionsKey,
+   started:performance.now(),clock:0,expectation:'A long score can take up to a minute to prepare.'};
+ readingOperation=op;job=running;practice?.pause();readingDialog(op);op.clock=window.setInterval(()=>paintReadingClock(op),1000);return op;
 }
 async function admitReading(bytes:Uint8Array,op:ReadingOperation){
  await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
@@ -152,9 +165,18 @@ function readingProgress(op:ReadingOperation,text:string){checkReadingOwner(op);
 function readingExecution(op:ReadingOperation):ReadingExecution {
  return {signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);readingProgress(op,preparationMessage(stage));}};
 }
+/** Engraving an imported score is the longest foreground step: a long piano
+ * score takes a minute or more, and preparing its pages for reading and hand
+ * editing takes about as long again. It reports its stage, stays cancellable
+ * at every cooperative step, and has no time limit. */
+async function engraving<T>(op:ReadingOperation,work:(execution:ReadingExecution)=>Promise<T>):Promise<T>{
+ op.expectation='A long score takes a minute or two to engrave, and about as long again to prepare its pages.';
+ try{return await work({signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);readingProgress(op,engravingMessage(stage));}});}
+ finally{op.expectation='Preparing the pages of a long score for reading and hand editing can take another minute.';}
+}
 function suspendReadingDialog(op:ReadingOperation){checkReading(op);op.dialog=undefined;closeDialog(false);}
 function finishReading(op:ReadingOperation,success:boolean){
- if(readingOperation!==op)return;
+ window.clearInterval(op.clock);if(readingOperation!==op)return;
  op.running.state=success?'complete':'failed';if(dialog===op.dialog)closeDialog(false);readingOperation=undefined;
  if(!success&&op.options&&current===op.previous){options(op.options);if(op.optionsFocus)dialog?.querySelector<HTMLElement>(`[data-options-key="${CSS.escape(op.optionsFocus)}"]`)?.focus();}
  if(!current)void refreshLibrarySummaries();
@@ -262,12 +284,17 @@ async function savePersonal(){if(!current)return;const target=current,snapshot=s
 }
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
 /** Painting follows accepted intent, never the completion order of host writes. */
-async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat){
- const editor=personalEditor(target),generation=++editor.generation;
+async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat,previous=target.personal){
+ const editor=personalEditor(target),generation=++editor.generation,before=previous;
  target.personal=personal;target.personal=resolveMemory(target);if(nextSeat&&current===target)selection=nextSeat;
- const next=target.personal;
+ let next=target.personal;
  capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!nextSeat||!!next.navigation?.followEdit);
- const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),projection=editor.session.project(next),navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
+ const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
+  attempted=next,projection=editor.session.project(next).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
+   if(editor.generation===generation)next=target.personal;
+   if(kept.keys)notify(kept.keys===1?'That hand can’t be drawn on the page yet, so the note keeps the hand it had.':'Those hands can’t be drawn on the page yet, so the notes keep the hands they had.');
+   return kept.view;}),
+  navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const ownerPractice=target===current&&practice instanceof PracticeView?practice:undefined,
   handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,ownerPractice.options.personal,note.id)!==handFor(target.package,next,note.id));
@@ -287,9 +314,34 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  // generation; never install a saved snapshot over subsequent keyboard intent.
  void saved.then(async()=>{if(current!==target||editor.generation!==generation)return;
   const before=target.personal,latest=personalMemory.personalFor(memoryInput(target));latest.view=before.view;latest.editContactId=before.editContactId;latest.navigation=before.navigation;target.personal=latest;const resolved=resolveMemory(target);
-  if(effectiveAssignmentKey(target.package,resolved)!==effectiveAssignmentKey(target.package,before))await presentPersonalChange(target,resolved,Promise.resolve());
+  // A refused hand from the other writer returns to the hand this view had.
+  if(effectiveAssignmentKey(target.package,resolved)!==effectiveAssignmentKey(target.package,before))await presentPersonalChange(target,resolved,Promise.resolve(),undefined,before);
   else{target.personal=resolved;editor.visiblePersonal=structuredClone(resolved);if(before.memoryResolved?.revision!==resolved.memoryResolved?.revision&&!practice){adviceKey='';renderToolbar();}}
  }).catch(error=>paintPersonalSaveError(target,error));
+}
+/** A hand choice the engraver can't fit yet is not kept: its notes return to
+ * the hand they had, as the player's own decision, so a saved choice can never
+ * stop the score from opening. Other refusals, and a choice whose notes had no
+ * hand to return to, still reach the player unchanged. `attempted` is the
+ * refused state; a note whose hand has changed since then is left as it is. */
+async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number}>{
+ const returned=new Set<string>();
+ for(let attempt=0;;attempt++){
+  const refused=undrawableHandOwners(error),seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
+  if(!refused||!seats.length||attempt>=3)throw error;
+  let changed=false;
+  for(const seat of seats){
+   const ownerId=seat.ownerIds.find(id=>refused.includes(id))!,refusedHand=handFor(target.package,attempted,ownerId);
+   if(handFor(target.package,target.personal,ownerId)!==refusedHand){changed=true;continue;}
+   const hand=hadHand(ownerId);if(!hand||hand===refusedHand)throw error;
+   const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});
+   target.personal=receipt.personal;target.personal=resolveMemory(target);returned.add(ownerId);changed=true;
+   void receipt.saved.catch(saveError=>paintPersonalSaveError(target,saveError));
+  }
+  if(!changed)throw error;
+  attempted=target.personal;
+  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size};}catch(next){error=next;}
+ }
 }
 async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat){
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
@@ -345,7 +397,7 @@ function loseFocus(){bindingOptions?.blur();midiOptions?.cancelListening();music
 function transformSurface(el:HTMLElement,_rotation:Rotation){fitSurface(el,orientation.rotation);}
 function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
  readerPages.clear();toolbarNavigation?.dispose();toolbarNavigation=undefined;librarySummaryPaintPending=false;
- app.innerHTML=`<section class="surface"><div class="library"><header><h1>Scores</h1><nav aria-label="Library actions">${instrumentPickerMarkup(preferences.keyboardLayout)}${button('Import','import','M')}${button('Rotate','rotate',rotationHint())}${button('Options','options',actionControlLabel(mainControls,'practiceSettings'))}${button('Exit','exit')}</nav></header><div class="scores" aria-label="Composers and scores"></div>${entries.length?'':'<p class="empty">Add a score to begin.<br><small>Import a .tuna score or a Guitar Pro file.</small></p>'}<p class="job">${job?.state==='working'?esc(job.progress):''}</p></div></section>`;
+ app.innerHTML=`<section class="surface"><div class="library"><header><h1>Scores</h1><nav aria-label="Library actions">${instrumentPickerMarkup(preferences.keyboardLayout)}${button('Import','import','M')}${button('Rotate','rotate',rotationHint())}${button('Options','options',actionControlLabel(mainControls,'practiceSettings'))}${button('Exit','exit')}</nav></header><div class="scores" aria-label="Composers and scores"></div>${entries.length?'':'<p class="empty">Add a score to begin.<br><small>Import a .tuna score, a MusicXML file or a Guitar Pro file.</small></p>'}<p class="job">${job?.state==='working'?esc(job.progress):''}</p></div></section>`;
  const libraryNavigation=document.createElement('nav');libraryNavigation.className='library-navigation';libraryNavigation.setAttribute('aria-label','Library navigation');app.querySelector('.surface')!.append(libraryNavigation);arrangeBottomNavigation(libraryNavigation,null,app.querySelector<HTMLButtonElement>('[data-action=options]'));
  transformSurface(app.querySelector('.surface')!,preferences.libraryRotation);
  libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>{const summary=practiceSummaries.get(entry,preferences.keyboardLayout);return `${readingParts.summary(entry)?esc(readingParts.summary(entry))+' · ':''}${esc(entry.metadata.opusLabel??'')}${entry.metadata.piece?` · No. ${entry.metadata.piece}`:''}${entry.metadata.variant?` · ${esc(entry.metadata.variant)}`:''}${summary?` · Sections ${practicePercent(summary.sections)}%${summary.whole?' · Whole piece at goal':''}`:''}`;},preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
@@ -575,7 +627,10 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  let clock:number|undefined,clockError:unknown;try{clock=await host.midiClock();}catch(error){clockError=error;}check();
  readingProgress(op,'Preparing your score for editing…');await paintCheckpoint(op.controller.signal);check();
  if(scoreCapabilities(next.package).pianoPreparation){next.personal=await personalMemory.loadPersonalCurrent(next.entry,next.package,async()=>rawMemoryPersonal(next.personal));check();next.personal=resolveMemory(next);}
- const nextEditor=personalEditor(next);await nextEditor.session.warm(readingExecution(op));check();nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op));resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
+ let keptHands=0;
+ const nextEditor=personalEditor(next);await nextEditor.session.warm(readingExecution(op));check();nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
+  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
  op.running.state='installing';op.dialog?.setAttribute('aria-busy','true');
@@ -586,7 +641,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingPresentation=nextPresentation;readingViewError=nextViewError;
  if(rememberOpened){toolbarVisible=false;libraryMenu.selection.update(entries,next.entry.id);libraryMenu.selection.select(`score:${next.entry.id}`);preferences.lastWorkedEntryId=next.entry.id;}
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
- if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);
+ if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
@@ -796,14 +851,14 @@ async function switchReadingPart(id:string){
 }
 async function importScore(){
  let bytes=await host.pickScore();if(!bytes)return;const kind=scoreImportKind(bytes);if(kind==='guitar-pro'){await importGuitarProScore(bytes);return;}
- if(kind==='musescore'&&!MUSICXML_IMPORT_ENABLED)throw Error('MuseScore files can\'t be opened yet.');
- if(kind==='musicxml'&&!MUSICXML_IMPORT_ENABLED)throw Error('MusicXML files can\'t be opened yet.');
+ if(kind==='musescore'&&!MUSESCORE_IMPORT_ENABLED)throw Error('MuseScore files can\'t be opened in this copy of the viewer yet. Export the score from MuseScore as MusicXML (.musicxml or .mxl) and import that file.');
  const op=beginReading('import');try{await readingCheckpoint(op);
  if(kind==='musicxml'){readingProgress(op,'Engraving the score…');const [{frettedPreparationAssets},{prepareMusicXmlScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musicxml-import')]);checkReading(op);
-  bytes=(await prepareMusicXmlScore(bytes,await frettedPreparationAssets(op.controller.signal),{signal:op.controller.signal})).bytes;await readingCheckpoint(op);}
- if(MUSICXML_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'Converting the MuseScore file…');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
-  bytes=(await prepareMuseScore(bytes,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
+  const written=bytes;bytes=(await engraving(op,execution=>prepareMusicXmlScore(written,assets,execution))).bytes;await readingCheckpoint(op);}
+ if(MUSESCORE_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'Converting the MuseScore file…');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
+  const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
+  const saved=bytes;bytes=(await engraving(op,execution=>prepareMuseScore(saved,assets,execution))).bytes;await readingCheckpoint(op);}
  const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false;
@@ -957,7 +1012,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
  if(admitted){if(admitted.plan.playerTempo)tempo=admitted.plan.referencePerformanceTempo;}
  else if(target.package.score.referencePerformanceTempo===undefined){
   // Refuse what practice cannot plan before asking for a tempo.
-  requirePracticeHands(target.package,target.personal);requirePerformedGraceTiming(target.package);
+  requirePracticeHands(target.package,target.personal);
   const start=++practiceStartGeneration,prior=practice,owns=()=>start===practiceStartGeneration&&current===target&&practice===prior&&!readingPresentation;
   tempo=savedPlayerTempo(target.package.score,await PracticeView.savedJournal(target.package,target.entry.id),context?.preferences);if(!owns())return;
   if(!tempo){const chosen=await chooseReference('Practice',scoreBeatUnit(target.package.score));if(!chosen||!owns())return;tempo=playerTempo(target.package.score,chosen.bpm);}

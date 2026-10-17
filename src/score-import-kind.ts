@@ -1,12 +1,13 @@
 import {unzipSync} from 'fflate';
-/** MusicXML intake stays off for players until ISO notation reads typical
- * MuseScore exports; the development server enables it for review. */
-export const MUSICXML_IMPORT_ENABLED=import.meta.env?.DEV===true;
+/** MuseScore files reach the MusicXML intake through the score-converter
+ * WebView host. Its runtime assets are emitted only by the development server
+ * (scripts/guitar-pro-assets.ts), so the native package cannot convert them and
+ * MuseScore import stays a development feature. MusicXML itself is always on. */
+export const MUSESCORE_IMPORT_ENABLED=import.meta.env?.DEV===true;
 export type ScoreImportKind='score'|'guitar-pro'|'musicxml'|'musescore';
-/** Picker extensions. MusicXML and MuseScore (converted to MusicXML) share one
- * gate, folded away in production; the native `pick_score` filter mirrors it. */
-export const SCORE_PICKER_EXTENSIONS:readonly string[]=Object.freeze(['tuna','gp','gpx','gp3','gp4','gp5',
- ...(MUSICXML_IMPORT_ENABLED?['musicxml','xml','mxl','mscz','mscx']:[])]);
+/** Picker extensions; the native `pick_score` filter mirrors them. */
+export const SCORE_PICKER_EXTENSIONS:readonly string[]=Object.freeze(['tuna','gp','gpx','gp3','gp4','gp5','musicxml','xml','mxl',
+ ...(MUSESCORE_IMPORT_ENABLED?['mscz','mscx']:[])]);
 /** Routing by content, never by filename. Every branch still runs its complete
  * ordinary admission; a label here grants no score or source authority. */
 export function scoreImportKind(bytes:Uint8Array):ScoreImportKind {
@@ -21,7 +22,9 @@ export function scoreImportKind(bytes:Uint8Array):ScoreImportKind {
   return manifest?'score':musescore?'musescore':container?'musicxml':'guitar-pro';
  }
  const head=xmlHead(bytes);
- if(head!==undefined){if(/<score-(partwise|timewise)[\s>]/.test(head))return 'musicxml';if(/<museScore[\s>]/.test(head))return 'musescore';}
+ if(head!==undefined){if(/<score-(partwise|timewise)[\s>]/.test(head))return 'musicxml';if(/<museScore[\s>]/.test(head))return 'musescore';
+  // Guitar Pro's own XML is GPIF; any other XML document is not a score this viewer reads.
+  if(!/<GPIF[\s>/]/.test(head))throw Error('This XML file isn\'t a MusicXML score. Export the score from your notation program as MusicXML (.musicxml or .mxl) and import that file.');}
  return 'guitar-pro';
 }
 /** The leading text of an XML document in UTF-8 or UTF-16, otherwise undefined.

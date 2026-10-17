@@ -4,6 +4,8 @@ Startup shows one loading surface while the library, saved display summaries, in
 
 Score opening uses the same loading component. Cancel is available during owned preparation and disabled during the existing durable install boundary. Preparation checkpoints describe page layout, notation, page fit and note labels. Canceled or superseded preparation cannot replace the previous score. Background library refreshes show a compact status after 120 milliseconds and yield priority when a foreground score operation starts.
 
+Importing or opening a score shows an elapsed clock after three seconds, with the expected duration and, while Cancel is available, that Cancel leaves the library unchanged. A MusicXML or MuseScore import names its engraving stage (laying out systems and pages, checking marks fit, drawing pages, placing note labels, connecting notes). No stage has a time limit: Schumann Op. 68 No. 13 engraves in about 45 seconds and then prepares its pages for about 35 more, and each later open takes about 35 seconds.
+
 The derived library cache and captured personal-preparation pool are separate from scores and earned practice journals. Their input bindings and retention limits are documented alongside their implementation. Cached summaries do not supply practice state, and private rendering authority is never restored from serialized cache data.
 
 Performance reports distinguish cold work, same-process reuse and a new-process restart. Cooperative scheduling allows feedback and cancellation between supported steps; it cannot preempt an individual synchronous step. The existing 100-millisecond visible-edit tuning goal and accepted editing trade-off remain separate from startup/loading measurements.

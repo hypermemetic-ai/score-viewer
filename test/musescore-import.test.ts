@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {MUSICXML_IMPORT_ENABLED,SCORE_PICKER_EXTENSIONS,scoreImportKind} from '../src/score-import-kind';
+import {MUSESCORE_IMPORT_ENABLED,SCORE_PICKER_EXTENSIONS,scoreImportKind} from '../src/score-import-kind';
 import {convertMuseScoreToMusicXml,prepareMuseScore,museScoreRefusalMessage,MuseScoreImportRefusal} from '../src/musescore-import';
 import {importPackage} from '../src/package';
 import {MusicXmlImportRefusal} from '../src/musicxml-import';
@@ -15,14 +15,20 @@ const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('
 // The intake's own refusal of converter output it can't read yet (ISO reader work).
 const readerRefusal=/^This MuseScore score can't be opened yet: it uses [a-z -]+, which the viewer doesn't read yet\.$/;
 
-test('MuseScore import and its picker extensions stay behind the MusicXML release gate',()=>{
- assert.equal(MUSICXML_IMPORT_ENABLED,false);
- assert.deepEqual([...SCORE_PICKER_EXTENSIONS],['tuna','gp','gpx','gp3','gp4','gp5']);
+test('MusicXML import is on for players; MuseScore stays behind its development gate',()=>{
+ // The native package does not ship the MuseScore converter assets (scripts/guitar-pro-assets.ts).
+ assert.equal(MUSESCORE_IMPORT_ENABLED,false);
+ assert.deepEqual([...SCORE_PICKER_EXTENSIONS],['tuna','gp','gpx','gp3','gp4','gp5','musicxml','xml','mxl']);
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
- assert.match(main,/if\(kind==='musescore'&&!MUSICXML_IMPORT_ENABLED\)throw Error\('MuseScore files can\\'t be opened yet\.'\);/);
+ assert.match(main,/if\(kind==='musescore'&&!MUSESCORE_IMPORT_ENABLED\)throw Error\('MuseScore files can\\'t be opened in this copy of the viewer yet\. Export the score from MuseScore as MusicXML/);
+ assert.doesNotMatch(main,/MusicXML files can\\'t be opened yet/);
  assert.match(main,/import\('\.\/musescore-import'\)/,'The converter host loads lazily, only for an actual MuseScore import.');
+ assert.match(main,/Import a \.tuna score, a MusicXML file or a Guitar Pro file\./);
+ const host=readFileSync(new URL('../src/host.ts',import.meta.url),'utf8');
+ assert.match(host,/invoke<string\|null>\('pick_score',\{musescore:MUSESCORE_IMPORT_ENABLED\}\)/);
  const rust=readFileSync(new URL('../src-tauri/src/main.rs',import.meta.url),'utf8');
- assert.match(rust,/let mut kinds=vec!\["tuna","gp","gpx","gp3","gp4","gp5"\];if musicxml==Some\(true\)\{kinds\.extend\(\["musicxml","xml","mxl","mscz","mscx"\]\);\}/);
+ assert.match(rust,/async fn pick_score\(musescore:Option<bool>\)/);
+ assert.match(rust,/let mut kinds=vec!\["tuna","gp","gpx","gp3","gp4","gp5","musicxml","xml","mxl"\];if musescore==Some\(true\)\{kinds\.extend\(\["mscz","mscx"\]\);\}/);
  assert.equal(scoreImportKind(fixture('cross-staff-arpeggio.mscz')),'musescore');
  assert.equal(scoreImportKind(fixture('original-piano-clarinet.mscx')),'musescore');
 });

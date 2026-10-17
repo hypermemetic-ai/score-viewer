@@ -4,7 +4,7 @@ const escape=(value:string)=>value.replaceAll('&','&amp;').replaceAll('<','&lt;'
 
 /** One visual language for startup and owned foreground preparation. */
 export function loadingMarkup(title:string,message:string):string {
- return `<div class="viewer-loading" aria-busy="true"><h2>${escape(title)}</h2><p class="job" role="status">${escape(message)}</p><progress class="viewer-loading-progress" aria-label="Loading"></progress><p class="viewer-loading-count" aria-live="off" hidden></p></div>`;
+ return `<div class="viewer-loading" aria-busy="true"><h2>${escape(title)}</h2><p class="job" role="status">${escape(message)}</p><progress class="viewer-loading-progress" aria-label="Loading"></progress><p class="viewer-loading-count" aria-live="off" hidden></p><p class="viewer-loading-elapsed" aria-live="off" hidden></p></div>`;
 }
 
 export function updateLoading(root:ParentNode,message:string,completed?:number,total?:number):void {
@@ -13,6 +13,28 @@ export function updateLoading(root:ParentNode,message:string,completed?:number,t
  const counted=typeof completed==='number'&&typeof total==='number'&&Number.isInteger(completed)&&Number.isInteger(total)&&total>0&&completed>=0&&completed<=total;
  if(progress){if(counted){progress.max=total!;progress.value=completed!;}else progress.removeAttribute('value');}
  if(count){count.hidden=!counted;count.textContent=counted?`${completed} of ${total} scores ready`:'';}
+}
+
+/** Elapsed time of a long foreground step, with what to expect. It is a clock,
+ * not an estimate; omit seconds to hide it. */
+export function updateLoadingElapsed(root:ParentNode,seconds?:number,note=''):void {
+ const line=root.querySelector<HTMLElement>('.viewer-loading-elapsed');if(!line)return;
+ const shown=typeof seconds==='number'&&Number.isFinite(seconds)&&seconds>=0;line.hidden=!shown;
+ if(!shown){line.textContent='';return;}
+ const whole=Math.floor(seconds!),text=`${Math.floor(whole/60)}:${String(whole%60).padStart(2,'0')} so far.${note?' '+note:''}`;
+ if(line.textContent!==text)line.textContent=text;
+}
+
+/** Stages of engraving an imported score, in the player's words. */
+export function engravingMessage(stage:PreparationStage):string {
+ switch(stage){
+  case 'layout':case 'placement':return 'Engraving the score: laying out systems and pages…';
+  case 'lint':return 'Engraving the score: checking that every mark fits…';
+  case 'paint':return 'Engraving the score: drawing the pages…';
+  case 'geometry':return 'Engraving the score: placing note labels…';
+  case 'fretted':case 'relations':return 'Engraving the score: connecting the notes…';
+  case 'commit':return 'Engraving the score: finishing…';
+ }
 }
 
 export function preparationMessage(stage:PreparationStage):string {

@@ -43,7 +43,7 @@ export function converterAssetFiles():Record<string,Uint8Array>{
 }
 /** The MuseScore WebView host, its adjacent local Worker and notices, unchanged
  * from the same pinned package. They are emitted only where MuseScore import
- * is enabled (the MusicXML intake gate), never into a production bundle. */
+ * is enabled (MUSESCORE_IMPORT_ENABLED, development only), never into a production bundle. */
 export function museScoreAssetFiles():Record<string,Uint8Array>{
  const {identity}=pinnedPackage(),pins=identity.musescore?.runtimeGraph?.assets;
  const entry=fileURLToPath(import.meta.resolve('score-converter-proof/musescore/webview')),
