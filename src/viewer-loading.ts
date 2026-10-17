@@ -21,6 +21,7 @@ export const LOADING_STEPS={
  check:'Checking the score',
  save:'Saving to your library',
  hands:'Engraving the pages with your fingerings',
+ 'hand-editing':'Engraving the score for hand choices',
  parts:'Preparing the part for reading',
  open:'Opening the score',
 } as const;

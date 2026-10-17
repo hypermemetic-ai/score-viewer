@@ -132,7 +132,7 @@ test('legacy repeated-leaf equivalence cannot promote an unplayed double during 
 // replaced at the final admission seam, so practice can be closed in this test.
 const mainSource=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),mainStart=mainSource.indexOf('async function installPreparedScore('),mainEnd=mainSource.indexOf('async function preparePianoLayout(',mainStart),mainInstall=stripTypeScriptTypes(mainSource.slice(mainStart,mainEnd));
 function applicationInstall(s:ReturnType<typeof storage>,prepare:(...args:any[])=>Promise<any>){
- const running={state:'installing'},context:any={structuredClone,TextEncoder,job:running,readingOperation:undefined,host:s.host,readerAdmission:{import:importPackage},entries:[f.entry],preferences:{keyboardLayout:'janko-four-row'},enqueue:async(fn:()=>Promise<any>)=>fn(),
+ const running={state:'installing'},context:any={structuredClone,TextEncoder,job:running,readingOperation:undefined,host:s.host,readerAdmission:{import:importPackage},admitOrContent:(bytes:Uint8Array)=>importPackage(bytes,{allowLegacyTempo:true}),entries:[f.entry],preferences:{keyboardLayout:'janko-four-row'},enqueue:async(fn:()=>Promise<any>)=>fn(),
   collectionId,readPersonal,getOriginalScorePackageBytes,personalStorageName,selectPresentation,retainedTranspositionFile,getScoreTransposition,stagePracticeEditionTransfer,stagePresentationInstall,PracticeView:{prepareContext:prepare}};
  runInNewContext(mainInstall,context);return {context,running,run:(navigation?:unknown,q=f.changed)=>context.installPreparedScore(f.entry,q,running,f.changed.personal,false,undefined,navigation)};
 }

@@ -40,6 +40,10 @@ dialog:is([data-kind=score-reading],[data-kind=piano-preparation],[data-kind=loa
 .viewer-loading-elapsed{margin:0 0 0 auto;font-size:12px;line-height:1.4;color:#7d7d7d;font-variant-numeric:tabular-nums}
 .viewer-loading-elapsed[hidden]{display:none}
 .viewer-library-loading{position:absolute;right:24px;bottom:24px;width:300px;box-sizing:border-box;padding:16px 20px;background:#0d0d0df5;border:1px solid #2c2c2c;border-radius:3px;pointer-events:none;z-index:3}
+/* A hand choice waiting for the engraver: under the editing controls, never in the way of a press. */
+.viewer-hand-preparation{position:absolute;top:56px;right:16px;width:320px;box-sizing:border-box;padding:14px 18px;background:#0d0d0df5;border:1px solid #2c2c2c;border-radius:3px;pointer-events:none;z-index:4}
+.viewer-hand-preparation-queue{margin:10px 0 0;font-size:13px;line-height:18px;color:#d8d8d8}
+.viewer-hand-preparation-queue[hidden]{display:none}
 .viewer-loading-compact .viewer-loading-title{font-size:15px;margin-bottom:12px}
 .viewer-loading-compact .viewer-loading-steps li{font-size:13px;line-height:18px}
 .viewer-loading-compact .viewer-loading-footer{margin-top:8px}

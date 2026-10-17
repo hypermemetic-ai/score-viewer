@@ -1,5 +1,5 @@
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {importPackage,selectPresentation,hashBytes,type ScorePackage} from './package';
+import {editionNeedsEngravingAgain,importPackage,selectPresentation,hashBytes,type ScorePackage} from './package';
 import {planPractice,practicePartition,readPractice,requirePracticeHands,wholePracticeProgress} from './practice';
 import {displayedPracticeTotal} from './practice-display';
 import {savedPlayerTempo} from './player-tempo';
@@ -40,7 +40,9 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  if(admission)await admission.waitForIdle();
  if(!isCurrent())return;
  const options={allowLegacyTempo:true,execution:{onCheckpoint:()=>{if(!isCurrent())throw new DOMException('Library reading was superseded.','AbortError');}}};
- const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options));
+ // An edition that must be engraved again still shows the progress saved
+ // with it; opening the score is what engraves it again.
+ const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options)).catch(async error=>await editionNeedsEngravingAgain(bytes,error)??Promise.reject(error));
  if(!isCurrent())return;
  if(collectionId(imported)!==entry.id)return;
  if(imported.reading?.dual&&scoreCapabilities(imported).manualPractice){

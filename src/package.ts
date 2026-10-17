@@ -265,6 +265,19 @@ export function importPackage(bytes:Uint8Array,options:PackageReadOptions={}):Pr
  * checked. Unlike importPackage it does not replay a calculated edition's
  * pages, so the result is for re-engraving only and is never displayed. */
 export function readEditionContent(bytes:Uint8Array,options:PackageReadOptions={}):Promise<ScorePackage>{return admitPackage(bytes,options,true);}
+/** A saved edition the reader refused only because its pages no longer
+ * reproduce under the pinned engraving (an earlier shared engraving policy,
+ * say) is engraved again when the player opens it. Work that walks other
+ * scores than the one asked for must not fail because of it. Returns the
+ * edition's content when `refusal` is such a refusal: a linked edition whose
+ * members, source and hands still read. Anything else (damaged, foreign,
+ * cancelled) returns undefined and keeps its own refusal. The content is for
+ * reading the edition's own facts and journals, never for display. */
+export async function editionNeedsEngravingAgain(bytes:Uint8Array,refusal:unknown):Promise<ScorePackage|undefined>{
+ if((refusal as Error)?.name==='AbortError')return;
+ try{const content=await readEditionContent(bytes,{allowLegacyTempo:true}),m=content.collectionManifest??content.manifest;
+  return m.version===2&&!!m.sourceScore&&!!content.sourceScore?content:undefined;}catch{return;}
+}
 export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
 /** Receipts for reading archives this build already replayed, keyed by
  * archive digest. Derived only: a missing or refused receipt replays again. */
