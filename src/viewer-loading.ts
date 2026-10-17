@@ -22,10 +22,12 @@ export const LOADING_STEPS={
  save:'Saving to your library',
  hands:'Engraving the pages with your fingerings',
  parts:'Preparing the part for reading',
- open:'Opening the first page',
+ open:'Opening the score',
 } as const;
 export type LoadingStepId=keyof typeof LOADING_STEPS;
 type StepState='pending'|'active'|'done'|'failed';
+/** Spoken with each step, since the drawn mark is hidden from screen readers. */
+const STATE_WORDS:Record<StepState,string>={pending:', waiting',active:', in progress',done:', done',failed:', stopped'};
 interface Step {id:LoadingStepId;state:StepState;detail:string}
 
 /** Engine stages in musical terms. `paint` is reported once per drawn page. */
@@ -75,9 +77,10 @@ export class LoadingProgress {
  /** Full surface markup; attach() then keeps it current. */
  markup():string {
   const o=this.options;
-  return `<div class="viewer-loading${o.compact?' viewer-loading-compact':''}" aria-busy="true" data-loading-state="${this.state}">`+
+  return `<div class="viewer-loading${o.compact?' viewer-loading-compact':''}" data-loading-state="${this.state}">`+
    `<p class="viewer-loading-kicker"${this.kicker?'':' hidden'}>${escape(this.kicker)}</p><h2 class="viewer-loading-title">${escape(this.title)}</h2>`+
-   `<ol class="viewer-loading-steps">${this.stepsMarkup()}</ol>`+
+   // Busy marks only the list, so the status line outside it is still announced.
+   `<ol class="viewer-loading-steps" aria-busy="true">${this.stepsMarkup()}</ol>`+
    `<progress class="viewer-loading-progress" aria-label="Progress" hidden></progress>`+
    `<p class="job viewer-loading-status" role="status">${escape(this.statusText())}</p>`+
    `<p class="viewer-loading-message" role="alert" hidden></p>`+
@@ -104,6 +107,13 @@ export class LoadingProgress {
   if(this.state==='saving'&&id!=='save')this.savingNote='Saved. This part can’t be cancelled.';
   this.render();
  }
+ /** Start the list again when the flow takes another route (e.g. a saved
+  * edition is set aside and the music is transposed afresh). */
+ restart(steps:readonly LoadingStepId[]){
+  if(this.state==='failed')return;
+  this.steps=steps.map(id=>({id,state:'pending',detail:''}));this.lastStage=undefined;this.pages=0;this.count=undefined;this.render();
+ }
+ setTitle(title:string){this.title=title;this.render();}
  /** Engine checkpoints refine the current step's detail. */
  stage(stage:PreparationStage){
   if(stage==='paint')this.pages=this.lastStage==='paint'?this.pages+1:1;
@@ -117,6 +127,7 @@ export class LoadingProgress {
  }
  /** The durable save has begun: cancel is no longer possible. */
  saving(note='Saving now. This part can’t be cancelled.'){
+  if(this.state==='failed')return;
   this.state='saving';this.savingNote=note;this.render();
  }
  /** Keep the surface open and say what stopped, with Close in place of Cancel. */
@@ -126,24 +137,25 @@ export class LoadingProgress {
   this.render();
   for(const root of this.roots){
    const footer=root.querySelector<HTMLElement>('.viewer-loading-footer');if(footer)footer.innerHTML=closeMarkup;
-   root.querySelector<HTMLElement>('[data-action=close]')?.focus();
+   root.querySelector<HTMLElement>('.viewer-loading-footer button')?.focus();
   }
  }
  statusText(){
-  if(this.state==='failed')return `Stopped. ${this.message}`;
+  // The message itself is announced by the alert; the status only says so.
+  if(this.state==='failed')return 'Stopped.';
   const step=this.steps.find(s=>s.state==='active');if(!step)return this.title;
   return `${LOADING_STEPS[step.id]}${step.detail?`: ${step.detail}`:''}`;
  }
  private stepsMarkup(){
   return this.steps.map(s=>`<li data-step="${s.id}" data-step-state="${s.state}"${s.state==='active'?' aria-current="step"':''}><span class="viewer-loading-mark" aria-hidden="true"></span>`+
-   `<span class="viewer-loading-label">${escape(LOADING_STEPS[s.id])}</span><span class="viewer-loading-detail">${escape(s.state==='active'?s.detail:'')}</span></li>`).join('');
+   `<span class="viewer-loading-label">${escape(LOADING_STEPS[s.id])}</span><span class="viewer-loading-said">${STATE_WORDS[s.state]}</span><span class="viewer-loading-detail">${escape(s.state==='active'?s.detail:'')}</span></li>`).join('');
  }
  /** Update rows in place so the running mark's motion is never restarted. */
  private paintSteps(list:Element){
   const rows=[...list.children] as HTMLElement[];
   if(rows.length!==this.steps.length||rows.some((row,i)=>row.dataset.step!==this.steps[i].id)){list.innerHTML=this.stepsMarkup();return;}
   rows.forEach((row,i)=>{const s=this.steps[i],detail=s.state==='active'?s.detail:'';
-   if(row.dataset.stepState!==s.state)row.dataset.stepState=s.state;
+   if(row.dataset.stepState!==s.state){row.dataset.stepState=s.state;const said=row.querySelector('.viewer-loading-said');if(said)said.textContent=STATE_WORDS[s.state];}
    if(s.state==='active')row.setAttribute('aria-current','step');else row.removeAttribute('aria-current');
    const line=row.querySelector('.viewer-loading-detail');if(line&&line.textContent!==detail)line.textContent=detail;});
  }
@@ -151,7 +163,7 @@ export class LoadingProgress {
   const status=this.statusText();
   for(const root of [...this.roots]){
    const surface=root.querySelector<HTMLElement>('.viewer-loading');if(!surface||!(root as Node).isConnected){this.roots.delete(root);continue;}
-   surface.dataset.loadingState=this.state;surface.setAttribute('aria-busy',String(this.state!=='failed'));
+   surface.dataset.loadingState=this.state;surface.querySelector('.viewer-loading-steps')?.setAttribute('aria-busy',String(this.state!=='failed'));
    const title=surface.querySelector('.viewer-loading-title');if(title&&title.textContent!==this.title)title.textContent=this.title;
    const kicker=surface.querySelector<HTMLElement>('.viewer-loading-kicker');if(kicker){kicker.hidden=!this.kicker;if(kicker.textContent!==this.kicker)kicker.textContent=this.kicker;}
    const list=surface.querySelector('.viewer-loading-steps');if(list)this.paintSteps(list);
@@ -171,7 +183,6 @@ export class LoadingProgress {
   for(const root of [...this.roots]){
    const line=root.querySelector<HTMLElement>('.viewer-loading-elapsed');if(!line||!(root as Node).isConnected){this.roots.delete(root);continue;}
    line.hidden=!shown;const text=shown?clock(seconds):'';if(line.textContent!==text)line.textContent=text;
-   if(shown)line.setAttribute('aria-label',`${text} elapsed`);
   }
   if(!this.roots.size)this.stop();
  }

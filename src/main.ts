@@ -143,11 +143,14 @@ let carriedLoading:LoadingProgress|undefined;
 const scoreTitle=(entryId:string)=>entries.find(e=>e.id===entryId)?.metadata.title??'Score';
 function openingLoading(entryId:string){return new LoadingProgress(scoreTitle(entryId),['check','hands','open'],{kicker:'Opening',cancel:true});}
 function beginReading(entryId:string,loading?:LoadingProgress){
+ const carried=carriedLoading;carriedLoading=undefined;
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
  libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
  job?.cancel();
- loading??=carriedLoading??openingLoading(entryId);carriedLoading=undefined;
- const controller=new AbortController(),running:ReadingJob={cancel:()=>controller.abort(),entryId,state:'working',progress:loading.statusText()},
+ loading??=carried??openingLoading(entryId);
+ // A surface carried past its save stays uncancellable: the new edition is
+ // already in the library, so Esc must not leave the reader on the old one.
+ const controller=new AbortController(),running:ReadingJob={cancel:()=>controller.abort(),entryId,state:loading.state==='saving'?'installing':'working',progress:loading.statusText()},
   op:ReadingOperation={controller,running,previous:current,keyboard:preferences.keyboardLayout,generation:++readingGeneration,
    options:dialog?.dataset.kind==='options'?optionsSection:undefined,optionsFocus:(document.activeElement as HTMLElement)?.dataset.optionsKey,loading};
  readingOperation=op;job=running;practice?.pause();readingDialog(op);return op;
@@ -165,6 +168,13 @@ function readingProgress(op:ReadingOperation,step:LoadingStepId){checkReadingOwn
  * stays cancellable at every cooperative step. */
 function readingExecution(op:ReadingOperation):ReadingExecution {
  return {signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);op.loading.stage(stage);}};
+}
+/** A failure the player did not ask for stays on its loading surface with
+ * Close; a cancelled one simply closes. */
+function holdFailure(loading:LoadingProgress,d:HTMLDialogElement,error:unknown,cancelled:boolean){
+ if(dialog!==d)return;
+ if(cancelled||!(error instanceof Error)||error.name==='AbortError'){loading.stop();closeDialog();return;}
+ loading.fail(error.message,button('Close','close','Esc'));d.dataset.kind='loading-failed';shownFailures.add(error);
 }
 function suspendReadingDialog(op:ReadingOperation){checkReading(op);op.dialog=undefined;closeDialog(false);}
 function finishReading(op:ReadingOperation,success:boolean,error?:unknown){
@@ -705,19 +715,19 @@ async function changeTransposition(steps:number){
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Score change cancelled. The current score is retained.');
     if(retained&&(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout))){running.state='installing';loading.step('save');loading.saving();prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,availableFingerPresentations:[]},running,dialog:d};}
     else{running.state='complete';closeDialog();retained=undefined;rebuilt=undefined;}
-   }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
+   }catch(error){running.state='failed';holdFailure(loading,d,error,controller.signal.aborted);throw error;}
   }
   let carried:ReturnType<typeof personalForTransposedEdition>|undefined;
   if(!prepared){if(steps===0)throw Error('The retained original for this instrument is unavailable. The current score is retained.');const bytes=await host.read(target.entry.file);if(!bytes)throw Error('Managed score is missing; current transposition retained.');
    const controller=new AbortController(),running={cancel:()=>controller.abort(),entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Transposing score…'};job=running;
-   const d=showDialog(loading.markup(),'piano-preparation');loading.attach(d);loading.step('transpose');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
+   const d=showDialog(loading.markup(),'piano-preparation');loading.attach(d);loading.restart(['transpose','save','hands','open']);loading.step('transpose');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
    try{const transposed=await prepareSourceTransposition(target.package,bytes,steps,{signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')loading.stage(stage);}});
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Transposing cancelled. The current score is retained.');
     const p=await readerAdmission.import(transposed,{allowLegacyTempo:true,keyboardLayout:layout});carried=personalForTransposedEdition(target.personal,target.package,p);
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Transposing cancelled. The current score is retained.');
     running.state='installing';loading.step('save');loading.saving();
     prepared={q:{status:'reading',package:p,packageBytes:transposed,personal:carried.personal,availableFingerPresentations:[]},running,dialog:d};
-   }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
+   }catch(error){running.state='failed';holdFailure(loading,d,error,controller.signal.aborted);throw error;}
   }
   const {q,running,dialog:d}=prepared;if(current!==target||getScoreTransposition(q.package)!==steps)throw Error('The score changed while preparing; previous transposition retained.');
   const personal=q.personal??initialPersonal(q.package);if(!retained)personal.view=anchorView(target.personal.view,q.package,writtenAnchor(target.package,target.personal.view.page));
@@ -730,7 +740,7 @@ async function changeTransposition(steps:number){
 }
 async function switchKeyboard(value:unknown){const source=document.activeElement as HTMLElement|null,optionsSurface=dialog,id=keyboardPreference(value);if(keyboardChanging)return;keyboardChanging=true;let op:ReadingOperation|undefined;
 
- try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id,new LoadingProgress(previous.entry.metadata.title,['save','hands','open'],{kicker:`Switching to ${keyboardLabel(id)}`,cancel:true,cancelNote:'Cancel keeps the current keyboard.'}));await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
+ try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id,new LoadingProgress(previous.entry.metadata.title,['check','save','hands','open'],{kicker:`Switching to ${keyboardLabel(id)}`,cancel:true,cancelNote:'Cancel keeps the current keyboard.'}));readingProgress(op,'check');await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
 
   const existing=previous.package.availablePresentations?.includes(id)?await selectPresentation(previous.package,id):undefined,
    personal=existing?await loadPersonal(previous.entry,existing):undefined,{q,running}=await preparePianoLayout(bytes,id,personal,previous.package,op);
@@ -857,7 +867,7 @@ async function importScore(){
  if(MUSESCORE_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'engrave');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
   const saved=bytes;bytes=(await prepareMuseScore(saved,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
- const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.title=p.manifest.metadata.title||op.loading.title;
+ const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.setTitle(p.manifest.metadata.title||op.loading.title);
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false;
  if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op);
@@ -923,7 +933,7 @@ async function earlierEditions(){
      entries=result.entries;return result;
     });
     restoring.state='complete';closeDialog(false);carriedLoading=loading;await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},context,admitted);notify(rebuilt?`Earlier edition restored. ${rebuiltNotice(rebuilt)}`:'Earlier edition restored with its saved choices.');
-   }catch(error){restoring.state='failed';loading.stop();progress.replaceChildren();if((error as Error).name==='AbortError'&&dialog!==d)return;if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else notify((error as Error).message);}
+   }catch(error){restoring.state='failed';loading.stop();progress.replaceChildren();if((error as Error).name==='AbortError'&&dialog!==d)return;if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else reportFailure(error);}
    finally{b.disabled=false;}
   })();});
  }
@@ -970,7 +980,7 @@ function options(section?:string){
  Promise.all([midiMounted,audioMounted,pianoMounted]).then(()=>{if(dialog===d&&!bindingOptions?.active)optionsNavigation?.focusInitial();});
  optionsNavigation=new OptionsNavigation(d,target=>{if(bindingOptions?.testing&&!target?.hasAttribute('data-binding-test'))bindingOptions.endTest(false);},()=>!!bindingOptions?.capturing||!!bindingOptions?.testing,{sectionChanged:id=>{optionsSection=id;}});
  if(current&&p&&scoreCapabilities(p).pianoPreparation&&!transpose.error){
-  const target=current,field=d.querySelector<HTMLInputElement>('[data-score-transpose]')!,notice=d.querySelector('[data-transpose-error]')!,read=()=>transposeDraft(field.value,transpose.min,transpose.max),commit=()=>{try{const steps=read();field.value=String(getScoreTransposition(target.package));notice.textContent='';if(steps!==getScoreTransposition(target.package)){field.disabled=true;d.querySelectorAll<HTMLButtonElement>('[data-manual-key="transpose"] button').forEach(button=>button.disabled=true);void changeTransposition(steps).catch(error=>{notify(error.message);if(current===target)options();});}return true;}catch(error){notice.textContent=(error as Error).message;return false;}};
+  const target=current,field=d.querySelector<HTMLInputElement>('[data-score-transpose]')!,notice=d.querySelector('[data-transpose-error]')!,read=()=>transposeDraft(field.value,transpose.min,transpose.max),commit=()=>{try{const steps=read();field.value=String(getScoreTransposition(target.package));notice.textContent='';if(steps!==getScoreTransposition(target.package)){field.disabled=true;d.querySelectorAll<HTMLButtonElement>('[data-manual-key="transpose"] button').forEach(button=>button.disabled=true);void changeTransposition(steps).catch(error=>{if(shownFailures.has(error))return;notify(error.message);if(current===target)options();});}return true;}catch(error){notice.textContent=(error as Error).message;return false;}};
   transposeControls=new ManualTempoControls({accepts:el=>dialog===d&&d.contains(el)&&el.closest<HTMLElement>('[data-manual-key]')?.dataset.manualKey==='transpose'&&!field.disabled,edit:{cancel:()=>{notice.textContent='';},commit:()=>commit(),adjust:(_key,draft,direction)=>{try{const value=transposeDraft(draft.value,transpose.min,transpose.max),next=value+direction;if(next<transpose.min||next>transpose.max)return false;draft.value=String(next);notice.textContent='';return true;}catch(error){notice.textContent=(error as Error).message;return false;}}},adjust:(_key,direction,repeated)=>{if(repeated)return false;const next=getScoreTransposition(target.package)+direction;if(next<transpose.min||next>transpose.max)return false;field.value=String(next);return commit();}});
  }
 }
@@ -1041,7 +1051,7 @@ app.addEventListener('pointerdown',e=>{const control=(e.target as HTMLElement).c
 window.addEventListener('pointerup',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 window.addEventListener('pointercancel',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 app.addEventListener('change',e=>{const el=e.target as HTMLSelectElement;if(!current||!el.dataset.option)return;const v=current.personal.view,key=el.dataset.option as keyof typeof v;(v as any)[key]=['count','scale'].includes(key)?Number(el.value):el.value;renderPages();renderToolbar();savePersonalQuietly();});
-document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-notation-system]')){const choice=field.value==='traditional'?'traditional':'iso';void saveNotationSystem(choice).catch(error=>{notify(error.message);field.value='iso';});return;}if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{notify(error.message);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}});
+document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-notation-system]')){const choice=field.value==='traditional'?'traditional':'iso';void saveNotationSystem(choice).catch(error=>{notify(error.message);field.value='iso';});return;}if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{reportFailure(error);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}});
 window.addEventListener('mousemove',e=>{if(current&&(e.clientY>innerHeight-36||e.clientX<20||e.clientX>innerWidth-20))reveal();});
 window.addEventListener('resize',()=>{if(dialog)fitDialog(dialog,orientation.rotation);if(practice)return;if(current)renderPages();else {const surface=app.querySelector<HTMLElement>('.surface');if(surface)transformSurface(surface,orientation.rotation);}});
 window.addEventListener('pagehide',()=>{if(job?.state==='working')job.cancel();readerAdmission.clear();});
@@ -1183,7 +1193,7 @@ async function boot(){
   if(pianoWarning)notify(pianoWarning);
  }catch(error){
   startupFailed=true;app.classList.add('viewer-startup');
-  if(startupLoading&&app.querySelector('.viewer-loading')){startupLoading.title='The library could not open';startupLoading.fail(`${(error as Error).message} Your saved files are kept as they were.`,button('Close Viewer','exit'));}
+  if(startupLoading&&app.querySelector('.viewer-loading')){const message=(error as Error).message.trim();startupLoading.setTitle('The library could not open');startupLoading.fail(`${/[.!?]$/.test(message)?message:`${message}.`} Your saved files are kept as they were.`,button('Close Viewer','exit'));}
   else app.innerHTML=`<section class="viewer-loading" data-loading-state="failed"><h2 class="viewer-loading-title">The library could not open</h2><p class="viewer-loading-message" role="alert">${esc((error as Error).message)} Your saved files are kept as they were.</p><div class="viewer-loading-footer">${button('Close Viewer','exit')}</div></section>`;
   startupLoading=undefined;
  }

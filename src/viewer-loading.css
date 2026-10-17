@@ -3,8 +3,9 @@ body{margin:0}
 .viewer-startup{min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;padding:32px;box-sizing:border-box;background:#000}
 .viewer-loading{width:100%;min-width:0;font-family:system-ui,sans-serif;color:#e8e8e8}
 .viewer-startup .viewer-loading{max-width:440px}
-dialog[data-kind=score-reading],dialog[data-kind=piano-preparation],dialog[data-kind=loading-failed]{width:min(500px,90vw);box-sizing:border-box;padding:30px 32px 26px;background:#0d0d0d;border-color:#2c2c2c}
-.viewer-loading-kicker{margin:0 0 6px;font-size:12px;line-height:1.4;letter-spacing:.08em;text-transform:uppercase;color:#8d8d8d}
+/* Earlier editions turns into piano-preparation while it saves; it keeps its own size. */
+dialog:is([data-kind=score-reading],[data-kind=piano-preparation],[data-kind=loading-failed]):not(:has([data-editions])){width:min(500px,90vw);box-sizing:border-box;padding:30px 32px 26px;background:#0d0d0d;border-color:#2c2c2c}
+.viewer-loading-kicker{margin:0 0 6px;font-size:13px;line-height:1.4;letter-spacing:.02em;color:#8d8d8d}
 .viewer-loading-kicker[hidden]{display:none}
 .viewer-loading .viewer-loading-title{font-size:21px;line-height:1.3;font-weight:450;letter-spacing:.01em;margin:0 0 22px;overflow-wrap:anywhere}
 .viewer-loading-steps{list-style:none;margin:0;padding:0;display:grid;gap:12px}
@@ -22,7 +23,7 @@ dialog[data-kind=score-reading],dialog[data-kind=piano-preparation],dialog[data-
 [data-step-state=active] .viewer-loading-mark::before{left:1px;top:2px;width:16px;height:16px;border:2px solid #2e3a3d;border-top-color:#b5c7cd;will-change:transform;animation:viewer-loading-turn .9s linear infinite}
 .viewer-loading-steps li[data-step-state=failed]{color:#f4f4f4}
 [data-step-state=failed] .viewer-loading-mark::before{content:"×";left:2px;top:-1px;width:auto;height:auto;border:0;border-radius:0;font-size:20px;line-height:20px;color:#e08b7f}
-.viewer-loading-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;margin:0}
+.viewer-loading-status,.viewer-loading-said{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;margin:0}
 .viewer-loading-message{margin:20px 0 0;padding:12px 14px;border-left:2px solid #e08b7f;background:#1a1312;color:#ead7d4;font-size:14px;line-height:1.5}
 .viewer-loading-message[hidden]{display:none}
 .viewer-loading-progress{display:block;width:100%;height:3px;margin:18px 0 0;border:0;background:#2a2a2a;accent-color:#b5c7cd;overflow:hidden;border-radius:2px}

@@ -4,6 +4,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import {LoadingProgress,LOADING_STEPS,stageDetail} from '../src/viewer-loading';
 
 const states=(markup:string)=>[...markup.matchAll(/data-step="([^"]+)" data-step-state="([^"]+)"/g)].map(m=>`${m[1]}:${m[2]}`);
+const spoken=(markup:string)=>[...markup.matchAll(/class="viewer-loading-said">([^<]*)</g)].map(m=>m[1]);
 
 test('steps advance in order, drop skipped ones and insert steps the flow reaches',()=>{
  const loading=new LoadingProgress('Mai, lieber Mai',['engrave','check','save','hands','open'],{kicker:'Importing',cancel:true});
@@ -13,6 +14,9 @@ test('steps advance in order, drop skipped ones and insert steps the flow reache
  loading.step('engrave-again');
  assert.deepEqual(states(loading.markup()),['engrave:done','save:done','engrave-again:active','hands:pending','open:pending']);
  assert.match(loading.markup(),/<p class="viewer-loading-kicker">Importing<\/p><h2 class="viewer-loading-title">Mai, lieber Mai<\/h2>/);
+ assert.deepEqual(spoken(loading.markup()),[', done',', done',', in progress',', waiting',', waiting'],'Each step says its state, not only its drawn mark.');
+ loading.restart(['transpose','save']);loading.step('transpose');
+ assert.deepEqual(states(loading.markup()),['transpose:active','save:pending'],'Work set aside is not left ticked.');
 });
 
 test('engine stages read as musical work and drawn pages are counted',()=>{
@@ -32,13 +36,17 @@ test('cancel is offered with what it leaves behind; failure replaces it with Clo
  assert.doesNotMatch(new LoadingProgress('Starting',['library']).markup(),/cancel-job/,'Startup cannot be cancelled.');
  loading.step('check');loading.fail('The file is not a score.','<button data-action="close">Close</button>');
  assert.equal(loading.state,'failed');assert.deepEqual(states(loading.markup()),['check:failed','open:pending']);
- assert.equal(loading.statusText(),'Stopped. The file is not a score.');
- loading.step('open');assert.equal(loading.state,'failed','A failed operation does not resume.');
+ assert.equal(loading.statusText(),'Stopped.','The alert carries the message; the status does not repeat it.');
+ assert.match(loading.markup(),/class="viewer-loading-said">, stopped</);
+ loading.step('open');loading.saving();assert.equal(loading.state,'failed','A failed operation does not resume.');
 });
 
-test('loading text names no time estimate and no engine terms',()=>{
- const text=[...Object.values(LOADING_STEPS),readFileSync(new URL('../src/viewer-loading.ts',import.meta.url),'utf8')].join('\n');
- assert.doesNotMatch(text,/minute|so far|about as long|can take/i);
+test('loading text names no time estimate',()=>{
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),
+  surfaces=[...main.matchAll(/new LoadingProgress\([^;]*/g)].map(m=>m[0]);
+ assert.ok(surfaces.length>=6,'Every loading surface in the viewer is checked.');
+ const text=[...Object.values(LOADING_STEPS),...surfaces,readFileSync(new URL('../src/viewer-loading.ts',import.meta.url),'utf8')].join('\n');
+ assert.doesNotMatch(text,/minute|seconds? (left|remaining)|so far|about as long|can take|almost done/i);
 });
 
 // The physical keyboard is legitimately the Jankó keyboard; the notation is
