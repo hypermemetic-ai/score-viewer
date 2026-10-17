@@ -25,8 +25,9 @@ test('both keyboards and transfer directions cold-replay complete authored beams
   assert.deepEqual(source.owners.map(o=>{assert.ok('pitch' in o);return[o.id,o.pitch,o.startTick,o.durationTicks];}),original.source.notes.map(n=>[n.id,requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,n.startTick,n.durationTicks]).sort((a,b)=>String(a[0])<String(b[0])?-1:1));
   assert.equal(source.silences.length,1);assert.equal(source.silences[0].source.voice,'melody');
   assert.equal(coverage.silences[0].disposition,'visible');assert.ok(coverage.silences[0].paint[0].ids.length);
-  assert.deepEqual(q.r.layouts[0].beams[0].notes.map(n=>n.id),['gesture-0','gesture-1','gesture-2']);
-  assert.deepEqual(q.r.layouts[0].beams[0].stems.map(s=>s.direction),hand==='LH'?[1,-1,1]:[-1,1,-1]);
+  // ISO #383: a beam splits where its hand changes, and each change is cued head to head.
+  assert.equal(q.r.layouts[0].beams.length,0);
+  assert.deepEqual(q.r.layouts[0].handTransfers!.map(t=>[t.fromIds,t.toIds,t.fromHand,t.toHand,!!t.cue]),[[['gesture-0'],['gesture-1'],hand,other,true],[['gesture-1'],['gesture-2'],other,hand,true]]);
   assert.equal(coverage.gestures[0].memberIds.length,3);assert.equal(coverage.gestures[0].edgeIds.length,4);
   assert.equal(annotationPositions(cold).size,cold.seats.length);assert.equal(fingerDisplayAvailable(cold,initialPersonal(cold),'annotations'),true);
   const replacementUnavailable={...cold,fingerEligibility:{eligible:false}};
@@ -44,21 +45,18 @@ test('strong cold admission rejects missing/duplicated/misattributed paint recei
  await assert.rejects(importPackage(await repinned(p,f=>{const r=JSON.parse(strFromU8(f['rendering-recipe.json']));r.baseline.pageSha256=p.calculatedHandReceipt!.outputIdentity.pageSha256;f['rendering-recipe.json']=strToU8(JSON.stringify(r));})),/raw-page baseline/);
  await assert.rejects(importPackage(await repinned(p,f=>{const s=JSON.parse(strFromU8(f['score.json']));s.notes[0].editorialHand={hand:s.notes[0].hand,kind:'confirm',authorityId:'forged-operator'};f['score.json']=strToU8(JSON.stringify(s));})),/source\/editorial provenance/);
 });
-test('repeat visits, unequal-release aliases and written holds keep original obligations and matching page-boundary seats on both keyboards',async()=>{
- for(const layout of ['conventional-piano','janko-four-row'] as const){const source=boundaryStudy(),original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:240}),
-  hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='edge-a'?'RH':requirePianoEvent(n).hand])),q=await calculatedStudy(original.p,layout,hands),inventory=q.p.calculatedHandReceipt!.sourceInventory,
-  short=inventory.owners.find(o=>o.id==='short-release')!,long=inventory.owners.find(o=>o.id==='long-release')!;
-  assert.equal(q.p.pages.length,2);assert.equal(inventory.occurrences.length,4);assert.equal(inventory.owners.reduce((n,o)=>n+o.performedVisits!.length,0),14);
-  assert.deepEqual(short.performedVisits!.map(v=>[v.startTick,v.releaseTick]),[[192,264],[480,552]]);
-  assert.deepEqual(long.performedVisits!.map(v=>[v.startTick,v.releaseTick]),[[192,288],[480,576]]);
-  const holdSeats=q.p.seats.filter(s=>s.ownerIds.includes('held'));assert.equal(holdSeats.length,2);assert.notEqual(holdSeats[0].page,holdSeats[1].page);assert.equal(holdSeats[1].continuation,true);assert.equal(holdSeats[0].actionId,holdSeats[1].actionId);
-  for(const id of ['short-release','long-release']){const seat=q.p.seats.find(s=>s.ownerIds.includes(id))!;assert.equal(seat.ownerIds.length,1);assert.equal(seat.page,1);assert.equal(seat.actionId,'192:61');}
-  const gesture=q.p.calculatedHandReceipt!.sourceCoverage.gestures.find(g=>g.memberIds.length===4)!;
-  assert.equal(gesture.fragments.length,2);assert.ok(gesture.fragments[0].outgoingEdgeIds.length);assert.ok(gesture.fragments[1].incomingEdgeIds.length);
-  const annotations=annotationPositions(q.p);assert.equal(annotations.size,q.p.seats.length);
-  for(const seat of q.p.seats){const g=q.p.annotationGeometry!.seats.find(g=>g.seatId===seat.id)!,a=annotations.get(seat.id)!;
-   assert.ok(g.durationBounds.every(b=>g.hand==='RH'?a.bounds[3]<b.y0:a.bounds[1]>b.y1));}
-  await assert.rejects(importPackage(await repinned(q.p,f=>{const s=JSON.parse(strFromU8(f['score.json']));s.notes.find((n:any)=>n.id==='long-release').durationTicks=72;f['score.json']=strToU8(JSON.stringify(s));})),/source|owner|hand|layer/);
+test('repeat visits, unequal-release aliases and written holds keep their seats across the page boundary; the calculated-hand recipe refuses the touching cross-bar beam on both keyboards',async()=>{
+ // A beam crossing the barline under the calculated-hand recipe touches it at
+ // the ISO #383 pin, so no such calculated edition can be made; the source's
+ // own edition keeps every obligation across the page boundary.
+ const source=boundaryStudy(),original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:240}),p=original.p;
+ assert.equal(p.pages.length,2);
+ const page=(id:string)=>p.seats.find(s=>s.ownerIds.includes(id))!.page;
+ assert.equal(p.seats.filter(s=>s.ownerIds.includes('held')).length,1);assert.equal(page('edge-b')+1,page('edge-c'),'the cross-bar beam continues on the next page');
+ for(const id of ['short-release','long-release']){const seat=p.seats.find(s=>s.ownerIds.includes(id))!;assert.equal(seat.ownerIds.length,1);assert.equal(seat.page,page('edge-c'));assert.equal(seat.actionId,'192:61');}
+ for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='edge-a'?'RH':requirePianoEvent(n).hand]));
+  await assert.rejects(calculatedStudy(p,layout,hands),(error:Error&{code?:string})=>error.code==='unsupported-fit');
  }
 });
 test('actual all-five replacement failure retains complete fresh long-value annotations and correction seats',async()=>{

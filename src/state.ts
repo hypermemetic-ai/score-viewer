@@ -28,7 +28,11 @@ export const collectionId=(p:ScorePackage)=>getOriginalScoreIdentity(p);
 function storageName(kind:string,entryId:string,p:ScorePackage):string{
  const binding=personalBinding(p);
  if(!binding)return `${kind}-${entryId}.json`;
- return `${kind}-${collectionId(p)}-${binding.keyboardLayout}-${binding.profileSha256}-${binding.effectiveHandSha256}${binding.editionRevision?'-'+binding.editionRevision:''}.json`;
+ // Hand digests do not depend on pitch, so an edition engraved from its own
+ // hands at another pitch names its transposed source; otherwise each pitch
+ // would overwrite the other's choices, practice and performance.
+ const suffix=binding.editionRevision??(binding.sourceRevision!==collectionId(p)?binding.sourceRevision:undefined);
+ return `${kind}-${collectionId(p)}-${binding.keyboardLayout}-${binding.profileSha256}-${binding.effectiveHandSha256}${suffix?'-'+suffix:''}.json`;
 }
 export const personalStorageName=(entryId:string,p:ScorePackage)=>storageName('state',entryId,p);
 export const practiceStorageName=(entryId:string,p:ScorePackage)=>storageName('practice',entryId,p);
