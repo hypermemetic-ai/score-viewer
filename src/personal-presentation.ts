@@ -200,6 +200,8 @@ export class PersonalPresentationSession {
   }).finally(()=>{if(prefetching===controller)prefetching=undefined;});
  }
  private checking?:Promise<boolean>;
+ /** A finished check that left the baseline open (a mixed-hand key in the source pages). */
+ private checked=false;
  get checkingHandChoices(){return !!this.checking;}
  /** Before a hand choice is saved: a score whose own engraving is refused
   * takes no hand choices, so a saved choice can never stop it opening. The
@@ -211,8 +213,8 @@ export class PersonalPresentationSession {
   * otherwise the running check (false when opening another score stopped it). */
  handChoiceCheck():Promise<boolean>|undefined{
   if(this.baseline instanceof Error)throw this.baseline;
-  if(this.baseline!==undefined||!this.base.renderingRecipe||!this.base.sourceSha256)return undefined;
-  return (this.checking??=this.settleBaseline().finally(()=>{this.checking=undefined;})).then(checked=>{
+  if(this.baseline!==undefined||this.checked||!this.base.renderingRecipe||!this.base.sourceSha256)return undefined;
+  return (this.checking??=this.settleBaseline().then(done=>{if(done)this.checked=true;return done;}).finally(()=>{this.checking=undefined;})).then(checked=>{
    if(this.baseline instanceof Error)throw this.baseline;return checked;});
  }
  private async settleBaseline():Promise<boolean>{
