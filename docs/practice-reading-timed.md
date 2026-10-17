@@ -141,10 +141,15 @@ not timed onsets: they carry no written duration, and how far before or on the
 beat to play them is the player's interpretation. A key that belongs to a grace
 group is accepted, without moving on, while its host onset is still to be
 played and at most one beat ahead. This applies to Timed onsets in the passage
-being assessed and to the current Reading step. A grace may be left out; it is
-never counted as missed. Played after its host, or more than a beat early, it is
-a different note like any other. Graces do not enter passage identity, so
-earned progress is unchanged.
+being assessed and to the current Reading step. Grace keys are not counted, so
+striking one again inside that window is also accepted. A grace on its host's
+own key is a second strike of that key: the first strike plays the host, and one
+more strike of it, within half a second of the host's beat in Timed or before the
+next note in Reading, is accepted; lifting the key between the two strikes is not
+releasing the host early. A grace may be left out; it is never counted as
+missed. Played after its host, or more than a beat early, it is a different note
+like any other. Graces are matched by key and time, not by hand. Graces do not
+enter passage identity, so earned progress is unchanged.
 
 ## Passive viewing and editing
 

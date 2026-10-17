@@ -56,3 +56,26 @@ test('Reading accepts the grace within the current step without advancing',()=>{
  assert.equal(w.note(59),'accepted');assert.equal(w.index,1);
  const without=new GroundworkSession(plain,plain.chunks[0]);without.note(55);assert.equal(without.note(57),'failed');
 });
+
+test('a grace on its host’s own key is a second strike of that key, not a wrong note',()=>{
+ const same=planPractice(withGrace(base,24,59),'connection-boundary-v1');
+ assert.deepEqual(same.attacks,plain.attacks);
+ const session=()=>{const s={...initialPractice(same),working:18,start:18},r=new PracticeSession(same,same.chunks[0],s,true);r.ready(0);return r;};
+ const r=session();
+ assert.equal(r.note(55,at(r,0)),'accepted');
+ assert.equal(r.note(59,at(r,24)-60),'accepted','the grace strike sounds the host key');
+ r.release(59,at(r,24)-30);assert.notEqual(r.phase,'error','releasing the grace is not releasing the host');
+ assert.equal(r.note(59,at(r,24)),'ornament');assert.notEqual(r.phase,'error');
+ for(const a of r.events.filter(a=>a.tick>24)){r.note(a.midi,at(r,a.tick));r.update(at(r,a.tick));}
+ r.update(at(r,r.completionTick));assert.equal(r.phase,'complete');
+ // Only one extra strike belongs to the grace; a third is a wrong note.
+ const third=session();third.note(55,at(third,0));third.note(59,at(third,24)-60);third.note(59,at(third,24));
+ assert.equal(third.note(59,at(third,24)+40),'failed');
+ // Without the grace the host is struck once, as before.
+ const once=session();for(const a of once.events){once.note(a.midi,at(once,a.tick));once.update(at(once,a.tick));}
+ once.update(at(once,once.completionTick));assert.equal(once.phase,'complete');
+ // Reading: the host step completes on the first strike, and the second strike is the ornament.
+ const w=new GroundworkSession(same,same.chunks[0]);w.note(55);assert.equal(w.note(59),'accepted');assert.equal(w.index,1);
+ assert.equal(w.note(59),'ornament');assert.equal(w.failure,undefined);assert.equal(w.index,1);
+ assert.notEqual(w.current.events[0].midi,59);assert.equal(w.note(59),'failed','a third strike is a wrong note');
+});
