@@ -21,7 +21,9 @@ function sourcePage(p:ScorePackage,page:number):Document {
  const source=p.pages[page],saved=pages.get(page);if(saved?.source===source){pages.delete(page);pages.set(page,saved);return saved.doc;}
  const doc=new DOMParser().parseFromString(source,'image/svg+xml');pages.delete(page);pages.set(page,{source,doc});if(pages.size>8)pages.delete(pages.keys().next().value!);return doc;
 }
-export interface Crop {bar:number;empty?:boolean;svg:SVGSVGElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
+export interface Crop {bar:number;empty?:boolean;svg:SVGSVGElement;
+ /** Detached ordinary rule of the measure's own system, for continuing its style at a system break. */
+ separator?:SVGLineElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
 /** Copy real-engine ink; attach source group ownership to existing vector elements, never invent notes. */
 export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  const seats=p.seats.filter(s=>s.writtenBar===bar+1);let first=seats[0],doc:Document,system:Element;
@@ -48,6 +50,10 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  if(!Number.isFinite(left)||!Number.isFinite(right)||right!<=left!)throw Error('Vector measure boundaries are unsupported.');
  const beat=system.querySelector<SVGLineElement>('.janko-beat-line')??system.querySelector<SVGLineElement>('.janko-barline')!;const top=Number(beat.getAttribute('y1'))-30,bottom=Number(beat.getAttribute('y2'))+32;
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`${left!} ${top} ${right!-left!} ${bottom-top}`);svg.setAttribute('preserveAspectRatio','xMidYMid meet');svg.dataset.practiceBar=String(bar+1);for(const resource of [...doc.documentElement.children].filter(el=>['style','defs'].includes(el.localName)))svg.append(document.importNode(resource,true));svg.append(document.importNode(system,true));applyAnnotationInkPolicy(svg,annotationInkPolicyFor(p));const clone=svg.querySelector(`#system-${first.system+1}`)!;clone.removeAttribute('id');clone.querySelectorAll('.janko-measure-num,.janko-system-bracket').forEach(e=>e.remove());
+ // The system's ordinary rule style, kept before this bar's entering rule is
+ // removed: a two-bar system's only interior rule is the second bar's entry.
+ const separator=[...clone.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(line=>Number(line.getAttribute('stroke-width'))===.6)?.cloneNode(false) as SVGLineElement|undefined;
+ separator?.removeAttribute('id');
  // Give each authored separator one side. Ordinary/double/end rules belong
  // to the ending bar; start-repeat ink belongs to the following bar.
  const boundary=p.score.barlines?.find(rule=>rule.tick===plan.barTicks[bar]),ending=p.score.barlines?.find(rule=>rule.tick===plan.barTicks[bar+1]);
@@ -104,7 +110,7 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
  // authored register extension is genuine ink, not a new staff origin.
  const lanes=[...system.querySelectorAll<SVGLineElement>('.janko-pitch-lane')].filter(l=>Math.abs(Number(l.getAttribute('x1'))-gridLeft)<.03&&Math.abs(Number(l.getAttribute('x2'))-gridRight)<.03).map(l=>Number(l.getAttribute('y1'))).filter((y,i,a)=>a.indexOf(y)===i).sort((a,b)=>a-b);
  if(!lanes.length)throw Error(`Measure ${bar+1}: missing musical staff frame.`);
- return {bar,svg,seats,width:right!-left!+leftAir+rightAir,height:bottom-top,left:left!,right:right!,leftAir,rightAir,endingType,frame:lanes[0],lanes:lanes.map(y=>y-lanes[0]),owned};
+ return {bar,svg,seats,width:right!-left!+leftAir+rightAir,height:bottom-top,left:left!,right:right!,leftAir,rightAir,endingType,frame:lanes[0],lanes:lanes.map(y=>y-lanes[0]),owned,...(separator?{separator}:{})};
 }
 
 /** Empty intervals retain their real staff, metric guides and authored boundary.
@@ -142,7 +148,7 @@ export function blankMeasureCrop(crop:Crop,width:number):Crop {
  // its template available after replacing an empty interval's system crop.
  if(!crop.endingType||crop.endingType==='regular'){
   const ending=[...rules.querySelectorAll<SVGLineElement>('line')].some(l=>Math.abs(Number(l.getAttribute('x1'))-crop.left-width)<3&&Math.abs(Number(l.getAttribute('x2'))-Number(l.getAttribute('x1')))<.03);
-  if(!ending){const template=[...crop.svg.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(l=>Number(l.getAttribute('stroke-width'))===.6);if(!template)throw Error(`Measure ${crop.bar+1}: missing admitted empty separator.`);const line=template.cloneNode(false) as SVGLineElement;line.removeAttribute('id');line.setAttribute('x1',String(crop.left+width));line.setAttribute('x2',String(crop.left+width));rules.append(line);}
+  if(!ending){const template=crop.separator??[...crop.svg.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(l=>Number(l.getAttribute('stroke-width'))===.6);if(!template)throw Error(`Measure ${crop.bar+1}: missing admitted empty separator.`);const line=template.cloneNode(false) as SVGLineElement;line.removeAttribute('id');line.setAttribute('x1',String(crop.left+width));line.setAttribute('x2',String(crop.left+width));rules.append(line);}
  }
  svg.dataset.practiceBar=String(crop.bar+1);svg.dataset.practiceEmpty='true';return {...crop,empty:true,svg,seats:[],owned:[],right:crop.left+width,width};
 }
@@ -234,7 +240,7 @@ export function composePassage(crops:Crop[],track:PassageTrack,policy:'compact'|
   // source boundary, using its existing geometry/style (never repeat ink).
   if(positions[slot+1]!==undefined&&(!crop.endingType||crop.endingType==='regular')){
    const ending=[...group.querySelectorAll<SVGLineElement>('.janko-barlines line,.janko-repeat line')].some(line=>Math.abs(Number(line.getAttribute('x1'))-crop.right)<3);
-   if(!ending){const template=[...crop.svg.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(line=>Number(line.getAttribute('stroke-width'))===.6);if(!template)throw Error(`Measure ${bar!+1}: missing admitted ordinary separator.`);const line=template.cloneNode(false) as SVGLineElement;line.removeAttribute('id');line.setAttribute('x1',String(crop.right));line.setAttribute('x2',String(crop.right));line.setAttribute('data-practice-source-boundary',String(bar!+1));source.append(line);}
+   if(!ending){const template=crop.separator??[...crop.svg.querySelectorAll<SVGLineElement>('.janko-barlines .janko-barline')].find(line=>Number(line.getAttribute('stroke-width'))===.6);if(!template)throw Error(`Measure ${bar!+1}: missing admitted ordinary separator.`);const line=template.cloneNode(false) as SVGLineElement;line.removeAttribute('id');line.setAttribute('x1',String(crop.right));line.setAttribute('x2',String(crop.right));line.setAttribute('data-practice-source-boundary',String(bar!+1));source.append(line);}
   }
   if(positions.slice(slot+1).every(bar=>bar===undefined)&&(!crop.endingType||crop.endingType==='regular'))group.querySelectorAll<SVGLineElement>('.janko-barlines line').forEach(line=>{if(Math.abs(Number(line.getAttribute('x1'))-crop.right)<.03)line.remove();});
   const rules=[...group.querySelectorAll<SVGLineElement>('.janko-pitch-lane')].filter(line=>crop.lanes.some(y=>Math.abs(Number(line.getAttribute('y1'))-crop.frame-y)<.03));

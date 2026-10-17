@@ -115,6 +115,24 @@ The current [Speed and shortcut source validation](practice-speed-shortcuts-vali
 records the integer-anchor refinement and exact keyboard/build evidence separately
 from the earlier Reading/Timed and native delivery receipts.
 
+## Scores without a reference tempo
+
+A piano score without a reference performance tempo (for example Bach's
+Goldberg Variation 1, or many imported MusicXML and MuseScore files) asks for
+your tempo the first time you open Practice. The tempo counts the opening
+meter's beat: the denominator, or the dotted beat in compound meters, the same
+beat as the count-in. It is remembered as the personal goal in that score's
+practice journal for the selected keyboard, and Options shows it as Your tempo,
+where you can change it. Starting, connection and working speeds, each success
+increase, section percentages, Best/Done and the totals are percentages of your
+tempo. No score reference is shown or offered. The selector and the active
+header show Your tempo beside the total. Earned speeds are kept as rates, so
+raising your tempo lowers their percentages instead of erasing them. Scores
+with a reference tempo are unchanged. Each keyboard and transposition keeps its
+own journal, so switching outside Practice asks again; switching while Practice
+is open carries the tempo across. Library progress for such a score appears once
+a tempo is set and counts toward that tempo.
+
 ## Passive viewing and editing
 
 The full-score reader, editor, selector and Free view do not match played notes, highlight matches, advance selection or turn pages automatically. Only section Reading/Timed and their preparation interpret notes. Free view retains physical held-key state for explicit practice re-entry without counting passive-view attacks as successful playing. MIDI reset, focus loss or connection replacement clears that state. Explicit keyboard/pedal commands, independent piano sound and Options diagnostics remain available. The former full-score Performance start and grading controls are retired; existing records remain stored.

@@ -22,6 +22,8 @@
 
 .metronome-mark{display:inline-block;font-weight:400;white-space:nowrap}.metronome-rate-unit{display:inline-block}.metronome-slash{display:inline-block;margin-inline:4px}/* Frozen notehead baseline22.86/27 at height35 gives5.37px descent. */
 .metronome-unit{width:26px;height:35px;overflow:visible;vertical-align:-5.37px;transform:translateY(2px);margin-right:-6px}.metronome-mark>span+input{margin-left:6px}.metronome-fraction{margin-inline-start:6px;margin-right:2px}.metronome-unit .janko-digit{font-family:"URW Gothic",sans-serif;text-anchor:middle;fill:currentColor}.metronome-unit .janko-stem,.metronome-unit .janko-stem-ring{stroke:currentColor}.metronome-unit .janko-flag,.metronome-unit .janko-augmentation-dot{fill:currentColor}.metronome-unit .janko-stem-ring{fill:#111}
+/* The player's tempo beside practice totals keeps the line's text height. */
+.practice-player-tempo .metronome-unit{width:1.45em;height:1.95em;vertical-align:-.42em;transform:none;margin-right:-.3em}
 
 dialog[data-kind=performance] .practice-reference{justify-content:flex-start;align-items:baseline;flex-wrap:wrap;gap:8px 14px}
 
