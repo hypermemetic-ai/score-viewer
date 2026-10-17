@@ -195,6 +195,10 @@ test('a score whose own engraving is refused says so instead of blaming a hand c
  const worker=fakeWorker(()=>({async warmAsync(){throw refuse();},async projectAsync(){throw refuse();}}));
  const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache:null});
  assert.equal(session.settlesOnOpen,false);
+ // A hand choice is refused before it is saved.
+ await assert.rejects(new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache:null}).ensureHandChoicesDrawable(),/can't be displayed yet/);
+ const drawable=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore).spawn),cache:null});
+ await drawable.ensureHandChoicesDrawable();await drawable.ensureHandChoicesDrawable();
  const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!;
  await assert.rejects(session.project(assigned(p,initialPersonal(p),seat,{hand:'RH'})),
   (e:unknown)=>e instanceof Error&&/can't be displayed yet/.test(e.message)&&undrawableHandOwners(e)===undefined);

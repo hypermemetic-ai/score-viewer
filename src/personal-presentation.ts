@@ -14,8 +14,9 @@ import type {DerivedFileCache} from './derived-file-cache';
 
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
- /** offThreadOnly: settle only where it cannot hold the reader's thread. */
- warm(execution?:ReadingExecution,offThreadOnly?:boolean):Promise<void>;
+ /** offThreadOnly: settle only where it cannot hold the reader's thread.
+  * Resolves whether the engraving actually settled. */
+ warm(execution?:ReadingExecution,offThreadOnly?:boolean):Promise<boolean>;
  project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>;
 }
 type Core=PersonalProjectionCore;
@@ -24,7 +25,7 @@ const preparations=new PersonalPreparationPool<Core>();
 function localCore(inputs:ProjectionCoreInputs):Core {
  const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
  return {
-  async warm(e,offThreadOnly){if(offThreadOnly)return;if(e)await core.warmAsync(e);else core.warm();},
+  async warm(e,offThreadOnly){if(offThreadOnly)return false;if(e)await core.warmAsync(e);else core.warm();return true;},
   async project(owners,digest,e){return e?core.projectAsync(owners,digest,e):core.project(owners,digest);}
  };
 }
@@ -34,7 +35,8 @@ function freezeView<T>(value:T):T {
 }
 /** The worker holds the core. A worker lost mid-request is started again
  * once; if no worker can run here at all, the same captured inputs make a
- * local core, exactly as before the worker existed. */
+ * local core. Work that was meant for the worker then runs cooperatively on
+ * the reader's thread, never as one uninterrupted engraving. */
 function workerCore(client:ProjectionWorkerClient,key:string,inputs:ProjectionCoreInputs):Core {
  let local:Core|undefined;
  async function remote<V>(run:()=>Promise<V>,offThreadOnly=false):Promise<V|undefined>{
@@ -50,13 +52,13 @@ function workerCore(client:ProjectionWorkerClient,key:string,inputs:ProjectionCo
  }
  return {
   async warm(e,offThreadOnly){
-   if(local){if(!offThreadOnly)await local.warm(e);return;}
-   await remote(()=>client.warm(key,inputs,e),offThreadOnly);
-   const fallback=local as Core|undefined;if(fallback&&!offThreadOnly)await fallback.warm(e);
+   if(!local&&await remote(()=>client.warm(key,inputs,e).then(()=>true),offThreadOnly))return true;
+   const fallback=local as Core|undefined;
+   return fallback&&!offThreadOnly?fallback.warm(e??{}):false;
   },
   async project(owners,digest,e){
    if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e));if(view)return freezeView(view);}
-   return local!.project(owners,digest,e);
+   return local!.project(owners,digest,e??{});
   }
  };
 }
@@ -173,7 +175,7 @@ export class PersonalPresentationSession {
  async warm(input?:ReadingExecution):Promise<void>{
   if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  try{await this.use((core,e)=>core.warm(e),execution);this.baseline=true;}
+  try{if(await this.use((core,e)=>core.warm(e),execution))this.baseline=true;}
   catch(error){
    // The source's own pages already draw a key whose notes differ in having a
    // hand; only a personal projection must refuse it. Read those pages, and
@@ -191,15 +193,29 @@ export class PersonalPresentationSession {
   if(this.prefetched||this.baseline||!this.worker?.available||!this.base.renderingRecipe||!this.base.sourceSha256)return;
   this.prefetched=true;cancelPersonalPrefetch();
   const controller=new AbortController();prefetching=controller;
-  void this.use((core,e)=>core.warm(e,true),{signal:controller.signal}).then(()=>{if(this.worker?.available)this.baseline??=true;},error=>{
+  void this.use((core,e)=>core.warm(e,true),{signal:controller.signal}).then(settled=>{if(settled)this.baseline??=true;else this.prefetched=false;},error=>{
    this.prefetched=false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});
   }).finally(()=>{if(prefetching===controller)prefetching=undefined;});
+ }
+ private checking?:Promise<void>;
+ /** Before a hand choice is saved: a score whose own engraving is refused
+  * takes no hand choices, so a saved choice can never stop it opening. The
+  * check settles the engraving where hand drawing runs (the worker, or
+  * cooperatively here), which the first drawn choice needs anyway. */
+ async ensureHandChoicesDrawable():Promise<void>{
+  if(this.baseline===undefined&&this.base.renderingRecipe&&this.base.sourceSha256)
+   await (this.checking??=this.settleBaseline().finally(()=>{this.checking=undefined;}));
+  if(this.baseline instanceof Error)throw this.baseline;
+ }
+ private async settleBaseline(){
+  try{if(await this.use((core,e)=>core.warm(e),{}))this.baseline??=true;}
+  catch(error){if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});else if(!(error instanceof HandPresentationError))throw error;}
  }
  /** A projection was refused. When the score's own engraving is what fails,
   * say so: no hand choice is at fault, so none is returned to the score. */
  private async refusal(error:unknown,execution?:ReadingExecution):Promise<never>{
   if(baselineRefusal(error)&&this.baseline===undefined&&this.base.renderingRecipe&&this.base.sourceSha256){
-   try{await this.use((core,e)=>core.warm(e),execution);this.baseline=true;}
+   try{if(await this.use((core,e)=>core.warm(e),execution))this.baseline=true;}
    catch(warmError){
     if(baselineRefusal(warmError))this.baseline=Error(CANNOT_DRAW,{cause:warmError});
     else if(!(warmError instanceof HandPresentationError))throw warmError;
@@ -217,7 +233,9 @@ export class PersonalPresentationSession {
   const cache=this.cache;if(!cache)return;
   if(this.cacheWrite!==undefined)clearTimeout(this.cacheWrite);
   const value={score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry};
-  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value)).catch(()=>{});},this.cacheWriteDelayMs);
+  const write=()=>{void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value)).catch(()=>{});};
+  // Serializing pages is real work: it waits for the reader to be idle.
+  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
  }
  async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
