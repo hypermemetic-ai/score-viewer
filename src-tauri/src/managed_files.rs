@@ -14,6 +14,10 @@ pub fn valid_managed_name(name: &str) -> bool {
     if matches!(name, "library.json" | "preferences.json" | "practice-error-log.json" | "viewer-derived-cache-v1.json") {
         return true;
     }
+    // The bounded derived-file cache: twelve overwritten slots of derived data.
+    if let Some(slot) = name.strip_prefix("viewer-derived-cache-v1-slot-").and_then(|s|s.strip_suffix(".bin")) {
+        return matches!(slot, "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "a" | "b");
+    }
     if let Some(hash) = name.strip_prefix("package-").and_then(|s|s.strip_suffix(".isoscore")) {
         return digest(hash, false);
     }
@@ -55,6 +59,16 @@ mod tests {
             assert!(valid_managed_name(name));
         }
         for name in ["library.pending", "Library.json", "notes.json", "library.json.backup", "viewer-derived-cache.json", "viewer-derived-cache-v2.json", "Viewer-derived-cache-v1.json", "viewer-derived-cache-v1.json.backup", "../viewer-derived-cache-v1.json"] {
+            assert!(!valid_managed_name(name));
+        }
+    }
+    #[test]
+    fn derived_cache_slots_are_bounded_and_exact() {
+        for slot in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b"] {
+            assert!(valid_managed_name(&format!("viewer-derived-cache-v1-slot-{slot}.bin")));
+        }
+        for name in ["viewer-derived-cache-v1-slot-c.bin", "viewer-derived-cache-v1-slot-B.bin", "viewer-derived-cache-v1-slot-10.bin",
+            "viewer-derived-cache-v1-slot-.bin", "viewer-derived-cache-v1-slot-0.json", "viewer-derived-cache-v2-slot-0.bin", "../viewer-derived-cache-v1-slot-0.bin"] {
             assert!(!valid_managed_name(name));
         }
     }

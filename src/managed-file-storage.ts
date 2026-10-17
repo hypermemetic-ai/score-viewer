@@ -6,12 +6,14 @@ const presentation=/^(?:state|practice|performance)-[a-f0-9]{64}-(?:conventional
 const manualPractice=/^practice-manual-v1-[a-f0-9]{64}\.json$/;
 const manualView=/^manual-reading-view-v1-[a-f0-9]{64}\.json$/;
 const fixed=new Set(['library.json','preferences.json','practice-error-log.json','viewer-derived-cache-v1.json']);
+/** The bounded derived-file cache: twelve overwritten slots, derived data only. */
+const derivedSlot=/^viewer-derived-cache-v1-slot-[0-9a-b]\.bin$/;
 
 /** The existing native contract stays bounded and accepts no paths. The full
  * prepared journal identity remains its logical key and content binding. */
 export function validPhysicalManagedName(name:string):boolean {
  return typeof name==='string'&&!/[^A-Za-z0-9.-]/.test(name)&&name.length<=230&&(fixed.has(name)||
-  /^package-[a-fA-F0-9]{64}\.isoscore$/.test(name)||/^state-version-[a-f0-9]{64}\.json$/.test(name)||legacy.test(name)||presentation.test(name));
+  /^package-[a-fA-F0-9]{64}\.isoscore$/.test(name)||derivedSlot.test(name)||/^state-version-[a-f0-9]{64}\.json$/.test(name)||legacy.test(name)||presentation.test(name));
 }
 
 /** Only the exact known prepared-key shape gets an alias. Other names must
