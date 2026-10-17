@@ -93,7 +93,7 @@ function transformScore(source:QuantizedGridScore,steps:number,enforceRange:bool
   }
  }
  // An instrument's MIDI program and channel name a sound and a channel, not a pitch.
- const instrumentMidi=(path:string,k:string)=>(k==='midiProgram'||k==='midiChannel')&&/\/parts\/\d+\/instruments\/\d+$/.test(path);
+ const instrumentMidi=(path:string,k:string)=>(k==='midiProgram'||k==='midiChannel')&&/^source\/parts\/\d+\/instruments\/\d+$/.test(path);
  const audit=(v:any,path:string)=>{if(!v||typeof v!=='object')return;if(seen.has(v))return;
   for(const [k,x]of Object.entries(v)){if(/pitch|midi|guard/i.test(k)&&k!=='pitchStatements'&&k!=='sourceHash'&&!instrumentMidi(path,k)){
     if(object(x)&&seen.has(x))continue;

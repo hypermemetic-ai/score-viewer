@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import {undrawableHandOwners} from '../src/personal-presentation';
+import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
@@ -134,4 +135,17 @@ test('restore failure after Escape retains pending choices and handles its rejec
  const restoring=f.restore(),newDialog={id:'new-options-dialog'};f.context.closeDialog();f.context.dialog=newDialog;
  f.projection.resolve({...f.target.package,choiceSnapshot:f.target.personal});await restoring;
  assert.equal(f.context.dialog,newDialog);await assert.rejects(f.editor.queue.flush(),/restore storage unavailable/);assert.equal(f.editor.queue.recovery.length,1);assert.match(f.editor.queue.error.message,/restore storage unavailable/);assert.ok(f.errors.length);
+});
+
+test('a hand the page cannot draw goes back to the hand it had; the player is told and the score stays usable',async()=>{
+ const f=fixture();f.context.handFor=(_p:any,s:any,id:string)=>s.choices[id]?.hand??null;
+ const refused=()=>Error('These hand choices can\'t be drawn on the page yet.',{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',['note-0'])});
+ f.setProject(async s=>{if(s.choices['note-0'].hand==='RH')throw refused();return {...f.target.package,choiceSnapshot:structuredClone(s)};});
+ await f.context.saveHandChoice('RH');await f.context.personalMemory.flush();await f.editor.queue.flush();await settle();
+ assert.equal(f.target.personal.choices['note-0'].hand,'LH');assert.equal(f.editor.view.choiceSnapshot.choices['note-0'].hand,'LH');
+ assert.equal(f.disk.choices['note-0'].hand,'LH','the saved choice is the drawable one, so the next open succeeds');
+ assert.ok(f.messages.includes('That hand can’t be drawn on the page yet, so the note keeps the hand it had.'));assert.deepEqual(f.errors,[]);
+ // A drawable choice on the other note still goes through.
+ f.context.selection=f.seats[1];await f.context.saveHandChoice('LH');await f.context.personalMemory.flush();await settle();
+ assert.equal(f.target.personal.choices['note-1'].hand,'LH');assert.equal(f.editor.view.choiceSnapshot.choices['note-1'].hand,'LH');
 });

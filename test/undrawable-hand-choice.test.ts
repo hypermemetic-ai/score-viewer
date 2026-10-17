@@ -43,7 +43,7 @@ test('a refused hand returns to the hand the note had, as a recorded choice, and
  const attempted=flipped(initialPersonal(p)),projected:PersonalState[]=[];
  const h=harness(attempted,async s=>{projected.push(s);return 'view';});
  const kept=await h.keep(attempted,refusal([owner]),()=>'LH');
- assert.equal(kept.view,'view');assert.equal(kept.notes,seat.ownerIds.length);
+ assert.equal(kept.view,'view');assert.equal(kept.keys,1,"one struck key, however many notes it holds");
  assert.deepEqual(h.accepted.map(a=>[a.kind,a.ownerId,a.hand]),[['hand',owner,'LH']]);
  assert.equal(handFor(p,h.target.personal,owner),'LH');assert.equal(projected.length,1);assert.equal(handFor(p,projected[0],owner),'LH');
 });
@@ -51,7 +51,7 @@ test('a refused hand returns to the hand the note had, as a recorded choice, and
 test('a note changed since the refusal is left alone; other refusals reach the player unchanged',async()=>{
  const attempted=flipped(initialPersonal(p)),later=initialPersonal(p);
  const h=harness(later,async()=>'view');
- const kept=await h.keep(attempted,refusal([owner]),()=>'LH');assert.equal(kept.view,'view');assert.equal(kept.notes,0);assert.equal(h.accepted.length,0);
+ const kept=await h.keep(attempted,refusal([owner]),()=>'LH');assert.equal(kept.view,'view');assert.equal(kept.keys,0);assert.equal(h.accepted.length,0);
  const other=Error('disk'),mixed=refusal([owner],'One struck key is written in notes with a performing hand and notes without one.');
  for(const error of [other,mixed]){const g=harness(attempted,async()=>'view');await assert.rejects(g.keep(attempted,error,()=>'LH'),e=>e===error);assert.equal(g.accepted.length,0);}
  // A note with no hand to return to keeps the refusal.

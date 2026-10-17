@@ -30,6 +30,8 @@ test('import routing reads content, not filenames',()=>{
  assert.equal(scoreImportKind(zipSync({'manifest.json':strToU8('{}'),'META-INF/container.xml':container('x.musicxml')})),'score');
  assert.equal(scoreImportKind(strToU8('FICHIER GUITAR PRO v5.00')),'guitar-pro');
  assert.equal(scoreImportKind(strToU8('<GPIF/>')),'guitar-pro');
+ // Released pickers offer .xml, so another XML document is named for what it is, not sent to Guitar Pro.
+ assert.throws(()=>scoreImportKind(strToU8('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"/>')),/isn't a MusicXML score/);
  assert.equal(scoreImportKind(strToU8(xml.replace('<score-partwise','<!--'+' '.repeat(5000)+'-->\n<score-partwise'))),'musicxml');
 });
 

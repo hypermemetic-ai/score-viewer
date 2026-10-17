@@ -25,10 +25,10 @@ test('MusicXML import is on for players; MuseScore stays behind its development 
  assert.match(main,/import\('\.\/musescore-import'\)/,'The converter host loads lazily, only for an actual MuseScore import.');
  assert.match(main,/Import a \.tuna score, a MusicXML file or a Guitar Pro file\./);
  const host=readFileSync(new URL('../src/host.ts',import.meta.url),'utf8');
- assert.match(host,/invoke<string\|null>\('pick_score',\{musicxml:true,musescore:MUSESCORE_IMPORT_ENABLED\}\)/);
+ assert.match(host,/invoke<string\|null>\('pick_score',\{musescore:MUSESCORE_IMPORT_ENABLED\}\)/);
  const rust=readFileSync(new URL('../src-tauri/src/main.rs',import.meta.url),'utf8');
- assert.match(rust,/async fn pick_score\(musicxml:Option<bool>,musescore:Option<bool>\)/);
- assert.match(rust,/let mut kinds=vec!\["tuna","gp","gpx","gp3","gp4","gp5"\];if musicxml==Some\(true\)\{kinds\.extend\(\["musicxml","xml","mxl"\]\);\}if musescore==Some\(true\)\{kinds\.extend\(\["mscz","mscx"\]\);\}/);
+ assert.match(rust,/async fn pick_score\(musescore:Option<bool>\)/);
+ assert.match(rust,/let mut kinds=vec!\["tuna","gp","gpx","gp3","gp4","gp5","musicxml","xml","mxl"\];if musescore==Some\(true\)\{kinds\.extend\(\["mscz","mscx"\]\);\}/);
  assert.equal(scoreImportKind(fixture('cross-staff-arpeggio.mscz')),'musescore');
  assert.equal(scoreImportKind(fixture('original-piano-clarinet.mscx')),'musescore');
 });

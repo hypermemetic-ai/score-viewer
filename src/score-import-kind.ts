@@ -22,7 +22,9 @@ export function scoreImportKind(bytes:Uint8Array):ScoreImportKind {
   return manifest?'score':musescore?'musescore':container?'musicxml':'guitar-pro';
  }
  const head=xmlHead(bytes);
- if(head!==undefined){if(/<score-(partwise|timewise)[\s>]/.test(head))return 'musicxml';if(/<museScore[\s>]/.test(head))return 'musescore';}
+ if(head!==undefined){if(/<score-(partwise|timewise)[\s>]/.test(head))return 'musicxml';if(/<museScore[\s>]/.test(head))return 'musescore';
+  // Guitar Pro's own XML is GPIF; any other XML document is not a score this viewer reads.
+  if(!/<GPIF[\s>/]/.test(head))throw Error('This XML file isn\'t a MusicXML score. Export the score from your notation program as MusicXML (.musicxml or .mxl) and import that file.');}
  return 'guitar-pro';
 }
 /** The leading text of an XML document in UTF-8 or UTF-16, otherwise undefined.
