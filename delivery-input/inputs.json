@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "ba35e574ff39d96ee0fa3f3b0ebf64abe515f218",
-    "tree": "f52892de51c61c5382c8248527088875e84e9b35",
-    "timestamp": "2026-10-16T10:28:51.000Z"
+    "revision": "e43456eb101edb474bdd7f3ded453180cd577080",
+    "tree": "a1d823f1978c4abd9526e5ed3c25a01af6d8b683",
+    "timestamp": "2026-10-17T08:23:48.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
-    "revision": "5364d40f2bc9793418037fd9ae3c5ff2dd329351"
+    "revision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8"
   },
   "nativeFiles": {
     ".cargo/config.toml": {
@@ -249,8 +249,8 @@
       "size": 5071
     },
     "src-tauri/src/main.rs": {
-      "sha256": "7383609e56818a868822e47efd7312ca9c2c0d8e6e24839d194fed2a87b857c4",
-      "size": 6812
+      "sha256": "6b6bebc48645144580a2a25d3e6a48489870ecdf3644e88e2052a64b0b9a5786",
+      "size": 6814
     },
     "src-tauri/src/managed_files.rs": {
       "sha256": "19d60916542fdf228e8655e978e72ed9f80322956dd5cc40c3413c31403c22a4",
@@ -7619,21 +7619,25 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-DksgJgnZ.js": {
-        "sha256": "fa6b6caaae20df95932d8f8cf6fe26bcd98ae108f191e166cc4e78f93e0a45cd",
-        "size": 8471
+      "assets/footer-ink-probe-Wup2cHVA.js": {
+        "sha256": "703540f597cf8d95c01e12cf6b52291cadfc0bf5707f3004f2b142290194c7a9",
+        "size": 8356
+      },
+      "assets/footer-probe-calculated-edition-7bcwDesV.isoscore": {
+        "sha256": "3bb4aeeb3134dd684465c10a711218c35f6eda2a1607e8f71f0e7d8d78f565ee",
+        "size": 89427
       },
       "assets/fretted-preparation-assets-D_5Ay36F.js": {
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-CBPmQiGv.css": {
-        "sha256": "7f611354dfbc49462ddd04ab9308d45efa225073a375fcd82d6cbee5a91983e0",
-        "size": 44852
+      "assets/index-CO8Nv5SY.js": {
+        "sha256": "4c96f026ba670d0e5178010e0f293584ddc85b9840cae2108982dc8eb18cfa8f",
+        "size": 629737
       },
-      "assets/index-DHgVSElV.js": {
-        "sha256": "1418e50b20ff4539a62fbb51482e531dc53f67c2622c5fe04708bd9d0cd0c710",
-        "size": 606310
+      "assets/index-T9vEz8GV.css": {
+        "sha256": "dd0bb5290d5656888508f2eaae8d40266f6467f9645217ef00fea601ba7819f5",
+        "size": 45135
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7643,21 +7647,17 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/musescore-import-hlZ-7BiN.js": {
-        "sha256": "e99385fcb326aec6d8a7a1a55d15418f400136a66939fbcd50a017eb05fd9a33",
-        "size": 3947
+      "assets/musescore-import-Bm07w3YP.js": {
+        "sha256": "c78e14ad2b43109c79ca33a9885da9952348a06b90cebbd8ae4be2f852b50cc8",
+        "size": 3943
       },
-      "assets/musicxml-import-6uNr-UVD.js": {
-        "sha256": "602b8a4651b59af6e3864f43296284e5e9ce704d7a2fe3c4c0129d10b5841a0c",
-        "size": 3805
+      "assets/musicxml-import-Pff5eVY_.js": {
+        "sha256": "873c3369fccfde1caf382234fe3c5bb299987397031464a9d9953b5c9a22b756",
+        "size": 3692
       },
-      "assets/piano-readiness-job-C3LP_QmV.js": {
-        "sha256": "90bf2bc6f6937629cc529b0c1a2fc78dc5ddbc058d12032b5ed73813277463b9",
-        "size": 2366616
-      },
-      "assets/piano-readiness.worker-CicK2kPb.js": {
-        "sha256": "50809394b689ac0b0ebb00bf260eeb8c355cf830bc7bb54dc4c6905a8d36636f",
-        "size": 2262902
+      "assets/piano-readiness-B6hvczsz.js": {
+        "sha256": "4962d41f46c9fe709a2cc7277c12f2b6da7ef4ce3ffd502c84d318030ad6746e",
+        "size": 2369368
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
@@ -7692,26 +7692,26 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "8044f5492432519532dc203850e923921af235a64fd716992e035de87319c571",
-        "size": 327
+        "sha256": "8c538c1141e7c4b4b2738b258433912a3e44568072d316956da685371a11b262",
+        "size": 323
       },
       "index.html": {
-        "sha256": "74680975bd9a117928a155e5bcc7c733e29b3224a6deb974cc0410b260ebd5e4",
-        "size": 728
+        "sha256": "c67cfd65b6230f62873371a28b6d63a20bdb67065842c88a67e2cd12d6607355",
+        "size": 724
       },
       "review/schumann-no14-conventional-20261006.isoscore": {
         "sha256": "2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d",
         "size": 423909
       }
     },
-    "digest": "1ff2419734bf3558f0c0334fe08d79e60a7bd654276305e0b13d60a9923bab74"
+    "digest": "3327ca78f37de70a153ef1b29aaa60c72799ae6f556ef73b4d350d7ac2c7795c"
   },
   "checks": {
-    "sha256": "c78a400ca941e1be24eeb62c1e6a1ef831f88cd85a895b9f20b8901d39b1f20c",
-    "size": 2442
+    "sha256": "b8dca0dbc56a0344fa54f3d86877705dc4bddb9c7b5c060b764d7a57831a1e36",
+    "size": 5114
   },
   "runtimeFontProbe": {
-    "version": "viewer-native-footer-ink-probe-v1",
+    "version": "viewer-native-footer-ink-probe-v2",
     "policySha256": "6618039ed2781380a85399f82c8342fab74a0c6bc3e68406b1b221b08860f532",
     "metricsLiteral": "{\"drawingAllowancePageUnits\":2,\"fontSha256\":\"eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242\",\"glyphs\":{\" \":{\"advance\":512,\"bounds\":null,\"glyph\":\"space\"},\"0\":{\"advance\":1024,\"bounds\":[79,-20,998,1362],\"glyph\":\"zero\"},\"1\":{\"advance\":1024,\"bounds\":[73,0,804,1352],\"glyph\":\"one\"},\"2\":{\"advance\":1024,\"bounds\":[1,0,979,1356],\"glyph\":\"two\"},\"3\":{\"advance\":1024,\"bounds\":[-3,-20,953,1356],\"glyph\":\"three\"},\"4\":{\"advance\":1024,\"bounds\":[5,0,978,1348],\"glyph\":\"four\"},\"5\":{\"advance\":1024,\"bounds\":[32,-20,963,1341],\"glyph\":\"five\"},\"6\":{\"advance\":1024,\"bounds\":[83,-20,1014,1356],\"glyph\":\"six\"},\"7\":{\"advance\":1024,\"bounds\":[120,0,1094,1341],\"glyph\":\"seven\"},\"8\":{\"advance\":1024,\"bounds\":[43,-20,1001,1362],\"glyph\":\"eight\"},\"9\":{\"advance\":1024,\"bounds\":[60,-20,991,1356],\"glyph\":\"nine\"},\"P\":{\"advance\":1251,\"bounds\":[-11,0,1199,1341],\"glyph\":\"P\"},\"a\":{\"advance\":1024,\"bounds\":[61,-21,947,964],\"glyph\":\"a\"},\"e\":{\"advance\":909,\"bounds\":[63,-20,863,965],\"glyph\":\"e\"},\"f\":{\"advance\":569,\"bounds\":[23,-436,805,1442],\"glyph\":\"f\"},\"g\":{\"advance\":1024,\"bounds\":[1,-436,964,964],\"glyph\":\"g\"},\"o\":{\"advance\":1024,\"bounds\":[61,-20,963,965],\"glyph\":\"o\"}},\"unitsPerEm\":2048,\"version\":\"viewer-footer-serif-metrics-v1\",\"verticalCell\":{\"head\":[-621,2009],\"hhea\":[-443,1825],\"typo\":[-442,1422],\"win\":[-443,1825]}}",
     "fixture": {
@@ -7731,8 +7731,8 @@
         "size": 6698
       },
       "scripts/native-delivery/footer-ink-receipt.mjs": {
-        "sha256": "2a2f04ce0b82ccb9bc40e4822eb4fd53aa8578ce9664800810d9d1be66a53c36",
-        "size": 7033
+        "sha256": "e8bbd4c2588aee35c4e8c8f28e32e38744a94df0c362da1c1779adc9cecdfbbb",
+        "size": 7028
       }
     }
   },
