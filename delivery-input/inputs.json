@@ -7723,12 +7723,12 @@
     },
     "files": {
       "scripts/native-delivery/footer-ink-probe.swift": {
-        "sha256": "36cfb20fcbf9d1456f9eb62dda3648bb50c9dcefb3eca157254a1c4abb02af6a",
-        "size": 4325
+        "sha256": "36054d228e4195a35713960355a2241c4896163545f5e7c4cc752110a005e6e2",
+        "size": 9320
       },
       "scripts/native-delivery/footer-ink-probe.mjs": {
-        "sha256": "8a6ee7f2635e7812d4d879f8148b8b19c0a55875155496d59d8ba3fe58eb1013",
-        "size": 6698
+        "sha256": "2b946e15b136dcc98c626a7765bb3ee33cc05c6e4934cd5541174e0c6c6c785c",
+        "size": 7452
       },
       "scripts/native-delivery/footer-ink-receipt.mjs": {
         "sha256": "e8bbd4c2588aee35c4e8c8f28e32e38744a94df0c362da1c1779adc9cecdfbbb",

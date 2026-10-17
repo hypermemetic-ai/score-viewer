@@ -49,8 +49,17 @@ export async function runFooterInkProbe(ctx,packet,{execute=boundedCommand}={}){
   const compiled=await execute('/usr/bin/xcrun',['swiftc','-parse-as-library','-framework','AppKit','-framework','WebKit',join(ctx.source,'scripts/native-delivery/footer-ink-probe.swift'),'-o',helper],{timeoutMs:30000});
   if(compiled.exitCode!==0||compiled.timedOut)throw Error('Cannot compile bounded WK font helper: '+compiled.stderr);
   server=await frozenFrontendServer(join(ctx.prepared,'frontend'),inputs.frontend.files);
-  const checked=await execute(helper,[`http://127.0.0.1:${server.port}/footer-ink-probe.html?nonce=${nonce}`,nonce,output],{timeoutMs:85000});
-  await requireFooterHelperSuccess(checked,output);
+  // DIAGNOSTIC BRANCH ONLY: run each hosting variant and print its full trace.
+  const outcomes=[];
+  for(const variant of ['none','offscreen','onscreen']){
+   process.env.FOOTER_INK_DIAG_VARIANT=variant;await rm(output,{force:true});
+   const spawned=Date.now(),checked=await execute(helper,[`http://127.0.0.1:${server.port}/footer-ink-probe.html?nonce=${nonce}`,nonce,output],{timeoutMs:85000});
+   console.error(`=== footer-ink variant ${variant}: spawned wall=${spawned} elapsed=${Date.now()-spawned}ms exit=${checked.exitCode} signal=${checked.signal} timeout=${checked.timedOut}`);
+   console.error(checked.stderr);
+   let detail;try{await requireFooterHelperSuccess(checked,output);detail='passed';}catch(error){detail=error.message.slice(0,600);}
+   console.error(`=== footer-ink variant ${variant} outcome: ${detail}`);outcomes.push(`${variant}: ${detail}`);
+  }
+  throw Error('Diagnostic footer-ink run complete: '+outcomes.join(' | '));
   const raw=JSON.parse(await readFile(output,'utf8'));if(raw.result?.nonce!==nonce)throw Error('WK runtime nonce differs');
   const receipt={version:footerProbeVersion,status:'passed',sourceInputs,bindings:inputs.runtimeFontProbe,frontendDigest:inputs.frontend.digest,
    host:{runtime:raw.runtime,os:raw.os,architecture:raw.helperArchitecture,nodeArchitecture:process.arch,webkitVersion:raw.webkitVersion},result:raw.result,
