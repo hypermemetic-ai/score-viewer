@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
+import {scoreCapabilities} from '../src/score-capabilities';
 import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
@@ -28,7 +29,7 @@ function fixture(){
  let write=(snapshot:any)=>{disk=structuredClone(snapshot);written.push(structuredClone(snapshot));};
  let project=async(personal:any)=>({...target.package,choiceSnapshot:structuredClone(personal)});
  const context:any={structuredClone,undrawableHandOwners,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
-  PersonalPresentationSession:class{project(personal:any){return project(structuredClone(personal));}},
+  scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}project(personal:any){return project(structuredClone(personal));}},
   personalStorageName:()=> 'source-bound-journal',personalContext:async(owner:any)=>({p:owner.package,file:'source-bound-journal',entry:owner.entry,active:context.current===owner?owner:undefined}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.then(()=>{},()=>{});return result;},
   async writeJson(_file:string,snapshot:any){await write(snapshot);},readPersonal:(value:any)=>structuredClone(value),

@@ -205,13 +205,15 @@ export class PersonalPresentationSession {
   * takes no hand choices, so a saved choice can never stop it opening. The
   * check settles the engraving where hand drawing runs (the worker, or
   * cooperatively here), which the first drawn choice needs anyway. */
- async ensureHandChoicesDrawable():Promise<boolean>{
-  let checked=true;
-  if(this.baseline===undefined&&this.base.renderingRecipe&&this.base.sourceSha256)
-   checked=await (this.checking??=this.settleBaseline().finally(()=>{this.checking=undefined;}));
+ async ensureHandChoicesDrawable():Promise<boolean>{return await this.handChoiceCheck()??true;}
+ /** The same check without a wait once it is known: undefined when a choice
+  * may be saved at once, a throw when the score takes no hand choices, and
+  * otherwise the running check (false when opening another score stopped it). */
+ handChoiceCheck():Promise<boolean>|undefined{
   if(this.baseline instanceof Error)throw this.baseline;
-  // False when opening another score stopped the check: nothing was settled.
-  return checked;
+  if(this.baseline!==undefined||!this.base.renderingRecipe||!this.base.sourceSha256)return undefined;
+  return (this.checking??=this.settleBaseline().finally(()=>{this.checking=undefined;})).then(checked=>{
+   if(this.baseline instanceof Error)throw this.baseline;return checked;});
  }
  private async settleBaseline():Promise<boolean>{
   // Opening another score stops this check; an unfinished check settles nothing.
