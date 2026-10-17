@@ -33,7 +33,18 @@ export function practicePartition(raw:unknown):PracticePartition {if(!raw)return
 /** Musical clock, passage and evidence identity; no physical assessment role. */
 export interface PracticePassagePlan {partition:PracticePartition;timeSignatures:TimeSignatureOverlay[];barPhaseTicks?:number[];referencePerformanceTempo?:ReferencePerformanceTempo;playerTempo?:true;revision:string;barTicks:number[];ticksPerBeat:number;chunks:PracticeChunk[];catalog?:readonly PracticeExercise[];policyFingerprint?:string;boundaryProfile?:PracticeSectionPlanning;legacyPlans?:Partial<Record<LegacyPracticePartition,PracticePassagePlan>>;sourcePracticeIdentity?:string;keyboardLayout?:string}
 /** Piano assessment adds genuine pitches and performing-hand groups. */
-export interface PracticePlan extends PracticePassagePlan {attacks:PracticeAttack[];gestures:Gesture[];ownerGroup:Map<string,string>}
+export interface PracticePlan extends PracticePassagePlan {attacks:PracticeAttack[];gestures:Gesture[];ownerGroup:Map<string,string>;ornaments?:PracticeOrnament[]}
+/** One written grace-note group at its host's onset (one per repeat pass).
+ * Grace notes are printed with no metrical duration, so practice treats them
+ * as ornaments of their host: they stay on the page, a played grace key is
+ * accepted, and none is required, timed or counted as a missed note. */
+export interface PracticeOrnament {id:string;tick:number;midis:number[]}
+/** The ornament a key belongs to, if any, while its host onset is still ahead.
+ * The window opens one beat before the host and closes once every note of the
+ * host onset is played; `limit` bounds it to the onsets being assessed. */
+export function practiceOrnament(plan:Pick<PracticePlan,'ornaments'|'ticksPerBeat'>,midi:number,nextTick:number,limit:number):PracticeOrnament|undefined {
+ return plan.ornaments?.find(o=>o.tick>=nextTick&&o.tick<limit&&o.tick-nextTick<=plan.ticksPerBeat&&o.midis.includes(midi));
+}
 export interface PersonalPerformanceGoal {version:'personal-performance-goal-v1';bpm:number;beat:ReferencePerformanceTempo['beat']}
 export interface LegacyPracticeEnvelope {version:'legacy-practice-envelope-v1';partition:LegacyPracticePartition;revision:string;state:PracticeState;record?:unknown}
 export interface PracticeEditionEvidence {version:'practice-edition-evidence-v1';sourceIdentity:string;keyboardLayout:string;revision:string;rawState:unknown}
@@ -41,7 +52,7 @@ export interface PracticeState {manualAttainment?:ManualAttainment;referenceBeat
 /** A brushed wrong key is not a failure; an expected quiet key is still a real attack. */
 export const QUIET_STRAY_MAX_VELOCITY=8;
 export const isQuietStray=(velocity:number)=>velocity>0&&velocity<=QUIET_STRAY_MAX_VELOCITY;
-export type NoteOutcome='accepted'|'quiet-ignored'|'too-early'|'inactive'|'failed';
+export type NoteOutcome='accepted'|'ornament'|'quiet-ignored'|'too-early'|'inactive'|'failed';
 const validTempo=(n:number)=>Number.isFinite(n)&&n>=5&&n<=500;
 export function readPersonalGoal(raw:unknown,reference:ReferencePerformanceTempo):PersonalPerformanceGoal {
  const goal=raw as PersonalPerformanceGoal;
@@ -62,15 +73,10 @@ export function requirePracticeHands(p:ScorePackage,personal?:PersonalState):voi
  const handless=(personal?personalPracticePackage(p,personal):p).score.notes.filter(n=>n.hand===undefined).length;
  if(handless)throw Error(handlessMessage(handless,'timed practice'));
 }
-/** Timed practice cannot yet place grace notes in time. */
-export function requirePerformedGraceTiming(p:ScorePackage):void {
- if(p.score.graceGroups?.length)throw Error('Timed practice needs performed timing for the score’s grace notes; the written notes remain available in Score.');
-}
 /** A score without a reference tempo plans only with the player's own tempo. */
 export function planPractice(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState,playerTempo?:ReferencePerformanceTempo):PracticePlan {
  const player=p.score.referencePerformanceTempo===undefined&&playerTempo?validateReferencePerformanceTempo(playerTempo):undefined;
  if(!player)requireReferencePerformanceTempo(p.score);
- requirePerformedGraceTiming(p);
  const plan=planSource(p,partition,personal,player);scorePulseGrid(plan,plan.barTicks);return plan;
 }
 export function planSource(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState,playerTempo?:ReferencePerformanceTempo):PracticePlan {
@@ -100,7 +106,11 @@ export function planSource(p:ScorePackage,partition:PracticePartition='bounded-e
   chunks.push({id:`${first+1}-${last+1}`,firstBar:first,lastBar:last,start,end,weight:weights.slice(first,last+1).reduce((sum,w,i)=>sum+w*(bars[first+i+1]-bars[first+i]),0),pattern,boundaryReasons:protectedAt(cut)});first=cut;
  }
 
- const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?playerTempo&&validateReferencePerformanceTempo(playerTempo):validateReferencePerformanceTempo(p.score.referencePerformanceTempo),...(p.score.referencePerformanceTempo===undefined&&playerTempo?{playerTempo:true as const}:{}),revision:p.manifest.revision,sourcePracticeIdentity:original.sourceRevision??original.manifest.revision,keyboardLayout:original.keyboardLayout,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
+ // Grace notes stay out of attacks, gestures and passage identity: they carry no
+ // written duration to time. Their keys are known so a played grace is no error.
+ const ornaments=(p.score.graceGroups??[]).flatMap(g=>{const midis=[...new Set(g.members.flatMap(m=>m.pitch?[m.pitch.octave*12+m.pitch.pitchClass+12]:[]))];
+  return midis.length?g.occurrences.map(o=>({id:o.id,tick:o.tick,midis})):[];}).sort((a,b)=>a.tick-b.tick||a.id.localeCompare(b.id));
+ const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?playerTempo&&validateReferencePerformanceTempo(playerTempo):validateReferencePerformanceTempo(p.score.referencePerformanceTempo),...(p.score.referencePerformanceTempo===undefined&&playerTempo?{playerTempo:true as const}:{}),revision:p.manifest.revision,sourcePracticeIdentity:original.sourceRevision??original.manifest.revision,keyboardLayout:original.keyboardLayout,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup,...(ornaments.length?{ornaments}:{})};
  if(boundaryProfile)for(const chunk of chunks)chunk.pattern=JSON.stringify({version:'bounded-piano-passage-v1',policyFingerprint:boundedPracticePolicyFingerprint,music:musicalSpanFact(plan,original.sourceScore??original.score,chunk,'piano')});
  registerPersonalPracticeIdentity(plan,original.score,p.score,base?.chunks??chunks.map(c=>({...c})));
  if(boundaryProfile){plan.boundaryProfile=boundaryProfile;plan.policyFingerprint=boundedPracticePolicyFingerprint;populatePracticeCatalog(plan,p.score);plan.legacyPlans={'fixed-four-v1':planSource(original,'fixed-four-v1',personal,playerTempo),'connection-boundary-v1':planSource(original,'connection-boundary-v1',personal,playerTempo)};}
@@ -300,11 +310,12 @@ export function resetProgress(chunk:PracticeChunk,s:PracticeState){for(const cla
 /** Untimed source-ordered solo / adjacent-pair preparation. MIDI cannot identify physical fingers. */
 export class GroundworkSession {
  readonly steps:Array<{groups:string[];events:PracticeAttack[]}>;index=0;matched=new Set<string>();failure?:PracticeAttack;complete=false;
- constructor(plan:PracticePlan,chunk:PracticeChunk){plan=practiceClipPlan(plan,chunk,false);const windows=chunk.joins?.map(bar=>[bar,bar+1])??[[chunk.firstBar,chunk.lastBar]],sequences:string[][]=[];for(const [first,last]of windows){const groups=plan.gestures.filter(g=>g.bar>=first&&g.bar<=last).sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));groups.forEach((g,i)=>{sequences.push([g.id]);if(i)sequences.push([groups[i-1].id,g.id]);});}this.steps=sequences.map(ids=>({groups:ids,events:plan.attacks.filter(a=>a.groups.some(g=>ids.includes(g)))}));this.complete=this.steps.length===0;}
+ private readonly ornaments:Pick<PracticePlan,'ornaments'|'ticksPerBeat'>;
+ constructor(plan:PracticePlan,chunk:PracticeChunk){this.ornaments={ornaments:plan.ornaments,ticksPerBeat:plan.ticksPerBeat};plan=practiceClipPlan(plan,chunk,false);const windows=chunk.joins?.map(bar=>[bar,bar+1])??[[chunk.firstBar,chunk.lastBar]],sequences:string[][]=[];for(const [first,last]of windows){const groups=plan.gestures.filter(g=>g.bar>=first&&g.bar<=last).sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));groups.forEach((g,i)=>{sequences.push([g.id]);if(i)sequences.push([groups[i-1].id,g.id]);});}this.steps=sequences.map(ids=>({groups:ids,events:plan.attacks.filter(a=>a.groups.some(g=>ids.includes(g)))}));this.complete=this.steps.length===0;}
  confirm(){this.index++;this.restart();this.complete=this.index>=this.steps.length;}
  get current(){return this.steps[Math.min(this.index,this.steps.length-1)];}
  restart(){this.matched.clear();this.failure=undefined;}
- note(midi:number,velocity=127):NoteOutcome {if(this.complete)return 'inactive';const events=this.current.events;if(this.failure){if(!events.filter(a=>a.tick===events[0].tick).some(a=>a.midi===midi))return isQuietStray(velocity)?'quiet-ignored':'inactive';this.restart();}else if(this.matched.size&&events[0].midi===midi&&events.find(a=>!this.matched.has(a.id))?.midi!==midi){if(isQuietStray(velocity))return 'quiet-ignored';this.restart();}const next=events.find(a=>!this.matched.has(a.id));if(!next)return 'inactive';const found=events.find(a=>a.tick===next.tick&&!this.matched.has(a.id)&&a.midi===midi);if(!found){if(isQuietStray(velocity))return 'quiet-ignored';this.failure=next;return 'failed';}this.matched.add(found.id);if(events.every(a=>this.matched.has(a.id)))this.confirm();return 'accepted';}
+ note(midi:number,velocity=127):NoteOutcome {if(this.complete)return 'inactive';const events=this.current.events;if(this.failure){if(!events.filter(a=>a.tick===events[0].tick).some(a=>a.midi===midi))return isQuietStray(velocity)?'quiet-ignored':'inactive';this.restart();}else if(this.matched.size&&events[0].midi===midi&&events.find(a=>!this.matched.has(a.id))?.midi!==midi){if(isQuietStray(velocity))return 'quiet-ignored';this.restart();}const next=events.find(a=>!this.matched.has(a.id));if(!next)return 'inactive';const found=events.find(a=>a.tick===next.tick&&!this.matched.has(a.id)&&a.midi===midi);if(!found){if(practiceOrnament(this.ornaments,midi,next.tick,events.at(-1)!.tick+1))return 'ornament';if(isQuietStray(velocity))return 'quiet-ignored';this.failure=next;return 'failed';}this.matched.add(found.id);if(events.every(a=>this.matched.has(a.id)))this.confirm();return 'accepted';}
 }
 /** Reading repeats genuine position steps forever. Its cursor is ephemeral:
  * neither a completed cycle nor manual browsing is musical attainment. */
@@ -364,6 +375,7 @@ export class PracticeSession {
  if(this.elapsedTick>=this.completionTick&&(!this.measured||this.events.every(a=>this.matched.has(a.id)))){this.phase='complete';this.sounding.reset();this.message=this.measured?'Group complete.':'Loop complete.';}
  }
  note(midi:number,now:number,velocity=127,stream?:MidiStream):NoteOutcome {if(!['trial','countin'].includes(this.phase))return 'inactive';this.expireSound(now);const adjusted=now;if(adjusted<this.startMs-500)return 'too-early';this.elapsedTick=Math.max(this.startTick,this.startTick+(now-this.startMs)/this.tickMs);const next=this.events.find(a=>!this.matched.has(a.id));if(!next){if(isQuietStray(velocity))return 'quiet-ignored';if(adjusted<this.startMs+(this.completionTick-this.startTick)*this.tickMs){this.fail(this.chunk.lastBar,'An extra note was played.',this.events.at(-1));return 'failed';}return 'inactive';}const due=this.startMs+(next.tick-this.startTick)*this.tickMs;const chord=this.events.filter(a=>a.tick===next.tick&&!this.matched.has(a.id));const found=chord.find(a=>a.midi===midi);
+ if(!found&&practiceOrnament(this.plan,midi,next.tick,this.chunk.end))return 'ornament';
  if(!found){if(isQuietStray(velocity))return 'quiet-ignored';this.fail(next.bar,'A different note was played.',next);return 'failed';}if(adjusted<due-500)return 'too-early';if(adjusted>due+500){this.fail(next.bar,'A note was missed.',next);return 'failed';}const released=this.obligations.find(a=>(this.matched.has(a.id)||a.tick<this.startTick)&&a.tick<found.tick&&a.end>found.tick&&adjusted<this.startMs+(a.end-this.startTick)*this.tickMs&&!this.sounding.has(a.id));if(released){this.fail(released.bar,'A held note was released early.',released);return 'failed';}this.matched.add(found.id);this.sounding.press(found.id,found.midi,stream);for(const id of found.groups){const g=this.plan.gestures.find(g=>g.id===id)!;if(found.tick===g.start)this.started.add(id);}return 'accepted'; }
  private expireSound(now:number){this.sounding.expire(id=>{const a=this.obligations.find(a=>a.id===id);return !a||now>=this.startMs+(Math.min(a.end,this.completionTick)-this.startTick)*this.tickMs;});}
  private stopped(ids:readonly string[],now:number){if(!this.measured||!['trial','countin'].includes(this.phase))return;const early=this.obligations.find(a=>ids.includes(a.id)&&(a.tick<this.startTick||a.end>this.chunk.end||this.plan.attacks.some(b=>b.tick>a.tick&&b.tick<a.end))&&now<this.startMs+(Math.min(a.end,this.completionTick)-this.startTick)*this.tickMs-500);if(early){this.elapsedTick=Math.max(this.startTick,this.startTick+(now-this.startMs)/this.tickMs);this.fail(early.bar,'A held note was released early.',early);}}

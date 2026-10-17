@@ -1,12 +1,13 @@
 import {unzipSync} from 'fflate';
-/** MusicXML intake stays off for players until ISO notation reads typical
- * MuseScore exports; the development server enables it for review. */
-export const MUSICXML_IMPORT_ENABLED=import.meta.env?.DEV===true;
+/** MuseScore files reach the MusicXML intake through the score-converter
+ * WebView host. Its runtime assets are emitted only by the development server
+ * (scripts/guitar-pro-assets.ts), so the native package cannot convert them and
+ * MuseScore import stays a development feature. MusicXML itself is always on. */
+export const MUSESCORE_IMPORT_ENABLED=import.meta.env?.DEV===true;
 export type ScoreImportKind='score'|'guitar-pro'|'musicxml'|'musescore';
-/** Picker extensions. MusicXML and MuseScore (converted to MusicXML) share one
- * gate, folded away in production; the native `pick_score` filter mirrors it. */
-export const SCORE_PICKER_EXTENSIONS:readonly string[]=Object.freeze(['tuna','gp','gpx','gp3','gp4','gp5',
- ...(MUSICXML_IMPORT_ENABLED?['musicxml','xml','mxl','mscz','mscx']:[])]);
+/** Picker extensions; the native `pick_score` filter mirrors them. */
+export const SCORE_PICKER_EXTENSIONS:readonly string[]=Object.freeze(['tuna','gp','gpx','gp3','gp4','gp5','musicxml','xml','mxl',
+ ...(MUSESCORE_IMPORT_ENABLED?['mscz','mscx']:[])]);
 /** Routing by content, never by filename. Every branch still runs its complete
  * ordinary admission; a label here grants no score or source authority. */
 export function scoreImportKind(bytes:Uint8Array):ScoreImportKind {

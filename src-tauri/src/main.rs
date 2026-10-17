@@ -36,7 +36,7 @@ async fn commit_assistance(app:tauri::AppHandle,input:assistance_store::Commit)-
  tauri::async_runtime::spawn_blocking(move||assistance_store::commit(&path,input)).await.map_err(|e|e.to_string())?
 }
 #[tauri::command]
-async fn pick_score(musicxml:Option<bool>)->Result<Option<String>,String>{tauri::async_runtime::spawn_blocking(move||{let mut kinds=vec!["tuna","gp","gpx","gp3","gp4","gp5"];if musicxml==Some(true){kinds.extend(["musicxml","xml","mxl","mscz","mscx"]);}match rfd::FileDialog::new().add_filter("Scores",&kinds[..]).pick_file(){None=>Ok(None),Some(p)=>{let n=fs::metadata(&p).map_err(|e|e.to_string())?.len();if n>50_000_000{return Err("Package exceeds 50 MB".into())};Ok(Some(STANDARD.encode(fs::read(p).map_err(|e|e.to_string())?)))}}}).await.map_err(|e|e.to_string())?}
+async fn pick_score(musicxml:Option<bool>,musescore:Option<bool>)->Result<Option<String>,String>{tauri::async_runtime::spawn_blocking(move||{let mut kinds=vec!["tuna","gp","gpx","gp3","gp4","gp5"];if musicxml==Some(true){kinds.extend(["musicxml","xml","mxl"]);}if musescore==Some(true){kinds.extend(["mscz","mscx"]);}match rfd::FileDialog::new().add_filter("Scores",&kinds[..]).pick_file(){None=>Ok(None),Some(p)=>{let n=fs::metadata(&p).map_err(|e|e.to_string())?.len();if n>50_000_000{return Err("Package exceeds 50 MB".into())};Ok(Some(STANDARD.encode(fs::read(p).map_err(|e|e.to_string())?)))}}}).await.map_err(|e|e.to_string())?}
 #[tauri::command]
 async fn save_score(data:String,filename:String)->Result<bool,String>{
  if data.len()>66_666_668{return Err("Shared score exceeds 50 MB".into());}
