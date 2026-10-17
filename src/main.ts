@@ -50,7 +50,7 @@ import {scoreImportKind,MUSESCORE_IMPORT_ENABLED} from './score-import-kind';
 import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
 import {practicePercent,requirePracticeHands} from './practice';
 import {LibraryPracticeSummaries} from './library-practice-progress';
-import {loadingMarkup,updateLoading,updateLoadingElapsed,preparationMessage,engravingMessage} from './viewer-loading';
+import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
 import type {ReadingExecution} from './reading-execution';
 import {hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
@@ -106,11 +106,15 @@ interface ReadingOperation {
  controller:AbortController;running:ReadingJob;dialog?:HTMLDialogElement;
  previous:typeof current;keyboard:PhysicalKeyboardId;generation:number;
  options?:string;optionsFocus?:string;
- /** Elapsed-time clock for long preparation, with what the player can expect. */
- started:number;clock:number;expectation:string;
+ /** The shared loading surface: ordered steps, engine stage detail and elapsed time. */
+ loading:LoadingProgress;
 }
 let readingOperation:ReadingOperation|undefined,readingGeneration=0;
-const cancelledReading=()=>Error('Opening cancelled. Your score and choices are retained.');
+const READING_CANCELLED='Opening cancelled. Your score and choices are retained.';
+const cancelledReading=()=>Error(READING_CANCELLED);
+/** A failure already shown on its loading surface is not repeated as a notice. */
+const shownFailures=new WeakSet<object>();
+const reportFailure=(error:unknown)=>{if(!(error instanceof Object&&shownFailures.has(error)))notify((error as Error).message);};
 function checkReadingOwner(op:ReadingOperation){
  if(readingOperation!==op||op.generation!==readingGeneration||op.controller.signal.aborted||job!==op.running||(op.dialog&&(!op.dialog.isConnected||dialog!==op.dialog)))throw cancelledReading();
 }
@@ -130,54 +134,57 @@ async function paintCheckpoint(signal?:AbortSignal){
 async function readingCheckpoint(op:ReadingOperation){checkReading(op);await paintCheckpoint(op.controller.signal);checkReading(op);}
 function readingDialog(op:ReadingOperation){
  checkReading(op);
- const d=showDialog(`${loadingMarkup('Opening score',op.running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'score-reading');
- op.dialog=d;d.addEventListener('close',()=>{if(op.dialog===d&&op.running.state==='working')op.running.cancel();},{once:true});paintReadingClock(op);return d;
+ const d=showDialog(op.loading.markup(),'score-reading');op.loading.attach(d);if(op.running.state==='installing'&&op.loading.state!=='saving')op.loading.saving();
+ op.dialog=d;d.addEventListener('close',()=>{if(op.dialog===d&&op.running.state==='working')op.running.cancel();},{once:true});return d;
 }
-/** A long score can take a minute or more to engrave or prepare. After a few
- * seconds the dialog shows how long it has been working; there is no limit. */
-const READING_CLOCK_AFTER_SECONDS=3;
-function paintReadingClock(op:ReadingOperation){
- if(readingOperation!==op){window.clearInterval(op.clock);return;}
- if(!op.dialog)return;const seconds=(performance.now()-op.started)/1000;
- if(seconds<READING_CLOCK_AFTER_SECONDS){updateLoadingElapsed(op.dialog);return;}
- const cancellable=op.running.state==='working'&&!!op.dialog.querySelector('[data-action=cancel-job]:not([disabled])');
- updateLoadingElapsed(op.dialog,seconds,`${op.expectation}${cancellable?' Cancel stops without changing your library.':''}`);
-}
-function beginReading(entryId:string){
+/** A loading surface handed from an earlier dialog of the same request
+ * (transposition, Earlier editions) to the score opening that completes it. */
+let carriedLoading:LoadingProgress|undefined;
+const scoreTitle=(entryId:string)=>entries.find(e=>e.id===entryId)?.metadata.title??'Score';
+function openingLoading(entryId:string){return new LoadingProgress(scoreTitle(entryId),['check','hands','open'],{kicker:'Opening',cancel:true});}
+function beginReading(entryId:string,loading?:LoadingProgress){
+ const carried=carriedLoading;carriedLoading=undefined;
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
  libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
  job?.cancel();
- const controller=new AbortController(),running:ReadingJob={cancel:()=>controller.abort(),entryId,state:'working',progress:'Opening score…'},
+ loading??=carried??openingLoading(entryId);
+ // A surface carried past its save stays uncancellable: the new edition is
+ // already in the library, so Esc must not leave the reader on the old one.
+ const controller=new AbortController(),running:ReadingJob={cancel:()=>controller.abort(),entryId,state:loading.state==='saving'?'installing':'working',progress:loading.statusText()},
   op:ReadingOperation={controller,running,previous:current,keyboard:preferences.keyboardLayout,generation:++readingGeneration,
-   options:dialog?.dataset.kind==='options'?optionsSection:undefined,optionsFocus:(document.activeElement as HTMLElement)?.dataset.optionsKey,
-   started:performance.now(),clock:0,expectation:'A long score can take up to a minute to prepare.'};
- readingOperation=op;job=running;practice?.pause();readingDialog(op);op.clock=window.setInterval(()=>paintReadingClock(op),1000);return op;
+   options:dialog?.dataset.kind==='options'?optionsSection:undefined,optionsFocus:(document.activeElement as HTMLElement)?.dataset.optionsKey,loading};
+ readingOperation=op;job=running;practice?.pause();readingDialog(op);return op;
 }
 async function admitReading(bytes:Uint8Array,op:ReadingOperation){
  await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
- readingProgress(op,'Checking saved score…');
+ readingProgress(op,'check');
  const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
  if(p.manifest.files[GUITAR_PRO_FILES.descriptor]&&guitarProPreparedByEarlierConverter(p))notify(EARLIER_GUITAR_PRO_CONVERTER);
- else if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'Checking retained Guitar Pro source…');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
+ else if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'check');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
  return p;
 }
-function readingProgress(op:ReadingOperation,text:string){checkReadingOwner(op);op.running.progress=text;if(op.dialog)updateLoading(op.dialog,text);}
+function readingProgress(op:ReadingOperation,step:LoadingStepId){checkReadingOwner(op);op.loading.step(step);op.running.progress=LOADING_STEPS[step];}
+/** Engine stages refine the current step; engraving has no time limit and
+ * stays cancellable at every cooperative step. */
 function readingExecution(op:ReadingOperation):ReadingExecution {
- return {signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);readingProgress(op,preparationMessage(stage));}};
+ return {signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);op.loading.stage(stage);}};
 }
-/** Engraving an imported score is the longest foreground step: a long piano
- * score takes a minute or more, and preparing its pages for reading and hand
- * editing takes about as long again. It reports its stage, stays cancellable
- * at every cooperative step, and has no time limit. */
-async function engraving<T>(op:ReadingOperation,work:(execution:ReadingExecution)=>Promise<T>):Promise<T>{
- op.expectation='A long score takes a minute or two to engrave, and about as long again to prepare its pages.';
- try{return await work({signal:op.controller.signal,onCheckpoint:stage=>{checkReadingOwner(op);readingProgress(op,engravingMessage(stage));}});}
- finally{op.expectation='Preparing the pages of a long score for reading and hand editing can take another minute.';}
+/** A failure the player did not ask for stays on its loading surface with
+ * Close; a cancelled one simply closes. */
+function holdFailure(loading:LoadingProgress,d:HTMLDialogElement,error:unknown,cancelled:boolean){
+ if(dialog!==d)return;
+ if(cancelled||!(error instanceof Error)||error.name==='AbortError'){loading.stop();closeDialog();return;}
+ loading.fail(error.message,button('Close','close','Esc'));d.dataset.kind='loading-failed';shownFailures.add(error);
 }
 function suspendReadingDialog(op:ReadingOperation){checkReading(op);op.dialog=undefined;closeDialog(false);}
-function finishReading(op:ReadingOperation,success:boolean){
- window.clearInterval(op.clock);if(readingOperation!==op)return;
- op.running.state=success?'complete':'failed';if(dialog===op.dialog)closeDialog(false);readingOperation=undefined;
+function finishReading(op:ReadingOperation,success:boolean,error?:unknown){
+ if(readingOperation!==op){op.loading.stop();return;}
+ op.running.state=success?'complete':'failed';
+ // A failure the player did not ask for stays on its surface with Close.
+ const shown=!success&&error instanceof Error&&error.name!=='AbortError'&&error.message!==READING_CANCELLED&&!op.controller.signal.aborted&&!op.options&&!!op.dialog&&dialog===op.dialog;
+ if(shown){op.loading.fail(error.message,button('Close','close','Esc'));op.dialog!.dataset.kind='loading-failed';shownFailures.add(error);}
+ else{op.loading.stop();if(dialog===op.dialog)closeDialog(false);}
+ readingOperation=undefined;
  if(!success&&op.options&&current===op.previous){options(op.options);if(op.optionsFocus)dialog?.querySelector<HTMLElement>(`[data-options-key="${CSS.escape(op.optionsFocus)}"]`)?.focus();}
  if(!current)void refreshLibrarySummaries();
 }
@@ -438,6 +445,8 @@ async function savePdf(){
  try{
   const target=current,p=readerPackage(),s={...(livePersonalEditors.get(target)?.visiblePersonal??target.personal),view:target.personal.view},mode=labelMode(),indices=p.pages.map((_,index)=>index),positions=annotationPositions(p,indices);
   await document.fonts.ready;
+  // Drawing every page holds the reader for a moment; say so first.
+  notify(`Preparing ${indices.length} page${indices.length===1?'':'s'} for the PDF…`);await paintCheckpoint();if(current!==target||practice)return;
   const svgs=indices.map(index=>{const page=createReaderPage(p,index);paintReaderSeats(page,target.package,p,s,mode,positions,false);return page.element.querySelector('svg')!;});
   const size=scorePageSize(svgs),filename=scorePdfFilename(target.entry.metadata.title),unmount=mountScorePrint(document,svgs,size);
   try{notify(pdfSaveMessage(await host.savePdf(filename,size),filename,svgs.length,mode));}finally{unmount();}
@@ -546,7 +555,7 @@ async function preparePiano(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:
  const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:op.controller.signal},readerAdmission);
  checkReading(op);
  if(!('package' in q))throw Error(q.message);
- await readingCheckpoint(op);readingProgress(op,'Opening score…');
+ await readingCheckpoint(op);
  return {q,running:op.running,dialog:op.dialog!};
 }
 
@@ -570,10 +579,10 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
  let previous=previousBytes&&!rebuilt?await readerAdmission.import(previousBytes,{allowLegacyTempo:true}):undefined;
  if(previous&&q.package.keyboardLayout&&previous.availablePresentations?.includes(q.package.keyboardLayout))previous=await selectPresentation(previous,q.package.keyboardLayout);
  let practiceContext:AdmittedPracticeContext|undefined;
- if(op)await readingCheckpoint(op);
+ if(op){await readingCheckpoint(op);readingProgress(op,'save');}
 
  return enqueue(async()=>{
-  if(op){checkReading(op);running.state='installing';op.dialog?.setAttribute('aria-busy','true');const cancel=op.dialog?.querySelector<HTMLButtonElement>('[data-action="cancel-job"]');if(cancel)cancel.disabled=true;}
+  if(op){checkReading(op);running.state='installing';op.loading.saving();}
   const latest=entries.find(e=>e.id===entry.id);
   if(newEntry?!!latest:!latest||latest.file!==entry.file)throw Error('The library changed while saving; previous files are retained.');
   const installed=await stagePresentationInstall(host,{packageBytes:q.packageBytes,personalBytes:new TextEncoder().encode(JSON.stringify(checked)),
@@ -602,12 +611,12 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,per
  const steps=getScoreTransposition(selected);
  if(selected.availablePresentations?.includes(layout)??selected.keyboardLayout===layout)return preparePiano(bytes,layout,personal,op);
  if(!steps){
-  readingProgress(op,'Engraving the score for this keyboard…');
+  readingProgress(op,'engrave-keyboard');
   const added=await addKeyboardView(selected,layout,readingExecution(op));checkReading(op);
   const view=await selectPresentation(await readerAdmission.import(added,{allowLegacyTempo:true}),layout);checkReading(op);
   return preparePiano(added,layout,personal??personalForAddedKeyboard(selected,view),op);
  }
- readingProgress(op,'Transposing score…');
+ readingProgress(op,'transpose');
  const transposed=await prepareSourceTransposition(selected,bytes,steps,readingExecution(op));checkReading(op);
  return preparePiano(transposed,layout,undefined,op);
 }
@@ -625,7 +634,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Clock acquisition is an activation prerequisite too. Keep the old reader,
  // selection and preferences intact until every awaited prerequisite is owned.
  let clock:number|undefined,clockError:unknown;try{clock=await host.midiClock();}catch(error){clockError=error;}check();
- readingProgress(op,'Preparing your score for editing…');await paintCheckpoint(op.controller.signal);check();
+ readingProgress(op,scoreCapabilities(next.package).pianoPreparation?'hands':'parts');await paintCheckpoint(op.controller.signal);check();
  if(scoreCapabilities(next.package).pianoPreparation){next.personal=await personalMemory.loadPersonalCurrent(next.entry,next.package,async()=>rawMemoryPersonal(next.personal));check();next.personal=resolveMemory(next);}
  // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
  let keptHands=0;
@@ -633,9 +642,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
- op.running.state='installing';op.dialog?.setAttribute('aria-busy','true');
- const cancel=op.dialog?.querySelector<HTMLButtonElement>('[data-action=cancel-job]');if(cancel)cancel.disabled=true;
- readingProgress(op,'Finishing score opening…');
+ op.running.state='installing';readingProgress(op,'open');op.loading.saving('Almost ready. This part can’t be cancelled.');
  readingParts.remember(next.entry,next.package);
  ++manualPracticeGeneration;adviceKey='';adviceRunner.cancel();pitchInput.block();practice?.close();practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;
  readingPresentation=nextPresentation;readingViewError=nextViewError;
@@ -645,7 +652,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
- }catch(error){if(ownsOperation)finishReading(op,false);throw error;}
+ }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
 }
 let notationChanging=false;
 async function switchReadingNotation(value:string){
@@ -679,20 +686,21 @@ async function changeTransposition(steps:number){
  try{
   activePractice?.pause();await activePractice?.flush();const context=activePractice?.contextSnapshot();await savePersonal();
   if(current!==target)throw Error('The selected score changed; previous transposition retained.');
-  const layout=target.package.keyboardLayout??preferences.keyboardLayout,file=retainedTranspositionFile(target.entry,steps,layout);let retained:Awaited<ReturnType<typeof prepareRetainedEdition>>|undefined,rebuilt:RebuiltInstall|undefined;
+  const layout=target.package.keyboardLayout??preferences.keyboardLayout,file=retainedTranspositionFile(target.entry,steps,layout),
+   loading=new LoadingProgress(target.entry.metadata.title,[file?'retained':'transpose','save','hands','open'],{kicker:steps===0?'Restoring the original pitch':`Transposing ${offsetLabel(steps)}`,cancel:true,cancelNote:'Cancel keeps the current score.'});let retained:Awaited<ReturnType<typeof prepareRetainedEdition>>|undefined,rebuilt:RebuiltInstall|undefined;
   if(file){
    const controller=new AbortController(),running={cancel:()=>controller.abort(),entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Opening retained score…'};job=running;
-   const d=showDialog(`${loadingMarkup('Opening score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
+   const d=showDialog(loading.markup(),'piano-preparation');loading.attach(d);loading.step('retained');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
    try{
     // A saved edition is engraved again at its pitch, bound to the original
     // the current score was made from; it keeps its own hands and fingers.
     const engraveAgain=async(refusal:unknown)=>{
-     updateLoading(d,'Engraving the score again…');
+     loading.step('engrave-again');
      const bytes=await readRetainedEdition(host,target.entry,file),currentBytes=await host.read(target.entry.file);
      if(!currentBytes)throw Error('Managed score is missing; current transposition retained.');
      const original={package:target.package.transpositionOriginal??target.package,bytes:getOriginalScorePackageBytes(target.package)??currentBytes};
      try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,bytes,layout,{refusal,...(steps?{original}:{}),admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},
-      {signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')updateLoading(d,preparationMessage(stage));}});}
+      {signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')loading.stage(stage);}});}
      catch(rebuildError){if(steps===0||(rebuildError as Error).name==='AbortError')throw rebuildError;}
      return rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:undefined;
     };
@@ -705,26 +713,26 @@ async function changeTransposition(steps:number){
      retained=await engraveAgain(Error('This pitch\'s saved edition belongs to an earlier engraving of the original. It stays saved.'));
     if(retained&&getScoreTransposition(retained.package)!==steps)throw Error('The retained edition has a different transposition; current score retained.');
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Score change cancelled. The current score is retained.');
-    if(retained&&(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout))){running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,availableFingerPresentations:[]},running,dialog:d};}
+    if(retained&&(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout))){running.state='installing';loading.step('save');loading.saving();prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,availableFingerPresentations:[]},running,dialog:d};}
     else{running.state='complete';closeDialog();retained=undefined;rebuilt=undefined;}
-   }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
+   }catch(error){running.state='failed';holdFailure(loading,d,error,controller.signal.aborted);throw error;}
   }
   let carried:ReturnType<typeof personalForTransposedEdition>|undefined;
   if(!prepared){if(steps===0)throw Error('The retained original for this instrument is unavailable. The current score is retained.');const bytes=await host.read(target.entry.file);if(!bytes)throw Error('Managed score is missing; current transposition retained.');
    const controller=new AbortController(),running={cancel:()=>controller.abort(),entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Transposing score…'};job=running;
-   const d=showDialog(`${loadingMarkup('Transposing score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
-   try{const transposed=await prepareSourceTransposition(target.package,bytes,steps,{signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')updateLoading(d,preparationMessage(stage));}});
+   const d=showDialog(loading.markup(),'piano-preparation');loading.attach(d);loading.restart(['transpose','save','hands','open']);loading.step('transpose');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
+   try{const transposed=await prepareSourceTransposition(target.package,bytes,steps,{signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')loading.stage(stage);}});
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Transposing cancelled. The current score is retained.');
     const p=await readerAdmission.import(transposed,{allowLegacyTempo:true,keyboardLayout:layout});carried=personalForTransposedEdition(target.personal,target.package,p);
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Transposing cancelled. The current score is retained.');
-    running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;
+    running.state='installing';loading.step('save');loading.saving();
     prepared={q:{status:'reading',package:p,packageBytes:transposed,personal:carried.personal,availableFingerPresentations:[]},running,dialog:d};
-   }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
+   }catch(error){running.state='failed';holdFailure(loading,d,error,controller.signal.aborted);throw error;}
   }
   const {q,running,dialog:d}=prepared;if(current!==target||getScoreTransposition(q.package)!==steps)throw Error('The score changed while preparing; previous transposition retained.');
   const personal=q.personal??initialPersonal(q.package);if(!retained)personal.view=anchorView(target.personal.view,q.package,writtenAnchor(target.package,target.personal.view.page));
   const installed=await installPreparedScore(target.entry,q,running,personal,false,retained?.personalFiles,context,rebuilt);running.state='complete';if(dialog===d)closeDialog();
-  await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);options();
+  loading.saving('Saved. This part can’t be cancelled.');carriedLoading=loading;await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);options();
   notify(rebuilt?`${steps===0?'Original pitch restored.':`Transposed ${offsetLabel(steps)}.`} ${rebuiltNotice(rebuilt)}`:
    steps===0?'Original pitch restored with its saved choices and progress.':transposedNotice(steps,!!activeLayer(target.package,target.personal),carried));
  }catch(error){if(prepared){prepared.running.state='failed';if(dialog===prepared.dialog)closeDialog();}throw error;}
@@ -732,7 +740,7 @@ async function changeTransposition(steps:number){
 }
 async function switchKeyboard(value:unknown){const source=document.activeElement as HTMLElement|null,optionsSurface=dialog,id=keyboardPreference(value);if(keyboardChanging)return;keyboardChanging=true;let op:ReadingOperation|undefined;
 
- try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id);await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
+ try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id,new LoadingProgress(previous.entry.metadata.title,['check','save','hands','open'],{kicker:`Switching to ${keyboardLabel(id)}`,cancel:true,cancelNote:'Cancel keeps the current keyboard.'}));readingProgress(op,'check');await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
 
   const existing=previous.package.availablePresentations?.includes(id)?await selectPresentation(previous.package,id):undefined,
    personal=existing?await loadPersonal(previous.entry,existing):undefined,{q,running}=await preparePianoLayout(bytes,id,personal,previous.package,op);
@@ -747,11 +755,11 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
    finishReading(op,true);
  }else{await enqueue(async()=>{await writeJson('preferences.json',{...preferences,keyboardLayout:id});preferences.keyboardLayout=id;});paintLibrarySummaries();}
  void refreshLibrarySummaries();return true;
- }catch(error){if(op)finishReading(op,false);notify((error as Error).message);if(current&&!practice)renderToolbar();return false;}
+ }catch(error){if(op)finishReading(op,false,error);reportFailure(error);if(current&&!practice)renderToolbar();return false;}
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}
 }
 
-async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id);try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
+async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  let prior:ScorePackage;try{prior=await admitReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}await openRebuiltEdition(entry,data,error,op);return;}
  if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);
  // An edition saved for one keyboard only opens on that keyboard.
@@ -766,7 +774,7 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
   if(layout!==op.keyboard)notify(`This edition has only a ${keyboardLabel(layout)} view, so it opened on that keyboard.`);
- }catch(error){finishReading(op,false);throw error;}
+ }catch(error){finishReading(op,false,error);throw error;}
 }
 
 /** Carry practice from each earlier keyboard view to its new view. Practice
@@ -794,7 +802,7 @@ function rebuiltNotice(r:RebuiltInstall){
  * engraved again from its own content and installed like an Earlier edition:
  * the earlier archive and its journals stay saved. */
 async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation){
- readingProgress(op,'Engraving the score again…');
+ readingProgress(op,'engrave-again');
  const rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
  await readingCheckpoint(op);
  const {q,running}=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op),
@@ -814,17 +822,17 @@ async function chooseGuitarProTracks(inspection:GuitarProInspection,op:ReadingOp
  });
 }
 async function importGuitarProScore(bytes:Uint8Array){
- const op=beginReading('import-guitar-pro');try{
-  await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);readingProgress(op,'Finding source parts…');
+ const op=beginReading('import-guitar-pro',new LoadingProgress('Guitar Pro score',['gp-parts','gp-read','gp-engrave','save','parts','open'],{kicker:'Importing',cancel:true}));try{
+  await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);readingProgress(op,'gp-parts');
   const inspection=await inspectGuitarProSource(bytes,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)}),ids=await chooseGuitarProTracks(inspection,op);checkReading(op);
-  if(!ids){finishReading(op,false);return;}readingDialog(op);readingProgress(op,'Reading selected parts…');
+  if(!ids){finishReading(op,false);return;}readingDialog(op);readingProgress(op,'gp-read');
   const {frettedPreparationAssets}=await import('./fretted-preparation-assets');checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);await readingCheckpoint(op);
   const staged=await stageGuitarProParts(inspection,ids,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op),prepareAndAdmit:async(input,signal)=>{
-   checkReading(op);readingProgress(op,'Preparing ISO and TAB…');const packet=await prepareDualReadingPacket({score:input.score,metadata:input.metadata,retainedFiles:input.retainedFiles,createdAt:new Date().toISOString(),...assets},{signal});checkReading(op);return packet;
+   checkReading(op);readingProgress(op,'gp-engrave');const packet=await prepareDualReadingPacket({score:input.score,metadata:input.metadata,retainedFiles:input.retainedFiles,createdAt:new Date().toISOString(),...assets},{signal});checkReading(op);return packet;
   }});await readingCheckpoint(op);
   const installed=await enqueue(async()=>{checkReading(op);return stageReadingPartsInstall(host,{parts:staged.parts,entries,
-   canCommit:()=>{try{checkReading(op);return true;}catch{return false;}},onCommitStarted:()=>{checkReading(op);op.running.state='installing';op.dialog?.querySelector<HTMLButtonElement>('[data-action=cancel-job]')?.setAttribute('disabled','');}
+   canCommit:()=>{try{checkReading(op);return true;}catch{return false;}},onCommitStarted:()=>{checkReading(op);op.running.state='installing';op.loading.step('save');op.loading.saving();}
   });});entries=installed.entries;const entry=installed.selected[0],part=staged.parts.find(part=>collectionId(part.package)===entry.id)!;
   checkReading(op);for(const selected of installed.selected){const prepared=staged.parts.find(part=>collectionId(part.package)===selected.id)!;readingParts.remember(selected,prepared.package);}
   const personal=await loadPersonal(entry,part.package);checkReading(op);const activated=await activateScore({entry,package:part.package,personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});finishReading(op,true);
@@ -835,7 +843,7 @@ async function importGuitarProScore(bytes:Uint8Array){
    const saved=await readJson<{version:number;entries:Entry[]}>('library.json').catch(()=>undefined);
    if(saved?.version===1&&Array.isArray(saved.entries)&&saved.entries.every(validEntryStorage))entries=saved.entries;
   }
-  finishReading(op,false);throw error;
+  finishReading(op,false,error);throw error;
  }
 }
 let partChanging=false;
@@ -852,14 +860,14 @@ async function switchReadingPart(id:string){
 async function importScore(){
  let bytes=await host.pickScore();if(!bytes)return;const kind=scoreImportKind(bytes);if(kind==='guitar-pro'){await importGuitarProScore(bytes);return;}
  if(kind==='musescore'&&!MUSESCORE_IMPORT_ENABLED)throw Error('MuseScore files can\'t be opened in this copy of the viewer yet. Export the score from MuseScore as MusicXML (.musicxml or .mxl) and import that file.');
- const op=beginReading('import');try{await readingCheckpoint(op);
- if(kind==='musicxml'){readingProgress(op,'Engraving the score…');const [{frettedPreparationAssets},{prepareMusicXmlScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musicxml-import')]);checkReading(op);
+ const op=beginReading('import',new LoadingProgress('New score',[...(kind==='score'?[]:['engrave'] as const),'check','save','hands','open'],{kicker:'Importing',cancel:true}));try{await readingCheckpoint(op);
+ if(kind==='musicxml'){readingProgress(op,'engrave');const [{frettedPreparationAssets},{prepareMusicXmlScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musicxml-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
-  const written=bytes;bytes=(await engraving(op,execution=>prepareMusicXmlScore(written,assets,execution))).bytes;await readingCheckpoint(op);}
- if(MUSESCORE_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'Converting the MuseScore file…');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
+  const written=bytes;bytes=(await prepareMusicXmlScore(written,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
+ if(MUSESCORE_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'engrave');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
-  const saved=bytes;bytes=(await engraving(op,execution=>prepareMuseScore(saved,assets,execution))).bytes;await readingCheckpoint(op);}
- const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;
+  const saved=bytes;bytes=(await prepareMuseScore(saved,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
+ const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.setTitle(p.manifest.metadata.title||op.loading.title);
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false;
  if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op);
@@ -879,28 +887,29 @@ async function importScore(){
   await readingCheckpoint(op);
   const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated);
   finishReading(op,true);
- }catch(error){finishReading(op,false);throw error;}
+ }catch(error){finishReading(op,false,error);throw error;}
 }
 async function confirmHeaderRefresh():Promise<boolean>{return new Promise(resolve=>{const d=showDialog(`<h2>Refresh printed header?</h2><p class="help">This package has identical music, glyph seats, finger choices and every vector byte outside its verified notice cleanup. Your saved corrections and finger choices stay intact. The previous package remains available through Restore previous header.</p><div class="dialog-actions"><button data-keep-header>Keep current <kbd>Esc</kbd></button><button data-refresh-header>Refresh header</button></div>`,'header-refresh');let finished=false;const done=(yes:boolean)=>{if(finished)return;finished=true;resolve(yes);closeDialog();};d.querySelector('[data-keep-header]')!.addEventListener('click',()=>done(false));d.querySelector('[data-refresh-header]')!.addEventListener('click',()=>done(true));d.addEventListener('close',()=>{if(!finished){finished=true;resolve(false);}});});}
 async function restoreHeader(){if(!current?.entry.presentations?.length)return;const target=current,history=target.entry.presentations!,file=history.at(-1)!,data=await host.read(file);if(!data)throw Error('The retained package is missing; current header preserved.');const prior=await readerAdmission.import(data,{allowLegacyTempo:true});if(!headerOnlyRefresh(target.package,prior))throw Error('Retained package does not pass the header-only contract; current data preserved.');const updated={...target.entry,file,presentations:history.slice(0,-1),retainedPackages:[...new Set([...(target.entry.retainedPackages??[]),target.entry.file])],...(target.entry.transposition?{transposition:nextTranspositionSelection(target.entry,file,{steps:getScoreTransposition(prior),layout:prior.keyboardLayout??preferences.keyboardLayout})}: {})},next=entries.map(e=>e.id===updated.id?updated:e);await enqueue(()=>writeJson('library.json',{version:1,entries:next}));entries=next;closeDialog();await open(updated);notify('Previous header restored; saved corrections and versions retained.');}
 async function earlierEditions(){
  if(!current||job?.state==='working'||job?.state==='installing')return;
  await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();const target=current,files=[...new Set(target.entry.retainedPackages??[])].filter(file=>file!==target.entry.file).reverse(),
-  d=showDialog(`<h2>Earlier editions</h2><p class="help">Each edition keeps its pages and saved choices. Select one to restore it for this instrument.</p><div data-editions></div><p class="help" role="status" data-edition-progress></p><p class="error" role="alert"></p><div class="dialog-actions">${button('Close','close','Esc')}</div>`,'earlier-editions'),list=d.querySelector('[data-editions]')!;
+  d=showDialog(`<h2>Earlier editions</h2><p class="help">Each edition keeps its pages and saved choices. Select one to restore it for this instrument.</p><div data-editions></div><div data-edition-progress></div><p class="error" role="alert"></p><div class="dialog-actions">${button('Close','close','Esc')}</div>`,'earlier-editions'),list=d.querySelector('[data-editions]')!;
  for(const [index,file]of files.entries()){
   const b=document.createElement('button');b.type='button';b.textContent=`Earlier ${index+1}`;list.append(b);
   b.addEventListener('click',()=>{void(async()=>{
-   b.disabled=true;const restoring={cancel:()=>{},entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Saving edition…'};try{
+   b.disabled=true;const restoring={cancel:()=>{},entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Saving edition…'},
+    loading=new LoadingProgress(target.entry.metadata.title,['save','hands','open'],{kicker:`Restoring Earlier ${index+1}`}),progress=d.querySelector<HTMLElement>('[data-edition-progress]')!;try{
     const layout=target.package.keyboardLayout??'janko-four-row';let rebuilt:RebuiltInstall|undefined,
      retained:Awaited<ReturnType<typeof prepareRetainedEdition>>;
     try{retained=await prepareRetainedEdition(host,target.entry,file,layout);}
     catch(error){
      // An earlier edition whose pages no longer reproduce is engraved again.
      if((error as Error).name==='AbortError')throw error;
-     const progress=d.querySelector('[data-edition-progress]')!,controller=new AbortController(),stop=()=>controller.abort();
-     d.querySelector('.error')!.textContent='';progress.textContent='Engraving the score again…';d.addEventListener('close',stop,{once:true});
-     try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,await readRetainedEdition(host,target.entry,file),layout,{refusal:error,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},{signal:controller.signal});}
-     finally{d.removeEventListener('close',stop);progress.textContent='';}
+     const controller=new AbortController(),stop=()=>controller.abort();
+     d.querySelector('.error')!.textContent='';progress.innerHTML=loading.markup();loading.attach(progress);loading.step('engrave-again');d.addEventListener('close',stop,{once:true});
+     try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,await readRetainedEdition(host,target.entry,file),layout,{refusal:error,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},{signal:controller.signal,onCheckpoint:stage=>loading.stage(stage)});}
+     finally{d.removeEventListener('close',stop);}
      retained={packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}};
     }
     // A re-engraved edition's practice arrives during the install, so its
@@ -920,11 +929,11 @@ async function earlierEditions(){
         if(!live())throw Error('Edition restore cancelled. The current score is retained.');
         admitted=context?await PracticeView.prepareContext(retained.package,target.entry.id,context,retained.personal):undefined;
         if(!live())throw Error('Edition restore cancelled. The current score is retained.');}}:{}),
-      onCommitStarted:()=>{restoring.state='installing';job=restoring;d.dataset.kind='piano-preparation';d.setAttribute('aria-busy','true');}});
+      onCommitStarted:()=>{restoring.state='installing';job=restoring;d.dataset.kind='piano-preparation';d.setAttribute('aria-busy','true');if(!progress.firstElementChild){progress.innerHTML=loading.markup();loading.attach(progress);}loading.step('save');loading.saving();}});
      entries=result.entries;return result;
     });
-    restoring.state='complete';closeDialog(false);await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},context,admitted);notify(rebuilt?`Earlier edition restored. ${rebuiltNotice(rebuilt)}`:'Earlier edition restored with its saved choices.');
-   }catch(error){restoring.state='failed';if((error as Error).name==='AbortError'&&dialog!==d)return;if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else notify((error as Error).message);}
+    restoring.state='complete';closeDialog(false);loading.saving('Saved. This part can’t be cancelled.');carriedLoading=loading;await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},context,admitted);notify(rebuilt?`Earlier edition restored. ${rebuiltNotice(rebuilt)}`:'Earlier edition restored with its saved choices.');
+   }catch(error){restoring.state='failed';loading.stop();progress.replaceChildren();if((error as Error).name==='AbortError'&&dialog!==d)return;if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else reportFailure(error);}
    finally{b.disabled=false;}
   })();});
  }
@@ -971,7 +980,7 @@ function options(section?:string){
  Promise.all([midiMounted,audioMounted,pianoMounted]).then(()=>{if(dialog===d&&!bindingOptions?.active)optionsNavigation?.focusInitial();});
  optionsNavigation=new OptionsNavigation(d,target=>{if(bindingOptions?.testing&&!target?.hasAttribute('data-binding-test'))bindingOptions.endTest(false);},()=>!!bindingOptions?.capturing||!!bindingOptions?.testing,{sectionChanged:id=>{optionsSection=id;}});
  if(current&&p&&scoreCapabilities(p).pianoPreparation&&!transpose.error){
-  const target=current,field=d.querySelector<HTMLInputElement>('[data-score-transpose]')!,notice=d.querySelector('[data-transpose-error]')!,read=()=>transposeDraft(field.value,transpose.min,transpose.max),commit=()=>{try{const steps=read();field.value=String(getScoreTransposition(target.package));notice.textContent='';if(steps!==getScoreTransposition(target.package)){field.disabled=true;d.querySelectorAll<HTMLButtonElement>('[data-manual-key="transpose"] button').forEach(button=>button.disabled=true);void changeTransposition(steps).catch(error=>{notify(error.message);if(current===target)options();});}return true;}catch(error){notice.textContent=(error as Error).message;return false;}};
+  const target=current,field=d.querySelector<HTMLInputElement>('[data-score-transpose]')!,notice=d.querySelector('[data-transpose-error]')!,read=()=>transposeDraft(field.value,transpose.min,transpose.max),commit=()=>{try{const steps=read();field.value=String(getScoreTransposition(target.package));notice.textContent='';if(steps!==getScoreTransposition(target.package)){field.disabled=true;d.querySelectorAll<HTMLButtonElement>('[data-manual-key="transpose"] button').forEach(button=>button.disabled=true);void changeTransposition(steps).catch(error=>{if(shownFailures.has(error))return;notify(error.message);if(current===target)options();});}return true;}catch(error){notice.textContent=(error as Error).message;return false;}};
   transposeControls=new ManualTempoControls({accepts:el=>dialog===d&&d.contains(el)&&el.closest<HTMLElement>('[data-manual-key]')?.dataset.manualKey==='transpose'&&!field.disabled,edit:{cancel:()=>{notice.textContent='';},commit:()=>commit(),adjust:(_key,draft,direction)=>{try{const value=transposeDraft(draft.value,transpose.min,transpose.max),next=value+direction;if(next<transpose.min||next>transpose.max)return false;draft.value=String(next);notice.textContent='';return true;}catch(error){notice.textContent=(error as Error).message;return false;}}},adjust:(_key,direction,repeated)=>{if(repeated)return false;const next=getScoreTransposition(target.package)+direction;if(next<transpose.min||next>transpose.max)return false;field.value=String(next);return commit();}});
  }
 }
@@ -1034,15 +1043,15 @@ async function act(action:string){try{if(!startupReady&&action!=='exit')return;i
  else if(action==='toggle'){if(!fingerDisplayAvailable(p,s,currentFingerPresentation(p))){notify('Choose a finger on a note first.');return;}if(preferences.fingerBehavior==='momentary'){refreshPresentation();return;}if(selection){selectionPitchToggle=!selectionPitchToggle;refreshPresentation();renderToolbar();return;}v.labelMode=v.labelMode==='pitch'?'finger':'pitch';}
  else if(action==='count')v.count=(v.count%3+1) as 1|2|3;else if(action==='scale'){const values=[1,.9,.75,.5] as const;v.scale=values[(values.indexOf(v.scale)+1)%4];}else return;
  if(practice)refreshPresentation();else{renderPages();renderToolbar();savePersonalQuietly();}
- }catch(error){notify((error as Error).message);}}
+ }catch(error){reportFailure(error);}}
 
-app.addEventListener('click',e=>{const el=e.target as HTMLElement;const openEl=el.closest<HTMLElement>('[data-open]');if(openEl){void open(entries.find(q=>q.id===openEl.dataset.open)!).catch(e=>notify(e.message));return;}const seatEl=el.closest<HTMLElement>('[data-viewer-seat],[data-finger-seat]');if(seatEl&&current&&!practice){void edit(readerPackage().seats.find(s=>s.id===(seatEl.dataset.viewerSeat??seatEl.dataset.fingerSeat))!,{x:e.clientX,y:e.clientY});return;}const b=el.closest<HTMLElement>('[data-action]');if(b){if(b.dataset.action==='toggle'&&preferences.fingerBehavior==='momentary'){return;}void act(b.dataset.action!);}});
+app.addEventListener('click',e=>{const el=e.target as HTMLElement;const openEl=el.closest<HTMLElement>('[data-open]');if(openEl){void open(entries.find(q=>q.id===openEl.dataset.open)!).catch(reportFailure);return;}const seatEl=el.closest<HTMLElement>('[data-viewer-seat],[data-finger-seat]');if(seatEl&&current&&!practice){void edit(readerPackage().seats.find(s=>s.id===(seatEl.dataset.viewerSeat??seatEl.dataset.fingerSeat))!,{x:e.clientX,y:e.clientY});return;}const b=el.closest<HTMLElement>('[data-action]');if(b){if(b.dataset.action==='toggle'&&preferences.fingerBehavior==='momentary'){return;}void act(b.dataset.action!);}});
 document.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('dialog [data-action]');if(b)void act(b.dataset.action!);});
 app.addEventListener('pointerdown',e=>{const control=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-action=toggle]');if(!current||dialog||preferences.fingerBehavior!=='momentary'||!control||control.disabled||e.button!==0)return;input.holdPointer(e.pointerId);void act('toggle');});
 window.addEventListener('pointerup',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 window.addEventListener('pointercancel',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 app.addEventListener('change',e=>{const el=e.target as HTMLSelectElement;if(!current||!el.dataset.option)return;const v=current.personal.view,key=el.dataset.option as keyof typeof v;(v as any)[key]=['count','scale'].includes(key)?Number(el.value):el.value;renderPages();renderToolbar();savePersonalQuietly();});
-document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-notation-system]')){const choice=field.value==='traditional'?'traditional':'iso';void saveNotationSystem(choice).catch(error=>{notify(error.message);field.value='iso';});return;}if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{notify(error.message);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}});
+document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-notation-system]')){const choice=field.value==='traditional'?'traditional':'iso';void saveNotationSystem(choice).catch(error=>{notify(error.message);field.value='iso';});return;}if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{reportFailure(error);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}});
 window.addEventListener('mousemove',e=>{if(current&&(e.clientY>innerHeight-36||e.clientX<20||e.clientX>innerWidth-20))reveal();});
 window.addEventListener('resize',()=>{if(dialog)fitDialog(dialog,orientation.rotation);if(practice)return;if(current)renderPages();else {const surface=app.querySelector<HTMLElement>('.surface');if(surface)transformSurface(surface,orientation.rotation);}});
 window.addEventListener('pagehide',()=>{if(job?.state==='working')job.cancel();readerAdmission.clear();});
@@ -1128,26 +1137,29 @@ let summaryLoadingGeneration=0;
 async function refreshLibrarySummaries(){
  libraryLoadingStatus?.remove();libraryLoadingStatus=undefined;
  const generation=++summaryLoadingGeneration;let status:HTMLElement|undefined,completed=0,total=entries.length;
- const progress=(count:number,size:number)=>{if(generation!==summaryLoadingGeneration)return;completed=count;total=size;if(!startupReady)updateLoading(app,'Preparing your library…',count,size);else if(status)updateLoading(status,'Updating your library…',count,size);};
+ const updating=new LoadingProgress('Updating your library',['summaries'],{compact:true});updating.step('summaries');
+ const progress=(count:number,size:number)=>{if(generation!==summaryLoadingGeneration)return;completed=count;total=size;(startupReady?updating:startupLoading)?.counted(count,size,size===1?'score':'scores');};
  const timer=window.setTimeout(()=>{
   if(!startupReady||generation!==summaryLoadingGeneration||summariesBlocked())return;
-  status=document.createElement('aside');status.className='viewer-library-loading';status.innerHTML=loadingMarkup('Updating library','Checking saved progress…');
-  app.querySelector('.surface')?.append(status);libraryLoadingStatus=status;progress(completed,total);
+  status=document.createElement('aside');status.className='viewer-library-loading';status.innerHTML=updating.markup();
+  app.querySelector('.surface')?.append(status);libraryLoadingStatus=status;updating.attach(status);progress(completed,total);
  },120);
  try{const changed=await loadPracticeTotals(progress);if(generation===summaryLoadingGeneration&&changed)paintLibrarySummaries();}
- finally{clearTimeout(timer);status?.remove();if(libraryLoadingStatus===status)libraryLoadingStatus=undefined;}
+ finally{clearTimeout(timer);updating.stop();status?.remove();if(libraryLoadingStatus===status)libraryLoadingStatus=undefined;}
 }
+let startupLoading:LoadingProgress|undefined;
 
 async function boot(){
  try{
-  app.classList.add('viewer-startup');app.innerHTML=loadingMarkup('Starting Score Viewer','Opening your library…');
+  const loading=startupLoading=new LoadingProgress('Starting Score Viewer',['library','settings','fingerings','input','summaries']);
+  app.classList.add('viewer-startup');app.innerHTML=loading.markup();loading.attach(app);loading.step('library');
   await paintCheckpoint();
   const lib=await readJson<{version:number;entries:Entry[]}>('library.json');
   if(lib){
    if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');
    entries=lib.entries;
   }
-  updateLoading(app,'Restoring your settings…');
+  loading.step('settings');
   const saved=await readJson<typeof preferences>('preferences.json');
   if(saved){
    if(saved.version!==1||![0,90,180,270].includes(saved.libraryRotation))throw Error('Preferences version differs; data retained');
@@ -1161,8 +1173,8 @@ async function boot(){
   orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);
   mainControls=readControlBindings(preferences.controlBindings,preferences);
   preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);
-  updateLoading(app,'Checking saved fingering choices…');await applyPendingConsolidation();
-  updateLoading(app,'Connecting input controls…');
+  loading.step('fingerings');await applyPendingConsolidation();
+  loading.step('input');
   await host.onFocusChange(focused=>{if(!focused)loseFocus();else gainFocus();});
   await host.onMidi(onMidi,status=>{
    if(status.generation===midiConnection?.generation&&status.source===midiConnection?.source){
@@ -1172,16 +1184,18 @@ async function boot(){
    }
   },onMidiNote);
   await host.fullscreen(true);await paintCheckpoint();
-  updateLoading(app,'Preparing your library…');
+  loading.step('summaries');
   await refreshLibrarySummaries();
-  updateLoading(app,pianoSettings.enabled?'Preparing piano sound…':'Finishing startup…');await paintCheckpoint();
+  if(pianoSettings.enabled)loading.step('sound');await paintCheckpoint();
   const requestedPiano=pianoSettings.enabled;
   try{const audio=await configurePiano();if(requestedPiano&&(!audio?.enabled||!audio.ready||audio.error))pianoWarning=`Piano sound is off: ${audio?.error??'The saved sound configuration is unavailable. Review Piano sound in Options.'}`;}catch(error){pianoWarning=`Piano sound is off: ${(error as Error).message}`;}
-  startupReady=true;resetInput();app.classList.remove('viewer-startup');render();
+  startupReady=true;loading.stop();startupLoading=undefined;resetInput();app.classList.remove('viewer-startup');render();
   if(pianoWarning)notify(pianoWarning);
  }catch(error){
   startupFailed=true;app.classList.add('viewer-startup');
-  app.innerHTML=`<section class="viewer-loading"><h2>The library could not open</h2><p>Your saved files have been retained.</p><p class="error" role="alert">${esc((error as Error).message)}</p><div class="dialog-actions">${button('Close Viewer','exit')}</div></section>`;
+  if(startupLoading&&app.querySelector('.viewer-loading')){const message=(error as Error).message.trim();startupLoading.setTitle('The library could not open');startupLoading.fail(`${/[.!?]$/.test(message)?message:`${message}.`} Your saved files are kept as they were.`,button('Close Viewer','exit'));}
+  else app.innerHTML=`<section class="viewer-loading" data-loading-state="failed"><h2 class="viewer-loading-title">The library could not open</h2><p class="viewer-loading-message" role="alert">${esc((error as Error).message)} Your saved files are kept as they were.</p><div class="viewer-loading-footer">${button('Close Viewer','exit')}</div></section>`;
+  startupLoading=undefined;
  }
 }
 void boot();
