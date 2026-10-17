@@ -88,3 +88,10 @@ test('helper exit success still requires later independent receipt admission and
  assert.equal(await requireFooterHelperSuccess({exitCode:0,timedOut:false},missing),undefined,'exit check does not replace the subsequent JSON/nonce/source/paint validator');
  await assert.rejects(requireFooterHelperSuccess({exitCode:0,timedOut:true,signal:'SIGKILL'},missing),/timeout true/);
 });
+test('a killed delivery helper still reports the last page stage it traced',async()=>{
+ const {requireFooterHelperSuccess:requireDelivered}=await import('../scripts/native-delivery/footer-ink-probe.mjs');
+ const stages=Array.from({length:120},(_,i)=>`footer-ink +${i}.0s stage 'footer conventional-piano page ${i+1} of 120' (page ${i*10} ms, page visible, window visible)\n`).join('');
+ const killed={exitCode:null,signal:'SIGKILL',timedOut:true,stderr:stages+"footer-ink +80.0s stage 'read janko-four-row' (page 4735 ms, page hidden, window occluded)\n"};
+ await assert.rejects(requireDelivered(killed,join(tmpdir(),'no-footer-helper-output-'+process.pid)),error=>{
+  assert.match(error.message,/timeout true.*wrote no failure JSON.*stage 'read janko-four-row' \(page 4735 ms, page hidden, window occluded\)/);assert.ok(error.message.length<4400);return true;});
+});

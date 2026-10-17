@@ -13,6 +13,8 @@ export async function boundedCommand(program,args,{cwd,timeoutMs=30000}={}){
 }
 // Failure text is diagnostic only. It never becomes a passed native receipt.
 // Read a capped owned helper file and emit only its bounded message fields.
+// The helper names the page's last stage in its message and traces each stage
+// on stderr; the stderr tail keeps those lines if the helper itself is killed.
 export async function requireFooterHelperSuccess(checked,output){
  if(checked.exitCode===0&&!checked.timedOut)return;
  let detail='',file;
@@ -23,7 +25,7 @@ export async function requireFooterHelperSuccess(checked,output){
  }catch(error){detail=error.code==='ENOENT'?'helper wrote no failure JSON':error.message==='oversized'?'helper failure JSON exceeds diagnostic bound':'helper failure JSON unavailable or malformed';}
  finally{await file?.close();}
  const clean=value=>String(value??'').slice(0,4096).replace(/[\u0000-\u001f\u007f-\u009f]/g,' ');
- throw Error(`Actual WK font readiness/drawing failed (exit ${checked.exitCode}, signal ${checked.signal??'none'}, timeout ${!!checked.timedOut}): ${clean(detail)}${checked.stderr?'; stderr: '+clean(checked.stderr):''}`);
+ throw Error(`Actual WK font readiness/drawing failed (exit ${checked.exitCode}, signal ${checked.signal??'none'}, timeout ${!!checked.timedOut}): ${clean(detail)}${checked.stderr?'; stderr: '+clean(String(checked.stderr).slice(-4096)):''}`);
 }
 /** Verified read-only loopback closure; no arbitrary path/source data serving. */
 export async function frozenFrontendServer(frontend,pins){
