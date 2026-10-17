@@ -69,7 +69,9 @@ test('installing a re-engraved edition keeps the earlier file listed with its jo
  assert.equal(stored.get(journal)!.byteLength,encode(prior).byteLength);
  for(const p of rebuilt.additionalPersonal)assert.ok(installed.entry.personalFiles![p.key],'the other keyboard keeps its journal');
  const moved=stored.get(practiceStorageName(id,rebuilt.package));assert.ok(moved,'practice came along');
- assert.equal(JSON.parse(new TextDecoder().decode(moved)).target,practice.target);
+ const carried=JSON.parse(new TextDecoder().decode(moved));
+ assert.equal(carried.target,practice.target);
+ assert.ok(Object.values(carried.best).includes(practice.target),'the practised section keeps its best');
 });
 
 test('a pitch selection naming a re-engraved archive names its replacement on the keyboards it serves',()=>{
@@ -123,4 +125,11 @@ test('an own-hands edition saved before the current shared engraving policy is r
 test('an edition whose content is damaged is refused, not engraved again',async()=>{
  const damaged=bytes.slice();damaged[Math.floor(damaged.length/2)]^=0xff;
  await assert.rejects(rebuildEdition(damaged,{refusal:Error('It stays saved.')}),/stays saved/);
+});
+
+test('an edition whose member no longer matches its recorded hash is refused, not engraved again',async()=>{
+ const m=structuredClone(content.collectionManifest??content.manifest),files={...content.files};delete files['manifest.json'];
+ const member=Object.keys(m.files).find(name=>name.endsWith('.svg'))!;
+ files[member]=new TextEncoder().encode(new TextDecoder().decode(files[member]).replace('</svg>','<!-- altered --></svg>'));
+ await assert.rejects(rebuildEdition(archivePackage(m,files),{refusal:Error('It stays saved.')}),/stays saved/);
 });

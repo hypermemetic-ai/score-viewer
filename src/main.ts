@@ -27,7 +27,7 @@ import {requireReferencePerformanceTempo,type ReferencePerformanceTempo} from '.
 import {beatUnitSvg,beatUnitLabel,metronomeMark,perMinuteSuffix,tempoRateNumber} from './metronome-mark';
 import {ManualTempoControls,manualTempoField} from './manual-tempo-control';
 import {scoreOptionsMarkup,transposeDraft} from './score-options';
-import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,prepareSourceTransposition} from './score-transposition';
+import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
 import {personalForTransposedEdition} from './transposed-personal';
 import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTransposition} from './score-transposition-selection';
 import {PitchInputEpoch,type AdmittedPracticeContext,type PracticeViewContext} from './practice-context';
@@ -527,14 +527,13 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
    beforeCommit:async()=>{
     const live=()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file);
     if(previous)await stagePracticeEditionTransfer(host,{entryId:entry.id,from:previous,to:q.package,personal:checked,canCommit:live});
-    // A journal already shared by both views needs no carrying.
-    for(const p of rebuilt?.practice??[])if(practiceStorageName(entry.id,p.from)!==practiceStorageName(entry.id,p.to))
-     await stagePracticeEditionTransfer(host,{entryId:entry.id,from:p.from,to:p.to,personal:p.to.keyboardLayout===q.package.keyboardLayout?checked:p.personal,canCommit:live});
+    if(rebuilt)await carryRebuiltPractice(entry.id,rebuilt,p=>p.to.keyboardLayout===q.package.keyboardLayout&&rebuilt.practice.includes(p)?checked:p.personal,live);
     if(!live())throw Error('Saving was cancelled; prior practice journals retained.');
     practiceContext=context?await PracticeView.prepareContext(q.package,entry.id,context,checked):undefined;
     if(!live())throw Error('Saving was cancelled; prior practice journals retained.');
    },
-   ...(entry.transposition||getScoreTransposition(q.package)!==0?{transposition:{steps:getScoreTransposition(q.package),layout:q.package.keyboardLayout??preferences.keyboardLayout,layouts:q.package.availablePresentations,originalPackageBytes,originalLayouts:original?.availablePresentations,originalPersonalFiles}}:{}),
+   ...(entry.transposition||getScoreTransposition(q.package)!==0?{transposition:{steps:getScoreTransposition(q.package),layout:q.package.keyboardLayout??preferences.keyboardLayout,layouts:q.package.availablePresentations,originalPackageBytes,originalLayouts:original?.availablePresentations,originalPersonalFiles,
+    ...(rebuilt?.originalPersonal.length?{originalPersonal:rebuilt.originalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))}))}:{})}}:{}),
    canCommit:()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file)});
   entries=installed.entries;return {entry:installed.entry,personal:checked,practiceContext};
  });
@@ -627,20 +626,25 @@ async function changeTransposition(steps:number){
    const controller=new AbortController(),running={cancel:()=>controller.abort(),entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Opening retained score…'};job=running;
    const d=showDialog(`${loadingMarkup('Opening score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
    try{
-    try{retained=await prepareRetainedEdition(host,target.entry,file,layout);}
-    catch(error){
-     if((error as Error).name==='AbortError')throw error;
-     // A saved edition whose pages no longer reproduce is engraved again at
-     // its pitch, bound to the original the current score was made from.
+    // A saved edition is engraved again at its pitch, bound to the original
+    // the current score was made from; it keeps its own hands and fingers.
+    const engraveAgain=async(refusal:unknown)=>{
      updateLoading(d,'Engraving the score again…');
      const bytes=await readRetainedEdition(host,target.entry,file),currentBytes=await host.read(target.entry.file);
      if(!currentBytes)throw Error('Managed score is missing; current transposition retained.');
      const original={package:target.package.transpositionOriginal??target.package,bytes:getOriginalScorePackageBytes(target.package)??currentBytes};
-     try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,bytes,layout,{refusal:error,...(steps?{original}:{}),admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},
+     try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,bytes,layout,{refusal,...(steps?{original}:{}),admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},
       {signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')updateLoading(d,preparationMessage(stage));}});}
      catch(rebuildError){if(steps===0||(rebuildError as Error).name==='AbortError')throw rebuildError;}
-     retained=rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:undefined;
-    }
+     return rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:undefined;
+    };
+    try{retained=await prepareRetainedEdition(host,target.entry,file,layout);}
+    catch(error){if((error as Error).name==='AbortError')throw error;retained=await engraveAgain(error);}
+    // A pitch saved against an original that has since been engraved again
+    // still shows the hands now shown; it is engraved again against the
+    // current original rather than replaced by a fresh transposition.
+    if(retained&&!rebuilt&&steps!==0&&!scoreTranspositionCompatible(retained.package,target.package,layout)&&sameHandsAtPitch(retained.package,target.package,layout))
+     retained=await engraveAgain(Error('This pitch\'s saved edition belongs to an earlier engraving of the original. It stays saved.'));
     if(retained&&getScoreTransposition(retained.package)!==steps)throw Error('The retained edition has a different transposition; current score retained.');
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Score change cancelled. The current score is retained.');
     if(retained&&(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout))){running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,availableFingerPresentations:[]},running,dialog:d};}
@@ -707,13 +711,26 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
  }catch(error){finishReading(op,false);throw error;}
 }
 
+/** Carry practice from each earlier keyboard view to its new view. Practice
+ * that can't move stays with the earlier edition and is reported; it never
+ * keeps the score from opening. */
+async function carryRebuiltPractice(entryId:string,r:RebuiltInstall,personalFor:(p:RebuiltInstall['practice'][number])=>PersonalState,live:()=>boolean){
+ r.practiceLeft=0;
+ for(const p of [...r.practice,...r.originalPractice]){
+  // A journal already shared by both views needs no carrying.
+  if(practiceStorageName(entryId,p.from)===practiceStorageName(entryId,p.to))continue;
+  try{await stagePracticeEditionTransfer(host,{entryId,from:p.from,to:p.to,personal:personalFor(p),canCommit:live});}
+  catch(error){if((error as Error).name==='AbortError'||!live())throw error;r.practiceLeft++;}
+ }
+}
 /** Say plainly what engraving an edition again kept, never how its hands
  * or fingers were first made. */
 function rebuiltNotice(r:RebuiltInstall){
  const moved=[r.hands==='choices'?'hands':'',r.fingers==='choices'?'fingers':''].filter(Boolean).join(' and '),notes=(n:number)=>`${n} note${n===1?'':'s'}`;
- return ['This score was engraved again with the current engraving. Your hands, fingers and choices came along.',
+ return [`This score was engraved again with the current engraving. ${r.left?'Your hands and fingers came along.':'Your hands, fingers and choices came along.'}`,
   moved?`The edition’s ${moved} now show as your own choices.`:'',
-  r.left?`Your choices for ${notes(r.left)} couldn’t move and stay with the earlier edition.`:''].filter(Boolean).join(' ');
+  r.left?`Your choices for ${notes(r.left)} couldn’t move and stay with the earlier edition.`:'',
+  r.practiceLeft?'Some practice progress couldn’t move and stays with the earlier edition.':''].filter(Boolean).join(' ');
 }
 /** A saved edition whose pages the current engraving no longer reproduces is
  * engraved again from its own content and installed like an Earlier edition:
@@ -811,7 +828,7 @@ async function restoreHeader(){if(!current?.entry.presentations?.length)return;c
 async function earlierEditions(){
  if(!current||job?.state==='working'||job?.state==='installing')return;
  await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();const target=current,files=[...new Set(target.entry.retainedPackages??[])].filter(file=>file!==target.entry.file).reverse(),
-  d=showDialog(`<h2>Earlier editions</h2><p class="help">Each edition keeps its pages and saved choices. Select one to restore it for this instrument.</p><div data-editions></div><p class="error" role="alert"></p><div class="dialog-actions">${button('Close','close','Esc')}</div>`,'earlier-editions'),list=d.querySelector('[data-editions]')!;
+  d=showDialog(`<h2>Earlier editions</h2><p class="help">Each edition keeps its pages and saved choices. Select one to restore it for this instrument.</p><div data-editions></div><p class="help" role="status" data-edition-progress></p><p class="error" role="alert"></p><div class="dialog-actions">${button('Close','close','Esc')}</div>`,'earlier-editions'),list=d.querySelector('[data-editions]')!;
  for(const [index,file]of files.entries()){
   const b=document.createElement('button');b.type='button';b.textContent=`Earlier ${index+1}`;list.append(b);
   b.addEventListener('click',()=>{void(async()=>{
@@ -822,27 +839,34 @@ async function earlierEditions(){
     catch(error){
      // An earlier edition whose pages no longer reproduce is engraved again.
      if((error as Error).name==='AbortError')throw error;
-     d.querySelector('.error')!.textContent='Engraving the score again…';
-     rebuilt=await prepareRebuiltEdition(host,target.entry,file,await readRetainedEdition(host,target.entry,file),layout,{refusal:error,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})});
+     const progress=d.querySelector('[data-edition-progress]')!,controller=new AbortController(),stop=()=>controller.abort();
+     d.querySelector('.error')!.textContent='';progress.textContent='Engraving the score again…';d.addEventListener('close',stop,{once:true});
+     try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,await readRetainedEdition(host,target.entry,file),layout,{refusal:error,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},{signal:controller.signal});}
+     finally{d.removeEventListener('close',stop);progress.textContent='';}
      retained={packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}};
     }
-    const admitted=context?await PracticeView.prepareContext(retained.package,target.entry.id,context,retained.personal):undefined;
+    // A re-engraved edition's practice arrives during the install, so its
+    // context is read after the transfer (as installPreparedScore does).
+    let admitted=context&&!rebuilt?await PracticeView.prepareContext(retained.package,target.entry.id,context,retained.personal):undefined;
     if(dialog!==d||!d.open)throw Error('Edition restore cancelled. The current score is retained.');
     const installed=await enqueue(async()=>{
      const latest=entries.find(e=>e.id===target.entry.id);
      if(dialog!==d||!d.open||current!==target||!latest||latest.file!==target.entry.file)throw Error('The active edition changed or restore was cancelled. Its saved choices are retained.');
      const result=await stagePresentationInstall(host,{entry:latest,entries,packageBytes:retained.packageBytes,
       personalBytes:new TextEncoder().encode(JSON.stringify(retained.personal)),personalKey:personalStorageName(latest.id,retained.package),
-      personalFiles:retained.personalFiles,...(latest.transposition||getScoreTransposition(retained.package)!==0?{transposition:{steps:getScoreTransposition(retained.package),layout:retained.package.keyboardLayout??preferences.keyboardLayout,...(rebuilt?{layouts:retained.package.availablePresentations}:{}),originalPackageBytes:getOriginalScorePackageBytes(retained.package),originalLayouts:retained.package.transpositionOriginal?.availablePresentations}}:{}),canCommit:()=>dialog===d&&d.open&&current===target&&entries.find(e=>e.id===target.entry.id)?.file===target.entry.file,
+      personalFiles:retained.personalFiles,...(latest.transposition||getScoreTransposition(retained.package)!==0?{transposition:{steps:getScoreTransposition(retained.package),layout:retained.package.keyboardLayout??preferences.keyboardLayout,...(rebuilt?{layouts:retained.package.availablePresentations}:{}),originalPackageBytes:getOriginalScorePackageBytes(retained.package),originalLayouts:retained.package.transpositionOriginal?.availablePresentations,
+       ...(rebuilt?.originalPersonal.length?{originalPersonal:rebuilt.originalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))}))}:{})}}:{}),canCommit:()=>dialog===d&&d.open&&current===target&&entries.find(e=>e.id===target.entry.id)?.file===target.entry.file,
       ...(rebuilt?{additionalPersonal:rebuilt.additionalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))})),replaced:rebuilt.replaced,
        beforeCommit:async()=>{const live=()=>dialog===d&&d.open&&current===target&&entries.find(e=>e.id===target.entry.id)?.file===target.entry.file;
-        for(const p of rebuilt!.practice)if(practiceStorageName(target.entry.id,p.from)!==practiceStorageName(target.entry.id,p.to))
-         await stagePracticeEditionTransfer(host,{entryId:target.entry.id,from:p.from,to:p.to,personal:p.personal,canCommit:live});}}:{}),
+        await carryRebuiltPractice(target.entry.id,rebuilt!,p=>p.personal,live);
+        if(!live())throw Error('Edition restore cancelled. The current score is retained.');
+        admitted=context?await PracticeView.prepareContext(retained.package,target.entry.id,context,retained.personal):undefined;
+        if(!live())throw Error('Edition restore cancelled. The current score is retained.');}}:{}),
       onCommitStarted:()=>{restoring.state='installing';job=restoring;d.dataset.kind='piano-preparation';d.setAttribute('aria-busy','true');}});
      entries=result.entries;return result;
     });
     restoring.state='complete';closeDialog(false);await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},context,admitted);notify(rebuilt?`Earlier edition restored. ${rebuiltNotice(rebuilt)}`:'Earlier edition restored with its saved choices.');
-   }catch(error){restoring.state='failed';if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else notify((error as Error).message);}
+   }catch(error){restoring.state='failed';if((error as Error).name==='AbortError'&&dialog!==d)return;if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else notify((error as Error).message);}
    finally{b.disabled=false;}
   })();});
  }

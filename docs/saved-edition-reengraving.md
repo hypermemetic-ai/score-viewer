@@ -43,9 +43,14 @@ For the new edition:
 
 - each keyboard gets its carried journal;
 - practice moves from each earlier keyboard view to its new view where their journals differ;
-- every pitch selection that named the earlier archive now names the new edition, on the keyboards it serves.
+- every pitch selection that named the earlier archive now names the new edition, on the keyboards it serves;
+- when a transposed edition's own original was engraved again too, the original's journals travel with it.
 
-The notice reads: "This score was engraved again with the current engraving. Your hands, fingers and choices came along." When hands or fingers moved into the player's choices, it adds "The edition's hands and fingers now show as your own choices." When choices could not move, it says how many stay with the earlier edition.
+Practice moves before the selection changes, so a rebuilt Earlier edition opens with its own progress. Practice that can't move stays with the earlier edition; it doesn't block the install. Closing the Earlier editions dialog cancels an engraving that is still running.
+
+A pitch whose saved edition was made from an earlier engraving of the original, with the same hands at that pitch, is engraved again from the current original rather than opened against it.
+
+The notice reads: "This score was engraved again with the current engraving. Your hands, fingers and choices came along." When hands or fingers moved into the player's choices, it adds "The edition's hands and fingers now show as your own choices." When choices could not move, it says "Your hands and fingers came along." and how many notes' choices stay with the earlier edition. If practice could not move, it says so too.
 
 ## Removed
 

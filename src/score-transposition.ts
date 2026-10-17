@@ -54,6 +54,13 @@ export function scoreTranspositionCompatible(candidate:ScorePackage,selected:Sco
  return candidate.preparationIdentity?.handPolicy==='retain-imported'&&
   canonicalJson(candidate.transposition.handMaps[keyboard])===canonicalJson(transpositionOwnerMap(selected));
 }
+/** A transposed edition shows, on this keyboard, exactly the hands `selected`
+ * shows now, whatever original it was saved against. */
+export function sameHandsAtPitch(candidate:ScorePackage,selected:ScorePackage,keyboard:PhysicalKeyboardId):boolean {
+ const map=candidate.transposition?.handMaps[keyboard];
+ if(!map||getOriginalScoreIdentity(candidate)!==getOriginalScoreIdentity(selected)||candidate.keyboardLayout!==keyboard)return false;
+ try{return canonicalJson(map)===canonicalJson(transpositionOwnerMap(selected));}catch{return false;}
+}
 /** Every known absolute pitch location is handled explicitly. Unknown pitch or
  * candidate display projections refuse rather than retaining stale ink. */
 export function transposeScore(source:QuantizedGridScore,steps:number):QuantizedGridScore {return transformScore(source,steps,true);}
@@ -221,12 +228,13 @@ export async function engraveEdition(request:{
   checkReadingExecution(execution);return checked;
  };
  let checked:ScorePackage,droppedFingers=views.filter(v=>v.fingers&&fellBack.includes(v.layout)).map(v=>v.layout);
+ const plain=(error:unknown):never=>{if((error as Error).name==='AbortError')throw error;throw Error(request.refusal,{cause:error});};
  try{checked=await assemble(true);}
  catch(error){
   // A layer that no longer binds stays with the earlier edition; the caller
   // carries its fingers as the player's own choices instead.
-  if((error as Error).name==='AbortError'||!chosen.some(v=>v.fingers))throw error;
-  checked=await assemble(false);droppedFingers=views.filter(v=>v.fingers).map(v=>v.layout);
+  if((error as Error).name==='AbortError'||!chosen.some(v=>v.fingers))plain(error);
+  checked=await assemble(false).catch(plain);droppedFingers=views.filter(v=>v.fingers).map(v=>v.layout);
  }
  return{bytes:(await publishPackage(checked)).bytes,fellBack,droppedFingers};
 }

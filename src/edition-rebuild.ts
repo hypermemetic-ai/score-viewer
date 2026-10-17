@@ -43,6 +43,9 @@ export interface RebuiltEdition {
  replaced:Record<string,string>;
  /** The keyboard the earlier edition opened on. */
  primary:PhysicalKeyboardId;
+ /** A transposed edition's own original, when it too had to be engraved
+  * again: the earlier original's archive name and its new edition. */
+ original?:{file:string;edition:RebuiltEdition};
 }
 
 /** Engrave a saved edition again with the current engine from its own
@@ -70,30 +73,33 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
  for(const id of content.availablePresentations??[])earlier[id]=await selectPresentation(content,id);
  for(const layout of layouts){
   const view=earlier[layout];
-  views.push(view?{layout,score:plainHandScore(planning,view.score),...(view.fingerLayer?{fingers:view.fingerLayer}:{}),fallback:planning}:{layout,score:views[0].score,fallback:planning});
+  let score:QuantizedGridScore;try{score=view?plainHandScore(planning,view.score):views[0].score;}catch(error){return refuse(error);}
+  views.push(view?{layout,score,...(view.fingerLayer?{fingers:view.fingerLayer}:{}),fallback:planning}:{layout,score,fallback:planning});
  }
  const replaced:Record<string,string>={},steps=getScoreTransposition(content);
+ let originalRebuilt:RebuiltEdition['original'];
  let transposition:Parameters<typeof engraveEdition>[0]['transposition'];
  if(steps){
-  let original=options.original;
+  let original=options.original,rebuiltOriginal:RebuiltEdition['original'];
   if(!original){
    // The edition's own original, engraved again when it, too, no longer reproduces.
    const embedded=getOriginalScorePackageBytes(content)!;
    try{original={package:await importPackage(embedded,{allowLegacyTempo:true,...(execution?{execution}:{})}),bytes:embedded};}
    catch(error){
     if((error as Error).name==='AbortError')throw error;
-    const again=await rebuildEdition(embedded,{},execution);Object.assign(replaced,again.replaced);
+    const again=await rebuildEdition(embedded,{},execution);Object.assign(replaced,again.replaced);rebuiltOriginal={file:await packageFile(embedded),edition:again};
     original={package:await importPackage(again.bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}),bytes:again.bytes};
    }
   }
   if(getScoreTransposition(original.package)!==0||original.package.sourceSha256!==content.transposition!.originalSourceSha256)
    throw Error('This transposed edition belongs to another original score.');
   transposition={original:original.package.transpositionOriginal??original.package,originalBytes:original.bytes,selectedBytes:new Uint8Array(bytes),steps};
+  originalRebuilt=rebuiltOriginal;
  }
  const engraved=await engraveEdition({base:content,source,sourceBytes,context:manifest.calculationContext,views,transposition,
   refusal:"This saved edition can't be engraved again with the current engraving. It stays saved."},execution);
  replaced[await packageFile(bytes)]=await packageFile(engraved.bytes);
- return{bytes:engraved.bytes,earlier,fellBack:engraved.fellBack,droppedFingers:engraved.droppedFingers,replaced,primary};
+ return{bytes:engraved.bytes,earlier,fellBack:engraved.fellBack,droppedFingers:engraved.droppedFingers,replaced,primary,...(originalRebuilt?{original:originalRebuilt}:{})};
 }
 
 /** Everything installing a re-engraved edition needs, for one keyboard. */
@@ -106,11 +112,17 @@ export interface RebuiltInstall {
  additionalPersonal:Array<{key:string;personal:PersonalState}>;
  /** Practice to carry from each earlier keyboard view to its new one. */
  practice:Array<{from:ScorePackage;to:ScorePackage;personal:PersonalState}>;
+ /** When the edition's own original was engraved again too: the journals
+  * and practice carried to the new original's keyboard views. */
+ originalPersonal:Array<{key:string;personal:PersonalState}>;
+ originalPractice:Array<{from:ScorePackage;to:ScorePackage;personal:PersonalState}>;
  replaced:Record<string,string>;
  /** Where the earlier edition's hands and printed fingers now live. */
  hands:'edition'|'choices';fingers:'edition'|'choices'|'none';
  /** The player's own earlier choices that came along, and those that stay with the earlier edition. */
  carried:number;left:number;
+ /** Set while installing: practice journals that stayed with the earlier edition. */
+ practiceLeft?:number;
 }
 /** Engrave a saved edition again and carry the player's journal for every
  * keyboard. Reads only; the caller installs the result like an Earlier
@@ -125,21 +137,28 @@ export async function prepareRebuiltEdition(host:{read(name:string):Promise<Uint
  const rebuilt=await rebuildEdition(bytes,{original:options.original,refusal:options.refusal},execution),earliest=rebuilt.earlier[rebuilt.primary]!;
  if(collectionId(earliest)!==entry.id)throw Error('The saved edition belongs to another score. Every edition is retained.');
  const admitted=await (options.admit??(b=>importPackage(b,{allowLegacyTempo:true,...(execution?{execution}:{})})))(rebuilt.bytes);checkReadingExecution(execution);
- const personalFiles=options.personalFiles??(file===entry.file?entry.personalFiles:entry.editionPersonalFiles?.[file])??{},
-  carried:Array<{to:ScorePackage;personal:PersonalState;carried:number;left:number}>=[],practice:RebuiltInstall['practice']=[];
- for(const id of admitted.availablePresentations??[]){
-  const to=await selectPresentation(admitted,id),from=rebuilt.earlier[id],
-   prior=from?await loadPersonalJournal(host,entry,from,{personalFiles,retained:true}):undefined,
-   result=personalForRebuiltEdition(prior,from,to,{hands:(from??earliest).score,fingers:from?.fingerLayer});
-  checkReadingExecution(execution);
-  carried.push({to,personal:result.personal,carried:result.carried,left:result.left});
-  if(from)practice.push({from,to,personal:result.personal});
- }
+ const journals=(name:string)=>(name===entry.file?entry.personalFiles:entry.editionPersonalFiles?.[name])??{},
+  personalFiles=options.personalFiles??journals(file);
+ // Each keyboard view's journal comes along; practice moves from its earlier view.
+ const carry=async(edition:RebuiltEdition,next:ScorePackage,files:Record<string,string>)=>{
+  const out:Array<{to:ScorePackage;from?:ScorePackage;personal:PersonalState;carried:number;left:number}>=[],first=edition.earlier[edition.primary]!;
+  for(const id of next.availablePresentations??[]){
+   const to=await selectPresentation(next,id),from=edition.earlier[id],
+    prior=from?await loadPersonalJournal(host,entry,from,{personalFiles:files,retained:true}):undefined,
+    result=personalForRebuiltEdition(prior,from,to,{hands:(from??first).score,fingers:from?.fingerLayer});
+   checkReadingExecution(execution);out.push({to,...(from?{from}:{}),personal:result.personal,carried:result.carried,left:result.left});
+  }
+  return out;
+ };
+ const carried=await carry(rebuilt,admitted,personalFiles),practice:RebuiltInstall['practice']=carried.flatMap(c=>c.from?[{from:c.from,to:c.to,personal:c.personal}]:[]);
+ const originalCarried=rebuilt.original?await carry(rebuilt.original.edition,await importPackage(rebuilt.original.edition.bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}),journals(rebuilt.original.file)):[];
  const shown=carried.find(c=>c.to.keyboardLayout===layout);
  if(!shown)throw Error('The engraved edition has no view for this keyboard. Every edition is retained.');
  const printed=Object.values(rebuilt.earlier).some(p=>p?.fingerLayer);
  return{packageBytes:rebuilt.bytes,package:shown.to,personal:shown.personal,
   additionalPersonal:carried.filter(c=>c!==shown).map(c=>({key:personalStorageName(entry.id,c.to),personal:c.personal})),practice,replaced:rebuilt.replaced,
+  originalPersonal:originalCarried.map(c=>({key:personalStorageName(entry.id,c.to),personal:c.personal})),
+  originalPractice:originalCarried.flatMap(c=>c.from?[{from:c.from,to:c.to,personal:c.personal}]:[]),
   hands:rebuilt.fellBack.length?'choices':'edition',fingers:!printed?'none':rebuilt.droppedFingers.length?'choices':'edition',
   carried:carried.reduce((n,c)=>n+c.carried,0),left:carried.reduce((n,c)=>n+c.left,0)};
 }
