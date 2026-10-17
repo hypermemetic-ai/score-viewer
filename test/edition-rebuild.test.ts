@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {importPackage,readEditionContent,selectPresentation,type ScorePackage} from '../src/package';
+import {archivePackage,hashBytes,importPackage,readEditionContent,selectPresentation,type ScorePackage} from '../src/package';
 import {addKeyboardView,packageFile,personalForAddedKeyboard,prepareRebuiltEdition,rebuildEdition} from '../src/edition-rebuild';
 import {stagePresentationInstall} from '../src/presentation-install';
 import {stagePracticeEditionTransfer} from '../src/practice-edition-install';
@@ -30,7 +30,7 @@ const chosenSeat=conventional.seats.find(s=>s.ownerIds.length===1)!,chosen=chose
 const host=(stored:Map<string,Uint8Array>)=>({read:async(name:string)=>stored.get(name)??null,write:async(name:string,data:Uint8Array)=>{stored.set(name,data);}});
 
 test('a saved edition that no longer reproduces is engraved again with every hand and finger and the player\'s choices, on both keyboards',async()=>{
- await assert.rejects(importPackage(bytes),/older beam connector/);
+ await assert.rejects(importPackage(bytes),/current shared engraving policy/);
  const copy=bytes.slice(),stored=new Map([[journal,encode(prior)]]),
   rebuilt=await prepareRebuiltEdition(host(stored),entry,file,bytes,'conventional-piano',{refusal:Error('refused')}),
   next=await importPackage(rebuilt.packageBytes);
@@ -97,8 +97,26 @@ test('a re-engraved edition and its other pitches keep separate choices, practic
  for(const layout of ['conventional-piano','janko-four-row'] as const){
   const zero=await selectPresentation(next,layout),up=await selectPresentation(await importPackage(await prepareSourceTransposition(zero,rebuilt.bytes,1)),layout);
   assert.equal(zero.preparationIdentity??up.preparationIdentity,undefined,'both pitches are engraved from their own hands');
-  assert.equal(zero.effectiveHandSha256,up.effectiveHandSha256,'hand digests do not name the pitch');
+  // Jankó shows the source's hands at both pitches, so the hand digests match.
+  if(layout==='janko-four-row')assert.equal(zero.effectiveHandSha256,up.effectiveHandSha256,'hand digests do not name the pitch');
   for(const name of [personalStorageName,practiceStorageName,performanceStorageName])assert.notEqual(name(id,zero),name(id,up),layout);
+ }
+});
+
+test('an own-hands edition saved before the current shared engraving policy is refused on opening and engraved again',async()=>{
+ // An approved-v3 recipe from before ISO #386 lacks the policy keys it now requires.
+ const fresh=await importPackage((await rebuildEdition(bytes,{refusal:Error('refused')})).bytes),m=structuredClone(fresh.collectionManifest??fresh.manifest),files={...fresh.files};delete files['manifest.json'];
+ for(const d of Object.values(m.presentations!)){const recipe=JSON.parse(new TextDecoder().decode(files[d!.renderingRecipe!]));
+  for(const key of ['performingHandPolicy','openingHeadMask','phraseSystemBreaks'])delete recipe.options[key];
+  files[d!.renderingRecipe!]=new TextEncoder().encode(JSON.stringify(recipe));m.files[d!.renderingRecipe!]=await hashBytes(files[d!.renderingRecipe!]);}
+ const stale=archivePackage(m,files);
+ const refusal=await importPackage(stale).then(()=>assert.fail('a stale approved recipe must not open as it is'),(error:Error)=>error);
+ assert.match(refusal.message,/current shared engraving policy/);
+ const content=await readEditionContent(stale),again=await rebuildEdition(stale,{refusal}),next=await importPackage(again.bytes);
+ for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const before=await selectPresentation(content,layout),after=await selectPresentation(next,layout);
+  for(const n of before.score.notes)assert.equal(after.score.notes.find(x=>x.id===n.id)?.hand,n.hand,`${layout} ${n.id}`);
+  for(const n of before.score.notes)assert.equal(printed(after,n.id),printed(before,n.id),`${layout} ${n.id} finger`);
  }
 });
 

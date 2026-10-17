@@ -16,7 +16,7 @@ import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-
 import {RR_TEMPORAL_LAYER_PLANNER,validateRRTemporalFingerLayer} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
 import {validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
 import type {PhysicalKeyboardId,PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {APPROVED_SCORE_RENDERING_ENGINE,validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {validateReferenceMidi} from './reference-midi';
 import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
 import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
@@ -361,7 +361,10 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   if(derived){if(JSON.stringify(sourceFactsProjection(planningSource))!==JSON.stringify(sourceFactsProjection(p.score)))fail('Linked calculated presentation changes immutable musical source facts');}
   else if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
   if(await handDigest(source,p.score)!==d.effectiveHandSha256)fail('Linked effective-hand identity differs');
-  if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});}
+  if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});
+   // An approved recipe made before the current shared policy refuses on
+   // opening, so the reader engraves the edition again from its content.
+   if(!contentOnly&&p.renderingRecipe.engineId===APPROVED_SCORE_RENDERING_ENGINE)validateScoreRenderingRecipe(p.renderingRecipe,{sourceSha256:m.sourceSha256!});}
   if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
   if(derived&&!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
   if(derived&&!contentOnly){

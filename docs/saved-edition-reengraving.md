@@ -11,7 +11,7 @@ The viewer never calculates or infers hands or fingers. Fingerings in an edition
 
 ## When an edition is engraved again
 
-A saved edition can stop opening because its pages no longer reproduce under the pinned engine. For example, ISO #383 split hand-change beams per hand and changed system breaks. In that case the viewer engraves the edition again from its own content instead of refusing it. This happens in four places:
+A saved edition can stop opening because its pages no longer reproduce under the pinned engine. For example, ISO #383 split hand-change beams per hand, and ISO #386 (pinned at 2b21840) made the approved recipe carry source-owned hands, ordinary opening head masks and short-phrase system breaks: a saved approved-v3 or calculated-hand recipe without those keys is refused with "This saved engraving does not match the current shared engraving policy. Open the score again to engrave it afresh." The reader checks approved-v3 recipes against the current policy on opening (`src/package.ts`); retained v1, v2 and no14-recovery recipes are unchanged. In these cases the viewer engraves the edition again from its own content instead of refusing it. This happens in four places:
 
 - opening the score;
 - choosing an edition under **Earlier editions**;
@@ -22,7 +22,7 @@ Integrity is still checked first: member hashes, the linked source, and the orig
 
 ## What the new edition carries
 
-`src/edition-rebuild.ts` reads the edition's content with `readEditionContent`. That is the ordinary integrity check without the page replay, and its result is never displayed. The edition is then engraved with the approved engine through the shared production rules (`engraveEdition` in `src/score-transposition.ts`; transposing uses the same path). The new edition serves both keyboards and keeps the base edition's page settings, font, notices and reference recording. A transposed edition keeps its pitch, and it is bound to the original the current score was made from or to its own original engraved again.
+`src/edition-rebuild.ts` reads the edition's content with `readEditionContent`. That is the ordinary integrity check without the page replay, and its result is never displayed. The edition is then engraved with the approved engine through the shared production rules (`engraveEdition` in `src/score-transposition.ts`; transposing uses the same path). The new edition serves both keyboards. Its pages use `approvedProductionIsoOptions()` and default tokens, exactly as a new import does; the earlier recipe's settings belong to the earlier pages and are not carried. The base edition's font, notices and reference recording carry over. A transposed edition keeps its pitch, and it is bound to the original the current score was made from or to its own original engraved again.
 
 For each keyboard view:
 
@@ -59,8 +59,10 @@ The page replay (`admitCalculatedHandEdition`) still admits calculated editions 
 
 ## Limits
 
-- At the ISO #383 pin, the approved engine refuses most calculated hands as plain content. Those hands therefore usually come back as the player's own choices. The personal projection draws them, but the edition's printed pages show the score's own hands.
+- At ISO 2b21840 every refused edition in a copy of the user's library (checked 2026-10-17) was engraved again with its saved hands and finger layers as edition content; none fell back to the score's own hands. At the earlier #383 pin most calculated hands fell back and travelled as the player's choices.
+- The new pages follow the shared rules, not the earlier recipe's settings, so page breaks, header height and vertical placement can differ from the earlier pages (Zelda's Lullaby goes from two pages to three, with one system on the last page).
+- Editions engraved from their own hands at another pitch have pitch-independent hand digests. Their personal, practice and performance keys therefore also name their transposed source (`src/state.ts`), so pitches don't overwrite each other's journals.
 - A rebuilt edition has new pages. Practice and personal journals are keyed by edition. Journals under the earlier view's key are carried over, and journals saved under another key stay where they were.
 - If engraving again also fails, the score is refused plainly and every edition stays saved.
 
-The footer probe's saved calculated edition (`fixtures/footer-probe-calculated-edition.isoscore`) was redrawn at the pin with its own hands and fingers by `test/support/footer-probe-edition.ts`. It still opens through its receipt, so the native footer probe exercises the same receipt path.
+The footer probe's saved calculated edition (`fixtures/footer-probe-calculated-edition.isoscore`) was redrawn at ISO 2b21840 with its own hands and fingers by `test/support/footer-probe-edition.ts`. It still opens through its receipt, so the native footer probe exercises the same receipt path.

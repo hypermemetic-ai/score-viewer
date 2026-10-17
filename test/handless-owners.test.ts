@@ -54,7 +54,16 @@ test('a hand the player gives one key applies there; the other notes stay hand-l
  assert.equal(personalPracticePackage(p,s).score.notes.filter(n=>n.hand==='RH').length,chosen.size);
 });
 
-test('one struck key with a hand on one voice only reads from its source pages, and one hand choice covers the key',async()=>{
+// ISO 2b21840 (#386) engraves new imports with source-owned hands, and its
+// physical admission refuses the source pages of a half-handed unison key
+// (source-beam-coverage), so these scores no longer import. The viewer's
+// half-handed-key behaviour below stays as written until ISO draws them again.
+const halfHandedRefused='ISO 2b21840 refuses the source pages of a half-handed unison key on import';
+test('a half-handed unison key is refused on import at the ISO pin, by name',async()=>{
+ for(const text of [mixedKey,twoMixedKeys])await assert.rejects(open(text),/This score can't be engraved yet: .*source-beam-coverage/);
+});
+
+test('one struck key with a hand on one voice only reads from its source pages, and one hand choice covers the key',{todo:halfHandedRefused},async()=>{
  const p=await open(mixedKey),hands=Object.fromEntries(p.score.notes.map(n=>[n.id,n.hand??null]));
  assert.deepEqual(hands,{'P1:m1:n1':'RH','P1:m1:n2':null,'P1:m1:n3':null,'P1:m1:n4':null});
  const session=new PersonalPresentationSession(p);
@@ -72,7 +81,7 @@ test('one struck key with a hand on one voice only reads from its source pages, 
  assert.deepEqual(['P1:m1:n1','P1:m1:n3'].map(id=>fingered.assignments!.choices[id].finger),[2,2]);
 });
 
-test('a hand choice elsewhere waits until a half-handed key has its hand',async()=>{
+test('a hand choice elsewhere waits until a half-handed key has its hand',{todo:halfHandedRefused},async()=>{
  const p=await open(mixedKey);
  assert.throws(()=>assigned(p,initialPersonal(p),seatOf(p,'P1:m1:n2'),{hand:'LH'}),{message:'Bar 1 has a key written as two notes, and only one of them has a hand. Choose a hand for that key first (L or R).'});
  // Resolving that key first lets every later choice through.
@@ -81,7 +90,7 @@ test('a hand choice elsewhere waits until a half-handed key has its hand',async(
  await new PersonalPresentationSession(p).project(s);
 });
 
-test('with several half-handed keys no single choice can be drawn, so every hand choice is refused before it is saved',async()=>{
+test('with several half-handed keys no single choice can be drawn, so every hand choice is refused before it is saved',{todo:halfHandedRefused},async()=>{
  const p=await open(twoMixedKeys),refusal='Bars 1 and 2 have 2 keys written as two notes where only one note has a hand. The viewer can\'t draw hand choices for this score yet.';
  await new PersonalPresentationSession(p).warm();
  for(const seat of p.seats)assert.throws(()=>assigned(p,initialPersonal(p),seat,{hand:'RH'}),{message:refusal});

@@ -46,7 +46,7 @@ test('a frozen V2/receiptV1 edition keeps its exact bytes and is engraved again 
  const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),copy=bytes.slice();
  assert.equal(await hashBytes(bytes),'ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1');
  // Its pages used the retired opposite-hand beam connector, so they no longer reproduce.
- await assert.rejects(importPackage(bytes),/older beam connector/);
+ await assert.rejects(importPackage(bytes),/current shared engraving policy/);
  const content=await readEditionContent(bytes);assert.equal(content.preparationIdentity!.version,'viewer-piano-preparation-v2');
  const receipt=JSON.parse(strFromU8(content.files[content.manifest.calculatedHandReceipt!]));assert.equal(receipt.version,'viewer-calculated-hand-edition-v1');
  assert.equal(annotationInkPolicyFor({calculatedHandReceipt:receipt}),undefined);
@@ -70,7 +70,7 @@ test('a changed receipt is refused on opening, and a member that differs from it
 
 test('the footer probe edition opens through its receipt on both keyboards at the ISO pin',async()=>{
  const bytes=new Uint8Array(readFileSync(new URL('../fixtures/footer-probe-calculated-edition.isoscore',import.meta.url)));
- assert.equal(await hashBytes(bytes),'a50215adcdfbf1179183d5762a2e9c83efab13821be450dbe23736120a1eea85','src/footer-ink-probe.ts names these bytes');
+ assert.equal(await hashBytes(bytes),'3bb4aeeb3134dd684465c10a711218c35f6eda2a1607e8f71f0e7d8d78f565ee','src/footer-ink-probe.ts names these bytes');
  const fixture=await readEditionContent(new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))));
  for(const layout of ['conventional-piano','janko-four-row'] as const){
   const result=await ensurePianoReady({packageBytes:bytes,layout});

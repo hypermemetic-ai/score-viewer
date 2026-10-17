@@ -4,9 +4,9 @@ Viewer transposition is an additive derivation, not a mutation of the imported
 score. `viewer-score-transposition-v1` retains one exact, independently admitted
 untransposed archive at `transposition/original.isoscore`. A retained baseline
 with a transposition envelope is refused before nested admission. The new
-edition is engraved afresh with the current engine; it adopts the baseline's
-page and spacing settings when it has a rendering recipe, and the baseline's
-old pages need not reproduce first. This member
+edition is engraved afresh with the current engine and the shared rules alone
+(`approvedProductionIsoOptions()` and default tokens, as a new import is); the
+baseline's recipe belongs to its old pages, which need not reproduce first. This member
 is the portable exact 0 restoration archive; the collection installer preserves
 its original sidecar and achievement journals separately.
 

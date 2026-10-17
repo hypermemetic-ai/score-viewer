@@ -117,8 +117,6 @@ async function transpositionEnvelope(original:ScorePackage,originalBytes:Uint8Ar
   effectiveSourceSha256:await hashBytes(sourceBytes),handMaps};
  return{...content,sha256:await identityHash(content)} as ScoreTransposition;
 }
-/** Options only the retired calculated-hand engraving accepts. */
-const CALCULATED_ONLY_OPTIONS=['performingHandPolicy','sourceTransferSpacing','temporalAssociation','openingHeadMask'];
 
 /** One keyboard view of a new edition: the score it shows, whose hands are
  * plain content, and the finger layer it carries as editor content, if any.
@@ -142,14 +140,15 @@ function ownerMap(original:QuantizedGridScore,score:QuantizedGridScore):Transpos
 
 /** Engrave an edition afresh with the current engine and the shared
  * production rules. Each keyboard view shows the hands it is given, as plain
- * content; views with the same hands share one set of pages. The base
- * edition's page and spacing settings, font, notices and reference recording
- * carry over; its old pages need not reproduce. A finger layer stays edition
+ * content; views with the same hands share one set of pages, engraved with
+ * `approvedProductionIsoOptions()` and default tokens. The base edition's
+ * font, notices and reference recording carry over; its old pages and their
+ * recipe need not reproduce. A finger layer stays edition
  * content, bound to its new pages. With `keep`, that admitted edition's own
  * views stay byte-identical and `views` add the keyboards it lacks. Nothing
  * is calculated. */
 export async function engraveEdition(request:{
- /** Supplies metadata, page settings, font, notices and reference recording. */
+ /** Supplies metadata, font, notices and reference recording. */
  base:ScorePackage;source:QuantizedGridScore;sourceBytes:Uint8Array;context?:PianoCalculationContext;views:readonly EditionView[];
  transposition?:{original:ScorePackage;originalBytes:Uint8Array;selectedBytes:Uint8Array;steps:number};
  keep?:ScorePackage;
@@ -161,8 +160,9 @@ export async function engraveEdition(request:{
   kept=keep?keep.collectionManifest??keep.manifest:undefined;
  if(!views.length||new Set(views.map(v=>v.layout)).size!==views.length||kept&&(transposition||kept.transposition||kept.version!==2||kept.sourceSha256!==sourceSha256||views.some(v=>kept.presentations?.[v.layout])))
   throw Error('An edition needs exactly one view for each keyboard it serves.');
- const options=approvedProductionIsoOptions(Object.fromEntries(Object.entries(base.renderingRecipe?.options??{}).filter(([key])=>!CALCULATED_ONLY_OPTIONS.includes(key)))),
-  tokens=base.renderingRecipe?.tokens??resolveIsoTokens({}),
+ // Fresh pages follow the shared rules alone, exactly as a new import does;
+ // the base edition's own recipe belongs to its old pages.
+ const options=approvedProductionIsoOptions(),tokens=resolveIsoTokens({}),
   shared:Record<string,Uint8Array>={[baseManifest.font]:base.files[baseManifest.font],...Object.fromEntries(baseManifest.notices.map(name=>[name,base.files[name]]))},
   engraved=new Map<string,{score:string;seats:string;recipe:string;pages:string[]}>(),chosen:EditionView[]=[],fellBack:PhysicalKeyboardId[]=[];
  if(kept)for(const [name,bytes]of Object.entries(keep!.files))if(name!=='manifest.json')shared[name]=bytes;

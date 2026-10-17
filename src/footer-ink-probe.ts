@@ -12,7 +12,7 @@ const fixtureSha256='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b3
 // Both keyboard views of that fixture's music with the hands and fingers the
 // former calculator saved, drawn again at the ISO pin (test/support/footer-probe-edition.ts).
 const editionUrl=new URL('../fixtures/footer-probe-calculated-edition.isoscore',import.meta.url);
-const editionSha256='a50215adcdfbf1179183d5762a2e9c83efab13821be450dbe23736120a1eea85';
+const editionSha256='3bb4aeeb3134dd684465c10a711218c35f6eda2a1607e8f71f0e7d8d78f565ee';
 const probeVersion='viewer-native-footer-ink-probe-v2';
 const sourceCss='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';
 const primitive=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${sourceCss}</style><text class="janko-page-num" x="575" y="830">Page 2 of 3</text></svg>`;
