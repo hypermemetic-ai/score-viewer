@@ -16,7 +16,7 @@ import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-
 import {RR_TEMPORAL_LAYER_PLANNER,validateRRTemporalFingerLayer} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
 import {validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
 import type {PhysicalKeyboardId,PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {APPROVED_SCORE_RENDERING_ENGINE,validatePassiveScoreRenderingRecipe,validateScoreRenderingRecipe,type PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {validateReferenceMidi} from './reference-midi';
 import {FINGER_PHYSICAL_COST_UNITS} from '../vendor/iso-notation/src/model/finger-performance-timing';
 import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
@@ -259,7 +259,14 @@ export async function selectPresentation(p:ScorePackage,id:PhysicalKeyboardId):P
  if(p.manifest.version===1){if(id!=='janko-four-row')fail('This package has no conventional-keyboard presentation');return p;}
  const view=linkedViews.get(p)?.get(id);if(!view)fail('This package has no compatible presentation for the selected keyboard');return view;
 }
-export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}={}):Promise<ScorePackage>{
+export function importPackage(bytes:Uint8Array,options:PackageReadOptions={}):Promise<ScorePackage>{return admitPackage(bytes,options,false);}
+/** The content a saved edition carries: its source, the hands each keyboard
+ * view shows and its finger layers, with every member hash and source binding
+ * checked. Unlike importPackage it does not replay a calculated edition's
+ * pages, so the result is for re-engraving only and is never displayed. */
+export function readEditionContent(bytes:Uint8Array,options:PackageReadOptions={}):Promise<ScorePackage>{return admitPackage(bytes,options,true);}
+export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
+async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentOnly:boolean):Promise<ScorePackage>{
  options={...options};const execution=options.execution?capturedReadingExecution(options.execution):undefined;checkReadingExecution(execution);
  if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;const members=new Set<string>();
  const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(members.has(f.name)||members.size>=10000)fail('Duplicate or excessive archive members');members.add(f.name);if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
@@ -327,7 +334,7 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
  if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
  const source=normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore);
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
- const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore],execution);
+ const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore],execution,contentOnly);
  if(transposition&&JSON.stringify(m.referenceMidi)!==JSON.stringify((transposition.original.collectionManifest??transposition.original.manifest).referenceMidi))fail('Transpose reference attachment differs from its original archive.');
  const calculationContext=m.calculationContext===undefined?undefined:validatePianoCalculationContext(m.calculationContext,m.sourceSha256!,source);
  if(source.performingHandPresentation||source.notes.some(n=>n.derivedHand))fail('Immutable original source cannot be substituted by a calculated display projection.');
@@ -348,16 +355,20 @@ export async function importPackage(bytes:Uint8Array,options:{allowLegacyTempo?:
   if(viewContext&&JSON.stringify(p.score.referencePerformanceTempo)!==JSON.stringify(viewContext.referencePerformanceTempo))
    fail('Linked presentation differs from its piano calculation reference');
   const derived=!!p.score.performingHandPresentation||p.score.notes.some(n=>n.derivedHand)||d.engineVersion===CALCULATED_HAND_SCORE_RENDERING_ENGINE||d.calculatedHandReceipt!==undefined;
-  // A calculated transposed edition shows its calculated hands; any other
-  // transposed edition shows exactly the score's own hands.
-  if(transposition){const map=transposition.envelope.handMaps[key];if(!map||map.some(o=>p.score.notes.find(n=>n.id===o.id)?.hand!==o.hand)||!derived&&map.some(o=>source.notes.find(n=>n.id===o.id)?.hand!==o.hand))fail('Transposed presentation differs from its selected owner-hand authority.');}
+  // A transposed edition shows exactly the hands its envelope names: the
+  // score's own, or the hands an earlier edition carried when engraved again.
+  if(transposition){const map=transposition.envelope.handMaps[key];if(!map||map.some(o=>p.score.notes.find(n=>n.id===o.id)?.hand!==o.hand))fail('Transposed presentation differs from its selected owner-hand authority.');}
   if(derived){if(JSON.stringify(sourceFactsProjection(planningSource))!==JSON.stringify(sourceFactsProjection(p.score)))fail('Linked calculated presentation changes immutable musical source facts');}
   else if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
   if(await handDigest(source,p.score)!==d.effectiveHandSha256)fail('Linked effective-hand identity differs');
-  if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});}
+  if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});
+   // An approved recipe made before the current shared policy refuses on
+   // opening, so the reader engraves the edition again from its content.
+   if(!contentOnly&&p.renderingRecipe.engineId===APPROVED_SCORE_RENDERING_ENGINE)validateScoreRenderingRecipe(p.renderingRecipe,{sourceSha256:m.sourceSha256!});}
   if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
-  if(derived){if(!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
-   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt),files[d.seats],heads=>actualHeads.set(p,heads),execution);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
+  if(derived&&!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
+  if(derived&&!contentOnly){
+   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt!),files[d.seats],heads=>actualHeads.set(p,heads),execution);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
   views.set(key,p);
  }
  if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');

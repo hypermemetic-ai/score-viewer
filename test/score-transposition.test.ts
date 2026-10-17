@@ -177,7 +177,7 @@ test('transposing a calculated edition keeps the score\'s own hands; a retained 
  }
 });
 
-test('transposing engraves afresh with the current engine; old pages need not reproduce and no recipe is required',async()=>{
+test('transposing engraves afresh with the current engine and the shared rules alone; old pages need not reproduce and no recipe is required',async()=>{
  const original=await prepared(),m=structuredClone(original.p.collectionManifest??original.p.manifest),files={...original.p.files};delete files['manifest.json'];
  const recipe=structuredClone(original.r);recipe.baseline={pageSha256:['f'.repeat(64)],seatSha256:'e'.repeat(64)};
  files['rendering-recipe.json']=strToU8(JSON.stringify(recipe));m.files['rendering-recipe.json']=await hashBytes(files['rendering-recipe.json']);
@@ -185,6 +185,6 @@ test('transposing engraves afresh with the current engine; old pages need not re
  for(const [p,b] of [[admitted,bytes],[(await prepared({recipe:false})).p,(await prepared({recipe:false})).bytes]] as const){
   const shifted=await importPackage(await prepareSourceTransposition(p,b,2),{keyboardLayout:'janko-four-row'});
   assert.equal(getScoreTransposition(shifted),2);assert.equal(shifted.renderingRecipe!.engineId,APPROVED_SCORE_RENDERING_ENGINE);assert.ok(shifted.pages.length>0);
-  assert.equal(shifted.renderingRecipe!.options.measuresPerSystem,p.renderingRecipe?1:approvedDefault.measuresPerSystem,'the original page settings carry over when present');
+  assert.deepEqual(shifted.renderingRecipe!.options,approvedDefault,'fresh pages use the shared rules alone; the earlier recipe belongs to its old pages');
  }
 });

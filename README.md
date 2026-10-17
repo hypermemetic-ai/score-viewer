@@ -21,6 +21,8 @@ Practice offers bounded original sections, overlapping connections of two consec
 
 Save as PDF exports every page as the reader shows it, including personal hands and the current label mode; see [Save as PDF](docs/pdf-export.md).
 
+A saved edition whose pages no longer reproduce under the pinned engraving is engraved again from its own source, hands and fingers, keeping the player's choices and the earlier file; see [engraving saved editions again](docs/saved-edition-reengraving.md).
+
 Common instrument reading and local MusicXML preparation are described in [instrument reading](docs/instrument-reading.md).
 
 Application navigation places Back at the bottom left and Options at the bottom right of the active screen or dialog, with task controls between them. The reader keeps its hideable toolbar. Scrolling uses no stock bars; Options retains its thin position marker. See the [interface rules](docs/interface.md).

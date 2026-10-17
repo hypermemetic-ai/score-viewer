@@ -4,7 +4,7 @@ import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady,verifyFooterAssets,
 import {svgClassStyles,resolvedSvgStyle} from '../src/svg-style';
 import {actualPageObstacles,boxesOverlap} from '../src/svg-annotation-clearance';
 import {unzipSync,strFromU8,strToU8} from 'fflate';
-import {hashBytes,importPackage,archivePackage} from '../src/package';import {ensurePianoReady} from '../src/piano-readiness';
+import {hashBytes,importPackage,archivePackage,readEditionContent} from '../src/package';import {rebuildEdition} from '../src/edition-rebuild';import {ensurePianoReady} from '../src/piano-readiness';
 const css='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';
 const page=(attrs='',text='Page 2 of 3')=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${css}</style><text class="janko-page-num" x="575" y="830" ${attrs}>${text}</text></svg>`;
 test('independently verified pinned font cells reserve actual footer ink, allow distant air, and keep unknown typography conservative',async()=>{
@@ -42,23 +42,41 @@ test('altered face and metrics cannot supply font readiness or imported box auth
  const altered=face.slice();altered[100]^=1;await assert.rejects(verifyFooterAssets(altered),/exact bytes/);
  await assert.rejects(verifyFooterAssets(face,'{"glyphs":{"P":{"advance":1}}}'),/exact bytes/);
 });
-test('independently frozen V2/receiptV1 edition retains exact historical hash and drawing',async()=>{
- const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url)));
+test('a frozen V2/receiptV1 edition keeps its exact bytes and is engraved again from its own hands and fingers',async()=>{
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),copy=bytes.slice();
  assert.equal(await hashBytes(bytes),'ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1');
- const p=await importPackage(bytes);assert.equal(p.preparationIdentity!.version,'viewer-piano-preparation-v2');assert.equal(p.calculatedHandReceipt!.version,'viewer-calculated-hand-edition-v1');
- assert.equal(annotationInkPolicyFor(p),undefined);
- const result=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano'});assert.equal(result.status,'editable');assert.deepEqual(result.packageBytes,bytes);
+ // Its pages used the retired opposite-hand beam connector, so they no longer reproduce.
+ await assert.rejects(importPackage(bytes),/current shared engraving policy/);
+ const content=await readEditionContent(bytes);assert.equal(content.preparationIdentity!.version,'viewer-piano-preparation-v2');
+ const receipt=JSON.parse(strFromU8(content.files[content.manifest.calculatedHandReceipt!]));assert.equal(receipt.version,'viewer-calculated-hand-edition-v1');
+ assert.equal(annotationInkPolicyFor({calculatedHandReceipt:receipt}),undefined);
+ const rebuilt=await rebuildEdition(bytes),p=await importPackage(rebuilt.bytes);
+ assert.deepEqual(bytes,copy,'the saved archive is never changed');
+ assert.deepEqual([...p.availablePresentations!].sort(),['conventional-piano','janko-four-row']);
+ for(const layout of p.availablePresentations!){const result=await ensurePianoReady({packageBytes:rebuilt.bytes,layout});assert.ok(['reading','editable'].includes(result.status),layout);}
 });
 
-
-test('legacy calculated inventory normalization refuses changed pitch or unknown discriminator after repinning archive hashes',async()=>{
+test('a changed receipt is refused on opening, and a member that differs from its pinned hash is refused before engraving again',async()=>{
  const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url)));
- for(const mutate of [(owner:Record<string,unknown>)=>{owner.eventKind='other';},
-   (owner:Record<string,unknown>)=>{owner.eventKind='unpitched';owner.soundingPitch=null;owner.referencePitch=owner.pitch;},
-   (owner:Record<string,unknown>)=>{owner.pitch=Number(owner.pitch)+1;}]){
+ for(const repin of [true,false]){
   const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])),receipt=JSON.parse(strFromU8(files[m.calculatedHandReceipt]));
-  mutate(receipt.sourceInventory.owners[0]);files[m.calculatedHandReceipt]=strToU8(JSON.stringify(receipt));
-  m.files[m.calculatedHandReceipt]=await hashBytes(files[m.calculatedHandReceipt]);
-  await assert.rejects(importPackage(archivePackage(m,files)),/inventory|receipt differs/);
+  receipt.sourceInventory.owners[0].pitch=Number(receipt.sourceInventory.owners[0].pitch)+1;files[m.calculatedHandReceipt]=strToU8(JSON.stringify(receipt));
+  if(repin)m.files[m.calculatedHandReceipt]=await hashBytes(files[m.calculatedHandReceipt]);
+  const changed=archivePackage(m,files);
+  await assert.rejects(importPackage(changed));
+  if(!repin)await assert.rejects(rebuildEdition(changed,{refusal:Error('stays saved')}),/stays saved/);
+ }
+});
+
+test('the footer probe edition opens through its receipt on both keyboards at the ISO pin',async()=>{
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/footer-probe-calculated-edition.isoscore',import.meta.url)));
+ assert.equal(await hashBytes(bytes),'3bb4aeeb3134dd684465c10a711218c35f6eda2a1607e8f71f0e7d8d78f565ee','src/footer-ink-probe.ts names these bytes');
+ const fixture=await readEditionContent(new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))));
+ for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const result=await ensurePianoReady({packageBytes:bytes,layout});
+  if(result.status!=='editable'&&result.status!=='ready')assert.fail(`${layout}: ${result.status}`);
+  const p=result.package;
+  assert.equal(p.preparationIdentity!.version,'viewer-piano-preparation-v3');assert.equal(p.calculatedHandReceipt!.version,'viewer-calculated-hand-edition-v2');
+  assert.deepEqual(annotationInkPolicyFor(p),ANNOTATION_INK_POLICY);assert.equal(p.sourceSha256,fixture.sourceSha256);
  }
 });

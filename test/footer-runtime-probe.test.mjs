@@ -3,9 +3,13 @@ import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} f
 import {createHash} from 'node:crypto';
 import {expectedFooterCover,validateFooterRuntimeReceipt,semanticHash,footerProbeVersion} from '../scripts/native-release-carrier/footer-ink-receipt.mjs';
 import {boundedCommand,frozenFrontendServer,requireFooterHelperSuccess} from '../scripts/native-release-carrier/footer-ink-probe.mjs';
-import {actualPageObstacles} from '../src/svg-annotation-clearance.ts';
-import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from '../src/annotation-ink-policy.ts';
-import {FOOTER_METRICS_JSON} from '../src/footer-font-data.ts';
+import {register} from 'tsx/esm/api';
+// The viewer's TypeScript modules import their siblings without extensions;
+// a plain `node --test` run needs the same loader `npm test` uses.
+register();
+const {actualPageObstacles}=await import('../src/svg-annotation-clearance.ts');
+const {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady}=await import('../src/annotation-ink-policy.ts');
+const {FOOTER_METRICS_JSON}=await import('../src/footer-font-data.ts');
 const sha=b=>createHash('sha256').update(b).digest('hex'),matrices=[[1,0,0,1,0,0],[-1,.2,.3,1,650,0],[1.3,-.2,.4,.8,2,4]],
  css='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}',
  rules={family:'"Viewer Calculated Footer Serif v1"',fontKerning:'none',fontVariantLigatures:'none',textRendering:'geometricprecision',fontSize:'10.6667px',fontStyle:'italic',fontWeight:'400',textAnchor:'end',stroke:'none'};

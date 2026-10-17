@@ -20,7 +20,9 @@ export function validTranspositionSelection(value:unknown,file:string,packages:r
 }
 
 /** Called while staging, never mutates the active collection or its pointer. */
-export function nextTranspositionSelection(entry:Entry,file:string,request?:{steps:number;layout:PhysicalKeyboardId;layouts?:readonly PhysicalKeyboardId[];originalFile?:string;originalLayouts?:readonly PhysicalKeyboardId[]}):ScoreTranspositionSelection|undefined {
+export function nextTranspositionSelection(entry:Entry,file:string,request?:{steps:number;layout:PhysicalKeyboardId;layouts?:readonly PhysicalKeyboardId[];originalFile?:string;originalLayouts?:readonly PhysicalKeyboardId[];
+ /** Earlier archive → the re-engraved edition that now stands for it. */
+ replaced?:Readonly<Record<string,string>>}):ScoreTranspositionSelection|undefined {
  if(!request&&!entry.transposition)return;
  const steps=request?.steps??entry.transposition!.steps;
  if(!offset(steps))throw Error('Invalid score transposition; previous edition retained.');
@@ -30,6 +32,12 @@ export function nextTranspositionSelection(entry:Entry,file:string,request?:{ste
   const original=request?.originalFile??(steps!==0?entry.file:file);
   if(!packageName(original))throw Error('The exact original edition is unavailable; previous edition retained.');
   editions['0']=Object.fromEntries((request?.originalLayouts??[layout]).map(id=>[id,original]));
+ }
+ // An archive engraved again is selected through the edition that replaced
+ // it, on the keyboards that edition serves.
+ const serves=new Map<string,readonly PhysicalKeyboardId[]>([[file,request?.layouts??[layout]],...(request?.originalFile?[[request.originalFile,request.originalLayouts??[layout]] as const]:[])]);
+ for(const pitch of Object.values(editions))for(const [id,archive]of Object.entries(pitch) as Array<[PhysicalKeyboardId,string]>){
+  const next=request?.replaced?.[archive];if(next&&serves.get(next)?.includes(id))pitch[id]=next;
  }
  if(request?.originalFile)for(const id of request.originalLayouts??[layout])editions['0'][id]??=request.originalFile;
  if(!packageName(file))throw Error('Invalid transposed archive identity; previous edition retained.');

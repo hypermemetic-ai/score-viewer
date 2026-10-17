@@ -14,7 +14,7 @@ test('a joined passage and Free view window survive a new pitch context without 
  const session=new PracticeSession(nextPlan,chunk,restored,true),prior=new PracticeSession(oldPlan,joined,old,true);assert.deepEqual(session.events.map(a=>a.midi),prior.events.map(a=>a.midi+1));assert.equal(session.matched.size,0);assert.notEqual(session.chunk.pattern,prior.chunk.pattern);
 });
 test('fresh pitch keeps practice preferences without earned speed; retained settings take priority',async()=>{
- const p=await importPackage(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),plan=planPractice(p),old=setPracticeGoal(initialPractice(plan),plan,150);
+ const p=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url)),{keyboardLayout:'janko-four-row'}),plan=planPractice(p),old=setPracticeGoal(initialPractice(plan),plan,150);
  Object.assign(old,{start:42,working:144,step:3,keepTempo:true,audioOutput:'chosen-output',best:{old:150},workingByPattern:{old:144},groundwork:{old:true}});
  const context:PracticeViewContext={partition:plan.partition,composites:{},selected:plan.chunks[0].id,includeManual:true,preferences:practicePreferences(old)},fresh=practiceStateForContext(plan,undefined,context);
  assert.equal(fresh.target,150);assert.equal(fresh.start,42);assert.equal(fresh.working,42);assert.equal(fresh.step,3);assert.equal(fresh.keepTempo,true);assert.equal(fresh.audioOutput,'chosen-output');assert.deepEqual(fresh.best,{});assert.deepEqual(fresh.workingByPattern,{});assert.deepEqual(fresh.groundwork,{});assert.equal(fresh.manualAttainment,undefined);
