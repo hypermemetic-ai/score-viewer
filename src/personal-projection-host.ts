@@ -14,12 +14,12 @@ export function serializeProjectionError(error:unknown):SerializedProjectionErro
  return {name:'Error',message:String(error)};
 }
 
-/** Projection cores live here, off the reader's thread. Only a bounded number
- * of captured cores is retained; an evicted core is made again on request. A
+/** Projection cores live here, off the reader's thread. Only as many captured
+ * cores as the reader's preparation pool keeps are retained; an evicted core is made again on request. A
  * refused hand choice leaves its core unchanged (ISO publishes a projection
  * only after it succeeds), so the core is kept; any other failure drops it. */
 export function createProjectionHost(post:(response:ProjectionResponse)=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore}={}){
- const cores=new Map<string,HostedProjectionCore>(),maxCores=options.maxCores??3,create=options.create??createHostedCore;
+ const cores=new Map<string,HostedProjectionCore>(),maxCores=options.maxCores??2,create=options.create??createHostedCore;
  let tail=Promise.resolve();
  async function run(request:ProjectionRequest):Promise<void>{
   let core=cores.get(request.key);

@@ -14,7 +14,8 @@ import type {DerivedFileCache} from './derived-file-cache';
 
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
- warm(execution?:ReadingExecution):Promise<void>;
+ /** offThreadOnly: settle only where it cannot hold the reader's thread. */
+ warm(execution?:ReadingExecution,offThreadOnly?:boolean):Promise<void>;
  project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>;
 }
 type Core=PersonalProjectionCore;
@@ -23,7 +24,7 @@ const preparations=new PersonalPreparationPool<Core>();
 function localCore(inputs:ProjectionCoreInputs):Core {
  const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
  return {
-  async warm(e){if(e)await core.warmAsync(e);else core.warm();},
+  async warm(e,offThreadOnly){if(offThreadOnly)return;if(e)await core.warmAsync(e);else core.warm();},
   async project(owners,digest,e){return e?core.projectAsync(owners,digest,e):core.project(owners,digest);}
  };
 }
@@ -31,16 +32,31 @@ function freezeView<T>(value:T):T {
  if(value&&typeof value==='object'&&!Object.isFrozen(value)){for(const child of Object.values(value))freezeView(child);Object.freeze(value);}
  return value;
 }
-/** The worker holds the core. If no worker can run here, the same captured
- * inputs make a local core, exactly as before the worker existed. */
+/** The worker holds the core. A worker lost mid-request is started again
+ * once; if no worker can run here at all, the same captured inputs make a
+ * local core, exactly as before the worker existed. */
 function workerCore(client:ProjectionWorkerClient,key:string,inputs:ProjectionCoreInputs):Core {
  let local:Core|undefined;
- const fallback=(error:unknown):Core=>{if(!(error instanceof ProjectionWorkerUnavailable))throw error;return local??=localCore(inputs);};
+ async function remote<V>(run:()=>Promise<V>,offThreadOnly=false):Promise<V|undefined>{
+  for(let attempt=0;;attempt++){
+   try{return await run();}
+   catch(error){
+    if(!(error instanceof ProjectionWorkerUnavailable))throw error;
+    if(client.available&&attempt===0)continue;
+    if(offThreadOnly)return undefined;
+    local??=localCore(inputs);return undefined;
+   }
+  }
+ }
  return {
-  async warm(e){if(local)return local.warm(e);try{await client.warm(key,inputs,e);}catch(error){await fallback(error).warm(e);}},
+  async warm(e,offThreadOnly){
+   if(local){if(!offThreadOnly)await local.warm(e);return;}
+   await remote(()=>client.warm(key,inputs,e),offThreadOnly);
+   const fallback=local as Core|undefined;if(fallback&&!offThreadOnly)await fallback.warm(e);
+  },
   async project(owners,digest,e){
-   if(local)return local.project(owners,digest,e);
-   try{return freezeView(await client.project(key,inputs,owners,digest,e));}catch(error){return fallback(error).project(owners,digest,e);}
+   if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e));if(view)return freezeView(view);}
+   return local!.project(owners,digest,e);
   }
  };
 }
@@ -55,7 +71,8 @@ let defaultCache:DerivedFileCache|undefined;
  * the same hand choices reads its pages instead of engraving them again. */
 export function usePersonalProjectionCache(cache:DerivedFileCache|undefined){defaultCache=cache;}
 export const PERSONAL_PROJECTION_CACHE_KIND='personal-projection-v1';
-/** A cached view must be the complete projection made for exactly these hand choices. */
+/** A cached view must be the complete projection made for exactly these hand
+ * choices: the assignment digest covers every owner's identity and hand. */
 export function cachedProjection(owners:readonly PersonalOwnerHand[],digest:string){
  return (value:unknown):ProjectionView=>{
   const v=value as ProjectionView;
@@ -116,7 +133,11 @@ export function undrawableHandOwners(error:unknown):readonly string[]|undefined 
 /** At most one background preparation runs; a newer one, or opening another score, stops it. */
 let prefetching:AbortController|undefined;
 export function cancelPersonalPrefetch(){prefetching?.abort();prefetching=undefined;}
-export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null}
+export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;cacheWriteDelayMs?:number}
+const CANNOT_DRAW="This score can't be displayed yet: the viewer can't draw its pages.";
+/** A refusal of the score's own engraving, rather than of a hand choice. A
+ * mixed-hand key is drawn from the source's own pages and stays editable. */
+const baselineRefusal=(error:unknown)=>error instanceof HandPresentationError&&error.code==='unsupported-fit'&&!MIXED_KEY.test(error.message);
 /** A reader owns its package/wrapper/buffers and local last view. Shared cores
  * are captured, bounded and serialized; changed pages are never a paint shortcut. */
 export class PersonalPresentationSession {
@@ -125,15 +146,24 @@ export class PersonalPresentationSession {
  private lastKey?:string;
  private lastView?:ScorePackage;
  private prefetched=false;
+ /** Whether the score's own engraving settles, once a warm or projection has shown it. */
+ private baseline?:true|Error;
+ private cacheRead=false;
+ private cacheWrite?:ReturnType<typeof setTimeout>;
  private readonly base:ScorePackage;
  private readonly pool:PersonalPreparationPool<Core>;
  private readonly worker:ProjectionWorkerClient|null;
  private readonly cache:DerivedFileCache|null;
+ private readonly cacheWriteDelayMs:number;
  constructor(base:ScorePackage,pool=preparations,options:PersonalPresentationOptions={}){
   this.base=base;this.pool=pool;
   this.worker=options.worker===undefined?defaultProjectionWorker():options.worker;
   this.cache=options.cache===undefined?defaultCache??null:options.cache;
+  this.cacheWriteDelayMs=options.cacheWriteDelayMs??2000;
  }
+ /** Without a projection worker the engraving settles cooperatively while the
+  * score opens, as before, so a first hand choice never freezes the reader. */
+ get settlesOnOpen(){return !this.worker?.available;}
  private prepare(){return this.preparation??=capture(this.base,this.worker).catch(error=>{this.preparation=undefined;throw error;});}
  private async use<V>(action:(core:Core,execution?:ReadingExecution)=>V|Promise<V>,execution?:ReadingExecution):Promise<V>{
   const request=await this.prepare();checkReadingExecution(execution);
@@ -143,24 +173,51 @@ export class PersonalPresentationSession {
  async warm(input?:ReadingExecution):Promise<void>{
   if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  try{await this.use((core,e)=>core.warm(e),execution);}
+  try{await this.use((core,e)=>core.warm(e),execution);this.baseline=true;}
   catch(error){
    // The source's own pages already draw a key whose notes differ in having a
    // hand; only a personal projection must refuse it. Read those pages, and
    // the player can give the key one hand.
    if(error instanceof HandPresentationError&&error.code==='unsupported-fit'&&MIXED_KEY.test(error.message))return;
-   await playerFacing(Promise.reject(error),"This score can't be displayed yet: the viewer can't draw its pages.");
+   if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});
+   await playerFacing(Promise.reject(error),CANNOT_DRAW);
   }
  }
  /** When hand editing begins, settle the engraving in the projection worker
   * so the first hand choice only places what changed. Only off the reader's
-  * thread: practice and reading never pay for it, and a failure costs nothing. */
+  * thread: practice and reading never pay for it. A failure costs nothing,
+  * except that a score whose own engraving is refused is remembered as such. */
  prefetch():void {
-  if(this.prefetched||!this.worker?.available||!this.base.renderingRecipe||!this.base.sourceSha256)return;
+  if(this.prefetched||this.baseline||!this.worker?.available||!this.base.renderingRecipe||!this.base.sourceSha256)return;
   this.prefetched=true;cancelPersonalPrefetch();
   const controller=new AbortController();prefetching=controller;
-  void this.use((core,e)=>core.warm(e),{signal:controller.signal}).catch(()=>{this.prefetched=false;})
-   .finally(()=>{if(prefetching===controller)prefetching=undefined;});
+  void this.use((core,e)=>core.warm(e,true),{signal:controller.signal}).then(()=>{if(this.worker?.available)this.baseline??=true;},error=>{
+   this.prefetched=false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});
+  }).finally(()=>{if(prefetching===controller)prefetching=undefined;});
+ }
+ /** A projection was refused. When the score's own engraving is what fails,
+  * say so: no hand choice is at fault, so none is returned to the score. */
+ private async refusal(error:unknown,execution?:ReadingExecution):Promise<never>{
+  if(baselineRefusal(error)&&this.baseline===undefined&&this.base.renderingRecipe&&this.base.sourceSha256){
+   try{await this.use((core,e)=>core.warm(e),execution);this.baseline=true;}
+   catch(warmError){
+    if(baselineRefusal(warmError))this.baseline=Error(CANNOT_DRAW,{cause:warmError});
+    else if(!(warmError instanceof HandPresentationError))throw warmError;
+   }
+  }
+  if(this.baseline instanceof Error)throw this.baseline;
+  throw error;
+ }
+ private async cacheKey():Promise<string>{
+  return hashBytes(JSON.stringify([PERSONAL_PROJECTION_CACHE_KIND,(await this.prepare()).digest,PERSONAL_ANNOTATION_INK_POLICY]));
+ }
+ /** One slot per captured score holds its latest projection. It is written
+  * once hand choices settle, never once per choice. */
+ private remember(view:ProjectionView){
+  const cache=this.cache;if(!cache)return;
+  if(this.cacheWrite!==undefined)clearTimeout(this.cacheWrite);
+  const value={score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry};
+  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value)).catch(()=>{});},this.cacheWriteDelayMs);
  }
  async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
@@ -170,14 +227,18 @@ export class PersonalPresentationSession {
   if(key===this.lastKey&&this.lastView)return this.lastView;
   await ensureAnnotationInkPolicyReady(PERSONAL_ANNOTATION_INK_POLICY);checkReadingExecution(execution);
   const digest=await hashBytes(key);checkReadingExecution(execution);
-  const cacheKey=this.cache?await hashBytes(JSON.stringify([(await this.prepare()).digest,key,PERSONAL_ANNOTATION_INK_POLICY])):undefined;
-  let result=cacheKey?await this.cache!.get(PERSONAL_PROJECTION_CACHE_KIND,cacheKey,cachedProjection(owners,digest)):undefined;
-  checkReadingExecution(execution);
+  let result:ProjectionView|undefined;
+  // Only a session's first projection, normally the one that opens the score, reads the disk.
+  if(this.cache&&!this.cacheRead){
+   this.cacheRead=true;
+   result=await this.cache.get(PERSONAL_PROJECTION_CACHE_KIND,await this.cacheKey(),cachedProjection(owners,digest));
+   checkReadingExecution(execution);
+  }
   if(!result){
-   result=await playerFacing(this.use((core,e)=>core.project(owners,digest,e),execution),
+   result=await playerFacing(this.use((core,e)=>core.project(owners,digest,e),execution).catch(error=>this.refusal(error,execution)),
     UNDRAWABLE_HAND_CHOICES,
     "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
-   if(cacheKey)void this.cache!.put(PERSONAL_PROJECTION_CACHE_KIND,cacheKey,{score:result.score,pages:result.pages,seats:result.seats,annotationGeometry:result.annotationGeometry});
+   this.baseline??=true;this.remember(result);
   }
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;

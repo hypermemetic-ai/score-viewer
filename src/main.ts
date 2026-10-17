@@ -104,9 +104,10 @@ let selection:Seat|undefined,selectionPitchToggle=false;let editNavigation:'note
 let transposeControls:ManualTempoControls|undefined;const pitchInput=new PitchInputEpoch();
 // This reader owns bounded exact-byte admission across revisits; library and Worker receivers own separate sessions.
 const readerAdmission=new PackageAdmissionSession({maxEntries:2,maxRetainedBytes:64*1024*1024});
-// Derived results this build already made are kept in bounded managed slots
-// (native storage only; the browser's local storage is too small for pages).
-if(isTauri()){
+// Derived results this build already made are kept in bounded managed slots:
+// native builds only. The browser's local storage is too small for pages, and
+// a development server's source can change under one identity.
+if(isTauri()&&!import.meta.env.DEV){
  const derived=new DerivedFileCache(host);
  usePersonalProjectionCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
@@ -649,8 +650,9 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
  let keptHands=0;
  // Opening draws only what this score shows: its own pages, or the saved
- // hand choices' projection. The engraver settles for editing when editing begins.
- cancelPersonalPrefetch();const nextEditor=personalEditor(next);nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
+ // hand choices' projection. With a projection worker the engraver settles
+ // for editing when editing begins; without one it settles here, as before.
+ cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.

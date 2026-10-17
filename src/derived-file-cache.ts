@@ -7,7 +7,7 @@ import {hashBytes} from './package';
 declare const __VIEWER_DERIVED_IDENTITY__:string|undefined;
 export const VIEWER_DERIVED_IDENTITY:string=typeof __VIEWER_DERIVED_IDENTITY__==='string'?__VIEWER_DERIVED_IDENTITY__:'unbuilt-source';
 
-export const DERIVED_FILE_CACHE_FORMAT='viewer-derived-file-cache-v1';
+export const DERIVED_FILE_CACHE_FORMAT='viewer-derived-file-cache-v2';
 export const DERIVED_FILE_CACHE_LIMITS=Object.freeze({slots:12,slotBytes:8*1024*1024,payloadBytes:96*1024*1024});
 /** The only managed names this cache writes. A slot is overwritten in place,
  * so the cache never grows beyond its slots; deleting a slot costs only time. */
@@ -17,13 +17,17 @@ export const derivedCacheSlotName=(slot:number)=>{
 };
 export interface DerivedFileStore {read(name:string):Promise<Uint8Array|null>;write(name:string,data:Uint8Array):Promise<void>}
 interface Header {format:string;identity:string;kind:string;key:string;payloadSha256:string;payloadBytes:number}
-const sha256=/^[a-f0-9]{64}$/,kindName=/^[a-z0-9-]{1,64}$/;
+const sha256=/^[a-f0-9]{64}$/,kindName=/^[a-z0-9-]{1,64}$/,MAX_HEADER=4096;
 
 /** A content-addressed disk cache of derived results only: engraving views
  * and admission evidence that this build already produced or checked. Every
  * entry is bound to its kind, its exact input digest and this build, and is
  * checked against its own payload digest on reading. A missing, foreign,
- * stale or corrupt slot is a miss; nothing here is user data. */
+ * stale or corrupt slot is a miss; nothing here is user data.
+ *
+ * A slot is a plain JSON header line followed by the deflated payload, so a
+ * slot written for another entry is recognised without inflating it, and
+ * inflation is bounded by the size the header declares. */
 export class DerivedFileCache {
  private readonly store:DerivedFileStore;
  readonly identity:string;
@@ -40,10 +44,12 @@ export class DerivedFileCache {
   try{
    const bytes=await this.store.read(derivedCacheSlotName(await this.slot(kind,key)));
    if(!bytes||bytes.byteLength>DERIVED_FILE_CACHE_LIMITS.slotBytes)return;
-   const text=inflateSync(bytes),newline=text.indexOf(10);if(newline<1||newline>4096)return;
-   const header=JSON.parse(strFromU8(text.subarray(0,newline))) as Header,payload=text.subarray(newline+1);
+   const newline=bytes.subarray(0,MAX_HEADER).indexOf(10);if(newline<1)return;
+   const header=JSON.parse(strFromU8(bytes.subarray(0,newline))) as Header;
    if(header.format!==DERIVED_FILE_CACHE_FORMAT||header.identity!==this.identity||header.kind!==kind||header.key!==key||
-    header.payloadBytes!==payload.byteLength||payload.byteLength>DERIVED_FILE_CACHE_LIMITS.payloadBytes||await hashBytes(payload)!==header.payloadSha256)return;
+    !Number.isSafeInteger(header.payloadBytes)||header.payloadBytes<2||header.payloadBytes>DERIVED_FILE_CACHE_LIMITS.payloadBytes)return;
+   const payload=inflateSync(bytes.subarray(newline+1),{out:new Uint8Array(header.payloadBytes)});
+   if(payload.byteLength!==header.payloadBytes||await hashBytes(payload)!==header.payloadSha256)return;
    return validate(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(payload)));
   }catch{return;}
  }
@@ -52,9 +58,9 @@ export class DerivedFileCache {
   const write=async()=>{
    const payload=strToU8(JSON.stringify(value));if(payload.byteLength>DERIVED_FILE_CACHE_LIMITS.payloadBytes)return;
    const header:Header={format:DERIVED_FILE_CACHE_FORMAT,identity:this.identity,kind,key,payloadSha256:await hashBytes(payload),payloadBytes:payload.byteLength},
-    head=strToU8(JSON.stringify(header)+'\n'),plain=new Uint8Array(head.byteLength+payload.byteLength);
-   plain.set(head);plain.set(payload,head.byteLength);
-   const bytes=deflateSync(plain,{level:1});if(bytes.byteLength>DERIVED_FILE_CACHE_LIMITS.slotBytes)return;
+    head=strToU8(JSON.stringify(header)+'\n'),body=deflateSync(payload,{level:1});
+   if(head.byteLength>MAX_HEADER||head.byteLength+body.byteLength>DERIVED_FILE_CACHE_LIMITS.slotBytes)return;
+   const bytes=new Uint8Array(head.byteLength+body.byteLength);bytes.set(head);bytes.set(body,head.byteLength);
    await this.store.write(derivedCacheSlotName(await this.slot(kind,key)),bytes);
   };
   this.writes=this.writes.then(write).catch(()=>{});return this.writes;

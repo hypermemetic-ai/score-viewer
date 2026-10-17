@@ -8,7 +8,7 @@ import {createProjectionHost,createHostedCore,type HostedProjectionCore} from '.
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,type ProjectionWorkerLike} from '../src/personal-projection-client';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse} from '../src/personal-projection-protocol';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
-import {PersonalPresentationSession} from '../src/personal-presentation';
+import {PersonalPresentationSession,undrawableHandOwners} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -125,8 +125,8 @@ test('worker projection and the disk cache give the same view as the reader thre
  const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
  const local=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null}).project(choice);
  const log:ProjectionRequest[]=[],worker=fakeWorker(createHostedCore,log),{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
- const first=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache});
- const viaWorker=await first.project(choice);await cache.flush();
+ const first=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache,cacheWriteDelayMs:0});
+ const viaWorker=await first.project(choice);await new Promise(r=>setTimeout(r,50));await cache.flush();
  assert.deepEqual(viaWorker.pages,local.pages);assert.deepEqual(viaWorker.seats,local.seats);assert.deepEqual(viaWorker.score,local.score);
  assert.deepEqual(viaWorker.annotationGeometry,local.annotationGeometry);assert.ok(Object.isFrozen(viaWorker.pages)||Object.isFrozen(viaWorker.score));
  assert.equal(files.size,1);const requests=log.length;
@@ -175,4 +175,34 @@ test('the personal memory scan skips reading packages from their manifest alone'
  const entries=[{id:'r',file:'package-'+sha('a')+'.isoscore'}] as any[],stored=new Map([[entries[0].file,reading]]);let admitted=0;
  const library=new PersonalMemoryLibrary({read:async name=>name==='library.json'?strToU8(JSON.stringify({version:1,entries})):stored.get(name)??null},()=>entries,async b=>{admitted++;return importPackage(b);});
  assert.deepEqual(await library.scan(),[]);assert.equal(admitted,0);
+});
+
+test('a projection made after earlier choices equals a cold projection of the same choices',async()=>{
+ const {p}=await sourcePackage(transferStudy());
+ const first=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,second=p.seats.find(s=>!s.ownerIds.includes('gesture-1')&&s.ownerIds.length)!;
+ const own=p.score.notes.find(n=>second.ownerIds.includes(n.id))!.hand;
+ const one=assigned(p,initialPersonal(p),first,{hand:'RH'}),two=assigned(p,one,second,{hand:own==='RH'?'LH':'RH'});
+ const editing=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null});
+ await editing.project(one);const incremental=await editing.project(two);
+ const cold=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null}).project(two);
+ assert.deepEqual(incremental.pages,cold.pages);assert.deepEqual(incremental.score,cold.score);
+ assert.deepEqual(incremental.seats,cold.seats);assert.deepEqual(incremental.annotationGeometry,cold.annotationGeometry);
+});
+
+test('a score whose own engraving is refused says so instead of blaming a hand choice; without a worker it settles on open',async()=>{
+ const {p}=await sourcePackage(transferStudy());
+ const refuse=()=>new HandPresentationError('unsupported-fit','Engraving lint failed: collision',['gesture-1']);
+ const worker=fakeWorker(()=>({async warmAsync(){throw refuse();},async projectAsync(){throw refuse();}}));
+ const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache:null});
+ assert.equal(session.settlesOnOpen,false);
+ const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!;
+ await assert.rejects(session.project(assigned(p,initialPersonal(p),seat,{hand:'RH'})),
+  (e:unknown)=>e instanceof Error&&/can't be displayed yet/.test(e.message)&&undrawableHandOwners(e)===undefined);
+ assert.equal(new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null}).settlesOnOpen,true);
+});
+
+test('a checkpoint that refuses to continue stops the worker like cancellation',async()=>{
+ const counts={warms:0,projects:0},worker=fakeWorker(()=>stubCore(counts)),client=new ProjectionWorkerClient(worker.spawn);
+ await assert.rejects(client.warm('core',stubInputs,{onCheckpoint:()=>{throw new DOMException('superseded','AbortError');}}),{name:'AbortError'});
+ await client.project('core',stubInputs,[],'d');assert.equal(worker.spawned(),2);
 });

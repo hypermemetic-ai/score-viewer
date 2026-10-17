@@ -9,9 +9,11 @@ import {converterAssets} from './scripts/guitar-pro-assets.ts';
  * Only file paths and bytes are hashed: no time, host or checkout location. */
 function viewerDerivedIdentity(root=import.meta.dirname):string {
  const hash=createHash('sha256'),skip=new Set(['node_modules','.git','dist','target']);
- const walk=(dir:string):string[]=>readdirSync(dir).filter(name=>!skip.has(name)).sort().flatMap(name=>{
-  const path=join(dir,name);return statSync(path).isDirectory()?walk(path):[path];});
- for(const input of ['src','vendor','public','package-lock.json','index.html'].map(p=>join(root,p)).filter(p=>existsSync(p)))
+ // Links are not followed: the build reads the files they lead to elsewhere.
+ const walk=(dir:string):string[]=>readdirSync(dir,{withFileTypes:true}).filter(e=>!skip.has(e.name)&&(e.isFile()||e.isDirectory()))
+  .sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0).flatMap(e=>{const path=join(dir,e.name);return e.isDirectory()?walk(path):[path];});
+ for(const input of ['src','vendor','public','scripts','index.html','package.json','package-lock.json','tsconfig.json','vite.config.ts']
+  .map(p=>join(root,p)).filter(p=>existsSync(p)))
   for(const file of statSync(input).isDirectory()?walk(input):[input]){
    hash.update(relative(root,file).split(sep).join('/'));hash.update('\0');hash.update(readFileSync(file));hash.update('\0');
   }
