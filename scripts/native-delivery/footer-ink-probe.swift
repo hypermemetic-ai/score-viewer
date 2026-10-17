@@ -47,8 +47,11 @@ final class Probe: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
    fail("Unexpected probe frame or nonce", 4); return
   }
   if message.name == "footerInkProgress" {
-   guard let stage = result["progress"] as? String, stage.count <= 128, progress.count < 256 else { fail("Malformed probe progress", 4); return }
-   let page = result["t"] as? Double ?? -1, visibility = String((result["visibility"] as? String ?? "unknown").prefix(16))
+   guard let stage = result["progress"] as? String, stage.count <= 128 else { fail("Malformed probe progress", 4); return }
+   let page = (result["t"] as? Double).flatMap { $0.isFinite && abs($0) < 1e12 ? $0 : nil } ?? -1
+   let visibility = String((result["visibility"] as? String ?? "unknown").prefix(16))
+   // Bounded: a long run keeps its first stages and always its latest one.
+   if progress.count >= 256 { progress.removeLast() }
    progress.append(["stage":stage, "pageMs":page, "helperSeconds":Date().timeIntervalSince(started), "visibility":visibility])
    trace("stage '\(stage)' (page \(Int(page)) ms, \(hosting))")
    return
@@ -101,7 +104,8 @@ struct FooterInkProbeMain {
   let frame = NSRect(x: 0, y: 0, width: 1800, height: 1500)
   let webView = WKWebView(frame: frame, configuration: configuration)
   let window = NSWindow(contentRect: NSRect(origin: NSScreen.main?.frame.origin ?? .zero, size: frame.size), styleMask: [.borderless], backing: .buffered, defer: false)
-  window.isReleasedWhenClosed = false; window.ignoresMouseEvents = true; window.contentView = webView
+  // Floating, so an ordinary window cannot cover and hide the page.
+  window.isReleasedWhenClosed = false; window.ignoresMouseEvents = true; window.level = .floating; window.contentView = webView
   window.orderFrontRegardless()
   owner.webView = webView; owner.window = window; webView.navigationDelegate = owner
   trace("window on " + (NSScreen.main.map { "screen \(Int($0.frame.width))x\(Int($0.frame.height))" } ?? "no screen"))
