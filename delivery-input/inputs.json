@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "e43456eb101edb474bdd7f3ded453180cd577080",
-    "tree": "a1d823f1978c4abd9526e5ed3c25a01af6d8b683",
-    "timestamp": "2026-10-17T08:23:48.000Z"
+    "revision": "edd16f3ef4bc05fd04e964628045b600ba804478",
+    "tree": "f9c9e44ceb62bcb89009847dbb7e03d2447d26e0",
+    "timestamp": "2026-10-17T17:58:49.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
@@ -7619,9 +7619,9 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-Wup2cHVA.js": {
-        "sha256": "703540f597cf8d95c01e12cf6b52291cadfc0bf5707f3004f2b142290194c7a9",
-        "size": 8356
+      "assets/footer-ink-probe-CXPnsSB1.js": {
+        "sha256": "9fa76fce7b6d7adac34d46b351fcb92974e4c57680d28558b348efe4ac7873af",
+        "size": 8776
       },
       "assets/footer-probe-calculated-edition-7bcwDesV.isoscore": {
         "sha256": "3bb4aeeb3134dd684465c10a711218c35f6eda2a1607e8f71f0e7d8d78f565ee",
@@ -7692,7 +7692,7 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "8c538c1141e7c4b4b2738b258433912a3e44568072d316956da685371a11b262",
+        "sha256": "0cfdf3de6bd9676804c1d1af70d0ec379955147d74277121496dcda235b429fe",
         "size": 323
       },
       "index.html": {
@@ -7704,11 +7704,11 @@
         "size": 423909
       }
     },
-    "digest": "3327ca78f37de70a153ef1b29aaa60c72799ae6f556ef73b4d350d7ac2c7795c"
+    "digest": "3e1289577408a813119c83893c1c11fd5cd85ec4660188cdad121ea69d239147"
   },
   "checks": {
-    "sha256": "f9e9dd120b8ee9bb9104ac6f704a61340fd96eac083363026a5d94b9e7b065b0",
-    "size": 5846
+    "sha256": "664cb04d0418ea1248bb08955b4e166acf097df1eb3597edb51ad88411655be9",
+    "size": 2228
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
@@ -7723,12 +7723,12 @@
     },
     "files": {
       "scripts/native-delivery/footer-ink-probe.swift": {
-        "sha256": "36cfb20fcbf9d1456f9eb62dda3648bb50c9dcefb3eca157254a1c4abb02af6a",
-        "size": 4325
+        "sha256": "01a5cc522de941c6e9d727bccd3aae007ecd532fccd24774279e54a0095a0979",
+        "size": 7527
       },
       "scripts/native-delivery/footer-ink-probe.mjs": {
-        "sha256": "8a6ee7f2635e7812d4d879f8148b8b19c0a55875155496d59d8ba3fe58eb1013",
-        "size": 6698
+        "sha256": "3c5f24b55895aa6ba10b2d4ae8fd36381ca38417738624e08948de4a711e5a4a",
+        "size": 6878
       },
       "scripts/native-delivery/footer-ink-receipt.mjs": {
         "sha256": "e8bbd4c2588aee35c4e8c8f28e32e38744a94df0c362da1c1779adc9cecdfbbb",
