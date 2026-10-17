@@ -29,7 +29,7 @@ function keyboardFixture(){
  runInNewContext(production("window.addEventListener('keydown'",'\n\nfunction onMidiNote('),context);
  const target={closest(){return null;},matches(){return false;}};
  const press=(code:string,extra:any={})=>{let prevented=false;key({code,key:code,target,repeat:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,preventDefault(){prevented=true;},...extra});return prevented;};
- return {context,calls,press,useActualActions(){runInNewContext(production('async function act(','\nasync function startJob('),context);}};
+ return {context,calls,press,useActualActions(){runInNewContext(production('async function act(',"\napp.addEventListener('click'"),context);}};
 }
 test('production edit arrows reveal the nearest note in the next page and restore selection focus',()=>{
  const f=keyboardFixture(),last=pkg.seats.filter(s=>s.page===0).sort((a,b)=>b.system-a.system)[0],next=systemSelection(pkg,last,1);assert.equal(next.page,1);
@@ -76,7 +76,7 @@ test('production reader toolbar omits Performance and stale actions cannot start
  const f=keyboardFixture();let markup='';const bar={contains:()=>false,set className(_value:string){},set innerHTML(value:string){markup=value;},querySelector:()=>null};
  Object.assign(f.context,{app:{querySelector:(selector:string)=>selector==='.editor-navigation'?null:bar},activeLayer:()=>undefined,scoreCapabilities:()=>({}),button:(label:string,action:string)=>`<button data-action="${action}">${label}</button>`,actionControlLabel:()=>'',rotationHint:()=>'',keyboardControl:()=>'',readingNotationControl:()=>'',OptionsNavigation:class{constructor(){}},readingPresentation:undefined,toolbarVisible:true,job:undefined,readingOperation:undefined});
  runInNewContext(production('function renderToolbar(','function renderEditorNavigation('),f.context);f.context.renderToolbar();assert.ok(!markup.includes('performance'));assert.deepEqual(f.calls,['mode']);f.calls.length=0;
- const previous=f.context.current.personal.view.page;runInNewContext(production('async function act(','\nasync function startJob('),f.context);await f.context.act('performance');await f.context.act('performance-stop');assert.equal(f.context.current.personal.view.page,previous);assert.deepEqual(f.calls,[]);
+ const previous=f.context.current.personal.view.page;runInNewContext(production('async function act(',"\napp.addEventListener('click'"),f.context);await f.context.act('performance');await f.context.act('performance-stop');assert.equal(f.context.current.personal.view.page,previous);assert.deepEqual(f.calls,[]);
 });
 
 test('production explicit pedal commands still turn pages outside interpreting modes',()=>{

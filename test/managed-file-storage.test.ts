@@ -4,7 +4,8 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {managedFileStorage,physicalManagedName,validPhysicalManagedName} from '../src/managed-file-storage';
 import {importPackage,hashBytes} from '../src/package';
-import {ensurePianoReady} from '../src/piano-readiness';
+import {prepareSourceTransposition} from '../src/score-transposition';
+import {ensurePianoReady as calculateEdition} from './support/calculate-edition';
 import {collectionId,initialPersonal,personalStorageName,practiceStorageName,performanceStorageName,type Entry} from '../src/state';
 import {loadPersonalJournal} from '../src/personal-journal';
 import {stagePresentationInstall} from '../src/presentation-install';
@@ -42,11 +43,9 @@ test('unsafe or unknown prepared-name forms refuse before either backend is call
  assert.equal(io,0);
 });
 
-const originalBytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),original=await importPackage(originalBytes,{keyboardLayout:'conventional-piano'}),
- prepared=await ensurePianoReady({packageBytes:originalBytes,layout:'conventional-piano',transposeSteps:1});
-assert.ok('package' in prepared,'message' in prepared?prepared.message:undefined);
-if(!('package' in prepared))throw Error('Public preparation fixture refused');
-const p=prepared.package,bytes=prepared.packageBytes,file=`package-${await hashBytes(originalBytes)}.isoscore`,entry:Entry={id:collectionId(original),file,metadata:original.manifest.metadata,importedAt:'now'};
+const originalBytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.isoscore',import.meta.url))),original=await importPackage(originalBytes),
+ bytes=await prepareSourceTransposition(original,originalBytes,1);
+const p=await importPackage(bytes,{keyboardLayout:'conventional-piano'}),file=`package-${await hashBytes(originalBytes)}.isoscore`,entry:Entry={id:collectionId(original),file,metadata:original.manifest.metadata,importedAt:'now'};
 
 test('fresh prepared personal lookup and staged cold recovery use native filenames without changing logical pointers or bindings',async()=>{
  const physical=strictStorage(new Map([[file,originalBytes]])),storage=managedFileStorage(physical),key=personalStorageName(entry.id,p),fresh=await loadPersonalJournal(storage,entry,p);
@@ -64,6 +63,10 @@ test('fresh prepared personal lookup and staged cold recovery use native filenam
 });
 
 test('existing raw browser records and long pointers cold-read unchanged; alias writes preserve the original and take precedence',async()=>{
+ // Long journal keys belong to editions the former calculator saved.
+ const saved=await calculateEdition({packageBytes:originalBytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});
+ if(!('package' in saved))throw Error('Saved calculated edition fixture refused');
+ const p=saved.package;assert.ok(p.preparationIdentity);
  const physical=strictStorage(),key=personalStorageName(entry.id,p),raw=encode(initialPersonal(p)),legacy=new Map([[key,raw]]),legacyReads:string[]=[],
   storage=managedFileStorage(physical,async(name)=>{legacyReads.push(name);return legacy.get(name)??null;});
  const pointer={...entry,personalFiles:{[key]:key}};assert.deepEqual(await loadPersonalJournal(storage,pointer,p),initialPersonal(p));assert.deepEqual(legacyReads,[key]);

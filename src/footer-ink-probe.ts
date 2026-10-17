@@ -1,13 +1,18 @@
-/** Public, isolated runtime acceptance entry. No main/Host/library boot. Uses
- * the ORDINARY production worker and its independent receiving-realm reader. */
-import {runPianoReadiness} from './piano-readiness-job';
-import {importPackage,hashBytes} from './package';
+/** Public, isolated runtime acceptance entry. No main/Host/library boot. Reads
+ * a saved calculated edition of the pinned public fixture through the ordinary
+ * read-only piano reader; the viewer no longer calculates editions. */
+import {ensurePianoReady} from './piano-readiness';
+import {hashBytes} from './package';
 import {annotationPositions} from './fingering-presentation';
 import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady,annotationInkPolicyFor,applyAnnotationInkPolicy,assertAnnotationInkPolicyReady,footerStyle} from './annotation-ink-policy';
 import {actualPageObstacles,boxesOverlap} from './svg-annotation-clearance';
 import {identityHash} from './piano-preparation-identity';
 const fixtureUrl=new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url);
 const fixtureSha256='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1';
+// Both keyboard views of that fixture's music, as the former calculator saved them.
+const editionUrl=new URL('../fixtures/footer-probe-calculated-edition.isoscore',import.meta.url);
+const editionSha256='cac847d23b88dee8ed9ad7c5f6eaf1054f7680bd133ef5f0e10211fc814fa249';
+const probeVersion='viewer-native-footer-ink-probe-v2';
 const sourceCss='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';
 const primitive=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${sourceCss}</style><text class="janko-page-num" x="575" y="830">Page 2 of 3</text></svg>`;
 const require=(condition:unknown,message:string):void=>{if(!condition)throw Error(message);};
@@ -29,18 +34,20 @@ function sourceTransform(svg:SVGSVGElement,el:SVGGraphicsElement):number[]{
 const boxCorners=(b:DOMRect,m:number[])=>[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]);
 const drawingRules=(el:Element)=>{const s=getComputedStyle(el);return{family:s.fontFamily,fontKerning:s.fontKerning,fontVariantLigatures:s.fontVariantLigatures,textRendering:s.textRendering,fontSize:s.fontSize,stroke:s.stroke,fontStyle:s.fontStyle,fontWeight:s.fontWeight,textAnchor:s.textAnchor};};
 async function run(){
- const bytes=new Uint8Array(await(await fetch(fixtureUrl)).arrayBuffer());require(await hashBytes(bytes)===fixtureSha256,'Public fixture differs from frozen original.');
- const original=await importPackage(bytes),policySha256=await identityHash(ANNOTATION_INK_POLICY),legacy=mount(primitive);
+ const fixture=new Uint8Array(await(await fetch(fixtureUrl)).arrayBuffer());require(await hashBytes(fixture)===fixtureSha256,'Public fixture differs from frozen original.');
+ const bytes=new Uint8Array(await(await fetch(editionUrl)).arrayBuffer());require(await hashBytes(bytes)===editionSha256,'Saved calculated edition differs from its frozen bytes.');
+ const policySha256=await identityHash(ANNOTATION_INK_POLICY),legacy=mount(primitive);
  await document.fonts.ready;const before=snapshot(legacy);await ensureAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);await document.fonts.ready;
  applyAnnotationInkPolicy(legacy,undefined);const after=snapshot(legacy);require(JSON.stringify(before)===JSON.stringify(after),'Registering the unique face changed actual historical drawing.');legacy.parentElement!.remove();
- const workers=[];
+ const views=[];let sourceSha256:string|undefined;
  for(const layout of ['conventional-piano','janko-four-row'] as const){
   const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),30_000);
-  let result;try{result=await runPianoReadiness({packageBytes:bytes,layout,maxExpansions:200_000,signal:abort.signal});}finally{clearTimeout(timer);}
-  require(result.status==='editable'||result.status==='ready','Real production worker/receiving cold reader failed: '+('message'in result?result.message:result.status));if(result.status!=='editable'&&result.status!=='ready')throw Error('Missing complete public output');
+  let result;try{result=await ensurePianoReady({packageBytes:bytes,layout,signal:abort.signal});}finally{clearTimeout(timer);}
+  require(result.status==='editable'||result.status==='ready','Ordinary cold reader failed: '+('message'in result?result.message:result.status));if(result.status!=='editable'&&result.status!=='ready')throw Error('Missing complete saved edition');
   const p=result.package,positions=annotationPositions(p);require(p.preparationIdentity?.version==='viewer-piano-preparation-v3'&&p.calculatedHandReceipt?.version==='viewer-calculated-hand-edition-v2','Production identity/policy dispatch differs.');
   require(JSON.stringify(annotationInkPolicyFor(p))===JSON.stringify(ANNOTATION_INK_POLICY),'Receiving realm admitted another policy.');
-  require(p.sourceSha256===original.sourceSha256&&p.score.notes.length===original.sourceScore!.notes.length&&positions.size===p.seats.length,'Public source/complete annotation coverage differs.');
+  sourceSha256??=p.sourceSha256;
+  require(p.sourceSha256===sourceSha256&&p.score.notes.length===p.sourceScore!.notes.length&&positions.size===p.seats.length,'Public source/complete annotation coverage differs.');
   let footers=0;const footerEnclosures=[];
   for(const [page,literal]of p.pages.entries()){const svg=mount(literal),els=[...svg.querySelectorAll<SVGGraphicsElement>('text.janko-page-num')];require(els.length===1,'Actual returned page footer is missing or duplicated.');
    const el=els[0],matrix=sourceTransform(svg,el),x=Number(el.getAttribute('x')),y=Number(el.getAttribute('y')),text=el.textContent!;
@@ -49,8 +56,8 @@ async function run(){
    const b=el.getBBox(),points=boxCorners(b,matrix),rules=drawingRules(el);require(points.every(([x,y])=>x>=cover[0]&&x<=cover[2]&&y>=cover[1]&&y<=cover[3]),'Actual returned-page footer escapes exact cell cover.');
    require(rules.family.includes(ANNOTATION_INK_POLICY.footer.family)&&rules.textRendering==='geometricprecision','Actual new page footer did not adopt precise unique face.');
    footerEnclosures.push({page,text,x,y,matrix,cover,points,rules,literalSha256:await hashBytes(new TextEncoder().encode(literal)),status:'passed'});footers++;svg.parentElement!.remove();}
-  workers.push({layout,status:result.status,sourceSha256:p.sourceSha256,owners:p.score.notes.length,seats:p.seats.length,annotations:positions.size,pages:p.pages.length,footers,footerEnclosures,
-   preparationVersion:p.preparationIdentity!.version,receiptVersion:p.calculatedHandReceipt!.version,policySha256:await identityHash(annotationInkPolicyFor(p)),outputArchiveSha256:await hashBytes(result.packageBytes),independentColdReader:true});
+  views.push({layout,status:result.status,sourceSha256:p.sourceSha256,owners:p.score.notes.length,seats:p.seats.length,annotations:positions.size,pages:p.pages.length,footers,footerEnclosures,
+   preparationVersion:p.preparationIdentity!.version,receiptVersion:p.calculatedHandReceipt!.version,policySha256:await identityHash(annotationInkPolicyFor(p)),editionSha256:await hashBytes(result.packageBytes),coldReader:true});
  }
  const mounted=[];
  // Unrelated HTML and sibling SVG styles must never enter source style inventory.
@@ -71,18 +78,18 @@ async function run(){
  let cacheRefused=false,readinessRefused=false;try{try{annotationPositions(fake);}catch{cacheRefused=true;}try{assertAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);}catch{readinessRefused=true;}}finally{document.fonts.delete(face);}
  require(cacheRefused&&readinessRefused,'Ambiguous-family cached/readiness admission did not refuse.');
  const actualFace=[...document.fonts].find(f=>f.family.replace(/[\"']/g,'')===ANNOTATION_INK_POLICY.footer.family)!;require(actualFace,'Verified Window face unavailable before refusal control.');document.fonts.delete(actualFace);
- let unavailableCacheRefused=false,unavailableReadinessRefused=false,workerStatus:string|undefined,unavailable;const unavailableAbort=new AbortController(),unavailableTimer=setTimeout(()=>unavailableAbort.abort(),30_000);
+ let unavailableCacheRefused=false,unavailableReadinessRefused=false,unavailable;const unavailableAbort=new AbortController(),unavailableTimer=setTimeout(()=>unavailableAbort.abort(),30_000);
  try{try{annotationPositions(fake);}catch{unavailableCacheRefused=true;}try{assertAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);}catch{unavailableReadinessRefused=true;}
-  unavailable=await runPianoReadiness({packageBytes:bytes,layout:'conventional-piano',maxExpansions:200_000,signal:unavailableAbort.signal},()=>{const worker=new Worker(new URL('./piano-readiness.worker.ts',import.meta.url),{type:'module'});worker.addEventListener('message',event=>{if(event.data.type==='complete')workerStatus=event.data.result.status;});return worker;});
+  unavailable=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',signal:unavailableAbort.signal});
  }finally{clearTimeout(unavailableTimer);document.fonts.add(actualFace);}assertAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);
- require(unavailableCacheRefused&&unavailableReadinessRefused&&unavailable.status==='unsupported'&&'retainedPackageBytes'in unavailable&&await hashBytes(unavailable.retainedPackageBytes)===fixtureSha256&&['ready','editable'].includes(workerStatus??''),'Unavailable receiving face did not independently refuse ordinary Worker output and retain input.');
- const availability={cacheRefused:unavailableCacheRefused,readinessRefused:unavailableReadinessRefused,workerStatus,independentReaderStatus:unavailable.status,retainedSha256:fixtureSha256};
- const controller=new AbortController();controller.abort();const cancelled=await runPianoReadiness({packageBytes:bytes,layout:'conventional-piano',signal:controller.signal});
- require(cancelled.status==='cancelled'&&'retainedPackageBytes'in cancelled&&await hashBytes(cancelled.retainedPackageBytes)===fixtureSha256,'Cancelled worker did not retain original input.');
- return{version:'viewer-native-footer-ink-probe-v1',status:'passed',nonce:new URL(location.href).searchParams.get('nonce'),fixtureSha256,policySha256,sourceSha256:original.sourceSha256,workers,mounted,
-  legacy:{before,after,status:'passed'},clearance,availability,ambiguity:{cacheRefused,readinessRefused},cancellation:{status:cancelled.status,retainedSha256:fixtureSha256},
+ require(unavailableCacheRefused&&unavailableReadinessRefused&&unavailable.status==='unsupported'&&'retainedPackageBytes'in unavailable&&await hashBytes(unavailable.retainedPackageBytes)===editionSha256,'Unavailable face did not make the reader refuse the saved edition and retain it.');
+ const availability={cacheRefused:unavailableCacheRefused,readinessRefused:unavailableReadinessRefused,readerStatus:unavailable.status,retainedSha256:editionSha256};
+ const controller=new AbortController();controller.abort();const cancelled=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',signal:controller.signal});
+ require(cancelled.status==='cancelled'&&'retainedPackageBytes'in cancelled&&await hashBytes(cancelled.retainedPackageBytes)===editionSha256,'Cancelled reading did not retain the saved edition.');
+ return{version:probeVersion,status:'passed',nonce:new URL(location.href).searchParams.get('nonce'),fixtureSha256,editionSha256,policySha256,sourceSha256,views,mounted,
+  legacy:{before,after,status:'passed'},clearance,availability,ambiguity:{cacheRefused,readinessRefused},cancellation:{status:cancelled.status,retainedSha256:editionSha256},
   platform:{userAgent:navigator.userAgent},limits:{hosting:'temporary loopback HTTP; not Tauri custom-origin/CSP',minimumOsAcceptance:false,physicalAcceptance:false}};
 }
 void run().then(result=>{(window as any).__viewerFooterInkProbe=result;(window as any).webkit?.messageHandlers?.footerInk?.postMessage(result);})
- .catch(error=>{const result={version:'viewer-native-footer-ink-probe-v1',status:'failed',nonce:new URL(location.href).searchParams.get('nonce'),message:(error as Error).message};
+ .catch(error=>{const result={version:probeVersion,status:'failed',nonce:new URL(location.href).searchParams.get('nonce'),message:(error as Error).message};
   (window as any).__viewerFooterInkProbe=result;(window as any).webkit?.messageHandlers?.footerInk?.postMessage(result);});

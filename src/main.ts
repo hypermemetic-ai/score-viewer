@@ -27,7 +27,8 @@ import {requireReferencePerformanceTempo,type ReferencePerformanceTempo} from '.
 import {beatUnitSvg,beatUnitLabel,metronomeMark,perMinuteSuffix,tempoRateNumber} from './metronome-mark';
 import {ManualTempoControls,manualTempoField} from './manual-tempo-control';
 import {scoreOptionsMarkup,transposeDraft} from './score-options';
-import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible} from './score-transposition';
+import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,prepareSourceTransposition} from './score-transposition';
+import {personalForTransposedEdition} from './transposed-personal';
 import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTransposition} from './score-transposition-selection';
 import {PitchInputEpoch,type AdmittedPracticeContext,type PracticeViewContext} from './practice-context';
 import {PracticeView} from './practice-view';
@@ -51,15 +52,15 @@ import {LibraryPracticeSummaries} from './library-practice-progress';
 import {loadingMarkup,updateLoading,preparationMessage} from './viewer-loading';
 import type {ReadingExecution} from './reading-execution';
 import {hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
-import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,restoreAll,personalCorrectionCount,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
+import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
 import {host,readJson,writeJson} from './host';
 import {keyboardPreference,keyboardLabel,writtenAnchor,anchorView} from './keyboard-selection';
-import {runPianoReadiness} from './piano-readiness-job';
+import {ensurePianoReady} from './piano-readiness';
 import type {PianoPrepared} from './piano-readiness';
 interface PreparedScore {packageBytes:Uint8Array;package:ScorePackage;personal?:PersonalState}
-import {stagePresentationInstall,rebindPersonalPresentation} from './presentation-install';
+import {stagePresentationInstall} from './presentation-install';
 import {prepareRetainedEdition,drawableEarlierEdition} from './retained-editions';
 import {UNDRAWABLE_CALCULATED_EDITION,undrawableCalculatedEdition} from './undrawable-edition';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
@@ -82,7 +83,7 @@ import {selectedAdviceExplanations} from './fingering-advice-markers';
 import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
-import {assigned,handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
+import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {PersonalPresentationSession} from './personal-presentation';
 import {PracticeClock} from './practice-clock';
 import {practiceAudio} from './host';
@@ -259,12 +260,6 @@ async function savePersonal(){if(!current)return;const target=current,snapshot=s
  await enqueue(async()=>{const {entry,p,file}=await personalContext(target),latest=await loadPersonalJournal(host,entry,p);latest.view=snapshot.view;latest.editContactId=snapshot.editContactId;latest.navigation=snapshot.navigation;await writeJson(file,latest);});
 }
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
-async function commitPersonal(target:NonNullable<typeof current>,change:(s:PersonalState)=>PersonalState){
- if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalMemory.error)throw personalMemory.error;if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
- const next=readPersonal(change(rawMemoryPersonal(target.personal)),target.package);
- const saved=personalMemory.updatePersonal(memoryInput(target),change);
- await presentPersonalChange(target,next,saved);await saved;
-}
 /** Painting follows accepted intent, never the completion order of host writes. */
 async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat){
  const editor=personalEditor(target),generation=++editor.generation;
@@ -395,7 +390,7 @@ async function savePdf(){
   try{notify(pdfSaveMessage(await host.savePdf(filename,size),filename,svgs.length,mode));}finally{unmount();}
  }finally{pdfSaving=false;}
 }
-function renderToolbar(){if(practice)return;if(!current)return;syncControls();renderEditorNavigation();const {personal:s}=current,p=readerPackage(),v=s.view,layer=activeLayer(current.package,s),capabilities=scoreCapabilities(p);const bar=app.querySelector<HTMLElement>('.toolbar')!,focused=bar.contains(document.activeElement)?document.activeElement as HTMLElement:undefined,focusSelector=focused?.dataset.action?`[data-action="${focused.dataset.action}"]`:focused?.dataset.optionsKey?`[data-options-key="${CSS.escape(focused.dataset.optionsKey)}"]`:focused?.dataset.option?`[data-options-key="${focused.dataset.option}"]`:undefined;toolbarNavigation?.dispose();bar.className=`toolbar${toolbarVisible?' visible':''}`;bar.innerHTML=`${button('Back','library','Esc')}${button('Previous','previous',actionControlLabel(controls.bindings,'previous'),v.page===0)}<small>${v.page+1} / ${p.pages.length}</small>${button('Next','next',actionControlLabel(controls.bindings,'next'),v.page===p.pages.length-1)}${capabilities.pianoPreparation?`${button(toggleLabel(),'toggle',actionControlLabel(controls.bindings,'toggle'),!fingerDisplayAvailable(p,s,currentFingerPresentation(p)))}<small data-label-mode>${labelMode()==='finger'?'Fingers':'Pitch'}</small><select aria-label="Finger choices" data-option="fingerSet"><option value="yours" ${v.fingerSet==='yours'?'selected':''}>Yours · ${personalCorrectionCount(s)}</option><option value="calculated" ${v.fingerSet==='calculated'?'selected':''}>Calculated</option></select>`:''}<select aria-label="Visible pages" data-option="count">${[1,2,3].map(n=>`<option value="${n}" ${v.count===n?'selected':''}>${n} page${n>1?'s':''}</option>`).join('')}</select>${v.count>1?`<select aria-label="Page advancement" data-option="advance"><option value="slide" ${v.advance==='slide'?'selected':''}>Slide pages</option><option value="group" ${v.advance==='group'?'selected':''}>Replace group</option></select>`:''}<select aria-label="Score scale" data-option="scale">${[1,.9,.75,.5].map(n=>`<option value="${n}" ${v.scale===n?'selected':''}>${Math.round(n*100)}%</option>`).join('')}</select>${capabilities.pianoPreparation?`${button(selection?'Done editing':'Edit hands / fingers',selection?'end-edit':'edit',selection?'Esc':actionControlLabel(controls.bindings,'edit'))}`:''}${button('Rotate','rotate',rotationHint())}${capabilities.pianoPractice||!!readingPresentation&&capabilities.manualPractice?button('Practice','practice','P'):''}${keyboardControl(p)}${readingNotationControl(p)}${button('Share score','share')}${button('Save as PDF','pdf')}${button('Options','practiceSettings',actionControlLabel(controls.bindings,'practiceSettings'))}${button('Hide','hide','H')}`;arrangeBottomNavigation(bar,bar.querySelector<HTMLButtonElement>('[data-action=library]'),bar.querySelector<HTMLButtonElement>('[data-action=practiceSettings]'));toolbarNavigation=new OptionsNavigation(bar,()=>{},()=>false,{horizontal:true,focusOnPrepare:false});if(focusSelector)bar.querySelector<HTMLElement>(focusSelector)?.focus();}
+function renderToolbar(){if(practice)return;if(!current)return;syncControls();renderEditorNavigation();const {personal:s}=current,p=readerPackage(),v=s.view,capabilities=scoreCapabilities(p);const bar=app.querySelector<HTMLElement>('.toolbar')!,focused=bar.contains(document.activeElement)?document.activeElement as HTMLElement:undefined,focusSelector=focused?.dataset.action?`[data-action="${focused.dataset.action}"]`:focused?.dataset.optionsKey?`[data-options-key="${CSS.escape(focused.dataset.optionsKey)}"]`:focused?.dataset.option?`[data-options-key="${focused.dataset.option}"]`:undefined;toolbarNavigation?.dispose();bar.className=`toolbar${toolbarVisible?' visible':''}`;bar.innerHTML=`${button('Back','library','Esc')}${button('Previous','previous',actionControlLabel(controls.bindings,'previous'),v.page===0)}<small>${v.page+1} / ${p.pages.length}</small>${button('Next','next',actionControlLabel(controls.bindings,'next'),v.page===p.pages.length-1)}${capabilities.pianoPreparation?`${button(toggleLabel(),'toggle',actionControlLabel(controls.bindings,'toggle'),!fingerDisplayAvailable(p,s,currentFingerPresentation(p)))}<small data-label-mode>${labelMode()==='finger'?'Fingers':'Pitch'}</small>`:''}<select aria-label="Visible pages" data-option="count">${[1,2,3].map(n=>`<option value="${n}" ${v.count===n?'selected':''}>${n} page${n>1?'s':''}</option>`).join('')}</select>${v.count>1?`<select aria-label="Page advancement" data-option="advance"><option value="slide" ${v.advance==='slide'?'selected':''}>Slide pages</option><option value="group" ${v.advance==='group'?'selected':''}>Replace group</option></select>`:''}<select aria-label="Score scale" data-option="scale">${[1,.9,.75,.5].map(n=>`<option value="${n}" ${v.scale===n?'selected':''}>${Math.round(n*100)}%</option>`).join('')}</select>${capabilities.pianoPreparation?`${button(selection?'Done editing':'Edit hands / fingers',selection?'end-edit':'edit',selection?'Esc':actionControlLabel(controls.bindings,'edit'))}`:''}${button('Rotate','rotate',rotationHint())}${capabilities.pianoPractice||!!readingPresentation&&capabilities.manualPractice?button('Practice','practice','P'):''}${keyboardControl(p)}${readingNotationControl(p)}${button('Share score','share')}${button('Save as PDF','pdf')}${button('Options','practiceSettings',actionControlLabel(controls.bindings,'practiceSettings'))}${button('Hide','hide','H')}`;arrangeBottomNavigation(bar,bar.querySelector<HTMLButtonElement>('[data-action=library]'),bar.querySelector<HTMLButtonElement>('[data-action=practiceSettings]'));toolbarNavigation=new OptionsNavigation(bar,()=>{},()=>false,{horizontal:true,focusOnPrepare:false});if(focusSelector)bar.querySelector<HTMLElement>(focusSelector)?.focus();}
 function reveal(focus=false){const changed=!toolbarVisible;toolbarVisible=true;if(current&&changed)renderToolbar();clearTimeout(timer);timer=window.setTimeout(()=>{if(!dialog&&!app.querySelector('.toolbar')?.contains(document.activeElement)){toolbarVisible=false;if(current)renderToolbar();}},3500);if(focus)app.querySelector<HTMLElement>('.toolbar button')?.focus();}
 async function loadPersonal(entry:Entry,p:ScorePackage){return scoreCapabilities(p).pianoPreparation?personalMemory.loadPersonalCurrent(entry,p,()=>loadPersonalJournal(host,entry,p)):loadPersonalJournal(host,entry,p);}
 function renderEditorNavigation(){
@@ -482,7 +477,7 @@ async function applyPendingConsolidation(){
 function keyboardControl(p?:ScorePackage){if(p&&!scoreCapabilities(p).pianoPreparation)return current?readingParts.control(entries,current.entry):'<span class="reading-instrument" aria-label="Instrument">Unknown instrument</span>';return `<select class="keyboard-select" data-keyboard aria-label="Instrument">${(['conventional-piano','janko-four-row'] as const).map(id=>`<option value="${id}" ${(p?(p.keyboardLayout??'janko-four-row'):preferences.keyboardLayout)===id?'selected':''}>${keyboardLabel(id)}</option>`).join('')}</select>`;}
 let keyboardChanging=false;
 function currentFingerPresentation(p=current?.package){return preferences.fingerPresentation==='replacement'&&p&&!p.fingerEligibility.eligible?'annotations':preferences.fingerPresentation;}
-async function chooseReference(actionLabel:'Calculate fingers'|'Practice'|'Use tempo'='Calculate fingers'):Promise<ReferencePerformanceTempo|undefined>{
+async function chooseReference(actionLabel:'Practice'):Promise<ReferencePerformanceTempo|undefined>{
  return new Promise(resolve=>{
   const units=[{name:'Quarter',numerator:1,denominator:4},{name:'Dotted quarter',numerator:3,denominator:8},{name:'Half',numerator:1,denominator:2},{name:'Whole',numerator:1,denominator:1},{name:'Eighth',numerator:1,denominator:8}],d=showDialog(`<h2>Choose a playing tempo</h2><p class="help">Choose your working rate, from 5 to 500 per minute. The printed score is retained.</p><form><label class="dialog-row">Duration<select data-reference-unit>${units.map((u,i)=>`<option value="${i}">${u.name}</option>`).join('')}</select></label><label class="dialog-row">Rate<span class="metronome-mark"><input data-reference-rate aria-label="Duration units per minute" inputmode="decimal" type="number" min="5" max="500" step="any" required><span class="metronome-rate-unit"><span data-reference-glyph>${beatUnitSvg(units[0])}</span>${perMinuteSuffix()}</span></span></label><p class="error" role="alert"></p><div class="dialog-actions">${button('Cancel','close','Esc')}<button type="submit">${actionLabel}</button></div></form>`,'piano-reference');
   let finished=false;d.addEventListener('close',()=>{if(!finished){finished=true;resolve(undefined);}},{once:true});
@@ -490,37 +485,26 @@ async function chooseReference(actionLabel:'Calculate fingers'|'Practice'|'Use t
   d.querySelector('form')!.addEventListener('submit',event=>{event.preventDefault();const bpm=Number(d.querySelector<HTMLInputElement>('[data-reference-rate]')!.value),unit=units[Number(d.querySelector<HTMLSelectElement>('[data-reference-unit]')!.value)];if(!Number.isFinite(bpm)||bpm<5||bpm>500){d.querySelector('.error')!.textContent='Enter a rate from 5 to 500 per minute.';return;}finished=true;resolve({version:'reference-performance-tempo-v1',bpm,beat:{numerator:unit.numerator,denominator:unit.denominator},provenance:{kind:'editorial',reference:'Explicit player working-rate choice in Score Viewer; not a printed source marking.'}});closeDialog();});
  });
 }
-async function preparePiano(bytes:Uint8Array,layout:PhysicalKeyboardId,entryId:string,personal?:PersonalState,forceRecalculate=false,referenceTempo?:ReferencePerformanceTempo,transposeSteps?:number,performingHandPolicy?:'calculate'|'retain-imported',op?:ReadingOperation):Promise<{q:PianoPrepared;running:NonNullable<typeof job>;dialog:HTMLDialogElement}>{
- if(job?.state==='installing')throw Error('Finger choices are being saved. Try again in a moment.');
- if(op)checkReading(op);else job?.cancel();const controller=op?.controller??new AbortController(),running=op?.running??{cancel:()=>controller.abort(),entryId,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Preparing finger choices…'};job=running;
- const d=op?.dialog??showDialog(`${loadingMarkup(transposeSteps===undefined?'Preparing fingers':'Transposing score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');
- if(!op)d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
- if(op){await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);}
- const q=await runPianoReadiness({packageBytes:bytes,layout,personal,forceRecalculate,referenceTempo,transposeSteps,performingHandPolicy,intent:forceRecalculate?'calculate':'read-retained',signal:controller.signal,
-  onProgress:progress=>{if(job!==running||running.state!=='working')return;running.progress=`Calculating finger choices ${progress.completed} / ${progress.total}…`;const label=d.querySelector('.job');if(label)label.textContent=running.progress;}},undefined,readerAdmission);
- if(job!==running||controller.signal.aborted){running.state='failed';if(dialog===d)closeDialog();throw Error('Calculation cancelled. Your score and choices are retained.');}
- if(!('package' in q)){running.progress=q.message;if(op)suspendReadingDialog(op);else{running.state='failed';if(dialog===d)closeDialog();}
-  if(q.status==='needs-data'&&q.code==='reference-tempo'){const reference=await chooseReference();if(op){checkReading(op);if(reference)readingDialog(op);}if(reference)return preparePiano(bytes,layout,entryId,personal,forceRecalculate,reference,transposeSteps,performingHandPolicy,op);throw Error('Tempo selection cancelled. Your score and choices are retained.');}
-  throw Error(q.message);}
- if(op)await readingCheckpoint(op);else{running.state='installing';const cancel=d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]');if(cancel)cancel.disabled=true;d.setAttribute('aria-busy','true');}running.progress=q.status==='reading'?'Opening score…':'Saving finger choices…';const label=d.querySelector('.job');if(label)label.textContent=running.progress;
- return {q,running,dialog:d};
+/** Open one saved keyboard view of a score inside a reading operation. */
+async function preparePiano(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,op:ReadingOperation):Promise<{q:PianoPrepared;running:NonNullable<typeof job>;dialog:HTMLDialogElement}>{
+ checkReading(op);await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
+ const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:op.controller.signal},readerAdmission);
+ checkReading(op);
+ if(!('package' in q))throw Error(q.message);
+ await readingCheckpoint(op);readingProgress(op,'Opening score…');
+ return {q,running:op.running,dialog:op.dialog!};
 }
 
 /** Musical reading enters the shared install path; physical preparation
  * is requested only by piano actions. */
-async function prepareScore(bytes:Uint8Array,layout:PhysicalKeyboardId,entryId:string,personal?:PersonalState,admitted?:ScorePackage,op?:ReadingOperation):Promise<{q:PreparedScore;running:NonNullable<typeof job>;dialog:HTMLDialogElement}>{
- const p=admitted??await readerAdmission.import(bytes,{allowLegacyTempo:true});
- if(scoreCapabilities(p).pianoPreparation)return preparePianoLayout(bytes,layout,entryId,personal,p,op);
- if(op){await readingCheckpoint(op);return {q:{packageBytes:bytes,package:p,...(personal?{personal:readPersonal(personal,p)}:{})},running:op.running,dialog:op.dialog!};}
- if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
- job?.cancel();
- const running={cancel:()=>{},entryId,state:'installing' as 'working'|'installing'|'complete'|'failed',progress:'Opening score…'};job=running;
- const d=showDialog(loadingMarkup('Opening score','Opening score…'),'score-reading');d.setAttribute('aria-busy','true');
- return {q:{packageBytes:bytes,package:p,...(personal?{personal:readPersonal(personal,p)}:{})},running,dialog:d};
+async function prepareScore(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,admitted:ScorePackage,op:ReadingOperation):Promise<{q:PreparedScore;running:NonNullable<typeof job>;dialog:HTMLDialogElement}>{
+ const p=admitted;
+ if(scoreCapabilities(p).pianoPreparation)return preparePianoLayout(bytes,layout,personal,p,op);
+ await readingCheckpoint(op);return {q:{packageBytes:bytes,package:p,...(personal?{personal:readPersonal(personal,p)}:{})},running:op.running,dialog:op.dialog!};
 }
 async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNullable<typeof job>,personal:PersonalState,newEntry=false,personalFiles?:Record<string,string>,context?:PracticeViewContext){
  const op=readingOperation?.running===running?readingOperation:undefined;if(op)checkReading(op);
- if(collectionId(q.package)!==entry.id)throw Error('Calculated score belongs to a different source.');
+ if(collectionId(q.package)!==entry.id)throw Error('This edition belongs to a different score.');
  const checked=readPersonal(q.personal??personal,q.package),originalPackageBytes=getOriginalScorePackageBytes(q.package),
   original=originalPackageBytes?await readerAdmission.import(originalPackageBytes,{allowLegacyTempo:true}):undefined,
   originalPersonalFiles:Record<string,string>={};
@@ -535,32 +519,30 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
  return enqueue(async()=>{
   if(op){checkReading(op);running.state='installing';op.dialog?.setAttribute('aria-busy','true');const cancel=op.dialog?.querySelector<HTMLButtonElement>('[data-action="cancel-job"]');if(cancel)cancel.disabled=true;}
   const latest=entries.find(e=>e.id===entry.id);
-  if(newEntry?!!latest:!latest||latest.file!==entry.file)throw Error('The library changed during calculation; previous files are retained.');
+  if(newEntry?!!latest:!latest||latest.file!==entry.file)throw Error('The library changed while saving; previous files are retained.');
   const installed=await stagePresentationInstall(host,{packageBytes:q.packageBytes,personalBytes:new TextEncoder().encode(JSON.stringify(checked)),
    personalKey:personalStorageName(entry.id,q.package),entry:latest??entry,entries,newEntry,personalFiles,
    beforeCommit:async()=>{
     const live=()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file);
     if(previous)await stagePracticeEditionTransfer(host,{entryId:entry.id,from:previous,to:q.package,personal:checked,canCommit:live});
-    if(!live())throw Error('Calculation is no longer active; prior practice journals retained.');
+    if(!live())throw Error('Saving was cancelled; prior practice journals retained.');
     practiceContext=context?await PracticeView.prepareContext(q.package,entry.id,context,checked):undefined;
-    if(!live())throw Error('Calculation is no longer active; prior practice journals retained.');
+    if(!live())throw Error('Saving was cancelled; prior practice journals retained.');
    },
-   ...(entry.transposition||getScoreTransposition(q.package)!==0?{transposition:{steps:getScoreTransposition(q.package),layout:q.package.keyboardLayout??preferences.keyboardLayout,originalPackageBytes,originalLayouts:original?.availablePresentations,originalPersonalFiles}}:{}),
+   ...(entry.transposition||getScoreTransposition(q.package)!==0?{transposition:{steps:getScoreTransposition(q.package),layout:q.package.keyboardLayout??preferences.keyboardLayout,layouts:q.package.availablePresentations,originalPackageBytes,originalLayouts:original?.availablePresentations,originalPersonalFiles}}:{}),
    canCommit:()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file)});
   entries=installed.entries;return {entry:installed.entry,personal:checked,practiceContext};
  });
 }
-/** A newly added keyboard first gets an admitted zero companion. Neither
- * intermediate preparation becomes the selected collection before final install. */
-async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,entryId:string,personal?:PersonalState,admitted?:ScorePackage,op?:ReadingOperation){
- const selected=admitted??await readerAdmission.import(bytes,{allowLegacyTempo:true}),steps=getScoreTransposition(selected);
- if(!steps||selected.availablePresentations?.includes(layout))return preparePiano(bytes,layout,entryId,personal,false,undefined,undefined,undefined,op);
- const baselineBytes=getOriginalScorePackageBytes(selected);if(!baselineBytes)throw Error('The exact original score is missing; current edition retained.');
- const baseline=op?await admitReading(baselineBytes,op):await readerAdmission.import(baselineBytes,{allowLegacyTempo:true});
- if(baseline.availablePresentations?.includes(layout))return preparePiano(bytes,layout,entryId,undefined,true,undefined,steps,'retain-imported',op);
- const zero=await preparePiano(baselineBytes,layout,entryId,undefined,false,undefined,undefined,'retain-imported',op);
- if(!op){zero.running.state='complete';if(dialog===zero.dialog)closeDialog();}
- return preparePiano(zero.q.packageBytes,layout,entryId,undefined,true,undefined,steps,'retain-imported',op);
+/** A retained transposed edition saved for one keyboard only is transposed
+ * again from its original, with the score's own hands for both keyboards.
+ * The new edition becomes current only when the caller installs it. */
+async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,selected:ScorePackage,op:ReadingOperation){
+ const steps=getScoreTransposition(selected);
+ if(!steps||selected.availablePresentations?.includes(layout))return preparePiano(bytes,layout,personal,op);
+ readingProgress(op,'Transposing score…');
+ const transposed=await prepareSourceTransposition(selected,bytes,steps,readingExecution(op));checkReading(op);
+ return preparePiano(transposed,layout,undefined,op);
 }
 let scoreActivation=0;
 async function activateScore(next:NonNullable<typeof current>,context?:PracticeViewContext,admitted?:AdmittedPracticeContext,op?:ReadingOperation,rememberOpened=false){
@@ -610,6 +592,15 @@ async function switchReadingNotation(value:string){
  }finally{notationChanging=false;}
 }
 let transpositionChanging=false;
+/** Say plainly what a transposed edition shows. */
+function transposedNotice(steps:number,editionFingers:boolean,carried?:{carried:number;left:number}){
+ const offset=`${steps>0?'+':''}${steps} step${Math.abs(steps)===1?'':'s'}`,notes=(n:number)=>`${n} note${n===1?'':'s'}`;
+ if(!carried)return `Transposed ${offset}. This saved edition opened with its own choices.`;
+ return [`Transposed ${offset} with the score’s own hands.`,
+  editionFingers?'The fingerings printed with the earlier edition stay at its pitch and aren’t shown here.':'',
+  carried.carried?`Your hand and finger choices for ${notes(carried.carried)} came along.`:'',
+  carried.left?`Your choices for ${notes(carried.left)} couldn’t move and stay with the earlier edition.`:''].filter(Boolean).join(' ');
+}
 async function changeTransposition(steps:number){
  const target=current;if(target)requirePianoCapability(target.package,'pianoPreparation');if(!target||transpositionChanging||job?.state==='working'||job?.state==='installing')throw Error('A score change is already running.');
  const range=scoreTranspositionRange(target.package);transposeDraft(String(steps),range.min,range.max);if(steps===getScoreTransposition(target.package))return;
@@ -623,15 +614,27 @@ async function changeTransposition(steps:number){
    const d=showDialog(`${loadingMarkup('Opening score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
    try{retained=await prepareRetainedEdition(host,target.entry,file,layout);if(getScoreTransposition(retained.package)!==steps)throw Error('The retained edition has a different transposition; current score retained.');
     if(controller.signal.aborted||current!==target||job!==running)throw Error('Score change cancelled. The current score is retained.');
-    if(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout)){running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,calculationDiagnostics:[],availableFingerPresentations:[]},running,dialog:d};}
+    if(steps===0||scoreTranspositionCompatible(retained.package,target.package,layout)){running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;prepared={q:{status:'reading',package:retained.package,packageBytes:retained.packageBytes,personal:retained.personal,availableFingerPresentations:[]},running,dialog:d};}
     else{running.state='complete';closeDialog();retained=undefined;}
    }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
   }
-  if(!prepared){if(steps===0)throw Error('The retained original for this instrument is unavailable. The current score is retained.');const bytes=await host.read(target.entry.file);if(!bytes)throw Error('Managed score is missing; current transposition retained.');prepared=await preparePiano(bytes,layout,target.entry.id,undefined,true,undefined,steps,'retain-imported');}
+  let carried:ReturnType<typeof personalForTransposedEdition>|undefined;
+  if(!prepared){if(steps===0)throw Error('The retained original for this instrument is unavailable. The current score is retained.');const bytes=await host.read(target.entry.file);if(!bytes)throw Error('Managed score is missing; current transposition retained.');
+   const controller=new AbortController(),running={cancel:()=>controller.abort(),entryId:target.entry.id,state:'working' as 'working'|'installing'|'complete'|'failed',progress:'Transposing score…'};job=running;
+   const d=showDialog(`${loadingMarkup('Transposing score',running.progress)}<div class="dialog-actions">${button('Cancel','cancel-job','Esc')}</div>`,'piano-preparation');d.addEventListener('close',()=>{if(running.state==='working')running.cancel();},{once:true});
+   try{const transposed=await prepareSourceTransposition(target.package,bytes,steps,{signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')updateLoading(d,preparationMessage(stage));}});
+    if(controller.signal.aborted||current!==target||job!==running)throw Error('Transposing cancelled. The current score is retained.');
+    const p=await readerAdmission.import(transposed,{allowLegacyTempo:true,keyboardLayout:layout});carried=personalForTransposedEdition(target.personal,target.package,p);
+    if(controller.signal.aborted||current!==target||job!==running)throw Error('Transposing cancelled. The current score is retained.');
+    running.state='installing';d.setAttribute('aria-busy','true');d.querySelector<HTMLButtonElement>('[data-action="cancel-job"]')!.disabled=true;
+    prepared={q:{status:'reading',package:p,packageBytes:transposed,personal:carried.personal,availableFingerPresentations:[]},running,dialog:d};
+   }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
+  }
   const {q,running,dialog:d}=prepared;if(current!==target||getScoreTransposition(q.package)!==steps)throw Error('The score changed while preparing; previous transposition retained.');
   const personal=q.personal??initialPersonal(q.package);if(!retained)personal.view=anchorView(target.personal.view,q.package,writtenAnchor(target.package,target.personal.view.page));
   const installed=await installPreparedScore(target.entry,q,running,personal,false,retained?.personalFiles,context);running.state='complete';if(dialog===d)closeDialog();
-  await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);options();notify(steps===0?'Original pitch restored with its saved choices and progress.':`Transposed ${steps>0?'+':''}${steps} steps.`);
+  await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);options();
+  notify(steps===0?'Original pitch restored with its saved choices and progress.':transposedNotice(steps,!!activeLayer(target.package,target.personal),carried));
  }catch(error){if(prepared){prepared.running.state='failed';if(dialog===prepared.dialog)closeDialog();}throw error;}
  finally{transpositionChanging=false;}
 }
@@ -640,8 +643,8 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
  try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id);await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
 
   const existing=previous.package.availablePresentations?.includes(id)?await selectPresentation(previous.package,id):undefined,
-   personal=existing?await loadPersonal(previous.entry,existing):undefined,{q,running}=await preparePianoLayout(bytes,id,previous.entry.id,personal,previous.package,op);
-  if(current!==previous)throw Error('The current score changed during calculation; prior choices are retained.');
+   personal=existing?await loadPersonal(previous.entry,existing):undefined,{q,running}=await preparePianoLayout(bytes,id,personal,previous.package,op);
+  if(current!==previous)throw Error('The current score changed while switching keyboards; prior choices are retained.');
    const next=q.personal??(existing?readPersonal(personal,q.package):await loadPersonal(previous.entry,q.package));
    next.view=anchorView(previous.personal.view,q.package,writtenAnchor(previous.package,previous.personal.view.page,selection?.ownerIds[0]));
 
@@ -658,8 +661,11 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
 
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id);try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  let prior:ScorePackage;try{prior=await admitReading(data,op);}catch(error){if(!undrawableCalculatedEdition(error))throw error;await openEarlierEdition(entry,op);return;}
- if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);const selected=prior.availablePresentations?.includes(op.keyboard)?await selectPresentation(prior,op.keyboard):undefined,
-  personal=selected?await loadPersonal(entry,selected):prior.manifest.version===3?await loadPersonal(entry,prior):undefined,{q,running}=await prepareScore(data,op.keyboard,entry.id,personal,prior,op);
+ if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);
+ // An edition saved for one keyboard only opens on that keyboard.
+ const layout=scoreCapabilities(prior).pianoPreparation&&!getScoreTransposition(prior)&&!(prior.availablePresentations?.includes(op.keyboard)??prior.keyboardLayout===op.keyboard)?prior.keyboardLayout??op.keyboard:op.keyboard,
+  selected=prior.availablePresentations?.includes(layout)?await selectPresentation(prior,layout):undefined,
+  personal=selected?await loadPersonal(entry,selected):prior.manifest.version===3?await loadPersonal(entry,prior):undefined,{q,running}=await prepareScore(data,layout,personal,prior,op);
  const loadedPersonal=q.personal??await loadPersonal(entry,q.package),
   // An admitted retained view needs no new package or personal-journal version.
   // Byte equality also covers retained ready/editable finger layers.
@@ -667,6 +673,7 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
+  if(layout!==op.keyboard)notify(`This edition has only a ${keyboardLabel(layout)} view, so it opened on that keyboard.`);
  }catch(error){finishReading(op,false);throw error;}
 }
 
@@ -760,7 +767,7 @@ async function importScore(){
  const selected=p.availablePresentations?.includes(preferences.keyboardLayout)?await selectPresentation(p,preferences.keyboardLayout):undefined,
 
   personal=priorEntry&&(selected||p.manifest.version===3)?await loadPersonal(priorEntry,selected??p):undefined,
-  {q,running}=await prepareScore(bytes,op.keyboard,id,personal,p,op);
+  {q,running}=await prepareScore(bytes,op.keyboard,personal,p,op);
 
  const entry:Entry=priorEntry?{...priorEntry,
    presentations:refresh&&!linkedRefresh?[...(priorEntry.presentations??[]),priorEntry.file]:(priorEntry.presentations??[])}:
@@ -771,7 +778,7 @@ async function importScore(){
   finishReading(op,true);
  }catch(error){finishReading(op,false);throw error;}
 }
-async function confirmHeaderRefresh():Promise<boolean>{return new Promise(resolve=>{const d=showDialog(`<h2>Refresh printed header?</h2><p class="help">This package has identical music, glyph seats, finger choices and every vector byte outside its verified notice cleanup. Your saved corrections and calculated versions stay intact. The previous package remains available through Restore previous header.</p><div class="dialog-actions"><button data-keep-header>Keep current <kbd>Esc</kbd></button><button data-refresh-header>Refresh header</button></div>`,'header-refresh');let finished=false;const done=(yes:boolean)=>{if(finished)return;finished=true;resolve(yes);closeDialog();};d.querySelector('[data-keep-header]')!.addEventListener('click',()=>done(false));d.querySelector('[data-refresh-header]')!.addEventListener('click',()=>done(true));d.addEventListener('close',()=>{if(!finished){finished=true;resolve(false);}});});}
+async function confirmHeaderRefresh():Promise<boolean>{return new Promise(resolve=>{const d=showDialog(`<h2>Refresh printed header?</h2><p class="help">This package has identical music, glyph seats, finger choices and every vector byte outside its verified notice cleanup. Your saved corrections and finger choices stay intact. The previous package remains available through Restore previous header.</p><div class="dialog-actions"><button data-keep-header>Keep current <kbd>Esc</kbd></button><button data-refresh-header>Refresh header</button></div>`,'header-refresh');let finished=false;const done=(yes:boolean)=>{if(finished)return;finished=true;resolve(yes);closeDialog();};d.querySelector('[data-keep-header]')!.addEventListener('click',()=>done(false));d.querySelector('[data-refresh-header]')!.addEventListener('click',()=>done(true));d.addEventListener('close',()=>{if(!finished){finished=true;resolve(false);}});});}
 async function restoreHeader(){if(!current?.entry.presentations?.length)return;const target=current,history=target.entry.presentations!,file=history.at(-1)!,data=await host.read(file);if(!data)throw Error('The retained package is missing; current header preserved.');const prior=await readerAdmission.import(data,{allowLegacyTempo:true});if(!headerOnlyRefresh(target.package,prior))throw Error('Retained package does not pass the header-only contract; current data preserved.');const updated={...target.entry,file,presentations:history.slice(0,-1),retainedPackages:[...new Set([...(target.entry.retainedPackages??[]),target.entry.file])],...(target.entry.transposition?{transposition:nextTranspositionSelection(target.entry,file,{steps:getScoreTransposition(prior),layout:prior.keyboardLayout??preferences.keyboardLayout})}: {})},next=entries.map(e=>e.id===updated.id?updated:e);await enqueue(()=>writeJson('library.json',{version:1,entries:next}));entries=next;closeDialog();await open(updated);notify('Previous header restored; saved corrections and versions retained.');}
 async function earlierEditions(){
  if(!current||job?.state==='working'||job?.state==='installing')return;
@@ -801,7 +808,7 @@ async function earlierEditions(){
 }
 function closeDialog(returnParent=true){adviceOptions?.dispose();adviceOptions=undefined;if(['piano-preparation','score-reading'].includes(dialog?.dataset.kind??'')&&job?.state==='installing')return;if(dialog&&readingOperation?.dialog===dialog&&readingOperation.running.state==='working')readingOperation.running.cancel();const back=dialogBack;dialogBack=undefined;practiceOptionsCleanup?.();practiceOptionsCleanup=undefined;transposeControls?.dispose();transposeControls=undefined;optionsNavigation?.dispose();optionsNavigation=undefined;dialogNavigation?.dispose();dialogNavigation=undefined;bindingOptions?.dispose();bindingOptions=undefined;midiOptions?.dispose();midiOptions=undefined;audioOptions?.dispose();audioOptions=undefined;pianoOptions?.dispose();pianoOptions=undefined;if(!dialog)return;dialog.close();dialog.remove();dialog=undefined;input.capture=undefined;resetInput();const practiceFocus=practiceFocusReturn?app.querySelector<HTMLElement>(practiceFocusReturn):undefined;practiceFocusReturn=undefined;if(selection)focusSelection();else if(practiceFocus)practiceFocus.focus();else if(focusReturn?.isConnected)focusReturn.focus();else app.querySelector<HTMLElement>('.practice-overview:not([hidden]) .practice-chunks [aria-current=true],.practice-stage,.reader')?.focus();focusReturn=undefined;if(librarySummaryPaintPending&&!current&&!practice)paintLibrarySummaries();if(returnParent)back?.();}
 function showDialog(html:string,kind='options'){const parentSection=dialog?.dataset.kind==='options'&&kind==='earlier-editions'?optionsSection:undefined,opener=document.activeElement as HTMLElement,openerAction=opener?.dataset.action;closeDialog(false);if(parentSection)dialogBack=()=>{options(parentSection);if(openerAction)dialog?.querySelector<HTMLElement>(`[data-action="${CSS.escape(openerAction)}"]`)?.focus();};focusReturn=document.activeElement as HTMLElement;dialog=document.createElement('dialog');dialog.innerHTML=html;arrangeDialogNavigation(dialog);dialog.dataset.kind=kind;dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});document.body.append(dialog);dialog.showModal();fitDialog(dialog,orientation.rotation);resetInput();if(kind!=='options')dialogNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});dialog.querySelector<HTMLElement>('input:not([hidden]),button:not([hidden]),select:not([hidden])')?.focus();return dialog;}
-async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore calculated','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{await acceptMemoryAction(target,{kind:'calculated',ownerId:seat.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
+async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore edition finger','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{await acceptMemoryAction(target,{kind:'calculated',ownerId:seat.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
 function onMidi(event:MidiCC){if(!startupReady)return;if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;syncControls();
  midiOptions?.receive(event);
  if([120,121,123].includes(event.controller)){bindingOptions?.cancel('Input reset. Start again.');musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();resetInput();return;}
@@ -816,7 +823,7 @@ async function connectMidi(source:string){const operation=++midiTransition;bindi
 async function disconnectMidi(){midiTransition++;bindingOptions?.connectionChanged();musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();midiConnection=undefined;resetInput();midiOptions?.cancelListening();await host.midiDisconnect();bindingOptions?.paint();}
 function options(section?:string){
  const activePractice=practice,focused=document.activeElement as HTMLElement,practiceFocus=activePractice?.bindingContext.active?'.practice-stage':activePractice&&app.contains(focused)?focused.dataset.practice?`[data-practice="${CSS.escape(focused.dataset.practice)}"]`:focused.dataset.practiceSetting?`[data-practice-setting="${CSS.escape(focused.dataset.practiceSetting)}"]`:'.practice-stage':undefined;activePractice?.pause();
- const p=current?.package,s=current?.personal,layer=p&&s?activeLayer(p,s):undefined;
+ const p=current?.package,s=current?.personal;
 
  let transpose={steps:p?getScoreTransposition(p):0,min:0,max:0,error:undefined as string|undefined};
  if(p&&scoreCapabilities(p).pianoPreparation)try{transpose={...transpose,...scoreTranspositionRange(p)};}catch(error){transpose.error=(error as Error).message;}
@@ -885,29 +892,21 @@ async function act(action:string){try{if(!startupReady&&action!=='exit')return;i
  }
  if(selection&&!practice&&action==='editorSource'){await visitMemorySource();return;}
  if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,{kind:action==='memory-reference'?'reference':'reset',ownerId:selection.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});return;}
- if(action==='generate'){await startJob();return;}
  if(action==='restore-all'||action==='undo-restore'){if(action==='restore-all'||s.undo||s.undoAssignments||s.undoCalculatedOwners){const target=current,ownerDialog=dialog,ownerSection=optionsSection;await acceptMemoryAction(target,{kind:action==='restore-all'?'restoreAll':'undoRestore',ownerId:p.seats[0].ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(current===target){if(dialog===ownerDialog)options(ownerSection);if(practice)practice.refit();else{renderPages();renderToolbar();}}}return;}
  if((selection||practice)&&['next','previous','count','scale'].includes(action))return;
  if(action==='next'||action==='previous'){const shown=readerPackage();current.personal.view=turnPage(v,action==='next'?1:-1,shown.pages.length,viewportFit(innerWidth,innerHeight,effectiveView(v),shown.pages.length).count);}
- else if(action==='toggle'){if(!fingerDisplayAvailable(p,s,currentFingerPresentation(p))){notify('Choose a finger on a note, or calculate a finger layer first.');return;}if(preferences.fingerBehavior==='momentary'){refreshPresentation();return;}if(selection){selectionPitchToggle=!selectionPitchToggle;refreshPresentation();renderToolbar();return;}v.labelMode=v.labelMode==='pitch'?'finger':'pitch';}
+ else if(action==='toggle'){if(!fingerDisplayAvailable(p,s,currentFingerPresentation(p))){notify('Choose a finger on a note first.');return;}if(preferences.fingerBehavior==='momentary'){refreshPresentation();return;}if(selection){selectionPitchToggle=!selectionPitchToggle;refreshPresentation();renderToolbar();return;}v.labelMode=v.labelMode==='pitch'?'finger':'pitch';}
  else if(action==='count')v.count=(v.count%3+1) as 1|2|3;else if(action==='scale'){const values=[1,.9,.75,.5] as const;v.scale=values[(values.indexOf(v.scale)+1)%4];}else return;
  if(practice)refreshPresentation();else{renderPages();renderToolbar();savePersonalQuietly();}
  }catch(error){notify((error as Error).message);}}
 
-async function startJob(){if(!current||job?.state==='working'||job?.state==='installing')return;requirePianoCapability(current.package,'pianoPreparation');await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();const target=current,bytes=await host.read(target.entry.file);if(!bytes)throw Error('Managed score is missing; saved choices are retained.');
- const {q,running,dialog:d}=await preparePiano(bytes,target.package.keyboardLayout??preferences.keyboardLayout,target.entry.id,target.personal,true);
- try{if(current!==target)throw Error('The current score changed; prior choices are retained.');const installed=await installPreparedScore(target.entry,q,running,q.personal??target.personal,false,undefined,context);running.state='complete';if(dialog===d)closeDialog();
-  await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);notify('Finger choices calculated. Your saved choices are retained.');
-
- }catch(error){running.state='failed';if(dialog===d)closeDialog();throw error;}
-}
 app.addEventListener('click',e=>{const el=e.target as HTMLElement;const openEl=el.closest<HTMLElement>('[data-open]');if(openEl){void open(entries.find(q=>q.id===openEl.dataset.open)!).catch(e=>notify(e.message));return;}const seatEl=el.closest<HTMLElement>('[data-viewer-seat],[data-finger-seat]');if(seatEl&&current&&!practice){void edit(readerPackage().seats.find(s=>s.id===(seatEl.dataset.viewerSeat??seatEl.dataset.fingerSeat))!,{x:e.clientX,y:e.clientY});return;}const b=el.closest<HTMLElement>('[data-action]');if(b){if(b.dataset.action==='toggle'&&preferences.fingerBehavior==='momentary'){return;}void act(b.dataset.action!);}});
 document.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('dialog [data-action]');if(b)void act(b.dataset.action!);});
 app.addEventListener('pointerdown',e=>{const control=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-action=toggle]');if(!current||dialog||preferences.fingerBehavior!=='momentary'||!control||control.disabled||e.button!==0)return;input.holdPointer(e.pointerId);void act('toggle');});
 window.addEventListener('pointerup',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 window.addEventListener('pointercancel',e=>{if(input.releasePointer(e.pointerId))refreshPresentation();});
 app.addEventListener('change',e=>{const el=e.target as HTMLSelectElement;if(!current||!el.dataset.option)return;const v=current.personal.view,key=el.dataset.option as keyof typeof v;(v as any)[key]=['count','scale'].includes(key)?Number(el.value):el.value;renderPages();renderToolbar();savePersonalQuietly();});
-document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-notation-system]')){const choice=field.value==='traditional'?'traditional':'iso';void saveNotationSystem(choice).catch(error=>{notify(error.message);field.value='iso';});return;}if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{notify(error.message);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}if(!current||!field.matches('dialog [data-history]'))return;const value=Number(field.value),target=current;void commitPersonal(target,latest=>{latest.calculatedVersion=value<0?undefined:value;latest.view.fingerSet='calculated';return latest;}).then(()=>{if(current===target){renderPages();renderToolbar();}}).catch(error=>paintPersonalSaveError(target,error));});
+document.addEventListener('change',e=>{const field=e.target as HTMLSelectElement;if(field.matches('[data-notation-system]')){const choice=field.value==='traditional'?'traditional':'iso';void saveNotationSystem(choice).catch(error=>{notify(error.message);field.value='iso';});return;}if(field.matches('[data-reading-part]')){void switchReadingPart(field.value).catch(error=>{notify(error.message);if(!practice)renderToolbar();});return;}if(field.matches('[data-reading-notation]')){void switchReadingNotation(field.value).catch(error=>notify(error.message));return;}if(field.matches('[data-keyboard]')){void switchKeyboard(field.value);return;}if(field.matches('dialog [data-finger-behavior],dialog [data-finger-replacement]')){if(field.matches('[data-finger-behavior]'))preferences.fingerBehavior=fingerBehavior(field.value);else preferences.fingerPresentation=fingerPresentation((field as unknown as HTMLInputElement).checked?'replacement':'annotations');resetInput();if(current){if(field.matches('[data-finger-behavior]'))current.personal.view.labelMode='pitch';refreshPresentation();renderToolbar();savePersonalQuietly();}void savePreferences();return;}});
 window.addEventListener('mousemove',e=>{if(current&&(e.clientY>innerHeight-36||e.clientX<20||e.clientX>innerWidth-20))reveal();});
 window.addEventListener('resize',()=>{if(dialog)fitDialog(dialog,orientation.rotation);if(practice)return;if(current)renderPages();else {const surface=app.querySelector<HTMLElement>('.surface');if(surface)transformSurface(surface,orientation.rotation);}});
 window.addEventListener('pagehide',()=>{if(job?.state==='working')job.cancel();readerAdmission.clear();});

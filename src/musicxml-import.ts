@@ -71,7 +71,8 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
   engineVersion:APPROVED_SCORE_RENDERING_ENGINE,createdAt:new Date().toISOString(),font:assets.font,notices:assets.notices,
   presentations:(['conventional-piano','janko-four-row'] as const).map(layoutId=>({layoutId,seats:rendered.seats,pages:rendered.pages}))});
  checkReadingExecution(execution);
- // Retain the recipe that reproduces these pages, as calculated editions require.
+ // Retain the recipe that reproduces these pages, so Transpose can engrave
+ // the moved score with the same contract.
  const m=structuredClone(published.package.manifest),files={...published.package.files},recipeBytes=strToU8(JSON.stringify(recipe));delete files['manifest.json'];
  files['rendering-recipe.json']=recipeBytes;m.files['rendering-recipe.json']=await hashBytes(recipeBytes);m.renderingRecipe='rendering-recipe.json';
  for(const d of Object.values(m.presentations??{}))if(d)d.renderingRecipe='rendering-recipe.json';

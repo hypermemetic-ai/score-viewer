@@ -1,5 +1,4 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {personalForCalculatedEdition,PersonalEditionConflict} from '../src/presentation-install';
 import {initialPersonal,corrected,validEntryStorage,readPersonal,personalStorageName,legacyPersonalStorageName,practiceStorageName,performanceStorageName,type Entry} from '../src/state';
 import {loadPersonalJournal,PersonalJournalError} from '../src/personal-journal';
 import type {ScorePackage} from '../src/package';
@@ -14,30 +13,6 @@ function fixture():ScorePackage{
   fingerLayer:{version:'piano-finger-assignments-v1',layoutId:'janko-four-row',profileId:'profile',profileSha256:'c'.repeat(64),
    plannerVersion:'fixture-planner',sourceHash:'a'.repeat(64),attacks,sourceOwnerToAttack:Object.fromEntries(notes.map((n,i)=>[n.id,attacks[i].id]))}} as unknown as ScorePackage;
 }
-test('selective hand change carries checked current choice while older layers/undo remain with their original edition',()=>{
- const from=fixture(),s=corrected(from,initialPersonal(from),from.seats[0],4);s.history=[structuredClone(from.fingerLayer!)];s.undo=structuredClone(s.overrides);
- const before=structuredClone(s),to=structuredClone(from);to.manifest.revision='e'.repeat(64);to.effectiveHandSha256='f'.repeat(64);
- to.score.notes[1].hand='LH';to.fingerLayer!.attacks[1].hand='LH';to.fingerLayer!.attacks[0].finger=4;
- const result=personalForCalculatedEdition(s,from,to);
- assert.deepEqual(result.overrides,s.overrides);assert.deepEqual(result.history,[]);assert.equal(result.layer,undefined);assert.equal(result.undo,undefined);
- assert.equal(result.binding!.effectiveHandSha256,to.effectiveHandSha256);assert.deepEqual(s,before);
-});
-test('changed hand/release/contact/profile/alias cannot silently receive an active correction',()=>{
- const from=fixture(),s=corrected(from,initialPersonal(from),from.seats[0],4),base=structuredClone(from);
- base.manifest.revision='e'.repeat(64);base.fingerLayer!.attacks[0].finger=4;
- for(const mutate of [
-  (to:ScorePackage)=>{to.fingerLayer!.attacks[0].hand='RH';},
-  (to:ScorePackage)=>{to.score.notes[0].durationTicks++;},
-  (to:ScorePackage)=>{to.fingerLayer!.attacks[0].row=4;},
-  (to:ScorePackage)=>{to.profileSha256='f'.repeat(64);},
-  (to:ScorePackage)=>{to.seats[0].ownerIds.push('owner-1');},
- ]){const to=structuredClone(base);mutate(to);assert.throws(()=>personalForCalculatedEdition(s,from,to),PersonalEditionConflict);}
-});
-test('same edition history retains the prior calculated layer, rather than pushing the replacement as its own predecessor',()=>{
- const from=fixture(),s=initialPersonal(from),to=structuredClone(from);to.fingerLayer!.attacks[0].finger=4;
- const result=personalForCalculatedEdition(s,from,to);
- assert.deepEqual(result.history,[from.fingerLayer]);assert.deepEqual(result.layer,to.fingerLayer);
-});
 test('prepared and legacy same-semantic-revision states have exact distinct bindings and storage keys',()=>{
  const legacy=fixture(),prepared=structuredClone(legacy);prepared.preparationIdentity={} as any;
  const old=initialPersonal(legacy),fresh=initialPersonal(prepared);

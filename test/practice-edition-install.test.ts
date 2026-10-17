@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
 import {transferStudy,sourcePackage} from './support/hand-edition-fixture';
-import {ensurePianoReady} from '../src/piano-readiness';import {assigned} from '../src/personal-assignments';
+import {ensurePianoReady} from './support/calculate-edition';import {assigned} from '../src/personal-assignments';
 import {initialPersonal,readPersonal,fingerFor,practiceStorageName,personalStorageName,collectionId,type Entry} from '../src/state';
 import {importPackage,hashBytes,selectPresentation} from '../src/package';
 import {getScoreTransposition,getOriginalScorePackageBytes} from '../src/score-transposition';import {retainedTranspositionFile} from '../src/score-transposition-selection';import {planPractice,initialPractice,readPractice,progressFor,practiceCatalogChunks,transferPracticeEdition,passageHierarchy} from '../src/practice';
@@ -57,7 +57,7 @@ for(const failure of ['write','invalid-target','cancel','stale-target'] as const
 });
 test('cancellation after additive target write keeps active source journal and library pointer intact',async()=>{
  const s=storage(),library=s.map.get('library.json')!,source=s.map.get(f.sourceKey)!;let active=true;const host={...s.host,async write(name:string,data:Uint8Array){await s.host.write(name,data);if(name===f.targetKey)active=false;}};
- await assert.rejects(stagePresentationInstall(host,request(async()=>{await stagePracticeEditionTransfer(host,{entryId:f.entry.id,from:f.from,to:f.to,canCommit:()=>active});},()=>active)),/no longer active/);
+ await assert.rejects(stagePresentationInstall(host,request(async()=>{await stagePracticeEditionTransfer(host,{entryId:f.entry.id,from:f.from,to:f.to,canCommit:()=>active});},()=>active)),/Saving was cancelled/);
  assert.deepEqual(s.map.get('library.json'),library);assert.deepEqual(s.map.get(f.sourceKey),source);assert.equal(progressFor(f.targetPlan.chunks[0],readPractice(parsed(s.map.get(f.targetKey)!),f.targetPlan)),1);
 });
 test('other sources, transpositions and keyboards do not read or copy progress',async()=>{
@@ -144,7 +144,7 @@ test('production main context admission reads merged journal before activation a
  for(const cancel of [false,true]){const s=storage(),library=s.map.get('library.json')!;let admissions=0;const application=applicationInstall(s,async(p,id,navigation,personal)=>{
   assert.equal(id,f.entry.id);assert.ok(!s.writes.includes('library.json'));const admitted=admitPracticeContext(p,parsed(s.map.get(f.targetKey)!),navigation,personal);assert.equal(progressFor(admitted.plan.chunks[0],admitted.state),1);admissions++;if(cancel)application.context.job=undefined;return admitted;
  }),navigation={partition:'bounded-exercises-v1',composites:{},selected:f.targetPlan.chunks[0].id,includeManual:true};
- if(cancel){await assert.rejects(application.run(navigation),/no longer active/);assert.deepEqual(s.map.get('library.json'),library);assert.equal(application.context.entries[0].file,f.entry.file);}else {const result=await application.run(navigation);assert.equal(result.practiceContext.saved,true);assert.equal(s.writes.at(-1),'library.json');}
+ if(cancel){await assert.rejects(application.run(navigation),/cancelled/);assert.deepEqual(s.map.get('library.json'),library);assert.equal(application.context.entries[0].file,f.entry.file);}else {const result=await application.run(navigation);assert.equal(result.practiceContext.saved,true);assert.equal(s.writes.at(-1),'library.json');}
  assert.equal(admissions,1);
  }
 });

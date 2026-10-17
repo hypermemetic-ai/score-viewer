@@ -1,7 +1,7 @@
 import {requirePitchedEvent} from '../../vendor/iso-notation/src/model/musical-event';
 import {readFileSync} from 'node:fs';import {strToU8} from 'fflate';
 import {publishPreparedNative} from '../../src/publication';import {archivePackage,hashBytes,importPackage,pianoPlanningScore,type ScorePackage} from '../../src/package';
-import {prepareCalculatedEdition} from '../../src/calculated-hand-edition';import {packagePianoPresentation} from '../../src/piano-package-presentation';
+import {prepareCalculatedEdition} from './calculator';import {packagePianoPresentation} from './piano-package-presentation';
 import {calculatePianoAssignments,type PianoAssignmentConstraint} from '../../vendor/iso-notation/src/model/piano-finger-assignments';
 import {renderScorePresentation} from '../../vendor/iso-notation/src/score-presentation';
 import {SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION} from '../../vendor/iso-notation/src/render/iso/score-rendering-recipe';

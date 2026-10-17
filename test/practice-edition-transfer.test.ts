@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {transferStudy,sourcePackage} from './support/hand-edition-fixture';
-import {ensurePianoReady} from '../src/piano-readiness';
+import {ensurePianoReady} from './support/calculate-edition';
 import {assigned} from '../src/personal-assignments';
 import {initialPersonal,fingerFor,practiceStorageName} from '../src/state';
 import {importPackage} from '../src/package';
@@ -9,7 +9,7 @@ import {toggleDone} from '../src/practice-attainment';
 import {transferPracticeEdition} from '../src/practice-edition-transfer';
 import {referenceFixture} from './support/reference-score';
 
-test('actual explicit hand/finger calculation preserves credited progress through a new journal and cold archive',async()=>{
+test('a saved calculated edition of the same music preserves credited progress through a new journal and cold archive',async()=>{
  const source=await sourcePackage(transferStudy()),prepared=await ensurePianoReady({packageBytes:source.bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});
  assert.ok('package' in prepared,'message' in prepared?prepared.message:prepared.status);if(!('package' in prepared))return;
  const baseline=prepared.package,seat=baseline.seats.find(s=>s.ownerIds.includes('gesture-0'))!,personal=assigned(baseline,initialPersonal(baseline),seat,{hand:'RH',finger:fingerFor(baseline,initialPersonal(baseline),seat)===1?2:1}),oldPlan=planPractice(baseline),old=initialPractice(oldPlan),chunk=oldPlan.chunks[0];

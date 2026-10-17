@@ -7,7 +7,6 @@ import {planPractice,initialPractice,readPractice,progressFor,passageHierarchy} 
 import {toggleDone} from '../src/practice-attainment';
 import {pianoRequestAuthority} from '../src/piano-request-authority';
 
-import {personalForCalculatedEdition} from '../src/presentation-install';
 import type {ScorePackage} from '../src/package';
 import {testReference} from './support/reference-score';
 
@@ -43,7 +42,7 @@ test('hand choice keeps effective finger, legacy correction/history and immutabl
  assert.equal(practiceStorageName('entry',p),practiceStorageName('entry',personalPracticePackage(p,next)));
  assert.deepEqual(readPersonal(JSON.parse(JSON.stringify(next)),p),next);assert.match(await effectiveAssignmentDigest(p,next),/^[a-f0-9]{64}$/);
  const fingers=corrected(p,next,p.seats[0],2);assert.equal(handFor(p,fingers,'owner-0'),'RH');assert.equal(fingerFor(p,fingers,p.seats[0]),2);
- fingers.view.fingerSet='calculated';assert.equal(fingerFor(p,fingers,p.seats[0]),3);
+ fingers.view.fingerSet='calculated';assert.equal(fingerFor(p,fingers,p.seats[0]),2,'a legacy saved calculated view still shows your own finger');
 });
 test('duplicate physical aliases and continued heads share the surgical choice, distant recurrence does not',()=>{
  const p=fixture(),alias={...p.score.notes[0],id:'alias',durationTicks:48};p.score.notes.push(alias);
@@ -95,14 +94,6 @@ test('materialized personal precedence remains recoverable without its optional 
  p.fingerLayer!.operatorConstraints=[{ownerId:n.id,guard,hand:'RH',finger:3,provenance:{kind:'personal-choice',reference:'Explicit personal edit'}} as any];
  assert.equal(pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,undefined,'calculate')[0].hand,'RH');
  (p.fingerLayer!.operatorConstraints as any[])[0].provenance.kind='operator-choice';assert.throws(()=>pianoRequestAuthority(p,p.score,'janko-four-row',p.fingerLayer,undefined,'calculate'),/source instruction/);
-});
-test('materialized edition carries effective choices and retains superseded legacy evidence with the prior edition',()=>{
- const from=fixture(),legacy=corrected(from,initialPersonal(from),from.seats[0],5),s=assigned(from,legacy,from.seats[0],{hand:'RH'}),before=structuredClone(s),to=structuredClone(from);
- to.manifest.revision='e'.repeat(64);to.effectiveHandSha256='f'.repeat(64);to.score.notes[0].hand='RH';to.fingerLayer!.attacks[0].hand='RH';to.fingerLayer!.attacks[0].finger=5;
- const next=personalForCalculatedEdition(s,from,to);
- assert.equal(handFor(to,next,'owner-0'),'RH');assert.equal(fingerFor(to,next,to.seats[0]),5);assert.deepEqual(next.overrides,{});assert.deepEqual(s,before);
- assert.equal(s.overrides[from.seats[0].contactId].hand,'LH');assert.deepEqual(readPersonal(next,to),next);
- to.fingerLayer!.attacks[0].finger=4;assert.throws(()=>personalForCalculatedEdition(s,from,to),/personal assignment was not retained/);
 });
 test('practice context admission resolves current personal hands while preserving the retained settings and claims',()=>{
  const p=fixture(),old=admitPracticeContext(p,undefined),a=old.plan.chunks[0];old.state.best[a.pattern]=90;

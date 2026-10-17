@@ -25,7 +25,7 @@ test('replacement fit refusal leaves complete annotations and source-linked edit
  const q={...p,fingerEligibility:{eligible:false,reason:'A replacement digit does not fit its frozen seat'}},state=initialPersonal(q);
  assert.equal(fingerDisplayAvailable(q,state,'annotations'),true);assert.equal(fingerDisplayAvailable(q,state,'replacement'),false);
  const seat=q.seats.find(s=>s.ownerIds.length===2)!;for(const finger of [1,2,3,4,5]){const edited=corrected(q,state,seat,finger);assert.equal(fingerFor(q,edited,seat),finger);assert.equal(edited.view.fingerSet,'yours');assert.deepEqual(q.score,p.score);}
- const missing={...q,fingerLayer:undefined};assert.equal(fingerDisplayAvailable(missing,initialPersonal(missing),'annotations'),false);assert.throws(()=>corrected(missing,initialPersonal(missing),seat,2),/complete/);
+ const missing={...q,fingerLayer:undefined};assert.equal(fingerDisplayAvailable(missing,initialPersonal(missing),'annotations'),false);assert.throws(()=>corrected(missing,initialPersonal(missing),seat,2),/no edition finger/);
 });
 test('literal No.14 annotations clear their actual upward/downward carriers without changing frozen pages',()=>{
  const before=JSON.stringify({score:p.score,pages:p.pages,seats:p.seats,manifest:p.manifest}),positions=annotationPositions(p);assert.equal(positions.size,p.seats.length);

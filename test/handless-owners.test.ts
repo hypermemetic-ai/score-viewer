@@ -11,7 +11,7 @@ import {initialPersonal} from '../src/state';
 import {assigned,effectiveAssignments,handChoiceOwners,handFor,personalPracticePackage,readPersonalAssignments} from '../src/personal-assignments';
 import {ensurePianoReady} from '../src/piano-readiness';
 import {planSource,requirePracticeHands} from '../src/practice';
-import {createScoreTransposition} from '../src/score-transposition';
+import {prepareSourceTransposition} from '../src/score-transposition';
 
 const xml=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url),'utf8');
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
@@ -102,17 +102,14 @@ test('ISO\'s refusal of a half-handed key reaches the player in plain words, kee
   (error:Error)=>error.message==="This score can't be displayed yet: the viewer can't draw its pages."&&error.cause===other);
 });
 
-test('fingers and timed practice wait for the player to give every note a hand',async()=>{
+test('timed practice waits for the player to give every note a hand',async()=>{
  const p=await open(oneStaff),count=p.score.notes.length,bytes=(await prepareMusicXmlScore(strToU8(oneStaff),assets)).bytes;
- const result=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',intent:'calculate',forceRecalculate:true});
- assert.equal(result.status,'needs-data');assert.equal((result as {code:string}).code,'performing-hands');
- assert.equal((result as {message:string}).message,`${count} notes have no hand in this score. Choose a hand for each (L or R while editing) before fingers can be calculated.`);
  assert.throws(()=>requirePracticeHands(p,initialPersonal(p)),{message:`${count} notes have no hand in this score. Choose a hand for each (L or R while editing) before timed practice.`});
  // Once the player gives every key a hand, practice plans with those hands.
  let s=initialPersonal(p);for(const seat of p.seats)s=assigned(p,s,seat,{hand:'RH'});
  requirePracticeHands(p,s);
  assert.ok(planSource(p,'bounded-exercises-v1',s).gestures.every(g=>g.hand==='RH'));
- await assert.rejects(createScoreTransposition(p,bytes,2,'conventional-piano'),{message:`Transposing keeps the score's own hands, and ${count} notes have none, so this score can't be transposed yet.`});
- // Reading the score is not a calculation request.
- assert.equal((await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',intent:'read-retained'})).status,'reading');
+ await assert.rejects(prepareSourceTransposition(p,bytes,2),{message:`Transposing keeps the score's own hands, and ${count} notes have none, so this score can't be transposed yet.`});
+ // Opening the score reads it; nothing supplies the missing hands.
+ assert.equal((await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano'})).status,'reading');
 });

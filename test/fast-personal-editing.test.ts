@@ -1,5 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
+import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {importPackage} from '../src/package';import {initialPersonal,readPersonal,viewportFit,personalStorageName} from '../src/state';
 import {assigned,effectiveAssignmentKey} from '../src/personal-assignments';import {editUnits} from '../src/selection';import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {PersonalMemorySession,rawMemoryPersonal,personalMemoryDocument} from '../src/personal-memory-session';
@@ -23,7 +24,7 @@ async function fixture(){
   resolveMemory:(owner:any)=>withResolvedMemory(memoryInput(owner),personalMemory.resolve(memoryInput(owner)),personalMemory.memory.revision),effectiveAssignmentKey,
   adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){}};
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
- runInNewContext(body('async function commitPersonal(','\nfunction labelMode('),context);
+ runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
  runInNewContext(body('async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
  return {context,target,store,editor:context.personalEditor(target),personalMemory,disk,written,frames,messages,units,setBroken(value:boolean){broken=value;},async flush(){await personalMemory.flush();await context.personalEditor(target).queue.flush();}};
 }
