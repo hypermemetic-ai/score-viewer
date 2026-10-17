@@ -134,7 +134,7 @@ async function paintCheckpoint(signal?:AbortSignal){
 async function readingCheckpoint(op:ReadingOperation){checkReading(op);await paintCheckpoint(op.controller.signal);checkReading(op);}
 function readingDialog(op:ReadingOperation){
  checkReading(op);
- const d=showDialog(op.loading.markup(),'score-reading');op.loading.attach(d);if(op.running.state==='installing')op.loading.saving();
+ const d=showDialog(op.loading.markup(),'score-reading');op.loading.attach(d);if(op.running.state==='installing'&&op.loading.state!=='saving')op.loading.saving();
  op.dialog=d;d.addEventListener('close',()=>{if(op.dialog===d&&op.running.state==='working')op.running.cancel();},{once:true});return d;
 }
 /** A loading surface handed from an earlier dialog of the same request
@@ -732,7 +732,7 @@ async function changeTransposition(steps:number){
   const {q,running,dialog:d}=prepared;if(current!==target||getScoreTransposition(q.package)!==steps)throw Error('The score changed while preparing; previous transposition retained.');
   const personal=q.personal??initialPersonal(q.package);if(!retained)personal.view=anchorView(target.personal.view,q.package,writtenAnchor(target.package,target.personal.view.page));
   const installed=await installPreparedScore(target.entry,q,running,personal,false,retained?.personalFiles,context,rebuilt);running.state='complete';if(dialog===d)closeDialog();
-  carriedLoading=loading;await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);options();
+  loading.saving('Saved. This part can’t be cancelled.');carriedLoading=loading;await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext);options();
   notify(rebuilt?`${steps===0?'Original pitch restored.':`Transposed ${offsetLabel(steps)}.`} ${rebuiltNotice(rebuilt)}`:
    steps===0?'Original pitch restored with its saved choices and progress.':transposedNotice(steps,!!activeLayer(target.package,target.personal),carried));
  }catch(error){if(prepared){prepared.running.state='failed';if(dialog===prepared.dialog)closeDialog();}throw error;}
@@ -932,7 +932,7 @@ async function earlierEditions(){
       onCommitStarted:()=>{restoring.state='installing';job=restoring;d.dataset.kind='piano-preparation';d.setAttribute('aria-busy','true');if(!progress.firstElementChild){progress.innerHTML=loading.markup();loading.attach(progress);}loading.step('save');loading.saving();}});
      entries=result.entries;return result;
     });
-    restoring.state='complete';closeDialog(false);carriedLoading=loading;await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},context,admitted);notify(rebuilt?`Earlier edition restored. ${rebuiltNotice(rebuilt)}`:'Earlier edition restored with its saved choices.');
+    restoring.state='complete';closeDialog(false);loading.saving('Saved. This part can’t be cancelled.');carriedLoading=loading;await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},context,admitted);notify(rebuilt?`Earlier edition restored. ${rebuiltNotice(rebuilt)}`:'Earlier edition restored with its saved choices.');
    }catch(error){restoring.state='failed';loading.stop();progress.replaceChildren();if((error as Error).name==='AbortError'&&dialog!==d)return;if(dialog===d){d.dataset.kind='earlier-editions';d.removeAttribute('aria-busy');d.querySelector('.error')!.textContent=(error as Error).message;}else reportFailure(error);}
    finally{b.disabled=false;}
   })();});
