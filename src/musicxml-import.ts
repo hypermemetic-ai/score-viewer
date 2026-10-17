@@ -1,16 +1,12 @@
-import {unzipSync,strToU8} from 'fflate';
+import {unzipSync} from 'fflate';
 import {parseMusicXmlAsync,projectMusicXml} from '../vendor/iso-notation/src/musicxml';
-import {renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
-import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
-import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
-import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
-import {archivePackage,hashBytes,importPackage} from './package';
-import {publishPackage,publishPreparedNative} from './publication';
+import {hashBytes} from './package';
+import {publishNativePianoScore,type NativePianoAssets} from './native-piano-preparation';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 
 const MAX_XML_BYTES=10_000_000;
 export class MusicXmlImportRefusal extends Error {}
-export interface MusicXmlAssets {font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>}
+export type MusicXmlAssets=NativePianoAssets;
 
 /** Plain MusicXML in UTF-8/UTF-16, or the root file of a compressed .mxl. */
 export function musicXmlText(bytes:Uint8Array):string {
@@ -58,25 +54,6 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
   throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);
  }
  score.title||='Untitled score';score.composer??='';
- const source=strToU8(JSON.stringify(score)),sourceSha256=await hashBytes(source);
- let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,
-  options:approvedProductionIsoOptions(),tokens:resolveIsoTokens({}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
- let rendered;
- try{rendered=await renderScorePresentationAsync(score,recipe,execution);}
- catch(error){if((error as Error).name==='AbortError')throw error;throw new MusicXmlImportRefusal(`This score can't be engraved yet: ${(error as Error).message}`);}
- checkReadingExecution(execution);
- if(rendered.lint.violations.length)throw new MusicXmlImportRefusal("This score can't be engraved cleanly yet: some of its notation doesn't fit the page layout.");
- recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
- const published=await publishPreparedNative({source,metadata:{title:score.title,composer:score.composer,provenance:[`MusicXML import ${inputSha256}; hands from printed staves and source hand marks.`]},
-  engineVersion:APPROVED_SCORE_RENDERING_ENGINE,createdAt:new Date().toISOString(),font:assets.font,notices:assets.notices,
-  presentations:(['conventional-piano','janko-four-row'] as const).map(layoutId=>({layoutId,seats:rendered.seats,pages:rendered.pages}))});
- checkReadingExecution(execution);
- // Retain the recipe that reproduces these pages, so Transpose can engrave
- // the moved score with the same contract.
- const m=structuredClone(published.package.manifest),files={...published.package.files},recipeBytes=strToU8(JSON.stringify(recipe));delete files['manifest.json'];
- files['rendering-recipe.json']=recipeBytes;m.files['rendering-recipe.json']=await hashBytes(recipeBytes);m.renderingRecipe='rendering-recipe.json';
- for(const d of Object.values(m.presentations??{}))if(d)d.renderingRecipe='rendering-recipe.json';
- const final=await publishPackage(await importPackage(archivePackage(m,files),{allowLegacyTempo:true}));
- checkReadingExecution(execution);
- return {bytes:final.bytes,filename:final.filename};
+ return publishNativePianoScore(score,{metadata:{title:score.title,composer:score.composer,provenance:[`MusicXML import ${inputSha256}; hands from printed staves and source hand marks.`]},
+  assets,execution,refusal:MusicXmlImportRefusal});
 }
