@@ -1,7 +1,9 @@
-import {initialPractice,readPractice,passageHierarchy,planPractice,requirePracticeHands,practicePartition,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
+import {initialPractice,readPractice,passageHierarchy,planPractice,requirePracticeHands,practicePartition,setPracticeGoal,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
 import type {PracticeMode,PracticePrimaryMode} from './practice-view';
 import type {PersonalState} from './state';
 import type {ScorePackage} from './package';
+import {savedPlayerTempo} from './player-tempo';
+import type {ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 
 export type PracticePreferences=Pick<PracticeState,'start'|'connectionStart'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'|'countInBars'|'resumeCooldownSeconds'>;
 export function practicePreferences(state:PracticeState):PracticePreferences {
@@ -13,11 +15,17 @@ export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,c
  const fresh=initialPractice(plan),state=readPractice(saved??(context?.preferences?{...fresh,...context.preferences,working:context.preferences.start}:undefined),plan);
  return context?restorePracticeGrouping(plan,state,context):state;
 }
-export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean}
-export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState):AdmittedPracticeContext {
+export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean;rememberTempo?:true}
+/** A score without a reference tempo uses the remembered player tempo, else
+ * the newly chosen one; the journal keeps it as the personal goal. */
+export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo):AdmittedPracticeContext {
  requirePracticeHands(p,personal);
- const plan=planPractice(p,'bounded-exercises-v1',personal);
- return {plan,state:practiceStateForContext(plan,saved,context),saved:!!saved};
+ const player=savedPlayerTempo(p.score,saved,context?.preferences)??(p.score.referencePerformanceTempo===undefined?chosenTempo:undefined);
+ const plan=planPractice(p,'bounded-exercises-v1',personal,player);
+ let state=practiceStateForContext(plan,saved,context);
+ const rememberTempo=!!plan.playerTempo&&!state.personalGoal;
+ if(rememberTempo)state=setPracticeGoal(state,plan,plan.referencePerformanceTempo!.bpm);
+ return {plan,state,saved:!!saved,...(rememberTempo?{rememberTempo:true as const}:{})};
 }
 
 /** Navigation/group structure only. No played evidence or completion claim. */

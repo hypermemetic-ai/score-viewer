@@ -4,6 +4,7 @@ import {practiceStorageName,legacyPracticeStorageName,collectionId} from './stat
 import {getScoreTransposition} from './score-transposition';
 import {planPractice,readPractice,passageHierarchy,transferPracticeEdition,type PracticeState} from './practice';
 import {equivalentPracticeClaims,practiceExerciseEvidenceKey} from './practice-equivalence';
+import {savedPlayerTempo} from './player-tempo';
 
 interface PracticeInstallHost {read(name:string):Promise<Uint8Array|null>;write(name:string,data:Uint8Array):Promise<void>}
 export interface MergedEditionPracticeState extends PracticeState {editionMergeEvidence?:{version:'practice-edition-merge-v1';targetRaw:unknown;incomingRaw:unknown}}
@@ -11,7 +12,7 @@ export interface MergedEditionPracticeState extends PracticeState {editionMergeE
  * same-sized complete source claims add credit, never replace prior credit. */
 export function mergeEditionPractice(targetRaw:unknown,incomingRaw:PracticeState,p:ScorePackage,personal?:PersonalState):MergedEditionPracticeState {
  if(targetRaw===null||targetRaw===undefined)return structuredClone(incomingRaw);
- const targetPlan=planPractice(p,'bounded-exercises-v1',personal),target=readPractice(targetRaw,targetPlan),incoming=readPractice(incomingRaw,targetPlan);
+ const targetPlan=planPractice(p,'bounded-exercises-v1',personal,savedPlayerTempo(p.score,targetRaw,incomingRaw)),target=readPractice(targetRaw,targetPlan),incoming=readPractice(incomingRaw,targetPlan);
  // Both old journals are validated and projected onto the current peer
  // catalog. Overlapping doubles never become a competing recursive tree.
  const all=passageHierarchy(targetPlan,target).all,from=passageHierarchy(targetPlan,incoming).all,fromByEvidence=new Map([...from.values()].flatMap(c=>{const evidence=practiceExerciseEvidenceKey(targetPlan,c);return evidence?[[evidence,c] as const]:[];}));

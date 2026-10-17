@@ -21,6 +21,7 @@ import type {TimeSignatureOverlay} from '../vendor/iso-notation/src/model/types'
 import {practiceTiming} from './practice-timing';
 import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
 import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
+import {savedPlayerTempo} from './player-tempo';
 export interface PracticeAttack {id:string;tick:number;end:number;midi:number;bar:number;owners:string[];groups:string[]}
 /** `hand: null` groups notes the score leaves hand-less; only plans that are not
  * practised carry it (source identity, earlier editions, summaries). */
@@ -30,7 +31,7 @@ export type LegacyPracticePartition='fixed-four-v1'|'connection-boundary-v1';
 export type PracticePartition=LegacyPracticePartition|'bounded-exercises-v1';
 export function practicePartition(raw:unknown):PracticePartition {if(!raw)return 'bounded-exercises-v1';const p=(raw as PracticeState).partition;if(p===undefined)return 'fixed-four-v1';if(p!=='fixed-four-v1'&&p!=='connection-boundary-v1'&&p!=='bounded-exercises-v1')throw Error('Practice partition differs; saved evidence retained.');return p;}
 /** Musical clock, passage and evidence identity; no physical assessment role. */
-export interface PracticePassagePlan {partition:PracticePartition;timeSignatures:TimeSignatureOverlay[];barPhaseTicks?:number[];referencePerformanceTempo?:ReferencePerformanceTempo;revision:string;barTicks:number[];ticksPerBeat:number;chunks:PracticeChunk[];catalog?:readonly PracticeExercise[];policyFingerprint?:string;boundaryProfile?:PracticeSectionPlanning;legacyPlans?:Partial<Record<LegacyPracticePartition,PracticePassagePlan>>;sourcePracticeIdentity?:string;keyboardLayout?:string}
+export interface PracticePassagePlan {partition:PracticePartition;timeSignatures:TimeSignatureOverlay[];barPhaseTicks?:number[];referencePerformanceTempo?:ReferencePerformanceTempo;playerTempo?:true;revision:string;barTicks:number[];ticksPerBeat:number;chunks:PracticeChunk[];catalog?:readonly PracticeExercise[];policyFingerprint?:string;boundaryProfile?:PracticeSectionPlanning;legacyPlans?:Partial<Record<LegacyPracticePartition,PracticePassagePlan>>;sourcePracticeIdentity?:string;keyboardLayout?:string}
 /** Piano assessment adds genuine pitches and performing-hand groups. */
 export interface PracticePlan extends PracticePassagePlan {attacks:PracticeAttack[];gestures:Gesture[];ownerGroup:Map<string,string>}
 export interface PersonalPerformanceGoal {version:'personal-performance-goal-v1';bpm:number;beat:ReferencePerformanceTempo['beat']}
@@ -51,6 +52,7 @@ export function readPersonalGoal(raw:unknown,reference:ReferencePerformanceTempo
 }
 export function setPracticeGoal(state:PracticeState,plan:PracticePassagePlan,bpm?:number):PracticeState {
  const next=structuredClone(state),reference=requireReferencePerformanceTempo(plan);
+ if(bpm===undefined&&plan.playerTempo)throw Error('This score has no reference tempo; practice keeps your own tempo.');
  if(bpm===undefined)delete next.personalGoal;else next.personalGoal=readPersonalGoal({version:'personal-performance-goal-v1',bpm,beat:reference.beat},reference);
  next.target=next.personalGoal?.bpm??reference.bpm;
  return readPractice(plan.partition==='bounded-exercises-v1'?normalizePracticePreferences(next):next,plan);
@@ -60,14 +62,20 @@ export function requirePracticeHands(p:ScorePackage,personal?:PersonalState):voi
  const handless=(personal?personalPracticePackage(p,personal):p).score.notes.filter(n=>n.hand===undefined).length;
  if(handless)throw Error(handlessMessage(handless,'timed practice'));
 }
-export function planPractice(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState):PracticePlan {
- requireReferencePerformanceTempo(p.score);
+/** Timed practice cannot yet place grace notes in time. */
+export function requirePerformedGraceTiming(p:ScorePackage):void {
  if(p.score.graceGroups?.length)throw Error('Timed practice needs performed timing for the score’s grace notes; the written notes remain available in Score.');
- const plan=planSource(p,partition,personal);scorePulseGrid(plan,plan.barTicks);return plan;
 }
-export function planSource(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState):PracticePlan {
+/** A score without a reference tempo plans only with the player's own tempo. */
+export function planPractice(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState,playerTempo?:ReferencePerformanceTempo):PracticePlan {
+ const player=p.score.referencePerformanceTempo===undefined&&playerTempo?validateReferencePerformanceTempo(playerTempo):undefined;
+ if(!player)requireReferencePerformanceTempo(p.score);
+ requirePerformedGraceTiming(p);
+ const plan=planSource(p,partition,personal,player);scorePulseGrid(plan,plan.barTicks);return plan;
+}
+export function planSource(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState,playerTempo?:ReferencePerformanceTempo):PracticePlan {
  requirePianoCapability(p,'pianoPractice');
- const original=p,base=personal?planSource(p,partition):undefined;if(personal)p=personalPracticePackage(p,personal);
+ const original=p,base=personal?planSource(p,partition,undefined,playerTempo):undefined;if(personal)p=personalPracticePackage(p,personal);
  const bars=p.score.sourceBarTicks;if(!bars||bars.length<2||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||bars.some((b,i)=>!Number.isFinite(b)||(i>0&&b<=bars[i-1])))throw Error('This score has no complete written-measure map.');
  const barFor=(tick:number)=>Math.max(0,bars.findIndex((b,i)=>i<bars.length-1&&tick>=b&&tick<bars[i+1]));
  const ownerGroup=new Map<string,string>(),groups=new Map<string,Gesture>(),attacks=new Map<string,PracticeAttack>();
@@ -92,10 +100,10 @@ export function planSource(p:ScorePackage,partition:PracticePartition='bounded-e
   chunks.push({id:`${first+1}-${last+1}`,firstBar:first,lastBar:last,start,end,weight:weights.slice(first,last+1).reduce((sum,w,i)=>sum+w*(bars[first+i+1]-bars[first+i]),0),pattern,boundaryReasons:protectedAt(cut)});first=cut;
  }
 
- const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?undefined:validateReferencePerformanceTempo(p.score.referencePerformanceTempo),revision:p.manifest.revision,sourcePracticeIdentity:original.sourceRevision??original.manifest.revision,keyboardLayout:original.keyboardLayout,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
+ const plan:PracticePlan={partition,timeSignatures:structuredClone(p.score.timeSignatures),barPhaseTicks:sourceBarPhaseTicks(p.score,bars),referencePerformanceTempo:p.score.referencePerformanceTempo===undefined?playerTempo&&validateReferencePerformanceTempo(playerTempo):validateReferencePerformanceTempo(p.score.referencePerformanceTempo),...(p.score.referencePerformanceTempo===undefined&&playerTempo?{playerTempo:true as const}:{}),revision:p.manifest.revision,sourcePracticeIdentity:original.sourceRevision??original.manifest.revision,keyboardLayout:original.keyboardLayout,barTicks:[...bars],ticksPerBeat:p.score.ticksPerBeat,attacks:ordered,gestures,chunks,ownerGroup};
  if(boundaryProfile)for(const chunk of chunks)chunk.pattern=JSON.stringify({version:'bounded-piano-passage-v1',policyFingerprint:boundedPracticePolicyFingerprint,music:musicalSpanFact(plan,original.sourceScore??original.score,chunk,'piano')});
  registerPersonalPracticeIdentity(plan,original.score,p.score,base?.chunks??chunks.map(c=>({...c})));
- if(boundaryProfile){plan.boundaryProfile=boundaryProfile;plan.policyFingerprint=boundedPracticePolicyFingerprint;populatePracticeCatalog(plan,p.score);plan.legacyPlans={'fixed-four-v1':planSource(original,'fixed-four-v1',personal),'connection-boundary-v1':planSource(original,'connection-boundary-v1',personal)};}
+ if(boundaryProfile){plan.boundaryProfile=boundaryProfile;plan.policyFingerprint=boundedPracticePolicyFingerprint;populatePracticeCatalog(plan,p.score);plan.legacyPlans={'fixed-four-v1':planSource(original,'fixed-four-v1',personal,playerTempo),'connection-boundary-v1':planSource(original,'connection-boundary-v1',personal,playerTempo)};}
  registerPracticePatterns(plan,original.sourceScore??original.score,'piano');return plan;
 }
 export function practiceSectionId(section:Pick<PracticeChunk,'start'|'end'|'firstBar'|'lastBar'>,bars:readonly number[]){
@@ -202,7 +210,7 @@ export function migratePracticeState(raw:unknown,plan:PracticePassagePlan):Pract
 export function transferPracticeEdition(from:ScorePackage,raw:unknown,to:ScorePackage,toPersonal?:PersonalState):PracticeState {
  if(!from.sourceSha256||from.sourceSha256!==to.sourceSha256||from.sourceRevision!==to.sourceRevision||!from.keyboardLayout||from.keyboardLayout!==to.keyboardLayout)throw Error('Practice edition belongs to another source or keyboard; prior evidence retained.');
  if(!samePracticeEditionMusic(from,to))throw Error('Practice edition changes musical source facts, pitches or clock; prior evidence retained.');
- const oldPlan=planPractice(from,practicePartition(raw)),old=oldPlan.partition==='bounded-exercises-v1'?readPractice(raw,oldPlan):readPracticeLiteral(raw,oldPlan,true),plan=planPractice(to,'bounded-exercises-v1',toPersonal),next=initialPractice(plan);
+ const oldPlan=planPractice(from,practicePartition(raw),undefined,savedPlayerTempo(from.score,raw)),old=oldPlan.partition==='bounded-exercises-v1'?readPractice(raw,oldPlan):readPracticeLiteral(raw,oldPlan,true),plan=planPractice(to,'bounded-exercises-v1',toPersonal,savedPlayerTempo(to.score,raw)),next=initialPractice(plan);
  const full=(p:PracticePlan,score:ScorePackage['score'])=>musicalSpanFact(p,score,{id:'source',pattern:'source',start:0,end:p.barTicks.at(-1)!,firstBar:0,lastBar:p.barTicks.length-2,weight:1},'piano');
  if(full(oldPlan,from.sourceScore??from.score)!==full(plan,to.sourceScore??to.score))throw Error('Practice edition changes musical source facts; prior evidence retained.');
  const oldAll=passageHierarchy(oldPlan,old).all,newAll=passageHierarchy(plan,next).all,oldByEvidence=new Map([...oldAll.values()].flatMap(c=>{const evidence=practiceExerciseEvidenceKey(oldPlan,c);return evidence?[[evidence,c] as const]:[];}));
