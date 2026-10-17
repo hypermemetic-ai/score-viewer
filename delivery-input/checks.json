@@ -46,18 +46,18 @@
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/121", "observed": "Dev viewer, seeded clean origin, screenshots inspected: Zelda re-engraved with notice, practice, +1 transposition, keyboard switching; No. 14 opens as saved; Add It Up opens."},
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/122", "observed": "Dev viewer, clean profile: No. 13 MusicXML reader on both keyboards with graces, practice with Your tempo and grace sections, Save as PDF print DOM, transposition, Earlier editions, hand-lockout recovery."}
       ],
-      "limits": "The PR inspections were made at their own head revisions in development servers and are cited, not re-run here. Only check-pdf-export.mjs was run at this revision. MusicXML import in a release frontend, grace-note practice with MIDI and the native pick_score filter were not observed in a browser at this revision."
+      "limits": "The PR inspections were made in development servers before merge and are cited, not re-run here. PR 120's browser checks and its independent review were made at 9d21f08 on notation 8bb6fa2 with a test stand-in for the m. 32 hand, before its rebase onto 2b21840; its final update records only tests and build. Only check-pdf-export.mjs was run at this revision. MusicXML import in a release frontend, grace-note practice with MIDI and the native pick_score filter were not observed in a browser at this revision."
     },
     "independentReview": {
       "status": "passed",
       "sourceCommit": "e43456eb101edb474bdd7f3ded453180cd577080",
       "reviews": [
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/119", "verdict": "fresh-context sub-agent review; one medium finding (pitch-selection overwrite) fixed before merge"},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/120", "verdict": "fresh-context sub-agent review; no correctness bugs; three findings fixed before merge"},
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/120", "verdict": "fresh-context sub-agent review at 9d21f08, before the rebase onto 2b21840; no correctness bugs; three findings fixed before merge"},
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/121", "verdict": "fresh-context sub-agent review; findings 1-3 and 5-7 fixed before merge"},
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/122", "verdict": "fresh-context sub-agent review; no blockers; confirmed findings fixed in the last two commits before merge"}
       ],
-      "scope": "Each merged change was reviewed independently as recorded in its PR body; the merge commits combine them on main. The seal itself is reviewed separately in its delivery PR."
+      "scope": "PRs 119-122 each record a fresh-context independent review in their PR bodies. PRs 116, 117 and 118 also ship in this application revision but record no independent review of their own: 116 mentions follow-up review fixes without a recorded verdict, 117 is a notation pin whose upstream review is recorded in docs/source-provenance.json, and 118's fallback was removed and superseded by the reviewed 121. Their behaviour is covered by the complete test suite above. The seal itself is reviewed separately in its delivery PR."
     }
   }
 }
