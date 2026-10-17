@@ -689,9 +689,9 @@ async function openEarlierEdition(entry:Entry,op:ReadingOperation){
    onCommitStarted:()=>{op.running.state='installing';op.dialog?.setAttribute('aria-busy','true');const cancel=op.dialog?.querySelector<HTMLButtonElement>('[data-action="cancel-job"]');if(cancel)cancel.disabled=true;}});
   entries=result.entries;return result;
  });
- await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
+ await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:retained.package,personal:retained.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
  finishReading(op,true);
- notify('The calculated edition of this score can no longer be drawn, so it opened from its earlier edition with the score’s own hands. The calculated edition stays saved under Earlier editions.');
+ notify(`The calculated edition of this score can no longer be drawn, so it opened from its earlier edition with the score’s own hands. The calculated edition stays saved under Earlier editions.${unsaved}`);
 }
 
 async function chooseGuitarProTracks(inspection:GuitarProInspection,op:ReadingOperation):Promise<string[]|undefined>{

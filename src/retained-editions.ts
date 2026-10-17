@@ -32,7 +32,9 @@ export async function drawableEarlierEdition(host:{read(name:string):Promise<Uin
     let edition:RetainedEdition;
     // An undrawable edition is refused for every keyboard.
     try{edition=await prepareRetainedEdition(host,entry,file,layout);}catch(error){if((error as Error).message===UNDRAWABLE_CALCULATED_EDITION)break;continue;}
-    if(calculatedEdition(edition.package)||getScoreTransposition(edition.package)!==steps||!await opens(edition))break;
+    if(calculatedEdition(edition.package)||getScoreTransposition(edition.package)!==steps)break;
+    // Pages are laid out per keyboard, so another keyboard of this edition may still open.
+    if(!await opens(edition))continue;
     return edition;
   }
 }
