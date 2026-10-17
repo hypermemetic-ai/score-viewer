@@ -47,6 +47,15 @@ function playerFacing<V>(work:Promise<V>,message:string,key?:string):Promise<V>{
 }
 /** ISO's refusal for one struck key written as notes with a hand and notes without one. */
 const MIXED_KEY=/notes with a performing hand and notes without one/;
+const UNDRAWABLE_HAND_CHOICES="These hand choices can't be drawn on the page yet.";
+/** The notes whose personal hands the engraver could not fit, when that is the
+ * whole refusal. A mixed-hand key is excluded: its message asks the player to
+ * finish the key's hand, so that choice is part of an edit still in progress. */
+export function undrawableHandOwners(error:unknown):readonly string[]|undefined {
+ const cause=error instanceof Error?error.cause:undefined;
+ if(!(error instanceof Error)||error.message!==UNDRAWABLE_HAND_CHOICES||!(cause instanceof HandPresentationError)||cause.code!=='unsupported-fit'||MIXED_KEY.test(cause.message))return;
+ return cause.ownerIds?.length?cause.ownerIds:undefined;
+}
 /** A reader owns its package/wrapper/buffers and local last view. Shared cores
  * are captured, bounded and serialized; changed pages are never a paint shortcut. */
 export class PersonalPresentationSession {
@@ -84,7 +93,7 @@ export class PersonalPresentationSession {
   await ensureAnnotationInkPolicyReady(PERSONAL_ANNOTATION_INK_POLICY);checkReadingExecution(execution);
   const digest=await hashBytes(key);checkReadingExecution(execution);
   const result=await playerFacing(this.use((core,e)=>e?core.projectAsync(owners,digest,e):core.project(owners,digest),execution),
-   "These hand choices can't be drawn on the page yet.",
+   UNDRAWABLE_HAND_CHOICES,
    "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;

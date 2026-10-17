@@ -85,7 +85,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession} from './personal-presentation';
+import {PersonalPresentationSession,undrawableHandOwners} from './personal-presentation';
 import {PracticeClock} from './practice-clock';
 import {practiceAudio} from './host';
 import {readMidiMapping,readMidiBindings,type MidiBindings,type MidiMapping,type MidiCC,type MidiNote} from './midi';
@@ -285,11 +285,16 @@ async function savePersonal(){if(!current)return;const target=current,snapshot=s
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
 /** Painting follows accepted intent, never the completion order of host writes. */
 async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat){
- const editor=personalEditor(target),generation=++editor.generation;
+ const editor=personalEditor(target),generation=++editor.generation,before=target.personal;
  target.personal=personal;target.personal=resolveMemory(target);if(nextSeat&&current===target)selection=nextSeat;
- const next=target.personal;
+ let next=target.personal;
  capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!nextSeat||!!next.navigation?.followEdit);
- const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),projection=editor.session.project(next),navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
+ const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
+  attempted=next,projection=editor.session.project(next).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
+   if(editor.generation===generation)next=target.personal;
+   if(kept.notes)notify(kept.notes===1?'That hand can’t be drawn on the page yet, so the note keeps the hand it had.':'Those hands can’t be drawn on the page yet, so the notes keep the hands they had.');
+   return kept.view;}),
+  navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const ownerPractice=target===current&&practice instanceof PracticeView?practice:undefined,
   handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,ownerPractice.options.personal,note.id)!==handFor(target.package,next,note.id));
@@ -312,6 +317,30 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
   if(effectiveAssignmentKey(target.package,resolved)!==effectiveAssignmentKey(target.package,before))await presentPersonalChange(target,resolved,Promise.resolve());
   else{target.personal=resolved;editor.visiblePersonal=structuredClone(resolved);if(before.memoryResolved?.revision!==resolved.memoryResolved?.revision&&!practice){adviceKey='';renderToolbar();}}
  }).catch(error=>paintPersonalSaveError(target,error));
+}
+/** A hand choice the engraver can't fit yet is not kept: its notes return to
+ * the hand they had, as the player's own decision, so a saved choice can never
+ * stop the score from opening. Other refusals, and a choice whose notes had no
+ * hand to return to, still reach the player unchanged. `attempted` is the
+ * refused state; a note whose hand has changed since then is left as it is. */
+async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;notes:number}>{
+ const returned=new Set<string>();
+ for(let attempt=0;;attempt++){
+  const refused=undrawableHandOwners(error),seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
+  if(!refused||!seats.length||attempt>=3)throw error;
+  let changed=false;
+  for(const seat of seats){
+   const ownerId=seat.ownerIds.find(id=>refused.includes(id))!,refusedHand=handFor(target.package,attempted,ownerId);
+   if(handFor(target.package,target.personal,ownerId)!==refusedHand){changed=true;continue;}
+   const hand=hadHand(ownerId);if(!hand||hand===refusedHand)throw error;
+   const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});
+   target.personal=receipt.personal;target.personal=resolveMemory(target);for(const id of seat.ownerIds)returned.add(id);changed=true;
+   void receipt.saved.catch(saveError=>paintPersonalSaveError(target,saveError));
+  }
+  if(!changed)throw error;
+  attempted=target.personal;
+  try{return {view:await personalEditor(target).session.project(target.personal,execution),notes:returned.size};}catch(next){error=next;}
+ }
 }
 async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat){
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
@@ -597,7 +626,10 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  let clock:number|undefined,clockError:unknown;try{clock=await host.midiClock();}catch(error){clockError=error;}check();
  readingProgress(op,'Preparing your score for editing…');await paintCheckpoint(op.controller.signal);check();
  if(scoreCapabilities(next.package).pianoPreparation){next.personal=await personalMemory.loadPersonalCurrent(next.entry,next.package,async()=>rawMemoryPersonal(next.personal));check();next.personal=resolveMemory(next);}
- const nextEditor=personalEditor(next);await nextEditor.session.warm(readingExecution(op));check();nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op));resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
+ let keptHands=0;
+ const nextEditor=personalEditor(next);await nextEditor.session.warm(readingExecution(op));check();nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
+  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.notes;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
  op.running.state='installing';op.dialog?.setAttribute('aria-busy','true');
@@ -608,7 +640,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingPresentation=nextPresentation;readingViewError=nextViewError;
  if(rememberOpened){toolbarVisible=false;libraryMenu.selection.update(entries,next.entry.id);libraryMenu.selection.select(`score:${next.entry.id}`);preferences.lastWorkedEntryId=next.entry.id;}
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
- if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);
+ if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  if(ownsOperation)finishReading(op,true);void refreshLibrarySummaries();return next;
