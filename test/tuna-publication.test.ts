@@ -73,7 +73,7 @@ test('prepared static native reading needs neither reference-performance tempo, 
 
 test('future passive recipe preserves fixed pages; strict generation and active/malformed preparation remain rejected',async()=>{
  const bytes=await edit(dual,(_m,f)=>{const r=JSON.parse(strFromU8(f['rendering-recipe.json']));r.version='future-passive-v2';r.engineId='future-engine';r.options.newGeometry={kind:'passive'};f['rendering-recipe.json']=strToU8(JSON.stringify(r));});
- const p=await importPackage(bytes),old=await importPackage(dual);assert.deepEqual(p.pages,old.pages);assert.equal(p.generationAvailable,false);assert.throws(()=>validateScoreRenderingRecipe(p.renderingRecipe),/Unsupported/);assert.equal((await importPackage(dual)).generationAvailable,true);
+ const p=await importPackage(bytes),old=await importPackage(dual);assert.deepEqual(p.pages,old.pages);assert.throws(()=>validateScoreRenderingRecipe(p.renderingRecipe),/Unsupported/);
  const active=await edit(bytes,(_m,f)=>{const r=JSON.parse(strFromU8(f['rendering-recipe.json']));r.options.constructor='program';f['rendering-recipe.json']=strToU8(JSON.stringify(r));});await assert.rejects(importPackage(active),/passive data/);
  const invalid=await edit(bytes,(_m,f)=>{const r=JSON.parse(strFromU8(f['rendering-recipe.json']));delete r.baseline;f['rendering-recipe.json']=strToU8(JSON.stringify(r));});await assert.rejects(importPackage(invalid),/Unsupported/);
 });

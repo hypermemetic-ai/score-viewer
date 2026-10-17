@@ -2,9 +2,14 @@ import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} fr
 import {strFromU8,strToU8,unzipSync} from 'fflate';
 import type {QuantizedGridScore,PitchCoordinate,Hand} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
-import {hashBytes,importPackage,pianoPlanningScore,type ScorePackage} from './package';
-import {replayRetainedRecipeBaseline} from './piano-engraving-recipe';
-import {CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/score-presentation';
+import {hashBytes,importPackage,type ScorePackage} from './package';
+import {CALCULATED_HAND_SCORE_RENDERING_ENGINE,renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
+import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
+import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
+import {scoreWithCalculationContext,validatePianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
+import {archivePackage,handDigest,type Manifest} from './package';
+import {publishPackage} from './publication';
 import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {serializeCompatibleScore} from './score-serialization';
 import {requirePianoEvent} from './piano-event';
@@ -33,13 +38,27 @@ export function transpositionOwnerMap(p:ScorePackage):TranspositionOwner[]{
  return p.score.notes.map(event=>{const n=requirePianoEvent(event),sourceEvent=notes.get(n.id),source=sourceEvent?requirePitchedEvent(sourceEvent):undefined;if(!source)throw Error('Transpose has a stale selected owner.');
   return{id:n.id,pitch:linear(source.pitch),startTick:source.startTick,durationTicks:source.durationTicks,hand:n.hand};}).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
 }
+/** A transposed edition the viewer makes carries the score's own hands and no
+ * finger layer; a retained calculated one carries calculated hands. */
+export const sourceHandEdition=(p:ScorePackage)=>!p.calculatedHandReceipt&&!p.score.performingHandPresentation&&!p.score.notes.some(n=>n.derivedHand)&&
+ p.renderingRecipe?.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE;
+/** The original's own hands, keyed by the original pitches. */
+function sourceOwnerMap(p:ScorePackage):TranspositionOwner[]{
+ requirePianoCapability(p,'pianoPreparation');
+ return originalSource(p).notes.map(event=>{const n=requirePianoEvent(event),source=requirePitchedEvent(n);
+  if(n.hand!=='LH'&&n.hand!=='RH')throw Error('Transpose needs a hand on every note.');
+  return{id:n.id,pitch:linear(source.pitch),startTick:source.startTick,durationTicks:source.durationTicks,hand:n.hand};}).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+}
 export function scoreTranspositionCompatible(candidate:ScorePackage,selected:ScorePackage,keyboard:PhysicalKeyboardId):boolean {
  if(getOriginalScoreIdentity(candidate)!==getOriginalScoreIdentity(selected))return false;
  const baseline=selected.transposition?.originalArchiveSha256??selected.archiveSha256;
  if(!candidate.transposition)return candidate.archiveSha256===baseline;
- return candidate.transposition.originalArchiveSha256===baseline&&candidate.keyboardLayout===keyboard&&
-  candidate.preparationIdentity?.handPolicy==='retain-imported'&&
-  canonicalJson(candidate.calculationContext?.referencePerformanceTempo??candidate.sourceScore?.referencePerformanceTempo)===canonicalJson(selected.calculationContext?.referencePerformanceTempo??selected.sourceScore?.referencePerformanceTempo)&&
+ if(candidate.transposition.originalArchiveSha256!==baseline||candidate.keyboardLayout!==keyboard||
+  canonicalJson(candidate.calculationContext?.referencePerformanceTempo??candidate.sourceScore?.referencePerformanceTempo)!==canonicalJson(selected.calculationContext?.referencePerformanceTempo??selected.sourceScore?.referencePerformanceTempo))return false;
+ // A source-hand edition was admitted with the original's own hands. A
+ // retained calculated edition must match the hands now shown.
+ if(sourceHandEdition(candidate))return !!candidate.transposition.handMaps[keyboard];
+ return candidate.preparationIdentity?.handPolicy==='retain-imported'&&
   canonicalJson(candidate.transposition.handMaps[keyboard])===canonicalJson(transpositionOwnerMap(selected));
 }
 /** Every known absolute pitch location is handled explicitly. Unknown pitch or
@@ -90,34 +109,76 @@ export function scoreTranspositionRange(p:ScorePackage):{min:number;max:number}{
  const min=9-Math.min(...values),max=96-Math.max(...values);
  if(min>max)throw Error('This score cannot fit the piano range at a single offset.');return{min,max};
 }
-export async function admitTranspositionBaselineRecipe(p:ScorePackage,input?:ReadingExecution):Promise<void>{
- const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
- if(!p.renderingRecipe)throw Error('Transpose needs a matching rendering preparation for the original edition.');
- // The calculated baseline has already passed full cold source/paint replay.
- // Raw historical recipes still need their literal factory-adoption gate.
- if(p.renderingRecipe.engineId!==CALCULATED_HAND_SCORE_RENDERING_ENGINE)await replayRetainedRecipeBaseline(pianoPlanningScore(p),p.renderingRecipe,p.sourceSha256!,execution);
- checkReadingExecution(execution);
-}
 /** Serialization compatibility only: absent legacy discriminants remain
  * absent in frozen source bytes. Active transformed events stay canonical. */
-function transposedArchiveSource(original:ScorePackage,steps:number):{source:QuantizedGridScore;bytes:Uint8Array}{
+export function transposedArchiveSource(original:ScorePackage,steps:number):{source:QuantizedGridScore;bytes:Uint8Array}{
  const source=transposeScore(original.sourceScore??original.score,steps),path=(original.collectionManifest??original.manifest).sourceScore??'score.json';
  return {source,bytes:strToU8(serializeCompatibleScore(source,original.files[path]))};
 }
-export async function createScoreTransposition(p:ScorePackage,archive:Uint8Array,steps:number,keyboard:PhysicalKeyboardId){
- const original=p.transpositionOriginal??p;
- await admitTranspositionBaselineRecipe(original);
+/** The authority a transposed archive carries: its exact original archive,
+ * the edition it was made from and the owner hands for each keyboard. */
+async function transpositionEnvelope(original:ScorePackage,originalBytes:Uint8Array,selectedBytes:Uint8Array,steps:number,sourceBytes:Uint8Array,
+ handMaps:ScoreTransposition['handMaps']):Promise<ScoreTransposition>{
+ const content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:'transposition/original.isoscore',
+  originalArchiveSha256:await hashBytes(originalBytes),baselineLayout:original.keyboardLayout!,originalSourceSha256:original.sourceSha256!,selectedEditionSha256:await hashBytes(selectedBytes),steps,
+  effectiveSourceSha256:await hashBytes(sourceBytes),handMaps};
+ return{...content,sha256:await identityHash(content)} as ScoreTransposition;
+}
+/** Options only the retired calculated-hand engraving accepts. */
+const CALCULATED_ONLY_OPTIONS=['performingHandPolicy','sourceTransferSpacing','temporalAssociation','openingHeadMask'];
+
+/** Transpose the original score by whole steps without calculating anything.
+ * The new edition is engraved from the transposed source with the shared
+ * production rules, keeps the score's own hands on both keyboards and has no
+ * finger layer: an edition's fingerings belong to its pitches. The player's
+ * own choices are carried separately (transposed-personal). */
+export async function prepareSourceTransposition(selected:ScorePackage,selectedBytes:Uint8Array,steps:number,input?:ReadingExecution):Promise<Uint8Array>{
+ const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
+ requirePianoCapability(selected,'pianoPreparation');
+ if(!Number.isSafeInteger(steps))throw Error('Transpose needs a whole number of steps within the piano range.');
  if(steps===0)throw Error('Select the retained original edition to restore 0 steps.');
- // A transposed edition keeps the score's hands and calculates fingers; it never supplies a missing hand.
- const handless=p.score.notes.filter(n=>n.hand===undefined).length;
+ const original=selected.transpositionOriginal??selected,handless=originalSource(selected).notes.filter(n=>n.hand===undefined).length;
+ // Transposing never supplies a missing hand.
  if(handless)throw Error(`Transposing keeps the score's own hands, and ${handless===1?'one note has':`${handless} notes have`} none, so this score can't be transposed yet.`);
- const originalBytes=getOriginalScorePackageBytes(p)??new Uint8Array(archive),source=original.sourceScore??original.score,
-  prepared=transposedArchiveSource(original,steps),effective=prepared.source,sourceBytes=prepared.bytes,
-  map=transpositionOwnerMap(p),content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:'transposition/original.isoscore',
-   originalArchiveSha256:await hashBytes(originalBytes),baselineLayout:original.keyboardLayout!,originalSourceSha256:original.sourceSha256!,selectedEditionSha256:await hashBytes(archive),steps,
-   effectiveSourceSha256:await hashBytes(sourceBytes),handMaps:{[keyboard]:map}};
- const retained=p.transposition?.steps===steps&&canonicalJson(p.transposition.handMaps[keyboard])===canonicalJson(map)?p.transposition:undefined;
- return{envelope:retained?structuredClone(retained):{...content,sha256:await identityHash(content)} as ScoreTransposition,originalBytes,source:effective,sourceBytes};
+ const originalBytes=getOriginalScorePackageBytes(selected)??new Uint8Array(selectedBytes),originalManifest=original.collectionManifest??original.manifest,
+  {source,bytes:sourceBytes}=transposedArchiveSource(original,steps),sourceSha256=await hashBytes(sourceBytes);
+ // The working tempo moves with the score; it is not a pitch.
+ const context=selected.calculationContext?validatePianoCalculationContext({...selected.calculationContext,sourceSha256},sourceSha256,source):undefined,
+  planning=scoreWithCalculationContext(source,context,sourceSha256);
+ // Engraved afresh with the current engine. The original's own page and
+ // spacing settings carry over; its old pages need not reproduce.
+ const base=original.renderingRecipe,options=Object.fromEntries(Object.entries(base?.options??{}).filter(([key])=>!CALCULATED_ONLY_OPTIONS.includes(key)));
+ let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,
+  options:approvedProductionIsoOptions(options),tokens:base?.tokens??resolveIsoTokens({}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
+ let rendered;
+ try{rendered=await renderScorePresentationAsync(structuredClone(planning),recipe,execution??{});}
+ catch(error){if((error as Error).name==='AbortError')throw error;
+  throw Error(`This score can't be engraved cleanly ${steps>0?'+':''}${steps} steps away. The current score is retained.`,{cause:error});}
+ checkReadingExecution(execution);
+ recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
+ // Both keyboards read the same fixed pages; the score's hands are one map.
+ const layouts=[original.keyboardLayout!,...(['conventional-piano','janko-four-row'] as const).filter(id=>id!==original.keyboardLayout)],
+  score=context?strToU8(JSON.stringify(planning)):sourceBytes,revision=await hashBytes(score),effectiveHandSha256=await handDigest(source,planning),
+  map=sourceOwnerMap(original),files:Record<string,Uint8Array>={'source-score.json':sourceBytes,'score.json':score,'seats.json':strToU8(JSON.stringify(rendered.seats)),
+   'rendering-recipe.json':strToU8(JSON.stringify(recipe)),[originalManifest.font]:original.files[originalManifest.font],
+   ...Object.fromEntries(originalManifest.notices.map(name=>[name,original.files[name]])),'transposition/original.isoscore':originalBytes},
+  pages=rendered.pages.map((page,i)=>{const name=`pages/${i+1}.svg`;files[name]=strToU8(page);return name;});
+ if(original.referenceMidi)files['reference.mid']=original.referenceMidi;
+ const presentations:Manifest['presentations']={};
+ for(const layoutId of layouts){const profileId='publisher-fixed-pages-v1';
+  presentations[layoutId]={layoutId,score:'score.json',seats:'seats.json',pages:pages.slice(),renderingRecipe:'rendering-recipe.json',revision,profileId,
+   profileSha256:await hashBytes(JSON.stringify({kind:profileId,layoutId})),effectiveHandSha256,layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE};}
+ const primary=presentations[layouts[0]]!,
+  m:Manifest={format:'iso-score',version:2,scoreId:source.id,metadata:structuredClone(originalManifest.metadata),createdAt:new Date().toISOString(),
+   sourceScore:'source-score.json',sourceRevision:sourceSha256,sourceSha256,keyboardLayout:primary.layoutId,semanticSha256:revision,revision,
+   profileId:primary.profileId,profileSha256:primary.profileSha256,effectiveHandSha256,layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE,
+   pages:pages.slice(),renderingRecipe:'rendering-recipe.json',presentations,font:originalManifest.font,notices:originalManifest.notices.slice(),files:{},
+   transposition:await transpositionEnvelope(original,originalBytes,selectedBytes,steps,sourceBytes,Object.fromEntries(layouts.map(id=>[id,map]))),
+   ...(context?{calculationContext:context}:{}),...(original.referenceMidi?{referenceMidi:{file:'reference.mid' as const}}:{})};
+ m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
+ const checked=await importPackage(archivePackage(m,files),{allowLegacyTempo:true,...(execution?{execution}:{})});
+ checkReadingExecution(execution);
+ return (await publishPackage(checked)).bytes;
 }
 export async function admitScoreTransposition(raw:unknown,files:Record<string,Uint8Array>,effectiveBytes:Uint8Array,input?:ReadingExecution):Promise<{envelope:ScoreTransposition;original:ScorePackage}>{
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
@@ -135,7 +196,6 @@ export async function admitScoreTransposition(raw:unknown,files:Record<string,Ui
  const originalFiles=unzipSync(bytes,{filter:f=>{if(f.originalSize>20_000_000)throw Error('Oversized transpose baseline.');return f.name==='manifest.json';}}),manifest=JSON.parse(strFromU8(originalFiles['manifest.json']));
  if(manifest.transposition!==undefined)throw Error('A transpose baseline must be an untransposed original archive.');
  const original=await importPackage(bytes,{allowLegacyTempo:true,keyboardLayout:envelope.baselineLayout,...(execution?{execution}:{})});
- await admitTranspositionBaselineRecipe(original,execution);
  checkReadingExecution(execution);
  const reference=files['reference.mid'],priorReference=original.referenceMidi;
  if(!!reference!==!!priorReference||reference&&priorReference&&(reference.length!==priorReference.length||reference.some((b,i)=>b!==priorReference[i])))throw Error('Transpose reference bytes differ from its original archive.');

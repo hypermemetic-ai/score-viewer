@@ -63,17 +63,6 @@ test('imported review journal and protected physical row are admitted as source 
  const history=structuredClone(layer);(history.reviewedFingerAuthority as any).operatorUpdates[0].baselineReviewedFingerAuthority.constraints.pop();await assert.rejects(validateLayerAsync(history,after),/baseline authority digest mismatch/);
 });
 
-test('actual complete RR recalculation preserves all 34 reviewed choices, rows and linked profile admission',async()=>{
- const replies:any[]=[];(globalThis as any).self=globalThis;(globalThis as any).postMessage=(v:any)=>replies.push(v);await import('../src/planner.worker');
- await (globalThis as any).self.onmessage({data:{score:after.score,manifest:after.manifest,seed:layer,reviewedAuthority:authority}});
- const complete=replies.find(r=>r.type==='complete');assert.ok(complete,JSON.stringify(replies.at(-1)));await validateLayerAsync(complete.layer,after);
- assert.equal(complete.layer.profileSha256,after.profileSha256);assert.deepEqual(complete.layer.reviewedFingerAuthority,authority);
- for(const q of authority.constraints){const a=complete.layer.attacks.find((a:any)=>a.id===complete.layer.sourceOwnerToAttack[q.id]);assert.equal(a.hand,q.hand);assert.equal(a.finger,q.finger);if(q.row!==undefined)assert.equal(a.row,q.row);}
- const stale=structuredClone(layer);stale.attacks.find(a=>a.id===stale.sourceOwnerToAttack[review.changes[0].id])!.row=1;replies.length=0;
- await (globalThis as any).self.onmessage({data:{score:after.score,manifest:after.manifest,seed:stale,reviewedAuthority:authority}});
- assert.equal(replies.some(r=>r.type==='complete'),false);assert.match(replies.at(-1).message,/Seed differs from reviewed source contact/);
-});
-
 test('opt-in real-engine review is clean, retains pitch pages and changes only the two source-linked finger labels',async()=>{
  const original=await prepareFingeringStudio(bytes,{operatorReview:true}),corrected=await prepareFingeringStudio(result.publication.bytes,{operatorReview:true});
  for(const prepared of [original,corrected]){

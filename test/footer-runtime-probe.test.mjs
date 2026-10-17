@@ -13,17 +13,17 @@ const actualCover=(text,x,y,matrix)=>actualPageObstacles(`<svg xmlns="http://www
 // Synthetic receipts test validator admission. They do not assert macOS paint.
 function syntheticReceipt(){
  const sourceInputs={version:'test-source-bound'},bindings={version:footerProbeVersion,policySha256:semanticHash(ANNOTATION_INK_POLICY),metricsLiteral:FOOTER_METRICS_JSON,
-  fixture:{sha256:'a'.repeat(64),sourceSha256:'b'.repeat(64),ownerCount:6}},inputs={runtimeFontProbe:bindings,frontend:{digest:'c'.repeat(64)}};
+  fixture:{sha256:'a'.repeat(64),sourceSha256:'b'.repeat(64),ownerCount:6}},inputs={runtimeFontProbe:bindings,frontend:{digest:'c'.repeat(64),files:{'assets/footer-probe-calculated-edition.isoscore':{sha256:'e'.repeat(64),size:1}}}};
  const enclosure=(text,x,y,matrix)=>{const cover=actualCover(text,x,y,matrix),points=[[cover[0],cover[1]],[cover[2],cover[1]],[cover[0],cover[3]],[cover[2],cover[3]]];return{status:'passed',cover,points,rules};};
  const mounted=[.3,1,2.7].flatMap(zoom=>matrices.map(matrix=>({zoom,matrix,...enclosure('Page 2 of 3',575,830,matrix)}))),
   legacy={literal:'<svg>unchanged historical footer</svg>',bbox:[1,2,3,4],family:'"Liberation Serif", serif'},
-  workers=['conventional-piano','janko-four-row'].map(layout=>({layout,status:'ready',sourceSha256:bindings.fixture.sourceSha256,owners:6,seats:6,annotations:6,pages:1,footers:1,
+  views=['conventional-piano','janko-four-row'].map(layout=>({layout,status:'ready',sourceSha256:bindings.fixture.sourceSha256,owners:6,seats:6,annotations:6,pages:1,footers:1,
    footerEnclosures:[{page:0,text:'Page 1 of 1',x:575,y:830,matrix:matrices[0],literalSha256:'d'.repeat(64),...enclosure('Page 1 of 1',575,830,matrices[0])}],
-   preparationVersion:'viewer-piano-preparation-v3',receiptVersion:'viewer-calculated-hand-edition-v2',policySha256:bindings.policySha256,outputArchiveSha256:'e'.repeat(64),independentColdReader:true}));
- const result={version:footerProbeVersion,status:'passed',nonce:'0'.repeat(32),fixtureSha256:bindings.fixture.sha256,policySha256:bindings.policySha256,sourceSha256:bindings.fixture.sourceSha256,workers,mounted,
+   preparationVersion:'viewer-piano-preparation-v3',receiptVersion:'viewer-calculated-hand-edition-v2',policySha256:bindings.policySha256,editionSha256:'e'.repeat(64),coldReader:true}));
+ const result={version:footerProbeVersion,status:'passed',nonce:'0'.repeat(32),fixtureSha256:bindings.fixture.sha256,policySha256:bindings.policySha256,editionSha256:'e'.repeat(64),sourceSha256:bindings.fixture.sourceSha256,views,mounted,
   legacy:{status:'passed',before:legacy,after:structuredClone(legacy)},clearance:{distantOverlap:false,actualOverlap:true},ambiguity:{cacheRefused:true,readinessRefused:true},
-  availability:{cacheRefused:true,readinessRefused:true,workerStatus:'ready',independentReaderStatus:'unsupported',retainedSha256:bindings.fixture.sha256},
-  cancellation:{status:'cancelled',retainedSha256:bindings.fixture.sha256},platform:{userAgent:'Synthetic validator test'},
+  availability:{cacheRefused:true,readinessRefused:true,readerStatus:'unsupported',retainedSha256:'e'.repeat(64)},
+  cancellation:{status:'cancelled',retainedSha256:'e'.repeat(64)},platform:{userAgent:'Synthetic validator test'},
   limits:{hosting:'temporary loopback HTTP; not Tauri custom-origin/CSP',minimumOsAcceptance:false,physicalAcceptance:false}};
  return{inputs,sourceInputs,receipt:{version:footerProbeVersion,status:'passed',sourceInputs,bindings,frontendDigest:inputs.frontend.digest,
   host:{runtime:'WKWebView',os:'test OS',architecture:'arm64',nodeArchitecture:'x64',webkitVersion:'test framework version'},result}};
@@ -35,9 +35,9 @@ test('independent pinned-metric derivation matches actual production covers unde
 });
 test('runtime receipts reject inflated covers, missing actual-page enclosures, wrong rules, failed reader and unproved helper architecture',async()=>{
  await ensureAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);const s=syntheticReceipt();assert.equal(validateFooterRuntimeReceipt(s.receipt,s.inputs,s.sourceInputs),s.receipt,'Rosetta Node architecture may differ from independently recorded helper');
- for(const mutate of [r=>r.result.mounted[0].cover[0]-=100,r=>r.result.workers[0].footerEnclosures[0].cover[2]+=100,
-  r=>r.result.workers[0].footerEnclosures=[],r=>r.result.mounted[0].rules.fontSize='10.5px',r=>r.result.workers[1].status='cancelled',
-  r=>r.result.availability.independentReaderStatus='ready',r=>delete r.host.architecture,r=>delete r.host.webkitVersion,r=>r.result.legacy.after.bbox[0]+=1]){
+ for(const mutate of [r=>r.result.mounted[0].cover[0]-=100,r=>r.result.views[0].footerEnclosures[0].cover[2]+=100,
+  r=>r.result.views[0].footerEnclosures=[],r=>r.result.mounted[0].rules.fontSize='10.5px',r=>r.result.views[1].status='cancelled',
+  r=>r.result.availability.readerStatus='ready',r=>{r.result.editionSha256='f'.repeat(64);},r=>{r.result.cancellation.retainedSha256=r.result.fixtureSha256;},r=>delete r.host.architecture,r=>delete r.host.webkitVersion,r=>r.result.legacy.after.bbox[0]+=1]){
   const bad=structuredClone(s.receipt);mutate(bad);assert.throws(()=>validateFooterRuntimeReceipt(bad,s.inputs,s.sourceInputs),/Footer runtime proof/);
  }
 });

@@ -9,7 +9,7 @@ async function run(status:string,changed=false,wrongCollection=false){
  const entry={id:'source',file:'retained.isoscore',personalFiles:{journal:'original.json'}},data=new Uint8Array([1,2,3]),personal={overrides:{owner:{hand:'LH',finger:2}},history:['retained']};
  const p={availablePresentations:['janko-four-row'],manifest:{version:1},collection:'source'},q={status,package:p,personal,packageBytes:changed?new Uint8Array([1,2,4]):new Uint8Array(data)};
  const calls:string[]=[],op={keyboard:'janko-four-row'},context:any={
-  beginReading:()=>op,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
+  beginReading:()=>op,scoreCapabilities:()=>({pianoPreparation:true}),getScoreTransposition:()=>0,keyboardLabel:(layout:string)=>layout,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
   host:{read:async()=>data,fullscreen:async()=>{}},admitReading:async()=>p,assertSelectedTransposition(){},selectPresentation:async()=>p,
   loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>wrongCollection?'other':'source',
   installPreparedScore:async()=>{calls.push('install');if(wrongCollection)throw Error('Calculated score belongs to a different source.');return {entry,personal};},

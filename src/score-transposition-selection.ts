@@ -20,7 +20,7 @@ export function validTranspositionSelection(value:unknown,file:string,packages:r
 }
 
 /** Called while staging, never mutates the active collection or its pointer. */
-export function nextTranspositionSelection(entry:Entry,file:string,request?:{steps:number;layout:PhysicalKeyboardId;originalFile?:string;originalLayouts?:readonly PhysicalKeyboardId[]}):ScoreTranspositionSelection|undefined {
+export function nextTranspositionSelection(entry:Entry,file:string,request?:{steps:number;layout:PhysicalKeyboardId;layouts?:readonly PhysicalKeyboardId[];originalFile?:string;originalLayouts?:readonly PhysicalKeyboardId[]}):ScoreTranspositionSelection|undefined {
  if(!request&&!entry.transposition)return;
  const steps=request?.steps??entry.transposition!.steps;
  if(!offset(steps))throw Error('Invalid score transposition; previous edition retained.');
@@ -33,7 +33,10 @@ export function nextTranspositionSelection(entry:Entry,file:string,request?:{ste
  }
  if(request?.originalFile)for(const id of request.originalLayouts??[layout])editions['0'][id]??=request.originalFile;
  if(!packageName(file))throw Error('Invalid transposed archive identity; previous edition retained.');
- editions[String(steps)]={...editions[String(steps)],[layout]:file};
+ if(request?.layouts&&!request.layouts.includes(layout))throw Error('The transposed keyboard identity is missing; previous edition retained.');
+ // An edition serving both keyboards fills only a keyboard with no edition
+ // at this pitch yet; the other keyboard's retained edition stays selected.
+ const pitch={...editions[String(steps)]};for(const id of request?.layouts??[])pitch[id]??=file;pitch[layout]=file;editions[String(steps)]=pitch;
  return {version:'score-transposition-selection-v1',steps,editions};
 }
 

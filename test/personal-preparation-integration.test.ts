@@ -6,9 +6,8 @@ import {initialPersonal} from '../src/state';
 import {assigned} from '../src/personal-assignments';
 import {PersonalPresentationSession} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
-import {replayRetainedRecipeBaseline} from '../src/piano-engraving-recipe';
 import {calculatedRecipeForRequest,admitCalculatedHandEdition} from '../src/calculated-hand-edition';
-import {admitTranspositionBaselineRecipe,admitScoreTransposition} from '../src/score-transposition';
+import {admitScoreTransposition} from '../src/score-transposition';
 
 test('admitted source reopening shares preparation and retains exact cold projection and current buffers',async()=>{
  const {p,bytes}=await sourcePackage(transferStudy()),reopened=await importPackage(bytes),pool=new PersonalPreparationPool<any>(),
@@ -26,14 +25,10 @@ test('admitted source reopening shares preparation and retains exact cold projec
  assert.equal(pool.retained.entries,1);
 });
 
-test('foreground replay retains literal baseline hashes and all admission boundaries reject canceled execution',async()=>{
- const {p}=await sourcePackage(transferStudy()),execution={onCheckpoint:()=>{}};
- await replayRetainedRecipeBaseline(p.sourceScore!,p.renderingRecipe!,p.sourceSha256!,execution);
- const wrong=structuredClone(p.renderingRecipe!);wrong.baseline.pageSha256[0]='0'.repeat(64);
- await assert.rejects(replayRetainedRecipeBaseline(p.sourceScore!,wrong,p.sourceSha256!,execution),/does not reproduce/);
+test('all admission boundaries reject canceled execution',async()=>{
+ const {p}=await sourcePackage(transferStudy());
  const controller=new AbortController();controller.abort();const canceled={signal:controller.signal};
  await assert.rejects(calculatedRecipeForRequest(p,canceled),{name:'AbortError'});
- await assert.rejects(admitTranspositionBaselineRecipe(p,canceled),{name:'AbortError'});
  await assert.rejects(admitScoreTransposition(undefined,{},new Uint8Array(),canceled),{name:'AbortError'});
  await assert.rejects(admitCalculatedHandEdition(p,undefined,new Uint8Array(),undefined,canceled),{name:'AbortError'});
 });

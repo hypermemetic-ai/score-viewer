@@ -1,17 +1,17 @@
-import {normalizeLegacyScoreEvents} from '../vendor/iso-notation/src/model/musical-event';
+import {normalizeLegacyScoreEvents} from '../../vendor/iso-notation/src/model/musical-event';
 import {strToU8} from 'fflate';
-import {archivePackage,hashBytes,importPackage,type FingerLayer,type ScorePackage,type PresentationDescriptor} from './package';
-import {publishPackage} from './publication';
-import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
-import type {PassiveScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
-import {RR_TEMPORAL_LAYER_PLANNER} from '../vendor/iso-notation/src/model/rr-temporal-finger-layer';
-import {PIANO_ASSIGNMENT_VERSION} from '../vendor/iso-notation/src/model/piano-finger-assignments';
-import {createPianoPreparationIdentity} from './piano-preparation-identity';
-import type {PerformingHandPolicy} from './piano-request-authority';
-import type {CalculatedHandReceipt} from './calculated-hand-edition';
-import type {PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
+import {archivePackage,hashBytes,importPackage,type FingerLayer,type ScorePackage,type PresentationDescriptor} from '../../src/package';
+import {publishPackage} from '../../src/publication';
+import type {PhysicalKeyboardId} from '../../vendor/iso-notation/src/model/physical-keyboard';
+import type {PassiveScoreRenderingRecipe} from '../../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+import {RR_TEMPORAL_LAYER_PLANNER} from '../../vendor/iso-notation/src/model/rr-temporal-finger-layer';
+import {PIANO_ASSIGNMENT_VERSION} from '../../vendor/iso-notation/src/model/piano-finger-assignments';
+import {createPianoPreparationIdentity} from '../../src/piano-preparation-identity';
+import type {PerformingHandPolicy} from '../../src/piano-request-authority';
+import type {CalculatedHandReceipt} from '../../src/calculated-hand-edition';
+import type {PianoCalculationContext} from '../../vendor/iso-notation/src/model/piano-calculation-context';
 
-import type {ScoreTransposition} from './score-transposition';
+import type {ScoreTransposition} from '../../src/score-transposition';
 
 export interface PianoPresentationPayload {
   layoutId:PhysicalKeyboardId;sourceSha256:string;score:string;seats:string;pages:string[];

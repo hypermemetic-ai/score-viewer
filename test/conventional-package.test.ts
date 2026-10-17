@@ -1,30 +1,15 @@
 import {requirePianoEvent} from '../src/piano-event';
-import {validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
-import {publishPackage} from '../src/publication';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {strFromU8,strToU8,unzipSync} from 'fflate';
 import {archivePackage,hashBytes,importPackage,selectPresentation,validateLayerAsync,type Manifest} from '../src/package';
 import {collectionId,corrected,fingerFor,initialPersonal,installLayer,legacyPersonalStorageName,legacyPracticeStorageName,legacyPerformanceStorageName,personalStorageName,practiceStorageName,performanceStorageName,readPersonal} from '../src/state';
-import {packagePresentation} from '../src/package-presentation';
-import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-planning-input';
-import {validateConventionalFingerLayer} from '../vendor/iso-notation/src/model/conventional-finger-layer';
-// Archived v1 regeneration checks preserve its original compatibility contract;
-// they do not certify its positions against the corrected physical-action model.
-import {replayConventionalRoute} from '../vendor/iso-notation/src/model/conventional-piano-planner-legacy';
 
 const fixture=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url));
 const files=unzipSync(fixture),outer=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;
 const piano=await importPackage(fixture),janko=await selectPresentation(piano,'janko-four-row');
 const sourceSha='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27';
-async function prepared(){
- const input=normalizeHandPlanningInput(piano.sourceScore!),layer=await validateConventionalFingerLayer(piano.fingerLayer,input,{sourceHash:sourceSha,sourceBytesSha256:sourceSha,effectiveHands:Object.fromEntries(piano.score.notes.map(n=>[n.id,requirePianoEvent(n).hand]))});
- const byId=new Map(layer.attacks.map(a=>[a.id,a]));
- const routes=input.gestures.map(g=>({id:g.id,nominalCost:0,pattern:g.attacks.map(a=>byId.get(a.id)!.hand[0]).join(''),assignments:g.attacks.map(a=>{const q=byId.get(a.id)!;return{attackId:a.id,hand:q.hand,finger:q.finger,contact:q.contact};})}));
- const replay=replayConventionalRoute(input,routes);assert.equal(replay.valid,true);
- return{score:strFromU8(files['score.json']),seats:strFromU8(files['seats.json']),pages:piano.pages.slice(),layer,recipe:validateScoreRenderingRecipe(piano.renderingRecipe),sourceSha256:sourceSha,semanticSha256:piano.manifest.revision,effectiveHandSha256:piano.effectiveHandSha256!,allFive:true,lint:{violations:0,warnings:0},replay};
-}
 async function changed(change:(m:Manifest,f:Record<string,Uint8Array>)=>void|Promise<void>){
  const f=structuredClone(files);delete f['manifest.json'];const m=structuredClone(outer);await change(m,f);
  for(const [name,bytes]of Object.entries(f))m.files[name]=await hashBytes(bytes);
@@ -104,41 +89,4 @@ test('exact original RR v1 sidecar fallback is explicit and read-only, never inh
 test('historical version-one package keeps legacy paths and unsupported conventional view never migrates it',async()=>{
  const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});const s=initialPersonal(p);
  assert.equal(s.version,1);assert.equal(personalStorageName('original',p),'state-original.json');assert.equal(practiceStorageName('original',p),'practice-original.json');assert.equal(performanceStorageName('original',p),'performance-original.json');assert.equal(await selectPresentation(p,'janko-four-row'),p);await assert.rejects(selectPresentation(p,'conventional-piano'),/no conventional/);
-});
-test('archive rebuilding from either selected view preserves immutable source, companion bytes, frozen geometry and sidecar identity',async()=>{
- const result=await prepared();
- for(const selected of [piano,janko]){
-  const before=new Map(Object.entries(selected.files).map(([name,bytes])=>[name,bytes.slice()]));
-  const bytes=await packagePresentation(selected,result),p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row');
-  assert.equal(collectionId(p),collectionId(piano));assert.equal(p.manifest.revision,piano.manifest.revision);assert.deepEqual(p.score,piano.score);assert.deepEqual(p.seats,piano.seats);assert.deepEqual(p.pages,piano.pages);assert.deepEqual(p.fingerLayer!.attacks,piano.fingerLayer!.attacks);
-  assert.equal(p.fingerEligibility.eligible,true);assert.equal(personalStorageName('entry',p),personalStorageName('entry',piano));
-  for(const name of Object.keys(selected.files).filter(n=>n.startsWith('presentations/janko-four-row/')||n.startsWith('fonts/')||n.startsWith('notices/')||n==='source-score.json'))assert.deepEqual(p.files[name],before.get(name));
-  assert.deepEqual(rr.score,janko.score);assert.deepEqual(rr.pages,janko.pages);assert.deepEqual(rr.fingerLayer,janko.fingerLayer);
-  for(const [name,bytes]of before)assert.deepEqual(selected.files[name],bytes);
- }
- const bad={...result,sourceSha256:'0'.repeat(64)};await assert.rejects(packagePresentation(piano,bad),/different source/);
-});
-test('upgrading the original RR v1 surface retains exact fingers, authority and pages in a linked companion',async()=>{
- const originalFiles:Record<string,Uint8Array>={'score.json':files['presentations/janko-four-row/score.json'],'seats.json':files['presentations/janko-four-row/seats.json'],'fingers.json':files['presentations/janko-four-row/fingers.json']};
- for(const name of [outer.font,...outer.notices])originalFiles[name]=files[name];
- janko.pages.forEach((svg,i)=>originalFiles[`pages/${i+1}.svg`]=strToU8(svg));
- const m:Manifest={...janko.manifest,version:1,pages:outer.pages.slice(),files:Object.fromEntries(await Promise.all(Object.entries(originalFiles).map(async([name,bytes])=>[name,await hashBytes(bytes)])))};
- for(const key of ['sourceScore','sourceRevision','sourceSha256','keyboardLayout','profileId','profileSha256','effectiveHandSha256','renderingRecipe','presentations'] as const)delete m[key];
- const original=await importPackage(archivePackage(m,originalFiles)),rebuilt=await importPackage(await packagePresentation(original,await prepared())),rr=await selectPresentation(rebuilt,'janko-four-row');
- assert.deepEqual(rr.fingerLayer,original.fingerLayer);assert.deepEqual(rr.pages,original.pages);assert.deepEqual(rr.score,original.score);assert.deepEqual(rebuilt.files['source-score.json'],original.files['score.json']);assert.deepEqual(rebuilt.files['presentations/janko-four-row/fingers.json'],original.files['fingers.json']);
-});
-test('rebuilding a Jankó-primary v2 archive relocates its root assets before installing conventional roots',async()=>{
- const bytes=await changed((m,f)=>{
-  const d=structuredClone(m.presentations!['janko-four-row']!);f['score.json']=f[d.score];f['seats.json']=f[d.seats];f['fingers.json']=f[d.fingers!];
-  d.pages.forEach((name,i)=>f[`pages/${i+1}.svg`]=f[name]);d.score='score.json';d.seats='seats.json';d.fingers='fingers.json';d.pages=m.pages.slice();d.renderingRecipe='rendering-recipe.json';m.presentations={'janko-four-row':d};
-  Object.assign(m,{keyboardLayout:d.layoutId,revision:d.revision,semanticSha256:d.revision,engineVersion:d.engineVersion,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash});
- });
- const original=await importPackage(bytes),rebuilt=await importPackage(await packagePresentation(original,await prepared())),rr=await selectPresentation(rebuilt,'janko-four-row');
- assert.deepEqual(rr.score,original.score);assert.deepEqual(rr.pages,original.pages);assert.deepEqual(rr.fingerLayer,original.fingerLayer);assert.deepEqual(rebuilt.files['source-score.json'],original.files['source-score.json']);
-});
-test('presentation generation retains declared MIDI bytes and the complete companion exactly',async()=>{
- const midi=new Uint8Array([77,84,104,100,0,0,0,6,0,0,0,1,0,48,77,84,114,107,0,0,0,4,0,255,47,0]);
- const installed=(await publishPackage(piano,midi)).package,next=await packagePresentation(installed,await prepared()),p=await importPackage(next),rr=await selectPresentation(p,'janko-four-row');
- assert.deepEqual(p.referenceMidi,midi);assert.equal(p.collectionManifest!.files['reference.mid'],installed.collectionManifest!.files['reference.mid']);
- assert.deepEqual(rr.pages,janko.pages);assert.deepEqual(rr.score,janko.score);assert.deepEqual(rr.fingerLayer,janko.fingerLayer);assert.deepEqual(p.files['source-score.json'],installed.files['source-score.json']);
 });

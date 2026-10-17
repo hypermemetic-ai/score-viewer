@@ -5,7 +5,6 @@ import {svgClassStyles,resolvedSvgStyle} from '../src/svg-style';
 import {actualPageObstacles,boxesOverlap} from '../src/svg-annotation-clearance';
 import {unzipSync,strFromU8,strToU8} from 'fflate';
 import {hashBytes,importPackage,archivePackage} from '../src/package';import {ensurePianoReady} from '../src/piano-readiness';
-import {preparationRequestIdentity} from '../src/piano-preparation-identity';import {pianoRequestAuthority} from '../src/piano-request-authority';
 const css='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';
 const page=(attrs='',text='Page 2 of 3')=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${css}</style><text class="janko-page-num" x="575" y="830" ${attrs}>${text}</text></svg>`;
 test('independently verified pinned font cells reserve actual footer ink, allow distant air, and keep unknown typography conservative',async()=>{
@@ -43,18 +42,12 @@ test('altered face and metrics cannot supply font readiness or imported box auth
  const altered=face.slice();altered[100]^=1;await assert.rejects(verifyFooterAssets(altered),/exact bytes/);
  await assert.rejects(verifyFooterAssets(face,'{"glyphs":{"P":{"advance":1}}}'),/exact bytes/);
 });
-test('independently frozen V2/receiptV1 edition retains exact historical hash and drawing while NEW requests bind V3 ink policy',async()=>{
+test('independently frozen V2/receiptV1 edition retains exact historical hash and drawing',async()=>{
  const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url)));
  assert.equal(await hashBytes(bytes),'ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1');
  const p=await importPackage(bytes);assert.equal(p.preparationIdentity!.version,'viewer-piano-preparation-v2');assert.equal(p.calculatedHandReceipt!.version,'viewer-calculated-hand-edition-v1');
  assert.equal(annotationInkPolicyFor(p),undefined);
- const result=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',intent:'read-retained'});assert.equal(result.status,'editable');assert.deepEqual(result.packageBytes,bytes);
- const constraints=pianoRequestAuthority(p,p.sourceScore!,p.keyboardLayout!,p.fingerLayer,undefined,'calculate');
- assert.notEqual(await preparationRequestIdentity(p,'calculate',constraints,p.preparationIdentity!.maxExpansions),p.preparationIdentity!.requestSha256);
- const fresh=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano',maxExpansions:200_000});
- assert.equal(fresh.status,'editable','message' in fresh?fresh.message:undefined);if(fresh.status!=='editable')return;
- assert.equal(fresh.package.preparationIdentity!.version,'viewer-piano-preparation-v3');assert.equal(fresh.package.calculatedHandReceipt!.version,'viewer-calculated-hand-edition-v2');
- assert.deepEqual(annotationInkPolicyFor(fresh.package),ANNOTATION_INK_POLICY);assert.deepEqual(fresh.package.files['source-score.json'],p.files['source-score.json']);
+ const result=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano'});assert.equal(result.status,'editable');assert.deepEqual(result.packageBytes,bytes);
 });
 
 

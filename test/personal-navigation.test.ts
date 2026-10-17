@@ -1,5 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
+import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 const main=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),state=readFileSync(new URL('../src/state.ts',import.meta.url),'utf8'),selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
@@ -15,14 +16,14 @@ function fixture(basePages=2,projectedPages=basePages){
   PersonalPresentationSession:class{project(s:any){return project(structuredClone(s));}},
   personalStorageName:()=> 'source-journal',personalContext:async(owner:any)=>({entry:owner.entry,p:owner.package,file:'source-journal'}),
   enqueue(fn:()=>Promise<any>){const pending=persist.then(fn);persist=pending.then(()=>{},()=>{});return pending;},
-  writeJson:async(_file:string,s:any)=>{disk=structuredClone(s);writes.push(structuredClone(s));},loadPersonalJournal:async()=>structuredClone(disk),host:{},rebindPersonalPresentation:(s:any)=>s,
+  writeJson:async(_file:string,s:any)=>{disk=structuredClone(s);writes.push(structuredClone(s));},loadPersonalJournal:async()=>structuredClone(disk),host:{},
   assigned(_p:any,s:any,owner:any,choice:any){const next=structuredClone(s),id=owner.ownerIds[0];next.choices[id]={...next.choices[id],...choice};return next;},
   editUnits:(view:any)=>[...view.seats],viewportFit:(_w:any,_h:any,v:any)=>({pages:[v.page]}),effectiveView:(v:any)=>v,innerWidth:1280,innerHeight:720,
   renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},paintPersonalSaveError(_owner:any,e:any){errors.push(e);},notify(){},practice:undefined,readingPresentation:undefined,ManualPracticeView:class{},readingViewError:undefined};
  personalMemoryBoundary(context,()=>disk,async(s,kind)=>{disk=structuredClone(s);if(kind==='navigation')writes.push(structuredClone(s));});
  runInNewContext(body(state,'export function readPersonal(','export const activeLayer='),context);
  runInNewContext(body(main,'function personalEditor(','function paintPersonalSaveError('),context);
- runInNewContext(body(main,'async function savePersonal(','\nfunction labelMode('),context);
+ runInNewContext(body(main,'async function savePersonal(','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
  runInNewContext(body(main,'async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
  runInNewContext(body(selection,'export function selectionOnPage(','/** Navigate the printed systems'),context);
  return {context,target,p,projected,seats,writes,frames,errors,get disk(){return disk;},get editor(){return context.personalEditor(target);},setProject(fn:(s:any)=>Promise<any>){project=fn;},cold(){const loaded=context.readPersonal(disk,p);context.resolvePersonalNavigation(loaded,projected);return loaded;}};
@@ -77,14 +78,4 @@ test('source-empty pages retain numeric fallback and malformed optional navigati
  const f=fixture(5,6),s=structuredClone(f.target.personal);f.projected.pages.push('<svg/>');s.view.page=6;f.context.capturePersonalNavigation(s,f.projected,undefined,false);delete s.navigation.edit;
  const admitted=f.context.readPersonal(s,f.p);f.context.resolvePersonalNavigation(admitted,f.projected);assert.equal(admitted.view.page,6);
  for(const navigation of [null,{version:1,followEdit:true,page:{owners:['foreign'],actionId:'foreign',writtenBar:1,alias:0,continuation:false}},[]]){const raw={...s,navigation},before=JSON.stringify(raw),loaded=f.context.readPersonal(raw,f.p);assert.equal(loaded.navigation,undefined);assert.deepEqual(loaded.choices,s.choices);assert.equal(JSON.stringify(raw),before);}
-});
-test('an explicit calculated edition carries validated navigation without changing the personal source binding',async()=>{
- const {initialPersonal,readPersonal}=await import('../src/state'),{personalForCalculatedEdition}=await import('../src/presentation-install');
- const f=fixture(5,6),from:any={...f.p,manifest:{version:2,revision:'b'.repeat(64)},sourceRevision:'a'.repeat(64),sourceSha256:'a'.repeat(64),keyboardLayout:'conventional-piano',profileId:'profile',profileSha256:'c'.repeat(64),effectiveHandSha256:'d'.repeat(64)},
-  attacks=from.score.notes.map((n:any,i:number)=>({id:from.seats[i].actionId,pitch:60+i,startTick:i*24,hand:'RH',finger:1,owners:[{id:n.id}]}));
- from.fingerLayer={version:'piano-finger-assignments-v1',layoutId:from.keyboardLayout,profileId:from.profileId,profileSha256:from.profileSha256,plannerVersion:'fixture',sourceHash:from.sourceSha256,attacks,sourceOwnerToAttack:Object.fromEntries(attacks.map((a:any)=>[a.owners[0].id,a.id]))};
- const personal=initialPersonal(from);personal.view.page=4;f.context.capturePersonalNavigation(personal,from,from.seats[1],true);personal.navigation=structuredClone(personal.navigation);
- const before=structuredClone(personal),to=structuredClone(from);to.manifest.revision='e'.repeat(64);to.effectiveHandSha256='f'.repeat(64);to.fingerLayer.attacks[0].hand='LH';
- const transferred=personalForCalculatedEdition(personal,from,to);assert.deepEqual(transferred.navigation,personal.navigation);assert.deepEqual(readPersonal(transferred,to),transferred);assert.deepEqual(personal,before);assert.equal(transferred.binding!.sourceRevision,personal.binding!.sourceRevision);
- assert.throws(()=>personalForCalculatedEdition(personal,from,{...to,sourceSha256:'f'.repeat(64)}),/another musical source/);
 });

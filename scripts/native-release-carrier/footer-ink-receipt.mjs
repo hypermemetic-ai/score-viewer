@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-export const footerProbeVersion='viewer-native-footer-ink-probe-v1';
+export const footerProbeVersion='viewer-native-footer-ink-probe-v2';
 export const footerProbeReceipt='native-validation/footer-ink/receipt.json';
 const canonical=v=>JSON.stringify(v&&typeof v==='object'?Array.isArray(v)?v.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(canonical(v[k]))])):v);
 export const semanticHash=v=>createHash('sha256').update(canonical(v)).digest('hex');
@@ -37,13 +37,14 @@ export function validateFooterRuntimeReceipt(receipt,inputs,sourceInputs){
  const r=receipt.result;
  if(r?.version!==footerProbeVersion||r.status!=='passed'||typeof r.nonce!=='string'||r.nonce.length!==32||r.fixtureSha256!==expected.fixture.sha256||
   r.policySha256!==expected.policySha256||r.sourceSha256!==expected.fixture.sourceSha256||
-  !Array.isArray(r.workers)||r.workers.length!==2||!Array.isArray(r.mounted)||r.mounted.length!==9)fail('Actual runtime source/cases differ');
+  !sha(r.editionSha256)||!Object.values(inputs.frontend.files??{}).some(f=>f?.sha256===r.editionSha256)||
+  !Array.isArray(r.views)||r.views.length!==2||!Array.isArray(r.mounted)||r.mounted.length!==9)fail('Actual runtime source/cases differ');
  for(const layout of ['conventional-piano','janko-four-row']){
-  const q=r.workers.filter(q=>q.layout===layout);if(q.length!==1)fail('Missing/duplicated ordinary worker layout');const w=q[0];
+  const q=r.views.filter(q=>q.layout===layout);if(q.length!==1)fail('Missing/duplicated saved keyboard view');const w=q[0];
   if(!['ready','editable'].includes(w.status)||w.sourceSha256!==expected.fixture.sourceSha256||w.owners!==expected.fixture.ownerCount||
    !Number.isSafeInteger(w.seats)||w.seats<w.owners||w.annotations!==w.seats||!Number.isSafeInteger(w.pages)||w.pages<1||w.footers!==w.pages||
    w.preparationVersion!=='viewer-piano-preparation-v3'||w.receiptVersion!=='viewer-calculated-hand-edition-v2'||w.policySha256!==expected.policySha256||
-   !sha(w.outputArchiveSha256)||w.independentColdReader!==true||!Array.isArray(w.footerEnclosures)||w.footerEnclosures.length!==w.pages)fail('Ordinary worker/independent reader did not pass');
+   w.editionSha256!==r.editionSha256||w.coldReader!==true||!Array.isArray(w.footerEnclosures)||w.footerEnclosures.length!==w.pages)fail('Saved edition cold reader did not pass');
   for(const [page,q]of w.footerEnclosures.entries()){
    if(q.page!==page||q.text!==`Page ${page+1} of ${w.pages}`||!sha(q.literalSha256))fail('Returned-page footer identity differs');
    validateEnclosure(q,expectedFooterCover(expected.metricsLiteral,q.text,q.x,q.y,q.matrix));
@@ -58,9 +59,9 @@ export function validateFooterRuntimeReceipt(receipt,inputs,sourceInputs){
   !Array.isArray(r.legacy.before.bbox)||r.legacy.before.bbox.length!==4||!r.legacy.before.bbox.every(Number.isFinite)||
   !r.legacy.before.family?.includes('Liberation Serif')||r.legacy.before.family.includes('Viewer Calculated Footer Serif'))fail('Actual historical drawing changed');
  if(r.clearance?.distantOverlap!==false||r.clearance.actualOverlap!==true||r.ambiguity?.cacheRefused!==true||r.ambiguity.readinessRefused!==true||
-  r.availability?.cacheRefused!==true||r.availability.readinessRefused!==true||!['ready','editable'].includes(r.availability.workerStatus)||
-  r.availability.independentReaderStatus!=='unsupported'||r.availability.retainedSha256!==expected.fixture.sha256||
-  r.cancellation?.status!=='cancelled'||r.cancellation.retainedSha256!==expected.fixture.sha256||
+  r.availability?.cacheRefused!==true||r.availability.readinessRefused!==true||
+  r.availability.readerStatus!=='unsupported'||r.availability.retainedSha256!==r.editionSha256||
+  r.cancellation?.status!=='cancelled'||r.cancellation.retainedSha256!==r.editionSha256||
   r.limits?.hosting!=='temporary loopback HTTP; not Tauri custom-origin/CSP'||r.limits.minimumOsAcceptance!==false||r.limits.physicalAcceptance!==false||
   typeof r.platform?.userAgent!=='string'||!r.platform.userAgent)fail('Clearance/refusal/retention/runtime limits differ');
  return receipt;

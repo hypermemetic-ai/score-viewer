@@ -30,7 +30,7 @@ const sameBytes=(a:Uint8Array|null,b:Uint8Array|null)=>a===b||!!a&&!!b&&a.length
 /** Called during the guarded installation stage, before context admission and
  * the final library pointer. The source/current journal is never overwritten. */
 export async function stagePracticeEditionTransfer(host:PracticeInstallHost,request:{entryId:string;from:ScorePackage;to:ScorePackage;personal?:PersonalState;canCommit?:()=>boolean}):Promise<{transferred:boolean;key?:string;state?:PracticeState}> {
- const {from,to,entryId,personal}=request,check=()=>{if(request.canCommit&&!request.canCommit())throw Error('Calculation is no longer active; prior practice journals retained.');};check();
+ const {from,to,entryId,personal}=request,check=()=>{if(request.canCommit&&!request.canCommit())throw Error('Saving was cancelled; prior practice journals retained.');};check();
  if(!from.keyboardLayout||!to.keyboardLayout||!from.sourceSha256||from.sourceSha256!==to.sourceSha256||from.sourceRevision!==to.sourceRevision||from.keyboardLayout!==to.keyboardLayout||getScoreTransposition(from)!==getScoreTransposition(to))return {transferred:false};
  if(collectionId(from)!==entryId||collectionId(to)!==entryId)throw Error('Practice storage belongs to another source collection; journals retained.');
  const sourceKey=practiceStorageName(entryId,from),targetKey=practiceStorageName(entryId,to);
@@ -40,9 +40,9 @@ export async function stagePracticeEditionTransfer(host:PracticeInstallHost,requ
  const targetBytes=await host.read(targetKey);check();
  const parsed=(bytes:Uint8Array)=>JSON.parse(new TextDecoder().decode(bytes)) as unknown,
   incoming=transferPracticeEdition(from,parsed(rawBytes),to,personal),state=mergeEditionPractice(targetBytes?parsed(targetBytes):undefined,incoming,to,personal);
- check();const currentSource=await host.read(sourceOrigin);check();if(!sameBytes(rawBytes,currentSource))throw Error('Source practice journal changed during calculation; saved progress retained.');
- const currentTarget=await host.read(targetKey);check();if(!sameBytes(targetBytes,currentTarget))throw Error('Target practice journal changed during calculation; saved progress retained.');
+ check();const currentSource=await host.read(sourceOrigin);check();if(!sameBytes(rawBytes,currentSource))throw Error('Source practice journal changed while saving; saved progress retained.');
+ const currentTarget=await host.read(targetKey);check();if(!sameBytes(targetBytes,currentTarget))throw Error('Target practice journal changed while saving; saved progress retained.');
  await host.write(targetKey,new TextEncoder().encode(JSON.stringify(state)));check();
- if(!sameBytes(rawBytes,await host.read(sourceOrigin)))throw Error('Source practice journal changed during calculation; saved progress retained.');check();
+ if(!sameBytes(rawBytes,await host.read(sourceOrigin)))throw Error('Source practice journal changed while saving; saved progress retained.');check();
  return {transferred:true,key:targetKey,state};
 }

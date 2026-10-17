@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
+import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 
@@ -43,7 +44,7 @@ function fixture(){
   currentFingerPresentation:()=> 'annotations',preferences:{keyboardLayout:'conventional-piano'},musicalSustain:{snapshot:()=>({})},midiConnection:undefined,connectMidi(){},disconnectMidi(){},settings(){},entries:[target.entry],practiceSummaries:{record:()=>false},paintLibrarySummaries(){},render(){}};
  personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await save(s);disk=structuredClone(s);});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
- runInNewContext(body('async function commitPersonal(','\nfunction labelMode('),context);
+ runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
  runInNewContext(body('async function retryPersonalEdits(','const personalFile='),context);
  runInNewContext(body('async function startPractice(','\nasync function act('),context);
  return {context,target,old,p,snapshot,settings,evidence,preparations,mounts,writes,errors,readerPaints,get editor(){return context.personalEditor(target);},

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
+import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 
@@ -33,10 +34,10 @@ function fixture(){
   editUnits:()=>seats,viewportFit:()=>({pages:[0]}),innerWidth:1280,innerHeight:720,effectiveView:(v:any)=>v,
   renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},practice:undefined,
   paintPersonalSaveError(_owner:any,error:Error){errors.push(error);},notify(message:string){messages.push(message);},
-  loadPersonalJournal:async()=>structuredClone(disk),host:{},rebindPersonalPresentation:(s:any)=>s};
+  loadPersonalJournal:async()=>structuredClone(disk),host:{}};
  const navigationWrites:any[]=[];personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await write(s);else{disk=structuredClone(s);navigationWrites.push(structuredClone(s));}});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
- runInNewContext(body('async function commitPersonal(','\nfunction labelMode('),context);
+ runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
  runInNewContext(body('async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
  return {context,target,seats,written,navigationWrites,frames,errors,messages,get disk(){return disk;},get editor(){return context.personalEditor(target);},
   setWrite(fn:(s:any)=>any){write=fn;},setProject(fn:(s:any)=>Promise<any>){project=fn;},writeDefault(s:any){disk=structuredClone(s);written.push(structuredClone(s));}};
