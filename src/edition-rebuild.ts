@@ -1,7 +1,9 @@
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
-import {hashBytes,importPackage,readEditionContent,selectPresentation,type ScorePackage} from './package';
+import {archivePackage,handDigest,hashBytes,importPackage,readEditionContent,selectPresentation,FIXED_PAGES_PROFILE,type Manifest,type PresentationDescriptor,type ScorePackage} from './package';
+import {publishPackage} from './publication';
+import {CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/score-presentation';
 import {engraveEdition,getOriginalScorePackageBytes,getScoreTransposition,type EditionView} from './score-transposition';
 import {checkReadingExecution,capturedReadingExecution,type ReadingExecution} from './reading-execution';
 import {requirePianoCapability} from './score-capabilities';
@@ -72,7 +74,11 @@ export interface RebuiltEdition {
 export async function rebuildEdition(bytes:Uint8Array,options:{original?:{package:ScorePackage;bytes:Uint8Array};
  /** Thrown instead when the edition's content itself can't be read: only
   * pages that no longer reproduce are a reason to engrave again. */
- refusal?:unknown}={},input?:ReadingExecution):Promise<RebuiltEdition>{
+ refusal?:unknown;
+ /** An early-format edition whose pages carry nothing made for one keyboard
+  * layout keeps them: both layouts show its existing pages, and nothing is
+  * engraved (linkEarlyEdition). */
+ keepPages?:boolean}={},input?:ReadingExecution):Promise<RebuiltEdition>{
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError'||options.refusal===undefined)throw error;throw options.refusal;},
   content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),manifest=content.collectionManifest??content.manifest;
@@ -83,6 +89,11 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
   planning=scoreWithCalculationContext(source,manifest.calculationContext,sourceSha256),earlier:RebuiltEdition['earlier']={},
   primary=content.keyboardLayout!,layouts=[primary,...KEYBOARDS.filter(id=>id!==primary)],views:EditionView[]=[];
  for(const id of content.availablePresentations??[])earlier[id]=await selectPresentation(content,id);
+ if(options.keepPages&&manifest.version===1&&layoutNeutralPages(content)){
+  const linked=await linkEarlyEdition(content,true).catch(async error=>{if((error as Error).name==='AbortError')throw error;return undefined;}),
+   kept=linked??await linkEarlyEdition(content,false);checkReadingExecution(execution);
+  return{bytes:kept,earlier,fellBack:[],droppedFingers:linked||!content.fingerLayer?[]:[primary],replaced:{[await packageFile(bytes)]:await packageFile(kept)},primary};
+ }
  for(const layout of layouts){
   const view=earlier[layout];
   let score:QuantizedGridScore;try{score=view?plainHandScore(planning,view.score):views[0].score;}catch(error){return refuse(error);}
@@ -112,6 +123,66 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
   refusal:"This saved edition can't be engraved again with the current engraving. It stays saved."},execution);
  replaced[await packageFile(bytes)]=await packageFile(engraved.bytes);
  return{bytes:engraved.bytes,earlier,fellBack:engraved.fellBack,droppedFingers:engraved.droppedFingers,replaced,primary,...(originalRebuilt?{original:originalRebuilt}:{})};
+}
+
+/** Whether a view's pages carry nothing made for its keyboard layout. ISO
+ * notation draws the same pages for every layout (the engine takes no layout),
+ * and the reader draws fingers at the seats, so a view's pages serve either
+ * layout unless its hands were calculated for its own layout. A piano
+ * preparation bound to a view is not ink: the shared view has none. */
+export function layoutNeutralPages(view:ScorePackage):boolean{
+ const m=view.manifest;
+ return !view.score.performingHandPresentation&&!view.score.notes.some(n=>n.derivedHand)&&m.engineVersion!==CALCULATED_HAND_SCORE_RENDERING_ENGINE&&
+  !m.calculatedHandReceipt&&!view.calculatedHandReceipt;
+}
+/** A view that shows `from`'s pages, seats and hands on `layout`, without
+ * `from`'s finger layer: fingerings made for one layout stay with it. */
+async function sharedPresentation(from:PresentationDescriptor,layout:PhysicalKeyboardId,sourceSha256:string):Promise<PresentationDescriptor>{
+ return{layoutId:layout,score:from.score,seats:from.seats,pages:from.pages.slice(),...(from.renderingRecipe?{renderingRecipe:from.renderingRecipe}:{}),revision:from.revision,
+  profileId:FIXED_PAGES_PROFILE,profileSha256:await hashBytes(JSON.stringify({kind:FIXED_PAGES_PROFILE,layoutId:layout})),effectiveHandSha256:from.effectiveHandSha256,
+  layerSourceHash:sourceSha256,engineVersion:from.engineVersion,...(from.calculationContext!==undefined?{calculationContext:structuredClone(from.calculationContext)}:{})};
+}
+const admitShared=async(m:Manifest,files:Record<string,Uint8Array>)=>
+ (await publishPackage(await importPackage(archivePackage(m,files),{allowLegacyTempo:true}))).bytes;
+/** An early-format edition as a linked edition with the same pages for both
+ * keyboard layouts. Its notes (`score.json`) become its source, its Jankó view
+ * keeps every page, seat and its finger layer (with `fingers`), and the
+ * conventional view shows the same pages without that layer. Nothing is
+ * engraved; the earlier archive is not changed. */
+async function linkEarlyEdition(early:ScorePackage,fingers:boolean):Promise<Uint8Array>{
+ const m1=early.manifest,sha=m1.semanticSha256,files:Record<string,Uint8Array>={};
+ for(const [name,bytes]of Object.entries(early.files))if(name!=='manifest.json'&&(fingers||name!=='fingers.json'))files[name]=bytes;
+ files['source-score.json']=early.files['score.json'];
+ const layer=fingers?early.fingerLayer:undefined,
+  profileId=typeof layer?.profileId==='string'?layer.profileId:FIXED_PAGES_PROFILE,
+  profileSha256=typeof layer?.profileSha256==='string'?layer.profileSha256:await hashBytes(JSON.stringify({kind:profileId,layoutId:'janko-four-row'})),
+  janko:PresentationDescriptor={layoutId:'janko-four-row',score:'score.json',seats:'seats.json',...(layer?{fingers:'fingers.json'}:{}),pages:m1.pages.slice(),revision:m1.revision,
+   profileId,profileSha256,effectiveHandSha256:await handDigest(early.score,early.score),layerSourceHash:layer?m1.layerSourceHash??sha:sha,engineVersion:m1.engineVersion},
+  m:Manifest={...structuredClone(m1),version:2,sourceScore:'source-score.json',sourceRevision:sha,sourceSha256:sha,keyboardLayout:'janko-four-row',
+   profileId,profileSha256,effectiveHandSha256:janko.effectiveHandSha256,layerSourceHash:janko.layerSourceHash,
+   presentations:{'janko-four-row':janko,'conventional-piano':await sharedPresentation(janko,'conventional-piano',sha)},files:{}};
+ m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
+ return admitShared(m,files);
+}
+/** Whether `selected` can show `layout` with pages it already has, without
+ * engraving: an early-format edition, or a linked one at its original pitch,
+ * whose pages carry nothing made for one layout. */
+export function canShareKeyboardView(selected:ScorePackage,layout:PhysicalKeyboardId):boolean{
+ const manifest=selected.collectionManifest??selected.manifest;
+ if(selected.availablePresentations?.includes(layout)||getScoreTransposition(selected)||!layoutNeutralPages(selected))return false;
+ return manifest.version===1||manifest.version===2&&!!manifest.sourceScore&&!!selected.sourceSha256&&!!selected.keyboardLayout&&!!manifest.presentations?.[selected.keyboardLayout];
+}
+/** Give a linked edition a keyboard layout it lacks by showing the selected
+ * view's own pages there. Nothing is engraved and its own views stay
+ * byte-identical, so their journals and practice need no carrying. (An
+ * early-format edition is linked first: rebuildEdition with keepPages.) */
+export async function shareKeyboardView(selected:ScorePackage,layout:PhysicalKeyboardId):Promise<Uint8Array>{
+ const manifest=selected.collectionManifest??selected.manifest;
+ if(manifest.version!==2||!canShareKeyboardView(selected,layout))throw Error('These pages can\'t serve another keyboard layout as they are.');
+ const m=structuredClone(manifest),files:Record<string,Uint8Array>={};
+ for(const [name,bytes]of Object.entries(selected.files))if(name!=='manifest.json')files[name]=bytes;
+ m.presentations![layout]=await sharedPresentation(manifest.presentations![selected.keyboardLayout!]!,layout,selected.sourceSha256!);
+ return admitShared(m,files);
 }
 
 /** Everything installing a re-engraved edition needs, for one keyboard. */
@@ -144,9 +215,11 @@ export async function prepareRebuiltEdition(host:{read(name:string):Promise<Uint
  /** The journal map the earlier edition used; defaults to the entry's record of `file`. */
  personalFiles?:Record<string,string>;
  admit?:(bytes:Uint8Array)=>Promise<ScorePackage>;
+ /** See rebuildEdition. */
+ keepPages?:boolean;
 }={},input?:ReadingExecution):Promise<RebuiltInstall>{
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
- const rebuilt=await rebuildEdition(bytes,{original:options.original,refusal:options.refusal},execution),earliest=rebuilt.earlier[rebuilt.primary]!;
+ const rebuilt=await rebuildEdition(bytes,{original:options.original,refusal:options.refusal,keepPages:options.keepPages},execution),earliest=rebuilt.earlier[rebuilt.primary]!;
  if(collectionId(earliest)!==entry.id)throw Error('The saved edition belongs to another score. Every edition is retained.');
  const admitted=await (options.admit??(b=>importPackage(b,{allowLegacyTempo:true,...(execution?{execution}:{})})))(rebuilt.bytes);checkReadingExecution(execution);
  const journals=(name:string)=>(name===entry.file?entry.personalFiles:entry.editionPersonalFiles?.[name])??{},

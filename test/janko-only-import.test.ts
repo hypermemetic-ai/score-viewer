@@ -7,8 +7,9 @@ import {ensurePianoReady} from '../src/piano-readiness';
 import {collectionId,corrected,fingerFor,initialPersonal,personalStorageName,type Entry} from '../src/state';
 
 // The two keyboard layouts read the same notation, so every score opens on
-// either one. A score file saved with pages for the Jankó layout only gains
-// the conventional layout by being engraved from its own notes.
+// either one. Opening shows its existing pages on both (shared-layout-pages);
+// engraving it again from its own notes, tested here, serves pages whose ink
+// was made for one layout.
 const fixture=(name:string)=>new Uint8Array(readFileSync(new URL('../fixtures/'+name,import.meta.url)));
 const encode=(value:unknown)=>new TextEncoder().encode(JSON.stringify(value));
 const host=(stored:Map<string,Uint8Array>)=>({read:async(name:string)=>stored.get(name)??null});
