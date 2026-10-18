@@ -1424,21 +1424,31 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "442f6c9c65b2552474d66c69117015e835763fa9",
+  "dependencyRevision": "df40c3fafc2707a6772c217dc2babb3505618ea7",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/401",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/403",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/405",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/406",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/407",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/408",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/409"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/411",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/412",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/413"
     ],
-    "previousRevision": "40c9c6d69d2aa4e23f3cc908759c8bee63fd26e3",
-    "scope": "Engraving and hand-editing speed, 2026-10-18; every benchmark page is byte-identical. #401 pins that an unchanged hand view draws the reading view's pages. #403 keeps a bounded cache of phrase routes, so re-engraving a system reuses them (about 10 MB more heap). #405 and #406 let the hand engine adopt an engrave already made for reading, under the viewer's calculated-hand recipe, after checking the same score, sharing, plan and repainted pages; anything else is refused and engraved as before. #407 tests tie ink against nearby boxes only, one slab test per segment, and #408 counts a traced tie's crown rib as ink where it crosses a box (no benchmark page changes; only boxes thinner than about 0.2 pt inside a crown can). #409 skips flag-outline edges already farther than the nearest when hand-transfer cues measure their air. Each PR records an independent sub-agent review in its thread; all were merged without GitHub review records."
+    "previousRevision": "442f6c9c65b2552474d66c69117015e835763fa9",
+    "scope": "Two workers when two cores are there, 2026-10-18. #413 lets an engrave lay systems out on a second worker (a layout peer) from the last system back while main lays them out from the first; main takes a delivered system or lays it out itself, never waits, and pages, seats and lint stay byte-identical to the one-worker engrave, which a test compares. On one core, or when a worker cannot start, the engrave is unchanged. #411 and #412 change test pins only: they re-pin Brahms pages and the No. 14 Jankó archive to the ink #388 and #400 intentionally moved, and list two retained-replay tests as known-failing. Each PR records an independent sub-agent review in its thread; all were merged without GitHub review records."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "442f6c9c65b2552474d66c69117015e835763fa9",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/401",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/403",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/405",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/406",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/407",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/408",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/409"
+      ],
+      "previousRevision": "40c9c6d69d2aa4e23f3cc908759c8bee63fd26e3",
+      "scope": "Engraving and hand-editing speed, 2026-10-18; every benchmark page is byte-identical. #401 pins that an unchanged hand view draws the reading view's pages. #403 keeps a bounded cache of phrase routes, so re-engraving a system reuses them (about 10 MB more heap). #405 and #406 let the hand engine adopt an engrave already made for reading, under the viewer's calculated-hand recipe, after checking the same score, sharing, plan and repainted pages; anything else is refused and engraved as before. #407 tests tie ink against nearby boxes only, one slab test per segment, and #408 counts a traced tie's crown rib as ink where it crosses a box (no benchmark page changes; only boxes thinner than about 0.2 pt inside a crown can). #409 skips flag-outline edges already farther than the nearest when hand-transfer cues measure their air. Each PR records an independent sub-agent review in its thread; all were merged without GitHub review records."
+    },
     {
       "revision": "40c9c6d69d2aa4e23f3cc908759c8bee63fd26e3",
       "pullRequests": [
