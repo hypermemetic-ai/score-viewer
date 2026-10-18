@@ -196,7 +196,7 @@ export async function addKeyboardView(selected:ScorePackage,layout:PhysicalKeybo
  const manifest=selected.collectionManifest??selected.manifest;
  // The source checks repeat canAddKeyboardView's so the fields are known present below.
  if(!canAddKeyboardView(selected,layout)||!manifest.sourceScore||!selected.sourceScore||!selected.sourceSha256)
-  throw Error('Only a linked edition at its original pitch gains a layout beside its own views; engrave other editions again.');
+  throw Error('Only a linked edition at its original pitch gains a keyboard layout beside its own pages.');
  const primary=await selectPresentation(selected,manifest.keyboardLayout!),
   planning=scoreWithCalculationContext(selected.sourceScore,manifest.calculationContext,selected.sourceSha256),
   engraved=await engraveEdition({base:primary,source:selected.sourceScore,sourceBytes:selected.files[manifest.sourceScore],context:manifest.calculationContext,

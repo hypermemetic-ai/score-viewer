@@ -601,12 +601,12 @@ async function preparePiano(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:
 
 /** Musical reading enters the shared install path; physical preparation
  * is requested only by piano actions. */
-async function prepareScore(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,admitted:ScorePackage,op:ReadingOperation,entry:Entry):Promise<{q:PreparedScore;running:NonNullable<typeof job>;dialog:HTMLDialogElement;gained?:GainedLayout}>{
+async function prepareScore(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,admitted:ScorePackage,op:ReadingOperation,entry:Entry,newEntry=false):Promise<{q:PreparedScore;running:NonNullable<typeof job>;dialog:HTMLDialogElement;gained?:GainedLayout}>{
  const p=admitted;
- if(scoreCapabilities(p).pianoPreparation)return preparePianoLayout(bytes,layout,personal,p,op,entry);
+ if(scoreCapabilities(p).pianoPreparation)return preparePianoLayout(bytes,layout,personal,p,op,entry,newEntry);
  await readingCheckpoint(op);return {q:{packageBytes:bytes,package:p,...(personal?{personal:readPersonal(personal,p)}:{})},running:op.running,dialog:op.dialog!};
 }
-async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNullable<typeof job>,personal:PersonalState,newEntry=false,personalFiles?:Record<string,string>,context?:PracticeViewContext,rebuilt?:RebuiltInstall){
+async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNullable<typeof job>,personal:PersonalState,newEntry=false,personalFiles?:Record<string,string>,context?:PracticeViewContext,rebuilt?:RebuiltInstall,earlier?:Uint8Array){
  const op=readingOperation?.running===running?readingOperation:undefined;if(op)checkReading(op);
  if(collectionId(q.package)!==entry.id)throw Error('This edition belongs to a different score.');
  const checked=readPersonal(q.personal??personal,q.package),originalPackageBytes=getOriginalScorePackageBytes(q.package),
@@ -630,7 +630,7 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
   if(newEntry?!!latest:!latest||latest.file!==entry.file)throw Error('The library changed while saving; previous files are retained.');
   const installed=await stagePresentationInstall(host,{packageBytes:q.packageBytes,personalBytes:new TextEncoder().encode(JSON.stringify(checked)),
    personalKey:personalStorageName(entry.id,q.package),entry:latest??entry,entries,newEntry,personalFiles,
-   ...(rebuilt?{additionalPersonal:rebuilt.additionalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))})),replaced:rebuilt.replaced}:{}),
+   ...(rebuilt?{additionalPersonal:rebuilt.additionalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))})),replaced:rebuilt.replaced}:{}),...(earlier?{earlier}:{}),
    beforeCommit:async()=>{
     const live=()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file);
     if(previous)await stagePracticeEditionTransfer(host,{entryId:entry.id,from:previous,to:q.package,personal:checked,canCommit:live});
@@ -657,8 +657,9 @@ interface GainedLayout {from:PhysicalKeyboardId;fingers:boolean;rebuilt?:Rebuilt
  * engraved again from its own notes for both layouts, carrying `entry`'s
  * journals and practice; a transposed edition is transposed again from its
  * original. Fingerings made for one layout stay with it. The new edition
- * becomes current only when the caller installs it. */
-async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,selected:ScorePackage,op:ReadingOperation,entry:Entry):Promise<{q:PianoPrepared;running:NonNullable<typeof job>;dialog:HTMLDialogElement;gained?:GainedLayout}>{
+ * becomes current only when the caller installs it. A new entry has no
+ * journals yet, so none are read for it. */
+async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:PersonalState|undefined,selected:ScorePackage,op:ReadingOperation,entry:Entry,newEntry=false):Promise<{q:PianoPrepared;running:NonNullable<typeof job>;dialog:HTMLDialogElement;gained?:GainedLayout}>{
  const steps=getScoreTransposition(selected);
  if(selected.availablePresentations?.includes(layout)??selected.keyboardLayout===layout)return preparePiano(bytes,layout,personal,op);
  const from=selected.keyboardLayout??'janko-four-row',fingers=!!selected.fingerLayer;
@@ -670,7 +671,7 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,per
  }
  if(!steps){
   readingProgress(op,'engrave-keyboard');
-  const rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,layout,{admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));checkReading(op);
+  const rebuilt=await prepareRebuiltEdition(newEntry?{read:async()=>null}:host,entry,entry.file,bytes,layout,{admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));checkReading(op);
   return {...await preparePiano(rebuilt.packageBytes,layout,rebuilt.personal,op),gained:{from,fingers,rebuilt}};
  }
  readingProgress(op,'transpose');
@@ -863,9 +864,9 @@ function rebuiltNotice(r:RebuiltInstall,lead='This score was engraved again with
 }
 /** Said once a score gained the keyboard layout it opened on, only when there
  * is something to say: that its edition was engraved again, or that
- * fingerings made for the other layout stay with that layout. */
+ * fingerings made for the other layout show only on that layout. */
 function gainedNotice(g:GainedLayout,shown:ScorePackage,imported:boolean):string{
- const fingers=g.fingers&&!shown.fingerLayer?`Fingerings made for the ${layoutName(g.from)} stay with that layout.`:'';
+ const fingers=g.fingers&&!shown.fingerLayer?`Fingerings made for the ${layoutName(g.from)} show only on that layout.`:'';
  if(!g.rebuilt)return fingers;
  const lead=`This score was engraved for the ${layoutName(shown.keyboardLayout!)} from its own notes.`;
  // A fresh import has nothing of the player's to carry yet.
@@ -960,6 +961,11 @@ async function importScore(){
  let refresh=false,linkedRefresh=false;
  if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op).catch(async error=>{try{checkReading(op);}catch{throw error;}return await editionNeedsEngravingAgain(prior,error)??Promise.reject(error);});
   if(referenceMidiDiffers(previous,p))throw Error('This score has a different MIDI reference; the installed score and your saved choices are retained.');
+  // An early-format score file whose notes the library's edition was already
+  // engraved from (to gain a keyboard layout) is the score already saved:
+  // it opens as saved, and the earlier file stays under Earlier editions.
+  if(p.manifest.version===1&&(previous.collectionManifest??previous.manifest).version!==1&&previous.sourceSha256===p.sourceSha256){
+   finishReading(op,false);await open(priorEntry);notify('This score is already in your library, so it opened as saved.');return;}
   refresh=!sameFrozenPayload(previous.manifest,p.manifest);linkedRefresh=p.manifest.version===2&&p.sourceSha256===(previous.sourceSha256??previous.manifest.semanticSha256);
   if(refresh&&!linkedRefresh){if(!headerOnlyRefresh(previous,p))throw Error('This source revision has a different frozen presentation beyond a verified header cleanup; the existing package and saved choices are retained.');suspendReadingDialog(op);const confirmed=await confirmHeaderRefresh();checkReading(op);if(!confirmed){finishReading(op,false);return;}readingDialog(op);}
  }
@@ -967,12 +973,14 @@ async function importScore(){
  const layout=op.keyboard,selected=p.availablePresentations?.includes(layout)?await selectPresentation(p,layout):undefined,
   personal=priorEntry&&(selected||p.manifest.version===3)?await loadPersonal(priorEntry,selected??p):undefined,
   journals:Entry=priorEntry??{id,file:scoreFileName(await hashBytes(bytes)),metadata:p.manifest.metadata,importedAt:new Date().toISOString()},
-  {q,running,gained}=await prepareScore(bytes,layout,personal,p,op,journals);
+  {q,running,gained}=await prepareScore(bytes,layout,personal,p,op,journals,!priorEntry);
 
  const entry:Entry=priorEntry?{...priorEntry,
    presentations:refresh&&!linkedRefresh?[...(priorEntry.presentations??[]),priorEntry.file]:(priorEntry.presentations??[])}:
    {id,file:scoreFileName(await hashBytes(q.packageBytes)),metadata:q.package.manifest.metadata,importedAt:new Date().toISOString()},
-   installed=await installPreparedScore(entry,q,running,q.personal??(priorEntry?await loadPersonal(priorEntry,q.package):initialPersonal(q.package)),!priorEntry,undefined,undefined,gained?.rebuilt);
+   installed=await installPreparedScore(entry,q,running,q.personal??(priorEntry?await loadPersonal(priorEntry,q.package):initialPersonal(q.package)),!priorEntry,undefined,undefined,gained?.rebuilt,
+    // A new score engraved again to gain a layout keeps the imported file as an Earlier edition.
+    !priorEntry&&gained?.rebuilt?bytes:undefined);
   await readingCheckpoint(op);
   const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated);
   finishReading(op,true);

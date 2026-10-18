@@ -18,6 +18,9 @@ export async function stagePresentationInstall(host:{write(name:string,data:Uint
   /** Earlier archives this edition stands for: each stays retained with its
    * journals, and every pitch selection naming it names the new edition. */
   replaced?:Readonly<Record<string,string>>;
+  /** The archive a new entry's edition was engraved again from (an imported
+   * score that gained a keyboard layout): it is kept as an Earlier edition. */
+  earlier?:Uint8Array;
   /** Offset comes from an independently admitted package, never a field draft. */
   transposition?:{steps:number;layout:PhysicalKeyboardId;
     /** Every keyboard view the new edition serves; defaults to layout. */
@@ -35,14 +38,17 @@ export async function stagePresentationInstall(host:{write(name:string,data:Uint
   if(request.canCommit&&!request.canCommit())throw Error('Saving was cancelled; existing score retained.');
   const originalFile=request.transposition?.originalPackageBytes?scoreFileName(await hashBytes(request.transposition.originalPackageBytes)):undefined,
     transposition=nextTranspositionSelection(request.entry,file,request.transposition?{steps:request.transposition.steps,layout:request.transposition.layout,layouts:request.transposition.layouts,originalFile,originalLayouts:request.transposition.originalLayouts,replaced:request.replaced}:undefined);
+  const earlierFile=request.earlier?scoreFileName(await hashBytes(request.earlier)):undefined;
+  if(earlierFile&&(!request.newEntry||earlierFile===file))throw Error('Only a new score keeps its imported file beside the edition engraved from it.');
   if(request.newEntry&&request.transposition?.steps&&!originalFile)throw Error('A transposed import requires its exact original edition; previous library retained.');
   const entry={...request.entry,file,...(transposition?{transposition}:{}),personalFiles:{...(request.personalFiles??request.entry.personalFiles),...Object.fromEntries(additional.map(p=>[p.key,p.file])),[request.personalKey]:personalFile},
-    editionPersonalFiles:{...request.entry.editionPersonalFiles,...(found?{[request.entry.file]:{...request.entry.personalFiles}}:{}),...(originalFile&&originalFile!==request.entry.file&&(request.transposition?.originalPersonalFiles||originalJournals.length)?{[originalFile]:{...request.transposition!.originalPersonalFiles,...Object.fromEntries(originalJournals.map(p=>[p.key,p.file]))}}:{})},
-    retainedPackages:[...new Set([...(request.entry.retainedPackages??[]),...(found?[request.entry.file]:[]),...(originalFile?[originalFile]:[])])]};
+    editionPersonalFiles:{...request.entry.editionPersonalFiles,...(found?{[request.entry.file]:{...request.entry.personalFiles}}:{}),...(earlierFile?{[earlierFile]:{}}:{}),...(originalFile&&originalFile!==request.entry.file&&(request.transposition?.originalPersonalFiles||originalJournals.length)?{[originalFile]:{...request.transposition!.originalPersonalFiles,...Object.fromEntries(originalJournals.map(p=>[p.key,p.file]))}}:{})},
+    retainedPackages:[...new Set([...(request.entry.retainedPackages??[]),...(found?[request.entry.file]:[]),...(earlierFile?[earlierFile]:[]),...(originalFile?[originalFile]:[])])]};
   const entries=found?request.entries.map(prior=>prior.id===entry.id?entry:prior):[...request.entries,entry];
   if(!found&&!request.newEntry)throw Error('The score is no longer in the library; existing files retained.');
   if(!validEntryStorage(entry))throw Error('The new edition selection is invalid; the active library and journals are retained.');
   if(originalFile){const retained=await host.read?.(originalFile);if(retained&&await hashBytes(retained)!==await hashBytes(request.transposition!.originalPackageBytes!))throw Error('The retained original archive differs; its bytes and active selection are preserved.');if(!retained)await host.write(originalFile,request.transposition!.originalPackageBytes!);}
+  if(earlierFile){const kept=await host.read?.(earlierFile);if(kept&&await hashBytes(kept)!==await hashBytes(request.earlier!))throw Error('The earlier score file differs; its bytes are preserved.');if(!kept)await host.write(earlierFile,request.earlier!);}
   await host.write(file,request.packageBytes);
   await host.write(personalFile,request.personalBytes);
   for(const p of [...additional,...originalJournals])await host.write(p.file,p.bytes);

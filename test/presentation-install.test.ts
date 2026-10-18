@@ -68,3 +68,13 @@ test('staging never reuses a mutable prior state version identifier',async()=>{
   {entry:first.entry,entries:[first.entry],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('same choices')}));
  assert.deepEqual(stored.get(oldName),oldData);
 });
+test('a new score engraved again to gain a keyboard layout keeps the imported file as an Earlier edition',async()=>{
+ const fresh={...entry,id:'e'.repeat(64),file:`package-${'f'.repeat(64)}.tuna`},imported=bytes('early-format score file'),stored=new Map<string,Uint8Array>(),
+  host={async write(name:string,data:Uint8Array){stored.set(name,data);},async read(name:string){return stored.get(name)??null;}};
+ const result=await stagePresentationInstall(host,{entry:fresh,entries:[entry],newEntry:true,personalKey:`state-${fresh.id}.json`,packageBytes:bytes('engraved for both layouts'),personalBytes:bytes('state'),earlier:imported});
+ const [kept]=result.entry.retainedPackages!;
+ assert.equal(result.entry.retainedPackages!.length,1);assert.notEqual(kept,result.entry.file);
+ assert.deepEqual(stored.get(kept),imported,'the imported bytes are stored unchanged');
+ assert.deepEqual(result.entry.editionPersonalFiles?.[kept],{});
+ await assert.rejects(stagePresentationInstall(host,{entry,entries:[entry],personalKey:key,packageBytes:bytes('other'),personalBytes:bytes('state'),earlier:imported}),/Only a new score/);
+});
