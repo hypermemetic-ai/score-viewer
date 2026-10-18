@@ -77,12 +77,12 @@ pub fn write(dir: &Path, key: &str, data: &[u8], limits: Limits, free_space: imp
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let target = entry(dir, key);
     let entries = others(dir, &target)?;
-    let above = |floor: u64| matches!(free_space(dir), Ok(free) if free >= floor);
     // Never fill the disk: under the floor the cache writes nothing and gives
-    // space back, oldest first.
-    if !above(limits.free_space_floor_bytes.saturating_add(size)) {
+    // space back, oldest first. Unknown free space only refuses the write.
+    let Ok(free) = free_space(dir) else { return Ok(false) };
+    if free < limits.free_space_floor_bytes.saturating_add(size) {
         for (_, _, path) in entries {
-            if above(limits.free_space_floor_bytes) { break; }
+            match free_space(dir) { Ok(free) if free < limits.free_space_floor_bytes => {}, _ => break }
             let _ = fs::remove_file(&path);
         }
         return Ok(false);
@@ -186,6 +186,13 @@ mod tests {
         assert_eq!(write(&d, &key(5), &[5; 20], small(100), |d| Ok(60 + 80 - stored(d))), Ok(false));
         let left: Vec<u8> = (1..=5).filter(|&n| entry(&d, &key(n)).exists()).collect();
         assert_eq!(left, vec![3, 4], "the two oldest go, and no more than the floor needs");
+        // Unknown free space refuses the write and gives nothing back, at the
+        // start or part way through.
+        assert_eq!(write(&d, &key(5), &[5; 20], small(100), |_| Err(io::Error::other("unknown"))), Ok(false));
+        let calls = std::cell::Cell::new(0);
+        assert_eq!(write(&d, &key(5), &[5; 20], small(100), |_| { calls.set(calls.get() + 1); if calls.get() == 1 { Ok(0) } else { Err(io::Error::other("unknown")) } }), Ok(false));
+        let left: Vec<u8> = (1..=5).filter(|&n| entry(&d, &key(n)).exists()).collect();
+        assert_eq!(left, vec![3, 4]);
         fs::remove_dir_all(&d).unwrap();
     }
     #[test]
