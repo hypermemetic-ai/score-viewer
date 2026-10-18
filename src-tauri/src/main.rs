@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use tauri::Manager;
 mod midi_input;
@@ -9,10 +9,13 @@ mod piano_engine;
 mod piano_bank_core;
 mod piano_bank;
 mod managed_files;
+mod derived_cache;
 mod assistance_store;
 mod score_save;
 mod score_pdf;
 struct Store(Mutex<()>);
+/// Serializes derived-cache writes; true once the earlier slot files are gone.
+struct Derived(Arc<Mutex<bool>>);
 fn managed(app:&tauri::AppHandle,name:&str)->Result<PathBuf,String>{
  if !managed_files::valid_managed_name(name){return Err("Invalid managed file identity".into());}
  let dir=app.path().app_data_dir().map_err(|e|e.to_string())?;fs::create_dir_all(&dir).map_err(|e|e.to_string())?;
@@ -25,6 +28,26 @@ fn write_managed(app:tauri::AppHandle,store:tauri::State<Store>,name:String,data
  // Windows replacement via MoveFileEx is atomic and preserves the old file on failure.
  #[cfg(windows)] {use std::os::windows::ffi::OsStrExt;unsafe extern "system" {fn MoveFileExW(a:*const u16,b:*const u16,flags:u32)->i32;}let a:Vec<u16>=tmp.as_os_str().encode_wide().chain(Some(0)).collect();let b:Vec<u16>=p.as_os_str().encode_wide().chain(Some(0)).collect();if unsafe{MoveFileExW(a.as_ptr(),b.as_ptr(),1|8)}==0{return Err(std::io::Error::last_os_error().to_string());}}
  #[cfg(not(windows))] fs::rename(&tmp,&p).map_err(|e|e.to_string())?;Ok(())}
+fn derived_directory(app:&tauri::AppHandle)->Result<(PathBuf,PathBuf),String>{
+ let managed=managed(app,"library.json")?.parent().ok_or("Managed directory missing")?.to_path_buf();
+ Ok((managed.join(derived_cache::DIRECTORY),managed))
+}
+#[tauri::command]
+async fn read_derived(app:tauri::AppHandle,key:String)->Result<Option<String>,String>{
+ let (dir,_)=derived_directory(&app)?;
+ tauri::async_runtime::spawn_blocking(move||->Result<Option<String>,String>{Ok(derived_cache::read(&dir,&key,derived_cache::LIMITS)?.map(|b|STANDARD.encode(b)))}).await.map_err(|e|e.to_string())?
+}
+/// False when the entry was not kept: too large, or the disk is low.
+#[tauri::command]
+async fn write_derived(app:tauri::AppHandle,state:tauri::State<'_,Derived>,key:String,data:String)->Result<bool,String>{
+ let (dir,managed)=derived_directory(&app)?;let lock=state.0.clone();
+ tauri::async_runtime::spawn_blocking(move||{
+  let bytes=STANDARD.decode(data).map_err(|e|e.to_string())?;
+  let mut swept=lock.lock().map_err(|_|"Derived cache unavailable")?;
+  if !*swept{derived_cache::remove_earlier_slots(&managed);*swept=true;}
+  derived_cache::write(&dir,&key,&bytes,derived_cache::LIMITS,|p|fs2::available_space(p))
+ }).await.map_err(|e|e.to_string())?
+}
 /// SCORE-FILE MIGRATION: see managed_files::remove_migrated_score_file.
 #[tauri::command]
 fn remove_migrated_score_file(app:tauri::AppHandle,store:tauri::State<Store>,name:String)->Result<bool,String>{let _guard=store.0.lock().map_err(|_|"Store unavailable")?;let p=managed(&app,&name)?;managed_files::remove_migrated_score_file(p.parent().ok_or("Managed directory missing")?,&name)}
@@ -57,7 +80,7 @@ async fn export_pdf(window:tauri::WebviewWindow,filename:String,width_points:f64
 }
 #[tauri::command]
 async fn export_feedback(data:String,filename:Option<String>)->Result<bool,String>{tauri::async_runtime::spawn_blocking(move||{let filename=filename.unwrap_or_else(||"ISO-fingering-corrections.json".into());if filename.len()>100||!filename.ends_with(".json")||!filename.chars().all(|c|c.is_ascii_alphanumeric()||c=='-'||c=='.'){return Err("Invalid export filename".into())};if data.len()>20_000_000{return Err("Feedback too large".into())};match rfd::FileDialog::new().add_filter("JSON feedback",&["json"]).set_file_name(&filename).save_file(){None=>Ok(false),Some(p)=>{fs::write(p,data).map_err(|e|e.to_string())?;Ok(true)}}}).await.map_err(|e|e.to_string())?}
-fn main(){tauri::Builder::default().manage(Store(Mutex::new(()))).manage(midi_input::State::default()).manage(practice_audio::State::default()).manage(piano_bank::State::default()).invoke_handler(tauri::generate_handler![read_managed,write_managed,remove_migrated_score_file,read_assistance,commit_assistance,pick_score,save_score,export_pdf,export_feedback,midi_input::midi_sources,midi_input::midi_connect,midi_input::midi_disconnect,midi_input::midi_clock,practice_audio::practice_audio_outputs,practice_audio::practice_audio_begin,practice_audio::practice_audio_stop,practice_audio::practice_audio_arm_repeat,practice_audio::practice_audio_cancel_repeat,practice_audio::piano_audio_configure,practice_audio::piano_audio_status,piano_bank::piano_bank_status,piano_bank::piano_bank_install,piano_bank::piano_bank_cancel,piano_bank::piano_bank_download,piano_bank::piano_audio_help]).build(tauri::generate_context!()).expect("ISO viewer could not start").run(|app,event|{
+fn main(){tauri::Builder::default().manage(Store(Mutex::new(()))).manage(Derived(Arc::new(Mutex::new(false)))).manage(midi_input::State::default()).manage(practice_audio::State::default()).manage(piano_bank::State::default()).invoke_handler(tauri::generate_handler![read_managed,write_managed,read_derived,write_derived,remove_migrated_score_file,read_assistance,commit_assistance,pick_score,save_score,export_pdf,export_feedback,midi_input::midi_sources,midi_input::midi_connect,midi_input::midi_disconnect,midi_input::midi_clock,practice_audio::practice_audio_outputs,practice_audio::practice_audio_begin,practice_audio::practice_audio_stop,practice_audio::practice_audio_arm_repeat,practice_audio::practice_audio_cancel_repeat,practice_audio::piano_audio_configure,practice_audio::piano_audio_status,piano_bank::piano_bank_status,piano_bank::piano_bank_install,piano_bank::piano_bank_cancel,piano_bank::piano_bank_download,piano_bank::piano_audio_help]).build(tauri::generate_context!()).expect("ISO viewer could not start").run(|app,event|{
  if matches!(event,tauri::RunEvent::Exit){
   midi_input::shutdown(&app.state::<midi_input::State>());
   if let Err(error)=app.state::<practice_audio::State>().shutdown(){

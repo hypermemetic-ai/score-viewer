@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {deflateSync,strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
-import {DerivedFileCache,DERIVED_FILE_CACHE_LIMITS,derivedCacheSlotName,type DerivedFileStore} from '../src/derived-file-cache';
+import {DerivedFileCache,DERIVED_FILE_CACHE_LIMITS,type DerivedFileStore} from '../src/derived-file-cache';
 import {validPhysicalManagedName} from '../src/managed-file-storage';
 import {createProjectionHost,createHostedCore,type HostedProjectionCore} from '../src/personal-projection-host';
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,type ProjectionWorkerLike} from '../src/personal-projection-client';
@@ -22,13 +22,13 @@ import {PersonalMemoryLibrary,readingOnlyArchive} from '../src/personal-memory-l
 const sha=(c:string)=>c.repeat(64);
 function memoryStore(){
  const files=new Map<string,Uint8Array>(),writes:string[]=[];
- const store:DerivedFileStore={async read(name){assert.ok(validPhysicalManagedName(name),name);return files.get(name)??null;},
-  async write(name,data){assert.ok(validPhysicalManagedName(name),name);writes.push(name);files.set(name,data);}};
+ const store:DerivedFileStore={async read(name){assert.match(name,/^[a-f0-9]{64}$/);return files.get(name)??null;},
+  async write(name,data){assert.match(name,/^[a-f0-9]{64}$/);writes.push(name);files.set(name,data);return true;}};
  return {files,writes,store};
 }
 const object=(v:unknown)=>{if(!v||typeof v!=='object')throw Error('not an object');return v as Record<string,unknown>;};
 
-test('derived file cache round-trips exact entries and treats every other slot content as a miss',async()=>{
+test('derived file cache round-trips exact entries and treats any other content as a miss',async()=>{
  const {files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
  await cache.put('kind-a',sha('a'),{pages:['<svg/>'],n:1});
  assert.deepEqual(await cache.get('kind-a',sha('a'),object),{pages:['<svg/>'],n:1});
@@ -40,31 +40,40 @@ test('derived file cache round-trips exact entries and treats every other slot c
  for(const corrupt of [new Uint8Array([1,2,3]),deflateSync(strToU8('{"format":"x"}\n{}')),files.get(name)!.slice(0,-3)]){
   files.set(name,corrupt);assert.equal(await cache.get('kind-a',sha('a'),object),undefined);
  }
- files.delete(name);assert.equal(await cache.get('kind-a',sha('a'),object),undefined,'a deleted slot costs only time');
+ files.delete(name);assert.equal(await cache.get('kind-a',sha('a'),object),undefined,'a deleted entry costs only time');
  await assert.rejects(Promise.resolve().then(()=>new DerivedFileCache(store,'')),/identity/);
 });
 
-test('derived file cache stays within its fixed managed slots and refuses oversized entries',async()=>{
+test('derived file cache keeps one entry per kind and key, and a refused or oversized entry is a miss',async()=>{
  const {files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
- for(let i=0;i<60;i++)await cache.put('kind-a',(await hashBytes(String(i))),{i});
- assert.ok(files.size<=DERIVED_FILE_CACHE_LIMITS.slots);
- for(const name of files.keys())assert.match(name,/^viewer-derived-cache-v1-slot-[0-9a-b]\.bin$/);
- assert.equal(validPhysicalManagedName(derivedCacheSlotName(11)),true);assert.throws(()=>derivedCacheSlotName(12));
- assert.equal(validPhysicalManagedName('viewer-derived-cache-v1-slot-c.bin'),false);
- const before=[...files].map(([name,data])=>[name,data.byteLength]);
- // Random text compresses poorly, so this payload exceeds one slot and is not written.
- const big=Array.from({length:DERIVED_FILE_CACHE_LIMITS.slotBytes/6},()=>Math.random().toString(36));
- await cache.put('kind-a',sha('c'),big);
- assert.deepEqual([...files].map(([name,data])=>[name,data.byteLength]),before);
- assert.equal(await cache.get('kind-a',sha('c'),object),undefined);
+ for(let i=0;i<60;i++)await cache.put(i%2?'kind-a':'kind-b',(await hashBytes(String(i>>1))),{i});
+ assert.equal(files.size,60,'no entry takes another one\'s place');
+ for(const name of files.keys())assert.equal(validPhysicalManagedName(name),false,'entries are not managed files');
+ assert.deepEqual(await cache.get('kind-b',await hashBytes('29'),object),{i:58});
+ const small=new DerivedFileCache(store,'build-a',{entryBytes:4096,payloadBytes:8192}),before=[...files.keys()];
+ // Random text compresses poorly: this entry exceeds its ceiling and is not written.
+ assert.equal(await small.put('kind-a',sha('c'),Array.from({length:1200},()=>Math.random().toString(36))),false);
+ assert.equal(await small.put('kind-a',sha('d'),'x'.repeat(9000)),false,'a payload over its ceiling');
+ assert.deepEqual([...files.keys()],before);
+ assert.equal(await cache.put('kind-a',sha('e'),'x'.repeat(9000)),true);
+ assert.equal(await small.get('kind-a',sha('e'),v=>v),undefined,'a payload over the reader\'s ceiling is a miss');
+ // A store that keeps nothing (over its budget, or the disk is low) is a miss, not an error.
+ const full=new DerivedFileCache({read:async()=>null,write:async()=>false},'build-a');
+ assert.equal(await full.put('kind-a',sha('a'),{}),false);assert.equal(await full.get('kind-a',sha('a'),object),undefined);
  const failing=new DerivedFileCache({read:async()=>{throw Error('io');},write:async()=>{throw Error('io');}},'build-a');
- await failing.put('kind-a',sha('a'),{});assert.equal(await failing.get('kind-a',sha('a'),object),undefined);
+ assert.equal(await failing.put('kind-a',sha('a'),{}),false);assert.equal(await failing.get('kind-a',sha('a'),object),undefined);
 });
 
-test('the Rust managed-name contract admits exactly the same derived cache slots',()=>{
- const rust=readFileSync(new URL('../src-tauri/src/managed_files.rs',import.meta.url),'utf8');
- assert.match(rust,/strip_prefix\("viewer-derived-cache-v1-slot-"\)\.and_then\(\|s\|s\.strip_suffix\("\.bin"\)\)/);
- assert.match(rust,/"0" \| "1" \| "2" \| "3" \| "4" \| "5" \| "6" \| "7" \| "8" \| "9" \| "a" \| "b"\)/);
+test('the native cache keeps the same entry ceiling, a 2 GB budget and a 5 GB free-space floor',()=>{
+ const rust=readFileSync(new URL('../src-tauri/src/derived_cache.rs',import.meta.url),'utf8'),main=readFileSync(new URL('../src-tauri/src/main.rs',import.meta.url),'utf8');
+ assert.match(rust,/LIMITS: Limits = Limits \{ budget_bytes: 2048 \* MIB, free_space_floor_bytes: 5120 \* MIB, entry_bytes: 256 \* MIB \}/);
+ assert.equal(DERIVED_FILE_CACHE_LIMITS.entryBytes,256*1024*1024);
+ assert.match(main,/generate_handler!\[[^\]]*read_derived,write_derived/);assert.match(main,/fs2::available_space/);
+ // The earlier fixed slots are no longer managed names; the native side removes them.
+ const managed=readFileSync(new URL('../src-tauri/src/managed_files.rs',import.meta.url),'utf8');
+ assert.doesNotMatch(managed,/strip_prefix\("viewer-derived-cache-v1-slot-"\)/);
+ assert.equal(validPhysicalManagedName('viewer-derived-cache-v1-slot-0.bin'),false);
+ assert.match(rust,/viewer-derived-cache-v1-slot-\{slot\}\.bin/);
 });
 
 /** An in-process stand-in for the module worker: messages are cloned both ways. */
@@ -126,7 +135,7 @@ async function written(cache:DerivedFileCache,files:Map<string,Uint8Array>,count
  for(let i=0;i<500&&files.size<count;i++){await new Promise(r=>setTimeout(r,10));await cache.flush();}
  await cache.flush();
 }
-/** A projection lost from the disk, as when another score's entry takes its slot. */
+/** A projection lost from the disk, as when the cache drops it to stay within its budget. */
 class EvictedProjections extends DerivedFileCache {
  override get<T>(kind:string,key:string,validate:(value:unknown)=>T){return kind===PERSONAL_PROJECTION_CACHE_KIND?Promise.resolve(undefined):super.get(kind,key,validate);}
 }
@@ -140,7 +149,7 @@ test('worker projection and the disk cache give the same view as the reader thre
  const viaWorker=await first.project(choice);await written(cache,files,2);
  assert.deepEqual(viaWorker.pages,local.pages);assert.deepEqual(viaWorker.seats,local.seats);assert.deepEqual(viaWorker.score,local.score);
  assert.deepEqual(viaWorker.annotationGeometry,local.annotationGeometry);assert.ok(Object.isFrozen(viaWorker.pages)||Object.isFrozen(viaWorker.score));
- // The projection and the settled engine behind it, never in the same slot.
+ // The projection and the settled engine behind it, each its own entry.
  // The choice moves one owner; the others keep the score's hands and carry no marker.
  assert.deepEqual(log.map(m=>m.kind),['project','save']);assert.equal(files.size,2);const requests=log.length;
  const reopenedSeat=reopened.seats.find(s=>s.ownerIds.includes('gesture-1'))!,again=assigned(reopened,initialPersonal(reopened),reopenedSeat,{hand:'RH'});
@@ -148,7 +157,7 @@ test('worker projection and the disk cache give the same view as the reader thre
  const cached=await second.project(again);
  assert.equal(log.length,requests,'a cached projection runs no engraving');
  assert.deepEqual(cached.pages,local.pages);assert.deepEqual(cached.score,local.score);assert.deepEqual(cached.annotationGeometry,local.annotationGeometry);
- // A corrupt slot is recomputed and written again.
+ // A corrupt entry is recomputed and written again.
  for(const name of files.keys())files.set(name,new Uint8Array([9]));
  const third=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
  assert.ok(log.length>requests);assert.deepEqual(third.pages,local.pages);
@@ -175,7 +184,7 @@ test('reopening resumes hand editing from the saved engine instead of engraving 
  const view=await reopened.project(choice);
  assert.deepEqual(view.pages,local.pages);assert.deepEqual(view.seats,local.seats);assert.deepEqual(view.score,local.score);assert.deepEqual(view.annotationGeometry,local.annotationGeometry);
  assert.deepEqual(second.log.map(m=>m.kind),['warm','warm','project'],'a restored engine is not saved again');
- // A projection lost from the disk (its slot taken by another entry) still
+ // A projection lost from the disk (dropped to stay within the budget) still
  // resumes from the saved engine: restore, then place only the choice.
  const third=fakeWorker(spying),direct=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(third.spawn),cache:new EvictedProjections(store,'build-a'),cacheWriteDelayMs:0});
  assert.deepEqual((await direct.project(choice)).pages,local.pages);
