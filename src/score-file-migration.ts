@@ -52,7 +52,8 @@ function renameEntry(e:Entry,renamed:ReadonlyMap<string,string>):Entry {
  const name=(file:string)=>renamed.get(file)??file,next:Entry={...e,file:name(e.file)};
  if(e.presentations)next.presentations=e.presentations.map(name);
  if(e.retainedPackages)next.retainedPackages=[...new Set(e.retainedPackages.map(name))];
- if(e.editionPersonalFiles)next.editionPersonalFiles=Object.fromEntries(Object.entries(e.editionPersonalFiles).map(([file,map])=>[name(file),map]));
+ // Journals listed under both names of one file are kept together.
+ if(e.editionPersonalFiles){const files:NonNullable<Entry['editionPersonalFiles']>={};for(const [file,map] of Object.entries(e.editionPersonalFiles)){const to=name(file);files[to]=to===file?{...files[to],...map}:{...map,...files[to]};}next.editionPersonalFiles=files;}
  if(e.transposition)next.transposition={...e.transposition,editions:Object.fromEntries(Object.entries(e.transposition.editions).map(([steps,layouts])=>
   [steps,Object.fromEntries(Object.entries(layouts??{}).map(([layout,file])=>[layout,name(file as string)]))]))};
  return next;

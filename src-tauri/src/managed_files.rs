@@ -1,5 +1,5 @@
 //! Exact managed sidecar names; never accept a path or arbitrary filename.
-use std::{fs, io, path::{Path, PathBuf}};
+use std::{fs, io::{self, Read}, path::{Path, PathBuf}};
 use sha2::{Digest, Sha256};
 
 pub const MAX_MANAGED_NAME_BYTES: usize = 230;
@@ -56,13 +56,20 @@ pub fn remove_migrated_score_file(dir: &Path, name: &str) -> Result<bool, String
     };
     let earlier = dir.join(name);
     if !earlier.try_exists().map_err(|e|e.to_string())? { return Ok(false); }
-    let renamed = match fs::read(dir.join(format!("package-{hash}.tuna"))) {
-        Ok(bytes) => bytes,
+    // Managed writes are not flushed, so the renamed copy and the library that
+    // names it are forced to disk before the only other copy goes; a crash
+    // straight after the removal then still finds both.
+    let mut copy = match fs::OpenOptions::new().read(true).write(true).open(dir.join(format!("package-{hash}.tuna"))) {
+        Ok(file) => file,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Err("The score file has not been renamed yet; it is kept".into()),
         Err(e) => return Err(e.to_string()),
     };
+    copy.sync_all().map_err(|e|e.to_string())?;
+    let mut renamed = Vec::new();
+    copy.read_to_end(&mut renamed).map_err(|e|e.to_string())?;
     let actual: String = Sha256::digest(&renamed).iter().map(|b|format!("{b:02x}")).collect();
     if actual != hash { return Err("The renamed score file differs; the earlier file is kept".into()); }
+    fs::OpenOptions::new().write(true).open(dir.join("library.json")).and_then(|library|library.sync_all()).map_err(|e|e.to_string())?;
     fs::remove_file(earlier).map_err(|e|e.to_string())?;
     Ok(true)
 }
@@ -173,8 +180,12 @@ mod tests {
         assert!(remove_migrated_score_file(&dir, &renamed).is_err());
         assert!(remove_migrated_score_file(&dir, "library.json").is_err());
         assert!(remove_migrated_score_file(&dir, &format!("package-{}.isoscore", hash.to_uppercase())).is_err());
-        // An exact renamed copy: removed; a second call finds nothing to remove.
+        // An exact renamed copy but no library on disk to force out: kept.
         fs::write(dir.join(&renamed), bytes).unwrap();
+        assert!(remove_migrated_score_file(&dir, &earlier).is_err());
+        assert!(dir.join(&earlier).exists());
+        // An exact renamed copy: removed; a second call finds nothing to remove.
+        fs::write(dir.join("library.json"), b"{}").unwrap();
         assert_eq!(remove_migrated_score_file(&dir, &earlier), Ok(true));
         assert!(!dir.join(&earlier).exists());
         assert_eq!(fs::read(dir.join(&renamed)).unwrap(), bytes);

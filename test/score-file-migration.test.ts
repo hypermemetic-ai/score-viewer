@@ -144,6 +144,18 @@ test('a stale renamed copy is replaced, and a failed library write keeps every e
  for(const [name,bytes] of blockedBefore)if(name.endsWith('.isoscore'))assert.deepEqual(blocked.get(name),bytes);
 });
 
+test('journals listed under both names of one file are kept together',async()=>{
+ const store=await ownersLibrary(),lib=library(store),entry=lib.entries.find(e=>e.editionPersonalFiles?.[missing])!,key=Object.keys(entry.editionPersonalFiles![missing])[0];
+ // A re-imported calculated edition already listed under its new name, with a journal of a second keyboard.
+ const old=await earlier(calculated),next=await tuna(calculated),other=key.replace('.json',`-conventional-piano-${'a'.repeat(64)}-${'b'.repeat(64)}.json`);
+ entry.editionPersonalFiles={[next]:{[key]:version(1),[other]:version(2)},...entry.editionPersonalFiles};entry.retainedPackages=[...entry.retainedPackages!,next];
+ store.set('library.json',encode(lib));store.set(next,calculated.slice());
+ const moved=(await migrateScoreFiles(folder(store).host,lib)).entries[lib.entries.indexOf(entry)];
+ assert.deepEqual(moved.editionPersonalFiles![next],{[key]:version(1),[other]:version(2)});
+ assert.equal(moved.editionPersonalFiles![old],undefined);
+ assert.deepEqual(moved.editionPersonalFiles![missing],{[key]:version(5)});
+});
+
 test('until the move finishes, both names are valid stored score files and library references',()=>{
  const hash='a'.repeat(64);
  for(const name of [`package-${hash}.tuna`,`package-${hash}.isoscore`]){assert.equal(validPhysicalManagedName(name),true);assert.equal(isScoreFileName(name),true);assert.equal(scoreFileSha256(name),hash);}
