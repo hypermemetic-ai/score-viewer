@@ -46,14 +46,14 @@ test('uncertain saved local fingers retain a known shared source without inventi
  assert.deepEqual(memoryReferenceTarget(input,resolved,'b2n1'),{entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'});
 });
 test('library donor scan excludes historical editions and detects changes to active source bytes',async()=>{
- const input=fixture(),entry={id:'piece',file:'active.isoscore',metadata:{title:'Fixture'},importedAt:'2020-01-01',retainedPackages:['old.isoscore']} as Entry;
- const files=new Map([['active.isoscore',new Uint8Array([1])]]),reads:string[]=[];
+ const input=fixture(),entry={id:'piece',file:'active.tuna',metadata:{title:'Fixture'},importedAt:'2020-01-01',retainedPackages:['old.tuna']} as Entry;
+ const files=new Map([['active.tuna',new Uint8Array([1])]]),reads:string[]=[];
  const library=new PersonalMemoryLibrary({read:async name=>{reads.push(name);return files.get(name)??null;}},()=>[entry],async()=>input.p);
- library.remember(input);assert.equal(library.scanned,false);const inputs=await library.scan();assert.equal(library.scanned,true);assert.equal(inputs.length,1);assert.ok(!reads.includes('old.isoscore'));assert.equal(await library.validate(),true);
- files.set('active.isoscore',new Uint8Array([2]));assert.equal(await library.validate(),false);
+ library.remember(input);assert.equal(library.scanned,false);const inputs=await library.scan();assert.equal(library.scanned,true);assert.equal(inputs.length,1);assert.ok(!reads.includes('old.tuna'));assert.equal(await library.validate(),true);
+ files.set('active.tuna',new Uint8Array([2]));assert.equal(await library.validate(),false);
 });
 test('library additions during election invalidate the donor snapshot',async()=>{
- const input=fixture(),entries=[{id:'piece',file:'active.isoscore',metadata:{title:'Fixture'},importedAt:'2020-01-01'} as Entry];
- const library=new PersonalMemoryLibrary({read:async name=>name==='active.isoscore'?new Uint8Array([1]):null},()=>entries,async()=>input.p);
+ const input=fixture(),entries=[{id:'piece',file:'active.tuna',metadata:{title:'Fixture'},importedAt:'2020-01-01'} as Entry];
+ const library=new PersonalMemoryLibrary({read:async name=>name==='active.tuna'?new Uint8Array([1]):null},()=>entries,async()=>input.p);
  await library.scan();entries.push({...entries[0],id:'other'});assert.equal(await library.validate(),false);
 });

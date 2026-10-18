@@ -11,7 +11,7 @@ const source=transferStudy();
 for(const event of source.notes)event.writtenPitch={...event.pitch,octave:event.pitch.octave+1};
 const original=await sourcePackage(source),bytes=original.bytes,
   id=original.p.sourceRevision??original.p.manifest.revision,
-  file=`package-${createHash('sha256').update(bytes).digest('hex')}.isoscore`;
+  file=`package-${createHash('sha256').update(bytes).digest('hex')}.tuna`;
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
 page.on('pageerror',error=>errors.push(error.message));

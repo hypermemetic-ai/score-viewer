@@ -189,7 +189,7 @@ async function put(root:string,path:string,bytes:Uint8Array|string){await mkdir(
 async function fixture(t:TestContext) {
   const root=await mkdtemp(join(tmpdir(),'iso-pair-test-'));t.after(()=>rm(root,{recursive:true,force:true}));
   const prepared=join(root,'prepared');await mkdir(prepared);
-  const scoreIdentity={path:'public/review/score.isoscore',sha256:sha256(Buffer.from('same-score-both-keyboards')),size:Buffer.from('same-score-both-keyboards').length};
+  const scoreIdentity={path:'public/review/score.tuna',sha256:sha256(Buffer.from('same-score-both-keyboards')),size:Buffer.from('same-score-both-keyboards').length};
   const frontend={'assets/reader.js':Buffer.from('keyboard-selector-current-reader'), 'assets/font.otf':Buffer.from('literal-font-payload'), 'index.html':Buffer.from('<!doctype html><html><head></head><body><script src="./assets/reader.js"></script></body></html>'), 'release-identity.json':Buffer.from(JSON.stringify({sourceRevision:'a'.repeat(40),version:'0.1.0',score:scoreIdentity}))};
   const probes:Record<string,{path:string;sha256:string;decodedSha256:string}>={};
   for(const [path,bytes]of Object.entries(frontend)) {
@@ -197,11 +197,11 @@ async function fixture(t:TestContext) {
     const decoded=path.endsWith('.html')?normalizedHtml(bytes):bytes,encoded=brotliCompressSync(decoded),probe=`probes/${path}.br`;
     await put(prepared,probe,encoded);probes[path]={path:probe,sha256:sha256(encoded),decodedSha256:sha256(decoded)};
   }
-  await put(prepared,'Schumann-No14.isoscore',Buffer.from('same-score-both-keyboards'));
+  await put(prepared,'Schumann-No14.tuna',Buffer.from('same-score-both-keyboards'));
   const files=await inventory(join(prepared,'frontend'));
-  const identity={releaseId:`0.1.0-${'a'.repeat(40)}`,sourceRevision:'a'.repeat(40),sourceTimestamp:'2026-10-06T00:00:00.000Z',version:'0.1.0',score:{path:'public/review/score.isoscore',sha256:sha256(Buffer.from('same-score-both-keyboards')),size:25},frontend:{files,digest:sha256(canonical(files))}};
+  const identity={releaseId:`0.1.0-${'a'.repeat(40)}`,sourceRevision:'a'.repeat(40),sourceTimestamp:'2026-10-06T00:00:00.000Z',version:'0.1.0',score:{path:'public/review/score.tuna',sha256:sha256(Buffer.from('same-score-both-keyboards')),size:25},frontend:{files,digest:sha256(canonical(files))}};
   // derive length instead of pinning a mistaken fixture string length.
-  identity.score.size=(await readFile(join(prepared,'Schumann-No14.isoscore'))).length;
+  identity.score.size=(await readFile(join(prepared,'Schumann-No14.tuna'))).length;
   const manifest={schema:1,identity,probes,files:await inventory(prepared),timings:{},cache:{}};
   await writeJson(join(prepared,'manifest.json'),manifest);
   const payload=Buffer.concat(await Promise.all(Object.values(probes).map(pin=>readFile(join(prepared,pin.path)))));

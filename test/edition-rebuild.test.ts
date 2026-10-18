@@ -14,7 +14,7 @@ import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical
 
 // A saved calculated edition whose pages no longer reproduce at the ISO pin:
 // Conventional shows calculated hands with a finger layer, Jankó the source's hands.
-const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),
+const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url))),
  content=await readEditionContent(bytes),id=collectionId(content),file=await packageFile(bytes),
  earlier={'conventional-piano':await selectPresentation(content,'conventional-piano'),'janko-four-row':await selectPresentation(content,'janko-four-row')} as Record<PhysicalKeyboardId,ScorePackage>,
  conventional=earlier['conventional-piano'],encode=(value:unknown)=>new TextEncoder().encode(JSON.stringify(value)),
@@ -75,7 +75,7 @@ test('installing a re-engraved edition keeps the earlier file listed with its jo
 });
 
 test('a pitch selection naming a re-engraved archive names its replacement on the keyboards it serves',()=>{
- const old=`package-${'1'.repeat(64)}.isoscore`,other=`package-${'2'.repeat(64)}.isoscore`,original=`package-${'3'.repeat(64)}.isoscore`,next=`package-${'4'.repeat(64)}.isoscore`,
+ const old=`package-${'1'.repeat(64)}.tuna`,other=`package-${'2'.repeat(64)}.tuna`,original=`package-${'3'.repeat(64)}.tuna`,next=`package-${'4'.repeat(64)}.tuna`,
   selection=nextTranspositionSelection({...entry,file:old,transposition:{version:'score-transposition-selection-v1',steps:1,
    editions:{'0':{'janko-four-row':original},'1':{'janko-four-row':old,'conventional-piano':other},'2':{'janko-four-row':old}}}},next,
    {steps:1,layout:'janko-four-row',layouts:['janko-four-row'],replaced:{[old]:next}})!;

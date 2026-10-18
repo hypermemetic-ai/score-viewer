@@ -29,7 +29,7 @@ test('only prepared keys get bounded native aliases; every full identity compone
   assert.equal(validPhysicalManagedName(name),false);assert.equal(await physicalManagedName(alias),alias);aliases.add(alias);
  }
  assert.equal(aliases.size,8);
- for(const name of ['library.json','preferences.json','practice-error-log.json',`package-${'A'.repeat(64)}.isoscore`,
+ for(const name of ['library.json','preferences.json','practice-error-log.json',`package-${'A'.repeat(64)}.tuna`,
   `state-version-${'a'.repeat(64)}.json`,`state-${'A'.repeat(64)}.json`,key().replace(`-${'d'.repeat(64)}.json`,'.json')])assert.equal(await physicalManagedName(name),name);
 });
 
@@ -43,9 +43,9 @@ test('unsafe or unknown prepared-name forms refuse before either backend is call
  assert.equal(io,0);
 });
 
-const originalBytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.isoscore',import.meta.url))),original=await importPackage(originalBytes),
+const originalBytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url))),original=await importPackage(originalBytes),
  bytes=await prepareSourceTransposition(original,originalBytes,1);
-const p=await importPackage(bytes,{keyboardLayout:'conventional-piano'}),file=`package-${await hashBytes(originalBytes)}.isoscore`,entry:Entry={id:collectionId(original),file,metadata:original.manifest.metadata,importedAt:'now'};
+const p=await importPackage(bytes,{keyboardLayout:'conventional-piano'}),file=`package-${await hashBytes(originalBytes)}.tuna`,entry:Entry={id:collectionId(original),file,metadata:original.manifest.metadata,importedAt:'now'};
 
 test('fresh prepared personal lookup and staged cold recovery use native filenames without changing logical pointers or bindings',async()=>{
  const physical=strictStorage(new Map([[file,originalBytes]])),storage=managedFileStorage(physical),key=personalStorageName(entry.id,p),fresh=await loadPersonalJournal(storage,entry,p);

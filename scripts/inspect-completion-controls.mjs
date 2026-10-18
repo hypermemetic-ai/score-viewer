@@ -3,7 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {unzipSync,strFromU8} from 'fflate';
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const url=process.env.PRACTICE_URL??'http://127.0.0.1:5211',output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-rendering/completion-controls';await mkdir(output,{recursive:true});
-const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'c'.repeat(64)}.isoscore`;
+const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'c'.repeat(64)}.tuna`;
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});let page;
 async function shot(name){await page.evaluate(()=>document.fonts.ready);const size=page.viewportSize();await page.setViewportSize({...size,width:size.width+1});await page.setViewportSize(size);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.screenshot({path:`${output}/${name}.png`});}
 async function reader(){await page.locator('.composer-entry').focus();await page.keyboard.press('ArrowRight');await page.locator('[data-open]').click();await page.locator('.reader').waitFor({timeout:60000});}

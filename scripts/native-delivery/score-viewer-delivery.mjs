@@ -7,7 +7,7 @@ import {validateSourceIdentity,validatePreparedCarrier,validateRecipientCarrier,
 
 const require = createRequire(new URL('../../package.json', import.meta.url));
 export const platforms = ['windows-x64', 'macos-universal'];
-export const defaultScore = {path:'public/review/schumann-no14-conventional-20261006.isoscore', sha256:'2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d'};
+export const defaultScore = {path:'public/review/schumann-no14-conventional-20261006.tuna', sha256:'2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d'};
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const canonical = value => JSON.stringify(value);
 export const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -43,7 +43,7 @@ export function validateIdentity(identity) {
   if(identity?.sourceInputs)validateSourceIdentity(identity.sourceInputs);
   if (!identity || !/^[a-f0-9]{40}$/.test(identity.sourceRevision) || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(identity.version) || identity.releaseId !== `${identity.version}-${identity.sourceRevision}` || !Number.isFinite(Date.parse(identity.sourceTimestamp))) fail('Invalid release identity');
   safePath(identity.score.path);
-  if(!/\.(?:tuna|isoscore)$/.test(identity.score.path))fail('Release score must be a .tuna or .isoscore package');
+  if(!/\.tuna$/.test(identity.score.path))fail('Release score must be a .tuna score file');
   if (!/^[a-f0-9]{64}$/.test(identity.score.sha256) || !Number.isSafeInteger(identity.score.size) || identity.score.size < 1) fail('Invalid score identity');
   const files = identity.frontend?.files;
   if (!files || !Object.keys(files).length || identity.frontend.digest !== sha256(canonical(files))) fail('Invalid frozen frontend identity');
@@ -70,7 +70,7 @@ export async function validatePrepared(root, {expectedRevision} = {}) {
   if (expectedRevision && manifest.identity.sourceRevision !== expectedRevision) fail('Prepared source revision differs');
   await validateInventory(root, manifest.files, ['manifest.json']);
   await validateInventory(join(root,'frontend'),manifest.identity.frontend.files);
-  const score = await readFile(join(root,'Schumann-No14.isoscore'));
+  const score = await readFile(join(root,'Schumann-No14.tuna'));
   if (sha256(score) !== manifest.identity.score.sha256 || score.length !== manifest.identity.score.size) fail('Prepared score differs');
   const embeddedIdentity=await readJson(join(root,'frontend','release-identity.json'));
   if(canonical(embeddedIdentity)!==canonical({sourceRevision:manifest.identity.sourceRevision,version:manifest.identity.version,score:manifest.identity.score,sourceInputs:manifest.identity.sourceInputs}))fail('Actual embedded release identity differs');
@@ -141,7 +141,7 @@ export async function validateWorker(root, prepared, platform) {
   await validateInventory(root,receipt.files,['receipt.json']);
   const bytes=await readFile(join(root,receipt.package.path)), files=readZip(bytes);
   if(sha256(bytes)!==receipt.package.sha256 || canonical(zipInventory(files))!==canonical(receipt.package.files))fail(`Recipient archive differs: ${platform}`);
-  if(!files['Schumann-No14.isoscore'] || sha256(files['Schumann-No14.isoscore'])!==manifest.identity.score.sha256)fail(`Recipient score differs: ${platform}`);
+  if(!files['Schumann-No14.tuna'] || sha256(files['Schumann-No14.tuna'])!==manifest.identity.score.sha256)fail(`Recipient score differs: ${platform}`);
   await validateRecipientCarrier(files,prepared);
   const binaryPath=platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer';
   if(!files[binaryPath])fail(`Delivered binary missing: ${platform}`);
@@ -165,7 +165,7 @@ export async function validatePair(root,{expectedRevision}={}) {
     if(receipt.platform!==platform || canonical(receipt.identity)!==canonical(release.identity))fail(`Pair identity differs: ${platform}`);
     const bytes=await readFile(join(root,pin.package)), files=readZip(bytes);
     if(sha256(bytes)!==receipt.package.sha256 || canonical(zipInventory(files))!==canonical(receipt.package.files))fail(`Pair package differs: ${platform}`);
-    if(sha256(files['Schumann-No14.isoscore']??Buffer.alloc(0))!==release.identity.score.sha256)fail('Pair score differs');
+    if(sha256(files['Schumann-No14.tuna']??Buffer.alloc(0))!==release.identity.score.sha256)fail('Pair score differs');
     await validateRecipientCarrier(files,prepared);
     const binary=files[platform==='windows-x64'?'iso-score-viewer.exe':'ISO Score Viewer.app/Contents/MacOS/iso-score-viewer'];
     if(!binary || canonical(await verifyEmbedded(binary,prepared,platform))!==canonical(receipt.embedded))fail(`Pair embedded payload differs: ${platform}`);

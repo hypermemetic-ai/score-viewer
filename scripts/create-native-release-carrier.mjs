@@ -66,7 +66,7 @@ export async function createCarrier({viewerSource, viewerRevision, frontend, che
     catch(error){if(error.code!=='ENOENT'||file.path!=='licenses/'+footerNotice)throw error;noticeMirrors.push({path:file.path,bytes});}
   }
   if(newFooterNotice){
-    const policy=JSON.parse(git(viewerSource,['show',`${viewerRevision}:src/footer-ink-policy.json`])),fixtureBytes=git(viewerSource,['show',`${viewerRevision}:fixtures/authored-calculated-preparation-v2.isoscore`],true),
+    const policy=JSON.parse(git(viewerSource,['show',`${viewerRevision}:src/footer-ink-policy.json`])),fixtureBytes=git(viewerSource,['show',`${viewerRevision}:fixtures/authored-calculated-preparation-v2.tuna`],true),
       fixtureFiles=unzipSync(fixtureBytes),fm=JSON.parse(strFromU8(fixtureFiles['manifest.json'])),source=fixtureFiles[fm.sourceScore];
     const fixturePath=Object.keys(frontendFiles).filter(p=>frontendFiles[p].sha256===sha256(fixtureBytes));
     if(fixturePath.length!==1||!frontendFiles['footer-ink-probe.html']||sha256(fixtureBytes)!=='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1')

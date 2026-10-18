@@ -36,7 +36,7 @@ test('existing part selection preserves personal pointers while invalid or forge
  const forged={...first.package,archiveSha256:await hashBytes(second.bytes)};host.writes.length=0;
  await assert.rejects(stageReadingPartsInstall(host,{parts:[{bytes:second.bytes,package:forged}],entries:installed.entries}),/archive differs/);assert.deepEqual(host.writes,[]);
  await assert.rejects(stageReadingPartsInstall(host,{parts:[{bytes:first.bytes,package:structuredClone(first.package)}],entries:installed.entries}),/actual receiving-realm/);assert.deepEqual(host.writes,[]);
- const conflicting:Entry={...installed.entries[0],file:'package-'+'f'.repeat(64)+'.isoscore'};
+ const conflicting:Entry={...installed.entries[0],file:'package-'+'f'.repeat(64)+'.tuna'};
  const conflictHost=memoryHost();conflictHost.files.set('library.json',new TextEncoder().encode(JSON.stringify({version:1,entries:[conflicting]})));
  await assert.rejects(stageReadingPartsInstall(conflictHost,{parts:[first],entries:[conflicting]}),/different retained edition/);assert.deepEqual(conflictHost.writes,[]);
 });

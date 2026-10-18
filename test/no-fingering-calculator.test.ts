@@ -15,8 +15,8 @@ test('the viewer offers no way to calculate fingers or hands',async()=>{
   for(const forbidden of [/['"]generate['"]/,/data-history/,/Calculated version/i,/Calculate fingers/i,/calculate a finger/i,/Calculation diagnostics/i,/Cancel calculation/i])
    assert.doesNotMatch(text,forbidden,`${file} still offers ${forbidden}`);
  }
- const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.isoscore',import.meta.url))),p=await importPackage(bytes);
- const entry={id:collectionId(p),file:'study.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-16'};
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url))),p=await importPackage(bytes);
+ const entry={id:collectionId(p),file:'study.tuna',metadata:p.manifest.metadata,importedAt:'2026-10-16'};
  for(const steps of [0,1]){
   const markup=scoreOptionsMarkup(entry,p,initialPersonal(p),{steps,min:-12,max:12},undefined,'',true);
   assert.doesNotMatch(markup,/calculat/i);assert.doesNotMatch(markup,/data-action="generate"/);
@@ -32,7 +32,7 @@ test('no calculation worker or calculation request remains in the application',a
  for(const name of files.filter(name=>name.endsWith('.ts')))
   assert.doesNotMatch(src(name),/from '\.\.\/test\//,`${name} must not depend on test fixture builders`);
  // Opening reads what the edition saved; an old calculation request is ignored.
- const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.isoscore',import.meta.url)));
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url)));
  const request={packageBytes:bytes,layout:'janko-four-row',intent:'calculate',performingHandPolicy:'calculate',maxExpansions:1} as any;
  const result=await ensurePianoReady(request);
  assert.equal(result.status,'editable','message' in result?result.message:undefined);

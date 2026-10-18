@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {stagePresentationInstall} from '../src/presentation-install';
 import type {Entry} from '../src/state';
-const bytes=(s:string)=>new TextEncoder().encode(s),entry:Entry={id:'a'.repeat(64),file:`package-${'b'.repeat(64)}.isoscore`,metadata:{title:'No.14',composer:'Schumann',provenance:[]},importedAt:'now'},key=`state-${entry.id}.json`;
+const bytes=(s:string)=>new TextEncoder().encode(s),entry:Entry={id:'a'.repeat(64),file:`package-${'b'.repeat(64)}.tuna`,metadata:{title:'No.14',composer:'Schumann',provenance:[]},importedAt:'now'},key=`state-${entry.id}.json`;
 test('final pointer phase starts after cancellation guard and before the asynchronous write',async()=>{
  const events:string[]=[];let committing=false;
  await stagePresentationInstall({async write(name){if(name==='library.json'){assert.equal(committing,true);events.push('pointer');}}},{entry,entries:[entry],personalKey:key,packageBytes:bytes('new'),personalBytes:bytes('state'),canCommit:()=>{events.push('guard');return true;},onCommitStarted:()=>{committing=true;events.push('commit');}});
@@ -16,7 +16,7 @@ for(const failure of [1,2,3])test(`installation failure at write ${failure} pres
  assert.equal(entry.personalFiles,undefined);
 });
 test('successful installation activates staged versions in one final pointer while retaining prior corrections/imports',async()=>{
- const prior=structuredClone(entry),other={...entry,id:'c'.repeat(64),file:`package-${'d'.repeat(64)}.isoscore`},writes:string[]=[],stored=new Map<string,Uint8Array>([[key,bytes('old choices')]]),personalBytes=bytes(JSON.stringify({overrides:{latestSavedFinger:2}}));
+ const prior=structuredClone(entry),other={...entry,id:'c'.repeat(64),file:`package-${'d'.repeat(64)}.tuna`},writes:string[]=[],stored=new Map<string,Uint8Array>([[key,bytes('old choices')]]),personalBytes=bytes(JSON.stringify({overrides:{latestSavedFinger:2}}));
  const result=await stagePresentationInstall({async write(name,data){writes.push(name);stored.set(name,data);}},
   {entry:prior,entries:[prior,other],personalKey:key,packageBytes:bytes('new archive'),personalBytes});
  assert.equal(writes.at(-1),'library.json');assert.equal(result.entries[1],other);assert.deepEqual(stored.get(key),bytes('old choices'));
@@ -33,7 +33,7 @@ test('edition snapshots retain the earlier state pointer even when a later editi
 });
 test('stale library edition and superseded stage cannot activate or mutate its predecessor',async()=>{
  await assert.rejects(stagePresentationInstall({async write(){assert.fail('stale request must not stage');}},
-  {entry,entries:[{...entry,file:`package-${'c'.repeat(64)}.isoscore`}],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('new choices')}),/library edition changed/);
+  {entry,entries:[{...entry,file:`package-${'c'.repeat(64)}.tuna`}],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('new choices')}),/library edition changed/);
  const library=bytes('old library'),stored=new Map<string,Uint8Array>([['library.json',library]]);let active=true;
  await assert.rejects(stagePresentationInstall({async write(name,data){stored.set(name,data);if(name.startsWith('state-version-'))active=false;}},
   {entry,entries:[entry],personalKey:key,packageBytes:bytes('new archive'),personalBytes:bytes('new choices'),canCommit:()=>active}),/Saving was cancelled/);
@@ -46,7 +46,7 @@ test('cancellation after staging leaves active library pointer and sidecar uncha
  assert.deepEqual(stored.get('library.json'),prior);assert.deepEqual(stored.get(key),oldState);
 });
 test('new complete piano import activates only after both bytes are staged and preserves existing library entries',async()=>{
- const original=[entry],fresh={...entry,id:'e'.repeat(64),file:`package-${'f'.repeat(64)}.isoscore`},writes:string[]=[],stored=new Map<string,Uint8Array>();
+ const original=[entry],fresh={...entry,id:'e'.repeat(64),file:`package-${'f'.repeat(64)}.tuna`},writes:string[]=[],stored=new Map<string,Uint8Array>();
  const result=await stagePresentationInstall({async write(name,data){writes.push(name);stored.set(name,data);}},
   {entry:fresh,entries:original,newEntry:true,personalKey:`state-${fresh.id}.json`,packageBytes:bytes('complete admitted piano'),personalBytes:bytes('new personal state')});
  assert.equal(writes.at(-1),'library.json');assert.equal(result.entries[0],entry);assert.equal(original.length,1);

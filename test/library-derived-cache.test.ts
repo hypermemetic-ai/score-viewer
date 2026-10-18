@@ -18,7 +18,7 @@ import {authoredFrettedInput} from './support/fretted-dual-fixture';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url));
 const p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row');
-const entry:Entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.isoscore`,metadata:p.manifest.metadata,importedAt:'2026-10-11T00:00:00Z'};
+const entry:Entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.tuna`,metadata:p.manifest.metadata,importedAt:'2026-10-11T00:00:00Z'};
 const plan=planPractice(rr),earned=initialPractice(plan);earned.best[plan.chunks[0].pattern]=earned.target;
 const fraction=displayedPracticeTotal(plan,readPractice(earned,plan));
 const current=practiceStorageName(entry.id,rr),legacy=legacyPracticeStorageName(rr)!,personal=personalStorageName(entry.id,rr),oldPersonal=legacyPersonalStorageName(rr)!;
@@ -131,7 +131,7 @@ test('foreground invalidation and clear reject an in-flight scan while a failed 
 
 test('manual reference and all actually visited manual fallback records participate in restart checks',async()=>{
  const input=authoredFrettedInput();delete input.score.referencePerformanceTempo;const manualBytes=await prepareDualReadingPackage(input),manual=await importPackage(manualBytes),context=await ReadingPresentationController.open(manual);
- const e:Entry={...entry,id:collectionId(manual),file:`package-${await hashBytes(manualBytes)}.isoscore`,metadata:manual.manifest.metadata};
+ const e:Entry={...entry,id:collectionId(manual),file:`package-${await hashBytes(manualBytes)}.tuna`,metadata:manual.manifest.metadata};
  const identity={partId:manual.reading!.dual!.sourcePartId,musicalRevision:context.revision},refName=await manualReferenceStorageName(identity),reference={version:'reference-performance-tempo-v1' as const,bpm:144,beat:{numerator:3,denominator:8},provenance:{kind:'editorial' as const,reference:'Test reference'}};
  const s=store();s.archive=manualBytes;await seed(s,e);assert.deepEqual((await readLibraryDerivedCache(s.cache))[0].dependencies,[{file:refName,sha256:null}]);assert.equal((await restartHit(s,e)).get(e,'janko-four-row'),undefined);
  const manualPlan=await planManualPractice(manual,'bounded-exercises-v1',reference),oldPlan=await planManualPractice(manual,'connection-boundary-v1',reference),journal=manualPracticeRecord(oldPlan,initialPractice(oldPlan));

@@ -53,7 +53,7 @@ The earlier-edition flow selected its exact own compatible archived bytes and de
 
 ## Independently frozen v1 control
 
-`fixtures/authored-preparation-v1.isoscore` is newly authored, six-owner public music. It was produced using exact accepted Viewer `94ef94baf2df69f25fdfa1ac595d4b106c99c05e` and retained ISO `da93cf9`, not the new identity implementation. Literal archive SHA256 `5c94ab9d3eb78f2109b04129fc065c220705f611137f3f1a7325dffb1012f52f`; v1 identity `2f4bc1a0f1ecd44ea66ce497434cd3b9f2e9e83fce4e102639f936a9c22cba01`. The new cold reader preserves it byte-for-byte, while NEW requests use v2. Parent independently rehydrated those old modules and confirmed their cold import and read-retained returned editable, exact original bytes for all six owners.
+`fixtures/authored-preparation-v1.tuna` is newly authored, six-owner public music. It was produced using exact accepted Viewer `94ef94baf2df69f25fdfa1ac595d4b106c99c05e` and retained ISO `da93cf9`, not the new identity implementation. Literal archive SHA256 `5c94ab9d3eb78f2109b04129fc065c220705f611137f3f1a7325dffb1012f52f`; v1 identity `2f4bc1a0f1ecd44ea66ce497434cd3b9f2e9e83fce4e102639f936a9c22cba01`. The new cold reader preserves it byte-for-byte, while NEW requests use v2. Parent independently rehydrated those old modules and confirmed their cold import and read-retained returned editable, exact original bytes for all six owners.
 
 ## Boundaries at the initial source/browser milestone
 

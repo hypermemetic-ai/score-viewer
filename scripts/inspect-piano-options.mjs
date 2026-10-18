@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {unzipSync,strFromU8} from 'fflate';
-const score=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(score)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'b'.repeat(64)}.isoscore`;
+const score=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(score)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'b'.repeat(64)}.tuna`;
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const output=process.env.PIANO_ARTIFACTS??'/tmp/score-viewer-piano-options';await mkdir(output,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});

@@ -1,6 +1,7 @@
 import {assigned,readPersonalAssignments,type PersonalAssignments} from './personal-assignments';
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage,FingerLayer,Seat,Attack,Metadata} from './package';
+import {isScoreFileName} from './score-file-name';
 import {CONVENTIONAL_PIANO,physicalContact,type PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {FingerBehavior,FingerPresentation} from './input';
 import {getOriginalScoreIdentity} from './score-transposition';
@@ -116,7 +117,7 @@ export interface GuitarProEntryHint {version:'guitar-pro-entry-hint-v1';groupId:
 export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>;transposition?:ScoreTranspositionSelection;guitarPro?:GuitarProEntryHint}
 export function validEntryStorage(e:Entry):boolean {
  const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v),
-   packageName=(v:unknown)=>typeof v==='string'&&/^package-[a-f0-9]{64}\.isoscore$/.test(v),
+   packageName=isScoreFileName,
    stateMap=(v:unknown)=>v===undefined||object(v)&&Object.entries(v).every(([key,file])=>
      /^state-[a-f0-9]{64}(?:-(?:conventional-piano|janko-four-row)-[a-f0-9]{64}-[a-f0-9]{64}(?:-[a-f0-9]{64})?)?\.json$/.test(key)&&
      key.startsWith(`state-${e.id}`)&&typeof file==='string'&&/^state-version-[a-f0-9]{64}\.json$/.test(file));

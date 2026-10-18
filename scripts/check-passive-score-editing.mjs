@@ -32,7 +32,7 @@ try{
  }
  await new Promise(r=>server.listen(0,'127.0.0.1',r));browser=await chromium.launch({headless:true,...(process.env.PRACTICE_CHROMIUM?{executablePath:process.env.PRACTICE_CHROMIUM}:{})});report.chromium=browser.version();
  for(const input of inputs){
-  console.log('Opening '+input.name);const {p}=input,entry={id:collectionId(p),file:`package-${sha(input.bytes)}.isoscore`,metadata:p.manifest.metadata,importedAt:'2026-10-11T00:00:00Z'},personal=initialPersonal(p);
+  console.log('Opening '+input.name);const {p}=input,entry={id:collectionId(p),file:`package-${sha(input.bytes)}.tuna`,metadata:p.manifest.metadata,importedAt:'2026-10-11T00:00:00Z'},personal=initialPersonal(p);
   const lastSystem=Math.max(...p.seats.filter(s=>s.page===0).map(s=>s.system)),start=(input.continuation?p.seats.find(s=>s.page===0&&s.ownerIds.includes('written-hold')&&!s.continuation):p.seats.find(s=>s.page===0&&s.system===lastSystem&&!s.continuation))??p.seats.find(s=>s.page===0),next=systemSelection(p,start,1);
   assert.equal(next.page,1,'Fixture must cross an actual printed page');if(input.continuation)assert.equal(next.continuation,true,'Fixture must target a visible held alias');
   personal.view.page=start.page;personal.view.count=1;personal.editContactId=start.contactId;

@@ -15,7 +15,7 @@ test('format routing grants no score/source authority and malformed archives ref
  assert.throws(()=>scoreImportKind(new Uint8Array([80,75,0,0])),/zip|data|invalid|EOF/i);
 });
 test('generic source labels and descriptive group hints never grant Bass/Guitar picker authority',async()=>{
- const packet=await prepareDualReadingPacket(authoredFrettedInput()),catalog=new ReadingPartCatalog(),entry:Entry={id:collectionId(packet.package),file:`package-${packet.package.archiveSha256}.isoscore`,
+ const packet=await prepareDualReadingPacket(authoredFrettedInput()),catalog=new ReadingPartCatalog(),entry:Entry={id:collectionId(packet.package),file:`package-${packet.package.archiveSha256}.tuna`,
   importedAt:'2026-10-09',metadata:{title:'Bass',composer:'Guitar',provenance:[]},guitarPro:{version:'guitar-pro-entry-hint-v1',groupId:'a'.repeat(64),inputSha256:'b'.repeat(64),sourceTrackId:'0',sourceName:'Guitar'}};
  assert.equal(validEntryStorage(entry),true);assert.equal(catalog.remember(entry,packet.package),undefined);assert.equal(catalog.context(entry),undefined);
  assert.match(catalog.summary(entry),/^Prepare source part/);assert.match(catalog.control([entry],entry),/Unknown instrument/);assert.deepEqual(catalog.siblings([entry],entry),[]);

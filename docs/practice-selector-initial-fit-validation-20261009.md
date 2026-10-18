@@ -20,6 +20,6 @@ PRACTICE_ARTIFACTS=/path/to/private/output \
 /home/qqp/.local/bin/qq-job -- node scripts/check-practice-selector-fit.mjs
 ```
 
-Optional `PRACTICE_ZELDA=/path/to/original.isoscore` runs the same checks on the read-only operator archive. No acquired music, screenshots or personal data are committed. The runner owns an ephemeral loopback server and browser and closes both on success or failure.
+Optional `PRACTICE_ZELDA=/path/to/original.tuna` runs the same checks on the read-only operator archive. No acquired music, screenshots or personal data are committed. The runner owns an ephemeral loopback server and browser and closes both on success or failure.
 
 All 544 configured source tests, TypeScript/Vite build and all 12 strict OpenSpec items pass. This establishes source/browser fitting at the observed sizes, not new native WebView, paired release, installation or physical musical acceptance. The sole native delivery owner must freeze and independently verify any replacement package. Existing wider joined-range admission limits remain unchanged.

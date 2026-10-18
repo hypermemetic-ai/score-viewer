@@ -43,7 +43,7 @@ test('altered face and metrics cannot supply font readiness or imported box auth
  await assert.rejects(verifyFooterAssets(face,'{"glyphs":{"P":{"advance":1}}}'),/exact bytes/);
 });
 test('a frozen V2/receiptV1 edition keeps its exact bytes and is engraved again from its own hands and fingers',async()=>{
- const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),copy=bytes.slice();
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url))),copy=bytes.slice();
  assert.equal(await hashBytes(bytes),'ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1');
  // Its pages used the retired opposite-hand beam connector, so they no longer reproduce.
  await assert.rejects(importPackage(bytes),/current shared engraving policy/);
@@ -57,7 +57,7 @@ test('a frozen V2/receiptV1 edition keeps its exact bytes and is engraved again 
 });
 
 test('a changed receipt is refused on opening, and a member that differs from its pinned hash is refused before engraving again',async()=>{
- const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url)));
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url)));
  for(const repin of [true,false]){
   const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])),receipt=JSON.parse(strFromU8(files[m.calculatedHandReceipt]));
   receipt.sourceInventory.owners[0].pitch=Number(receipt.sourceInventory.owners[0].pitch)+1;files[m.calculatedHandReceipt]=strToU8(JSON.stringify(receipt));
@@ -69,9 +69,9 @@ test('a changed receipt is refused on opening, and a member that differs from it
 });
 
 test('the footer probe edition opens through its receipt on both keyboards at the ISO pin',async()=>{
- const bytes=new Uint8Array(readFileSync(new URL('../fixtures/footer-probe-calculated-edition.isoscore',import.meta.url)));
+ const bytes=new Uint8Array(readFileSync(new URL('../fixtures/footer-probe-calculated-edition.tuna',import.meta.url)));
  assert.equal(await hashBytes(bytes),'dec7f831b48d5a2cc316640e71fac3c49e0dffd12dfea0bbe60899dfc4ed1d50','src/footer-ink-probe.ts names these bytes');
- const fixture=await readEditionContent(new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))));
+ const fixture=await readEditionContent(new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url))));
  for(const layout of ['conventional-piano','janko-four-row'] as const){
   const result=await ensurePianoReady({packageBytes:bytes,layout});
   if(result.status!=='editable'&&result.status!=='ready')assert.fail(`${layout}: ${result.status}`);

@@ -14,7 +14,7 @@ import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 
 // A saved edition whose recipe the current shared engraving policy refuses.
 // It stands for every edition the next ISO notation pin makes stale.
-const stale=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url))),
+const stale=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url))),
  staleContent=await readEditionContent(stale),
  staleEntry:Entry={id:collectionId(staleContent),file:await packageFile(stale),metadata:staleContent.manifest.metadata,importedAt:'2026-10-01T00:00:00.000Z'};
 const {bytes:fresh,p:freshPackage}=await sourcePackage(transferStudy()),

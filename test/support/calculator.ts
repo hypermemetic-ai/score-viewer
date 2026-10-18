@@ -15,7 +15,7 @@ import type {PerformingHandPolicy} from '../../src/piano-request-authority';
 import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from '../../src/annotation-ink-policy';
 import {calculatedRecipeForRequest,calculatedHandInputs,ownerHands,receiptFor} from '../../src/calculated-hand-edition';
 import {transposedArchiveSource,transpositionOwnerMap,getOriginalScorePackageBytes,
-  SCORE_TRANSPOSITION_VERSION,type ScoreTransposition} from '../../src/score-transposition';
+  SCORE_TRANSPOSITION_VERSION,ORIGINAL_ARCHIVE,type ScoreTransposition} from '../../src/score-transposition';
 
 export async function prepareCalculatedEdition(p:ScorePackage,layer:FingerLayer,policy:PerformingHandPolicy,constraints:readonly PianoAssignmentConstraint[]=[]){
  await ensureAnnotationInkPolicyReady(ANNOTATION_INK_POLICY);
@@ -33,7 +33,7 @@ export async function createScoreTransposition(p:ScorePackage,archive:Uint8Array
  if(handless)throw Error(`Transposing keeps the score's own hands, and ${handless===1?'one note has':`${handless} notes have`} none, so this score can't be transposed yet.`);
  const originalBytes=getOriginalScorePackageBytes(p)??new Uint8Array(archive),
   prepared=transposedArchiveSource(original,steps),effective=prepared.source,sourceBytes=prepared.bytes,
-  map=transpositionOwnerMap(p),content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:'transposition/original.isoscore',
+  map=transpositionOwnerMap(p),content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:ORIGINAL_ARCHIVE,
    originalArchiveSha256:await hashBytes(originalBytes),baselineLayout:original.keyboardLayout!,originalSourceSha256:original.sourceSha256!,selectedEditionSha256:await hashBytes(archive),steps,
    effectiveSourceSha256:await hashBytes(sourceBytes),handMaps:{[keyboard]:map}};
  const retained=p.transposition?.steps===steps&&canonicalJson(p.transposition.handMaps[keyboard])===canonicalJson(map)?p.transposition:undefined;

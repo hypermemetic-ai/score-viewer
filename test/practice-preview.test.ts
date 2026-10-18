@@ -1,7 +1,7 @@
 import {referenceFixture} from './support/reference-score';
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {importPackage} from '../src/package';import {planPractice,type PracticePlan} from '../src/practice';import {PracticePreview} from '../src/practice-preview';
-const p=await referenceFixture(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),plan=planPractice(p),groups=new Set(plan.gestures.filter(g=>g.bar<4).map(g=>g.id));
+const p=await referenceFixture(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),plan=planPractice(p),groups=new Set(plan.gestures.filter(g=>g.bar<4).map(g=>g.id));
 const run=(f:PracticePreview,notes:number[],start=0)=>notes.map((n,i)=>f.note(n,80,start+i*100,groups));
 test('literal first-bar repeats follow their own occurrences and a fresh7B7 resolves bar4',()=>{
  const f=new PracticePreview(plan),r=run(f,[55,59,62,71,67,62]);assert.deepEqual(r.map(a=>a.attack?.id),plan.attacks.slice(0,6).map(a=>a.id));assert.equal(r.at(-1)?.attack?.tick,120);

@@ -1,5 +1,6 @@
 import {hashBytes} from './package';
 import {validEntryStorage,type Entry} from './state';
+import {scoreFileName} from './score-file-name';
 import {nextTranspositionSelection} from './score-transposition-selection';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 /** Stage new package/state versions; only the final library pointer activates
@@ -24,7 +25,7 @@ export async function stagePresentationInstall(host:{write(name:string,data:Uint
     /** New journals for the original's keyboards (an original engraved again). */
     originalPersonal?:ReadonlyArray<{key:string;bytes:Uint8Array}>};
 }):Promise<{entry:Entry;entries:Entry[]}> {
-  const file=`package-${await hashBytes(request.packageBytes)}.isoscore`,versionFile=async(bytes:Uint8Array)=>`state-version-${await hashBytes(new TextEncoder().encode(crypto.randomUUID()+await hashBytes(bytes)))}.json`,
+  const file=scoreFileName(await hashBytes(request.packageBytes)),versionFile=async(bytes:Uint8Array)=>`state-version-${await hashBytes(new TextEncoder().encode(crypto.randomUUID()+await hashBytes(bytes)))}.json`,
     personalFile=await versionFile(request.personalBytes),
     additional=await Promise.all((request.additionalPersonal??[]).filter(p=>p.key!==request.personalKey).map(async p=>({...p,file:await versionFile(p.bytes)}))),
     originalJournals=await Promise.all((request.transposition?.originalPersonal??[]).map(async p=>({...p,file:await versionFile(p.bytes)})));
@@ -32,7 +33,7 @@ export async function stagePresentationInstall(host:{write(name:string,data:Uint
   if(request.newEntry&&found)throw Error('The imported score already exists; its managed state is retained.');
   if(existing&&existing.file!==request.entry.file)throw Error('The library edition changed; existing files retained.');
   if(request.canCommit&&!request.canCommit())throw Error('Saving was cancelled; existing score retained.');
-  const originalFile=request.transposition?.originalPackageBytes?`package-${await hashBytes(request.transposition.originalPackageBytes)}.isoscore`:undefined,
+  const originalFile=request.transposition?.originalPackageBytes?scoreFileName(await hashBytes(request.transposition.originalPackageBytes)):undefined,
     transposition=nextTranspositionSelection(request.entry,file,request.transposition?{steps:request.transposition.steps,layout:request.transposition.layout,layouts:request.transposition.layouts,originalFile,originalLayouts:request.transposition.originalLayouts,replaced:request.replaced}:undefined);
   if(request.newEntry&&request.transposition?.steps&&!originalFile)throw Error('A transposed import requires its exact original edition; previous library retained.');
   const entry={...request.entry,file,...(transposition?{transposition}:{}),personalFiles:{...(request.personalFiles??request.entry.personalFiles),...Object.fromEntries(additional.map(p=>[p.key,p.file])),[request.personalKey]:personalFile},

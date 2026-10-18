@@ -12,7 +12,7 @@ function fixture(){
 }
 const check=(p:ReturnType<typeof fixture>)=>{const expected=originalCarriers(p);assert.deepEqual(fingeringCarriers(p),expected);assert.deepEqual(fingeringCarriers(p),expected);return expected;};
 test('literal public No14 carrier maps retain all independent aliases, continuations and cached order',async()=>{
- const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});check(p);
+ const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});check(p);
  assert.deepEqual(fingeringCarriers({...p,seats:[...p.seats].reverse()}),originalCarriers({...p,seats:[...p.seats].reverse()}));
 });
 test('cached carrier values are detached and actual page, seat and effective owner changes retain old truth',()=>{

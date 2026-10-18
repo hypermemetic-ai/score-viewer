@@ -17,7 +17,7 @@ const {DOMParser,XMLSerializer}=require('@xmldom/xmldom') as {
  XMLSerializer:new()=>{serializeToString:(node:Node)=>string};
 };
 type Studio=Awaited<ReturnType<typeof prepareFingeringStudio>>;
-const prepared=await prepareFingeringStudio(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url))).catch(error=>{if(isFrozenNo14StudioRefusal(error))return undefined;throw error;});
+const prepared=await prepareFingeringStudio(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url))).catch(error=>{if(isFrozenNo14StudioRefusal(error))return undefined;throw error;});
 // The studio's frozen replay is refused at this pin; its tests stay as todo.
 const todo=prepared?undefined:frozenNo14StudioRefused,review=prepared as Studio;
 const p=review?.package as Studio['package'],before=JSON.stringify(p),digits=new Map(p?.seats.map(s=>[s.id,s.pitchDigit]));

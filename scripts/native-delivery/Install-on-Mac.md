@@ -2,7 +2,7 @@
 
 1. Open the supplied `.dmg` and drag **ISO Score Viewer** into **Applications**.
 2. Open it from Applications. For this private build, if macOS blocks it, open **System Settings → Privacy & Security**, select **Open Anyway**, and confirm **Open**.
-3. Import the supplied **Schumann-No14.isoscore** from **Scores → Import**.
+3. Import the supplied **Schumann-No14.tuna** from **Scores → Import**.
 4. Choose your keyboard in settings. Conventional piano is the default; four-row Jankó is available.
 5. For practice, connect your piano's USB MIDI interface. In **Keys & pedal**, select its input and connect. Learn an unused pedal if you want pedal control of fingerings. Leave sustain assigned to the piano.
 6. In practice settings, select an available audio output and use **Test click** before starting. On an interface with many channels, the metronome uses its first stereo pair; other channels remain silent.

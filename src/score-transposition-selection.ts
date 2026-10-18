@@ -1,6 +1,7 @@
 import type {Entry} from './state';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {ScorePackage} from './package';
+import {isScoreFileName,scoreFileSha256} from './score-file-name';
 import {getOriginalScoreIdentity,getScoreTransposition} from './score-transposition';
 
 export interface ScoreTranspositionSelection {
@@ -9,7 +10,7 @@ export interface ScoreTranspositionSelection {
  /** Most recently selected admitted archive for each absolute pitch offset. */
  editions:Record<string,Partial<Record<PhysicalKeyboardId,string>>>;
 }
-const packageName=(value:unknown):value is string=>typeof value==='string'&&/^package-[a-f0-9]{64}\.isoscore$/.test(value);
+const packageName=isScoreFileName;
 const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const offset=(value:unknown):value is number=>Number.isSafeInteger(value);
 export function validTranspositionSelection(value:unknown,file:string,packages:readonly string[]):value is ScoreTranspositionSelection {
@@ -55,5 +56,5 @@ export function retainedTranspositionFile(entry:Entry,steps:number,layout:Physic
 
 /** A library pointer is admitted against its actual cold-opened archive. */
 export function assertSelectedTransposition(entry:Entry,p:ScorePackage){
- if(getOriginalScoreIdentity(p)!==entry.id||`package-${p.archiveSha256}.isoscore`!==entry.file||getScoreTransposition(p)!==(entry.transposition?.steps??0)||entry.transposition&&!Object.values(entry.transposition.editions[String(entry.transposition.steps)]??{}).includes(entry.file))throw Error('The saved transposition differs from this score edition. All editions and journals are retained.');
+ if(getOriginalScoreIdentity(p)!==entry.id||p.archiveSha256!==scoreFileSha256(entry.file)||getScoreTransposition(p)!==(entry.transposition?.steps??0)||entry.transposition&&!Object.values(entry.transposition.editions[String(entry.transposition.steps)]??{}).includes(entry.file))throw Error('The saved transposition differs from this score edition. All editions and journals are retained.');
 }

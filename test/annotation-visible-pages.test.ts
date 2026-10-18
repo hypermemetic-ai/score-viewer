@@ -33,7 +33,7 @@ test('page requests retain exact font admission even before any overlay work',()
  for(const pages of [undefined,[]])assert.throws(()=>annotationPositions(p,pages),/independently admitted/);
 });
 test('literal No14 single pages and overlapping spreads equal the complete placements and independent original carriers',async()=>{
- const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
+ const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
  assert.ok(p.pages.length>1);check(p);
  for(const pages of [[-1],[.5],[NaN],[p.pages.length]]){
   assert.throws(()=>annotationPositions(p,pages),/complete score/);

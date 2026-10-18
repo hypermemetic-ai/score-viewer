@@ -37,7 +37,7 @@ test('a reading whose pages an earlier engraving drew is engraved again from its
 test('engraving a reading again keeps every refusal it cannot answer',async()=>{
   const refusal=Error('refused');
   // Not a single-reading archive: someone else's question.
-  const piano=new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)));
+  const piano=new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
   assert.equal(await reengraveReadingArchive(piano,refusal),undefined);
   assert.equal(await reengraveReadingArchive(strToU8('not a zip'),refusal),undefined);
   // A member the new archive would not keep.

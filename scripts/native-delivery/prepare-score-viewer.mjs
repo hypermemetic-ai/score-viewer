@@ -18,7 +18,7 @@ export async function prepare({source, output, scorePath=defaultScore.path, scor
   if(expectedRevision && expectedRevision!==revision)throw Error('Reviewed carrier revision differs');
   const verified=await validateCarrierInputs(source);
   safePath(scorePath);
-  if(!/\.(?:tuna|isoscore)$/.test(scorePath))throw Error('Prepared score must be a .tuna or .isoscore package');
+  if(!/\.tuna$/.test(scorePath))throw Error('Prepared score must be a .tuna score file');
   const score=await readFile(join(source,scorePath));
   if(sha256(score)!==scoreHash)throw Error('Reviewed score hash differs');
   const version=verified.inputs.version;
@@ -29,7 +29,7 @@ export async function prepare({source, output, scorePath=defaultScore.path, scor
   await cp(join(source,'delivery-input','frontend'),join(output,'frontend'),{recursive:true});
   const embeddedIdentity={sourceRevision:revision,version,score:{path:scorePath,sha256:scoreHash,size:score.length},sourceInputs:verified.sourceInputs};
   await writeJson(join(output,'frontend','release-identity.json'),embeddedIdentity);
-  await cp(join(source,scorePath),join(output,'Schumann-No14.isoscore'));
+  await cp(join(source,scorePath),join(output,'Schumann-No14.tuna'));
   await cp(join(source,'delivery-input','inputs.json'),join(output,'source-inputs.json'));
   await cp(join(source,'delivery-input','checks.json'),join(output,'source-checks.json'));
   const frontend=await inventory(join(output,'frontend'));

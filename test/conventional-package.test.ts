@@ -87,6 +87,6 @@ test('exact original RR v1 sidecar fallback is explicit and read-only, never inh
  assert.throws(()=>readPersonal(legacy,janko),/layout\/profile/);const bound=readPersonal(legacy,janko,{allowLegacyJanko:true});assert.equal(bound.version,2);assert.equal(JSON.stringify(legacy),raw);assert.equal(bound.binding!.keyboardLayout,'janko-four-row');assert.throws(()=>readPersonal(legacy,piano,{allowLegacyJanko:true}),/layout\/profile/);
 });
 test('historical version-one package keeps legacy paths and unsupported conventional view never migrates it',async()=>{
- const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});const s=initialPersonal(p);
+ const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});const s=initialPersonal(p);
  assert.equal(s.version,1);assert.equal(personalStorageName('original',p),'state-original.json');assert.equal(practiceStorageName('original',p),'practice-original.json');assert.equal(performanceStorageName('original',p),'performance-original.json');assert.equal(await selectPresentation(p,'janko-four-row'),p);await assert.rejects(selectPresentation(p,'conventional-piano'),/no conventional/);
 });

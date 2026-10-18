@@ -11,7 +11,7 @@ import {PackageAdmissionSession} from '../src/package-admission-session';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-janko-operator-reviewed-20261007.tuna',import.meta.url));
 const p=await importPackage(bytes),rr=await selectPresentation(p,'janko-four-row'),cp=await selectPresentation(p,'conventional-piano');
-const entry:Entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.isoscore`,importedAt:'2026-10-07T00:00:00Z',metadata:p.manifest.metadata};
+const entry:Entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.tuna`,importedAt:'2026-10-07T00:00:00Z',metadata:p.manifest.metadata};
 const plan=planPractice(rr,'fixed-four-v1'),earned=initialPractice(plan);
 // Two earned source patterns cover five leaves; one groundwork pattern covers two.
 for(const i of [0,1])earned.best[plan.chunks[i].pattern]=earned.target;
@@ -37,7 +37,7 @@ test('warm summary reuse rereads progress and changed archive bytes never borrow
 
 test('newest refresh waits for a distinct old producer without omitting progress or replaying stale generations',async()=>{
  const cache=new LibraryPracticeSummaries(),slot=(cache as unknown as {admission:PackageAdmissionSession}).admission,
-  other=readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),producer=slot.import(other,{allowLegacyTempo:true});
+  other=readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),producer=slot.import(other,{allowLegacyTempo:true});
  assert.equal(slot.retained.pending,1);
  const old=cache.refresh([entry],'conventional-piano',reader,()=>true),
   superseded=cache.refresh([entry],'conventional-piano',reader,()=>true),
@@ -99,7 +99,7 @@ test('refreshes keep the prior coherent snapshot and reject changed live context
  await started.promise;assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);
  current=false;gate.resolve();assert.equal(await loading,false);
  assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);
- assert.equal(cache.get({...entry,file:'a-new-managed-package.isoscore'},'janko-four-row'),undefined);
+ assert.equal(cache.get({...entry,file:'a-new-managed-package.tuna'},'janko-four-row'),undefined);
 });
 
 test('newer source-bound Practice saves invalidate pending loads and retain whole-run attainment',async()=>{
@@ -115,7 +115,7 @@ test('late callbacks from another keyboard/source/file and malformed results can
  const cache=new LibraryPracticeSummaries();await cache.refresh([entry],'janko-four-row',reader,()=>true);
  assert.equal(cache.record(entry,entry,cp,'janko-four-row',1,true),false);
  assert.equal(cache.record({...entry,id:'another-source'},{...entry,id:'another-source'},rr,'janko-four-row',1,true),false);
- assert.equal(cache.record({...entry,file:'new.isoscore'},entry,rr,'janko-four-row',1,true),false);
+ assert.equal(cache.record({...entry,file:'new.tuna'},entry,rr,'janko-four-row',1,true),false);
  assert.equal(cache.record(undefined,entry,rr,'janko-four-row',1,true),false);
  assert.equal(cache.record(entry,entry,rr,'janko-four-row',NaN,true),false);
  assert.equal(cache.get(entry,'janko-four-row')!.sections,fraction);

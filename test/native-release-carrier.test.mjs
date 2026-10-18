@@ -378,9 +378,9 @@ test('both packages and Mac app resources must carry original curated notices an
 test('new exact footer notice is additive, emitted, copied to recipients and included in the generated Mac resource map',async()=>withFixture(async f=>{
  const name='LiberationSerif-Italic-NOTICE.txt',notice=await readFile(new URL('../licenses/'+name,import.meta.url)),font=await readFile(new URL('../src/LiberationSerif-Italic.ttf',import.meta.url));
  await file(f.viewer,'licenses/'+name,notice);await file(f.frontend,'assets/'+name,notice);await file(f.frontend,'assets/footer.ttf',font);
- const policy=await readFile(new URL('../src/footer-ink-policy.json',import.meta.url)),fixture=await readFile(new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url));
- await file(f.viewer,'src/footer-font-data.ts',await readFile(new URL('../src/footer-font-data.ts',import.meta.url)));await file(f.viewer,'src/footer-ink-policy.json',policy);await file(f.viewer,'fixtures/authored-calculated-preparation-v2.isoscore',fixture);
- await file(f.frontend,'footer-ink-probe.html','<script type=module src=assets/probe.js></script>');await file(f.frontend,'assets/public.isoscore',fixture);
+ const policy=await readFile(new URL('../src/footer-ink-policy.json',import.meta.url)),fixture=await readFile(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url));
+ await file(f.viewer,'src/footer-font-data.ts',await readFile(new URL('../src/footer-font-data.ts',import.meta.url)));await file(f.viewer,'src/footer-ink-policy.json',policy);await file(f.viewer,'fixtures/authored-calculated-preparation-v2.tuna',fixture);
+ await file(f.frontend,'footer-ink-probe.html','<script type=module src=assets/probe.js></script>');await file(f.frontend,'assets/public.tuna',fixture);
  for(const helper of ['footer-ink-probe.swift','footer-ink-probe.mjs','footer-ink-receipt.mjs'])await file(f.viewer,'scripts/native-release-carrier/'+helper,await readFile(new URL('../scripts/native-release-carrier/'+helper,import.meta.url)));
  await bindViewer(f);f.receipt.frontendDigest=sha256(canonical(await inventory(f.frontend)));await writeFile(f.checks,JSON.stringify(f.receipt,null,2)+'\n');
  const nativeBefore=await inventory(join(f.viewer,'src-tauri')),oldNotice=await readFile(join(f.iso,'licenses/NOTICE.txt'));

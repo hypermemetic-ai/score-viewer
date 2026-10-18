@@ -11,7 +11,7 @@ import {withResolvedMemory} from '../src/personal-assistance';
 import {handFor} from '../src/personal-assignments';
 import {HandChoiceQueue,abandonedChoicesText,waitingOutcomeText} from '../src/hand-editing-wait';
 const source=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),body=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
-const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
+const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
 async function fixture(){
  const disk=deferred(),written:any[]=[],frames:any[]=[],messages:string[]=[],target={entry:{id:'piece',importedAt:'2026-01-01T00:00:00.000Z'},package:p,personal:initialPersonal(p)},units=editUnits(p),data=new Map<string,string>();

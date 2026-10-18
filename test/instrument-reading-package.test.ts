@@ -144,7 +144,7 @@ test('physical piano operations reject reading packages before making actions or
   assert.deepEqual(scoreCapabilities(p),{reading:true,manualPractice:true,pianoPreparation:false,pianoPractice:false,pianoPerformance:false,fingerEditing:false});
   assert.throws(()=>planSource(p),/available for reading/);assert.throws(()=>planPerformance(p),/available for reading/);
   assert.throws(()=>scoreTranspositionRange(p),/available for reading/);
-  const markup=scoreOptionsMarkup({id:collectionId(p),file:'package-'+p.archiveSha256+'.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-08'},p,initialPersonal(p),{steps:0,min:0,max:0});
+  const markup=scoreOptionsMarkup({id:collectionId(p),file:'package-'+p.archiveSha256+'.tuna',metadata:p.manifest.metadata,importedAt:'2026-10-08'},p,initialPersonal(p),{steps:0,min:0,max:0});
   assert.match(markup,/Read the score/);assert.match(markup,/Share score/);assert.doesNotMatch(markup,/data-score-transpose|Generate fingerings|personal corrections/);
   const ready=await ensurePianoReady({packageBytes:bytes,layout:'conventional-piano'});
   assert.equal(ready.status,'unsupported');if('code' in ready)assert.equal(ready.code,'instrument-reading');
@@ -169,7 +169,7 @@ test('reading uses ordinary saved view identity and sharing excludes personal st
 });
 
 test('legacy bytes, revision, fingers and owner IDs survive canonical boundary normalization',async()=>{
-  const legacyBytes=readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),raw=unzipSync(legacyBytes),
+  const legacyBytes=readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),raw=unzipSync(legacyBytes),
     legacy=await importPackage(legacyBytes,{allowLegacyTempo:true}),serialized=JSON.parse(strFromU8(raw['score.json']));
   assert.ok(legacy.score.notes.every(isPitchedEvent));assert.deepEqual(legacy.files['score.json'],raw['score.json']);
   assert.equal(legacy.manifest.revision,await hashBytes(raw['score.json']));

@@ -148,6 +148,20 @@ test('cold admission refuses repinned transformation/map/source/seat claims and 
  await assert.rejects(()=>importPackage(referenceTampered),/reference bytes/);
 });
 
+test('a new transposed score keeps its original as transposition/original.tuna; earlier archives with the old member name still open',async()=>{
+ const original=await prepared(),bytes=await prepareSourceTransposition(original.p,original.bytes,1),q=await importPackage(bytes),m=q.collectionManifest??q.manifest;
+ assert.equal(m.transposition!.originalArchive,'transposition/original.tuna');
+ assert.ok(q.files['transposition/original.tuna']);assert.ok(!Object.keys(q.files).some(name=>name.endsWith('.isoscore')));
+ const rename=async(member:string)=>{const next=structuredClone(m),files={...q.files};delete files['manifest.json'];
+  files[member]=files['transposition/original.tuna'];delete files['transposition/original.tuna'];next.transposition!.originalArchive=member;
+  const {sha256,...content}=next.transposition!;next.transposition!.sha256=await identityHash(content);
+  next.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([n,b])=>[n,await hashBytes(b)])));return archivePackage(next,files);};
+ // Archives already on disk name the member transposition/original.isoscore.
+ const earlier=await importPackage(await rename('transposition/original.isoscore'));
+ assert.equal(getScoreTransposition(earlier),1);assert.deepEqual(getOriginalScorePackageBytes(earlier),original.bytes);assert.deepEqual(earlier.pages,q.pages);
+ await assert.rejects(async()=>importPackage(await rename('transposition/original.zip')),/transposition envelope/);
+});
+
 test('a saved working tempo moves with the transposed score and is rebound to its pitches',async()=>{
  const original=await prepared({reference:false}),referenceTempo={version:'reference-performance-tempo-v1' as const,bpm:140,beat:{numerator:1,denominator:4},provenance:{kind:'editorial' as const,reference:'Current player clock'}},
   withTempo=await preparePianoCalculationContext(original.p,{version:'piano-calculation-context-v1',sourceSha256:original.p.sourceSha256!,referencePerformanceTempo:referenceTempo}),
