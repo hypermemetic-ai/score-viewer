@@ -187,6 +187,7 @@ export async function addKeyboardView(selected:ScorePackage,layout:PhysicalKeybo
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  requirePianoCapability(selected,'pianoPreparation');
  const manifest=selected.collectionManifest??selected.manifest;
+ // The source checks repeat canAddKeyboardView's so the fields are known present below.
  if(!canAddKeyboardView(selected,layout)||!manifest.sourceScore||!selected.sourceScore||!selected.sourceSha256)
   throw Error(`This edition can't gain a ${layout==='janko-four-row'?'Jankó':'conventional'} keyboard view. The current score is retained.`);
  const primary=await selectPresentation(selected,manifest.keyboardLayout!),

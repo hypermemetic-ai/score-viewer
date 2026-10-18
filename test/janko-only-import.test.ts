@@ -24,4 +24,6 @@ test('a Jankó-only score file that can gain a conventional view still gains it 
  assert.deepEqual(p.availablePresentations,['janko-four-row']);
  assert.equal(importKeyboard(p,'conventional-piano'),'conventional-piano');
  assert.equal(importKeyboard(p,'janko-four-row'),'janko-four-row');
+ const added=await importPackage(await addKeyboardView(p,'conventional-piano'));
+ assert.deepEqual([...added.availablePresentations!].sort(),['conventional-piano','janko-four-row']);
 });
