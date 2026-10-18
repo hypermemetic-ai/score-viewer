@@ -154,8 +154,8 @@ export function matchesSourceRun(run, sourceRevision) {
 }
 
 export function reviewedScorePin(options) {
-  // Always name the score explicitly: the workflow's own default input still
-  // names the bundled score's earlier file name.
+  // Always name the reviewed bundled score explicitly rather than relying on
+  // the workflow's default input.
   if (options.scorePath === undefined && options.scoreSha256 === undefined) return { ...defaultScore };
   if (options.scorePath === undefined || options.scoreSha256 === undefined) throw Error('--score-path and --score-sha256 must be supplied together.');
   safePath(options.scorePath);
