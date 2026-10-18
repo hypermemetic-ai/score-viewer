@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "e43456eb101edb474bdd7f3ded453180cd577080",
-    "tree": "a1d823f1978c4abd9526e5ed3c25a01af6d8b683",
-    "timestamp": "2026-10-17T08:23:48.000Z"
+    "revision": "9c23896201a8162a71c7ad102dfb9f25941ec9f1",
+    "tree": "298d7dcbcbb2d0a18b3f7a214849dcbe4569207e",
+    "timestamp": "2026-10-18T00:22:59.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
-    "revision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8"
+    "revision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506"
   },
   "nativeFiles": {
     ".cargo/config.toml": {
@@ -253,8 +253,8 @@
       "size": 6814
     },
     "src-tauri/src/managed_files.rs": {
-      "sha256": "19d60916542fdf228e8655e978e72ed9f80322956dd5cc40c3413c31403c22a4",
-      "size": 5755
+      "sha256": "13c7034ec44666dec3c6e08bbc333ed0045d4a57097bcf22accf5206bd749a21",
+      "size": 6678
     },
     "src-tauri/src/metronome_stream.rs": {
       "sha256": "34d510de61c2c6b2d52e0c6a0e916e2aff67f015d09585897991a95641d15014",
@@ -7619,25 +7619,25 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-Wup2cHVA.js": {
-        "sha256": "703540f597cf8d95c01e12cf6b52291cadfc0bf5707f3004f2b142290194c7a9",
-        "size": 8356
+      "assets/footer-ink-probe-Dn-hPw_w.js": {
+        "sha256": "0f4024e6727b2273b7bf5de2dbd470fb1432d59f4c8edf00f66c246d3c759aae",
+        "size": 8776
       },
-      "assets/footer-probe-calculated-edition-7bcwDesV.isoscore": {
-        "sha256": "3bb4aeeb3134dd684465c10a711218c35f6eda2a1607e8f71f0e7d8d78f565ee",
-        "size": 89427
+      "assets/footer-probe-calculated-edition-CRqyU34U.isoscore": {
+        "sha256": "dec7f831b48d5a2cc316640e71fac3c49e0dffd12dfea0bbe60899dfc4ed1d50",
+        "size": 89887
       },
       "assets/fretted-preparation-assets-D_5Ay36F.js": {
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-CO8Nv5SY.js": {
-        "sha256": "4c96f026ba670d0e5178010e0f293584ddc85b9840cae2108982dc8eb18cfa8f",
-        "size": 629737
+      "assets/index-CjEh9wH2.css": {
+        "sha256": "a9741a0935610397f786d517743a56cae2c2dab1f255c7d4450704523f845b2b",
+        "size": 48103
       },
-      "assets/index-T9vEz8GV.css": {
-        "sha256": "dd0bb5290d5656888508f2eaae8d40266f6467f9645217ef00fea601ba7819f5",
-        "size": 45135
+      "assets/index-CUDhkWu3.js": {
+        "sha256": "8753f49b3d4998dcedebe3e7ec792b4f7cb88231501ff4f7defd276c7c9ee737",
+        "size": 651528
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7647,17 +7647,21 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/musescore-import-Bm07w3YP.js": {
-        "sha256": "c78e14ad2b43109c79ca33a9885da9952348a06b90cebbd8ae4be2f852b50cc8",
+      "assets/musescore-import-CEbKGOQT.js": {
+        "sha256": "f1c96089730885135e04d1737bd39b5d56f7ffce9b740ec0a8c3a82213b46d33",
         "size": 3943
       },
-      "assets/musicxml-import-Pff5eVY_.js": {
-        "sha256": "873c3369fccfde1caf382234fe3c5bb299987397031464a9d9953b5c9a22b756",
+      "assets/musicxml-import-5QK9aX3x.js": {
+        "sha256": "e4cfda8f7d2e526e738f0273624ec274c31fd8755cc52cbb9bf18df8ab2870a7",
         "size": 3692
       },
-      "assets/piano-readiness-B6hvczsz.js": {
-        "sha256": "4962d41f46c9fe709a2cc7277c12f2b6da7ef4ce3ffd502c84d318030ad6746e",
-        "size": 2369368
+      "assets/personal-projection-worker-DBnG4qMK.js": {
+        "sha256": "2614875867fca4d14ba0b13be491772b3496c98f1c163570328707a25120a77f",
+        "size": 1481217
+      },
+      "assets/piano-readiness-bqEEQfHh.js": {
+        "sha256": "81aea8ba8c585fa26bf118110b1f7b1bea5b785e0e4efd78f31dd8633ef58176",
+        "size": 2398122
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
@@ -7692,23 +7696,23 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "8c538c1141e7c4b4b2738b258433912a3e44568072d316956da685371a11b262",
+        "sha256": "bf232f4d4f1c560a624d4b92b657428c2e0a63dd38e94b351e9f2675b70f3a0e",
         "size": 323
       },
       "index.html": {
-        "sha256": "c67cfd65b6230f62873371a28b6d63a20bdb67065842c88a67e2cd12d6607355",
-        "size": 724
+        "sha256": "e7f50fba60e8eb51a5cf1532352da56e3da070291d6ed3810d7236a813c5677a",
+        "size": 969
       },
       "review/schumann-no14-conventional-20261006.isoscore": {
         "sha256": "2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d",
         "size": 423909
       }
     },
-    "digest": "3327ca78f37de70a153ef1b29aaa60c72799ae6f556ef73b4d350d7ac2c7795c"
+    "digest": "a5480c60e49e77d750745a549197d84d744b68bb0d2dfcc1c8aa6c61c33b598a"
   },
   "checks": {
-    "sha256": "f9e9dd120b8ee9bb9104ac6f704a61340fd96eac083363026a5d94b9e7b065b0",
-    "size": 5846
+    "sha256": "b4cc2708c91032c645725348ad8771f7713b5e9dfb1f3670e6094ea9e2c3b710",
+    "size": 6972
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
@@ -7723,12 +7727,12 @@
     },
     "files": {
       "scripts/native-delivery/footer-ink-probe.swift": {
-        "sha256": "36cfb20fcbf9d1456f9eb62dda3648bb50c9dcefb3eca157254a1c4abb02af6a",
-        "size": 4325
+        "sha256": "01a5cc522de941c6e9d727bccd3aae007ecd532fccd24774279e54a0095a0979",
+        "size": 7527
       },
       "scripts/native-delivery/footer-ink-probe.mjs": {
-        "sha256": "8a6ee7f2635e7812d4d879f8148b8b19c0a55875155496d59d8ba3fe58eb1013",
-        "size": 6698
+        "sha256": "3c5f24b55895aa6ba10b2d4ae8fd36381ca38417738624e08948de4a711e5a4a",
+        "size": 6878
       },
       "scripts/native-delivery/footer-ink-receipt.mjs": {
         "sha256": "e8bbd4c2588aee35c4e8c8f28e32e38744a94df0c362da1c1779adc9cecdfbbb",
