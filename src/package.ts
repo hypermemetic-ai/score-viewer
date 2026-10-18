@@ -23,7 +23,7 @@ import {validatePianoCalculationContext,scoreWithCalculationContext,type PianoCa
 import {PIANO_ASSIGNMENT_VERSION,validatePianoAssignments} from '../vendor/iso-notation/src/model/piano-finger-assignments';
 import {validatePianoPreparationIdentity,type PianoPreparationIdentity} from './piano-preparation-identity';
 import {validateDerivedHandPresentation,sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry,type PresentationWrittenHead} from '../vendor/iso-notation/src/score-presentation';
-import {admitCalculatedHandEdition,type CalculatedHandReceipt} from './calculated-hand-edition';
+import {admitCalculatedHandEdition,calculatedAdmissionKey,type CalculatedAdmissionEvidence,type CalculatedAdmissionEvidenceStore,type CalculatedHandReceipt} from './calculated-hand-edition';
 import {admitScoreTransposition,type ScoreTransposition} from './score-transposition';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
 export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
@@ -286,6 +286,9 @@ export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:P
 export interface ReadingAdmissionReceipts {get(archiveSha256:string):Promise<ReadingAdmissionReceipt|undefined>;put(archiveSha256:string,receipt:ReadingAdmissionReceipt):void}
 let readingReceipts:ReadingAdmissionReceipts|undefined;
 export function useReadingAdmissionReceipts(receipts:ReadingAdmissionReceipts|undefined){readingReceipts=receipts;}
+let calculatedEvidence:CalculatedAdmissionEvidenceStore|undefined;
+/** Evidence for calculated editions this build already replayed; see {@link CalculatedAdmissionEvidence}. */
+export function useCalculatedAdmissionEvidence(store:CalculatedAdmissionEvidenceStore|undefined){calculatedEvidence=store;}
 async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentOnly:boolean):Promise<ScorePackage>{
  options={...options};const execution=options.execution?capturedReadingExecution(options.execution):undefined;checkReadingExecution(execution);
  if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;const members=new Set<string>();
@@ -298,6 +301,9 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  const dualArchiveSha256=m.version===3&&m.reading?.version==='instrument-reading-package-v2'?await hashBytes(new Uint8Array(bytes)):undefined;
  const receipts=m.version===3&&m.reading?.version==='instrument-reading-package-v1'?readingReceipts:undefined,
   receiptArchiveSha256=receipts?await hashBytes(new Uint8Array(bytes)):undefined;
+ // Copied before the first await, hashed only for a calculated presentation.
+ const evidence=m.version===2&&!contentOnly?calculatedEvidence:undefined,evidenceBytes=evidence?new Uint8Array(bytes):undefined;
+ let evidenceArchiveSha256:Promise<string>|undefined;const madeEvidence:[string,CalculatedAdmissionEvidence][]=[];
  checkReadingExecution(execution);if(Object.keys(files).length!==Object.keys(m.files).length+1)fail('Unlisted package content');
  for(const [name,d] of Object.entries(m.files)){if(!/^[A-Za-z0-9_./-]+$/.test(name)||name.includes('..')||!digest(d)||!files[name]||await hashBytes(files[name])!==d)fail(`Integrity mismatch: ${name}`);checkReadingExecution(execution);}
  let referenceMidi:Uint8Array|undefined;
@@ -393,7 +399,9 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
   if(derived&&!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
   if(derived&&!contentOnly){
-   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt!),files[d.seats],heads=>actualHeads.set(p,heads),execution);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
+   const evidenceKey=evidence?await calculatedAdmissionKey(await (evidenceArchiveSha256??=hashBytes(evidenceBytes!)),key):undefined;
+   p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt!),files[d.seats],heads=>actualHeads.set(p,heads),execution,
+    evidence&&evidenceKey?{found:()=>evidence.get(evidenceKey),made:made=>madeEvidence.push([evidenceKey,made])}:undefined);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
   views.set(key,p);
  }
  if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');
@@ -406,6 +414,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  // Defer registration until every companion and outer root-manifest check
  // succeeds. A rejected import never publishes usable partial evidence.
  for(const [p,heads]of actualHeads)recordWrittenHeads(p,heads);
+ for(const [key,made] of madeEvidence)evidence!.put(key,made);
  if(options.keyboardLayout)return selectPresentation(primary,options.keyboardLayout);
  return primary;
 }

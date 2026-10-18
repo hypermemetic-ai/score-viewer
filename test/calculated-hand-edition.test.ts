@@ -2,7 +2,7 @@ import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-even
 import {requirePianoEvent} from '../src/piano-event';
 import test from 'node:test';import assert from 'node:assert/strict';import {strToU8,strFromU8} from 'fflate';
 import {transferStudy,boundaryStudy,completeTieBoundaryStudy,sourcePackage,calculatedStudy} from './support/hand-edition-fixture';
-import {archivePackage,hashBytes,importPackage,type ScorePackage} from '../src/package';
+import {archivePackage,hashBytes,importPackage,useCalculatedAdmissionEvidence,type ScorePackage} from '../src/package';
 import {annotationPositions} from '../src/fingering-presentation';import {initialPersonal,fingerDisplayAvailable,corrected,fingerFor} from '../src/state';
 import {createPianoPreparationIdentity} from '../src/piano-preparation-identity';
 import {ensurePianoReady} from '../src/piano-readiness';
@@ -41,7 +41,11 @@ test('strong cold admission rejects missing/duplicated/misattributed paint recei
  for(const change of [(r:any)=>{r.sourceCoverage.silences=[];},(r:any)=>{r.sourceCoverage.silences.push(r.sourceCoverage.silences[0]);},
   (r:any)=>{r.sourceCoverage.gestures[0].memberIds[0]='foreign';},(r:any)=>{r.annotationGeometry.seats[0].durationBounds=[];}])
   await assert.rejects(importPackage(await repinned(p,mutateReceipt(change))),/actual paint|coverage|geometry/);
- await assert.rejects(importPackage(await repinned(p,f=>{f['pages/1.svg']=strToU8(strFromU8(f['pages/1.svg']).replace(/<line[^>]+class="janko-stem"[^>]*\/>/,''));})),/pages or seats/);
+ // A refused replay leaves no admission evidence behind.
+ const kept:unknown[]=[];useCalculatedAdmissionEvidence({get:async()=>undefined,put:(_,e)=>{kept.push(e);}});
+ try{await assert.rejects(importPackage(await repinned(p,f=>{f['pages/1.svg']=strToU8(strFromU8(f['pages/1.svg']).replace(/<line[^>]+class="janko-stem"[^>]*\/>/,''));})),/pages or seats/);}
+ finally{useCalculatedAdmissionEvidence(undefined);}
+ assert.deepEqual(kept,[]);
  await assert.rejects(importPackage(await repinned(p,f=>{const r=JSON.parse(strFromU8(f['rendering-recipe.json']));r.baseline.pageSha256=p.calculatedHandReceipt!.outputIdentity.pageSha256;f['rendering-recipe.json']=strToU8(JSON.stringify(r));})),/raw-page baseline/);
  await assert.rejects(importPackage(await repinned(p,f=>{const s=JSON.parse(strFromU8(f['score.json']));s.notes[0].editorialHand={hand:s.notes[0].hand,kind:'confirm',authorityId:'forged-operator'};f['score.json']=strToU8(JSON.stringify(s));})),/source\/editorial provenance/);
 });

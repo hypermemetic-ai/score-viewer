@@ -75,9 +75,36 @@ function normalizeCalculatedReceipt(raw:unknown):CalculatedHandReceipt {
  return r;
 }
 
+/** Proof that this viewer build replayed one exact calculated edition view
+ * (archive digest and keyboard) through the shared engine and found it equal:
+ * the receipt it confirmed and the written heads it drew. Derived only, it is
+ * never written into a package; a missing or refused entry replays again. */
+export interface CalculatedAdmissionEvidence {version:'calculated-admission-evidence-v1';receipt:CalculatedHandReceipt;writtenHeads:PresentationWrittenHead[]}
+export interface CalculatedAdmissionEvidenceStore {get(key:string):Promise<CalculatedAdmissionEvidence|undefined>;put(key:string,evidence:CalculatedAdmissionEvidence):void}
+const strings=(v:unknown)=>Array.isArray(v)&&v.every(x=>typeof x==='string');
+export function calculatedAdmissionEvidence(value:unknown):CalculatedAdmissionEvidence {
+ const e=value as CalculatedAdmissionEvidence;
+ if(!e||typeof e!=='object'||e.version!=='calculated-admission-evidence-v1'||Object.keys(e).length!==3||!e.receipt||typeof e.receipt!=='object'||
+  !Array.isArray(e.writtenHeads)||e.writtenHeads.some(h=>!h||typeof h!=='object'||!strings(h.ownerIds)||!strings(h.headIds)))throw Error('Invalid calculated admission evidence');
+ return e;
+}
+/** The evidence for one presentation of one exact archive. */
+export const calculatedAdmissionKey=(archiveSha256:string,layout:string)=>identityHash({version:'calculated-admission-evidence-v1',archiveSha256,layout});
+
 /** Cold admission is an actual source-owned engine replay with no optimizer.
- * The saved ledger or its hashes cannot substitute for source/paint audit. */
-export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seatBytes:Uint8Array,onActualReplay?:(heads:readonly PresentationWrittenHead[])=>void,input?:ReadingExecution):Promise<CalculatedHandReceipt>{
+ * The saved ledger or its hashes cannot substitute for source/paint audit.
+ * Evidence that this build already replayed these exact archive bytes, and
+ * confirmed this very receipt, stands in for the replay. */
+/** The written heads the evidence claims are exactly this edition's seats,
+ * as the package's own written-head ledger requires. */
+const headsFitSeats=(p:ScorePackage,heads:readonly PresentationWrittenHead[])=>heads.length===p.seats.length&&new Set(heads.map(h=>h.seatId)).size===heads.length&&
+ heads.every(h=>{const s=p.seats.find(s=>s.id===h.seatId);return !!s&&s.page===h.page&&s.system===h.system&&s.x===h.x&&s.baseline===h.baseline&&s.fontSize===h.fontSize&&
+  s.pitchDigit===h.digit&&JSON.stringify([...s.ownerIds].sort())===JSON.stringify(h.ownerIds)&&h.headIds.length>0&&h.headIds.every(id=>typeof id==='string'&&!!id);});
+/** `evidence.found` is read before replaying; a replay that passes reports
+ * its evidence through `evidence.made`, for the caller to keep once the whole
+ * package is admitted. */
+export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seatBytes:Uint8Array,onActualReplay?:(heads:readonly PresentationWrittenHead[])=>void,input?:ReadingExecution,
+ evidence?:{found:()=>Promise<CalculatedAdmissionEvidence|undefined>;made:(evidence:CalculatedAdmissionEvidence)=>void}):Promise<CalculatedHandReceipt>{
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  const r=normalizeCalculatedReceipt(raw),inkPolicy=(r?.version==='viewer-calculated-hand-edition-v2'||r?.version==='viewer-calculated-hand-edition-v3')?validateAnnotationInkPolicy(r.annotationInkPolicy):undefined;
  if(r?.version!=='viewer-calculated-hand-edition-v1'&&!inkPolicy)throw Error('Unsupported calculated edition receipt.');
@@ -90,6 +117,12 @@ export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seat
   {inputs,operatorRequirements}=await calculatedHandInputs(p,p.fingerLayer,policy,recipe,constraints,inkPolicy),owners=ownerHands(p.fingerLayer),
   identity=await createHandPresentationIdentity(inputs,owners);
  await validateHandPresentationAgainstSource(source,p.score,identity,operatorRequirements);
+ const saved=evidence?await evidence.found().catch(()=>undefined):undefined;checkReadingExecution(execution);
+ if(saved&&same(r,saved.receipt)&&headsFitSeats(p,saved.writtenHeads)){
+  annotationPositions({...p,calculatedHandReceipt:saved.receipt,annotationGeometry:saved.receipt.annotationGeometry});
+  onActualReplay?.(saved.writtenHeads.map(h=>({...h,ownerIds:[...h.ownerIds],headIds:[...h.headIds]})));
+  return structuredClone(saved.receipt);
+ }
  const replay=await prepareCalculatedHandPresentation(source,owners,recipe,inputs,operatorRequirements,execution),expected=receiptFor(replay,inkPolicy,p.transposition?.sha256);
  checkReadingExecution(execution);
  if(!same(r,expected))throw Error('Calculated edition receipt differs from original-source actual paint, coverage or annotation geometry.');
@@ -102,5 +135,6 @@ export async function admitCalculatedHandEdition(p:ScorePackage,raw:unknown,seat
  annotationPositions({...p,calculatedHandReceipt:expected,annotationGeometry:expected.annotationGeometry});
  checkReadingExecution(execution);
  onActualReplay?.(replay.writtenHeads.map(h=>({...h,ownerIds:[...h.ownerIds],headIds:[...h.headIds]})));
+ evidence?.made(structuredClone({version:'calculated-admission-evidence-v1',receipt:expected,writtenHeads:replay.writtenHeads}));
  return structuredClone(expected);
 }
