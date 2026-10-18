@@ -25,12 +25,18 @@ test('passive recipe admits resolved preparation, rejects programs, unresolved d
   assert.throws(()=>validateScoreRenderingRecipe({...recipe,engineId:'imported-program'}),/Unsupported/);
 });
 
-test('real-engine recipe reproduces all frozen No14 pages and exact source-owner label seats',()=>{
-  const p=renderScorePresentation(score,recipe);
-  assert.equal(p.layouts.length,11);assert.deepEqual(p.rawPages,pages);assert.deepEqual(p.seats,seats);
+// Saved pages are derived output, not a byte-identity gate (owner direction,
+// 2026-10-17). ISO #388 (pinned at bee8c67) seats dynamics by their own music,
+// which moves the frozen No14 systems this recipe draws today (the reader
+// shows a retained edition's stored pages). The retained recipe still draws every source owner
+// on the same seats, deterministically and lint-clean.
+test('real-engine recipe engraves every frozen No14 owner in its own seat group, deterministically within a run',()=>{
+  const p=renderScorePresentation(score,recipe),again=renderScorePresentation(score,recipe);
+  assert.equal(p.layouts.length,11);assert.equal(p.rawPages.length,pages.length);
+  assert.deepEqual(p.seats.map(s=>[s.id,s.ownerIds]),seats.map((s:{id:string;ownerIds:string[]})=>[s.id,s.ownerIds]));
   assert.equal(p.allFive,true);assert.deepEqual(p.lint.violations,[]);assert.deepEqual(p.lint.warnings,[]);
   assert.equal(new Set(p.seats.flatMap(s=>s.ownerIds)).size,383);
-  assert.deepEqual(p.pages,[1,2,3].map(n=>strFromU8(files[`pages/${n}.svg`])));
+  assert.deepEqual(again.rawPages,p.rawPages);assert.deepEqual(again.seats,p.seats);
 });
 
 test('hand projection preserves genuine editorial guards; authored unguarded projection retains source facts and occurrences',()=>{

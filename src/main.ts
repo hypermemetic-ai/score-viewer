@@ -88,7 +88,7 @@ import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-as
 import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
-import {readingAdmissionReceipt} from './reading-package';
+import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
 import {isTauri} from '@tauri-apps/api/core';
 import {PracticeClock} from './practice-clock';
 import {practiceAudio} from './host';
@@ -604,7 +604,10 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
  const previousBytes=!newEntry?await host.read(entry.file):null;
  if(!newEntry&&!previousBytes)throw Error('The prior managed score is missing; saved progress and edition retained.');
  // A re-engraved edition carries practice from the earlier views it replaces.
- let previous=previousBytes&&!rebuilt?await admitOrContent(previousBytes):undefined;
+ // Practice moves only between keyboard editions (stagePracticeEditionTransfer);
+ // a musical reading's journals are named for the score alone, so its earlier
+ // archive is not read again here.
+ let previous=previousBytes&&!rebuilt&&q.package.keyboardLayout?await admitOrContent(previousBytes):undefined;
  if(previous&&q.package.keyboardLayout&&previous.availablePresentations?.includes(q.package.keyboardLayout))previous=await selectPresentation(previous,q.package.keyboardLayout);
  let practiceContext:AdmittedPracticeContext|undefined;
  if(op){await readingCheckpoint(op);readingProgress(op,'save');}
@@ -836,6 +839,8 @@ function rebuiltNotice(r:RebuiltInstall){
  * the earlier archive and its journals stay saved. */
 async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation){
  readingProgress(op,'engrave-again');
+ const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
+ if(reading){await openReengravedReading(entry,reading,op);return;}
  const rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
  await readingCheckpoint(op);
  const {q,running}=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op),
@@ -843,6 +848,19 @@ async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown
  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
  finishReading(op,true);
  notify(rebuiltNotice(rebuilt)+unsaved);
+}
+
+/** A musical reading engraved again is installed like any new edition of
+ * the score: the earlier archive and its journals stay saved. Its journals
+ * are named for the score alone, so the reader's place and practice stay. */
+async function openReengravedReading(entry:Entry,bytes:Uint8Array,op:ReadingOperation){
+ await readingCheckpoint(op);
+ const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
+ const {q,running}=await prepareScore(bytes,op.keyboard,await loadPersonal(entry,p),p,op),
+  installed=await installPreparedScore(entry,q,running,q.personal??await loadPersonal(entry,q.package));await readingCheckpoint(op);
+ await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
+ finishReading(op,true);
+ notify('This score was engraved again with the current engraving. Your place and practice came along.'+unsaved);
 }
 
 async function chooseGuitarProTracks(inspection:GuitarProInspection,op:ReadingOperation):Promise<string[]|undefined>{

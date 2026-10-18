@@ -11,7 +11,7 @@ The viewer never calculates or infers hands or fingers. Fingerings in an edition
 
 ## When an edition is engraved again
 
-A saved edition can stop opening because its pages no longer reproduce under the pinned engine. For example, ISO #383 split hand-change beams per hand, and ISO #386 (pinned at 2b21840) made the approved recipe carry source-owned hands, ordinary opening head masks and short-phrase system breaks: a saved approved-v3 or calculated-hand recipe without those keys is refused with "This saved engraving does not match the current shared engraving policy. Open the score again to engrave it afresh." The reader checks approved-v3 recipes against the current policy on opening (`src/package.ts`); retained v1, v2 and no14-recovery recipes are unchanged. In these cases the viewer engraves the edition again from its own content instead of refusing it. This happens in four places:
+A saved edition can stop opening because its pages no longer reproduce under the pinned engine. For example, ISO #383 split hand-change beams per hand, and ISO #386 (pinned at 2b21840) made the approved recipe carry source-owned hands, ordinary opening head masks and short-phrase system breaks: a saved approved-v3 or calculated-hand recipe without those keys is refused with "This saved engraving does not match the current shared engraving policy. Open the score again to engrave it afresh." The reader checks approved-v3 recipes against the current policy on opening (`src/package.ts`); retained v1, v2 and no14-recovery recipes are unchanged. ISO bee8c67 adds stem diamonds for dotted values, shared unison heads, hand corners and stacked shared-duration heads to that policy (#390–#392, #394), so every approved-v3 and calculated-hand edition saved at 2b21840 or earlier is engraved again on opening. Its #388 dynamics seating also moves the systems a retained no14-recovery recipe would draw today; such an edition is not a calculated edition, so its saved pages are shown as stored and are not replayed on opening. In these cases the viewer engraves the edition again from its own content instead of refusing it. This happens in four places:
 
 - opening the score;
 - choosing an edition under **Earlier editions**;
@@ -52,6 +52,10 @@ A pitch whose saved edition was made from an earlier engraving of the original, 
 
 The notice reads: "This score was engraved again with the current engraving. Your hands, fingers and choices came along." When hands or fingers moved into the player's choices, it adds "The edition's hands and fingers now show as your own choices." When choices could not move, it says "Your hands and fingers came along." and how many notes' choices stay with the earlier edition. If practice could not move, it says so too.
 
+## Musical readings
+
+A single-reading archive (`instrument-reading-package-v1`, for example an earlier Guitar Pro part such as Add It Up) is admitted only when the pinned engine redraws its pages, owners and layout byte for byte. ISO bee8c67 draws dotted values with a stem diamond, so readings saved at 2b21840 or earlier stopped opening with "Reading page differs from its shared source preparation". On opening, such a reading is now engraved again from its own content (`reengraveReadingArchive` in `src/reading-package.ts`): the same `score.json` bytes, metadata, creation time, font, notices, layout options and tokens go through `prepareReadingPackage`, and the source revision must come out unchanged. The new archive is installed like any new edition (`stagePresentationInstall`); the earlier archive keeps its bytes and journal mapping. A reading's state and practice journals are named for the score alone, so the reader's place and practice stay, and the notice says so. An archive carrying any member the new archive would not keep, or whose source or policy no longer reads, keeps its refusal. `readEditionContent` reads such a reading for its content by drawing it with the pinned engine instead of comparing pages; it records no admission receipt. Dual readings (`instrument-reading-package-v2`) are not engraved again by this path.
+
 ## Removed
 
 The following are removed:
@@ -70,4 +74,4 @@ The page replay (`admitCalculatedHandEdition`) still admits calculated editions 
 - A rebuilt edition has new pages. Practice and personal journals are keyed by edition. Journals under the earlier view's key are carried over, and journals saved under another key stay where they were.
 - If engraving again also fails, the score is refused plainly and every edition stays saved.
 
-The footer probe's saved calculated edition (`fixtures/footer-probe-calculated-edition.isoscore`) was redrawn at ISO 2b21840 with its own hands and fingers by `test/support/footer-probe-edition.ts`. It still opens through its receipt, so the native footer probe exercises the same receipt path.
+The footer probe's saved calculated edition (`fixtures/footer-probe-calculated-edition.isoscore`) was redrawn at ISO bee8c67 with its own hands and fingers by `test/support/footer-probe-edition.ts`. It still opens through its receipt, so the native footer probe exercises the same receipt path.
