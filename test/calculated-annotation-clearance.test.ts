@@ -91,6 +91,6 @@ test('stem-mounted round openings and half capsules reserve their exact arc boun
  const near=(a:number[],b:number[])=>a.every((n,i)=>Math.abs(n-b[i])<1e-9);
  assert.ok(near(p.boxes[0],[47,97,53,103]),String(p.boxes[0]));
  assert.ok(near(p.boxes[1],[97,196,103,203]),String(p.boxes[1]));
- assert.ok(near(p.boxes[2],[10,5,20,10]),String(p.boxes[2]),'a relative arc sweeping up');
+ assert.ok(near(p.boxes[2],[10,5,20,10]),'a relative arc sweeping up: '+String(p.boxes[2]));
  assert.throws(()=>actualPageObstacles(page('<path d="M 0 0 A 3 3 0 2 0 6 0"/>'),new Map()),/Malformed/);
 });
