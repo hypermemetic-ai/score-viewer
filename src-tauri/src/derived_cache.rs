@@ -4,7 +4,7 @@
 //! dropping its least recently used entries, and stops writing while free disk
 //! space is under a floor. A refused or failed write, and a missing or damaged
 //! entry, cost only time.
-use std::{fs, io::{self, Read}, path::{Path, PathBuf}, time::SystemTime};
+use std::{fs, io::{self, Read}, path::{Path, PathBuf}, time::{Duration, SystemTime}};
 
 /// The cache's own directory, inside the managed data directory.
 pub const DIRECTORY: &str = "viewer-derived-v2";
@@ -43,43 +43,61 @@ pub fn read(dir: &Path, key: &str, limits: Limits) -> Result<Option<Vec<u8>>, St
     Ok(Some(data))
 }
 
-/// Store an entry, dropping the least recently used others until it fits the
-/// budget. False, with nothing written, when it cannot fit or the disk is low.
-pub fn write(dir: &Path, key: &str, data: &[u8], limits: Limits, free_space: impl Fn(&Path) -> io::Result<u64>) -> Result<bool, String> {
-    if !valid_key(key) { return Err("Invalid derived cache entry".into()); }
-    let size = data.len() as u64;
-    if size > limits.entry_bytes || size > limits.budget_bytes { return Ok(false); }
-    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    // Never fill the disk: under the floor the cache only reads.
-    match free_space(dir) {
-        Ok(free) if free >= limits.free_space_floor_bytes.saturating_add(size) => {}
-        _ => return Ok(false),
-    }
-    let target = entry(dir, key);
+/// A write interrupted before its rename leaves a pending file; one this old
+/// belongs to no running copy of the app.
+const STALE_PENDING: Duration = Duration::from_secs(3600);
+
+/// The other entries, least recently used first. Stale pending files go.
+fn others(dir: &Path, target: &Path) -> Result<Vec<(SystemTime, u64, PathBuf)>, String> {
     let mut entries = Vec::new();
     for item in fs::read_dir(dir).map_err(|e| e.to_string())? {
         let Ok(item) = item else { continue };
         let path = item.path();
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
-        // A write interrupted before its rename leaves a pending file.
-        if name.ends_with(".pending") { let _ = fs::remove_file(&path); continue; }
-        if path == target || !name.strip_suffix(".bin").is_some_and(valid_key) { continue; }
         let Ok(meta) = item.metadata() else { continue };
-        entries.push((meta.modified().unwrap_or(SystemTime::UNIX_EPOCH), meta.len(), path));
+        let modified = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+        if name.ends_with(".pending") {
+            if SystemTime::now().duration_since(modified).is_ok_and(|age| age > STALE_PENDING) { let _ = fs::remove_file(&path); }
+            continue;
+        }
+        if path == target || !name.strip_suffix(".bin").is_some_and(valid_key) { continue; }
+        entries.push((modified, meta.len(), path));
     }
-    let mut total: u64 = entries.iter().map(|e| e.1).sum();
     entries.sort();
+    Ok(entries)
+}
+
+/// Store an entry, dropping the least recently used others until it fits the
+/// budget. False, with nothing written, when it cannot fit or the disk is low;
+/// on a low disk the oldest entries are given back until it is above the floor.
+pub fn write(dir: &Path, key: &str, data: &[u8], limits: Limits, free_space: impl Fn(&Path) -> io::Result<u64>) -> Result<bool, String> {
+    if !valid_key(key) { return Err("Invalid derived cache entry".into()); }
+    let size = data.len() as u64;
+    if size > limits.entry_bytes || size > limits.budget_bytes { return Ok(false); }
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let target = entry(dir, key);
+    let entries = others(dir, &target)?;
+    let above = |floor: u64| matches!(free_space(dir), Ok(free) if free >= floor);
+    // Never fill the disk: under the floor the cache writes nothing and gives
+    // space back, oldest first.
+    if !above(limits.free_space_floor_bytes.saturating_add(size)) {
+        for (_, _, path) in entries {
+            if above(limits.free_space_floor_bytes) { break; }
+            let _ = fs::remove_file(&path);
+        }
+        return Ok(false);
+    }
+    // The entry is on disk before anything is dropped for it.
+    let pending = dir.join(format!("{key}.pending"));
+    if let Err(e) = fs::write(&pending, data) { let _ = fs::remove_file(&pending); return Err(e.to_string()); }
+    let mut total: u64 = entries.iter().map(|e| e.1).sum();
     for (_, len, path) in entries {
         if total.saturating_add(size) <= limits.budget_bytes { break; }
         // An entry in use elsewhere stays and still counts.
         if fs::remove_file(&path).is_ok() { total -= len; }
     }
-    if total.saturating_add(size) > limits.budget_bytes { return Ok(false); }
-    let pending = dir.join(format!("{key}.pending"));
-    if let Err(e) = fs::write(&pending, data).and_then(|_| fs::rename(&pending, &target)) {
-        let _ = fs::remove_file(&pending);
-        return Err(e.to_string());
-    }
+    if total.saturating_add(size) > limits.budget_bytes { let _ = fs::remove_file(&pending); return Ok(false); }
+    if let Err(e) = fs::rename(&pending, &target) { let _ = fs::remove_file(&pending); return Err(e.to_string()); }
     Ok(true)
 }
 
@@ -94,7 +112,6 @@ pub fn remove_earlier_slots(managed: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     fn dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("derived-cache-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
@@ -160,13 +177,29 @@ mod tests {
         fs::remove_dir_all(&d).unwrap();
     }
     #[test]
+    fn a_low_disk_gives_back_the_oldest_entries_until_it_is_above_the_floor() {
+        let d = dir("give-back");
+        for n in 1..=4 { assert_eq!(write(&d, &key(n), &[n; 20], small(100), PLENTY), Ok(true)); }
+        for n in 1..=4 { age(&d, &key(n), 100 * (5 - n as u64)); }
+        // Free space is 60 plus whatever the cache gives back; the floor is 100.
+        let stored = |d: &Path| (1..=4).filter(|&n| entry(d, &key(n)).exists()).count() as u64 * 20;
+        assert_eq!(write(&d, &key(5), &[5; 20], small(100), |d| Ok(60 + 80 - stored(d))), Ok(false));
+        let left: Vec<u8> = (1..=5).filter(|&n| entry(&d, &key(n)).exists()).collect();
+        assert_eq!(left, vec![3, 4], "the two oldest go, and no more than the floor needs");
+        fs::remove_dir_all(&d).unwrap();
+    }
+    #[test]
     fn pending_files_and_foreign_names_are_not_counted() {
         let d = dir("foreign");
         fs::create_dir_all(&d).unwrap();
-        fs::write(d.join(format!("{}.pending", key(9))), [0; 90]).unwrap();
+        let (stale, fresh) = (d.join(format!("{}.pending", key(9))), d.join(format!("{}.pending", key(8))));
+        fs::write(&stale, [0; 90]).unwrap();
+        fs::OpenOptions::new().write(true).open(&stale).unwrap().set_modified(SystemTime::now() - Duration::from_secs(7200)).unwrap();
+        fs::write(&fresh, [0; 10]).unwrap();
         fs::write(d.join("notes.txt"), [0; 90]).unwrap();
         assert_eq!(write(&d, &key(1), &[1; 50], small(100), PLENTY), Ok(true));
-        assert!(!d.join(format!("{}.pending", key(9))).exists());
+        assert!(!stale.exists(), "a stale pending file is removed");
+        assert!(fresh.exists(), "another running copy's write in progress is left alone");
         assert!(d.join("notes.txt").exists(), "a file the cache did not write is left alone");
         fs::remove_dir_all(&d).unwrap();
     }

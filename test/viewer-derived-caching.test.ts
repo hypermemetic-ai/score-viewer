@@ -64,11 +64,24 @@ test('derived file cache keeps one entry per kind and key, and a refused or over
  assert.equal(await failing.put('kind-a',sha('a'),{}),false);assert.equal(await failing.get('kind-a',sha('a'),object),undefined);
 });
 
+test('a large entry, several times the largest real one, round-trips exactly',async()=>{
+ const {files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+ // About 24 MB of poorly compressible text; a settled No. 14 engine stores about 4 MB.
+ const big={pages:Array.from({length:2000},(_,i)=>i+':'+Array.from({length:1100},()=>Math.random().toString(36).slice(2)).join(''))};
+ assert.equal(await cache.put('kind-a',sha('f'),big),true);
+ const [stored]=[...files.values()];assert.ok(stored.byteLength>8*1024*1024,`${stored.byteLength} bytes, over the old 8 MB slot`);
+ assert.deepEqual(await cache.get('kind-a',sha('f'),object),big);
+});
+
 test('the native cache keeps the same entry ceiling, a 2 GB budget and a 5 GB free-space floor',()=>{
  const rust=readFileSync(new URL('../src-tauri/src/derived_cache.rs',import.meta.url),'utf8'),main=readFileSync(new URL('../src-tauri/src/main.rs',import.meta.url),'utf8');
  assert.match(rust,/LIMITS: Limits = Limits \{ budget_bytes: 2048 \* MIB, free_space_floor_bytes: 5120 \* MIB, entry_bytes: 256 \* MIB \}/);
  assert.equal(DERIVED_FILE_CACHE_LIMITS.entryBytes,256*1024*1024);
  assert.match(main,/generate_handler!\[[^\]]*read_derived,write_derived/);assert.match(main,/fs2::available_space/);
+ // Raw bytes both ways: base64 of a large entry would exhaust the reader's memory.
+ assert.match(main,/fn read_derived[^\n]*->Result<tauri::ipc::Response,String>/);assert.match(main,/InvokeBody::Raw/);
+ const host=readFileSync(new URL('../src/host.ts',import.meta.url),'utf8');
+ assert.match(host,/invoke<ArrayBuffer>\('read_derived',\{key\}\)/);assert.match(host,/invoke<boolean>\('write_derived',data,\{headers:\{'derived-key':key\}\}\)/);
  // The earlier fixed slots are no longer managed names; the native side removes them.
  const managed=readFileSync(new URL('../src-tauri/src/managed_files.rs',import.meta.url),'utf8');
  assert.doesNotMatch(managed,/strip_prefix\("viewer-derived-cache-v1-slot-"\)/);

@@ -8,11 +8,11 @@ declare const __VIEWER_DERIVED_IDENTITY__:string|undefined;
 export const VIEWER_DERIVED_IDENTITY:string=typeof __VIEWER_DERIVED_IDENTITY__==='string'?__VIEWER_DERIVED_IDENTITY__:'unbuilt-source';
 
 export const DERIVED_FILE_CACHE_FORMAT='viewer-derived-file-cache-v3';
-/** One entry's ceilings. The total budget and the free-disk floor belong to the
- * store (src-tauri/src/derived_cache.rs): 2 GB, dropping the least recently
- * used entries, and nothing new below 5 GB free. A decoded payload stays
- * under the longest string a JavaScript engine can hold. */
-export const DERIVED_FILE_CACHE_LIMITS=Object.freeze({entryBytes:256*1024*1024,payloadBytes:500*1024*1024});
+/** One entry's ceilings, stored and decoded, far above any real entry (a
+ * settled engine is a few MB). The total budget and the free-disk floor
+ * belong to the store (src-tauri/src/derived_cache.rs): 2 GB, dropping the
+ * least recently used entries, and nothing new below 5 GB free. */
+export const DERIVED_FILE_CACHE_LIMITS=Object.freeze({entryBytes:256*1024*1024,payloadBytes:256*1024*1024});
 /** Entries are named by a lowercase SHA-256 and nothing else. A write
  * resolves false when the store keeps nothing: over its budget, or low disk. */
 export interface DerivedFileStore {read(name:string):Promise<Uint8Array|null>;write(name:string,data:Uint8Array):Promise<boolean>}

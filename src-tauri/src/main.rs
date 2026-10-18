@@ -32,17 +32,21 @@ fn derived_directory(app:&tauri::AppHandle)->Result<(PathBuf,PathBuf),String>{
  let managed=managed(app,"library.json")?.parent().ok_or("Managed directory missing")?.to_path_buf();
  Ok((managed.join(derived_cache::DIRECTORY),managed))
 }
+/// Raw bytes both ways, never base64: an entry can be large. Empty is a miss.
 #[tauri::command]
-async fn read_derived(app:tauri::AppHandle,key:String)->Result<Option<String>,String>{
+async fn read_derived(app:tauri::AppHandle,key:String)->Result<tauri::ipc::Response,String>{
  let (dir,_)=derived_directory(&app)?;
- tauri::async_runtime::spawn_blocking(move||->Result<Option<String>,String>{Ok(derived_cache::read(&dir,&key,derived_cache::LIMITS)?.map(|b|STANDARD.encode(b)))}).await.map_err(|e|e.to_string())?
+ let data=tauri::async_runtime::spawn_blocking(move||derived_cache::read(&dir,&key,derived_cache::LIMITS)).await.map_err(|e|e.to_string())??;
+ Ok(tauri::ipc::Response::new(data.unwrap_or_default()))
 }
-/// False when the entry was not kept: too large, or the disk is low.
+/// The entry's bytes are the raw request body and its key the `derived-key`
+/// header. False when the entry was not kept: too large, or the disk is low.
 #[tauri::command]
-async fn write_derived(app:tauri::AppHandle,state:tauri::State<'_,Derived>,key:String,data:String)->Result<bool,String>{
- let (dir,managed)=derived_directory(&app)?;let lock=state.0.clone();
+async fn write_derived(app:tauri::AppHandle,state:tauri::State<'_,Derived>,request:tauri::ipc::Request<'_>)->Result<bool,String>{
+ let tauri::ipc::InvokeBody::Raw(bytes)=request.body() else{return Err("Derived cache entries are raw bytes".into())};
+ let key=request.headers().get("derived-key").and_then(|v|v.to_str().ok()).ok_or("Derived cache entry has no key")?.to_string();
+ let (bytes,(dir,managed),lock)=(bytes.clone(),derived_directory(&app)?,state.0.clone());
  tauri::async_runtime::spawn_blocking(move||{
-  let bytes=STANDARD.decode(data).map_err(|e|e.to_string())?;
   let mut swept=lock.lock().map_err(|_|"Derived cache unavailable")?;
   if !*swept{derived_cache::remove_earlier_slots(&managed);*swept=true;}
   derived_cache::write(&dir,&key,&bytes,derived_cache::LIMITS,|p|fs2::available_space(p))
