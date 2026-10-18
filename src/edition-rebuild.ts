@@ -4,7 +4,7 @@ import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/pian
 import {hashBytes,importPackage,readEditionContent,selectPresentation,type ScorePackage} from './package';
 import {engraveEdition,getOriginalScorePackageBytes,getScoreTransposition,type EditionView} from './score-transposition';
 import {checkReadingExecution,capturedReadingExecution,type ReadingExecution} from './reading-execution';
-import {requirePianoCapability} from './score-capabilities';
+import {requirePianoCapability,scoreCapabilities} from './score-capabilities';
 import {collectionId,personalStorageName,type Entry,type PersonalState} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {scoreFileName} from './score-file-name';
@@ -164,6 +164,20 @@ export async function prepareRebuiltEdition(host:{read(name:string):Promise<Uint
   carried:carried.reduce((n,c)=>n+c.carried,0),left:carried.reduce((n,c)=>n+c.left,0)};
 }
 
+/** Whether addKeyboardView can give this edition the keyboard. */
+export function canAddKeyboardView(selected:ScorePackage,layout:PhysicalKeyboardId):boolean{
+ const manifest=selected.collectionManifest??selected.manifest;
+ return manifest.version===2&&!!manifest.sourceScore&&!!selected.sourceScore&&!!selected.sourceSha256&&!getScoreTransposition(selected)&&!selected.availablePresentations?.includes(layout);
+}
+
+/** The keyboard a newly imported piano score is prepared on: the player's
+ * keyboard when the score has that view or can gain it; otherwise the
+ * keyboard the score was saved for, as opening an edition does. */
+export function importKeyboard(p:ScorePackage,preferred:PhysicalKeyboardId):PhysicalKeyboardId{
+ if(!scoreCapabilities(p).pianoPreparation||getScoreTransposition(p)||(p.availablePresentations?.includes(preferred)??p.keyboardLayout===preferred)||canAddKeyboardView(p,preferred))return preferred;
+ return p.keyboardLayout??preferred;
+}
+
 /** Add a keyboard an admitted edition lacks. Its own views stay
  * byte-identical, so their journals and practice need no carrying; the new
  * keyboard shows the same hands, engraved with the current engine. Where the
@@ -173,7 +187,7 @@ export async function addKeyboardView(selected:ScorePackage,layout:PhysicalKeybo
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  requirePianoCapability(selected,'pianoPreparation');
  const manifest=selected.collectionManifest??selected.manifest;
- if(manifest.version!==2||!manifest.sourceScore||!selected.sourceScore||!selected.sourceSha256||getScoreTransposition(selected)||selected.availablePresentations?.includes(layout))
+ if(!canAddKeyboardView(selected,layout)||!manifest.sourceScore||!selected.sourceScore||!selected.sourceSha256)
   throw Error(`This edition can't gain a ${layout==='janko-four-row'?'Jankó':'conventional'} keyboard view. The current score is retained.`);
  const primary=await selectPresentation(selected,manifest.keyboardLayout!),
   planning=scoreWithCalculationContext(selected.sourceScore,manifest.calculationContext,selected.sourceSha256),
