@@ -4,7 +4,7 @@ import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/pian
 import {hashBytes,importPackage,readEditionContent,selectPresentation,type ScorePackage} from './package';
 import {engraveEdition,getOriginalScorePackageBytes,getScoreTransposition,type EditionView} from './score-transposition';
 import {checkReadingExecution,capturedReadingExecution,type ReadingExecution} from './reading-execution';
-import {requirePianoCapability,scoreCapabilities} from './score-capabilities';
+import {requirePianoCapability} from './score-capabilities';
 import {collectionId,personalStorageName,type Entry,type PersonalState} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {scoreFileName} from './score-file-name';
@@ -30,6 +30,15 @@ export function plainHandScore(planning:QuantizedGridScore,shown:QuantizedGridSc
  return score;
 }
 
+/** The notes a piano edition was engraved from: a linked edition's source,
+ * or an early-format edition's own score, whose `score.json` holds the notes
+ * and is its source identity. */
+export function editionSource(p:ScorePackage):{source:QuantizedGridScore;sourceBytes:Uint8Array;sourceSha256:string}|undefined{
+ const manifest=p.collectionManifest??p.manifest,name=manifest.version===1?'score.json':manifest.version===2?manifest.sourceScore:undefined,
+  source=manifest.version===1?p.score:p.sourceScore,bytes=name?p.files[name]:undefined;
+ return source&&bytes&&p.sourceSha256?{source,sourceBytes:bytes,sourceSha256:p.sourceSha256}:undefined;
+}
+
 export interface RebuiltEdition {
  bytes:Uint8Array;
  /** The earlier edition's content, one entry per keyboard it served. Never displayed. */
@@ -51,7 +60,8 @@ export interface RebuiltEdition {
 
 /** Engrave a saved edition again with the current engine from its own
  * content: its source, the hands each keyboard view shows and the fingers it
- * prints. Both keyboards are served; a keyboard the edition lacked shows the
+ * prints. An early-format edition's own notes are its source. Both keyboard
+ * layouts are served; a keyboard the edition lacked shows the
  * hands of the keyboard it had, without printed fingers. Where the engraving
  * refuses those hands (a hand crossing a rest its staff writes, say), the
  * view shows the score's own hands and the caller carries the edition's hands
@@ -67,15 +77,16 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
  const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError'||options.refusal===undefined)throw error;throw options.refusal;},
   content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),manifest=content.collectionManifest??content.manifest;
  checkReadingExecution(execution);try{requirePianoCapability(content,'pianoPreparation');}catch(error){refuse(error);}
- if(manifest.version!==2||!manifest.sourceScore||!content.sourceScore||!content.sourceSha256)return refuse(Error('This saved edition has no linked source to engrave again from.'));
- const source=content.sourceScore,sourceBytes=content.files[manifest.sourceScore],
-  planning=scoreWithCalculationContext(source,manifest.calculationContext,content.sourceSha256),earlier:RebuiltEdition['earlier']={},
+ const own=editionSource(content);
+ if(!own)return refuse(Error('This saved edition has no linked source to engrave again from.'));
+ const {source,sourceBytes,sourceSha256}=own,
+  planning=scoreWithCalculationContext(source,manifest.calculationContext,sourceSha256),earlier:RebuiltEdition['earlier']={},
   primary=content.keyboardLayout!,layouts=[primary,...KEYBOARDS.filter(id=>id!==primary)],views:EditionView[]=[];
  for(const id of content.availablePresentations??[])earlier[id]=await selectPresentation(content,id);
  for(const layout of layouts){
   const view=earlier[layout];
   let score:QuantizedGridScore;try{score=view?plainHandScore(planning,view.score):views[0].score;}catch(error){return refuse(error);}
-  views.push(view?{layout,score,...(view.fingerLayer?{fingers:view.fingerLayer}:{}),fallback:planning}:{layout,score,fallback:planning});
+  views.push(view?{layout,score,...(view.fingerLayer?{fingers:view.fingerLayer,layerSourceHash:view.manifest.layerSourceHash??sourceSha256}:{}),fallback:planning}:{layout,score,fallback:planning});
  }
  const replaced:Record<string,string>={},steps=getScoreTransposition(content);
  let originalRebuilt:RebuiltEdition['original'];
@@ -164,18 +175,14 @@ export async function prepareRebuiltEdition(host:{read(name:string):Promise<Uint
   carried:carried.reduce((n,c)=>n+c.carried,0),left:carried.reduce((n,c)=>n+c.left,0)};
 }
 
-/** Whether addKeyboardView can give this edition the keyboard. */
+/** Whether addKeyboardView can give this edition a keyboard layout it
+ * lacks while its own views stay as they are: a linked edition at its
+ * original pitch. An early-format edition gains a layout by being engraved
+ * again from its own notes (rebuildEdition), and a transposed edition by
+ * being transposed again from its original. */
 export function canAddKeyboardView(selected:ScorePackage,layout:PhysicalKeyboardId):boolean{
  const manifest=selected.collectionManifest??selected.manifest;
  return manifest.version===2&&!!manifest.sourceScore&&!!selected.sourceScore&&!!selected.sourceSha256&&!getScoreTransposition(selected)&&!selected.availablePresentations?.includes(layout);
-}
-
-/** The keyboard a newly imported piano score is prepared on: the player's
- * keyboard when the score has that view or can gain it; otherwise the
- * keyboard the score was saved for, as opening an edition does. */
-export function importKeyboard(p:ScorePackage,preferred:PhysicalKeyboardId):PhysicalKeyboardId{
- if(!scoreCapabilities(p).pianoPreparation||getScoreTransposition(p)||(p.availablePresentations?.includes(preferred)??p.keyboardLayout===preferred)||canAddKeyboardView(p,preferred))return preferred;
- return p.keyboardLayout??preferred;
 }
 
 /** Add a keyboard an admitted edition lacks. Its own views stay
@@ -189,12 +196,12 @@ export async function addKeyboardView(selected:ScorePackage,layout:PhysicalKeybo
  const manifest=selected.collectionManifest??selected.manifest;
  // The source checks repeat canAddKeyboardView's so the fields are known present below.
  if(!canAddKeyboardView(selected,layout)||!manifest.sourceScore||!selected.sourceScore||!selected.sourceSha256)
-  throw Error(`This edition can't gain a ${layout==='janko-four-row'?'Jankó':'conventional'} keyboard view. The current score is retained.`);
+  throw Error('Only a linked edition at its original pitch gains a keyboard layout beside its own pages.');
  const primary=await selectPresentation(selected,manifest.keyboardLayout!),
   planning=scoreWithCalculationContext(selected.sourceScore,manifest.calculationContext,selected.sourceSha256),
   engraved=await engraveEdition({base:primary,source:selected.sourceScore,sourceBytes:selected.files[manifest.sourceScore],context:manifest.calculationContext,
    views:[{layout,score:plainHandScore(planning,primary.score),fallback:planning}],keep:primary,
-   refusal:"This score can't be engraved for that keyboard yet. The current score is retained."},execution);
+   refusal:"This score can't be engraved for that keyboard layout yet. The current score is retained."},execution);
  return engraved.bytes;
 }
 

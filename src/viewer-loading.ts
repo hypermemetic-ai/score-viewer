@@ -12,7 +12,7 @@ export const LOADING_STEPS={
  sound:'Preparing piano sound',
  engrave:'Engraving the music',
  'engrave-again':'Engraving this edition again',
- 'engrave-keyboard':'Engraving for this keyboard',
+ 'engrave-keyboard':'Engraving for this keyboard layout',
  transpose:'Writing the music at the new pitch',
  retained:'Opening the saved edition at this pitch',
  'gp-parts':'Finding the parts',

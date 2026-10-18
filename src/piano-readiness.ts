@@ -33,7 +33,7 @@ export interface PianoReading {
 export type PianoPrepared=PianoReady|PianoReading;
 export type PianoReadinessResult=PianoPrepared|PianoNotReady;
 const currentLayer=(layer:FingerLayer)=>layer.version===PIANO_ASSIGNMENT_VERSION||layer.plannerVersion===CONVENTIONAL_PLANNER_VERSION||layer.plannerVersion===RR_TEMPORAL_LAYER_PLANNER;
-const keyboardName=(layout:PhysicalKeyboardId)=>layout==='conventional-piano'?'conventional':'Jankó four-row';
+const keyboardName=(layout:PhysicalKeyboardId)=>layout==='conventional-piano'?'conventional':'Jankó';
 class Cancelled extends Error {}
 const CANCELLED='Opening cancelled. Your score and choices are retained.';
 
@@ -56,7 +56,7 @@ export async function ensurePianoReady(request:PianoReadinessRequest,admission?:
       return failure('unsupported','instrument-reading','This score is available for reading. Hands and fingers apply to piano scores.');
     if(!['conventional-piano','janko-four-row'].includes(request.layout))return failure('unsupported','layout','Choose a supported piano keyboard.');
     if(!(prior.availablePresentations?.includes(request.layout)??prior.keyboardLayout===request.layout))
-      return failure('unsupported','keyboard-presentation',`This edition has no ${keyboardName(request.layout)} keyboard view. The current score is retained.`);
+      return failure('unsupported','keyboard-presentation',`This edition has no pages for the ${keyboardName(request.layout)} layout yet. The current score is retained.`);
     const p=await selectPresentation(prior,request.layout);
     let personal:PersonalState|undefined;
     if(request.personal)try{personal=readPersonal(request.personal,p);}catch(error){return failure('conflict','personal-binding',(error as Error).message);}

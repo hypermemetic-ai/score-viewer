@@ -49,11 +49,13 @@ test('loading text names no time estimate',()=>{
  assert.doesNotMatch(text,/minute|seconds? (left|remaining)|so far|about as long|can take|almost done/i);
 });
 
-// The physical keyboard is legitimately the Jankó keyboard; the notation is
-// always "ISO notation" and is never called Janko in anything the player sees.
+// The physical keyboard is legitimately the Jankó keyboard, and its key
+// layout is the Jankó layout (owner direction 2026-10-18: the conventional and
+// Jankó layouts are two key layouts of one piano). The notation is always
+// "ISO notation" and is never called Janko in anything the player sees.
 test('the notation and its pages are never called Janko',()=>{
  const root=new URL('../',import.meta.url),files=['index.html',...readdirSync(new URL('src/',root)).filter(f=>/\.(ts|html|css)$/.test(f)).map(f=>'src/'+f)];
- const notation=/jank[oó]\s+(notation|layout|score|pages?|engraving|reading|edition)\b|notation\s+(is\s+|called\s+)?jank/i;
+ const notation=/jank[oó]\s+(notation|score|pages?|engraving|reading|edition)\b|jank[oó]\s+(page|notation|score)\s+layout|notation\s+(is\s+|called\s+)?jank/i;
  for(const file of files){
   const source=readFileSync(new URL(file,root),'utf8');
   for(const literal of source.matchAll(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`|>[^<>]+</g))

@@ -44,6 +44,8 @@ export function admittedDualArchiveSha256(p:ScorePackage):string|undefined {
  try{selectReadingNotation(p,p.reading?.dual?.notation??'iso');return record.sha256;}catch{return;}
 }
 function fail(s:string):never{throw Error(s);}
+/** The profile of a view whose fingers, if any, are the edition's own fixed ones. */
+export const FIXED_PAGES_PROFILE='publisher-fixed-pages-v1';
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
 function passiveSvg(svg:string,seats:Seat[],page:number){
  const errors:string[]=[];const doc=new DOMParser({onError:(_level,msg)=>errors.push(msg)}).parseFromString(svg,'image/svg+xml');
@@ -225,7 +227,9 @@ export async function validateLayerAsync(value:unknown,p:ScorePackage,options:{h
  const projection=layer.providedAuthorityProjection as Record<string,any>|undefined;
  if(projection){const raw={...layer};delete raw.reviewedFingerAuthority;delete raw.providedAuthorityProjection;const authority=layer.reviewedFingerAuthority as Record<string,any>;
   if(await hashBytes(JSON.stringify(raw,null,2)+'\n')!==projection.rawCalculatedLayerSha256||await hashBytes(JSON.stringify(authority.constraints))!==projection.retainedConstraintsSha256)fail('Provided authority projection digest mismatch');}
- if(p.manifest.version===2&&!options.history&&(layer.profileId!==p.profileId||layer.profileSha256!==p.profileSha256))fail('Linked Jankó profile differs');
+ // An early-format layer names no profile; it stands on a view whose fingers are the edition's own fixed ones.
+ const unprofiled=layer.profileId===undefined&&layer.profileSha256===undefined&&p.profileId===FIXED_PAGES_PROFILE;
+ if(p.manifest.version===2&&!options.history&&!unprofiled&&(layer.profileId!==p.profileId||layer.profileSha256!==p.profileSha256))fail('Linked Jankó profile differs');
  return layer;
 }
 /** Only performing-hand editorial fields may differ from the immutable source. */
@@ -378,7 +382,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   const d=raw as PresentationDescriptor;
   const viewContext=d.calculationContext===undefined?calculationContext:d.calculationContext===null?undefined:validatePianoCalculationContext(d.calculationContext,m.sourceSha256!,source),
     planningSource=scoreWithCalculationContext(source,viewContext,m.sourceSha256!);
-  if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(d.fingers)requireReferencePerformanceTempo(planningSource);
+  if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(d.fingers&&!options.allowLegacyTempo)requireReferencePerformanceTempo(planningSource);
   const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe,preparationIdentity:d.preparationIdentity,calculatedHandReceipt:d.calculatedHandReceipt};
   if(viewContext)viewManifest.calculationContext=viewContext;else delete viewManifest.calculationContext;
   const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(transposition?{transposition:transposition.envelope,transpositionOriginal:transposition.original}:{}),...(viewContext?{calculationContext:viewContext}:{})});

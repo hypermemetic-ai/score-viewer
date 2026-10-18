@@ -91,7 +91,7 @@ test('an edition gains the keyboard it lacks; its own view keeps its exact pages
  assert.deepEqual(kept.pages,p.pages);assert.equal(personalStorageName(id,kept)===personalStorageName(id,p),true);
  assert.deepEqual(view.score.notes.map(n=>n.hand),p.score.notes.map(n=>n.hand));
  const s=personalForAddedKeyboard(p,view);for(const n of p.score.notes)assert.equal(handFor(view,s,n.id),n.hand);
- await assert.rejects(addKeyboardView(next,'conventional-piano'),/can't gain/);
+ await assert.rejects(addKeyboardView(next,'conventional-piano'),/Only a linked edition/);
 });
 
 test('a re-engraved edition and its other pitches keep separate choices, practice and performance',async()=>{
