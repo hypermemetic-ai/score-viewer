@@ -19,8 +19,8 @@ if(baseline){
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});
 const results=[];
 try {
- const packages=[{name:'schumann-janko',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore'},
-  {name:'schumann-conventional',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'}];
+ const packages=[{name:'schumann-janko',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},
+  {name:'schumann-conventional',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
  if(process.env.PRACTICE_ZELDA)for(const keyboard of ['conventional-piano','janko-four-row'])packages.push({name:`zelda-${keyboard}`,path:process.env.PRACTICE_ZELDA,keyboard});
  for(const input of packages.filter(input=>!process.env.PRACTICE_FIXTURE_ONLY&&(!process.env.PRACTICE_SCORE_FILTER||input.name.includes(process.env.PRACTICE_SCORE_FILTER)))){
   const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage();

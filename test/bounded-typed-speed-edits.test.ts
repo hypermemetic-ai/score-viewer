@@ -5,7 +5,7 @@ import {PracticeView} from '../src/practice-view';import {ManualPracticeView} fr
 import {planPractice,initialPractice,readPractice} from '../src/practice';import {planManualPractice} from '../src/manual-practice-plan';
 import {speedNumber} from '../src/tempo-presentation';
 import {tempoRateNumber} from '../src/metronome-mark';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
 const manualSource=await authoredManualPackage(12);
 const plans={piano:planPractice(p),manual:await planManualPractice(manualSource)};
 const keys=['working','start','connectionStart','step'] as const;

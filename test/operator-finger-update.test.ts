@@ -11,7 +11,7 @@ import {renderCandidatesView} from '../vendor/iso-notation/src/render/iso/studio
 import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
 import {frozenNo14StudioRefused,isFrozenNo14StudioRefusal} from './support/frozen-no14-studio';
 
-const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url));
+const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url));
 const review=readOperatorFingerReview(JSON.parse(readFileSync(new URL('../vendor/iso-notation/data/reviews/schumann-no14-janko-fingers-20261007.json',import.meta.url),'utf8')));
 const result=await applyOperatorFingerReview(bytes,review),{before,after}=result;
 const old=before.fingerLayer!,layer=after.fingerLayer!,authority=layer.reviewedFingerAuthority as any;

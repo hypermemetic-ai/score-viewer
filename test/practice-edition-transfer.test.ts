@@ -25,7 +25,7 @@ test('a saved calculated edition of the same music preserves credited progress t
 });
 
 test('literal source-bound joined claims survive while larger runs never distribute credit to smaller ranges',async()=>{
- const from=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));from.sourceScore=structuredClone(from.score);from.sourceSha256='a'.repeat(64);from.sourceRevision='a'.repeat(64);from.keyboardLayout='janko-four-row';
+ const from=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));from.sourceScore=structuredClone(from.score);from.sourceSha256='a'.repeat(64);from.sourceRevision='a'.repeat(64);from.keyboardLayout='janko-four-row';
  const oldPlan=planPractice(from,'fixed-four-v1'),old=initialPractice(oldPlan);old.composites={'1-8':['1-4','5-8'],'1-12':['1-8','9-12']};const rows=passageHierarchy(oldPlan,old).all;old.best[rows.get('1-8')!.pattern]=60;old.best[rows.get('1-12')!.pattern]=180;
  const to=structuredClone(from);to.manifest.revision='b'.repeat(64);to.score.notes[0].hand='RH';const state=transferPracticeEdition(from,old,to),plan=planPractice(to),next=practiceCatalogChunks(plan),double=next.find(c=>c.kind==='connection'&&c.start===rows.get('1-8')!.start&&c.end===rows.get('1-8')!.end)!;
  assert.equal(state.best[double.pattern],60);assert.equal(state.best[rows.get('1-12')!.pattern],undefined);assert.equal(progressFor(plan.chunks[0],state),0);assert.deepEqual(state.editionEvidence.rawState,old);assert.equal(state.composites,undefined);assert.equal(next.some(c=>c.start===0&&c.end===rows.get('1-12')!.end),false);

@@ -4,7 +4,7 @@ import {referenceFixture} from './support/reference-score';
 import {planPractice,initialPractice,PracticeSession,GroundworkSession,practiceOrnament} from '../src/practice';
 import type {ScorePackage} from '../src/package';
 
-const base=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const base=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
 /** No. 14 with one written grace note, A3 (MIDI 57), before the B3 at tick 24. */
 function withGrace(p:ScorePackage,tick=24,midi=57):ScorePackage {
  const q=structuredClone(p),host=q.score.notes.find(n=>n.startTick===tick)!;

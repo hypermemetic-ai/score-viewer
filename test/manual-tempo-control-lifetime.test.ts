@@ -3,7 +3,7 @@ import {ManualTempoControls,refreshPracticeSpeedDisplay} from '../src/manual-tem
 import {initialPersonal} from '../src/state';
 import {PracticeView} from '../src/practice-view';import {initialPractice,passed} from '../src/practice';import {speedNumber} from '../src/tempo-presentation';import {referenceFixture} from './support/reference-score';
 
-const score=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const score=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
 
 /** Minimal field tree: real editor/repeat ownership, without emulating browser layout. */
 function fixture(create?:(root:HTMLElement)=>ManualTempoControls){

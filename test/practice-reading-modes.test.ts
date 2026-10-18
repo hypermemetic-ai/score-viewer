@@ -9,7 +9,7 @@ import {PracticeDone} from '../src/practice-attainment';
 import {PracticeClock} from '../src/practice-clock';
 import {PracticeDiagnostics} from '../src/practice-diagnostics';
 import {host} from '../src/host';
-const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg,'connection-boundary-v1');
+const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(pkg,'connection-boundary-v1');
 function fixture(t:any,connected=true){
  const state=initialPractice(plan),view=Object.create(PracticeView.prototype) as any,writes:any[]=[],messages:string[]=[],oldWrite=host.write;
  host.write=async(name,bytes)=>{writes.push({name,value:JSON.parse(new TextDecoder().decode(bytes))});};t.after(()=>{host.write=oldWrite;view.clock?.close?.();});

@@ -84,7 +84,7 @@ Run the existing release command **from the generated carrier checkout** so it i
 node scripts/release-score-viewer.mjs \
   --repository hypermemetic-ai/iso-notation --ref RETAINED_NEW_CARRIER_BRANCH \
   --revision REVIEWED_CARRIER_SHA \
-  --score-path public/review/schumann-no14-conventional-20261006.isoscore \
+  --score-path public/review/schumann-no14-conventional-20261006.tuna \
   --score-sha256 2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d \
   --output /home/qqp/projects/iso-notation-deploy/public/review/score-viewer
 ```

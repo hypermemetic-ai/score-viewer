@@ -4,7 +4,7 @@ import {referenceFixture} from './support/reference-score';
 import {planPractice,PracticeSession,initialPractice} from '../src/practice';
 import {scoreTickMs} from '../src/score-clock';import {practiceTiming} from '../src/practice-timing';
 
-const packageFixture=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(packageFixture);
+const packageFixture=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(packageFixture);
 
 test('real PracticeView Ready routes global output and replaces a cached clock after a new choice',async t=>{
  const previous={clock:host.midiClock,begin:practiceAudio.begin,stop:practiceAudio.stop,error:practiceAudio.onError};const devices:string[]=[],durations:number[]=[];let selected='chosen-output';

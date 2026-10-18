@@ -6,7 +6,7 @@ const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core'
 const url=process.env.PRACTICE_URL??'http://127.0.0.1:5212',output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-rendering/selector-scrollbars-hidden';
 const sourceRevision=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 await mkdir(output,{recursive:true});
-const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'a'.repeat(64)}.tuna`;
+const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'a'.repeat(64)}.tuna`;
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true,ignoreDefaultArgs:['--hide-scrollbars']});let page;
 async function shot(name){await page.evaluate(()=>document.fonts.ready);const size=page.viewportSize();await page.setViewportSize({...size,width:size.width+1});await page.setViewportSize(size);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.screenshot({path:`${output}/${name}.png`});}
 async function resize(size,parent){await page.setViewportSize(size);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.evaluate(async parent=>window.scrollbarView.action('select:'+parent),parent);}

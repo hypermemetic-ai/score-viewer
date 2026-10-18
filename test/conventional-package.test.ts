@@ -6,7 +6,7 @@ import {strFromU8,strToU8,unzipSync} from 'fflate';
 import {archivePackage,hashBytes,importPackage,selectPresentation,validateLayerAsync,type Manifest} from '../src/package';
 import {collectionId,corrected,fingerFor,initialPersonal,installLayer,legacyPersonalStorageName,legacyPracticeStorageName,legacyPerformanceStorageName,personalStorageName,practiceStorageName,performanceStorageName,readPersonal} from '../src/state';
 
-const fixture=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url));
+const fixture=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url));
 const files=unzipSync(fixture),outer=JSON.parse(strFromU8(files['manifest.json'])) as Manifest;
 const piano=await importPackage(fixture),janko=await selectPresentation(piano,'janko-four-row');
 const sourceSha='e363c2897ab1a85fb6a4178ab1514987d7b6d207be92b56a90dbb0a5a5d5bc27';

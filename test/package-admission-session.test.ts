@@ -7,7 +7,7 @@ import {archivePackage,importPackage,selectPresentation,type Manifest} from '../
 import {PackageAdmissionSession} from '../src/package-admission-session';
 
 const legacy=new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url))),
- linked=new Uint8Array(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url)));
+ linked=new Uint8Array(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url)));
 async function parsing<T>(action:()=>Promise<T>){
  let calls=0;const original=DOMParser.prototype.parseFromString;
  DOMParser.prototype.parseFromString=function(...args:Parameters<typeof original>){calls++;return original.apply(this,args);};

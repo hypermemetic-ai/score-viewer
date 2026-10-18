@@ -6,7 +6,7 @@ import {PracticeDone,toggleDone,hasDone,attainedRate,measuredRate} from '../src/
 import {displayedPracticeProgress,displayedPracticeTotal} from '../src/practice-display';
 import {PracticeBrowser} from '../src/practice-browser';
 import {equivalentPracticeClaims} from '../src/practice-equivalence';
-const original=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const original=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
 const legacyPlan=(p:Parameters<typeof planPractice>[0])=>planPractice(p,'connection-boundary-v1');
 const target=(c:{id:string;pattern:string},rate=180)=>({passage:c.id,pattern:c.pattern,rate});
 /** Repeated units retain the actual admitted No14 canonical events/voices. */

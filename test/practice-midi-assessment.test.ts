@@ -4,7 +4,7 @@ import {importPackage} from '../src/package';
 import {planPractice,initialPractice,PracticeSession,GroundworkSession,totalProgress} from '../src/practice';
 import {PracticeDiagnostics} from '../src/practice-diagnostics';
 import type {MidiNote} from '../src/midi';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(p);
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(p);
 test('recovered current package retains its exact all-five frozen-seat eligibility',()=>assert.equal(p.fingerEligibility.eligible,true,p.fingerEligibility.reason));
 const trial=()=>{const state=initialPractice(plan);state.working=15;const session=new PracticeSession(plan,plan.chunks[0],state,true);session.ready(0);return session;};
 test('literal No14 extra rebound after next7 explains0X without changing musical ownership',()=>{

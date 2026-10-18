@@ -24,7 +24,7 @@ test('sizing counts intended onset positions, preserving source chords, hands an
 });
 
 test('ordinary No14 calibrates around four written bars without a fixed four-bar grid',()=>{
- const files=unzipSync(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url))),s=JSON.parse(strFromU8(files['score.json'])) as PracticeSectionSource;
+ const files=unzipSync(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url))),s=JSON.parse(strFromU8(files['score.json'])) as PracticeSectionSource;
  const p=planPracticeSections(s);assert.equal(p.sections.length,16);
  assert.equal(p.sections.filter(section=>section.onsetCount===24).length,15,JSON.stringify(p.sections.map(s=>[s.firstBar+1,s.lastBar+1,s.onsetCount])));
  assert.ok(p.sections.every((section,i)=>section.firstBar===4*i&&section.lastBar===4*i+3));

@@ -3,7 +3,7 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {unzipSync,strFromU8} from 'fflate';
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-rendering/settings';await mkdir(output,{recursive:true});
-const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'b'.repeat(64)}.tuna`;
+const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'b'.repeat(64)}.tuna`;
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});
 const receipts=[];let currentPage;let currentName;
 const modes=(process.env.PRACTICE_SETTINGS_MODES??'development,production').split(',');

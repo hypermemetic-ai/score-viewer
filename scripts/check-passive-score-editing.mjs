@@ -23,7 +23,7 @@ const csp=JSON.parse(await readFile('src-tauri/tauri.conf.json','utf8')).app.sec
 const server=createServer(async(req,res)=>{try{const path=resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));if(path!==root&&!path.startsWith(root+'/'))throw Error('outside');const file=path===root?join(root,'index.html'):path;res.setHeader('Content-Security-Policy',csp);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.otf':'font/otf','.ttf':'font/ttf'}[extname(file)]??'application/octet-stream'));res.end(await readFile(file));}catch{res.writeHead(404);res.end();}});
 let browser;
 try{
- const no14Bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore'),no14=await importPackage(no14Bytes),inputs=[];
+ const no14Bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna'),no14=await importPackage(no14Bytes),inputs=[];
  const tied=completeTieBoundaryStudy(3,'RH');tied.id='viewer-passive-continuation';tied.title='Passive continuation navigation';
  const base=await sourcePackage(tied,{measuresPerSystem:1,systemsPerPage:1,pageWidth:255});
  for(const keyboard of ['conventional-piano','janko-four-row']){

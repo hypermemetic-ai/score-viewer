@@ -4,7 +4,7 @@ import {referenceFixture} from './support/reference-score';
 import {planPractice,initialPractice,readPractice,passageHierarchy,practiceCatalogChunks,practiceClipChunk,totalProgress,progressFor,PracticeSession,transferPracticeEdition} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';
 import {toggleExerciseExclusion} from '../src/practice-exercise-catalog';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
 const plan=planPractice(p);
 test('bounded No14 catalog has all originals, overlapping doubles, and independent contrast episodes upfront',()=>{
  assert.equal(plan.partition,'bounded-exercises-v1');assert.equal(plan.chunks.length,16);
