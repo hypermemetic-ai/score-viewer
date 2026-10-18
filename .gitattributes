@@ -64,6 +64,7 @@ delivery-input/** -text
 "src-tauri/src/audio_period.rs" -text
 "src-tauri/src/audio_queue.rs" -text
 "src-tauri/src/audio_render_queue.rs" -text
+"src-tauri/src/derived_cache.rs" -text
 "src-tauri/src/main.rs" -text
 "src-tauri/src/managed_files.rs" -text
 "src-tauri/src/metronome_stream.rs" -text
