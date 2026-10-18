@@ -112,7 +112,7 @@ test('a release always names the bundled .tuna review score, the same one the wo
   assert.deepEqual(pin,defaultScore);assert.match(pin.path,/^public\/review\/[^/]+\.tuna$/);
   assert.equal(sha256(await readFile(new URL('../'+pin.path,import.meta.url))),pin.sha256);
   const workflow=await readFile(new URL('../.github/workflows/build-score-viewer-native.yml',import.meta.url),'utf8');
-  assert.ok(workflow.includes(`default: ${pin.path}\n`));assert.ok(workflow.includes(`inputs.score_path || '${pin.path}'`));assert.ok(workflow.includes(`inputs.score_sha256 || '${pin.sha256}'`));
+  assert.ok(workflow.includes(`default: ${pin.path}\n`));assert.ok(workflow.includes(`default: ${pin.sha256}\n`));assert.ok(workflow.includes(`inputs.score_path || '${pin.path}'`));assert.ok(workflow.includes(`inputs.score_sha256 || '${pin.sha256}'`));
   assert.doesNotMatch(workflow,/isoscore/);
   assert.deepEqual(reviewedScorePin({scorePath:'public/review/other.tuna',scoreSha256:'a'.repeat(64)}),{path:'public/review/other.tuna',sha256:'a'.repeat(64)});
   assert.throws(()=>reviewedScorePin({scorePath:'public/review/other.zip',scoreSha256:'a'.repeat(64)}),/Invalid reviewed score/);
