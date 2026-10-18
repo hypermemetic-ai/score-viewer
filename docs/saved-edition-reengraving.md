@@ -16,9 +16,21 @@ A saved edition can stop opening because its pages no longer reproduce under the
 - opening the score;
 - choosing an edition under **Earlier editions**;
 - choosing a pitch whose saved edition no longer reproduces;
-- switching to a keyboard the edition lacks, at the original pitch. The edition's own pages stay byte-identical and only the new keyboard view is engraved.
+- opening, importing or switching to a keyboard layout the edition lacks (see below).
 
-Integrity is still checked first: member hashes, the linked source, and the original of a transposed edition. A damaged or foreign archive is refused as before, and so is one with no linked source. Only pages that don't reproduce are a reason to engrave again.
+Integrity is still checked first: member hashes, the linked source, and the original of a transposed edition. A damaged or foreign archive is refused as before, and so is a linked edition with no source. Only pages that don't reproduce, or a missing keyboard layout, are a reason to engrave again.
+
+## Either keyboard layout
+
+The conventional and Jankó layouts are two key layouts of the same piano, not two instruments (owner direction, 2026-10-18). ISO notation reads the same on both, so the engine draws the same pages for both: `renderScorePresentation` takes no layout, and an engraving shows identical pages and note heads on each layout. Only fingerings can differ. There is no such thing as a Jankó-only score: every piano score opens on the player's layout, and importing, opening or switching layout never falls back to another layout or refuses because of the layout. When the edition has no pages for the chosen layout:
+
+- **A linked edition at its original pitch** gains the layout beside its own views. Its own pages stay byte-identical, and the new layout is engraved with the same hands (`addKeyboardView`).
+- **An early-format edition** (manifest version 1, such as `fixtures/schumann-op68-no14.tuna`) has no linked source; its `score.json` holds the notes and is its source identity. It is engraved again for both layouts from those notes (`rebuildEdition`), and installed like an Earlier edition, as above. The earlier score file keeps its bytes. Its finger layer stays edition content on the Jankó layout: the layer keeps the source identity it was made against (`layerSourceHash`), and an early layer that names no fingering profile stands on a view whose fingers are the edition's own fixed ones. Its journal and practice move to the new Jankó view.
+- **A transposed edition** is transposed again from its original for both layouts, as before.
+
+Fingerings made for one layout (the Jankó operator fingers with their physical rows, for example) show on that layout only. The other layout shows none of them, and the player's own finger choices stay in their own layout's journal; nothing is lost. When a score gains a layout and its fingers stay behind, the reader says "Fingerings made for the Jankó layout stay with that layout." An early-format edition engraved again says "This score was engraved for the conventional layout from its own notes." and, when the score was already in the library, the usual note on what came along and that the earlier edition stays saved.
+
+The Jankó view of an early-format edition engraved again has new pages. They carry no frozen-seat geometry certificate, so its fingers show as annotations beside the heads rather than in place of the pitch digits.
 
 ## What the new edition carries
 

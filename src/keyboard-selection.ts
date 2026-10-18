@@ -2,7 +2,11 @@ import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical
 import type {ScorePackage} from './package';
 import type {ViewState} from './state';
 
-export const keyboardLabel=(id:PhysicalKeyboardId)=>id==='conventional-piano'?'Conventional piano':'Jankó piano (4-row)';
+/** The two keyboard layouts are one instrument, the piano, reading the same
+ * notation; the choice names the layout. */
+export const keyboardLabel=(id:PhysicalKeyboardId)=>id==='conventional-piano'?'Piano, conventional layout':'Piano, Jankó layout (4-row)';
+/** The layout alone, for a sentence: "the Jankó layout". */
+export const layoutName=(id:PhysicalKeyboardId)=>id==='conventional-piano'?'conventional layout':'Jankó layout';
 /** Missing preferences on an existing, positively identified RR installation
  * keep its keyboard. Fresh installations use conventional piano. */
 export function keyboardPreference(value:unknown,retainedRR=false):PhysicalKeyboardId {

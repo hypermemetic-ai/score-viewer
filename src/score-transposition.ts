@@ -8,7 +8,7 @@ import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateS
 import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
 import {scoreWithCalculationContext,validatePianoCalculationContext,type PianoCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
-import {archivePackage,handDigest,type Manifest} from './package';
+import {archivePackage,handDigest,FIXED_PAGES_PROFILE,type Manifest} from './package';
 import {publishPackage} from './publication';
 import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {serializeCompatibleScore} from './score-serialization';
@@ -138,7 +138,10 @@ async function transpositionEnvelope(original:ScorePackage,originalBytes:Uint8Ar
  * plain content, and the finger layer it carries as editor content, if any.
  * When the engraving refuses those hands, the view shows `fallback` (the
  * score's own hands) instead and carries no finger layer. */
-export interface EditionView {layout:PhysicalKeyboardId;score:QuantizedGridScore;fingers?:FingerLayer;fallback?:QuantizedGridScore}
+export interface EditionView {layout:PhysicalKeyboardId;score:QuantizedGridScore;fingers?:FingerLayer;fallback?:QuantizedGridScore;
+ /** The source identity `fingers` names, when the layer was made against an
+  * identity other than the source bytes (an early-format edition's layer). */
+ layerSourceHash?:string}
 export interface EngravedEdition {
  bytes:Uint8Array;
  /** Keyboards that show `fallback` because the engraving refused their hands. */
@@ -212,13 +215,13 @@ export async function engraveEdition(request:{
   const files:Record<string,Uint8Array>={...shared,...(kept?{}:{'source-score.json':sourceBytes})},presentations:Manifest['presentations']={...structuredClone(kept?.presentations??{})},handMaps:ScoreTransposition['handMaps']={};
   for(const [i,view] of chosen.entries()){
    const e=engraved.get(canonicalJson(view.score))!,revision=await hashBytes(files[e.score]),layer=withFingers?view.fingers:undefined,
-    profileId=typeof layer?.profileId==='string'?layer.profileId:'publisher-fixed-pages-v1',
+    profileId=typeof layer?.profileId==='string'?layer.profileId:FIXED_PAGES_PROFILE,
     profileSha256=typeof layer?.profileSha256==='string'?layer.profileSha256:await hashBytes(JSON.stringify({kind:profileId,layoutId:view.layout})),
     fingers=layer?(i||kept?`${view.layout}/fingers.json`:'fingers.json'):undefined;
    // The layer's fingers and hands are unchanged; it now names these pages.
    if(layer&&fingers)files[fingers]=strToU8(JSON.stringify({...structuredClone(layer),...('revision' in layer?{revision}:{})}));
    presentations[view.layout]={layoutId:view.layout,score:e.score,seats:e.seats,...(fingers?{fingers}:{}),pages:e.pages.slice(),renderingRecipe:e.recipe,revision,profileId,profileSha256,
-    effectiveHandSha256:await handDigest(source,view.score),layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE};
+    effectiveHandSha256:await handDigest(source,view.score),layerSourceHash:layer&&view.layerSourceHash?view.layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE};
    if(transposition)handMaps[view.layout]=ownerMap(originalSource(transposition.original),view.score);
   }
   let m:Manifest;
@@ -227,7 +230,7 @@ export async function engraveEdition(request:{
    const primary=presentations[chosen[0].layout]!;
    m={format:'iso-score',version:2,scoreId:source.id,metadata:structuredClone(baseManifest.metadata),createdAt:new Date().toISOString(),
     sourceScore:'source-score.json',sourceRevision:sourceSha256,sourceSha256,keyboardLayout:primary.layoutId,semanticSha256:primary.revision,revision:primary.revision,
-    profileId:primary.profileId,profileSha256:primary.profileSha256,effectiveHandSha256:primary.effectiveHandSha256,layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE,
+    profileId:primary.profileId,profileSha256:primary.profileSha256,effectiveHandSha256:primary.effectiveHandSha256,layerSourceHash:primary.layerSourceHash,engineVersion:APPROVED_SCORE_RENDERING_ENGINE,
     pages:primary.pages.slice(),renderingRecipe:primary.renderingRecipe,presentations,font:baseManifest.font,notices:baseManifest.notices.slice(),files:{},
     ...(transposition?{transposition:await transpositionEnvelope(transposition.original,transposition.originalBytes,transposition.selectedBytes,transposition.steps,sourceBytes,handMaps)}:{}),
     ...(context?{calculationContext:context}:{}),...(base.referenceMidi?{referenceMidi:{file:'reference.mid' as const}}:{})};
