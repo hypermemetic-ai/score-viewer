@@ -4,6 +4,7 @@ import type {QuantizedGridScore,PitchCoordinate,Hand} from '../vendor/iso-notati
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {hashBytes,importPackage,readEditionContent,type ScorePackage,type FingerLayer} from './package';
 import {CALCULATED_HAND_SCORE_RENDERING_ENGINE,renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
+import {withLayoutPeer} from './layout-peer';
 import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
@@ -193,7 +194,7 @@ export async function engraveEdition(request:{
   const prefix=engraved.size||kept?`${layout}/`:'';
   let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,options,tokens,
    baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256}),rendered;
-  try{rendered=await renderScorePresentationAsync(structuredClone(score),recipe,execution??{});}
+  try{rendered=await withLayoutPeer(layoutPeer=>renderScorePresentationAsync(structuredClone(score),recipe,{...execution,layoutPeer}));}
   catch(error){if((error as Error).name==='AbortError')throw error;throw Error(request.refusal,{cause:error});}
   checkReadingExecution(execution);
   recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});

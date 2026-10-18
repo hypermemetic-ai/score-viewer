@@ -1,4 +1,5 @@
 import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationExecution,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
+import {withLayoutPeer,type StartLayoutPeer} from './layout-peer';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse,ProjectionView,SerializedProjectionError} from './personal-projection-protocol';
 
 /** The calls the projection host makes on one ISO personal projection core. */
@@ -17,11 +18,16 @@ export function serializeProjectionError(error:unknown):SerializedProjectionErro
  return {name:'Error',message:String(error)};
 }
 
+/** A real task turn, so a layout peer's messages are read between steps. */
+const taskTurn=()=>new Promise<void>(resolve=>{const channel=new MessageChannel();channel.port1.onmessage=()=>{channel.port1.close();resolve();};channel.port2.postMessage(0);});
+
 /** Projection cores live here, off the reader's thread. Only as many captured
  * cores as the reader's preparation pool keeps are retained; an evicted core is made again on request. A
  * refused hand choice leaves its core unchanged (ISO publishes a projection
  * only after it succeeds), so the core is kept; any other failure drops it. */
-export function createProjectionHost(post:(response:ProjectionResponse)=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore}={}){
+export function createProjectionHost(post:(response:ProjectionResponse)=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore;
+ /** A second worker for a core's whole first engrave (layout-peer.ts). */
+ startLayoutPeer?:StartLayoutPeer}={}){
  const cores=new Map<string,HostedProjectionCore>(),maxCores=options.maxCores??2,create=options.create??createHostedCore;
  const settled=new WeakSet<HostedProjectionCore>();
  let tail=Promise.resolve();
@@ -39,12 +45,19 @@ export function createProjectionHost(post:(response:ProjectionResponse)=>void,op
    let last:PreparationStage|undefined;
    // The worker owns its thread: steps run back to back, reporting each new stage.
    const execution:PreparationExecution={budgetMs:50,yieldControl:()=>Promise.resolve(),onCheckpoint:stage=>{if(stage!==last){last=stage;post({id:request.id,kind:'stage',stage});}}};
+   // A core's first engrave lays the whole score out, on a second worker too
+   // when one starts. Its systems arrive as messages, so the steps then give
+   // the worker real task turns.
+   const engraving=<T>(run:(execution:PreparationExecution)=>Promise<T>)=>options.startLayoutPeer?
+    withLayoutPeer(layoutPeer=>run(layoutPeer?{...execution,layoutPeer,yieldControl:taskTurn}:execution),options.startLayoutPeer):run(execution);
+   const hostCore=core;
    if(request.kind==='warm'){
     const already=settled.has(core),restored=!already&&!!request.saved&&!!core.restoreAsync&&await core.restoreAsync(request.saved,execution);
-    if(!restored)await core.warmAsync(execution);
+    if(!restored)await (already?core.warmAsync(execution):engraving(execution=>hostCore.warmAsync(execution)));
     settled.add(core);post({id:request.id,kind:'done',settled:already?'already':restored?'restored':'engraved'});return;
    }
-   const view=await core.projectAsync(request.owners,request.digest,execution);settled.add(core);
+   const view=settled.has(core)?await core.projectAsync(request.owners,request.digest,execution):
+    await engraving(execution=>hostCore.projectAsync(request.owners,request.digest,execution));settled.add(core);
    post({id:request.id,kind:'done',view:{score:view.score,pages:[...view.pages],seats:[...view.seats],annotationGeometry:view.annotationGeometry}});
   }catch(error){
    if(!(error instanceof HandPresentationError)&&cores.get(request.key)===core)cores.delete(request.key);
