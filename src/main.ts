@@ -108,11 +108,11 @@ let selection:Seat|undefined,selectionPitchToggle=false;let editNavigation:'note
 let transposeControls:ManualTempoControls|undefined;const pitchInput=new PitchInputEpoch();
 // This reader owns bounded exact-byte admission across revisits; library and Worker receivers own separate sessions.
 const readerAdmission=new PackageAdmissionSession({maxEntries:2,maxRetainedBytes:64*1024*1024});
-// Derived results this build already made are kept in bounded managed slots:
-// native builds only. The browser's local storage is too small for pages, and
-// a development server's source can change under one identity.
-if(isTauri()&&!import.meta.env.DEV){
- const derived=new DerivedFileCache(host);
+// Derived results this build already made are kept on disk within a size
+// budget: native builds only. The browser's local storage is too small for
+// pages, and a development server's source can change under one identity.
+if(isTauri()&&!import.meta.env.DEV&&host.derived){
+ const derived=new DerivedFileCache(host.derived);
  usePersonalProjectionCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});

@@ -311,14 +311,8 @@ export class PersonalPresentationSession {
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
   return this.savedEngine??=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
  }
- /** The engine never takes its own projection's slot, so saving one cannot
-  * evict the other. */
  private async engineKey():Promise<string>{
-  const digest=(await this.prepare()).digest,cache=this.cache,projection=cache&&await cache.slot(PERSONAL_PROJECTION_CACHE_KIND,await this.cacheKey());
-  for(let salt=0;;salt++){
-   const key=await hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,digest,salt]));
-   if(!cache||await cache.slot(PERSONAL_ENGINE_CACHE_KIND,key)!==projection)return key;
-  }
+  return hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,(await this.prepare()).digest]));
  }
  /** Whether this session's engine is on disk: restored from it, or saved. */
  private engineSaved=false;
@@ -338,7 +332,7 @@ export class PersonalPresentationSession {
  private async cacheKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_PROJECTION_CACHE_KIND,(await this.prepare()).digest,PERSONAL_ANNOTATION_INK_POLICY]));
  }
- /** One slot per captured score holds its latest projection. It is written
+ /** One entry per captured score holds its latest projection. It is written
   * once hand choices settle, never once per choice. */
  private remember(view:ProjectionView){
   const cache=this.cache;if(!cache)return;
