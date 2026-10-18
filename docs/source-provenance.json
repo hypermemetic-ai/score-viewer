@@ -1424,22 +1424,32 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
+  "dependencyRevision": "42f5ff21b02576a17cbc9adea8f0364c3d75d13e",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/387",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/388",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/389",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/390",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/391",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/392",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/394",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/395"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/396",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/397",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/398"
     ],
-    "previousRevision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8",
-    "scope": "Production engraving after the 2026-10-17 No. 13 review. #387 speeds up slur contour admission with identical pages. #388 seats dynamics by their own music instead of below the whole system and honours MusicXML direction placement and staff. #389 scales grace figures as a whole (stems, beams, digits at 0.65) and sets them tight before the host onset; a written grace slash is painted. #390 marks genuinely ambiguous stemless heads with a hand corner (ambiguousHandCorners). #391 engraves one head for one key struck by two voices (shareAttackHeads, independentUnisonAttachments, sharedHeadTerminal 'long'). #392 replaces augmentation dots on stemmed values with a \"+½\" diamond on the note's own stem (stemDurationMark 'middle'); hollow stems form it by absence. #394 stacks heads that share an onset and a written duration (clusterStacking 'shared-duration-v1'). #395 escapes every SVG attribute and text interpolation. These options join APPROVED_PRODUCTION_ISO_POLICY, so validateScoreRenderingRecipe refuses saved approved-v3 and calculated-hands-v1 recipes made at 2b21840 or earlier with 'This saved engraving does not match the current shared engraving policy.' and the viewer engraves those editions again from their own source, hands and fingers (docs/saved-edition-reengraving.md). Retained v1, v2 and no14-recovery recipes are unchanged. Draft slur candidate #393 is not included. #388, #390, #391, #392, #394 and #395 record independent sub-agent reviews in their PR bodies; #387 records none; #389 records no verdict in its body, though its commit 8226e09 addresses review findings. All were merged without GitHub review records."
+    "previousRevision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
+    "scope": "Engraving speed and the hand engine, 2026-10-18. #396 adds an engraving benchmark and reference-score speed budgets, with no ink change. #397 lets the personal hand projection export and restore its settled engine (exportState, restore, restoreAsync), refusing any state that does not reproduce the same pages, so the viewer can resume hand editing on reopening without engraving again. #398 marks only owners whose hand a personal ledger changes, so a hand view with no changes draws the reading view's page (on Schumann No. 13 the pickup's left-hand rest stays on the Middle C line). Reading views are unchanged. Each PR records an independent sub-agent review in its thread; all were merged without GitHub review records."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/387",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/388",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/389",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/390",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/391",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/392",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/394",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/395"
+      ],
+      "previousRevision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8",
+      "scope": "Production engraving after the 2026-10-17 No. 13 review. #387 speeds up slur contour admission with identical pages. #388 seats dynamics by their own music instead of below the whole system and honours MusicXML direction placement and staff. #389 scales grace figures as a whole (stems, beams, digits at 0.65) and sets them tight before the host onset; a written grace slash is painted. #390 marks genuinely ambiguous stemless heads with a hand corner (ambiguousHandCorners). #391 engraves one head for one key struck by two voices (shareAttackHeads, independentUnisonAttachments, sharedHeadTerminal 'long'). #392 replaces augmentation dots on stemmed values with a \"+½\" diamond on the note's own stem (stemDurationMark 'middle'); hollow stems form it by absence. #394 stacks heads that share an onset and a written duration (clusterStacking 'shared-duration-v1'). #395 escapes every SVG attribute and text interpolation. These options join APPROVED_PRODUCTION_ISO_POLICY, so validateScoreRenderingRecipe refuses saved approved-v3 and calculated-hands-v1 recipes made at 2b21840 or earlier with 'This saved engraving does not match the current shared engraving policy.' and the viewer engraves those editions again from their own source, hands and fingers (docs/saved-edition-reengraving.md). Retained v1, v2 and no14-recovery recipes are unchanged. Draft slur candidate #393 is not included. #388, #390, #391, #392, #394 and #395 record independent sub-agent reviews in their PR bodies; #387 records none; #389 records no verdict in its body, though its commit 8226e09 addresses review findings. All were merged without GitHub review records."
+    },
     {
       "revision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8",
       "pullRequests": [

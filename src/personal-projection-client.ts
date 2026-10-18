@@ -1,4 +1,4 @@
-import {HandPresentationError,type PersonalOwnerHand} from '../vendor/iso-notation/src/score-presentation';
+import {HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand} from '../vendor/iso-notation/src/score-presentation';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse,ProjectionView,SerializedProjectionError} from './personal-projection-protocol';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
 
@@ -15,7 +15,8 @@ export function deserializeProjectionError(error:SerializedProjectionError):Erro
  if(error.name==='AbortError')return new DOMException(error.message,'AbortError');
  const result=Error(error.message);result.name=error.name;return result;
 }
-interface Pending {request:ProjectionRequest;inputs:ProjectionCoreInputs;execution?:ReadingExecution;resolve(view:ProjectionView|undefined):void;reject(error:unknown):void;cleanup():void;cancel(reason:unknown):void}
+type Done=Extract<ProjectionResponse,{kind:'done'}>;
+interface Pending {request:ProjectionRequest;inputs:ProjectionCoreInputs;execution?:ReadingExecution;resolve(done:Done):void;reject(error:unknown):void;cleanup():void;cancel(reason:unknown):void}
 
 /** One projection worker for the reader. Cores are identified by the
  * caller's digest of the captured package; the worker may forget one at any
@@ -61,9 +62,9 @@ export class ProjectionWorkerClient {
   if(response.kind==='stage'){try{p.execution?.onCheckpoint?.(response.stage);}catch(error){p.cancel(error);}return;}
   if(response.kind==='missing'){this.known.delete(p.request.key);try{this.send(p);}catch(error){this.pending.delete(response.id);p.cleanup();p.reject(error);}return;}
   this.pending.delete(response.id);p.cleanup();
-  if(response.kind==='done')p.resolve(response.view);else{if(response.error.name!=='HandPresentationError')this.known.delete(p.request.key);p.reject(deserializeProjectionError(response.error));}
+  if(response.kind==='done')p.resolve(response);else{if(response.error.name!=='HandPresentationError')this.known.delete(p.request.key);p.reject(deserializeProjectionError(response.error));}
  }
- private request(base:{kind:'warm'}|{kind:'project';owners:PersonalOwnerHand[];digest:string},key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<ProjectionView|undefined>{
+ private request(base:{kind:'warm';saved?:PersonalHandEngineState}|{kind:'project';owners:PersonalOwnerHand[];digest:string}|{kind:'save'},key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<Done>{
   checkReadingExecution(execution);
   return new Promise((resolve,reject)=>{
    const id=++this.sequence,signal=execution?.signal;
@@ -82,10 +83,15 @@ export class ProjectionWorkerClient {
    try{this.send(p);}catch(error){this.pending.delete(id);p.cleanup();reject(error);}
   });
  }
- /** Settle a core's engraving ahead of its first projection. */
- warm(key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<void>{return this.request({kind:'warm'},key,inputs,execution).then(()=>undefined);}
+ /** Settle a core's engraving ahead of its first projection, from `saved`
+  * when it reproduces. Resolves how it settled. */
+ warm(key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution,saved?:PersonalHandEngineState):Promise<'restored'|'engraved'|'already'>{
+  return this.request({kind:'warm',...(saved?{saved}:{})},key,inputs,execution).then(done=>done.settled??'engraved');
+ }
+ /** The core's settled engine, when the worker still holds a settled core. */
+ save(key:string,inputs:ProjectionCoreInputs):Promise<PersonalHandEngineState|undefined>{return this.request({kind:'save'},key,inputs).then(done=>done.state);}
  async project(key:string,inputs:ProjectionCoreInputs,owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>{
-  const view=await this.request({kind:'project',owners:owners.map(o=>({...o})),digest},key,inputs,execution);
+  const {view}=await this.request({kind:'project',owners:owners.map(o=>({...o})),digest},key,inputs,execution);
   if(!view)throw Error('The hand drawing worker returned no pages.');
   return view;
  }

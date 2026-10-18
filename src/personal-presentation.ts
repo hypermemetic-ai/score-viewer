@@ -1,5 +1,6 @@
-import {createPersonalHandProjection,HandPresentationError,type PersonalOwnerHand,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
+import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
+import {effectivePerformingHand} from '../vendor/iso-notation/src/model/effective-hand';
 import {calculatedRecipeForRequest} from './calculated-hand-edition';
 import {PERSONAL_ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from './annotation-ink-policy';
 import {effectiveAssignments} from './personal-assignments';
@@ -15,18 +16,29 @@ import type {DerivedFileCache} from './derived-file-cache';
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
  /** offThreadOnly: settle only where it cannot hold the reader's thread.
-  * Resolves whether the engraving actually settled. */
- warm(execution?:ReadingExecution,offThreadOnly?:boolean):Promise<boolean>;
+  * `saved`: an engine this build saved for the same captured package, to
+  * resume from instead of engraving. Resolves false when the engraving did
+  * not settle, else how: restored, engraved, or already settled before. */
+ warm(execution?:ReadingExecution,offThreadOnly?:boolean,saved?:PersonalHandEngineState):Promise<false|'restored'|'engraved'|'already'>;
  project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>;
+ /** The settled engine, for the disk cache; undefined when there is none. */
+ save():Promise<PersonalHandEngineState|undefined>;
 }
 type Core=PersonalProjectionCore;
 type Capture=PreparationRequest<Core>&{digest:string};
 const preparations=new PersonalPreparationPool<Core>();
 function localCore(inputs:ProjectionCoreInputs):Core {
  const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
+ let settled=false;
  return {
-  async warm(e,offThreadOnly){if(offThreadOnly)return false;if(e)await core.warmAsync(e);else core.warm();return true;},
-  async project(owners,digest,e){return e?core.projectAsync(owners,digest,e):core.project(owners,digest);}
+  async warm(e,offThreadOnly,saved){
+   if(offThreadOnly)return false;
+   if(settled)return 'already';
+   if(saved&&(e?await core.restoreAsync(saved,e):core.restore(saved))){settled=true;return 'restored';}
+   if(e)await core.warmAsync(e);else core.warm();settled=true;return 'engraved';
+  },
+  async project(owners,digest,e){const view=e?await core.projectAsync(owners,digest,e):core.project(owners,digest);settled=true;return view;},
+  async save(){return core.exportState();}
  };
 }
 function freezeView<T>(value:T):T {
@@ -51,10 +63,14 @@ function workerCore(client:ProjectionWorkerClient,key:string,inputs:ProjectionCo
   }
  }
  return {
-  async warm(e,offThreadOnly){
-   if(!local&&await remote(()=>client.warm(key,inputs,e).then(()=>true),offThreadOnly))return true;
+  async warm(e,offThreadOnly,saved){
+   if(!local){const done=await remote(()=>client.warm(key,inputs,e,saved),offThreadOnly);if(done)return done;}
    const fallback=local as Core|undefined;
-   return fallback&&!offThreadOnly?fallback.warm(e??{}):false;
+   return fallback&&!offThreadOnly?fallback.warm(e??{},false,saved):false;
+  },
+  async save(){
+   if(local)return local.save();
+   try{return await client.save(key,inputs);}catch{return undefined;}
   },
   async project(owners,digest,e){
    if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e));if(view)return freezeView(view);}
@@ -73,6 +89,16 @@ let defaultCache:DerivedFileCache|undefined;
  * the same hand choices reads its pages instead of engraving them again. */
 export function usePersonalProjectionCache(cache:DerivedFileCache|undefined){defaultCache=cache;}
 export const PERSONAL_PROJECTION_CACHE_KIND='personal-projection-v1';
+/** The settled hand engine of one captured package, so hand editing resumes
+ * on reopening instead of engraving the score again. ISO notation refuses a
+ * state that does not reproduce; the cache's build identity keeps another
+ * build's engine away. */
+export const PERSONAL_ENGINE_CACHE_KIND='personal-engine-v1';
+export function cachedEngine(value:unknown):PersonalHandEngineState {
+ const v=value as PersonalHandEngineState;
+ if(!v||typeof v!=='object'||v.version!=='personal-hand-engine-state-v1'||!Array.isArray(v.rawPages)||!v.graph||typeof v.graph!=='object')throw Error('Incomplete cached hand engine');
+ return v;
+}
 /** A cached view must be the complete projection made for exactly these hand
  * choices: the assignment digest covers every owner's identity and hand. */
 export function cachedProjection(owners:readonly PersonalOwnerHand[],digest:string){
@@ -81,8 +107,11 @@ export function cachedProjection(owners:readonly PersonalOwnerHand[],digest:stri
   if(!v||typeof v!=='object'||!v.score||!Array.isArray(v.score.notes)||!Array.isArray(v.pages)||!v.pages.length||v.pages.some(page=>typeof page!=='string'||!page)||
    !Array.isArray(v.seats)||v.annotationGeometry?.version!=='annotation-carrier-geometry-v1'||v.annotationGeometry.presentationIdentity!==digest||!Array.isArray(v.annotationGeometry.seats))
    throw Error('Incomplete cached projection');
+  // Only owners whose hand the choices change carry this ledger's marker; the
+  // rest keep the score's own hand, so each owner is checked by its effective hand.
   const notes=new Map(v.score.notes.map(n=>[n.id,n]));
-  for(const o of owners){if(o.hand===null)continue;const n=notes.get(o.id);if(!n||n.hand!==o.hand||n.personalHand?.assignmentId!==digest)throw Error('Cached projection has other hands');}
+  if(!v.score.notes.some(n=>n.personalHand?.assignmentId===digest)||v.score.notes.some(n=>n.personalHand&&n.personalHand.assignmentId!==digest))throw Error('Cached projection has other hands');
+  for(const o of owners){if(o.hand===null)continue;const n=notes.get(o.id);if(!n||effectivePerformingHand(n)!==o.hand)throw Error('Cached projection has other hands');}
   return freezeView(v);
  };
 }
@@ -183,7 +212,7 @@ export class PersonalPresentationSession {
  async warm(input?:ReadingExecution):Promise<void>{
   if(!this.base.renderingRecipe||!this.base.sourceSha256)return;
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  try{if(await this.use((core,e)=>core.warm(e),execution))this.baseline=true;}
+  try{if(await this.use((core,e)=>this.settle(core,e),execution))this.baseline=true;}
   catch(error){
    // The source's own pages already draw a key whose notes differ in having a
    // hand; only a personal projection must refuse it. Read those pages, and
@@ -201,7 +230,7 @@ export class PersonalPresentationSession {
   if(this.prefetched||this.baseline||!this.worker?.available||!this.base.renderingRecipe||!this.base.sourceSha256)return;
   this.prefetched=true;prefetching?.abort();
   const controller=new AbortController();prefetching=controller;
-  void this.use((core,e)=>core.warm(e,true),{signal:controller.signal,onCheckpoint:this.noteStage}).then(settled=>{if(settled)this.baseline??=true;else this.prefetched=false;},error=>{
+  void this.use((core,e)=>this.settle(core,e,true),{signal:controller.signal,onCheckpoint:this.noteStage}).then(settled=>{if(settled)this.baseline??=true;else this.prefetched=false;},error=>{
    this.prefetched=false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});
   }).finally(()=>{if(prefetching===controller)prefetching=undefined;});
  }
@@ -225,7 +254,7 @@ export class PersonalPresentationSession {
  }
  private async settleBaseline():Promise<boolean>{
   // Opening another score stops this check; an unfinished check settles nothing.
-  try{if(await this.use((core,e)=>core.warm(e),{signal:(scoreWork??=new AbortController()).signal,onCheckpoint:this.noteStage}))this.baseline??=true;}
+  try{if(await this.use((core,e)=>this.settle(core,e),{signal:(scoreWork??=new AbortController()).signal,onCheckpoint:this.noteStage}))this.baseline??=true;}
   catch(error){if(error instanceof DOMException&&error.name==='AbortError')return false;if(baselineRefusal(error))this.baseline=Error(CANNOT_DRAW,{cause:error});else if(!(error instanceof HandPresentationError))throw error;}
   return true;
  }
@@ -233,7 +262,7 @@ export class PersonalPresentationSession {
   * say so: no hand choice is at fault, so none is returned to the score. */
  private async refusal(error:unknown,execution?:ReadingExecution):Promise<never>{
   if(baselineRefusal(error)&&this.baseline===undefined&&this.base.renderingRecipe&&this.base.sourceSha256){
-   try{if(await this.use((core,e)=>core.warm(e),execution))this.baseline=true;}
+   try{if(await this.use((core,e)=>this.settle(core,e),execution))this.baseline=true;}
    catch(warmError){
     if(baselineRefusal(warmError))this.baseline=Error(CANNOT_DRAW,{cause:warmError});
     else if(!(warmError instanceof HandPresentationError))throw warmError;
@@ -241,6 +270,48 @@ export class PersonalPresentationSession {
   }
   if(this.baseline instanceof Error)throw this.baseline;
   throw error;
+ }
+ /** The engine saved for this captured package, read once per session. */
+ private savedEngine?:Promise<PersonalHandEngineState|undefined>;
+ private engineWrite?:ReturnType<typeof setTimeout>;
+ /** Settle the engraving for hand editing: from the engine saved on disk
+  * when there is one that reproduces, else by engraving, which is then saved. */
+ private async settle(core:Core,execution?:ReadingExecution,offThreadOnly=false):Promise<boolean>{
+  const saved=await this.savedState();checkReadingExecution(execution);
+  const settled=await core.warm(execution,offThreadOnly,saved);
+  // A settled core holds the engine now; the saved copy is not kept in memory.
+  if(settled)this.savedEngine=Promise.resolve(undefined);
+  // A restored engine, or one already settled from a saved copy, is on disk.
+  if(settled==='restored'||settled==='already'&&saved)this.engineSaved=true;else if(settled==='engraved')this.rememberEngine();
+  return !!settled;
+ }
+ private savedState():Promise<PersonalHandEngineState|undefined>{
+  const cache=this.cache;if(!cache)return Promise.resolve(undefined);
+  return this.savedEngine??=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+ }
+ /** The engine never takes its own projection's slot, so saving one cannot
+  * evict the other. */
+ private async engineKey():Promise<string>{
+  const digest=(await this.prepare()).digest,cache=this.cache,projection=cache&&await cache.slot(PERSONAL_PROJECTION_CACHE_KIND,await this.cacheKey());
+  for(let salt=0;;salt++){
+   const key=await hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,digest,salt]));
+   if(!cache||await cache.slot(PERSONAL_ENGINE_CACHE_KIND,key)!==projection)return key;
+  }
+ }
+ /** Whether this session's engine is on disk: restored from it, or saved. */
+ private engineSaved=false;
+ private engineAttempts=0;
+ /** The settled engine is saved once the reader is idle, once per session:
+  * hand choices change only what the engine places, not what it restores. */
+ private rememberEngine(){
+  const cache=this.cache;if(!cache||this.engineSaved||this.engineWrite!==undefined||this.engineAttempts>=2)return;
+  const write=()=>{
+   const core=this.lease?.valid?this.lease.core:undefined;if(!core||this.engineSaved)return;
+   // An engine the cache refuses (too large, or the disk fails) is tried once more, not after every choice.
+   this.engineAttempts++;
+   void core.save().then(async state=>{if(state&&await cache.put(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),state))this.engineSaved=true;}).catch(()=>{});
+  };
+  this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
  }
  private async cacheKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_PROJECTION_CACHE_KIND,(await this.prepare()).digest,PERSONAL_ANNOTATION_INK_POLICY]));
@@ -271,10 +342,12 @@ export class PersonalPresentationSession {
    checkReadingExecution(execution);
   }
   if(!result){
-   result=await playerFacing(this.use((core,e)=>core.project(owners,digest,e),execution).catch(error=>this.refusal(error,execution)),
+   // A saved engine settles the core first, so this choice only places what
+   // changed, even when its projection is no longer on disk.
+   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState())await this.settle(core,e);return core.project(owners,digest,e);},execution).catch(error=>this.refusal(error,execution)),
     UNDRAWABLE_HAND_CHOICES,
     "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
-   this.baseline??=true;this.remember(result);
+   this.baseline??=true;this.remember(result);this.rememberEngine();
   }
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;

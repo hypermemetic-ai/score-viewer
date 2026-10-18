@@ -8,7 +8,7 @@ import {createProjectionHost,createHostedCore,type HostedProjectionCore} from '.
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,type ProjectionWorkerLike} from '../src/personal-projection-client';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse} from '../src/personal-projection-protocol';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
-import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch} from '../src/personal-presentation';
+import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch,PERSONAL_PROJECTION_CACHE_KIND} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -120,16 +120,28 @@ test('cancelling projection work stops the worker; a worker that never answers i
  await assert.rejects(unbuildable.warm('core',stubInputs),ProjectionWorkerUnavailable);
 });
 
+/** Idle-time writes land after a worker round trip; wait for them, not a timer. */
+async function written(cache:DerivedFileCache,files:Map<string,Uint8Array>,count:number){
+ for(let i=0;i<500&&files.size<count;i++){await new Promise(r=>setTimeout(r,10));await cache.flush();}
+ await cache.flush();
+}
+/** A projection lost from the disk, as when another score's entry takes its slot. */
+class EvictedProjections extends DerivedFileCache {
+ override get<T>(kind:string,key:string,validate:(value:unknown)=>T){return kind===PERSONAL_PROJECTION_CACHE_KIND?Promise.resolve(undefined):super.get(kind,key,validate);}
+}
+
 test('worker projection and the disk cache give the same view as the reader thread, and reopening reads the cache',async()=>{
  const {p,bytes}=await sourcePackage(transferStudy()),reopened=await importPackage(bytes);
  const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
  const local=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null}).project(choice);
  const log:ProjectionRequest[]=[],worker=fakeWorker(createHostedCore,log),{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
  const first=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache,cacheWriteDelayMs:0});
- const viaWorker=await first.project(choice);await new Promise(r=>setTimeout(r,50));await cache.flush();
+ const viaWorker=await first.project(choice);await written(cache,files,2);
  assert.deepEqual(viaWorker.pages,local.pages);assert.deepEqual(viaWorker.seats,local.seats);assert.deepEqual(viaWorker.score,local.score);
  assert.deepEqual(viaWorker.annotationGeometry,local.annotationGeometry);assert.ok(Object.isFrozen(viaWorker.pages)||Object.isFrozen(viaWorker.score));
- assert.equal(files.size,1);const requests=log.length;
+ // The projection and the settled engine behind it, never in the same slot.
+ // The choice moves one owner; the others keep the score's hands and carry no marker.
+ assert.deepEqual(log.map(m=>m.kind),['project','save']);assert.equal(files.size,2);const requests=log.length;
  const reopenedSeat=reopened.seats.find(s=>s.ownerIds.includes('gesture-1'))!,again=assigned(reopened,initialPersonal(reopened),reopenedSeat,{hand:'RH'});
  const second=new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache});
  const cached=await second.project(again);
@@ -139,6 +151,37 @@ test('worker projection and the disk cache give the same view as the reader thre
  for(const name of files.keys())files.set(name,new Uint8Array([9]));
  const third=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
  assert.ok(log.length>requests);assert.deepEqual(third.pages,local.pages);
+});
+
+test('reopening resumes hand editing from the saved engine instead of engraving again',async()=>{
+ const {p}=await sourcePackage(transferStudy()),{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+ const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const local=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null}).project(choice);
+ const restores:boolean[]=[],spying=(inputs:ProjectionCoreInputs)=>{
+  const core=createHostedCore(inputs),restore=core.restoreAsync!;
+  return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;}});
+ };
+ const first=fakeWorker(spying),opened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(first.spawn),cache,cacheWriteDelayMs:0});
+ opened.prefetch();await opened.ensureHandChoicesDrawable();await written(cache,files,1);
+ // The prefetch and the drawable check each ask for a warm; only the one that
+ // engraved saves the engine.
+ assert.deepEqual(first.log.map(m=>m.kind),['warm','warm','save']);assert.equal((first.log[0] as {saved?:unknown}).saved,undefined);
+ // Another session, worker and pool: the saved engine settles it, and its
+ // hand choices draw exactly as a cold engraving draws them.
+ const second=fakeWorker(spying),reopened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(second.spawn),cache,cacheWriteDelayMs:0});
+ reopened.prefetch();await reopened.ensureHandChoicesDrawable();
+ assert.deepEqual(restores,[true]);assert.equal(second.log[0].kind,'warm');assert.ok((second.log[0] as {saved?:unknown}).saved);
+ const view=await reopened.project(choice);
+ assert.deepEqual(view.pages,local.pages);assert.deepEqual(view.seats,local.seats);assert.deepEqual(view.score,local.score);assert.deepEqual(view.annotationGeometry,local.annotationGeometry);
+ assert.deepEqual(second.log.map(m=>m.kind),['warm','warm','project'],'a restored engine is not saved again');
+ // A projection lost from the disk (its slot taken by another entry) still
+ // resumes from the saved engine: restore, then place only the choice.
+ const third=fakeWorker(spying),direct=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(third.spawn),cache:new EvictedProjections(store,'build-a'),cacheWriteDelayMs:0});
+ assert.deepEqual((await direct.project(choice)).pages,local.pages);
+ assert.deepEqual(third.log.map(m=>m.kind),['warm','project']);assert.ok((third.log[0] as {saved?:unknown}).saved);assert.deepEqual(restores,[true,true]);
+ // On the reader's thread too.
+ const here=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache});
+ await here.warm();assert.deepEqual((await here.project(choice)).pages,local.pages);
 });
 
 test('prefetch settles the engraving only in a worker and never without one',async()=>{
