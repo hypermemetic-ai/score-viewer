@@ -1,8 +1,8 @@
-import {strFromU8,strToU8,zipSync} from 'fflate';
+import {strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
 import {prepareInstrumentReading,validateInstrumentReadingScore,instrumentReadingEngine,
   type ReadingOwner,type IsoLayoutOptions,type IsoTokens} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
-import {hashBytes,importPackageForReading,type Manifest,type Metadata} from './package';
+import {hashBytes,importPackageForReading,readEditionContent,type Manifest,type Metadata} from './package';
 import {admitDualReadingContent,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
 
 export interface LegacyReadingDescriptor {
@@ -59,8 +59,13 @@ export function readingAdmissionReceipt(value:unknown):ReadingAdmissionReceipt {
 
 /** Canonical musical admission does not grant physical practice capabilities.
  * Pages and ownership replay through the exact shared engine authority before
- * the application exposes the archive or writes any library pointer. */
-export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,receipt?:ReadingAdmissionReceipt):{
+ * the application exposes the archive or writes any library pointer.
+ * `contentOnly` reads a single-reading archive for its musical content: the
+ * same source and policy checks, but its pages, owners and layout are drawn
+ * by the pinned engine instead of compared with the stored ones, which the
+ * archive's member hashes already bind. Such content is for engraving the
+ * archive again or reading its own facts, never for display. */
+export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,receipt?:ReadingAdmissionReceipt,contentOnly=false):{
   score:QuantizedGridScore;pages:string[];reading:ReadingContent
 } {
   const d=m.reading;
@@ -90,6 +95,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,r
   }
   const result=checkedPreparation(score,d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
   if(result.engineId!==d.engineId)throw Error('Reading preparation authority differs from its musical source.');
+  if(contentOnly)return {score,pages:result.pages,reading:{owners:result.owners,layoutMetadata:result.layoutMetadata,geometryEvidence:result.geometryEvidence}};
   if(result.pages.length!==m.pages.length||JSON.stringify(result.owners)!==JSON.stringify(owners)||
     JSON.stringify(result.layoutMetadata)!==JSON.stringify(layout))throw Error('Reading event ownership or geometry differs from its musical source.');
   const pages=m.pages.map((name,index)=>{
@@ -132,4 +138,28 @@ export async function prepareReadingPackage(input:{score:QuantizedGridScore;meta
   const bytes=zipSync(files,{level:6});
   await importPackageForReading(bytes);
   return bytes;
+}
+
+const manifestOf=(bytes:Uint8Array):Manifest|undefined=>{
+  try{return JSON.parse(strFromU8(unzipSync(bytes,{filter:f=>f.name==='manifest.json'})['manifest.json'])) as Manifest;}catch{return;}
+};
+/** A single-reading archive whose pages the pinned engraving no longer draws
+ * byte for byte (an earlier shared engraving, say) is engraved again from its
+ * own content: the same score bytes, metadata, creation time, font, notices,
+ * layout options and tokens. Pages, owners and layout are drawn afresh;
+ * nothing is calculated and the earlier archive is not changed. Returns
+ * undefined for any other kind of archive. When the archive's content itself
+ * doesn't read, or carries members this would not keep, `refusal` is thrown. */
+export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown):Promise<Uint8Array|undefined>{
+  const peek=manifestOf(bytes);
+  if(peek?.version!==3||peek.reading?.version!=='instrument-reading-package-v1')return;
+  const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError')throw error;throw refusal;};
+  const content=await readEditionContent(bytes,{allowLegacyTempo:true}).catch(refuse),m=content.manifest,d=m.reading as LegacyReadingDescriptor,files=content.files;
+  const members=new Set(['score.json','seats.json',d.owners,d.layout,m.font,...m.notices,...m.pages]);
+  if(Object.keys(m.files).length!==members.size||Object.keys(m.files).some(name=>!members.has(name)))return refuse(Error('This reading carries files engraving it again would not keep.'));
+  const again=await prepareReadingPackage({score:JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore,metadata:structuredClone(m.metadata),createdAt:m.createdAt,
+    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]])),options:d.options,tokens:d.tokens});
+  // The score's identity is its source bytes; engraving again never changes them.
+  if(manifestOf(again)?.revision!==m.revision)return refuse(Error('Engraving this reading again would change its musical source.'));
+  return again;
 }

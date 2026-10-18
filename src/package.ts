@@ -271,13 +271,14 @@ export function readEditionContent(bytes:Uint8Array,options:PackageReadOptions={
  * content still reads with every member hash, source, seat and hand check. Work that walks other
  * scores than the one asked for must not fail because of it. Returns the
  * edition's content when `refusal` is such a refusal: a linked edition whose
- * members, source and hands still read. Anything else (damaged, foreign,
+ * members, source and hands still read, or a single-reading archive whose
+ * members, source and policy still read. Anything else (damaged, foreign,
  * cancelled) returns undefined and keeps its own refusal. The content is for
  * reading the edition's own facts and journals, never for display. */
 export async function editionNeedsEngravingAgain(bytes:Uint8Array,refusal:unknown):Promise<ScorePackage|undefined>{
  if((refusal as Error)?.name==='AbortError')return;
  try{const content=await readEditionContent(bytes,{allowLegacyTempo:true}),m=content.collectionManifest??content.manifest;
-  return m.version===2&&!!m.sourceScore&&!!content.sourceScore?content:undefined;}catch{return;}
+  return m.version===2&&!!m.sourceScore&&!!content.sourceScore||m.version===3&&m.reading?.version==='instrument-reading-package-v1'?content:undefined;}catch{return;}
 }
 export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
 /** Receipts for reading archives this build already replayed, keyed by
@@ -305,7 +306,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  if(m.version===3){
   if(options.keyboardLayout)fail('This score has no piano keyboard presentation.');
   const receipt=receiptArchiveSha256?await receipts!.get(receiptArchiveSha256).catch(()=>undefined):undefined;checkReadingExecution(execution);
-  const admitted=execution&&m.reading?.version==='instrument-reading-package-v2'?await admitDualReadingContentAsync(m,files,execution):admitReadingContent(m,files,receipt),{score,pages,reading}=admitted;
+  const admitted=execution&&m.reading?.version==='instrument-reading-package-v2'?await admitDualReadingContentAsync(m,files,execution):admitReadingContent(m,files,receipt,contentOnly),{score,pages,reading}=admitted;
   if('manifest' in admitted)m=admitted.manifest as Manifest;checkReadingExecution(execution);
   function* passiveChecks():Generator<PreparationStage,void,void>{
    if(reading.dual){for(const view of Object.values(reading.dual.views))for(const[page,svg]of view.pages.entries()){passiveSvg(svg,[],page);yield 'paint';}}
@@ -315,7 +316,8 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   if(execution)await drainReadingChecks(passiveChecks(),execution);else for(const _ of passiveChecks()){}
   freezeSource(score);
   const archiveSha256=dualArchiveSha256??receiptArchiveSha256??await hashBytes(bytes);
-  if(receiptArchiveSha256&&!receipt)receipts!.put(receiptArchiveSha256,{version:'reading-admission-receipt-v1',geometryEvidence:reading.geometryEvidence});
+  // Content read without comparing pages proves nothing about the stored ones.
+  if(receiptArchiveSha256&&!receipt&&!contentOnly)receipts!.put(receiptArchiveSha256,{version:'reading-admission-receipt-v1',geometryEvidence:reading.geometryEvidence});
   checkReadingExecution(execution);if(reading.dual)admittedDualArchives.set(m,{score,sha256:archiveSha256});
   return {manifest:m,score,seats:[],pages,files,reading,archiveSha256,sourceScore:score,sourceRevision:m.revision,sourceSha256:m.semanticSha256,
    fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};

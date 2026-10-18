@@ -52,6 +52,10 @@ A pitch whose saved edition was made from an earlier engraving of the original, 
 
 The notice reads: "This score was engraved again with the current engraving. Your hands, fingers and choices came along." When hands or fingers moved into the player's choices, it adds "The edition's hands and fingers now show as your own choices." When choices could not move, it says "Your hands and fingers came along." and how many notes' choices stay with the earlier edition. If practice could not move, it says so too.
 
+## Musical readings
+
+A single-reading archive (`instrument-reading-package-v1`, for example an earlier Guitar Pro part such as Add It Up) is admitted only when the pinned engine redraws its pages, owners and layout byte for byte. ISO bee8c67 draws dotted values with a stem diamond, so readings saved at 2b21840 or earlier stopped opening with "Reading page differs from its shared source preparation". On opening, such a reading is now engraved again from its own content (`reengraveReadingArchive` in `src/reading-package.ts`): the same `score.json` bytes, metadata, creation time, font, notices, layout options and tokens go through `prepareReadingPackage`, and the source revision must come out unchanged. The new archive is installed like any new edition (`stagePresentationInstall`); the earlier archive keeps its bytes and journal mapping. A reading's state and practice journals are named for the score alone, so the reader's place and practice stay, and the notice says so. An archive carrying any member the new archive would not keep, or whose source or policy no longer reads, keeps its refusal. `readEditionContent` reads such a reading for its content by drawing it with the pinned engine instead of comparing pages; it records no admission receipt. Dual readings (`instrument-reading-package-v2`) are not engraved again by this path.
+
 ## Removed
 
 The following are removed:
