@@ -30,6 +30,17 @@ function boundedScore(score:QuantizedGridScore):void {
     score.sourceBarTicks.length>2_001)throw Error('Reading preparation needs a complete score of at most 10,000 events and 2,000 measures.');
   validateInstrumentReadingScore(score);
 }
+// The page and spacing dimensions a reading may choose, as the shared reading
+// admission lists them. Every other option a reading records is the shared
+// engraving rule of the day it was drawn.
+const READING_DIMENSIONS=['pageWidth','pageHeight','pageMargin','pageMarginLeft','pageMarginRight','pageMarginTop','pageMarginBottom',
+  'headerHeight','footerHeight','runningHeaderHeight','measuresPerSystem','systemsPerPage','measureInset','interStaffGap'] as const;
+/** A reading drawn afresh keeps its own page dimensions and takes the current
+ * shared engraving rules, so a rule changed since (slur routing, say) is not
+ * replayed from the earlier archive. */
+function currentReadingOptions(options:Partial<IsoLayoutOptions>):Partial<IsoLayoutOptions>{
+  return Object.fromEntries(READING_DIMENSIONS.filter(key=>Object.hasOwn(options,key)).map(key=>[key,options[key]])) as Partial<IsoLayoutOptions>;
+}
 function checkedPreparation(score:QuantizedGridScore,options:Partial<IsoLayoutOptions>,tokens:Partial<IsoTokens>){
   const result=prepareInstrumentReading(score,options,tokens);
   if(!result.geometryEvidence.ok)throw Error('Reading page geometry needs correction: '+result.geometryEvidence.violations.slice(0,3).map(v=>v.message).join('; '));
@@ -94,7 +105,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,r
     const pages=m.pages.map(name=>{if(!files[name])throw Error('Missing reading page: '+name);return strFromU8(files[name]);});
     return {score,pages,reading:{owners,layoutMetadata:layout,geometryEvidence:receipt.geometryEvidence}};
   }
-  const result=checkedPreparation(score,d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
+  const result=checkedPreparation(score,contentOnly?currentReadingOptions(d.options):d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
   if(result.engineId!==d.engineId)throw Error('Reading preparation authority differs from its musical source.');
   if(contentOnly)return {score,pages:result.pages,reading:{owners:result.owners,layoutMetadata:result.layoutMetadata,geometryEvidence:result.geometryEvidence}};
   if(result.pages.length!==m.pages.length||JSON.stringify(result.owners)!==JSON.stringify(owners)||
@@ -147,7 +158,8 @@ const manifestOf=(bytes:Uint8Array):Manifest|undefined=>{
 /** A single-reading archive whose pages the pinned engraving no longer draws
  * byte for byte (an earlier shared engraving, say) is engraved again from its
  * own content: the same score bytes, metadata, creation time, font, notices,
- * layout options and tokens. Pages, owners and layout are drawn afresh;
+ * page dimensions and tokens, under the current shared engraving rules.
+ * Pages, owners and layout are drawn afresh;
  * nothing is calculated and the earlier archive is not changed. Returns
  * undefined for any other kind of archive. When the archive's content itself
  * doesn't read, carries members this would not keep, or would come out with
@@ -162,7 +174,7 @@ export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown,e
   const members=new Set(['score.json','seats.json',d.owners,d.layout,m.font,...m.notices,...m.pages]);
   if(Object.keys(m.files).length!==members.size||Object.keys(m.files).some(name=>!members.has(name)))return refuse(Error('This reading carries files engraving it again would not keep.'));
   const again=await prepareReadingPackage({score:JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore,metadata:structuredClone(m.metadata),createdAt:m.createdAt,
-    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]])),options:d.options,tokens:d.tokens},execution);
+    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]])),options:currentReadingOptions(d.options),tokens:d.tokens},execution);
   // The score's identity is its source bytes; engraving again never changes them.
   if(manifestOf(again)?.revision!==m.revision)return refuse(Error('Engraving this reading again would change its musical source.'));
   return again;

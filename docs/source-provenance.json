@@ -1424,14 +1424,15 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "53c4c986327c8bc6c41018321c9fdbc62d630a5d",
+  "dependencyRevision": "916245c5ba526885b210fdd6645006b1477a9811",
   "dependencyReview": {
     "pullRequests": [
       "https://github.com/hypermemetic-ai/iso-notation/pull/402",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/421"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/421",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/422"
     ],
     "previousRevision": "fe5b85fe060503112c78d312af09dfe2eb9f27dc",
-    "scope": "Slurs by note-gesture, 2026-10-18. #402 adds one slur model, phraseRouting 'note-gesture': each slur bows from the notes it is about, on the side that relates it most clearly to them; ties bow in proportion to their length and clear the staff lines by placement. #421 makes note-gesture the production default (APPROVED_PRODUCTION_ISO_POLICY); retained policies keep optical-open so frozen recipes still replay, and a recipe saved with the earlier routing is refused with the policy message, which the viewer answers by engraving the edition again on opening. On No. 13 all 5 pages change (222 of 224 slurs move) and on No. 14 all 3 pages change. #421 records an independent review in its PR body; #402 records its review rounds in its PR body; both were merged without GitHub review records. The ISO import regressions noted at fe5b85f remain follow-ups."
+    "scope": "Slurs by note-gesture and two import repairs, 2026-10-18. #402 adds one slur model, phraseRouting 'note-gesture': each slur bows from the notes it is about, on the side that relates it most clearly to them; ties bow in proportion to their length and clear the staff lines by placement. #421 makes note-gesture the production default (APPROVED_PRODUCTION_ISO_POLICY); retained policies keep optical-open so frozen recipes still replay, and a recipe saved with the earlier routing is refused with the policy message, which the viewer answers by engraving the edition again on opening. On No. 13 all 5 pages change (222 of 224 slurs move) and on No. 14 all 3 pages change. #421 records an independent review in its PR body; #402 records its review rounds in its PR body; all were merged without GitHub review records. #422 repairs the two import regressions noted at fe5b85f: heads are seated off a hollow stem with the linter's 0.5 pt of air (the MuseScore cross-staff fixture, refused for ring geometry after #410, imports again) and '+1/2' marks are counted from the written value rather than sounding ticks (the Guitar Pro bass fixture, whose 336-tick quarters read as double-dotted wholes after #404, stages again); the viewer's tests for both run in full again. #422 records an independent review (changes requested, then made) in its PR body."
   },
   "previousDependencyReviews": [
     {

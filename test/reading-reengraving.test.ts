@@ -34,6 +34,20 @@ test('a reading whose pages an earlier engraving drew is engraved again from its
   assert.match(String(await importPackage(stale).then(()=>undefined,error=>error)),/page differs/);
 });
 
+test('a reading saved under an earlier engraving rule is engraved again under the current one, keeping its page dimensions',async()=>{
+  // Readings record their resolved options. One drawn before production slurs
+  // routed by note-gesture records the earlier routing.
+  const earlierRule=await earlier((files,m)=>{const d=m.reading as unknown as {options:Record<string,unknown>};
+    assert.equal(d.options.phraseRouting,'note-gesture');d.options={...d.options,phraseRouting:'optical-open'};});
+  const refusal=await importPackage(earlierRule).then(()=>undefined,error=>error);
+  assert.match(String(refusal),/Unsupported reading option phraseRouting/);
+  assert.ok(await editionNeedsEngravingAgain(earlierRule,refusal));
+  const again=await reengraveReadingArchive(earlierRule,refusal);assert.ok(again);
+  assert.deepEqual(members(again!),members(current));
+  const {files:_a,...next}=manifest(again!),{files:_b,...today}=manifest(current);assert.deepEqual(next,today);
+  assert.deepEqual((await importPackage(again!)).pages,(await importPackage(current)).pages);
+});
+
 test('engraving a reading again keeps every refusal it cannot answer',async()=>{
   const refusal=Error('refused');
   // Not a single-reading archive: someone else's question.
