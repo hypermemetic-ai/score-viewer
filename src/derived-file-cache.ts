@@ -36,7 +36,8 @@ export class DerivedFileCache {
   if(typeof identity!=='string'||!identity||identity.length>200)throw Error('Invalid derived cache identity');
   this.store=store;this.identity=identity;
  }
- private async slot(kind:string,key:string){
+ /** The slot an entry occupies; entries in the same slot replace each other. */
+ async slot(kind:string,key:string){
   if(!kindName.test(kind)||!sha256.test(key))throw Error('Invalid derived cache key');
   return parseInt((await hashBytes(JSON.stringify([DERIVED_FILE_CACHE_FORMAT,this.identity,kind,key]))).slice(0,8),16)%DERIVED_FILE_CACHE_LIMITS.slots;
  }
@@ -53,17 +54,18 @@ export class DerivedFileCache {
    return validate(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(payload)));
   }catch{return;}
  }
- /** Ordered and best effort: a refused or failed write keeps the old slot or none. */
- put(kind:string,key:string,value:unknown):Promise<void>{
+ /** Ordered and best effort: a refused or failed write keeps the old slot or
+  * none, and resolves false. */
+ put(kind:string,key:string,value:unknown):Promise<boolean>{
   const write=async()=>{
-   const payload=strToU8(JSON.stringify(value));if(payload.byteLength>DERIVED_FILE_CACHE_LIMITS.payloadBytes)return;
+   const payload=strToU8(JSON.stringify(value));if(payload.byteLength>DERIVED_FILE_CACHE_LIMITS.payloadBytes)return false;
    const header:Header={format:DERIVED_FILE_CACHE_FORMAT,identity:this.identity,kind,key,payloadSha256:await hashBytes(payload),payloadBytes:payload.byteLength},
     head=strToU8(JSON.stringify(header)+'\n'),body=deflateSync(payload,{level:1});
-   if(head.byteLength>MAX_HEADER||head.byteLength+body.byteLength>DERIVED_FILE_CACHE_LIMITS.slotBytes)return;
+   if(head.byteLength>MAX_HEADER||head.byteLength+body.byteLength>DERIVED_FILE_CACHE_LIMITS.slotBytes)return false;
    const bytes=new Uint8Array(head.byteLength+body.byteLength);bytes.set(head);bytes.set(body,head.byteLength);
-   await this.store.write(derivedCacheSlotName(await this.slot(kind,key)),bytes);
+   await this.store.write(derivedCacheSlotName(await this.slot(kind,key)),bytes);return true;
   };
-  this.writes=this.writes.then(write).catch(()=>{});return this.writes;
+  const written=this.writes.then(write).catch(()=>false);this.writes=written.then(()=>{});return written;
  }
  flush():Promise<void>{return this.writes;}
 }
