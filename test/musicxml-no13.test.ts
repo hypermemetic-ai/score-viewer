@@ -4,6 +4,9 @@ import {readFileSync} from 'node:fs';
 import {prepareMusicXmlScore} from '../src/musicxml-import';
 import {importPackage,selectPresentation,type ScorePackage} from '../src/package';
 import {planPractice,initialPractice,PracticeSession} from '../src/practice';
+import {ensurePianoReady} from '../src/piano-readiness';
+import {PackageAdmissionSession} from '../src/package-admission-session';
+import {adoptImportedReading} from '../src/personal-presentation';
 
 const root=new URL('../',import.meta.url);
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('src/URWGothic-Demi.otf',root))},
@@ -19,6 +22,10 @@ test('Schumann Op. 68 No. 13 imports from MusicXML, opens on both keyboards and 
  const stages=new Set<string>();
  const prepared=await prepareMusicXmlScore(readFileSync(new URL('vendor/iso-notation/src/scores/schumann-op68-no13.musicxml',root)),assets,{onCheckpoint:stage=>stages.add(stage)});
  assert.ok(stages.size>0,'the engraving reports its progress');
+ // Hand editing takes the import's reading engrave as its own, so the first
+ // hand choice engraves nothing again.
+ const opened=await ensurePianoReady({packageBytes:prepared.bytes,layout:'conventional-piano',signal:new AbortController().signal},new PackageAdmissionSession());
+ assert.ok('package' in opened);assert.equal(await adoptImportedReading(opened.package,prepared.reading),true);
  const all=await importPackage(prepared.bytes,{allowLegacyTempo:true});
  assert.deepEqual([...all.availablePresentations??[]].sort(),['conventional-piano','janko-four-row']);
  for(const layout of ['conventional-piano','janko-four-row'] as const){

@@ -1,5 +1,5 @@
-import {strToU8} from 'fflate';
-import {renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
+import {strFromU8,strToU8} from 'fflate';
+import {renderScorePresentationAsync,type AdmittedReading} from '../vendor/iso-notation/src/score-presentation';
 import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 import {resolveIsoTokens,type IsoLayoutOptions,type IsoTokens} from '../vendor/iso-notation/src/render/iso/types';
 import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
@@ -27,14 +27,17 @@ export interface NativePianoPreparation {
  * production engraving with zero lint violations, both keyboards get the
  * same pages, and the recipe that reproduces them is retained, as calculated
  * editions and personal hand editing require. The package passes ordinary
- * admission. */
-export async function publishNativePianoScore(score:QuantizedGridScore,input:NativePianoPreparation):Promise<{bytes:Uint8Array;filename:string}> {
+ * admission. The reading engrave is returned too, so hand editing can start
+ * from it instead of engraving the score again. */
+export async function publishNativePianoScore(score:QuantizedGridScore,input:NativePianoPreparation):Promise<{bytes:Uint8Array;filename:string;reading:AdmittedReading}> {
  const {execution,assets}=input,Refusal=input.refusal??Error;
  const source=strToU8(JSON.stringify(score)),sourceSha256=await hashBytes(source);
  let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,
   options:approvedProductionIsoOptions(input.options),tokens:resolveIsoTokens(input.tokens??{}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
+ // The score as the package stores it: hand editing reads it from there, and
+ // takes this engrave as its own only for that very score.
  let rendered;
- try{rendered=await renderScorePresentationAsync(score,recipe,execution);}
+ try{rendered=await renderScorePresentationAsync(JSON.parse(strFromU8(source)),recipe,execution);}
  catch(error){if((error as Error).name==='AbortError')throw error;throw new Refusal(`This score can't be engraved yet: ${(error as Error).message}`);}
  checkReadingExecution(execution);
  if(rendered.lint.violations.length)throw new Refusal("This score can't be engraved cleanly yet: some of its notation doesn't fit the page layout.");
@@ -50,5 +53,5 @@ export async function publishNativePianoScore(score:QuantizedGridScore,input:Nat
  for(const d of Object.values(m.presentations??{}))if(d)d.renderingRecipe='rendering-recipe.json';
  const final=await publishPackage(await importPackage(archivePackage(m,files),{allowLegacyTempo:true}));
  checkReadingExecution(execution);
- return {bytes:final.bytes,filename:final.filename};
+ return {bytes:final.bytes,filename:final.filename,reading:rendered};
 }

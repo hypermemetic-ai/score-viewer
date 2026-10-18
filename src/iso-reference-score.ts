@@ -37,5 +37,5 @@ export async function prepareIsoReferenceScore(id:IsoReferenceScoreId,assets:Nat
   options:{exceptionCarrier,...(durationSeatPreferences?{durationSeatPreferences}:{})},
   metadata:{title:score.title,composer:info.composer,provenance:[
    `iso-notation ${isoRevision}, active score ${id} revision ${active.revision}.`,info.hands]}});
- return {...out,revision:active.revision};
+ return {bytes:out.bytes,filename:out.filename,revision:active.revision};
 }
