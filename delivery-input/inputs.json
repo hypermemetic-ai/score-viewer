@@ -7711,8 +7711,8 @@
     "digest": "a5480c60e49e77d750745a549197d84d744b68bb0d2dfcc1c8aa6c61c33b598a"
   },
   "checks": {
-    "sha256": "058264382bedd5c4db68b4d10f3649399365d449751ce6c1d272174a2596b778",
-    "size": 6019
+    "sha256": "b4cc2708c91032c645725348ad8771f7713b5e9dfb1f3670e6094ea9e2c3b710",
+    "size": 6972
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",

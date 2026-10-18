@@ -32,7 +32,7 @@
       "ownerLibraryRehearsal": {
         "sourceCommit": "1a3266170ba07def95ee12fa96d3667470480cec",
         "frontend": "Byte-identical to the frozen frontend (diff -r of the 1a32661 build and the clean 9c23896 build: no differences).",
-        "browser": "Chromium (playwright-core) headless Linux, production dist served with the Tauri CSP from src-tauri/tauri.conf.json, native IPC emulated",
+        "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints, so same-origin fetch under the unmodified policy is not shown (worker-src, which governs the worker, is unchanged)",
         "data": "Read-only copy of the owner's laptop data (1311 files; piano sample bank excluded); every write kept in memory, two sessions against the same in-memory disk",
         "firstOpenMs": {"No. 13 (approved-v3)": 24773, "No. 14 (retained no14-recovery)": 9336, "Zelda's Lullaby (calculated)": 3266, "Add It Up (reading v1)": 17868, "Bach Goldberg Var. 1 (approved-v3)": 1436},
         "reopenMs": {"No. 13": 3056, "No. 14": 4770, "Zelda's Lullaby": 3469, "Add It Up": 245, "Bach Goldberg Var. 1": 1804},
@@ -40,8 +40,8 @@
         "screenshots": "/tmp/sv-delivery-shots/sim8-review on the build host"
       },
       "imports": {
-        "sourceCommit": "b7c6009 (application code identical to 1a32661 for import paths)",
-        "observed": "Fresh profile: Schumann Op. 68 No. 13 MusicXML import, 5 pages with corners, diamonds and graces; on the Janko piano keyboard the No. 14 fixture .isoscore (2.0 s, 3 stored pages) and Bach .tuna (2.0 s, 4 pages)."
+        "sourceCommits": {"musicXmlImport": "c95309c", "jankoImports": "b7c6009"},
+        "observed": "Fresh profile: Schumann Op. 68 No. 13 MusicXML import at c95309c, 5 pages with corners, diamonds and graces; at b7c6009 on the Janko piano keyboard the No. 14 fixture .isoscore (2.0 s, 3 stored pages) and Bach .tuna (2.0 s, 4 pages). Later commits (b7c6009, 1a32661) change only the saved-reading re-engraving path, the practice-transfer read for readings and tests; the imports were not repeated on them."
       },
       "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. Dual readings (instrument-reading-package-v2) were not exercised under bee8c67 (the owner has none). Pre-existing on main 132970b as well: a refused hand choice on No. 13 (L on the RH pickup) leaves 'Choices haven't been saved' and blocks returning to the library; importing a Janko-only .isoscore on a fresh Conventional-piano profile fails."
     },
@@ -49,12 +49,12 @@
       "status": "passed",
       "sourceCommit": "1a3266170ba07def95ee12fa96d3667470480cec",
       "reviews": [
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/124", "verdict": "fresh subagent review; no blocking issues; should-fix items addressed in the second commit before merge"},
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/124", "verdict": "fresh subagent review; no blocking issues; should-fix items addressed in the second commit before merge. A third commit (37176da, wording when a carried surface reopens) landed after the review and was not re-reviewed; the PR notes the full suite could not finish on it then (machine overloaded). It is covered by the complete suite recorded above."},
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/125", "verdict": "fresh-context sub-agent review of 5f92ecd approved with nits; findings fixed in edd16f3, re-approved by the same reviewer"},
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/127", "verdict": "fresh reviewer agent; findings addressed in a146587 before merge"},
         {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/128", "verdict": "fresh-context agent reviewed b7c6009 from a clean clone (re-ran npm test, mjs tests, tsc, build; rebuilt a real 2b21840 reading at bee8c67): approve with nits, no data-loss, identity or receipt problems; should-fix items 1-2 and nits 3, 4, 6, 7, 8 fixed in 1a32661, which was not re-reviewed"}
       ],
-      "scope": "PR 126 (derived-engraving disk cache, hand choices in a worker) also ships here; its commits include 'Address review: per-score projection slot, baseline refusals, worker fallbacks', but its PR body records no independent review verdict. Its behaviour is covered by the complete test suite and the owner-library rehearsal above. The seal itself is reviewed separately in its delivery PR."
+      "scope": "PR 126 (derived-engraving disk cache, hand choices in a worker) also ships here; its commits include 'Address review: per-score projection slot, baseline refusals, worker fallbacks', but its PR body records no independent review verdict. Its behaviour is covered by the complete test suite and the owner-library rehearsal above. The pinned notation bee8c67 (iso-notation #387-#392, #394, #395) is recorded in docs/source-provenance.json: #388, #390, #391, #392, #394 and #395 record independent sub-agent reviews in their PR bodies; #387 records none; #389 records no verdict (its commit 8226e09 addresses review findings); all were merged without GitHub review records. The seal itself is reviewed separately in its delivery PR."
     }
   }
 }
