@@ -161,6 +161,22 @@ export function undrawableHandOwners(error:unknown):readonly string[]|undefined 
  if(!(error instanceof Error)||error.message!==UNDRAWABLE_HAND_CHOICES||!(cause instanceof HandPresentationError)||cause.code!=='unsupported-fit'||MIXED_KEY.test(cause.message))return;
  return cause.ownerIds?.length?cause.ownerIds:undefined;
 }
+/** The engraver's answer that it cannot draw these hands, raw or put in the
+ * player's words; a lost worker or any other failure is not one. */
+export function engravingRefusal(error:unknown):boolean {
+ return error instanceof HandPresentationError||error instanceof Error&&error.cause instanceof HandPresentationError;
+}
+/** Why the engraver could not draw a hand choice, in the player's words, as
+ * one sentence; undefined when ISO notation gave no diagnosis. */
+export function undrawableHandReason(error:unknown):string|undefined {
+ if(!undrawableHandOwners(error))return;
+ const codes=((error as Error).cause as HandPresentationError).context.diagnostics?.map(d=>d.code)??[];
+ if(!codes.length)return;
+ // A hand change inside a written beam is marked by a short line from one
+ // hand's note to the other's; ISO refuses rather than let it cross ink.
+ if(codes.some(code=>code.startsWith('hand-transfer-cue')))return 'It shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation.';
+ return 'Drawing it would make symbols overlap on the page.';
+}
 /** At most one background preparation runs; a newer one, or opening another score, stops it. */
 let prefetching:AbortController|undefined;
 /** Edit-time engraving checks belong to the open score; opening another stops them. */

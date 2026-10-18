@@ -39,13 +39,21 @@ export function waitingChoicesText(choices:readonly WaitingHandChoice[]):string 
 /** A reason sentence read as the clause after a colon. */
 const clause=(reason:string)=>reason.trim().replace(/[.!?]$/,'').replace(/^[A-Z](?=[a-z])/,c=>c.toLowerCase());
 const notes=(choices:readonly WaitingHandChoice[])=>choices.length===1?`${handName(choices[0].hand)} for the note in ${bars(choices)}`:`${choices.length} hand choices (${bars(choices)})`;
+/** Said when a hand choice is refused because the engraver can't draw it:
+ * the note keeps its hand, nothing waits to be saved, and the reason (one
+ * sentence from the engraver's diagnosis) says why. */
+export function keptHandsText(keys:number,reason?:string):string {
+ const kept=keys===1?'That hand can’t be drawn on the page yet, so the note keeps the hand it had.':'Those hands can’t be drawn on the page yet, so the notes keep the hands they had.';
+ return reason?`${kept} ${reason}`:kept;
+}
 /** What became of the waiting choices once hand editing is ready: applied,
  * kept as they were because the engraver cannot draw that hand yet, or not
  * applied with the reason. */
-export function waitingOutcomeText(outcome:{applied:readonly WaitingHandChoice[];kept?:readonly WaitingHandChoice[];unapplied?:readonly WaitingHandChoice[];reason?:string}):string {
+export function waitingOutcomeText(outcome:{applied:readonly WaitingHandChoice[];kept?:readonly WaitingHandChoice[];keptReason?:string;unapplied?:readonly WaitingHandChoice[];reason?:string}):string {
  const {applied,kept=[],unapplied=[]}=outcome,parts=['Hand editing is ready.'];
  if(applied.length)parts.push(applied.length===1?`${handName(applied[0].hand)} applied to the note in ${bars(applied)}.`:`${applied.length} hand choices applied in ${bars(applied)}.`);
  if(kept.length)parts.push(kept.length===1?`The note in ${bars(kept)} keeps the hand it had: that hand can’t be drawn on the page yet.`:`The notes in ${bars(kept)} keep the hands they had: those hands can’t be drawn on the page yet.`);
+ if(kept.length&&outcome.keptReason)parts.push(outcome.keptReason);
  if(unapplied.length)parts.push(`${notes(unapplied)} ${unapplied.length===1?'was':'were'} not applied${outcome.reason?`: ${clause(outcome.reason)}`:''}.`);
  return parts.join(' ');
 }

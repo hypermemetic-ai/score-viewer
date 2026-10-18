@@ -85,8 +85,8 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
-import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
+import {PersonalPresentationSession,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
+import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
 import {calculatedAdmissionEvidence} from './calculated-hand-edition';
@@ -228,7 +228,11 @@ const livePersonalEditors=new WeakMap<NonNullable<typeof current>,LivePersonalEd
 function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  const existing=livePersonalEditors.get(target);if(existing)return existing;
  const editor:LivePersonalEditor={view:target.package,visiblePersonal:structuredClone(target.personal),session:new PersonalPresentationSession(target.package),generation:0,queue:undefined!,projections:new Map()};
- editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{const projected=await editor.projections.get(sequence);if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});editor.projections.delete(sequence);});
+ // The page drawn for a choice only places the saved view. A choice the
+ // engraver refused is answered where it was made; it is not a failed save,
+ // so it never holds the score open behind "Choices haven't been saved".
+ // Any other projection failure keeps its snapshot for recovery.
+ editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{const projected=await editor.projections.get(sequence)?.catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});editor.projections.delete(sequence);});
  livePersonalEditors.set(target,editor);return editor;
 }
 function readerPackage(){if(!current)throw Error('No open score.');return livePersonalEditors.get(current)?.view??current.package;}
@@ -307,20 +311,21 @@ async function savePersonal(){if(!current)return;const target=current,snapshot=s
  if(readingPresentation&&target.package.reading?.dual){if(readingViewError){notify(readingViewError);return;}const controller=readingPresentation;
   if(practice instanceof ManualPracticeView)controller.adoptView(practice.options.context.viewRecord());
   const record=practice instanceof ManualPracticeView?controller.record():retainManualReaderView(controller,view);await enqueue(()=>writeJson(controller.storageName,record));return;}
- if(scoreCapabilities(target.package).pianoPreparation){const projected=await personalEditor(target).session.project(snapshot);resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});return;}
+ // A page the engraver refuses still leaves the view to save: leaving is never held by that refusal.
+ if(scoreCapabilities(target.package).pianoPreparation){const projected=await personalEditor(target).session.project(snapshot).catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});return;}
  await enqueue(async()=>{const {entry,p,file}=await personalContext(target),latest=await loadPersonalJournal(host,entry,p);latest.view=snapshot.view;latest.editContactId=snapshot.editContactId;latest.navigation=snapshot.navigation;await writeJson(file,latest);});
 }
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
 /** Painting follows accepted intent, never the completion order of host writes. */
-async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat,previous=target.personal){
- const editor=personalEditor(target),generation=++editor.generation,before=previous;
+async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat,previous=target.personal):Promise<{keptReason?:string}>{
+ const editor=personalEditor(target),generation=++editor.generation,before=previous;let keptReason:string|undefined;
  target.personal=personal;target.personal=resolveMemory(target);if(nextSeat&&current===target)selection=nextSeat;
  let next=target.personal;
  capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!nextSeat||!!next.navigation?.followEdit);
  const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
   attempted=next,projection=editor.session.project(next).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
    if(editor.generation===generation)next=target.personal;
-   if(kept.keys)notify(kept.keys===1?'That hand can’t be drawn on the page yet, so the note keeps the hand it had.':'Those hands can’t be drawn on the page yet, so the notes keep the hands they had.');
+   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}
    return kept.view;}),
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
@@ -346,14 +351,17 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
   if(effectiveAssignmentKey(target.package,resolved)!==effectiveAssignmentKey(target.package,before))await presentPersonalChange(target,resolved,Promise.resolve(),undefined,before);
   else{target.personal=resolved;editor.visiblePersonal=structuredClone(resolved);if(before.memoryResolved?.revision!==resolved.memoryResolved?.revision&&!practice){adviceKey='';renderToolbar();}}
  }).catch(error=>paintPersonalSaveError(target,error));
+ return keptReason?{keptReason}:{};
 }
 /** A hand choice the engraver can't fit yet is not kept: its notes return to
  * the hand they had, as the player's own decision, so a saved choice can never
  * stop the score from opening. Other refusals, and a choice whose notes had no
  * hand to return to, still reach the player unchanged. `attempted` is the
- * refused state; a note whose hand has changed since then is left as it is. */
-async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number}>{
- const returned=new Set<string>();
+ * refused state; a note whose hand has changed since then is left as it is.
+ * A refusal also names the notes the choice ran into, such as the other note
+ * of a beam; one whose hand the choice did not change has nothing to return. */
+async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string}>{
+ const returned=new Set<string>(),reason=undrawableHandReason(error);
  for(let attempt=0;;attempt++){
   const refused=undrawableHandOwners(error),seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
   if(!refused||!seats.length||attempt>=3)throw error;
@@ -361,14 +369,14 @@ async function keepDrawableHands(target:NonNullable<typeof current>,attempted:Pe
   for(const seat of seats){
    const ownerId=seat.ownerIds.find(id=>refused.includes(id))!,refusedHand=handFor(target.package,attempted,ownerId);
    if(handFor(target.package,target.personal,ownerId)!==refusedHand){changed=true;continue;}
-   const hand=hadHand(ownerId);if(!hand||hand===refusedHand)throw error;
+   const hand=hadHand(ownerId);if(hand===refusedHand)continue;if(!hand)throw error;
    const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});
    target.personal=receipt.personal;target.personal=resolveMemory(target);returned.add(ownerId);changed=true;
    void receipt.saved.catch(saveError=>paintPersonalSaveError(target,saveError));
   }
   if(!changed)throw error;
   attempted=target.personal;
-  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size};}catch(next){error=next;}
+  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{})};}catch(next){error=next;}
  }
 }
 async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat){
@@ -1139,7 +1147,7 @@ window.addEventListener('keydown',e=>{if(!startupReady){if(!startupFailed)e.prev
  if(!current&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&inputCode(e)==='KeyI'&&!e.repeat){e.preventDefault();libraryMenu.beginInstrument();return;}
  if(!current&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&libraryMenu.key(actionCode(e),focused)){e.preventDefault();return;}
  const seat=focused.closest?.<HTMLElement>('[data-viewer-seat]');
- if(selection){if(result.action==='practiceSettings'){e.preventDefault();void act(result.action);return;}const inToolbar=!!focused.closest?.('.toolbar');if(result.action==='toggle'){e.preventDefault();void act('toggle');return;}if(!inToolbar&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&['KeyL','KeyR'].includes(inputCode(e))){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden)void saveHandChoice(inputCode(e)==='KeyL'?'LH':'RH').catch(error=>notify(`Hand choice is pending: ${error.message}`));return;}const replacement=directFingerKey(e);if(!inToolbar&&replacement!==undefined){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden){void saveFingerDigit(replacement).catch(error=>notify(`Finger was not saved: ${error.message}`));}return;}if(!inToolbar&&result.action&&isEditorAction(result.action)){e.preventDefault();void act(result.action);return;}if(!inToolbar&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&e.code==='Tab'){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden)selectFinger(e.shiftKey?-1:1);return;}if(!inToolbar&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&(e.code==='ArrowUp'||e.code==='ArrowDown')){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden)selectFingerSystem(e.code==='ArrowUp'?-1:1);return;}if(!inToolbar&&uiCode==='Enter'){e.preventDefault();if(!e.repeat)void edit(selection);return;}if(inputCode(e)==='KeyH'&&!e.repeat){e.preventDefault();reveal(true);return;}if(inToolbar)return;e.preventDefault();return;}
+ if(selection){if(result.action==='practiceSettings'){e.preventDefault();void act(result.action);return;}const inToolbar=!!focused.closest?.('.toolbar');if(result.action==='toggle'){e.preventDefault();void act('toggle');return;}if(!inToolbar&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&['KeyL','KeyR'].includes(inputCode(e))){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden)void saveHandChoice(inputCode(e)==='KeyL'?'LH':'RH').catch(error=>notify(current&&(personalMemory.error||personalEditor(current).queue.error)?`Hand choice is pending: ${error.message}`:error.message));return;}const replacement=directFingerKey(e);if(!inToolbar&&replacement!==undefined){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden){void saveFingerDigit(replacement).catch(error=>notify(`Finger was not saved: ${error.message}`));}return;}if(!inToolbar&&result.action&&isEditorAction(result.action)){e.preventDefault();void act(result.action);return;}if(!inToolbar&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&e.code==='Tab'){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden)selectFinger(e.shiftKey?-1:1);return;}if(!inToolbar&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&(e.code==='ArrowUp'||e.code==='ArrowDown')){e.preventDefault();if(!e.repeat&&!repeatedDown&&readerFocused&&!document.hidden)selectFingerSystem(e.code==='ArrowUp'?-1:1);return;}if(!inToolbar&&uiCode==='Enter'){e.preventDefault();if(!e.repeat)void edit(selection);return;}if(inputCode(e)==='KeyH'&&!e.repeat){e.preventDefault();reveal(true);return;}if(inToolbar)return;e.preventDefault();return;}
  if(seat&&current&&uiCode==='Enter'&&!e.repeat){e.preventDefault();void edit(readerPackage().seats.find(s=>s.id===seat.dataset.viewerSeat)!);return;}
  if(result.action){if(result.action==='done'&&uiCode==='Enter'&&!activePracticeFooter&&focused.closest('button,a,summary'))return;e.preventDefault();if(controlActionAllowed(result.action,{modal:!!dialog||!!practice?.modalOpen,selecting:!!selection,practice:!!practice,practicePaused:practice?.canTurnPage,practiceDone:practice?.canMarkDone,practiceModes:practice instanceof PracticeView&&practice.bindingContext.active,practiceFreeView:practice?.bindingContext.active}))void act(result.action);return;}if(e.repeat)return;
  if(e.code==='Tab'&&current&&!toolbarVisible){reveal(true);e.preventDefault();return;}
@@ -1173,11 +1181,11 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  const action:PersonalMemoryAction=choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  const receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
- if(waitedOwner||!nextSeat){await presentPersonalChange(target,next,receipt.saved);return;}
+ if(waitedOwner||!nextSeat)return presentPersonalChange(target,next,receipt.saved);
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
  capturePersonalNavigation(next,readerPackage(),nextSeat,true);
- await presentPersonalChange(target,next,receipt.saved,nextSeat);
+ return presentPersonalChange(target,next,receipt.saved,nextSeat);
 }
 function saveFingerDigit(replacement:number){return saveSelectedChoice({finger:replacement},true).catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});}
 function saveHandChoice(hand:PersonalHand){return saveSelectedChoice({hand},false).catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});}
@@ -1204,21 +1212,21 @@ function handEditingWait(target:NonNullable<typeof current>):HandEditingWait|und
  * The outcome says which landed, which notes kept their hand because the
  * engraver cannot draw it yet, and which were not applied. */
 async function applyWaitingHandChoices(wait:HandEditingWait,ready:boolean){
- const applied:WaitingHandChoice[]=[],kept:WaitingHandChoice[]=[];
+ const applied:WaitingHandChoice[]=[],kept:WaitingHandChoice[]=[];let keptReason:string|undefined;
  try{
   if(!ready||current!==wait.target){const choices=wait.queue.take();if(choices.length)notify(abandonedChoicesText(choices));return;}
   for(let choice=wait.queue.shift();choice;choice=wait.queue.shift()){
-   if(current!==wait.target){const unapplied=[choice,...wait.queue.take()];notify(applied.length||kept.length?waitingOutcomeText({applied,kept,unapplied,reason:'the score was closed or changed first'}):abandonedChoicesText(unapplied));return;}
-   try{await saveSelectedChoice({hand:choice.hand},false,choice.key);}
+   if(current!==wait.target){const unapplied=[choice,...wait.queue.take()];notify(applied.length||kept.length?waitingOutcomeText({applied,kept,keptReason,unapplied,reason:'the score was closed or changed first'}):abandonedChoicesText(unapplied));return;}
+   try{keptReason=(await saveSelectedChoice({hand:choice.hand},false,choice.key))?.keptReason??keptReason;}
    catch(error){
     // As with a direct press, a refused or unsaved choice is not counted as applied; the save panel offers its retry.
     const unapplied=[choice,...wait.queue.take()];
     if(current===wait.target&&(personalMemory.error||personalEditor(wait.target).queue.error))paintPersonalSaveError(wait.target,error as Error);
-    notify(waitingOutcomeText({applied,kept,unapplied,reason:(error as Error).message}));return;
+    notify(waitingOutcomeText({applied,kept,keptReason,unapplied,reason:(error as Error).message}));return;
    }
    (handFor(wait.target.package,wait.target.personal,choice.key)===choice.hand?applied:kept).push(choice);
   }
-  if(applied.length||kept.length)notify(waitingOutcomeText({applied,kept}));
+  if(applied.length||kept.length)notify(waitingOutcomeText({applied,kept,keptReason}));
  }finally{if(handWait===wait)handWait=undefined;}
 }
 /** Leaving the score: its waiting choices are said to be not applied now,

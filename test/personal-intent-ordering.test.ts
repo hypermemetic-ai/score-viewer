@@ -1,5 +1,6 @@
 import {test} from 'node:test';
-import {undrawableHandOwners} from '../src/personal-presentation';
+import {engravingRefusal,undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
+import {keptHandsText} from '../src/hand-editing-wait';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -28,7 +29,7 @@ function fixture(){
  const written:any[]=[],frames:any[]=[],errors:Error[]=[],messages:string[]=[];let disk:any=structuredClone(target.personal),persist=Promise.resolve();
  let write=(snapshot:any)=>{disk=structuredClone(snapshot);written.push(structuredClone(snapshot));};
  let project=async(personal:any)=>({...target.package,choiceSnapshot:structuredClone(personal)});
- const context:any={structuredClone,undrawableHandOwners,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
+ const context:any={structuredClone,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}project(personal:any){return project(structuredClone(personal));}},
   personalStorageName:()=> 'source-bound-journal',personalContext:async(owner:any)=>({p:owner.package,file:'source-bound-journal',entry:owner.entry,active:context.current===owner?owner:undefined}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.then(()=>{},()=>{});return result;},
