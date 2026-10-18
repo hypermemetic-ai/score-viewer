@@ -76,6 +76,7 @@ function arcCorners(x1:number,y1:number,rx:number,ry:number,degrees:number,large
  const at=(t:number):[number,number]=>[cx+rx*cos*Math.cos(t)-ry*sin*Math.sin(t),cy+rx*sin*Math.cos(t)+ry*cos*Math.sin(t)],
   within=(t:number)=>{const turn=2*Math.PI,d=((delta>=0?t-start:start-t)%turn+turn)%turn;return d<=Math.abs(delta);},
   points:Array<[number,number]>=[[x1,y1],[x2,y2]],tx=Math.atan2(-ry*sin,rx*cos),ty=Math.atan2(ry*cos,rx*sin);
+ if(![cx,cy,rx,ry,start,delta,tx,ty].every(Number.isFinite))throw Error('Malformed SVG path');
  for(const t of [tx,tx+Math.PI,ty,ty+Math.PI])if(within(t))points.push(at(t));
  const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),x0=Math.min(...xs),y0=Math.min(...ys),x3=Math.max(...xs),y3=Math.max(...ys);
  return [[x0,y0],[x3,y0],[x3,y3],[x0,y3]];

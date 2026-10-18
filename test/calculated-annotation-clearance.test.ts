@@ -93,4 +93,6 @@ test('stem-mounted round openings and half capsules reserve their exact arc boun
  assert.ok(near(p.boxes[1],[97,196,103,203]),String(p.boxes[1]));
  assert.ok(near(p.boxes[2],[10,5,20,10]),'a relative arc sweeping up: '+String(p.boxes[2]));
  assert.throws(()=>actualPageObstacles(page('<path d="M 0 0 A 3 3 0 2 0 6 0"/>'),new Map()),/Malformed/);
+ // A radius too large to place a centre refuses rather than narrowing to the chord.
+ assert.throws(()=>actualPageObstacles(page('<path d="M 0 0 A 1e160 3 0 1 0 6 0"/>'),new Map()),/Malformed/);
 });
