@@ -161,21 +161,27 @@ export function undrawableHandOwners(error:unknown):readonly string[]|undefined 
  if(!(error instanceof Error)||error.message!==UNDRAWABLE_HAND_CHOICES||!(cause instanceof HandPresentationError)||cause.code!=='unsupported-fit'||MIXED_KEY.test(cause.message))return;
  return cause.ownerIds?.length?cause.ownerIds:undefined;
 }
-/** The engraver's answer that it cannot draw these hands, raw or put in the
- * player's words; a lost worker or any other failure is not one. */
+/** The engraver's answer that it cannot fit or draw these hands, raw or put
+ * in the player's words. A lost worker, or an ownership, authority or recipe
+ * failure, is not one: those still wait for recovery. */
 export function engravingRefusal(error:unknown):boolean {
- return error instanceof HandPresentationError||error instanceof Error&&error.cause instanceof HandPresentationError;
+ const refusal=error instanceof HandPresentationError?error:error instanceof Error&&error.cause instanceof HandPresentationError?error.cause:undefined;
+ return refusal?.code==='unsupported-fit'||refusal?.code==='unsupported-grace-hand';
 }
 /** Why the engraver could not draw a hand choice, in the player's words, as
- * one sentence; undefined when ISO notation gave no diagnosis. */
+ * a clause about the refused note ("shares a beam …"); undefined when ISO
+ * notation gave no diagnosis this can state truthfully. */
 export function undrawableHandReason(error:unknown):string|undefined {
  if(!undrawableHandOwners(error))return;
- const codes=((error as Error).cause as HandPresentationError).context.diagnostics?.map(d=>d.code)??[];
- if(!codes.length)return;
+ const diagnostics=((error as Error).cause as HandPresentationError).context.diagnostics??[];
  // A hand change inside a written beam is marked by a short line from one
- // hand's note to the other's; ISO refuses rather than let it cross ink.
- if(codes.some(code=>code.startsWith('hand-transfer-cue')))return 'It shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation.';
- return 'Drawing it would make symbols overlap on the page.';
+ // hand's note to the other's; ISO refuses rather than let it cross ink or
+ // squeeze it between heads that are too close.
+ const cue=diagnostics.filter(d=>d.code.startsWith('hand-transfer-cue'));
+ if(!cue.length)return;
+ return cue.some(d=>d.message.includes('touches other ink'))?
+  'shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation':
+  'shares a beam with a note in the other hand, and there is no room to draw the line that marks the change of hand';
 }
 /** At most one background preparation runs; a newer one, or opening another score, stops it. */
 let prefetching:AbortController|undefined;

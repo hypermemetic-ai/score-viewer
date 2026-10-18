@@ -83,12 +83,27 @@ test('a refusal that also names the note the choice ran into returns only the ch
 });
 
 test('the refusal reason is said in plain words',()=>{
- assert.equal(undrawableHandReason(cueRefusal(['a','b'])),'It shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation.');
- assert.equal(undrawableHandReason(Error(UNDRAWABLE,{cause:new HandPresentationError('unsupported-fit','x',['a'],{diagnostics:[{code:'rest-collision',message:'m'}]})})),'Drawing it would make symbols overlap on the page.');
+ const diagnosed=(code:string,message:string)=>Error(UNDRAWABLE,{cause:new HandPresentationError('unsupported-fit','x',['a'],{diagnostics:[{code,message}]})});
+ assert.equal(undrawableHandReason(cueRefusal(['a','b'])),'shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation');
+ // Other cue refusals (heads too close, too little line left) are not collisions.
+ assert.equal(undrawableHandReason(diagnosed('hand-transfer-cue-refused','No hand-transfer cue fits for LH→RH in source group g: head centres are only 1.20pt apart.')),
+  'shares a beam with a note in the other hand, and there is no room to draw the line that marks the change of hand');
+ assert.equal(undrawableHandReason(diagnosed('rest-collision','m')),undefined,'no guessed reason for other diagnoses');
  assert.equal(undrawableHandReason(refusal(['a'])),undefined,'no diagnosis, no invented reason');
  assert.equal(undrawableHandReason(Error('disk')),undefined);
  assert.equal(keptHandsText(1,undrawableHandReason(cueRefusal(['a']))),'That hand can’t be drawn on the page yet, so the note keeps the hand it had. It shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation.');
+ assert.equal(keptHandsText(2,undrawableHandReason(cueRefusal(['a']))),'Those hands can’t be drawn on the page yet, so the notes keep the hands they had. One of them shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation.');
  assert.equal(keptHandsText(2),'Those hands can’t be drawn on the page yet, so the notes keep the hands they had.');
+});
+
+test('only fit refusals pass the save queue; integrity failures still wait for recovery',()=>{
+ assert.equal(engravingRefusal(cueRefusal(['a'])),true);
+ assert.equal(engravingRefusal(new HandPresentationError('unsupported-grace-hand','g',['a'])),true);
+ for(const code of ['ownership','authority','source-coverage','incompatible-recipe'] as const){
+  assert.equal(engravingRefusal(new HandPresentationError(code,'c',['a'])),false,code);
+  assert.equal(engravingRefusal(Error(UNDRAWABLE,{cause:new HandPresentationError(code,'c',['a'])})),false,code);
+ }
+ assert.equal(engravingRefusal(Error('projection unavailable')),false);
 });
 
 /** personalEditor from main.ts: its save queue, with the memory replaced. */
