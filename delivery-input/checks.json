@@ -1,63 +1,60 @@
 {
   "schema": 1,
-  "viewerRevision": "e43456eb101edb474bdd7f3ded453180cd577080",
-  "notationRevision": "2b21840f00557f0d6219cf5bda9d71f8ad1706b8",
-  "frontendDigest": "3327ca78f37de70a153ef1b29aaa60c72799ae6f556ef73b4d350d7ac2c7795c",
+  "viewerRevision": "9c23896201a8162a71c7ad102dfb9f25941ec9f1",
+  "notationRevision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
+  "frontendDigest": "a5480c60e49e77d750745a549197d84d744b68bb0d2dfcc1c8aa6c61c33b598a",
   "checks": {
     "tests": {
       "status": "passed",
-      "sourceCommit": "e43456eb101edb474bdd7f3ded453180cd577080",
+      "sourceCommit": "9c23896201a8162a71c7ad102dfb9f25941ec9f1",
       "command": "npm test",
-      "tests": 1181,
-      "passed": 1178,
+      "tests": 1210,
+      "passed": 1202,
       "failed": 0,
-      "todo": 3,
-      "durationMs": 98511,
+      "todo": 8,
+      "durationMs": 107631,
       "additional": [
-        {"command": "node --test test/*.test.mjs", "tests": 45, "passed": 45, "failed": 0, "durationMs": 5565},
+        {"command": "node --test test/*.test.mjs", "tests": 46, "passed": 46, "failed": 0, "durationMs": 6376},
         {"command": "npx tsc --noEmit -p .", "result": "clean"}
       ],
-      "todoNote": "The 3 todo tests are half-handed MusicXML unison keys that iso-notation 2b21840 refuses on import (source-beam-coverage); recorded as todo since PR 121.",
-      "scope": "Complete suite on a clean checkout of merged main after PRs 116-122 (hand-less MusicXML owners, ISO pins 3cf3a17 and 2b21840, saved-edition re-engraving, fingering calculator removal, Goldberg Var. 1 and Your tempo, MusicXML release import, grace-note practice, transposition fix)."
+      "todoNote": "3 todo tests are half-handed MusicXML unison keys that iso-notation 2b21840 and bee8c67 refuse on import (source-beam-coverage), todo since PR 121. 5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages that ISO #388 moves at bee8c67; each is todo only when that exact refusal is caught (PR 128).",
+      "scope": "Complete suite on a clean clone of merged main 9c23896 (PR 128 merge; tree identical to its reviewed head 1a32661), after PRs 124-128: loading step lists, Mac WebKit footer check window, derived-engraving disk cache and hand-choice worker, stale-edition reads and hand-edit wait, ISO pin bee8c67 with reading re-engraving."
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "e43456eb101edb474bdd7f3ded453180cd577080",
-      "configured": "TypeScript + source pin validation + fingering-assistance pin + Vite",
-      "frontendFiles": 22,
-      "frontendDigest": "3327ca78f37de70a153ef1b29aaa60c72799ae6f556ef73b4d350d7ac2c7795c"
+      "sourceCommit": "9c23896201a8162a71c7ad102dfb9f25941ec9f1",
+      "configured": "npm run build: TypeScript + source pin validation + fingering-assistance pin + Vite",
+      "frontendFiles": 23,
+      "frontendDigest": "a5480c60e49e77d750745a549197d84d744b68bb0d2dfcc1c8aa6c61c33b598a"
     },
     "browserInspection": {
       "status": "passed",
-      "script": "scripts/check-pdf-export.mjs",
-      "scriptRun": {
-        "sourceCommit": "e43456eb101edb474bdd7f3ded453180cd577080",
-        "browser": "Chromium (playwright chromium-1234) headless Linux, production dist",
-        "viewport": [1440, 1200],
-        "score": "Op. 68 No. 14 Kleine Studie (saved edition a2b6198b, personal hand choices), private data copy (1042 files), unchanged after the run",
-        "pdf": "3 A4 pages each for pitch labels, finger numbers and double-click; 6 embedded fonts; no leftover print pages; no page errors",
-        "readerVsPdfDifferingBlocks": [0, 1, 1],
-        "observed": "Page 1 finger-number PDF raster inspected by eye: hand-coloured finger numbers, beams, slurs, pedal lines, hairpins and footer present.",
-        "limits": "Headless Chromium printing with simulated IPC, not Windows WebView2 PrintToPdf, its fonts or an installed package."
+      "ownerLibraryRehearsal": {
+        "sourceCommit": "1a3266170ba07def95ee12fa96d3667470480cec",
+        "frontend": "Byte-identical to the frozen frontend (diff -r of the 1a32661 build and the clean 9c23896 build: no differences).",
+        "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints, so same-origin fetch under the unmodified policy is not shown (worker-src, which governs the worker, is unchanged)",
+        "data": "Read-only copy of the owner's laptop data (1311 files; piano sample bank excluded); every write kept in memory, two sessions against the same in-memory disk",
+        "firstOpenMs": {"No. 13 (approved-v3)": 24773, "No. 14 (retained no14-recovery)": 9336, "Zelda's Lullaby (calculated)": 3266, "Add It Up (reading v1)": 17868, "Bach Goldberg Var. 1 (approved-v3)": 1436},
+        "reopenMs": {"No. 13": 3056, "No. 14": 4770, "Zelda's Lullaby": 3469, "Add It Up": 245, "Bach Goldberg Var. 1": 1804},
+        "observed": "No. 13, Zelda and Bach engrave again once with 'This score was engraved again with the current engraving. Your hands, fingers and choices came along.'; Add It Up engraves again with '... Your place and practice came along.'; No. 14 opens its stored pages with no notice; reopening shows no notice; no page errors. Hand edit right after opening No. 13: 'Preparing hand editing' panel in 83 ms with live stage text, personal-projection worker loaded under the CSP; leaving during the wait saved nothing and said so. Screenshots inspected: stem '+1/2' diamonds, hand corners, stacked heads and graces visible. An earlier run on b7c6009 (same behaviour, Add It Up 24.2 s) compared every personal-fingering-memory finger and hand fact order-independently: 186 = 186, 0 lost, 0 gained.",
+        "screenshots": "/tmp/sv-delivery-shots/sim8-review on the build host"
       },
-      "citedPullRequestInspections": [
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/119", "observed": "Dev server, seeded library copy, Chromium: No. 14 opens with no recalculation and no calculator controls; finger edit, cold reopen and restore; Zelda transpose +1 with carried choices, Jankó switch, practice, transpose 0 restore."},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/120", "observed": "Vite dev, headless Chromium 1440x900: Goldberg Var. 1 import and both keyboards; Your tempo prompt, Options and relaunch; Speed editor frame and kbd styling; No. 14 unchanged; practice sections across system breaks."},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/121", "observed": "Dev viewer, seeded clean origin, screenshots inspected: Zelda re-engraved with notice, practice, +1 transposition, keyboard switching; No. 14 opens as saved; Add It Up opens."},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/122", "observed": "Dev viewer, clean profile: No. 13 MusicXML reader on both keyboards with graces, practice with Your tempo and grace sections, Save as PDF print DOM, transposition, Earlier editions, hand-lockout recovery."}
-      ],
-      "limits": "The PR inspections were made in development servers before merge and are cited, not re-run here. PR 120's browser checks and its independent review were made at 9d21f08 on notation 8bb6fa2 with a test stand-in for the m. 32 hand, before its rebase onto 2b21840; its final update records only tests and build. Only check-pdf-export.mjs was run at this revision. MusicXML import in a release frontend, grace-note practice with MIDI and the native pick_score filter were not observed in a browser at this revision."
+      "imports": {
+        "sourceCommits": {"musicXmlImport": "c95309c", "jankoImports": "b7c6009"},
+        "observed": "Fresh profile: Schumann Op. 68 No. 13 MusicXML import at c95309c, 5 pages with corners, diamonds and graces; at b7c6009 on the Janko piano keyboard the No. 14 fixture .isoscore (2.0 s, 3 stored pages) and Bach .tuna (2.0 s, 4 pages). Later commits (b7c6009, 1a32661) change only the saved-reading re-engraving path, the practice-transfer read for readings and tests; the imports were not repeated on them."
+      },
+      "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. Dual readings (instrument-reading-package-v2) were not exercised under bee8c67 (the owner has none). Pre-existing on main 132970b as well: a refused hand choice on No. 13 (L on the RH pickup) leaves 'Choices haven't been saved' and blocks returning to the library; importing a Janko-only .isoscore on a fresh Conventional-piano profile fails."
     },
     "independentReview": {
       "status": "passed",
-      "sourceCommit": "e43456eb101edb474bdd7f3ded453180cd577080",
+      "sourceCommit": "1a3266170ba07def95ee12fa96d3667470480cec",
       "reviews": [
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/119", "verdict": "fresh-context sub-agent review; one medium finding (pitch-selection overwrite) fixed before merge"},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/120", "verdict": "fresh-context sub-agent review at 9d21f08, before the rebase onto 2b21840; no correctness bugs; three findings fixed before merge"},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/121", "verdict": "fresh-context sub-agent review; findings 1-3 and 5-7 fixed before merge"},
-        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/122", "verdict": "fresh-context sub-agent review; no blockers; confirmed findings fixed in the last two commits before merge"}
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/124", "verdict": "fresh subagent review; no blocking issues; should-fix items addressed in the second commit before merge. A third commit (37176da, wording when a carried surface reopens) landed after the review and was not re-reviewed; the PR notes the full suite could not finish on it then (machine overloaded). It is covered by the complete suite recorded above."},
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/125", "verdict": "fresh-context sub-agent review of 5f92ecd approved with nits; findings fixed in edd16f3, re-approved by the same reviewer"},
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/127", "verdict": "fresh reviewer agent; findings addressed in a146587 before merge"},
+        {"pr": "https://github.com/hypermemetic-ai/score-viewer/pull/128", "verdict": "fresh-context agent reviewed b7c6009 from a clean clone (re-ran npm test, mjs tests, tsc, build; rebuilt a real 2b21840 reading at bee8c67): approve with nits, no data-loss, identity or receipt problems; should-fix items 1-2 and nits 3, 4, 6, 7, 8 fixed in 1a32661, which was not re-reviewed"}
       ],
-      "scope": "PRs 119-122 each record a fresh-context independent review in their PR bodies. PRs 116, 117 and 118 also ship in this application revision but record no independent review of their own: 116 mentions follow-up review fixes without a recorded verdict, 117 pins notation 3cf3a17 (iso #381 and #382, recorded in docs/source-provenance.json as merged without GitHub review records) and adjusts the practice crop at repeat-end-start boundaries, and neither has an independent review, and 118's fallback was removed and superseded by the reviewed 121. Their behaviour is covered by the complete test suite above. The seal itself is reviewed separately in its delivery PR."
+      "scope": "PR 126 (derived-engraving disk cache, hand choices in a worker) also ships here; its commits include 'Address review: per-score projection slot, baseline refusals, worker fallbacks', but its PR body records no independent review verdict. Its behaviour is covered by the complete test suite and the owner-library rehearsal above. The pinned notation bee8c67 (iso-notation #387-#392, #394, #395) is recorded in docs/source-provenance.json: #388, #390, #391, #392, #394 and #395 record independent sub-agent reviews in their PR bodies; #387 records none; #389 records no verdict (its commit 8226e09 addresses review findings); all were merged without GitHub review records. The seal itself is reviewed separately in its delivery PR."
     }
   }
 }
