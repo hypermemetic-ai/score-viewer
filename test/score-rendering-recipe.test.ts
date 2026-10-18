@@ -30,7 +30,7 @@ test('passive recipe admits resolved preparation, rejects programs, unresolved d
 // which moves the frozen No14 systems this recipe draws today (the reader
 // shows a retained edition's stored pages). The retained recipe still draws every source owner
 // on the same seats, deterministically and lint-clean.
-test('real-engine recipe engraves every frozen No14 owner on its own label seats, deterministically',()=>{
+test('real-engine recipe engraves every frozen No14 owner in its own seat group, deterministically within a run',()=>{
   const p=renderScorePresentation(score,recipe),again=renderScorePresentation(score,recipe);
   assert.equal(p.layouts.length,11);assert.equal(p.rawPages.length,pages.length);
   assert.deepEqual(p.seats.map(s=>[s.id,s.ownerIds]),seats.map((s:{id:string;ownerIds:string[]})=>[s.id,s.ownerIds]));

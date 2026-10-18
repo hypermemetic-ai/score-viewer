@@ -3,6 +3,7 @@ import {prepareInstrumentReading,validateInstrumentReadingScore,instrumentReadin
   type ReadingOwner,type IsoLayoutOptions,type IsoTokens} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,readEditionContent,type Manifest,type Metadata} from './package';
+import type {ReadingExecution} from './reading-execution';
 import {admitDualReadingContent,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
 
 export interface LegacyReadingDescriptor {
@@ -111,7 +112,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,r
  * source score, personal state, input device or native installation is changed. */
 export async function prepareReadingPackage(input:{score:QuantizedGridScore;metadata:Metadata;createdAt:string;
   font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>;
-  options?:Partial<IsoLayoutOptions>;tokens?:Partial<IsoTokens>}):Promise<Uint8Array> {
+  options?:Partial<IsoLayoutOptions>;tokens?:Partial<IsoTokens>},execution?:ReadingExecution):Promise<Uint8Array> {
   boundedScore(input.score);
   if(!input.createdAt||input.metadata.title!==input.score.title||input.metadata.composer!==input.score.composer||
     !input.font.name||!input.font.bytes.length||!Object.keys(input.notices).length)throw Error('Incomplete musical reading preparation.');
@@ -136,7 +137,7 @@ export async function prepareReadingPackage(input:{score:QuantizedGridScore;meta
   m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)])));
   files['manifest.json']=strToU8(JSON.stringify(m));
   const bytes=zipSync(files,{level:6});
-  await importPackageForReading(bytes);
+  await importPackageForReading(bytes,execution);
   return bytes;
 }
 
@@ -149,16 +150,19 @@ const manifestOf=(bytes:Uint8Array):Manifest|undefined=>{
  * layout options and tokens. Pages, owners and layout are drawn afresh;
  * nothing is calculated and the earlier archive is not changed. Returns
  * undefined for any other kind of archive. When the archive's content itself
- * doesn't read, or carries members this would not keep, `refusal` is thrown. */
-export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown):Promise<Uint8Array|undefined>{
+ * doesn't read, carries members this would not keep, or would come out with
+ * another source revision, `refusal` is thrown. A refusal from engraving the
+ * content afresh at the current pin (too many pages, say) is thrown as it is,
+ * since it says truthfully why the reading can't open. */
+export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown,execution?:ReadingExecution):Promise<Uint8Array|undefined>{
   const peek=manifestOf(bytes);
   if(peek?.version!==3||peek.reading?.version!=='instrument-reading-package-v1')return;
   const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError')throw error;throw refusal;};
-  const content=await readEditionContent(bytes,{allowLegacyTempo:true}).catch(refuse),m=content.manifest,d=m.reading as LegacyReadingDescriptor,files=content.files;
+  const content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),m=content.manifest,d=m.reading as LegacyReadingDescriptor,files=content.files;
   const members=new Set(['score.json','seats.json',d.owners,d.layout,m.font,...m.notices,...m.pages]);
   if(Object.keys(m.files).length!==members.size||Object.keys(m.files).some(name=>!members.has(name)))return refuse(Error('This reading carries files engraving it again would not keep.'));
   const again=await prepareReadingPackage({score:JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore,metadata:structuredClone(m.metadata),createdAt:m.createdAt,
-    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]])),options:d.options,tokens:d.tokens});
+    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]])),options:d.options,tokens:d.tokens},execution);
   // The score's identity is its source bytes; engraving again never changes them.
   if(manifestOf(again)?.revision!==m.revision)return refuse(Error('Engraving this reading again would change its musical source.'));
   return again;

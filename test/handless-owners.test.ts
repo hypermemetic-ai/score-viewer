@@ -55,10 +55,10 @@ test('a hand the player gives one key applies there; the other notes stay hand-l
 });
 
 // ISO 2b21840 (#386) engraves new imports with source-owned hands, and its
-// physical admission refuses the source pages of a half-handed unison key
+// physical admission (still at bee8c67) refuses the source pages of a half-handed unison key
 // (source-beam-coverage), so these scores no longer import. The viewer's
 // half-handed-key behaviour below stays as written until ISO draws them again.
-const halfHandedRefused='ISO 2b21840 refuses the source pages of a half-handed unison key on import';
+const halfHandedRefused='ISO 2b21840 and bee8c67 refuse the source pages of a half-handed unison key on import';
 test('a half-handed unison key is refused on import at the ISO pin, by name',async()=>{
  for(const text of [mixedKey,twoMixedKeys])await assert.rejects(open(text),/This score can't be engraved yet: .*source-beam-coverage/);
 });

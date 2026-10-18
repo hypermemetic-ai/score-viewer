@@ -9,7 +9,7 @@ import {prepareFingeringStudio} from '../vendor/iso-notation/scripts/lib/fingeri
 import {getCandidate,ROUND_83_CANDIDATES,NO14_OPERATOR_FINGER_CANDIDATES} from '../vendor/iso-notation/src/render/iso/candidates';
 import {renderCandidatesView} from '../vendor/iso-notation/src/render/iso/studio';
 import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
-import {frozenNo14StudioRefused} from './support/frozen-no14-studio';
+import {frozenNo14StudioRefused,isFrozenNo14StudioRefusal} from './support/frozen-no14-studio';
 
 const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url));
 const review=readOperatorFingerReview(JSON.parse(readFileSync(new URL('../vendor/iso-notation/data/reviews/schumann-no14-janko-fingers-20261007.json',import.meta.url),'utf8')));
@@ -64,7 +64,9 @@ test('imported review journal and protected physical row are admitted as source 
  const history=structuredClone(layer);(history.reviewedFingerAuthority as any).operatorUpdates[0].baselineReviewedFingerAuthority.constraints.pop();await assert.rejects(validateLayerAsync(history,after),/baseline authority digest mismatch/);
 });
 
-test('opt-in real-engine review is clean, retains pitch pages and changes only the two source-linked finger labels',{todo:frozenNo14StudioRefused},async()=>{
+// The studio's frozen replay is refused at this pin; only that refusal makes the test todo.
+const studioRefused=await prepareFingeringStudio(bytes,{operatorReview:true}).then(()=>false,error=>{if(isFrozenNo14StudioRefusal(error))return true;throw error;});
+test('opt-in real-engine review is clean, retains pitch pages and changes only the two source-linked finger labels',{todo:studioRefused?frozenNo14StudioRefused:undefined},async()=>{
  const original=await prepareFingeringStudio(bytes,{operatorReview:true}),corrected=await prepareFingeringStudio(result.publication.bytes,{operatorReview:true});
  for(const prepared of [original,corrected]){
   assert.ok(prepared.package.renderingRecipe,'linked operator package exercises its explicit versioned recipe');

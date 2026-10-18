@@ -50,4 +50,10 @@ test('engraving a reading again keeps every refusal it cannot answer',async()=>{
   // Damaged bytes: a member whose hash no longer matches.
   const files=unzipSync(await earlier());files['pages/1.svg']=strToU8('<svg/>');
   await assert.rejects(reengraveReadingArchive(zipSync(files),refusal),error=>error===refusal);
+  // Source bytes that would come out with another revision (not canonical JSON).
+  const pretty=await earlier(files=>{files['score.json']=strToU8(JSON.stringify(JSON.parse(strFromU8(files['score.json'])),null,1));});
+  await assert.rejects(reengraveReadingArchive(pretty,refusal),error=>error===refusal);
+  // Leaving the score stops it as a cancellation, never as the refusal.
+  const leaving=new AbortController();leaving.abort();
+  await assert.rejects(reengraveReadingArchive(await earlier(),refusal,{signal:leaving.signal}),error=>(error as Error).name==='AbortError');
 });

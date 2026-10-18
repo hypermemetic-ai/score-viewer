@@ -604,7 +604,10 @@ async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNulla
  const previousBytes=!newEntry?await host.read(entry.file):null;
  if(!newEntry&&!previousBytes)throw Error('The prior managed score is missing; saved progress and edition retained.');
  // A re-engraved edition carries practice from the earlier views it replaces.
- let previous=previousBytes&&!rebuilt?await admitOrContent(previousBytes):undefined;
+ // Practice moves only between keyboard editions (stagePracticeEditionTransfer);
+ // a musical reading's journals are named for the score alone, so its earlier
+ // archive is not read again here.
+ let previous=previousBytes&&!rebuilt&&q.package.keyboardLayout?await admitOrContent(previousBytes):undefined;
  if(previous&&q.package.keyboardLayout&&previous.availablePresentations?.includes(q.package.keyboardLayout))previous=await selectPresentation(previous,q.package.keyboardLayout);
  let practiceContext:AdmittedPracticeContext|undefined;
  if(op){await readingCheckpoint(op);readingProgress(op,'save');}
@@ -836,7 +839,7 @@ function rebuiltNotice(r:RebuiltInstall){
  * the earlier archive and its journals stay saved. */
 async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation){
  readingProgress(op,'engrave-again');
- const reading=await reengraveReadingArchive(bytes,admission);
+ const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
  if(reading){await openReengravedReading(entry,reading,op);return;}
  const rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
  await readingCheckpoint(op);
