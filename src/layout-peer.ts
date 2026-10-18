@@ -18,9 +18,13 @@ export const startLayoutPeer:StartLayoutPeer=()=>{
  }catch{return undefined;}
 };
 
+let starter=startLayoutPeer;
+/** Replaces how imports and editions start their peer (tests); returns the undo. */
+export function useLayoutPeerStarter(start:StartLayoutPeer):()=>void{const prior=starter;starter=start;return ()=>{starter=prior;};}
+
 /** Runs one engrave with a layout peer when one starts, and stops the peer
  * when the engrave ends, so it holds no memory between engraves. */
-export async function withLayoutPeer<T>(run:(layoutPeer:LayoutPeerPort|undefined)=>Promise<T>,start:StartLayoutPeer=startLayoutPeer):Promise<T>{
- const peer=start();
+export async function withLayoutPeer<T>(run:(layoutPeer:LayoutPeerPort|undefined)=>Promise<T>,start?:StartLayoutPeer):Promise<T>{
+ const peer=(start??starter)();
  try{return await run(peer);}finally{peer?.terminate();}
 }
