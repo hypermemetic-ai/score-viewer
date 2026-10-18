@@ -53,7 +53,7 @@ test('bounded eviction retains complete independent inventories and does not cac
  const first=svg(primitive),map=heads(),expected=originalObstacles(first,map);actualPageObstacles(first,map);
  for(let i=0;i<25;i++){const p=svg(primitive+`<circle cx="${100+i}" cy="200" r="10"/>`);assert.deepEqual(actualPageObstacles(p,map),originalObstacles(p,map));}
  assert.deepEqual(actualPageObstacles(first,map),expected);
- for(const bad of [svg('<path d="M0 0 A4 4 0 0 0 5 5"/>'),svg('<g transform="skewX(15)">'+primitive+'</g>'),svg('<style>text{font-size:9pt}</style>'+primitive),svg('<line x1="0" y1="NaN" x2="1" y2="2"/>')]){
+ for(const bad of [svg('<path d="M10 10 S20 20 30 10"/>'),svg('<g transform="skewX(15)">'+primitive+'</g>'),svg('<style>text{font-size:9pt}</style>'+primitive),svg('<line x1="0" y1="NaN" x2="1" y2="2"/>')]){
   let oldMessage='';try{originalObstacles(bad,map);}catch(e){oldMessage=String(e);}
   assert.throws(()=>actualPageObstacles(bad,map),e=>String(e)===oldMessage);assert.throws(()=>actualPageObstacles(bad,map),e=>String(e)===oldMessage);
  }
