@@ -90,7 +90,7 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
   primary=content.keyboardLayout!,layouts=[primary,...KEYBOARDS.filter(id=>id!==primary)],views:EditionView[]=[];
  for(const id of content.availablePresentations??[])earlier[id]=await selectPresentation(content,id);
  if(options.keepPages&&manifest.version===1&&layoutNeutralPages(content)){
-  const linked=await linkEarlyEdition(content,true).catch(async error=>{if((error as Error).name==='AbortError')throw error;return undefined;}),
+  const linked=await linkEarlyEdition(content,true).catch(async error=>{if((error as Error).name==='AbortError')throw error;console.warn('The finger layer could not stay with the linked edition; its fingers travel as choices.',error);return undefined;}),
    kept=linked??await linkEarlyEdition(content,false);checkReadingExecution(execution);
   return{bytes:kept,earlier,fellBack:[],droppedFingers:linked||!content.fingerLayer?[]:[primary],replaced:{[await packageFile(bytes)]:await packageFile(kept)},primary};
  }

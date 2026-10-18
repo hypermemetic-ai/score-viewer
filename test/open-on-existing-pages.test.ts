@@ -17,7 +17,7 @@ const layoutFlow=slice('async function preparePianoLayout(','let scoreActivation
 function harness(engrave:()=>Promise<Uint8Array>){
  const opened:string[]=[],controller=new AbortController();
  const context:Record<string,unknown>={
-  READING_CANCELLED,host:{read:async()=>null},readerAdmission:{import:async()=>({})},
+  READING_CANCELLED,layoutName,console:{warn:()=>{}},host:{read:async()=>null},readerAdmission:{import:async()=>({})},
   getScoreTransposition:()=>0,canShareKeyboardView:()=>false,shareKeyboardView:async()=>{throw Error('not shared');},
   canAddKeyboardView:()=>true,addKeyboardView:engrave,prepareRebuiltEdition:async()=>{throw Error('not rebuilt');},
   prepareSourceTransposition:async()=>{throw Error('not transposed');},selectPresentation:async()=>({}),personalForAddedKeyboard:()=>undefined,

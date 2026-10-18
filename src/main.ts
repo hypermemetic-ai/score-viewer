@@ -680,7 +680,7 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,per
   }
   const linked=await prepareRebuiltEdition(journals,entry,entry.file,bytes,layout,{admit,keepPages:true},readingExecution(op));checkReading(op);
   return {...await preparePiano(linked.packageBytes,layout,linked.personal,op),gained:{from,fingers,rebuilt:linked,shared:true}};
- }catch(error){if(cancelled(error))throw error;}
+ }catch(error){if(cancelled(error))throw error;console.warn('The existing pages could not serve the other keyboard layout; engraving it instead.',error);}
  try{
   if(!steps&&canAddKeyboardView(selected,layout)){
    readingProgress(op,'engrave-keyboard');
@@ -698,6 +698,7 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,per
   return await preparePiano(transposed,layout,undefined,op);
  }catch(error){
   if(!keepOnFailure||cancelled(error))throw error;
+  console.warn(`The ${layoutName(layout)} pages could not be made; opening on the ${layoutName(from)} pages.`,error);
   // Opening never fails for want of a layout's pages: the score opens on the pages it has.
   return {...await preparePiano(bytes,from,personal,op),gained:{from,fingers,kept:layout}};
  }
@@ -988,8 +989,9 @@ async function importScore(){
   const saved=bytes;bytes=(await prepareMuseScore(saved,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
  const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.setTitle(p.manifest.metadata.title||op.loading.title);
  await practice?.flush();await savePersonal();
- let refresh=false,linkedRefresh=false;
+ let refresh=false,linkedRefresh=false,savedHasLayout=false;
  if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op).catch(async error=>{try{checkReading(op);}catch{throw error;}return await editionNeedsEngravingAgain(prior,error)??Promise.reject(error);});
+  savedHasLayout=previous.availablePresentations?.includes(op.keyboard)??previous.keyboardLayout===op.keyboard;
   if(referenceMidiDiffers(previous,p))throw Error('This score has a different MIDI reference; the installed score and your saved choices are retained.');
   // An early-format score file whose notes the library's edition was already
   // engraved from (to gain a keyboard layout) is the score already saved:
@@ -1003,7 +1005,8 @@ async function importScore(){
  const layout=op.keyboard,selected=p.availablePresentations?.includes(layout)?await selectPresentation(p,layout):undefined,
   personal=priorEntry&&(selected||p.manifest.version===3)?await loadPersonal(priorEntry,selected??p):undefined,
   journals:Entry=priorEntry??{id,file:scoreFileName(await hashBytes(bytes)),metadata:p.manifest.metadata,importedAt:new Date().toISOString()},
-  {q,running,gained}=await prepareScore(bytes,layout,personal,p,op,journals,!priorEntry,true);
+  // A file lacking a layout the saved edition has never replaces it on other pages.
+  {q,running,gained}=await prepareScore(bytes,layout,personal,p,op,journals,!priorEntry,!savedHasLayout);
 
  const entry:Entry=priorEntry?{...priorEntry,
    presentations:refresh&&!linkedRefresh?[...(priorEntry.presentations??[]),priorEntry.file]:(priorEntry.presentations??[])}:
