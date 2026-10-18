@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {deflateSync,strToU8,unzipSync,zipSync} from 'fflate';
+import {deflateSync,strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
 import {DerivedFileCache,DERIVED_FILE_CACHE_LIMITS,derivedCacheSlotName,type DerivedFileStore} from '../src/derived-file-cache';
 import {validPhysicalManagedName} from '../src/managed-file-storage';
 import {createProjectionHost,createHostedCore,type HostedProjectionCore} from '../src/personal-projection-host';
@@ -10,10 +10,11 @@ import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse} from '..
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
-import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
+import {sourcePackage,transferStudy,calculatedStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
 import {assigned} from '../src/personal-assignments';
-import {importPackage,useReadingAdmissionReceipts,hashBytes} from '../src/package';
+import {importPackage,useReadingAdmissionReceipts,useCalculatedAdmissionEvidence,admittedWrittenHeads,hashBytes} from '../src/package';
+import {calculatedAdmissionEvidence,type CalculatedAdmissionEvidence} from '../src/calculated-hand-edition';
 import {readingAdmissionReceipt,type ReadingAdmissionReceipt} from '../src/reading-package';
 import {authoredReadingPackage} from './support/instrument-reading-fixture';
 import {PersonalMemoryLibrary,readingOnlyArchive} from '../src/personal-memory-library';
@@ -166,6 +167,41 @@ test('reading admission reuses a receipt for the exact archive bytes and replays
   await assert.rejects(importPackage(zipSync(files)));
   assert.throws(()=>readingAdmissionReceipt({version:'reading-admission-receipt-v1',geometryEvidence:{ok:false,violations:[]}}));
  }finally{useReadingAdmissionReceipts(undefined);}
+});
+
+test('calculated admission reuses evidence for the exact archive bytes and replays without it',async()=>{
+ const original=await sourcePackage(transferStudy()),q=await calculatedStudy(original.p,'janko-four-row',{'gesture-0':'LH','gesture-1':'RH','gesture-2':'LH','melody-entrance':'RH'});
+ const stored=new Map<string,CalculatedAdmissionEvidence>();let gets=0;
+ useCalculatedAdmissionEvidence({get:async key=>{gets++;const e=stored.get(key);return e?calculatedAdmissionEvidence(structuredClone(e)):undefined;},put:(key,e)=>{stored.set(key,e);}});
+ try{
+  const cold=await importPackage(q.bytes,{keyboardLayout:'janko-four-row'});assert.equal(stored.size,1);assert.equal(gets,1);
+  const [key]=stored.keys(),evidence=stored.get(key)!;
+  assert.deepEqual(evidence.receipt,cold.calculatedHandReceipt);
+  // Marked evidence shows the reopened edition took the stored heads, not a replay's.
+  evidence.writtenHeads=evidence.writtenHeads.map(h=>({...h,headIds:['stored-'+h.headIds[0]]}));
+  const warm=await importPackage(q.bytes,{keyboardLayout:'janko-four-row'});assert.equal(gets,2);
+  assert.deepEqual(warm.pages,cold.pages);assert.deepEqual(warm.seats,cold.seats);assert.deepEqual(warm.score,cold.score);
+  assert.deepEqual(warm.calculatedHandReceipt,cold.calculatedHandReceipt);assert.deepEqual(warm.annotationGeometry,cold.annotationGeometry);
+  assert.ok([...admittedWrittenHeads(warm)!.values()].every(ids=>ids.length===1&&ids[0].startsWith('stored-')));
+  // Evidence for another receipt is not this edition's: it replays and is replaced.
+  stored.set(key,{...evidence,receipt:{...evidence.receipt,outputIdentity:{...evidence.receipt.outputIdentity,seatSha256:'0'.repeat(64)}}});
+  const replayed=await importPackage(q.bytes,{keyboardLayout:'janko-four-row'});
+  assert.ok([...admittedWrittenHeads(replayed)!.values()].every(ids=>!ids[0].startsWith('stored-')));
+  assert.deepEqual(stored.get(key)!.receipt,cold.calculatedHandReceipt);
+  // Evidence whose heads are not this edition's seats replays too, as does a store that fails.
+  const fresh=structuredClone(stored.get(key)!);
+  stored.set(key,{...fresh,writtenHeads:fresh.writtenHeads.map(h=>({...h,x:h.x+1,headIds:['stored-'+h.headIds[0]]}))});
+  const reseated=await importPackage(q.bytes,{keyboardLayout:'janko-four-row'});
+  assert.ok([...admittedWrittenHeads(reseated)!.values()].every(ids=>!ids[0].startsWith('stored-')));
+  assert.deepEqual(stored.get(key),fresh);
+  useCalculatedAdmissionEvidence({get:async()=>{throw Error('unreadable');},put:()=>{}});
+  assert.deepEqual((await importPackage(q.bytes,{keyboardLayout:'janko-four-row'})).pages,cold.pages);
+  // A changed archive has another digest and is replayed (and refused) as before.
+  const files=unzipSync(q.bytes),page=Object.keys(files).find(n=>n.endsWith('.svg'))!;files[page]=strToU8(strFromU8(files[page]).replace('<svg','<svg data-x="1"'));
+  await assert.rejects(importPackage(zipSync(files),{keyboardLayout:'janko-four-row'}));
+  assert.throws(()=>calculatedAdmissionEvidence({...evidence,extra:1}));
+  assert.throws(()=>calculatedAdmissionEvidence({...evidence,writtenHeads:[{ownerIds:'a',headIds:[]}]}));
+ }finally{useCalculatedAdmissionEvidence(undefined);}
 });
 
 test('the personal memory scan skips reading packages from their manifest alone',async()=>{
