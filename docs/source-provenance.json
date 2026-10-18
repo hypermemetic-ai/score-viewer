@@ -1424,17 +1424,26 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "42f5ff21b02576a17cbc9adea8f0364c3d75d13e",
+  "dependencyRevision": "40c9c6d69d2aa4e23f3cc908759c8bee63fd26e3",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/396",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/397",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/398"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/400",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/399"
     ],
-    "previousRevision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
-    "scope": "Engraving speed and the hand engine, 2026-10-18. #396 adds an engraving benchmark and reference-score speed budgets, with no ink change. #397 lets the personal hand projection export and restore its settled engine (exportState, restore, restoreAsync), refusing any state that does not reproduce the same pages, so the viewer can resume hand editing on reopening without engraving again. #398 marks only owners whose hand a personal ledger changes, so a hand view with no changes draws the reading view's page (on Schumann No. 13 the pickup's left-hand rest stays on the Middle C line). Reading views are unchanged. Each PR records an independent sub-agent review in its thread; all were merged without GitHub review records."
+    "previousRevision": "42f5ff21b02576a17cbc9adea8f0364c3d75d13e",
+    "scope": "Engraving speed and the score file name, 2026-10-18. #400 moves placed systems rigidly: each system keeps its settled slurs and placement translates them instead of searching again, so engraving is faster and pages change by rounding only (slurs at most 0.0095 pt, other marks at most 0.007 pt, no page breaks moved). #399 uses .tuna for every score file in the engine: its review fixtures and the recipient packet file Schumann-No14.tuna are renamed with identical bytes, so the viewer's tests, scripts and release carrier name the .tuna files. Each PR records an independent sub-agent review in its thread; both were merged without GitHub review records."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "42f5ff21b02576a17cbc9adea8f0364c3d75d13e",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/396",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/397",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/398"
+      ],
+      "previousRevision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
+      "scope": "Engraving speed and the hand engine, 2026-10-18. #396 adds an engraving benchmark and reference-score speed budgets, with no ink change. #397 lets the personal hand projection export and restore its settled engine (exportState, restore, restoreAsync), refusing any state that does not reproduce the same pages, so the viewer can resume hand editing on reopening without engraving again. #398 marks only owners whose hand a personal ledger changes, so a hand view with no changes draws the reading view's page (on Schumann No. 13 the pickup's left-hand rest stays on the Middle C line). Reading views are unchanged. Each PR records an independent sub-agent review in its thread; all were merged without GitHub review records."
+    },
     {
       "revision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506",
       "pullRequests": [

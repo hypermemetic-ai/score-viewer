@@ -70,7 +70,7 @@ test('library shows the same combined manual/measured total without preparation 
 });
 
 test('an unavailable selected companion never reads another keyboard’s records',async()=>{
- const single=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+ const single=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
  const imported=await importPackage(single,{allowLegacyTempo:true});let recordReads=0;
  const summary=await readLibraryPracticeSummary({...entry,id:collectionId(imported)},'conventional-piano',{readPackage:async()=>single,readRecord:async()=>{recordReads++;return earned;}});
  assert.equal(summary,undefined);assert.equal(recordReads,0);

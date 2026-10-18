@@ -54,7 +54,7 @@ test('the display adapter selects precisely the same known labels and measured f
 });
 
 test('one No14 hand edit no longer pushes unrelated right-hand fingerings above distant measure-number bands',async()=>{
- const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url)),
+ const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url)),
   p=await selectPresentation(await importPackage(bytes),'janko-four-row'),initial=initialPersonal(p),beforePages=[...p.pages],beforeNotes=JSON.stringify(p.score.notes),
   seat=p.seats.find(s=>s.ownerIds.some(id=>p.score.notes.find(n=>n.id===id)?.hand==='LH'))!,
   personal=assigned(p,initial,seat,{hand:'RH'}),beforePersonal=JSON.stringify(personal),session=new PersonalPresentationSession(p),q=await session.project(personal);

@@ -6,7 +6,7 @@ import {PracticeBrowser} from '../src/practice-browser';
 import {PracticeDone} from '../src/practice-attainment';
 import {initialPractice,planPractice,readPractice,passageHierarchy,passageStartTempo,reconcilePassages,type PracticeState} from '../src/practice';
 import {practicePreferences,practiceStateForContext} from '../src/practice-context';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(p,'connection-boundary-v1');
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(p,'connection-boundary-v1');
 
 test('fresh selection ignores saved working rates without changing earned or saved evidence',()=>{
  const raw=initialPractice(plan);raw.start=27;raw.connectionStart=99;raw.working=72;raw.workingByPattern[plan.chunks[0].pattern]=144;raw.best[plan.chunks[0].pattern]=180;

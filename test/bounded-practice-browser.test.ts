@@ -3,7 +3,7 @@ import {referenceFixture} from './support/reference-score';
 import {PracticeBrowser,practiceChunkRange,practicePreviewSourceRows} from '../src/practice-browser';
 import {initialPractice,planPractice,practiceCatalogChunks} from '../src/practice';
 import {displayedPracticeAssessment,displayedPracticeProgress,displayedPracticeTotal} from '../src/practice-display';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(p),chunks=practiceCatalogChunks(plan);
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(p),chunks=practiceCatalogChunks(plan);
 test('bounded selector retains every catalog row and its position through exclusion and attainment changes',()=>{
  const state=initialPractice(plan),browser=new PracticeBrowser(plan),ids=browser.rows(state).map(c=>c.id),target=chunks.find(c=>c.kind==='contrast')!;
  assert.equal(ids.length,plan.catalog!.length);browser.select(state,target.id);const before=JSON.stringify(state.best);

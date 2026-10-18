@@ -5,7 +5,7 @@ import {planPractice,initialPractice,readPractice,transferPracticeEdition,setPra
 import {planManualPractice} from '../src/manual-practice-plan';
 import {readManualPractice,manualPracticeRecord} from '../src/manual-practice-state';
 import {snapPracticeSpeed} from '../src/tempo-presentation';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(p);
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(p);
 const settings={start:10,working:26.966292134831466,step:5,connectionStart:99.123456789,tolerance:123.456789,offset:-17.123456789,countInBars:4,resumeCooldownSeconds:7,keepTempo:true,audioOutput:'synthetic-retained-output'};
 function chosen(state:PracticeState){Object.assign(state,settings);delete state.speedRevision;state.workingByPattern={...state.workingByPattern,'retained-historical-rate':35.123456789};return state;}
 function exact(state:PracticeState){for(const key of Object.keys(settings) as (keyof typeof settings)[])assert.equal(state[key],settings[key],key);}

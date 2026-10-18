@@ -4,7 +4,7 @@ import {referenceFixture} from './support/reference-score';
 import {planPractice,initialPractice,readPractice} from '../src/practice';
 import {practicePreferences,practiceStateForContext} from '../src/practice-context';
 import {adjustPracticePercent as adjustPercent,adjustProgression,snapPracticeSpeed,snapPracticeStep,speedEdit} from '../src/tempo-presentation';
-const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url));
+const p=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
 const plan=planPractice(p);
 const legacyPlan=planPractice(p,'connection-boundary-v1');
 const onGrid=(value:number,goal:number)=>assert.ok(Math.abs(value/(goal*.005)-Math.round(value/(goal*.005)))<1e-9);

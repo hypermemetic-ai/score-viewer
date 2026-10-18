@@ -4,7 +4,7 @@ import {unzipSync,strFromU8} from 'fflate';
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const url=process.env.PRACTICE_URL??'http://127.0.0.1:5210',output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-rendering/free-view-bindings';
 await mkdir(output,{recursive:true});
-const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'d'.repeat(64)}.tuna`;
+const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'d'.repeat(64)}.tuna`;
 const key=key=>({kind:'key',key}),pedal=controller=>({kind:'midi',source:'Inspection piano',channel:2,controller,press:100,release:20});
 const original={version:1,actions:{previous:[key('PageUp'),pedal(66)],next:[key('PageDown'),null],toggle:[key('KeyF'),null],edit:[key('KeyE'),key('F11')],done:[key('Enter'),null],practiceSettings:[key('KeyO'),null]}};
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});let page;

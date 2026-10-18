@@ -24,7 +24,7 @@ test('equal horizontal distances break by vertical proximity, then written sourc
 });
 test('both shipped piano presentations navigate their printed systems independently of page breaks',async()=>{
  const {selectPresentation}=await import('../src/package'),{systemSelection}=await import('../src/selection');
- const conventional=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url)));
+ const conventional=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url)));
  for(const pkg of [conventional,await selectPresentation(conventional,'janko-four-row')]){
   const systems=[...new Map(pkg.seats.map(s=>[`${s.page}:${s.system}`,{page:s.page,system:s.system}])).values()].sort((a,b)=>a.page-b.page||a.system-b.system);
   let crossings=0;

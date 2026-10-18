@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {referenceFixture} from './support/reference-score';
 import {planPractice,initialPractice,PracticeSession} from '../src/practice';
 import {PracticeView} from '../src/practice-view';import {PracticeDone} from '../src/practice-attainment';import {host} from '../src/host';
-const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(pkg);
+const pkg=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(pkg);
 function fixture(t:any){const state=initialPractice(plan);state.working=180;const session=new PracticeSession(plan,plan.chunks[0],state,true);session.ready(1000);const view=Object.create(PracticeView.prototype) as any;let starts=0,stops=0,preparations=0;const startsAt=session.startMs;const old=host.write;host.write=async()=>{};t.after(()=>{host.write=old;});
  Object.assign(view,{mode:'timed',previousMode:'timed',readingPaused:true,feedback:'',plan,state,session,loopRate:180,doneClaims:new PracticeDone(),overview:false,disposed:false,saved:Promise.resolve(),app:{querySelector:()=>null,querySelectorAll:()=>[]},options:{entryId:pkg.manifest.revision,package:pkg,changed(){}},manual:{cancel(){},begin(_code:string,fn:any){starts++;fn(false,0);}},contacts:{clear(){}},preview:{clear(){}},clock:{stop(){stops++;},close(){stops++;}},paintProgress(){},paintVisibility(){},paintControls(){},refreshSettings(){},prepareRepeat(){preparations++;},status(){}});
  return {view,state,session,startsAt,counts:()=>({starts,stops,preparations})};

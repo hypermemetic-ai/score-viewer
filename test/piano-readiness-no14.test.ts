@@ -5,7 +5,7 @@ import type {Attack} from '../src/package';
 import {corrected as editFinger,initialPersonal,readPersonal} from '../src/state';
 
 test('accepted literal No. 14 operator fingers open unchanged, with no calculation',async()=>{
-  const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url)),
+  const bytes=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url)),
     review=JSON.parse(readFileSync(new URL('../vendor/iso-notation/data/reviews/schumann-no14-janko-fingers-20261007.json',import.meta.url),'utf8')),
     corrected=await applyOperatorFingerReview(bytes,review),q=await ensurePianoReady({packageBytes:corrected.publication.bytes,
       layout:'janko-four-row'});

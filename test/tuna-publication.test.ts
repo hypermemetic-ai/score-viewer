@@ -13,7 +13,7 @@ import {planPractice} from '../src/practice';
 import {planPerformance} from '../src/performance';
 
 const legacy=readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url));
-const dual=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url));
+const dual=readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url));
 const track=(events:number[])=>new Uint8Array([...Buffer.from('MThd'),0,0,0,6,0,0,0,1,0,48,...Buffer.from('MTrk'),0,0,events.length>>8,events.length&255,...events]);
 const midi=track([0,0x90,60,80,48,0x80,60,0,0,0xff,0x2f,0]);
 async function edit(bytes:Uint8Array,fn:(m:Manifest,f:Record<string,Uint8Array>)=>void|Promise<void>){const f=unzipSync(bytes),m=JSON.parse(strFromU8(f['manifest.json'])) as Manifest;await fn(m,f);m.files=Object.fromEntries(await Promise.all(Object.entries(f).filter(([n])=>n!=='manifest.json').map(async([n,b])=>[n,await hashBytes(b)])));f['manifest.json']=strToU8(JSON.stringify(m));return zipSync(f);}

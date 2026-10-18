@@ -6,7 +6,7 @@ import {PracticeView} from '../src/practice-view';
 import {adjustDuration,speedNumber} from '../src/tempo-presentation';
 import {tempoRateNumber} from '../src/metronome-mark';
 
-const score=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.isoscore',import.meta.url)),plan=planPractice(score);
+const score=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url)),plan=planPractice(score);
 function draft(key:'working'|'step'|'target',value:string){
  const view=Object.create(PracticeView.prototype) as PracticeView;view.plan=plan;view.state=initialPractice(plan);let error='';Object.assign(view,{status:(message:string)=>{error=message;}});
  const field={value,dataset:{absolute:String(view.state[key]),presented:key==='target'?tempoRateNumber(view.state[key]):speedNumber(view.state[key],view.state.target)}} as unknown as HTMLInputElement;

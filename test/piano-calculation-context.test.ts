@@ -58,7 +58,7 @@ test('untrusted context cannot exempt any other musical source fact or silently 
 test('context preparation verifies installed pins and refuses to silently re-pin an already calculated layer',async()=>{
   const tampered=await importPackage(original.bytes);tampered.files[tampered.manifest.pages[0]][20]^=1;
   await assert.rejects(preparePianoCalculationContext(tampered,context),/Integrity mismatch/);
-  const p=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.isoscore',import.meta.url)));
+  const p=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url)));
   const q:PianoCalculationContext={version:'piano-calculation-context-v1',sourceSha256:p.sourceSha256!,referencePerformanceTempo:p.sourceScore!.referencePerformanceTempo!};
   await assert.rejects(preparePianoCalculationContext(p,q),/fresh complete finger replay/);
 });
