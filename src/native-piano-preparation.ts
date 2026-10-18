@@ -53,5 +53,6 @@ export async function publishNativePianoScore(score:QuantizedGridScore,input:Nat
  for(const d of Object.values(m.presentations??{}))if(d)d.renderingRecipe='rendering-recipe.json';
  const final=await publishPackage(await importPackage(archivePackage(m,files),{allowLegacyTempo:true}));
  checkReadingExecution(execution);
- return {bytes:final.bytes,filename:final.filename,reading:rendered};
+ // Only what hand editing reads, so the rest of the engrave is let go.
+ return {bytes:final.bytes,filename:final.filename,reading:{score:rendered.score,layouts:rendered.layouts,rawPages:rendered.rawPages}};
 }

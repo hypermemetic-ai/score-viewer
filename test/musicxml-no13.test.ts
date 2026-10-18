@@ -22,8 +22,8 @@ test('Schumann Op. 68 No. 13 imports from MusicXML, opens on both keyboards and 
  const stages=new Set<string>();
  const prepared=await prepareMusicXmlScore(readFileSync(new URL('vendor/iso-notation/src/scores/schumann-op68-no13.musicxml',root)),assets,{onCheckpoint:stage=>stages.add(stage)});
  assert.ok(stages.size>0,'the engraving reports its progress');
- // Hand editing takes the import's reading engrave as its own, so the first
- // hand choice engraves nothing again.
+ // The hand engine accepts No. 13's reading engrave as its own (the handoff
+ // itself is pinned in viewer-derived-caching).
  const opened=await ensurePianoReady({packageBytes:prepared.bytes,layout:'conventional-piano',signal:new AbortController().signal},new PackageAdmissionSession());
  assert.ok('package' in opened);assert.equal(await adoptImportedReading(opened.package,prepared.reading),true);
  const all=await importPackage(prepared.bytes,{allowLegacyTempo:true});

@@ -145,9 +145,10 @@ async function coreInputs(p:ScorePackage,execution?:ReadingExecution):Promise<Pr
  const recipe=await calculatedRecipeForRequest(p,execution),source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256??p.manifest.semanticSha256);
  checkReadingExecution(execution);return {source,baseline:p.score,recipe};
 }
-/** The hand engine the latest import settled from its reading engrave, for
- * the session that opens that package; the session saves it to disk. */
-let importedEngine:{base:ScorePackage;state:PersonalHandEngineState}|undefined;
+/** Hand engines imports settled from their reading engraves, for the session
+ * that opens each package; the session saves it to disk. One no session takes
+ * goes with its package. */
+const importedEngines=new WeakMap<ScorePackage,PersonalHandEngineState>();
 /** An imported score was just engraved for reading; its hand engine starts
  * from that engrave instead of engraving the score a second time. ISO
  * notation adopts only the engrave the engine's own first preparation would
@@ -159,7 +160,7 @@ export async function adoptImportedReading(base:ScorePackage,reading:AdmittedRea
  const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
  if(!(execution?await core.adoptReadingAsync(reading,execution):core.adoptReading(reading)))return false;
  const state=core.exportState();checkReadingExecution(execution);if(!state)return false;
- importedEngine={base,state};return true;
+ importedEngines.set(base,state);return true;
 }
 /** Engraving refusals arrive in ISO notation's terms; players see what failed
  * in theirs, and the original diagnosis stays attached as the cause. */
@@ -323,14 +324,15 @@ export class PersonalPresentationSession {
   if(settled)this.savedEngine=Promise.resolve(undefined);
   // A restored engine, or one already settled from a saved copy, is on disk,
   // unless it came from the import.
-  if(settled==='engraved'||settled==='restored'&&this.imported)this.rememberEngine();else if(settled==='restored'||settled==='already'&&saved)this.engineSaved=true;
+  if(settled==='engraved'||settled==='restored'&&this.imported)this.rememberEngine();else if(settled==='restored'||settled==='already'&&saved&&!this.imported)this.engineSaved=true;
   return !!settled;
  }
  /** Whether the saved engine is the one the import of this package adopted. */
  private imported=false;
  private savedState():Promise<PersonalHandEngineState|undefined>{
   if(this.savedEngine)return this.savedEngine;
-  if(importedEngine?.base===this.base){this.imported=true;const {state}=importedEngine;importedEngine=undefined;return this.savedEngine=Promise.resolve(state);}
+  const state=importedEngines.get(this.base);
+  if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
   return this.savedEngine=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
  }

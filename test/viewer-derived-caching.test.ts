@@ -230,6 +230,12 @@ test('an imported score hands its reading engrave to hand editing, which engrave
    // A warm of a settled core does nothing; only one that engraves counts.
    warmAsync:async(...a:Parameters<typeof warm>)=>{if(!core.exportState!())warms.push(1);return warm(...a);}});
  };
+ // An equal package that isn't the one the import opened engraves its own.
+ const again=await ensurePianoReady({packageBytes:prepared.bytes,layout:'conventional-piano',signal:new AbortController().signal},new PackageAdmissionSession());
+ assert.ok('package' in again&&again.package!==p);
+ const stranger=fakeWorker(createHostedCore),distinct=new PersonalPresentationSession(again.package,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(stranger.spawn),cache:null});
+ distinct.prefetch();await distinct.ensureHandChoicesDrawable();
+ assert.equal(stranger.log[0]?.kind,'warm');assert.equal((stranger.log[0] as {saved?:unknown}).saved,undefined);
  // The session that opens the import resumes from the adopted engine, and saves it.
  const first=fakeWorker(spying),opened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(first.spawn),cache,cacheWriteDelayMs:0});
  opened.prefetch();await opened.ensureHandChoicesDrawable();await written(cache,files,1);
