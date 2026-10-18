@@ -57,6 +57,7 @@ delivery-input/** -text
 "src-tauri/src/audio_buffer_lease.rs" -text
 "src-tauri/src/audio_capture_validation.rs" -text
 "src-tauri/src/audio_diagnostic.rs" -text
+"src-tauri/src/derived_cache.rs" -text
 "src-tauri/src/audio_diagnostic_macos.rs" -text
 "src-tauri/src/audio_hal_buffer.rs" -text
 "src-tauri/src/audio_latency_diagnostic.rs" -text
