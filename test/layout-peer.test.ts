@@ -132,6 +132,8 @@ test('an edition engraves with a peer when one starts, drawing the same pages',a
  const edition=async()=>importPackage(await prepareSourceTransposition(p,bytes,2,execution),{allowLegacyTempo:true});
  const {alone,paired,peers:[peer]}=await withAndWithoutPeer(edition);
  assert.deepEqual(paired.pages,alone.pages);assert.deepEqual(paired.seats,alone.seats);
+ // Main is warm by now (this test's own import), so whether it takes the
+ // peer's systems is a race; the import test above covers taking them.
  assert.ok(peer,'the edition starts a peer');
  assert.equal(peer.requests[0],'layout');assert.equal(peer.terminated,1,'the peer stops with its engrave');
 });
