@@ -21,7 +21,7 @@ Practice offers bounded original sections, overlapping connections of two consec
 
 Save as PDF exports every page as the reader shows it, including personal hands and the current label mode; see [Save as PDF](docs/pdf-export.md).
 
-A saved edition whose pages no longer reproduce under the pinned engraving is engraved again from its own source, hands and fingers, keeping the player's choices and the earlier file; see [engraving saved editions again](docs/saved-edition-reengraving.md). The conventional and Jankó keyboard layouts read the same ISO notation, so every piano score opens on either layout; a score saved with pages for one layout is engraved for the other from its own notes, and fingerings made for one layout stay with it.
+A saved edition whose pages no longer reproduce under the pinned engraving is engraved again from its own source, hands and fingers, keeping the player's choices and the earlier file; see [engraving saved editions again](docs/saved-edition-reengraving.md). The conventional and Jankó keyboard layouts read the same ISO notation, so every piano score opens on either layout; a score saved with pages for one layout shows those same pages on the other, engraving only pages whose hands were calculated for one layout, and fingerings made for one layout stay with it.
 
 Common instrument reading and local MusicXML preparation are described in [instrument reading](docs/instrument-reading.md).
 
