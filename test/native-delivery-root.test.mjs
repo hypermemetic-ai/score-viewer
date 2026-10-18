@@ -8,8 +8,8 @@ import {brotliCompressSync} from 'node:zlib';
 import {prepare} from '../scripts/native-delivery/prepare-score-viewer.mjs';
 import {validateCarrierInputs, sha256, canonical, inventory} from '../scripts/native-delivery/score-viewer-carrier-inputs.mjs';
 import {workerInputs} from '../scripts/native-delivery/score-viewer-native-worker.mjs';
-import {normalizedHtml} from '../scripts/native-delivery/score-viewer-delivery.mjs';
-import {publishPair, parseArguments, WORKFLOW} from '../scripts/native-delivery/release-score-viewer.mjs';
+import {normalizedHtml, defaultScore} from '../scripts/native-delivery/score-viewer-delivery.mjs';
+import {publishPair, parseArguments, reviewedScorePin, WORKFLOW} from '../scripts/native-delivery/release-score-viewer.mjs';
 const file=async(root,path,bytes)=>{await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),bytes);};
 const git=(root,...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 async function fixture(t) {
@@ -22,7 +22,7 @@ async function fixture(t) {
     '.gitignore':'dist/\nbuild/\n',
     'delivery-input/frontend/index.html':'<!DOCTYPE html><html></html>',
     'delivery-input/frontend/worker.js':'self.postMessage(1)',
-    'sample.isoscore':'fixture score',
+    'sample.tuna':'fixture score',
   }))await file(source,path,bytes);
   const nativeFiles=Object.fromEntries((await Promise.all(['src-tauri/Cargo.toml','src-tauri/tauri.conf.json','package.json','package-lock.json'].map(async path=>{const b=await readFile(join(source,path));return[path,{sha256:sha256(b),size:b.length}];}))).sort(([a],[b])=>a.localeCompare(b)));
   const files=await inventory(join(source,'delivery-input/frontend')),digest=sha256(canonical(files));
@@ -35,7 +35,7 @@ async function fixture(t) {
 }
 test('root preparation and worker admission retain separate delivery/runtime identities without a private checkout',async t=>{
   const f=await fixture(t),prepared=join(f.root,'prepared'),calls=[];
-  const manifest=await prepare({source:f.source,output:prepared,scorePath:'sample.isoscore',scoreHash:sha256(Buffer.from('fixture score')),expectedRevision:f.revision,execute:async(program,args)=>{
+  const manifest=await prepare({source:f.source,output:prepared,scorePath:'sample.tuna',scoreHash:sha256(Buffer.from('fixture score')),expectedRevision:f.revision,execute:async(program,args)=>{
     calls.push({program,args});if(program==='cargo')return;
     const bytes=await readFile(args[0]);await writeFile(args[1],brotliCompressSync(args.includes('normalize-html')?normalizedHtml(bytes):bytes));
   }});
@@ -106,4 +106,15 @@ test('normal viewer delivery continues to enforce delivery-commit ancestry',asyn
   const f=await publicationFixture(t),calls=[];
   const result=await publishPair(f.artifact,f.output,{validate:f.validate,compareRevisions:async(a,b)=>{calls.push([a,b]);return true;}});
   assert.deepEqual(calls,[[f.before,f.after]]);assert.equal(result.identity.sourceRevision,f.after);
+});
+test('a release always names the bundled .tuna review score, the same one the workflow defaults to',async()=>{
+  const pin=reviewedScorePin({});
+  assert.deepEqual(pin,defaultScore);assert.match(pin.path,/^public\/review\/[^/]+\.tuna$/);
+  assert.equal(sha256(await readFile(new URL('../'+pin.path,import.meta.url))),pin.sha256);
+  const workflow=await readFile(new URL('../.github/workflows/build-score-viewer-native.yml',import.meta.url),'utf8');
+  assert.ok(workflow.includes(`default: ${pin.path}\n`));assert.ok(workflow.includes(`default: ${pin.sha256}\n`));assert.ok(workflow.includes(`inputs.score_path || '${pin.path}'`));assert.ok(workflow.includes(`inputs.score_sha256 || '${pin.sha256}'`));
+  assert.doesNotMatch(workflow,/isoscore/);
+  assert.deepEqual(reviewedScorePin({scorePath:'public/review/other.tuna',scoreSha256:'a'.repeat(64)}),{path:'public/review/other.tuna',sha256:'a'.repeat(64)});
+  assert.throws(()=>reviewedScorePin({scorePath:'public/review/other.zip',scoreSha256:'a'.repeat(64)}),/Invalid reviewed score/);
+  assert.throws(()=>reviewedScorePin({scorePath:pin.path}),/supplied together/);
 });

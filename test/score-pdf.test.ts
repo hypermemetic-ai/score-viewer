@@ -14,7 +14,7 @@ test('PDF pages take the engraved page size in points',async()=>{
  assert.deepEqual(svgPageSize(svg('width="210mm" height="11in"')),{widthPoints:210*72/25.4,heightPoints:792});
  assert.deepEqual(svgPageSize(svg('viewBox="0 0 800 1000"')),{widthPoints:600,heightPoints:750});
  for(const bad of ['','width="50%" height="100%"','width="10pt" height="10pt"','width="1e9pt" height="800pt"'])assert.throws(()=>svgPageSize(svg(bad)),/printable size/);
- const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
+ const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
  const page=new DOMParser().parseFromString(p.pages[0],'image/svg+xml').documentElement as unknown as Element,size=svgPageSize(page);
  assert.ok(Math.abs(size.widthPoints-595.28)<.01&&Math.abs(size.heightPoints-841.89)<.01,JSON.stringify(size));
  const a4=svg('width="595.28pt" height="841.89pt"');
@@ -37,8 +37,8 @@ test('PDF messages name the pages and the label mode the pianist saved',()=>{
 });
 
 test('Options offers Save as PDF beside Share score only where the reader can export',async()=>{
- const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true}),s=initialPersonal(p);
- const entry={id:collectionId(p),file:'package-'+p.archiveSha256+'.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-16'};
+ const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true}),s=initialPersonal(p);
+ const entry={id:collectionId(p),file:'package-'+p.archiveSha256+'.tuna',metadata:p.manifest.metadata,importedAt:'2026-10-16'};
  const reader=scoreOptionsMarkup(entry,p,s,{steps:0,min:-12,max:12},undefined,'',true),practice=scoreOptionsMarkup(entry,p,s,{steps:0,min:-12,max:12});
  assert.match(reader,/data-action="share">Share score<\/button><button type="button" data-action="pdf">Save as PDF<\/button>/);
  assert.doesNotMatch(practice,/data-action="pdf"/);

@@ -13,7 +13,7 @@ const derivedSlot=/^viewer-derived-cache-v1-slot-[0-9a-b]\.bin$/;
  * prepared journal identity remains its logical key and content binding. */
 export function validPhysicalManagedName(name:string):boolean {
  return typeof name==='string'&&!/[^A-Za-z0-9.-]/.test(name)&&name.length<=230&&(fixed.has(name)||
-  /^package-[a-fA-F0-9]{64}\.isoscore$/.test(name)||derivedSlot.test(name)||/^state-version-[a-f0-9]{64}\.json$/.test(name)||legacy.test(name)||presentation.test(name));
+  /^package-[a-fA-F0-9]{64}\.(?:tuna|isoscore)$/.test(name)||derivedSlot.test(name)||/^state-version-[a-f0-9]{64}\.json$/.test(name)||legacy.test(name)||presentation.test(name));
 }
 
 /** Only the exact known prepared-key shape gets an alias. Other names must

@@ -21,7 +21,7 @@ function fixture():ScorePackage {
 }
 test('hand-only choices expose surgical recovery controls without double counting legacy corrections',()=>{
  const p=fixture();p.manifest.metadata={title:'Study',provenance:[]} as any;
- const s=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),entry={id:'study',file:'study.isoscore',metadata:p.manifest.metadata,importedAt:'2026-10-11'};
+ const s=assigned(p,initialPersonal(p),p.seats[0],{hand:'RH'}),entry={id:'study',file:'study.tuna',metadata:p.manifest.metadata,importedAt:'2026-10-11'};
  assert.equal(personalCorrectionCount(s),1);
  const markup=scoreOptionsMarkup(entry,p,s,{steps:0,min:-12,max:12});
  assert.match(markup,/1 personal correction</);assert.match(markup,/data-action="restore-all"/);assert.match(markup,/data-action="feedback"/);

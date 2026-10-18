@@ -19,7 +19,7 @@ const records=[];
 for(const [suffix,title] of [['a','Retained first part'],['b','Pending second part']]){
  const input=authoredFrettedInput();input.score.id+='-'+suffix;input.score.title=title;input.metadata.title=title;
  const packet=await prepareDualReadingPacket(input),sha=createHash('sha256').update(packet.bytes).digest('hex'),
-  entry={id:collectionId(packet.package),file:`package-${sha}.isoscore`,metadata:packet.package.manifest.metadata,importedAt:'2026-10-09T00:00:00Z'},
+  entry={id:collectionId(packet.package),file:`package-${sha}.tuna`,metadata:packet.package.manifest.metadata,importedAt:'2026-10-09T00:00:00Z'},
   presentation=await ReadingPresentationController.open(packet.package);
  records.push({entry,archive:Buffer.from(packet.bytes).toString('base64'),viewFile:await physicalManagedName(presentation.storageName)});
 }

@@ -84,7 +84,7 @@ test('alternate endings use explicit performed occurrence order rather than repe
 });
 
 test('real Schumann projection covers every performed written owner and does not mutate its source',async()=>{
- const p=await referenceFixture(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),before=JSON.stringify(p.score);
+ const p=await referenceFixture(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),before=JSON.stringify(p.score);
  const assigned=p.score.notes.map(n=>({id:n.id,hand:n.hand,finger:p.fingerLayer?.attacks.find(a=>a.owners.some(o=>o.id===n.id))?.finger}));
  const contacts=scoreAdviceContacts(p,assigned);assert.equal(contacts.length,p.score.writtenPresentation!.events.notes.length);
  assert.equal(new Set(contacts.map(c=>c.id)).size,contacts.length);assert.equal(JSON.stringify(p.score),before);

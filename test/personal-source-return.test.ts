@@ -5,7 +5,7 @@ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const body=(start:string,end:string)=>stripTypeScriptTypes(main.slice(main.indexOf(start),main.indexOf(end,main.indexOf(start))));
 const seat=(id:string,page:number,continuation=false)=>({id,contactId:`contact-${id}`,ownerIds:['departure-owner'],writtenBar:18,actionId:'departure-action',continuation,page,system:0,x:20});
 function fixture(){
- const entryA={id:'departure',file:'departure-edition.isoscore'},entryB={id:'reference',file:'reference-edition.isoscore'},aliases=[seat('attack',0),seat('held-first',3,true),seat('held-second',4,true)];
+ const entryA={id:'departure',file:'departure-edition.tuna'},entryB={id:'reference',file:'reference-edition.tuna'},aliases=[seat('attack',0),seat('held-first',3,true),seat('held-second',4,true)];
  const packageA={manifest:{revision:'departure-package'},sourceRevision:'departure-source',keyboardLayout:'janko-four-row',pages:Array(7).fill('svg'),seats:aliases};
  const referenceSeat={...seat('reference-note',1),ownerIds:['reference-owner'],writtenBar:2,actionId:'reference-action'};
  const packageB={manifest:{revision:'reference-package'},sourceRevision:'reference-source',keyboardLayout:'janko-four-row',pages:Array(2).fill('svg'),seats:[referenceSeat]};
@@ -24,11 +24,11 @@ function fixture(){
  return{context,a,b,view,opens,saved,paints,imports,presentations,aliases,setAdmitted(value:any){admitted=value;},setReturnPackage(value:any){returnPackage=value;},setGate(value:Promise<void>){gate=value;}};
 }
 test('production Source/Return restores score edition, continuation alias, exact view and editor navigation across scores',async()=>{
- const f=fixture();await f.context.visitMemorySource();assert.deepEqual(f.opens,['reference']);assert.deepEqual(f.imports,['reference-edition.isoscore']);assert.deepEqual(f.presentations,['janko-four-row']);
+ const f=fixture();await f.context.visitMemorySource();assert.deepEqual(f.opens,['reference']);assert.deepEqual(f.imports,['reference-edition.tuna']);assert.deepEqual(f.presentations,['janko-four-row']);
  assert.equal(f.context.selection.ownerIds[0],'reference-owner');assert.equal(f.context.current.personal.view.page,1);assert.equal(f.context.editNavigation,'measures');assert.equal(f.context.sourceReturn.file,f.a.entry.file);
  const reopened={...f.a.package,seats:f.aliases.map((s,i)=>({...s,id:`reflow-${i}`,contactId:`reflow-contact-${i}`,page:i?i+3:0}))};f.setReturnPackage(reopened);
  f.context.current.personal.view.rotation=180;f.context.editNavigation='notes';f.context.selectionPitchToggle=false;await f.context.visitMemorySource();
- assert.deepEqual(f.opens,['reference','departure']);assert.equal(f.context.current.entry.file,'departure-edition.isoscore');assert.equal(f.context.current.package.sourceRevision,'departure-source');
+ assert.deepEqual(f.opens,['reference','departure']);assert.equal(f.context.current.entry.file,'departure-edition.tuna');assert.equal(f.context.current.package.sourceRevision,'departure-source');
  assert.equal(f.context.selection.id,'reflow-2');assert.equal(f.context.selection.continuation,true);assert.equal(f.context.selection.writtenBar,18);assert.deepEqual(structuredClone(f.context.current.personal.view),f.view);
  assert.equal(f.context.editNavigation,'measures');assert.equal(f.context.selectionPitchToggle,true);assert.equal(f.context.sourceReturn,undefined);assert.equal(f.context.sourceNavigating,false);
  const saved=f.saved.at(-1);assert.equal(saved.entryId,'departure');assert.equal(saved.personal.navigation.edit.alias,1);assert.equal(saved.personal.navigation.edit.continuation,true);assert.equal(saved.personal.editContactId,'reflow-contact-2');assert.deepEqual(saved.personal.choices,{untouched:{finger:3}});
@@ -38,7 +38,7 @@ test('a mismatched reference source is rejected before leaving the current score
  assert.equal(f.context.current,f.a);assert.equal(f.context.selection,f.aliases[2]);assert.deepEqual(f.opens,[]);assert.equal(f.context.sourceReturn,undefined);assert.equal(f.context.sourceNavigating,false);
 });
 test('Return retains the departure anchor and refuses a replaced active edition',async()=>{
- const f=fixture();await f.context.visitMemorySource();const anchor=f.context.sourceReturn;f.context.entries[0]={...f.a.entry,file:'replacement.isoscore'};
+ const f=fixture();await f.context.visitMemorySource();const anchor=f.context.sourceReturn;f.context.entries[0]={...f.a.entry,file:'replacement.tuna'};
  await assert.rejects(f.context.visitMemorySource(),/departure edition is no longer active/);assert.deepEqual(f.opens,['reference']);assert.equal(f.context.current,f.b);assert.equal(f.context.sourceReturn,anchor);assert.equal(f.context.sourceNavigating,false);
 });
 test('Return rejects changed source bytes even when the active filename is unchanged',async()=>{

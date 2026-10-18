@@ -1,5 +1,6 @@
 //! Exact managed sidecar names; never accept a path or arbitrary filename.
-use std::{io, path::{Path, PathBuf}};
+use std::{fs, io::{self, Read}, path::{Path, PathBuf}};
+use sha2::{Digest, Sha256};
 
 pub const MAX_MANAGED_NAME_BYTES: usize = 230;
 
@@ -18,8 +19,12 @@ pub fn valid_managed_name(name: &str) -> bool {
     if let Some(slot) = name.strip_prefix("viewer-derived-cache-v1-slot-").and_then(|s|s.strip_suffix(".bin")) {
         return matches!(slot, "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "a" | "b");
     }
-    if let Some(hash) = name.strip_prefix("package-").and_then(|s|s.strip_suffix(".isoscore")) {
-        return digest(hash, false);
+    // SCORE-FILE MIGRATION: `.isoscore` is the earlier name of the same score
+    // file; remove it together with `remove_migrated_score_file`.
+    for suffix in [".tuna", ".isoscore"] {
+        if let Some(hash) = name.strip_prefix("package-").and_then(|s|s.strip_suffix(suffix)) {
+            return digest(hash, false);
+        }
     }
     if let Some(hash) = name.strip_prefix("state-version-").and_then(|s|s.strip_suffix(".json")) {
         return digest(hash, true);
@@ -36,6 +41,37 @@ pub fn valid_managed_name(name: &str) -> bool {
         }
     }
     false
+}
+
+/// SCORE-FILE MIGRATION (2026-10-17): libraries saved before this date name
+/// their score files `package-<sha256>.isoscore`; src/score-file-migration.ts
+/// copies each to `package-<sha256>.tuna` and switches library.json first.
+/// This then removes the earlier file, but only while the `.tuna` file holds
+/// bytes whose SHA-256 is the one both names declare. Returns whether a file
+/// was removed. Delete this, its command and the `.isoscore` suffix above
+/// together with the frontend migration.
+pub fn remove_migrated_score_file(dir: &Path, name: &str) -> Result<bool, String> {
+    let Some(hash) = name.strip_prefix("package-").and_then(|s|s.strip_suffix(".isoscore")).filter(|h|digest(h, true)) else {
+        return Err("Only an earlier score file name can be removed".into());
+    };
+    let earlier = dir.join(name);
+    if !earlier.try_exists().map_err(|e|e.to_string())? { return Ok(false); }
+    // Managed writes are not flushed, so the renamed copy and the library that
+    // names it are forced to disk before the only other copy goes; a crash
+    // straight after the removal then still finds both.
+    let mut copy = match fs::OpenOptions::new().read(true).write(true).open(dir.join(format!("package-{hash}.tuna"))) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Err("The score file has not been renamed yet; it is kept".into()),
+        Err(e) => return Err(e.to_string()),
+    };
+    copy.sync_all().map_err(|e|e.to_string())?;
+    let mut renamed = Vec::new();
+    copy.read_to_end(&mut renamed).map_err(|e|e.to_string())?;
+    let actual: String = Sha256::digest(&renamed).iter().map(|b|format!("{b:02x}")).collect();
+    if actual != hash { return Err("The renamed score file differs; the earlier file is kept".into()); }
+    fs::OpenOptions::new().write(true).open(dir.join("library.json")).and_then(|library|library.sync_all()).map_err(|e|e.to_string())?;
+    fs::remove_file(earlier).map_err(|e|e.to_string())?;
+    Ok(true)
 }
 
 /// Called only after creating the app's data directory. Rust's Windows
@@ -75,6 +111,7 @@ mod tests {
     #[test]
     fn legacy_package_and_sidecars_keep_the_existing_hex_contract() {
         for hash in ["a".repeat(64), "ABCDEF01".repeat(8)] {
+            assert!(valid_managed_name(&format!("package-{hash}.tuna")));
             assert!(valid_managed_name(&format!("package-{hash}.isoscore")));
             for kind in ["state", "practice", "performance"] {
                 assert!(valid_managed_name(&format!("{kind}-{hash}.json")));
@@ -115,6 +152,45 @@ mod tests {
         let valid=v2("performance", "conventional-piano");
         assert!(!valid_managed_name(&format!("x{valid}")));
         assert!(!valid_managed_name(&valid.replace(&"a".repeat(64), &"a".repeat(65))));
+    }
+    #[test]
+    fn score_file_names_are_exact() {
+        for wrong in [format!("package-{}.zip", "a".repeat(64)), format!("package-{}.tuna", "a".repeat(63)),
+            format!("package-{}.tuna.isoscore", "a".repeat(64)), format!("package-{}.TUNA", "a".repeat(64)), "package-.tuna".into()]
+        { assert!(!valid_managed_name(&wrong), "accepted {wrong}"); }
+    }
+    #[test]
+    fn earlier_score_file_is_removed_only_after_an_exact_renamed_copy() {
+        let dir = std::env::temp_dir().join(format!("score-file-migration-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let bytes = b"PK score bytes";
+        let hash: String = Sha256::digest(bytes).iter().map(|b|format!("{b:02x}")).collect();
+        let earlier = format!("package-{hash}.isoscore");
+        let renamed = format!("package-{hash}.tuna");
+        fs::write(dir.join(&earlier), bytes).unwrap();
+        // Not renamed yet: kept.
+        assert!(remove_migrated_score_file(&dir, &earlier).is_err());
+        assert!(dir.join(&earlier).exists());
+        // A renamed copy with other bytes: kept.
+        fs::write(dir.join(&renamed), b"other").unwrap();
+        assert!(remove_migrated_score_file(&dir, &earlier).is_err());
+        assert!(dir.join(&earlier).exists());
+        // Only names of the earlier form are accepted.
+        assert!(remove_migrated_score_file(&dir, &renamed).is_err());
+        assert!(remove_migrated_score_file(&dir, "library.json").is_err());
+        assert!(remove_migrated_score_file(&dir, &format!("package-{}.isoscore", hash.to_uppercase())).is_err());
+        // An exact renamed copy but no library on disk to force out: kept.
+        fs::write(dir.join(&renamed), bytes).unwrap();
+        assert!(remove_migrated_score_file(&dir, &earlier).is_err());
+        assert!(dir.join(&earlier).exists());
+        // An exact renamed copy: removed; a second call finds nothing to remove.
+        fs::write(dir.join("library.json"), b"{}").unwrap();
+        assert_eq!(remove_migrated_score_file(&dir, &earlier), Ok(true));
+        assert!(!dir.join(&earlier).exists());
+        assert_eq!(fs::read(dir.join(&renamed)).unwrap(), bytes);
+        assert_eq!(remove_migrated_score_file(&dir, &earlier), Ok(false));
+        fs::remove_dir_all(&dir).unwrap();
     }
     #[cfg(windows)]
     #[test]

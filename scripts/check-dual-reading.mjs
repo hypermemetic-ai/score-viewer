@@ -19,7 +19,7 @@ const report={checks:[],errors:[],screenshots:[]};
 await mkdir(evidence,{recursive:true});
 const input=authoredFrettedLongInput();
 delete input.score.referencePerformanceTempo;input.score.tempoEvents=[];
-const bytes=await prepareDualReadingPackage(input),fixture=join(evidence,'authored-clockless-dual.isoscore');
+const bytes=await prepareDualReadingPackage(input),fixture=join(evidence,'authored-clockless-dual.tuna');
 const admitted=await importPackage(bytes);assert.ok(admitted.pages.length>1,'Public reader control needs actual multi-page preparation');
 await writeFile(fixture,bytes);report.archiveSha256=createHash('sha256').update(bytes).digest('hex');
 const server=createServer(async(req,res)=>{
@@ -99,7 +99,7 @@ try{
  await page.locator('.practice-overview:not([hidden])').waitFor();assert.equal(await page.locator('[data-reference-rate]').count(),0);await key('Escape');await page.locator('.reader').waitFor();
  check('Explicit per-part playing reference survives cold reopen and enables shared manual practice without rewriting either archive');
  await page.locator('.reader').focus();await key('Escape');await page.locator('.library').waitFor();
- const timedInput=authoredFrettedLongInput(),timedBytes=await prepareDualReadingPackage(timedInput),timedFixture=join(evidence,'authored-timed-dual.isoscore');
+ const timedInput=authoredFrettedLongInput(),timedBytes=await prepareDualReadingPackage(timedInput),timedFixture=join(evidence,'authored-timed-dual.tuna');
  await writeFile(timedFixture,timedBytes);const timedChooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Import',exact:false}).click();
  await(await timedChooser).setFiles(timedFixture);await page.locator('.reader').waitFor();await key('p');await page.locator('.practice-overview:not([hidden])').waitFor();
  assert.equal(await page.locator('.practice-render-error').count(),0);assert.equal(await page.locator('.practice-leaf-preview svg').count(),1);
@@ -177,7 +177,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('.practice-header')?.textContent?.includes('Manual practice · ISO'));await key('Escape');assert.equal(await range(),'Measures 5 to 8');
  await key('o');await page.locator('[data-practice-setting=step]').focus();await key('Enter');await page.locator('[data-practice-setting=step]').fill('2');await key('Enter');await key('Escape');assert.equal(await range(),'Measures 5 to 8');
  check('Notation and practice-setting changes restore the exact overlapping source window rather than its earlier neighbour');
- const fiveFile=join(evidence,'authored-five-bars-dual.isoscore');await writeFile(fiveFile,await prepareDualReadingPackage(authoredFrettedFiveInput()));
+ const fiveFile=join(evidence,'authored-five-bars-dual.tuna');await writeFile(fiveFile,await prepareDualReadingPackage(authoredFrettedFiveInput()));
  const fiveContext=await browser.newContext({viewport:{width:1440,height:900}}),fivePage=await fiveContext.newPage();fivePage.on('pageerror',error=>report.errors.push(error.message));await fivePage.goto(url);await fivePage.locator('.library').waitFor();
  const fiveChooser=fivePage.waitForEvent('filechooser');await fivePage.getByRole('button',{name:'Import',exact:false}).click();await(await fiveChooser).setFiles(fiveFile);await fivePage.locator('.reader').waitFor({timeout:120000});await fivePage.locator('.reader').focus();await fivePage.keyboard.press('p');await fivePage.locator('.practice-overview:not([hidden])').waitFor();await fivePage.locator('[data-passage-id="1-5"][data-component="false"]').focus();await fivePage.keyboard.press('Enter');await fivePage.locator('.practice-stage:not([hidden])').waitFor();
  assert.equal(await fivePage.locator('.practice-score svg').getAttribute('aria-label'),'Measures 1 to 4');assert.equal(await fivePage.locator('.practice-score [data-manual-separator]').count(),3);await fivePage.keyboard.press('ArrowRight');assert.equal(await fivePage.locator('.practice-score svg').getAttribute('aria-label'),'Measures 2 to 5');assert.equal(await fivePage.locator('.practice-render-error').count(),0);await fivePage.screenshot({path:join(evidence,'five-bars-iso-manual.png')});report.screenshots.push('five-bars-iso-manual.png');

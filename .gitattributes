@@ -1905,5 +1905,5 @@ delivery-input/** -text
 "src-tauri/vendor/sfizz/src/sfizz_message.h" -text
 "vendor/fingering-editor-assistance/hypermemetic-ai-fingering-editor-assistance-0.1.0.tgz" -text
 "vendor/score-converter/score-converter-proof-0.0.0.tgz" -text
-"public/review/schumann-no14-conventional-20261006.isoscore" -text
+"public/review/schumann-no14-conventional-20261006.tuna" -text
 scripts/native-delivery/** -text

@@ -4,7 +4,7 @@ import {importPackage as importPackageStrict,archivePackage,hashBytes,libraryOrd
 import {initialPersonal,corrected,fingerFor,restoreAll,readPersonal,installLayer,feedback,viewportFit,turnPage,effectiveLabelMode} from '../src/state';
 import {InputController,chord,fingerBehavior} from '../src/input';
 const importPackage=(bytes:Uint8Array)=>importPackageStrict(bytes,{allowLegacyTempo:true});
-const fixture=readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url));
+const fixture=readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url));
 const p=await importPackage(fixture);
 async function changed(change:(q:ScorePackage)=>void){const q=await importPackage(fixture);delete q.files['manifest.json'];change(q);for(const [name,bytes] of Object.entries(q.files))q.manifest.files[name]=await hashBytes(bytes);q.manifest.semanticSha256=q.manifest.files['score.json'];q.manifest.revision=q.manifest.semanticSha256;return archivePackage(q.manifest,q.files);}
 test('reviewed package preserves every owner, attack, source meaning and exact vector seats',()=>{

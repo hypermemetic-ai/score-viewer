@@ -1,4 +1,4 @@
-/** Builds fixtures/footer-probe-calculated-edition.isoscore: the footer probe's
+/** Builds fixtures/footer-probe-calculated-edition.tuna: the footer probe's
  * saved calculated edition of the public authored fixture, on both keyboards.
  * Nothing is calculated. Each keyboard keeps the hands and fingers its earlier
  * saved edition carries; only its pages are drawn again by the pinned engine,

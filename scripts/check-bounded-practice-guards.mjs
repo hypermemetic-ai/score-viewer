@@ -6,7 +6,7 @@ import {unzipSync,strFromU8} from 'fflate';
 import {preview} from 'vite';
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs');
 const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-bounded-ui-guards';await mkdir(output,{recursive:true});
-const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${createHash('sha256').update(bytes).digest('hex')}.isoscore`;
+const bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${createHash('sha256').update(bytes).digest('hex')}.tuna`;
 let server,browser,currentPage;const receipt={cases:[],errors:[],limits:['Fresh emitted application in Chromium with isolated browser storage; no operator data, installed native application, physical input/audio, or pianist acceptance.','Viewport checks establish visible controls and contained source preview; readability at very small sizes needs human acceptance.']};
 async function state(page){return page.evaluate(()=>Object.keys(localStorage).filter(k=>k.startsWith('iso-viewer-dev/practice-')).sort().map(k=>({key:k,state:JSON.parse(decodeURIComponent(escape(atob(localStorage.getItem(k)))))})));}
 const exclusions=async page=>(await state(page)).map(r=>[r.key,r.state.excluded??{}]);

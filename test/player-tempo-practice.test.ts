@@ -14,7 +14,7 @@ import {mergeEditionPractice} from '../src/practice-edition-install';
 import {referenceFixture} from './support/reference-score';
 
 // The same Schumann No. 14 source, without and with a reference tempo (dotted quarter = 180).
-const url=new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url),bytes=readFileSync(url);
+const url=new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url),bytes=readFileSync(url);
 const none=await importPackage(bytes,{allowLegacyTempo:true}),referenced=await referenceFixture(url);
 const json=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
 const sha=(text:string)=>createHash('sha256').update(text).digest('hex');
@@ -114,7 +114,7 @@ test('scores with a reference tempo are unchanged by the player tempo path',()=>
 });
 
 test('library progress appears only once a player tempo is remembered, and counts toward it',async()=>{
- const entry:Entry={id:collectionId(none),file:`package-${await hashBytes(bytes)}.isoscore`,importedAt:'2026-10-17T00:00:00Z',metadata:none.manifest.metadata};
+ const entry:Entry={id:collectionId(none),file:`package-${await hashBytes(bytes)}.tuna`,importedAt:'2026-10-17T00:00:00Z',metadata:none.manifest.metadata};
  const records=new Map<string,unknown>(),reader={readPackage:async()=>bytes,readRecord:async(name:string)=>records.has(name)?json(records.get(name)):null};
  assert.equal(await readLibraryPracticeSummary(entry,'janko-four-row',reader),undefined);
  const {plan,state}=admitPracticeContext(none,undefined,undefined,undefined,playerTempo(none.score,96));

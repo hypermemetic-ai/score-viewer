@@ -1,6 +1,7 @@
 import {guitarProContext,type GuitarProContext} from './guitar-pro-provider';
 import {admittedDualArchiveSha256,type ScorePackage} from './package';
 import {collectionId,type Entry} from './state';
+import {scoreFileSha256} from './score-file-name';
 
 const escape=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 export const sourcePartLabel=(context:GuitarProContext)=>`${context.family==='bass'?'Bass':'Guitar'}${context.sourceName?` · ${context.sourceName}`:` · Track ${context.sourceTrackId}`}`;
@@ -10,7 +11,7 @@ export class ReadingPartCatalog {
  #entries=new Map<string,{file:string;context:GuitarProContext}>();
  remember(entry:Entry,p:ScorePackage){
   const context=guitarProContext(p);if(!context)return;
-  if(collectionId(p)!==entry.id||entry.file!==`package-${admittedDualArchiveSha256(p)}.isoscore`)throw Error('Source part differs from its exact managed archive.');
+  if(collectionId(p)!==entry.id||scoreFileSha256(entry.file)!==admittedDualArchiveSha256(p))throw Error('Source part differs from its exact managed archive.');
   this.#entries.delete(entry.id);this.#entries.set(entry.id,{file:entry.file,context});
   while(this.#entries.size>64)this.#entries.delete(this.#entries.keys().next().value!);return context;
  }

@@ -5,7 +5,7 @@ import {importPackage} from '../src/package';
 import {fingerPreferences,fingerPresentation,fingerBehavior,InputController} from '../src/input';
 import {initialPersonal,fingerDisplayAvailable,corrected,fingerFor,effectiveLabelMode,readPersonal} from '../src/state';
 import {annotationPositions} from '../src/fingering-presentation';
-const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
+const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const key=(code:string,repeat=false)=>({code,repeat,ctrlKey:false,altKey:false,shiftKey:false,metaKey:false});
 test('absent preferences select Toggle plus annotations; valid legacy Hold survives without mutating saved evidence',()=>{
  assert.deepEqual(fingerPreferences(),{fingerBehavior:'toggle',fingerPresentation:'annotations'});

@@ -11,7 +11,7 @@ const bytes=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)),parsed=(v:U
 async function fixture(score=transferStudy()){
  const source=await sourcePackage(score),baseline=await ensurePianoReady({packageBytes:source.bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});if(!('package' in baseline))throw Error('Fixture cannot prepare baseline');
  const from=baseline.package,seat=from.seats.find(s=>s.ownerIds.includes('gesture-0'))!,personal=assigned(from,initialPersonal(from),seat,{hand:'RH',finger:fingerFor(from,initialPersonal(from),seat)===1?2:1}),changed=await ensurePianoReady({packageBytes:baseline.packageBytes,layout:'janko-four-row',personal,forceRecalculate:true,performingHandPolicy:'retain-imported'});if(!('package' in changed))throw Error('Fixture cannot calculate choices');
- const to=changed.package,id=collectionId(from),entry:Entry={id,file:`package-${await hashBytes(baseline.packageBytes)}.isoscore`,metadata:from.manifest.metadata,importedAt:'fixture'},oldPlan=planPractice(from),old=initialPractice(oldPlan),targetPlan=planPractice(to),target=initialPractice(targetPlan),chunk=oldPlan.chunks[0];
+ const to=changed.package,id=collectionId(from),entry:Entry={id,file:`package-${await hashBytes(baseline.packageBytes)}.tuna`,metadata:from.manifest.metadata,importedAt:'fixture'},oldPlan=planPractice(from),old=initialPractice(oldPlan),targetPlan=planPractice(to),target=initialPractice(targetPlan),chunk=oldPlan.chunks[0];
  old.best[chunk.pattern]=45;toggleDone(old,{passage:chunk.id,pattern:chunk.pattern,rate:90});
  target.best[targetPlan.chunks[0].pattern]=30;toggleDone(target,{passage:targetPlan.chunks[0].id,pattern:targetPlan.chunks[0].pattern,rate:60});Object.assign(target,{working:36,start:36,keepTempo:true,audioOutput:'target-device',countInBars:4});
  return {from,to,entry,old,target,targetPlan,sourceKey:practiceStorageName(id,from),targetKey:practiceStorageName(id,to),changed,baseline};
@@ -151,7 +151,7 @@ test('production main context admission reads merged journal before activation a
 test('production main source and library guards stop activation before any practice journal mutation',async()=>{
  for(const failure of ['source','stale-library','practice-storage'] as const){const s=storage(),original=new Map(s.map),application=applicationInstall(s,async()=>{assert.fail('failed installation must not admit a context');});let q=f.changed;
   if(failure==='source')q={...q,package:{...q.package,sourceRevision:'f'.repeat(64),sourceSha256:'f'.repeat(64)}};
-  if(failure==='stale-library')application.context.entries=[{...f.entry,file:'package-'+ 'f'.repeat(64)+'.isoscore'}];
+  if(failure==='stale-library')application.context.entries=[{...f.entry,file:'package-'+ 'f'.repeat(64)+'.tuna'}];
   if(failure==='practice-storage')application.context.host={...s.host,async write(name:string,data:Uint8Array){if(name===f.targetKey)throw Error('practice disk failure');await s.host.write(name,data);}};
   await assert.rejects(application.run(undefined,q),failure);assert.deepEqual(s.map.get('library.json'),original.get('library.json'));assert.deepEqual(s.map.get(f.sourceKey),original.get(f.sourceKey));assert.deepEqual(s.map.get(f.targetKey),original.get(f.targetKey));
  }

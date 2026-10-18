@@ -7,10 +7,11 @@ import {checkReadingExecution,capturedReadingExecution,type ReadingExecution} fr
 import {requirePianoCapability} from './score-capabilities';
 import {collectionId,personalStorageName,type Entry,type PersonalState} from './state';
 import {loadPersonalJournal} from './personal-journal';
+import {scoreFileName} from './score-file-name';
 import {personalForRebuiltEdition} from './transposed-personal';
 
 const KEYBOARDS=['janko-four-row','conventional-piano'] as const;
-export const packageFile=async(bytes:Uint8Array)=>`package-${await hashBytes(bytes)}.isoscore`;
+export const packageFile=async(bytes:Uint8Array)=>scoreFileName(await hashBytes(bytes));
 
 /** The score a keyboard view showed, as plain content: the source's own
  * events with that view's hands. The record of how those hands were once

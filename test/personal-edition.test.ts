@@ -27,9 +27,9 @@ test('prepared and legacy same-semantic-revision states have exact distinct bind
  }
 });
 test('library storage accepts only source-scoped declared edition state maps',()=>{
- const e:Entry={id:'a'.repeat(64),file:`package-${'b'.repeat(64)}.isoscore`,retainedPackages:[`package-${'c'.repeat(64)}.isoscore`],
+ const e:Entry={id:'a'.repeat(64),file:`package-${'b'.repeat(64)}.tuna`,retainedPackages:[`package-${'c'.repeat(64)}.tuna`],
   metadata:{title:'Authored fixture',composer:'Fixture',provenance:[]},importedAt:'now',
-  editionPersonalFiles:{[`package-${'c'.repeat(64)}.isoscore`]:{[`state-${'a'.repeat(64)}.json`]:`state-version-${'d'.repeat(64)}.json`}}};
+  editionPersonalFiles:{[`package-${'c'.repeat(64)}.tuna`]:{[`state-${'a'.repeat(64)}.json`]:`state-version-${'d'.repeat(64)}.json`}}};
  assert.equal(validEntryStorage(e),true);
  assert.equal(validEntryStorage({...e,editionPersonalFiles:{'../unknown':{}}}),false);
  assert.equal(validEntryStorage({...e,editionPersonalFiles:{[e.retainedPackages![0]]:{[`state-${'f'.repeat(64)}.json`]:`state-version-${'d'.repeat(64)}.json`}}}),false);

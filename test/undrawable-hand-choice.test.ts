@@ -11,7 +11,7 @@ import {keptHandsText} from '../src/hand-editing-wait';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 
-const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
+const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const keepBody=stripTypeScriptTypes(source.slice(source.indexOf('async function keepDrawableHands('),source.indexOf('async function acceptMemoryAction(')));
 const UNDRAWABLE="These hand choices can't be drawn on the page yet.";

@@ -10,7 +10,7 @@ import {expertSettings} from '../src/expert-settings';
 import {fingerPreferences} from '../src/input';
 import {DOMParser} from '@xmldom/xmldom';
 import {actualPageObstacles,boxesOverlap,type AnnotationBox} from '../src/svg-annotation-clearance';
-const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)),{allowLegacyTempo:true});
+const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const base=p.score.notes[0];
 function note(id:string,pitch:number,tick=0,duration=48,hand:'LH'|'RH'='RH') {return {...base,id,startTick:tick,durationTicks:duration,hand,eventKind:'pitched' as const,pitch:{...requirePitchedEvent(base).pitch,octave:Math.floor(pitch/12),pitchClass:pitch%12}};}
 function seat(id:string,owners:string[],y:number,x=50,continuation=false):Seat {return {...p.seats[0],id,ownerIds:owners,x,baseline:y+3,fontSize:6,system:0,page:0,continuation};}

@@ -1,4 +1,5 @@
 import {admittedDualArchiveSha256,hashBytes,type ScorePackage} from './package';
+import {scoreFileName,scoreFileSha256} from './score-file-name';
 import {selectReadingNotation} from './dual-reading-package';
 import {guitarProContext} from './guitar-pro-provider';
 import {conservativeMaterialBytes,PACKAGE_MATERIAL_BUDGET_BYTES} from './package-material';
@@ -43,9 +44,9 @@ export async function stageReadingPartsInstall(host:ManagedHost,request:{
  const prior=library.entries;
  for(const part of parts){
   if(await hashBytes(part.bytes)!==part.sha256)throw Error('The source archive differs from its actual admission; the library is retained.');check();
-  const file=`package-${part.sha256}.isoscore`,existing=prior.find(e=>e.id===part.id);
+  const file=scoreFileName(part.sha256),existing=prior.find(e=>e.id===part.id);
   if(existing){
-   if(existing.file!==file)throw Error('This source part has a different retained edition. The existing score and choices are retained.');
+   if(scoreFileSha256(existing.file)!==part.sha256)throw Error('This source part has a different retained edition. The existing score and choices are retained.');
    staged.push({entry:existing,bytes:part.bytes});continue;
   }
   const personalBytes=encoder.encode(JSON.stringify(initialPersonal(part.p))),personalKey=personalStorageName(part.id,part.p),

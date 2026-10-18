@@ -6,7 +6,7 @@ import {SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe,type ScoreRe
 import {renderScorePresentation,scoreWithPerformingHands} from '../vendor/iso-notation/src/render/iso/score-presentation';
 import {sourceFactsProjection} from '../vendor/iso-notation/src/score-presentation';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
-const files=unzipSync(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)));
+const files=unzipSync(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
 const score:QuantizedGridScore=normalizeLegacyScoreEvents(JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore),seats=JSON.parse(strFromU8(files['seats.json']));
 const gold=JSON.parse(readFileSync(new URL('../vendor/iso-notation/src/render/iso/no14-gold-profile.json',import.meta.url),'utf8'));
 const hash=(s:string|Uint8Array)=>createHash('sha256').update(s).digest('hex');

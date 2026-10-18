@@ -37,6 +37,8 @@ import {ManualPracticeView} from './manual-practice-view';
 import {ManualReadingContext} from './manual-reading-context';
 import {planManualPractice} from './manual-practice-plan';
 import {readManualPracticeWithLegacy} from './manual-practice-state';
+import {scoreFileName} from './score-file-name';
+import {migrateScoreFiles} from './score-file-migration';
 import {manualReferenceStorageName,manualReferenceRecord,readManualReference} from './manual-reference-context';
 import {manualPassageScene,manualPassageClipScene} from './manual-passage-scene';
 import {ReadingPresentationController} from './reading-presentation';
@@ -943,7 +945,7 @@ async function importScore(){
 
  const entry:Entry=priorEntry?{...priorEntry,
    presentations:refresh&&!linkedRefresh?[...(priorEntry.presentations??[]),priorEntry.file]:(priorEntry.presentations??[])}:
-   {id,file:`package-${await hashBytes(q.packageBytes)}.isoscore`,metadata:q.package.manifest.metadata,importedAt:new Date().toISOString()},
+   {id,file:scoreFileName(await hashBytes(q.packageBytes)),metadata:q.package.manifest.metadata,importedAt:new Date().toISOString()},
    installed=await installPreparedScore(entry,q,running,q.personal??(priorEntry?await loadPersonal(priorEntry,q.package):initialPersonal(q.package)),!priorEntry);
   await readingCheckpoint(op);
   const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated);
@@ -1272,7 +1274,8 @@ async function boot(){
   const lib=await readJson<{version:number;entries:Entry[]}>('library.json');
   if(lib){
    if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');
-   entries=lib.entries;
+   // SCORE-FILE MIGRATION: see score-file-migration.ts.
+   entries=(await migrateScoreFiles(host,{version:1,entries:lib.entries})).entries;
   }
   loading.step('settings');
   const saved=await readJson<typeof preferences>('preferences.json');

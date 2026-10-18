@@ -20,7 +20,7 @@ const handFor=(p:any,s:any,id:string)=>s.choices[id]?.hand??p.baselines[s.calcul
 function fixture(){
  const p={sourceSha256:'immutable-source',score:{notes:[{id:'a'},{id:'b'}]},seats:[],pages:[{}],baselines:[{a:'LH',b:'RH'},{a:'RH',b:'RH'}]};
  const personal={view:{page:1,fingerSet:'yours'},overrides:{},choices:{a:{hand:'LH',finger:2}}};
- const target={entry:{id:'piece',file:'retained.isoscore'},package:p,personal:structuredClone(personal)};
+ const target={entry:{id:'piece',file:'retained.tuna'},package:p,personal:structuredClone(personal)};
  const settings={working:72,target:180,increase:3.6,countIn:2,cooldown:3,keepTempo:true};
  const evidence={leaf:{earned:[{at:123,tempo:96,correct:18,total:18}],done:true},join:{earned:[{at:456,tempo:108,correct:32,total:32}],done:false}};
  const snapshot={partition:'source-partition',composites:{join:['leaf-a','leaf-b']},preferences:settings,selected:'leaf-a',parent:'join',component:1,includeManual:true,mode:'timed',previousMode:'reading',passage:'leaf-a',window:[5,8]};

@@ -3,7 +3,7 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {unzipSync,strFromU8} from 'fflate';
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-rendering/contextual-options';await mkdir(output,{recursive:true});
-const url=process.env.PRACTICE_URL??'http://127.0.0.1:5207',bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'d'.repeat(64)}.isoscore`;
+const url=process.env.PRACTICE_URL??'http://127.0.0.1:5207',bytes=await readFile('vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.isoscore'),manifest=JSON.parse(strFromU8(unzipSync(bytes)['manifest.json'])),id=manifest.sourceRevision??manifest.revision,file=`package-${'d'.repeat(64)}.tuna`;
 const key=key=>({kind:'key',key}),pedal=controller=>({kind:'midi',source:'retained-piano',channel:2,controller,press:64,release:32});
 const original={version:1,actions:{previous:[key('PageUp'),null],next:[key('PageDown'),null],toggle:[key('KeyF'),pedal(66)],edit:[key('KeyE'),key('F11')],done:[key('Enter'),pedal(67)],practiceSettings:[key('KeyO'),null]}};
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});let page;

@@ -11,7 +11,7 @@ const output=process.env.READING_ARTIFACTS??'/tmp/score-viewer-instrument-readin
 await mkdir(output,{recursive:true});
 const bytes=process.env.READING_PACKAGE?await readFile(process.env.READING_PACKAGE):await authoredReadingPackage(),
   files=unzipSync(bytes),manifest=JSON.parse(strFromU8(files['manifest.json'])),score=JSON.parse(strFromU8(files['score.json'])),id=manifest.revision,
-  file=`package-${createHash('sha256').update(bytes).digest('hex')}.isoscore`,owners=JSON.parse(strFromU8(files['reading-owners.json'])),
+  file=`package-${createHash('sha256').update(bytes).digest('hex')}.tuna`,owners=JSON.parse(strFromU8(files['reading-owners.json'])),
   layouts=JSON.parse(strFromU8(files['reading-layout.json']));
 assert.equal(manifest.version,3);
 assert.equal(score.readingPolicy.version,'instrument-reading-v2');

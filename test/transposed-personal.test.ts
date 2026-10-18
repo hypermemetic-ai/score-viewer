@@ -8,7 +8,7 @@ import {assigned,handFor,effectiveAssignments} from '../src/personal-assignments
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 
 // A source-owned edition: hands come from the score, fingers from its edition layer.
-const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.isoscore',import.meta.url))),
+const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url))),
  from=await importPackage(bytes,{keyboardLayout:'janko-four-row'}),
  to=await importPackage(await prepareSourceTransposition(from,bytes,1),{keyboardLayout:'janko-four-row'}),
  pitchOf=(p:typeof from,id:string)=>{const n=p.score.notes.find(n=>n.id===id)!;assert.ok(isPitchedEvent(n));return n.pitch.octave*12+n.pitch.pitchClass;},
@@ -50,7 +50,7 @@ test('choices whose notes do not match after transposing are reported and stay w
 });
 
 test('choices never move to another score',async()=>{
- const other=await importPackage(new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url))),{allowLegacyTempo:true});
+ const other=await importPackage(new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url))),{allowLegacyTempo:true});
  const s=assigned(from,initialPersonal(from),single[0],{finger:2});
  assert.throws(()=>personalForTransposedEdition(s,from,other),/another score/);
 });

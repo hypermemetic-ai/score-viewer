@@ -5,7 +5,7 @@ import {setImmediate} from 'node:timers/promises';
 import {importPackage} from '../src/package';
 import {PackageAdmissionSession} from '../src/package-admission-session';
 
-const bytes=new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)));
+const bytes=new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
 
 test('piano package checks yield real host turns without changing admitted source or pages',async()=>{
  const expected=await importPackage(bytes,{allowLegacyTempo:true});

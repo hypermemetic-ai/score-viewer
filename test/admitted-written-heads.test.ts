@@ -46,6 +46,6 @@ test('semantic/source/seat/recipe/page mutations and disguised accessors refuse 
 });
 
 test('legacy fixed-page reading without actual calculated replay keeps the strict fallback',async()=>{
- const p=await importPackage(new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url))),{allowLegacyTempo:true});
+ const p=await importPackage(new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url))),{allowLegacyTempo:true});
  assert.equal(admittedWrittenHeads(p),undefined);assert.equal(admittedWrittenHeads({...p}),undefined);
 });

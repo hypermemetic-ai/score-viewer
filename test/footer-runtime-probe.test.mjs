@@ -17,7 +17,7 @@ const actualCover=(text,x,y,matrix)=>actualPageObstacles(`<svg xmlns="http://www
 // Synthetic receipts test validator admission. They do not assert macOS paint.
 function syntheticReceipt(){
  const sourceInputs={version:'test-source-bound'},bindings={version:footerProbeVersion,policySha256:semanticHash(ANNOTATION_INK_POLICY),metricsLiteral:FOOTER_METRICS_JSON,
-  fixture:{sha256:'a'.repeat(64),sourceSha256:'b'.repeat(64),ownerCount:6}},inputs={runtimeFontProbe:bindings,frontend:{digest:'c'.repeat(64),files:{'assets/footer-probe-calculated-edition.isoscore':{sha256:'e'.repeat(64),size:1}}}};
+  fixture:{sha256:'a'.repeat(64),sourceSha256:'b'.repeat(64),ownerCount:6}},inputs={runtimeFontProbe:bindings,frontend:{digest:'c'.repeat(64),files:{'assets/footer-probe-calculated-edition.tuna':{sha256:'e'.repeat(64),size:1}}}};
  const enclosure=(text,x,y,matrix)=>{const cover=actualCover(text,x,y,matrix),points=[[cover[0],cover[1]],[cover[2],cover[1]],[cover[0],cover[3]],[cover[2],cover[3]]];return{status:'passed',cover,points,rules};};
  const mounted=[.3,1,2.7].flatMap(zoom=>matrices.map(matrix=>({zoom,matrix,...enclosure('Page 2 of 3',575,830,matrix)}))),
   legacy={literal:'<svg>unchanged historical footer</svg>',bbox:[1,2,3,4],family:'"Liberation Serif", serif'},
@@ -49,7 +49,7 @@ test('frozen loopback serves only the reviewed byte closure and refuses mutation
  const dir=await mkdtemp(join(tmpdir(),'footer-probe-http-'));let server;
  try{const bytes=Buffer.from('source-bound public frontend');await writeFile(join(dir,'entry.html'),bytes);server=await frozenFrontendServer(dir,{'entry.html':{sha256:sha(bytes),size:bytes.length}});
   const root=`http://127.0.0.1:${server.port}`;assert.deepEqual(Buffer.from(await(await fetch(root+'/entry.html')).arrayBuffer()),bytes);
-  assert.equal((await fetch(root+'/private.isoscore')).status,404);assert.equal((await fetch(root+'/entry.html',{method:'POST'})).status,404);
+  assert.equal((await fetch(root+'/private.tuna')).status,404);assert.equal((await fetch(root+'/entry.html',{method:'POST'})).status,404);
   await writeFile(join(dir,'entry.html'),'altered frontend');assert.equal((await fetch(root+'/entry.html')).status,500);await server.close();server=undefined;
   await assert.rejects(fetch(root+'/entry.html'));
  }finally{await server?.close();await rm(dir,{recursive:true,force:true});}

@@ -11,23 +11,23 @@ import {initialPractice,planPractice} from '../src/practice';
 import {readLibraryPracticeSummary,LibraryPracticeSummaries} from '../src/library-practice-progress';
 
 // A source-owned edition: its hands come from the score (no calculated hands).
-const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.isoscore',import.meta.url))),original=await importPackage(bytes),
- file=`package-${await hashBytes(bytes)}.isoscore`,entry:Entry={id:collectionId(original),file,metadata:original.manifest.metadata,importedAt:'now'},
+const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url))),original=await importPackage(bytes),
+ file=`package-${await hashBytes(bytes)}.tuna`,entry:Entry={id:collectionId(original),file,metadata:original.manifest.metadata,importedAt:'now'},
  derivedBytes=await prepareSourceTransposition(original,bytes,1),derived=await importPackage(derivedBytes),encode=(value:unknown)=>new TextEncoder().encode(JSON.stringify(value));
 
 test('strict offset/layout records retain original editions and refuse unsupported or inconsistent pointers',()=>{
- const nextFile=`package-${'c'.repeat(64)}.isoscore`,record=nextTranspositionSelection(entry,nextFile,{steps:1,layout:'conventional-piano',originalFile:file,originalLayouts:['conventional-piano','janko-four-row']})!,
+ const nextFile=`package-${'c'.repeat(64)}.tuna`,record=nextTranspositionSelection(entry,nextFile,{steps:1,layout:'conventional-piano',originalFile:file,originalLayouts:['conventional-piano','janko-four-row']})!,
   next={...entry,file:nextFile,transposition:record,retainedPackages:[file]};
  assert.equal(validEntryStorage(next),true);assert.equal(retainedTranspositionFile(next,0,'janko-four-row'),file);
  assert.equal(retainedTranspositionFile(next,1,'janko-four-row'),undefined);
  for(const bad of [{...record,extra:true},{...record,steps:2},{...record,editions:{...record.editions,'01':{'conventional-piano':nextFile}}},{...record,editions:{...record.editions,0:{unknown:file}}},{...record,editions:{1:{'conventional-piano':nextFile}}}])assert.equal(validEntryStorage({...next,transposition:bad as any}),false);
  assert.equal(entry.transposition,undefined);
- const addedZero=`package-${'d'.repeat(64)}.isoscore`,added=nextTranspositionSelection({...next,transposition:{...record,editions:{0:{'conventional-piano':file},1:{'conventional-piano':nextFile}}}},nextFile,{steps:1,layout:'janko-four-row',originalFile:addedZero,originalLayouts:['conventional-piano','janko-four-row']})!;
+ const addedZero=`package-${'d'.repeat(64)}.tuna`,added=nextTranspositionSelection({...next,transposition:{...record,editions:{0:{'conventional-piano':file},1:{'conventional-piano':nextFile}}}},nextFile,{steps:1,layout:'janko-four-row',originalFile:addedZero,originalLayouts:['conventional-piano','janko-four-row']})!;
  assert.equal(added.editions['0']['conventional-piano'],file,'available original stays exact');assert.equal(added.editions['0']['janko-four-row'],addedZero,'new zero companion is retained separately');
 });
 
 test('an edition serving both keyboards fills only a keyboard with no edition at that pitch',()=>{
- const other=`package-${'a'.repeat(64)}.isoscore`,kept=`package-${'b'.repeat(64)}.isoscore`,both=`package-${'e'.repeat(64)}.isoscore`,
+ const other=`package-${'a'.repeat(64)}.tuna`,kept=`package-${'b'.repeat(64)}.tuna`,both=`package-${'e'.repeat(64)}.tuna`,
   prior:Entry={...entry,file:other,transposition:{version:'score-transposition-selection-v1',steps:2,editions:{0:{'conventional-piano':file},2:{'conventional-piano':other,'janko-four-row':kept}}}},
   next=nextTranspositionSelection(prior,both,{steps:2,layout:'conventional-piano',layouts:['conventional-piano','janko-four-row']})!;
  assert.deepEqual(next.editions['2'],{'conventional-piano':both,'janko-four-row':kept},'the other keyboard keeps its retained edition and journal');
@@ -71,7 +71,7 @@ test('a changed retained original is refused instead of overwritten from the emb
 });
 
 test('library progress cold-opens the selected pitch edition and never borrows original achievement or a late callback',async()=>{
- const derivedFile=`package-${await hashBytes(derivedBytes)}.isoscore`,selected={...entry,file:derivedFile,retainedPackages:[file],transposition:nextTranspositionSelection(entry,derivedFile,{steps:1,layout:'janko-four-row',originalFile:file})!},
+ const derivedFile=`package-${await hashBytes(derivedBytes)}.tuna`,selected={...entry,file:derivedFile,retainedPackages:[file],transposition:nextTranspositionSelection(entry,derivedFile,{steps:1,layout:'janko-four-row',originalFile:file})!},
   plan=planPractice(original),earned=initialPractice(plan);earned.best[plan.chunks[0].pattern]=earned.target;const record=encode(earned),originalRecord=practiceStorageName(entry.id,original),reads:string[]=[];
  const reader={readPackage:async()=>derivedBytes,readRecord:async(name:string)=>{reads.push(name);return name===originalRecord?JSON.parse(new TextDecoder().decode(record)):null;}};
  const summary=await readLibraryPracticeSummary(selected,'janko-four-row',reader);assert.equal(summary!.sections,0);assert.equal(reads.includes(originalRecord),false);

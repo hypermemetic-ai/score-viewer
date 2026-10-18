@@ -10,7 +10,7 @@ on:
       score_path:
         description: Reviewed compatible score path in that commit
         required: false
-        default: public/review/schumann-no14-conventional-20261006.isoscore
+        default: public/review/schumann-no14-conventional-20261006.tuna
         type: string
       score_sha256:
         description: Reviewed score-package SHA256
@@ -55,7 +55,7 @@ jobs:
         id: prepare
         env:
           SOURCE_REVISION: ${{ inputs.source_revision || github.sha }}
-          SCORE_PATH: ${{ inputs.score_path || 'public/review/schumann-no14-conventional-20261006.isoscore' }}
+          SCORE_PATH: ${{ inputs.score_path || 'public/review/schumann-no14-conventional-20261006.tuna' }}
           SCORE_SHA256: ${{ inputs.score_sha256 || '2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d' }}
           PROBE_CACHE_HIT: ${{ steps.probe-cache.outputs.cache-hit }}
           NPM_CACHE_HIT: ${{ steps.node.outputs.cache-hit }}

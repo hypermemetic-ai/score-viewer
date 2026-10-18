@@ -1,14 +1,15 @@
 import {hashBytes,importPackageForReading,selectPresentation,type ScorePackage} from './package';
 import {collectionId,type Entry,type PersonalState} from './state';
+import {isScoreFileName,scoreFileSha256} from './score-file-name';
 import {loadPersonalJournal} from './personal-journal';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 
 /** The bytes of one declared historical edition, checked against its saved identity. */
 export async function readRetainedEdition(host:{read(name:string):Promise<Uint8Array|null>},entry:Entry,file:string):Promise<Uint8Array>{
-  if(!entry.retainedPackages?.includes(file)||!/^package-[a-f0-9]{64}\.isoscore$/.test(file))
+  if(!entry.retainedPackages?.includes(file)||!isScoreFileName(file))
     throw Error('That edition is not a declared retained package. The current score is retained.');
   const bytes=await host.read(file);
-  if(!bytes||`package-${await hashBytes(bytes)}.isoscore`!==file)
+  if(!bytes||await hashBytes(bytes)!==scoreFileSha256(file))
     throw Error('The retained package is missing or differs from its saved identity. The current score is retained.');
   return bytes;
 }

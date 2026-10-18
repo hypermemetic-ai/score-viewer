@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { validatePair, validateIdentity, safePath } from './score-viewer-delivery.mjs';
+import { validatePair, validateIdentity, safePath, defaultScore } from './score-viewer-delivery.mjs';
 
 export const WORKFLOW = 'build-score-viewer-native.yml';
 export const DOWNLOAD_INDEX = `<!doctype html>
@@ -153,11 +153,13 @@ export function matchesSourceRun(run, sourceRevision) {
   return run.event === 'push' && run.head_sha === sourceRevision;
 }
 
-function reviewedScorePin(options) {
-  if (options.scorePath === undefined && options.scoreSha256 === undefined) return undefined;
+export function reviewedScorePin(options) {
+  // Always name the reviewed bundled score explicitly rather than relying on
+  // the workflow's default input.
+  if (options.scorePath === undefined && options.scoreSha256 === undefined) return { ...defaultScore };
   if (options.scorePath === undefined || options.scoreSha256 === undefined) throw Error('--score-path and --score-sha256 must be supplied together.');
   safePath(options.scorePath);
-  if (!/\.(?:tuna|isoscore)$/.test(options.scorePath) || !/^[a-f0-9]{64}$/.test(options.scoreSha256)) throw Error('Invalid reviewed score path or SHA256.');
+  if (!/\.tuna$/.test(options.scorePath) || !/^[a-f0-9]{64}$/.test(options.scoreSha256)) throw Error('Invalid reviewed score path or SHA256.');
   return { path: options.scorePath, sha256: options.scoreSha256 };
 }
 
@@ -351,7 +353,7 @@ export function parseArguments(args) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const options = parseArguments(process.argv.slice(2));
-    if (options.help) console.log('Usage: npm run release:score-viewer -- --output <private-directory> [--revision <reviewed-commit>] [--ref <workflow-branch>] [--repository <owner/repo>] [--score-path <reviewed.tuna-or-isoscore> --score-sha256 <SHA256>]\nDefaults: reviewed main revision and main workflow ref. Always downloads, verifies and publishes Windows x64 and universal Mac together. Explicit score pins must be supplied together and are verified against actual prepared output.');
+    if (options.help) console.log('Usage: npm run release:score-viewer -- --output <private-directory> [--revision <reviewed-commit>] [--ref <workflow-branch>] [--repository <owner/repo>] [--score-path <reviewed.tuna> --score-sha256 <SHA256>]\nDefaults: reviewed main revision, main workflow ref and the bundled review score. Always downloads, verifies and publishes Windows x64 and universal Mac together. Explicit score pins must be supplied together and are verified against actual prepared output.');
     else await releaseScoreViewer(options);
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

@@ -7,7 +7,7 @@ import {comparePracticeSections,practiceSimilarityPairs,type PracticeSimilarityS
 import {practiceContrastEpisodes} from '../src/practice-contrast';
 import {planPracticeSections} from '../src/practice-boundaries';
 
-const no14=JSON.parse(strFromU8(unzipSync(readFileSync(new URL('../fixtures/schumann-op68-no14.isoscore',import.meta.url)))['score.json'])) as QuantizedGridScore;
+const no14=JSON.parse(strFromU8(unzipSync(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)))['score.json'])) as QuantizedGridScore;
 const original=(first:number,last:number):PracticeSimilaritySection=>({id:`${first}-${last}`,start:(first-1)*144,end:last*144,firstBar:first-1,lastBar:last-1});
 const pitch=(n:number)=>({octave:Math.floor(n/12),pitchClass:n%12});
 function example(count=24,shift=0){

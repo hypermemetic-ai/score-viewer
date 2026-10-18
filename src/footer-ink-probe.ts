@@ -7,11 +7,11 @@ import {annotationPositions} from './fingering-presentation';
 import {ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady,annotationInkPolicyFor,applyAnnotationInkPolicy,assertAnnotationInkPolicyReady,footerStyle} from './annotation-ink-policy';
 import {actualPageObstacles,boxesOverlap} from './svg-annotation-clearance';
 import {identityHash} from './piano-preparation-identity';
-const fixtureUrl=new URL('../fixtures/authored-calculated-preparation-v2.isoscore',import.meta.url);
+const fixtureUrl=new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url);
 const fixtureSha256='ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1';
 // Both keyboard views of that fixture's music with the hands and fingers the
 // former calculator saved, drawn again at the ISO pin (test/support/footer-probe-edition.ts).
-const editionUrl=new URL('../fixtures/footer-probe-calculated-edition.isoscore',import.meta.url);
+const editionUrl=new URL('../fixtures/footer-probe-calculated-edition.tuna',import.meta.url);
 const editionSha256='dec7f831b48d5a2cc316640e71fac3c49e0dffd12dfea0bbe60899dfc4ed1d50';
 const probeVersion='viewer-native-footer-ink-probe-v2';
 const sourceCss='.janko-page-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:400;font-size:8pt;text-anchor:end}';

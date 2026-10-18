@@ -117,11 +117,18 @@ export function transposedArchiveSource(original:ScorePackage,steps:number):{sou
  const source=transposeScore(original.sourceScore??original.score,steps),path=(original.collectionManifest??original.manifest).sourceScore??'score.json';
  return {source,bytes:strToU8(serializeCompatibleScore(source,original.files[path]))};
 }
+/** The archive member holding a transposed score's exact original. */
+export const ORIGINAL_ARCHIVE='transposition/original.tuna';
+// SCORE-FILE MIGRATION: transposed scores saved before 2026-10-17 name this
+// member `transposition/original.isoscore`; those archives stay on disk and
+// keep opening. The member name is part of their signed envelope, so this
+// reader alternative stays until no such archive remains in a library.
+const ORIGINAL_ARCHIVES:readonly string[]=[ORIGINAL_ARCHIVE,'transposition/original.isoscore'];
 /** The authority a transposed archive carries: its exact original archive,
  * the edition it was made from and the owner hands for each keyboard. */
 async function transpositionEnvelope(original:ScorePackage,originalBytes:Uint8Array,selectedBytes:Uint8Array,steps:number,sourceBytes:Uint8Array,
  handMaps:ScoreTransposition['handMaps']):Promise<ScoreTransposition>{
- const content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:'transposition/original.isoscore',
+ const content={version:SCORE_TRANSPOSITION_VERSION,originalArchive:ORIGINAL_ARCHIVE,
   originalArchiveSha256:await hashBytes(originalBytes),baselineLayout:original.keyboardLayout!,originalSourceSha256:original.sourceSha256!,selectedEditionSha256:await hashBytes(selectedBytes),steps,
   effectiveSourceSha256:await hashBytes(sourceBytes),handMaps};
  return{...content,sha256:await identityHash(content)} as ScoreTransposition;
@@ -175,7 +182,7 @@ export async function engraveEdition(request:{
   shared:Record<string,Uint8Array>={[baseManifest.font]:base.files[baseManifest.font],...Object.fromEntries(baseManifest.notices.map(name=>[name,base.files[name]]))},
   engraved=new Map<string,{score:string;seats:string;recipe:string;pages:string[]}>(),chosen:EditionView[]=[],fellBack:PhysicalKeyboardId[]=[];
  if(kept)for(const [name,bytes]of Object.entries(keep!.files))if(name!=='manifest.json')shared[name]=bytes;
- if(transposition)shared['transposition/original.isoscore']=transposition.originalBytes;
+ if(transposition)shared[ORIGINAL_ARCHIVE]=transposition.originalBytes;
  if(base.referenceMidi)shared['reference.mid']=base.referenceMidi;
  const engrave=async(layout:PhysicalKeyboardId,score:QuantizedGridScore)=>{
   const key=canonicalJson(score);if(engraved.has(key))return;
@@ -270,7 +277,7 @@ export async function admitScoreTransposition(raw:unknown,files:Record<string,Ui
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  if(!object(raw)||raw.version!==SCORE_TRANSPOSITION_VERSION||Object.keys(raw).sort().join()!==
   ['version','originalArchive','originalArchiveSha256','baselineLayout','originalSourceSha256','selectedEditionSha256','steps','effectiveSourceSha256','handMaps','sha256'].sort().join()||
-  raw.originalArchive!=='transposition/original.isoscore'||!layout(raw.baselineLayout)||
+  !ORIGINAL_ARCHIVES.includes(raw.originalArchive as string)||!layout(raw.baselineLayout)||
   ![raw.originalArchiveSha256,raw.originalSourceSha256,raw.selectedEditionSha256,raw.effectiveSourceSha256,raw.sha256].every(digest)||!object(raw.handMaps)||
   !Object.keys(raw.handMaps).length||Object.keys(raw.handMaps).some(k=>!layout(k))||raw.steps===0)
   throw Error('Unsupported Viewer transposition envelope.');

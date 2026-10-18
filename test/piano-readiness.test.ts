@@ -84,7 +84,7 @@ test('earlier edition reads exact pages and its own correction journal, without 
  const original=await prepared(),old=await calculateEdition({packageBytes:original.bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});
  assert.equal(old.status,'editable');const first=old.layer.attacks[0].finger,replacement=first===5?4:5,
   state=corrected(old.package,initialPersonal(old.package),old.package.seats[0],replacement),key=(await import('../src/state')).personalStorageName(old.package.sourceRevision!,old.package),
-  file=`package-${await hashBytes(old.packageBytes)}.isoscore`,oldStateFile=`state-version-${'a'.repeat(64)}.json`,entry:Entry={
+  file=`package-${await hashBytes(old.packageBytes)}.tuna`,oldStateFile=`state-version-${'a'.repeat(64)}.json`,entry:Entry={
    id:old.package.sourceRevision!,file,metadata:old.package.manifest.metadata,importedAt:'now',personalFiles:{[key]:oldStateFile}},
   stored=new Map<string,Uint8Array>([[file,old.packageBytes],[oldStateFile,strToU8(JSON.stringify(state))]]),
   next=await calculateEdition({packageBytes:old.packageBytes,layout:'janko-four-row',performingHandPolicy:'retain-imported',personal:state,forceRecalculate:true});
@@ -107,11 +107,11 @@ test('an archived package with a missing declared journal cannot restore an empt
  // optional Viewer preparation identity/storage suffix was introduced.
  const manifest=structuredClone(calculated.package.collectionManifest??calculated.package.manifest),files={...calculated.package.files};
  delete files['manifest.json'];delete manifest.preparationIdentity;delete manifest.presentations!['janko-four-row']!.preparationIdentity;
- const archive=archivePackage(manifest,files),p=await importPackage(archive),file=`package-${await hashBytes(archive)}.isoscore`,
+ const archive=archivePackage(manifest,files),p=await importPackage(archive),file=`package-${await hashBytes(archive)}.tuna`,
   key=personalStorageName(p.sourceRevision!,p),legacy=legacyPersonalStorageName(p)!;
  assert.ok(legacy);
  const other=corrected(p,initialPersonal(p),p.seats[0],p.fingerLayer!.attacks[0].finger===1?2:1),
-  missing=`state-version-${'f'.repeat(64)}.json`,entry:Entry={id:p.sourceRevision!,file:`package-${await hashBytes(calculated.packageBytes)}.isoscore`,
+  missing=`state-version-${'f'.repeat(64)}.json`,entry:Entry={id:p.sourceRevision!,file:`package-${await hashBytes(calculated.packageBytes)}.tuna`,
    metadata:p.manifest.metadata,importedAt:'now',retainedPackages:[file],editionPersonalFiles:{[file]:{[key]:missing}}},
   before=structuredClone(entry),library=strToU8(JSON.stringify({version:1,entries:[entry]})),
   stored=new Map<string,Uint8Array>([[file,archive],[legacy,strToU8(JSON.stringify(other))],['library.json',library]]),reads:string[]=[];

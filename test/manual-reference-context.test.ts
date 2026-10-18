@@ -46,7 +46,7 @@ test('planner owns the full fallback before hashing, and canonical references re
 test('saved reference and library progress are part/source bound without archive changes',async()=>{
  const reader=await ReadingPresentationController.open(p),identity={partId:p.reading!.dual!.sourcePartId,musicalRevision:reader.revision},
   refRecord=manualReferenceRecord(identity,reference),refName=await manualReferenceStorageName(identity),plan=await planManualPractice(p,'connection-boundary-v1',reference),
-  journal=manualPracticeRecord(plan,initialPractice(plan)),entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.isoscore`,importedAt:'2026-10-09T00:00:00Z',metadata:p.manifest.metadata},reads:string[]=[];
+  journal=manualPracticeRecord(plan,initialPractice(plan)),entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.tuna`,importedAt:'2026-10-09T00:00:00Z',metadata:p.manifest.metadata},reads:string[]=[];
  const summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async name=>{reads.push(name);return name===refName?refRecord:name===manualPracticeStorageName(plan)?journal:undefined;}});
  assert.equal(summary!.assessment,'manual');assert.equal(summary!.sections,0);assert.deepEqual(reads,[refName,manualPracticeStorageName(await planManualPractice(p,'bounded-exercises-v1',reference)),manualPracticeStorageName(plan)]);
  assert.equal(await readLibraryPracticeSummary(entry,'conventional-piano',{readPackage:async()=>bytes,readRecord:async()=>null}),undefined);

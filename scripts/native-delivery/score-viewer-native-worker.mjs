@@ -149,7 +149,7 @@ export async function notices(source,viewer,packet,targetTriple) {
   await writeFile(join(packet,'NOTICE.txt'),'ISO Score Viewer. Font and dependency notices are in notices/. Imported scores retain their own provenance and notices.\n');
 }
 export async function finishWorker(ctx,platform,packet,binary,nativeChecks,details={}) {
-  await cp(join(ctx.prepared,'Schumann-No14.isoscore'),join(packet,'Schumann-No14.isoscore'));
+  await cp(join(ctx.prepared,'Schumann-No14.tuna'),join(packet,'Schumann-No14.tuna'));
   await cp(join(ctx.prepared,'source-inputs.json'),join(packet,'Source-provenance.json'));
   await cp(join(ctx.prepared,'source-checks.json'),join(packet,'Source-validation.json'));
   await cp(join(ctx.prepared,'frontend','release-identity.json'),join(packet,'Release-identity.json'));

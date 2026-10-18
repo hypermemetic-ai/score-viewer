@@ -251,7 +251,7 @@ test('the personal memory scan skips reading packages from their manifest alone'
  const reading=await authoredReadingPackage();assert.equal(readingOnlyArchive(reading),true);
  const {bytes:piano}=await sourcePackage(transferStudy());assert.equal(readingOnlyArchive(piano),false);
  assert.equal(readingOnlyArchive(new Uint8Array([1,2,3])),false);
- const entries=[{id:'r',file:'package-'+sha('a')+'.isoscore'}] as any[],stored=new Map([[entries[0].file,reading]]);let admitted=0;
+ const entries=[{id:'r',file:'package-'+sha('a')+'.tuna'}] as any[],stored=new Map([[entries[0].file,reading]]);let admitted=0;
  const library=new PersonalMemoryLibrary({read:async name=>name==='library.json'?strToU8(JSON.stringify({version:1,entries})):stored.get(name)??null},()=>entries,async b=>{admitted++;return importPackage(b);});
  assert.deepEqual(await library.scan(),[]);assert.equal(admitted,0);
 });
