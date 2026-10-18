@@ -79,7 +79,7 @@ export async function convertMuseScoreToMusicXml(bytes:Uint8Array,signal?:AbortS
 
 /** MuseScore → MusicXML → the unchanged MusicXML intake: one printed piano
  * part on two staves, hands from those staves, no inference. */
-export async function prepareMuseScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):Promise<{bytes:Uint8Array;filename:string}>{
+export async function prepareMuseScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):ReturnType<typeof prepareMusicXmlScore>{
  const execution=capturedReadingExecution(inputExecution);checkReadingExecution(execution);
  const musicxml=await convertMuseScoreToMusicXml(bytes,execution.signal);checkReadingExecution(execution);
  try{return await prepareMusicXmlScore(new TextEncoder().encode(musicxml),assets,execution);}

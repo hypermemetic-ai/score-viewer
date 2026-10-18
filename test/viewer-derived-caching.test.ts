@@ -8,7 +8,10 @@ import {createProjectionHost,createHostedCore,type HostedProjectionCore} from '.
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,type ProjectionWorkerLike} from '../src/personal-projection-client';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse} from '../src/personal-projection-protocol';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
-import {PersonalPresentationSession,undrawableHandOwners,cancelPersonalPrefetch,PERSONAL_PROJECTION_CACHE_KIND} from '../src/personal-presentation';
+import {PersonalPresentationSession,adoptImportedReading,undrawableHandOwners,cancelPersonalPrefetch,PERSONAL_PROJECTION_CACHE_KIND} from '../src/personal-presentation';
+import {prepareMusicXmlScore} from '../src/musicxml-import';
+import {ensurePianoReady} from '../src/piano-readiness';
+import {PackageAdmissionSession} from '../src/package-admission-session';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {sourcePackage,transferStudy,calculatedStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -205,6 +208,48 @@ test('reopening resumes hand editing from the saved engine instead of engraving 
  // On the reader's thread too.
  const here=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache});
  await here.warm();assert.deepEqual((await here.project(choice)).pages,local.pages);
+});
+
+const musicXml=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url));
+const musicXmlAssets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
+ notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>['licenses/'+name,readFileSync(new URL('../licenses/'+name,import.meta.url))]))};
+test('an imported score hands its reading engrave to hand editing, which engraves nothing again',async()=>{
+ const prepared=await prepareMusicXmlScore(musicXml,musicXmlAssets),admission=new PackageAdmissionSession();
+ // The package the import opens on the player's layout.
+ const ready=await ensurePianoReady({packageBytes:prepared.bytes,layout:'conventional-piano',signal:new AbortController().signal},admission);
+ assert.ok('package' in ready);const p=ready.package;
+ const seat=p.seats.find(s=>s.ownerIds.some(id=>p.score.notes.find(n=>n.id===id)?.hand==='RH'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'LH'});
+ const cold=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache:null}).project(choice);
+ // Another score's reading is refused.
+ const {files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a'),other=await sourcePackage(transferStudy());
+ assert.equal(await adoptImportedReading(other.p,prepared.reading),false);
+ assert.equal(await adoptImportedReading(p,prepared.reading),true);
+ const restores:boolean[]=[],warms:number[]=[],spying=(inputs:ProjectionCoreInputs)=>{
+  const core=createHostedCore(inputs),restore=core.restoreAsync!,warm=core.warmAsync;
+  return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;},
+   // A warm of a settled core does nothing; only one that engraves counts.
+   warmAsync:async(...a:Parameters<typeof warm>)=>{if(!core.exportState!())warms.push(1);return warm(...a);}});
+ };
+ // An equal package that isn't the one the import opened engraves its own.
+ const again=await ensurePianoReady({packageBytes:prepared.bytes,layout:'conventional-piano',signal:new AbortController().signal},new PackageAdmissionSession());
+ assert.ok('package' in again&&again.package!==p);
+ const stranger=fakeWorker(createHostedCore),distinct=new PersonalPresentationSession(again.package,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(stranger.spawn),cache:null});
+ distinct.prefetch();await distinct.ensureHandChoicesDrawable();
+ assert.equal(stranger.log[0]?.kind,'warm');assert.equal((stranger.log[0] as {saved?:unknown}).saved,undefined);
+ // The session that opens the import resumes from the adopted engine, and saves it.
+ const first=fakeWorker(spying),opened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(first.spawn),cache,cacheWriteDelayMs:0});
+ opened.prefetch();await opened.ensureHandChoicesDrawable();await written(cache,files,1);
+ assert.deepEqual(restores,[true]);assert.deepEqual(warms,[]);assert.ok((first.log[0] as {saved?:unknown}).saved);
+ assert.deepEqual(first.log.map(m=>m.kind),['warm','warm','save']);
+ const view=await opened.project(choice);
+ assert.deepEqual(view.pages,cold.pages);assert.deepEqual(view.seats,cold.seats);assert.deepEqual(view.score,cold.score);assert.deepEqual(view.annotationGeometry,cold.annotationGeometry);
+ // The session took the engine from memory; a later one reads it from the
+ // disk (its projection dropped, so it must resume the engine).
+ const second=fakeWorker(spying),reopened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(second.spawn),cache:new EvictedProjections(store,'build-a'),cacheWriteDelayMs:0});
+ assert.deepEqual((await reopened.project(choice)).pages,cold.pages);assert.deepEqual(restores,[true,true]);assert.deepEqual(warms,[]);
+ // With nothing kept, the choice is engraved from the score, as before.
+ const third=fakeWorker(spying),none=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(third.spawn),cache:null});
+ assert.deepEqual((await none.project(choice)).pages,cold.pages);assert.deepEqual(third.log.map(m=>m.kind),['project']);assert.deepEqual(restores,[true,true]);
 });
 
 test('prefetch settles the engraving only in a worker and never without one',async()=>{

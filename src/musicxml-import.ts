@@ -37,7 +37,7 @@ function decodeXml(bytes:Uint8Array){
  * Nothing is inferred; the player chooses hands in the handedness editor.
  * Pages use the approved production engraving, and the package passes
  * ordinary admission. */
-export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):Promise<{bytes:Uint8Array;filename:string}> {
+export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):ReturnType<typeof publishNativePianoScore> {
  const execution=capturedReadingExecution(inputExecution),inputSha256=await hashBytes(bytes);checkReadingExecution(execution);
  let written;
  try{written=await parseMusicXmlAsync(musicXmlText(bytes),'import.musicxml');}

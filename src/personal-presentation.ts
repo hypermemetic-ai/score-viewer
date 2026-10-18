@@ -1,4 +1,4 @@
-import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
+import {createPersonalHandProjection,HandPresentationError,type AdmittedReading,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
 import {effectivePerformingHand} from '../vendor/iso-notation/src/model/effective-hand';
 import {calculatedRecipeForRequest} from './calculated-hand-edition';
@@ -136,12 +136,31 @@ async function capture(base:ScorePackage,worker:ProjectionWorkerClient|null):Pro
  const members=await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)]));
  const key=JSON.stringify([identity,members]),digest=await hashBytes(key);
  return {key,digest,materialBytes,async produce(execution){
-  checkReadingExecution(execution);
-  const recipe=await calculatedRecipeForRequest(snapshot,execution),source=scoreWithCalculationContext(snapshot.sourceScore??snapshot.score,
-   snapshot.calculationContext,snapshot.sourceSha256??snapshot.manifest.semanticSha256);
-  checkReadingExecution(execution);const inputs={source,baseline:snapshot.score,recipe};
+  const inputs=await coreInputs(snapshot,execution);
   return worker?.available?workerCore(worker,digest,inputs):localCore(inputs);
  }};
+}
+async function coreInputs(p:ScorePackage,execution?:ReadingExecution):Promise<ProjectionCoreInputs>{
+ checkReadingExecution(execution);
+ const recipe=await calculatedRecipeForRequest(p,execution),source=scoreWithCalculationContext(p.sourceScore??p.score,p.calculationContext,p.sourceSha256??p.manifest.semanticSha256);
+ checkReadingExecution(execution);return {source,baseline:p.score,recipe};
+}
+/** Hand engines imports settled from their reading engraves, for the session
+ * that opens each package; the session saves it to disk. One no session takes
+ * goes with its package. */
+const importedEngines=new WeakMap<ScorePackage,PersonalHandEngineState>();
+/** An imported score was just engraved for reading; its hand engine starts
+ * from that engrave instead of engraving the score a second time. ISO
+ * notation adopts only the engrave the engine's own first preparation would
+ * make, and resumes a saved engine only where it reproduces the pages. Any
+ * other is refused (false), and hand editing engraves as before. */
+export async function adoptImportedReading(base:ScorePackage,reading:AdmittedReading,input?:ReadingExecution):Promise<boolean>{
+ if(!base.renderingRecipe||!base.sourceSha256)return false;
+ const execution=input?capturedReadingExecution(input):undefined,inputs=await coreInputs(base,execution);
+ const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
+ if(!(execution?await core.adoptReadingAsync(reading,execution):core.adoptReading(reading)))return false;
+ const state=core.exportState();checkReadingExecution(execution);if(!state)return false;
+ importedEngines.set(base,state);return true;
 }
 /** Engraving refusals arrive in ISO notation's terms; players see what failed
  * in theirs, and the original diagnosis stays attached as the cause. */
@@ -303,13 +322,19 @@ export class PersonalPresentationSession {
   const settled=await core.warm(execution,offThreadOnly,saved);
   // A settled core holds the engine now; the saved copy is not kept in memory.
   if(settled)this.savedEngine=Promise.resolve(undefined);
-  // A restored engine, or one already settled from a saved copy, is on disk.
-  if(settled==='restored'||settled==='already'&&saved)this.engineSaved=true;else if(settled==='engraved')this.rememberEngine();
+  // A restored engine, or one already settled from a saved copy, is on disk,
+  // unless it came from the import.
+  if(settled==='engraved'||settled==='restored'&&this.imported)this.rememberEngine();else if(settled==='restored'||settled==='already'&&saved&&!this.imported)this.engineSaved=true;
   return !!settled;
  }
+ /** Whether the saved engine is the one the import of this package adopted. */
+ private imported=false;
  private savedState():Promise<PersonalHandEngineState|undefined>{
+  if(this.savedEngine)return this.savedEngine;
+  const state=importedEngines.get(this.base);
+  if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
-  return this.savedEngine??=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+  return this.savedEngine=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
  }
  private async engineKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,(await this.prepare()).digest]));

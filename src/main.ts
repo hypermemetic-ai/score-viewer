@@ -67,6 +67,7 @@ import {stagePresentationInstall} from './presentation-install';
 import {prepareRetainedEdition,readRetainedEdition} from './retained-editions';
 import {prepareRebuiltEdition,addKeyboardView,canAddKeyboardView,canShareKeyboardView,shareKeyboardView,personalForAddedKeyboard,type RebuiltInstall} from './edition-rebuild';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
+import type {AdmittedReading} from '../vendor/iso-notation/src/score-presentation';
 
 import {editUnits,moveSelection,selectionOnPage,systemSelection,measureSelection} from './selection';
 import {LibraryMenu,instrumentPickerMarkup,libraryFocusKey,libraryFocusElement} from './library-menu';
@@ -87,7 +88,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
+import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
@@ -980,13 +981,13 @@ async function switchReadingPart(id:string){
 async function importScore(){
  let bytes=await host.pickScore();if(!bytes)return;const kind=scoreImportKind(bytes);if(kind==='guitar-pro'){await importGuitarProScore(bytes);return;}
  if(kind==='musescore'&&!MUSESCORE_IMPORT_ENABLED)throw Error('MuseScore files can\'t be opened in this copy of the viewer yet. Export the score from MuseScore as MusicXML (.musicxml or .mxl) and import that file.');
- const op=beginReading('import',new LoadingProgress('New score',[...(kind==='score'?[]:['engrave'] as const),'check','save','hands','open'],{kicker:'Importing',cancel:true}));try{await readingCheckpoint(op);
+ const op=beginReading('import',new LoadingProgress('New score',[...(kind==='score'?[]:['engrave'] as const),'check','save','hands','open'],{kicker:'Importing',cancel:true}));let reading:AdmittedReading|undefined;try{await readingCheckpoint(op);
  if(kind==='musicxml'){readingProgress(op,'engrave');const [{frettedPreparationAssets},{prepareMusicXmlScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musicxml-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
-  const written=bytes;bytes=(await prepareMusicXmlScore(written,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
+  const written=bytes;({bytes,reading}=await prepareMusicXmlScore(written,assets,readingExecution(op)));await readingCheckpoint(op);}
  if(MUSESCORE_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'engrave');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
-  const saved=bytes;bytes=(await prepareMuseScore(saved,assets,readingExecution(op))).bytes;await readingCheckpoint(op);}
+  const saved=bytes;({bytes,reading}=await prepareMuseScore(saved,assets,readingExecution(op)));await readingCheckpoint(op);}
  const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.setTitle(p.manifest.metadata.title||op.loading.title);
  await practice?.flush();await savePersonal();
  let refresh=false,linkedRefresh=false,savedHasLayout=false;
@@ -1007,6 +1008,10 @@ async function importScore(){
   journals:Entry=priorEntry??{id,file:scoreFileName(await hashBytes(bytes)),metadata:p.manifest.metadata,importedAt:new Date().toISOString()},
   // A file lacking a layout the saved edition has never replaces it on other pages.
   {q,running,gained}=await prepareScore(bytes,layout,personal,p,op,journals,!priorEntry,!savedHasLayout);
+ // The engrave just made for reading settles hand editing too, so the first
+ // hand choice doesn't engrave the score again. A refusal costs nothing.
+ if(reading)await adoptImportedReading(q.package,reading,readingExecution(op)).catch(error=>{if(error instanceof DOMException&&error.name==='AbortError')throw error;});
+ reading=undefined;
 
  const entry:Entry=priorEntry?{...priorEntry,
    presentations:refresh&&!linkedRefresh?[...(priorEntry.presentations??[]),priorEntry.file]:(priorEntry.presentations??[])}:
