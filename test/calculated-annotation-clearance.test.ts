@@ -17,7 +17,7 @@ test('positioned descendants, text displacement and unbounded paint effects fail
  for(const ink of ['<text x="10" y="20" font-size="8"><tspan x="80" y="120">Shifted</tspan></text>',
   '<text x="10" y="20" dy="100" font-size="8">Shifted</text>',
   '<path d="M10 10 L20 20" stroke="black" vector-effect="non-scaling-stroke"/>',
-  '<path d="M10 10 A10 10 0 1 0 20 20"/>',
+  '<path d="M10 10 S20 20 30 10"/>',
   '<g style="filter:blur(3px)"><line x1="1" y1="2" x2="3" y2="4"/></g>'])
   assert.throws(()=>actualPageObstacles(page(ink),new Map()),/Unsupported/);
 });
@@ -82,4 +82,17 @@ test('large source origin and cancelling affine translation retain outward cover
  for(let k=0;k<=200;k++){const t=k/200,x=20*(1-t)**3+180*t*(1-t)**2+420*t*t*(1-t)+180*t**3,
   y=150*(1-t)**3+120*t*(1-t)**2+120*t*t*(1-t)+150*t**3;
   for(const mix of [0,.5,1])assert.ok(p.boxes.some(b=>x>=b[0]&&x<=b[2]&&y+mix*10>=b[1]&&y+mix*10<=b[3]));}
+});
+test('stem-mounted round openings and half capsules reserve their exact arc bounds',()=>{
+ // ISO's ring (two half arcs per circle, even-odd) and a half capsule whose arc bows below its straight sides.
+ const ring='M 47.00 100.00 A 3.00 3.00 0 1 0 53.00 100.00 A 3.00 3.00 0 1 0 47.00 100.00 Z M 48.00 100.00 A 2.00 2.00 0 1 0 52.00 100.00 A 2.00 2.00 0 1 0 48.00 100.00 Z',
+  half='M 97.00 200.00 A 3.00 3.00 0 0 0 103.00 200.00 L 103.00 196.00 L 97.00 196.00 Z',
+  p=actualPageObstacles(page(`<g><path d="${ring}" fill="#111111" fill-rule="evenodd"/></g><path d="${half}" fill="#111111"/><path d="M 10 10 a 5 5 0 0 1 10 0 Z" fill="black"/>`),new Map());
+ const near=(a:number[],b:number[])=>a.every((n,i)=>Math.abs(n-b[i])<1e-9);
+ assert.ok(near(p.boxes[0],[47,97,53,103]),String(p.boxes[0]));
+ assert.ok(near(p.boxes[1],[97,196,103,203]),String(p.boxes[1]));
+ assert.ok(near(p.boxes[2],[10,5,20,10]),'a relative arc sweeping up: '+String(p.boxes[2]));
+ assert.throws(()=>actualPageObstacles(page('<path d="M 0 0 A 3 3 0 2 0 6 0"/>'),new Map()),/Malformed/);
+ // A radius too large to place a centre refuses rather than narrowing to the chord.
+ assert.throws(()=>actualPageObstacles(page('<path d="M 0 0 A 1e160 3 0 1 0 6 0"/>'),new Map()),/Malformed/);
 });

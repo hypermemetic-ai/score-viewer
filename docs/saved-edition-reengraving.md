@@ -86,4 +86,4 @@ The page replay (`admitCalculatedHandEdition`) still admits calculated editions 
 - A rebuilt edition has new pages. Practice and personal journals are keyed by edition. Journals under the earlier view's key are carried over, and journals saved under another key stay where they were.
 - If engraving again also fails, the score is refused plainly and every edition stays saved.
 
-The footer probe's saved calculated edition (`fixtures/footer-probe-calculated-edition.tuna`) was redrawn at ISO bee8c67 with its own hands and fingers by `test/support/footer-probe-edition.ts`. It still opens through its receipt, so the native footer probe exercises the same receipt path.
+The footer probe's saved calculated edition (`fixtures/footer-probe-calculated-edition.tuna`) was redrawn at ISO cfc6f01 (pinned at fe5b85f; #404 adds stem marks drawn with arcs) with its own hands and fingers by `test/support/footer-probe-edition.ts`. It still opens through its receipt, so the native footer probe exercises the same receipt path.

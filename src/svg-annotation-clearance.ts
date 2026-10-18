@@ -58,19 +58,45 @@ function pairedRibbonHulls(d:string):Point[][]|undefined{
  }
  return pairs.map(([a,b])=>[...a,...b]); // exactly sixteen bounded partitions
 }
+/** An elliptical arc's exact local bounds, as the four corners of its box:
+ * its ends and every axis extreme its sweep passes (SVG endpoint
+ * parameterization, radii scaled up when too small). Corners rather than the
+ * extremes themselves keep the box conservative under a later transform. */
+function arcCorners(x1:number,y1:number,rx:number,ry:number,degrees:number,large:boolean,sweep:boolean,x2:number,y2:number):Array<[number,number]>{
+ if(x1===x2&&y1===y2)return [];
+ rx=Math.abs(rx);ry=Math.abs(ry);if(!rx||!ry)return [[x1,y1],[x2,y2]];
+ const phi=degrees*Math.PI/180,cos=Math.cos(phi),sin=Math.sin(phi),hx=(x1-x2)/2,hy=(y1-y2)/2,
+  px=cos*hx+sin*hy,py=-sin*hx+cos*hy,scale=px*px/(rx*rx)+py*py/(ry*ry);
+ if(scale>1){rx*=Math.sqrt(scale);ry*=Math.sqrt(scale);}
+ const den=rx*rx*py*py+ry*ry*px*px,coef=(large!==sweep?1:-1)*Math.sqrt(Math.max(0,(rx*rx*ry*ry-den)/den)),
+  qx=coef*rx*py/ry,qy=-coef*ry*px/rx,cx=cos*qx-sin*qy+(x1+x2)/2,cy=sin*qx+cos*qy+(y1+y2)/2,
+  angle=(ux:number,uy:number)=>Math.atan2(uy,ux),start=angle((px-qx)/rx,(py-qy)/ry);
+ let delta=angle((-px-qx)/rx,(-py-qy)/ry)-start;
+ if(sweep&&delta<0)delta+=2*Math.PI;else if(!sweep&&delta>0)delta-=2*Math.PI;
+ const at=(t:number):[number,number]=>[cx+rx*cos*Math.cos(t)-ry*sin*Math.sin(t),cy+rx*sin*Math.cos(t)+ry*cos*Math.sin(t)],
+  within=(t:number)=>{const turn=2*Math.PI,d=((delta>=0?t-start:start-t)%turn+turn)%turn;return d<=Math.abs(delta);},
+  points:Array<[number,number]>=[[x1,y1],[x2,y2]],tx=Math.atan2(-ry*sin,rx*cos),ty=Math.atan2(ry*cos,rx*sin);
+ if(![cx,cy,rx,ry,start,delta,tx,ty].every(Number.isFinite))throw Error('Malformed SVG path');
+ for(const t of [tx,tx+Math.PI,ty,ty+Math.PI])if(within(t))points.push(at(t));
+ const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),x0=Math.min(...xs),y0=Math.min(...ys),x3=Math.max(...xs),y3=Math.max(...ys);
+ return [[x0,y0],[x3,y0],[x3,y3],[x0,y3]];
+}
 /** Bézier curves stay inside their control hull. Reserve the entire hull;
- * unsupported commands refuse instead of inventing a narrower ink bound. */
+ * arcs reserve their exact box; unsupported commands refuse instead of
+ * inventing a narrower ink bound. */
 function pathPoints(d:string):Array<[number,number]>{
  const tokens=d.match(/[a-df-z]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/gi)??[],points:Array<[number,number]>=[];
  let i=0,x=0,y=0,sx=0,sy=0,cmd='';
  while(i<tokens.length){if(/^[a-z]$/i.test(tokens[i]))cmd=tokens[i++];if(!cmd)throw Error('Malformed SVG path');
-  const upper=cmd.toUpperCase(),relative=cmd!==upper,count=({M:2,L:2,H:1,V:1,C:6,Q:4,Z:0} as Record<string,number>)[upper];
+  const upper=cmd.toUpperCase(),relative=cmd!==upper,count=({M:2,L:2,H:1,V:1,C:6,Q:4,A:7,Z:0} as Record<string,number>)[upper];
   if(count===undefined)throw Error('Unsupported SVG annotation path command: '+cmd);
   if(!count){x=sx;y=sy;points.push([x,y]);cmd='';continue;}
   const raw=tokens.slice(i,i+count);if(raw.length!==count||raw.some(t=>/^[a-z]$/i.test(t)))throw Error('Malformed SVG path');
   const n=raw.map(Number);i+=count;
   if(upper==='H'){x=relative?x+n[0]:n[0];points.push([x,y]);}
   else if(upper==='V'){y=relative?y+n[0]:n[0];points.push([x,y]);}
+  else if(upper==='A'){if(![n[3],n[4]].every(f=>f===0||f===1))throw Error('Malformed SVG path');
+   const ex=relative?x+n[5]:n[5],ey=relative?y+n[6]:n[6];points.push(...arcCorners(x,y,n[0],n[1],n[2],n[3]===1,n[4]===1,ex,ey));x=ex;y=ey;}
   else{const baseX=relative?x:0,baseY=relative?y:0;for(let j=0;j<count;j+=2)points.push([baseX+n[j],baseY+n[j+1]]);x=baseX+n[count-2];y=baseY+n[count-1];}
   if(upper==='M'){sx=x;sy=y;cmd=relative?'l':'L';}
  }return points;
