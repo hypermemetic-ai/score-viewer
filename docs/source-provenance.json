@@ -1424,17 +1424,27 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "916245c5ba526885b210fdd6645006b1477a9811",
+  "dependencyRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/402",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/421",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/422"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/423",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/424",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/425"
     ],
-    "previousRevision": "fe5b85fe060503112c78d312af09dfe2eb9f27dc",
-    "scope": "Slurs by note-gesture and two import repairs, 2026-10-18. #402 adds one slur model, phraseRouting 'note-gesture': each slur bows from the notes it is about, on the side that relates it most clearly to them; ties bow in proportion to their length and clear the staff lines by placement. #421 makes note-gesture the production default (APPROVED_PRODUCTION_ISO_POLICY); retained policies keep optical-open so frozen recipes still replay, and a recipe saved with the earlier routing is refused with the policy message, which the viewer answers by engraving the edition again on opening. On No. 13 all 5 pages change (222 of 224 slurs move) and on No. 14 all 3 pages change. #421 records an independent review in its PR body; #402 records its review rounds in its PR body; all were merged without GitHub review records. #422 repairs the two import regressions noted at fe5b85f: heads are seated off a hollow stem with the linter's 0.5 pt of air (the MuseScore cross-staff fixture, refused for ring geometry after #410, imports again) and '+1/2' marks are counted from the written value rather than sounding ticks (the Guitar Pro bass fixture, whose 336-tick quarters read as double-dotted wholes after #404, stages again); the viewer's tests for both run in full again. #422 changes ink only on those fixtures (the MuseScore fixture's bars 2-3 and the Guitar Pro bass bar 1) and notes as follow-ups that other places still count dots from sounding ticks; it records an independent review (changes requested, then made) in its PR body. Known viewer limit at this pin: a saved dual reading (instrument-reading-package-v2) records the earlier slur routing among its options and is refused without an offer to engrave it again; single readings are engraved again under the current rules. The owner's library has no dual reading."
+    "previousRevision": "916245c5ba526885b210fdd6645006b1477a9811",
+    "scope": "Faster slurs and tie repairs, 2026-10-18. #424 lets each note-gesture slur settle once in its system's layout and move with the system at page placement, as optical slurs already did (#400). A settled route records the routing that made it and every music obstacle relative to the staff, and the slur is routed again if any of them moved by more than 0.02 pt. In the engraving benchmark, No. 13's page placement goes from 2.50 s to 1.00 s and its total from 7.28 s to 5.30 s. Its slurs move by at most 0.22 pt (bar 51), which is not visible; its seats and written heads are identical, but its page bytes differ from 916245c. A calculated edition saved at 916245c therefore no longer replays and is engraved again on opening, keeping its hands and fingers. #423 bows long ties in proportion to their length behind the layout option tieProportion 'long', which only the Brahms score sets; the production policy takes the same branches as before. #425 adds a shared, ungated rule: two neighbouring ties of one chord that bow toward each other take the chord's sides. It changes only Brahms page 6 (bars 65-66); No. 13, No. 14 and No. 30 tie arcs are identical. Each PR records its independent reviews in its PR body; all were merged without GitHub review records."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "916245c5ba526885b210fdd6645006b1477a9811",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/402",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/421",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/422"
+      ],
+      "previousRevision": "fe5b85fe060503112c78d312af09dfe2eb9f27dc",
+      "scope": "Slurs by note-gesture and two import repairs, 2026-10-18. #402 adds one slur model, phraseRouting 'note-gesture': each slur bows from the notes it is about, on the side that relates it most clearly to them; ties bow in proportion to their length and clear the staff lines by placement. #421 makes note-gesture the production default (APPROVED_PRODUCTION_ISO_POLICY); retained policies keep optical-open so frozen recipes still replay, and a recipe saved with the earlier routing is refused with the policy message, which the viewer answers by engraving the edition again on opening. On No. 13 all 5 pages change (222 of 224 slurs move) and on No. 14 all 3 pages change. #421 records an independent review in its PR body; #402 records its review rounds in its PR body; all were merged without GitHub review records. #422 repairs the two import regressions noted at fe5b85f: heads are seated off a hollow stem with the linter's 0.5 pt of air (the MuseScore cross-staff fixture, refused for ring geometry after #410, imports again) and '+1/2' marks are counted from the written value rather than sounding ticks (the Guitar Pro bass fixture, whose 336-tick quarters read as double-dotted wholes after #404, stages again); the viewer's tests for both run in full again. #422 changes ink only on those fixtures (the MuseScore fixture's bars 2-3 and the Guitar Pro bass bar 1) and notes as follow-ups that other places still count dots from sounding ticks; it records an independent review (changes requested, then made) in its PR body. Known viewer limit at this pin: a saved dual reading (instrument-reading-package-v2) records the earlier slur routing among its options and is refused without an offer to engrave it again; single readings are engraved again under the current rules. The owner's library has no dual reading."
+    },
     {
       "revision": "fe5b85fe060503112c78d312af09dfe2eb9f27dc",
       "pullRequests": [
