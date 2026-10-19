@@ -279,10 +279,12 @@ export function readEditionContent(bytes:Uint8Array,options:PackageReadOptions={
  * dual) whose members, source and policy still read. Anything else (damaged, foreign,
  * cancelled) returns undefined and keeps its own refusal. The content is for
  * reading the edition's own facts and journals, never for display. */
-export async function editionNeedsEngravingAgain(bytes:Uint8Array,refusal:unknown):Promise<ScorePackage|undefined>{
+export async function editionNeedsEngravingAgain(bytes:Uint8Array,refusal:unknown,execution?:ReadingExecution):Promise<ScorePackage|undefined>{
  if((refusal as Error)?.name==='AbortError')return;
- try{const content=await readEditionContent(bytes,{allowLegacyTempo:true}),m=content.collectionManifest??content.manifest;
-  return m.version===2&&!!m.sourceScore&&!!content.sourceScore||m.version===3&&(m.reading?.version==='instrument-reading-package-v1'||m.reading?.version==='instrument-reading-package-v2')?content:undefined;}catch{return;}
+ // With an execution, reading the content (a dual reading draws both views) yields and can be stopped.
+ try{const content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}),m=content.collectionManifest??content.manifest;
+  return m.version===2&&!!m.sourceScore&&!!content.sourceScore||m.version===3&&(m.reading?.version==='instrument-reading-package-v1'||m.reading?.version==='instrument-reading-package-v2')?content:undefined;}
+ catch(error){if(execution&&(error as Error)?.name==='AbortError')throw error;return;}
 }
 export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
 /** Receipts for reading archives this build already replayed, keyed by

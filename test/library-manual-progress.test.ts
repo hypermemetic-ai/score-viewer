@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {importPackage,hashBytes,type Manifest} from '../src/package';
+import {importPackage,hashBytes,editionNeedsEngravingAgain,type Manifest} from '../src/package';
 import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {prepareDualReadingPackage,selectReadingNotation} from '../src/dual-reading-package';
 import {authoredFrettedInput} from './support/fretted-dual-fixture';
@@ -11,6 +11,8 @@ import {toggleDone} from '../src/practice-attainment';
 import {displayedPracticeTotal} from '../src/practice-display';
 import {collectionId,type Entry} from '../src/state';
 import {LibraryPracticeSummaries,readLibraryPracticeSummary} from '../src/library-practice-progress';
+import {ReadingPresentationController} from '../src/reading-presentation';
+import {manualReferenceStorageName} from '../src/manual-reference-context';
 
 const bytes=await prepareDualReadingPackage(authoredFrettedInput()),p=await importPackage(bytes),plan=await planManualPractice(p),state=initialPractice(plan),
  entry:Entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.tuna`,importedAt:'2026-10-09T00:00:00Z',metadata:p.manifest.metadata};
@@ -50,4 +52,19 @@ test('a dual reading that must be engraved again still shows the progress saved 
  const saved={...entry,file:`package-${await hashBytes(stale)}.tuna`};
  const summary=await readLibraryPracticeSummary(saved,'janko-four-row',{readPackage:async()=>stale,readRecord:async(name:string)=>name===storage?JSON.parse(raw):null});
  assert.deepEqual(summary,{entryId:entry.id,file:saved.file,assessment:'manual',sections:displayedPracticeTotal(plan,state),whole:false});
+ // Reading it yields to a newer refresh, which stops it as a cancellation, never as the score's refusal.
+ const refusal=await importPackage(stale).then(()=>undefined,error=>error);let checkpoints=0;
+ assert.ok(await editionNeedsEngravingAgain(stale,refusal,{onCheckpoint:()=>{checkpoints++;}}));assert.ok(checkpoints>0);
+ await assert.rejects(editionNeedsEngravingAgain(stale,refusal,{onCheckpoint:()=>{throw new DOMException('Library reading was superseded.','AbortError');}}),error=>(error as Error).name==='AbortError');
+});
+test('a dual reading without a reference tempo reads its manual reference under the same revision when it must be engraved again',async()=>{
+ const input=authoredFrettedInput();delete input.score.referencePerformanceTempo;
+ const fresh=await prepareDualReadingPackage(input),files=unzipSync(fresh),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest,d=m.reading as {options:Record<string,unknown>};
+ delete files['manifest.json'];d.options={...d.options,phraseRouting:'optical-open'};
+ m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,b])=>[name,await hashBytes(b)])));files['manifest.json']=strToU8(JSON.stringify(m));
+ const stale=zipSync(files),admitted=await importPackage(fresh),saved={...entry,id:collectionId(admitted),file:`package-${await hashBytes(stale)}.tuna`},names:string[]=[];
+ await assert.rejects(importPackage(stale),/Unsupported reading option/);
+ assert.equal(await readLibraryPracticeSummary(saved,'janko-four-row',{readPackage:async()=>stale,readRecord:async(name:string)=>{names.push(name);return null;}}),undefined);
+ const identity={partId:admitted.reading!.dual!.sourcePartId,musicalRevision:(await ReadingPresentationController.open(admitted)).revision};
+ assert.deepEqual(names,[await manualReferenceStorageName(identity)]);
 });

@@ -43,7 +43,7 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  // An edition that must be engraved again still shows the progress saved
  // with it; opening the score is what engraves it again.
  let content=false;
- const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options)).catch(async error=>{const read=await editionNeedsEngravingAgain(bytes,error);if(!read)throw error;content=true;return read;});
+ const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options)).catch(async error=>{const read=await editionNeedsEngravingAgain(bytes,error,options.execution);if(!read)throw error;content=true;return read;});
  if(!isCurrent())return;
  if(collectionId(imported)!==entry.id)return;
  if(imported.reading?.dual&&scoreCapabilities(imported).manualPractice){
