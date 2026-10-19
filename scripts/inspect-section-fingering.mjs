@@ -47,6 +47,9 @@ try{
  // Jump straight back to the second note typed and correct it.
  // Esc with labels showing puts them away and keeps the stage.
  await press('KeyJ');await press('Escape');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);assert.ok(await page.isVisible('.section-fingering'));
+ // Shift alone keeps the labels; a key the labels do not use puts them away and says where the cursor is.
+ const labelCount=()=>page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length);
+ await press('KeyJ');await press('ShiftLeft');assert.ok(await labelCount()>0);await press('Comma');assert.equal(await labelCount(),0);assert.match((await state()).status,/^Right hand · measure /);
  await press('KeyJ');await page.screenshot({path:output+'/3-jump-labels.png'});
  const target=await page.evaluate(()=>saved[1][0]),label=await page.getAttribute(`[data-jump-seat="${target}"]`,'data-jump-label');
  for(const letter of label)await press('Key'+letter.toUpperCase());
