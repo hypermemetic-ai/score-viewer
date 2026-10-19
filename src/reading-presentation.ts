@@ -5,6 +5,11 @@ import {identityHash} from './piano-preparation-identity';
 import type {PracticePartition} from './practice';
 import type {ReadingSourceAnchor,ManualReadingViewState} from './manual-reading-context';
 
+/** The musical revision a reading's view and manual reference are saved
+ * under: its source part and written music, never its ink. */
+export function readingRevision(iso:Pick<ScorePackage,'score'|'reading'>,partition:PracticePartition='connection-boundary-v1'){
+ return identityHash({version:'musical-manual-practice-v1',partId:iso.reading!.dual!.sourcePartId,partition,source:manualMusicalFacts(iso)});
+}
 /** Reading does not require a performance tempo. This controller owns source
  * anchors/cursors only; a manual session adds its genuine clock separately. */
 export class ReadingPresentationController {
@@ -13,8 +18,7 @@ export class ReadingPresentationController {
  static async open(input:ScorePackage,raw?:unknown,partition:PracticePartition='connection-boundary-v1'){
   if(!['connection-boundary-v1','fixed-four-v1'].includes(partition))throw Error('Unsupported reading source partition.');
   const iso=selectReadingNotation(input,'iso'),tab=selectReadingNotation(input,'tab'),snapshot=structuredClone(raw),
-   packages={iso:{...iso,seats:[]},tab:{...tab,seats:[]}},partId=iso.reading!.dual!.sourcePartId,
-   revision=await identityHash({version:'musical-manual-practice-v1',partId,partition,source:manualMusicalFacts(iso)});
+   packages={iso:{...iso,seats:[]},tab:{...tab,seats:[]}},revision=await readingRevision(iso,partition);
   return new ReadingPresentationController(packages,revision,partition,snapshot);
  }
  get package(){return this.packages[this.view.notation];}

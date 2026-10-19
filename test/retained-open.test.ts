@@ -10,7 +10,7 @@ async function run(status:string,changed=false,wrongCollection=false){
  const p={availablePresentations:['janko-four-row'],manifest:{version:1},collection:'source'},q={status,package:p,personal,packageBytes:changed?new Uint8Array([1,2,4]):new Uint8Array(data)};
  const calls:string[]=[],op={keyboard:'janko-four-row'},context:any={
   beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),getScoreTransposition:()=>0,keyboardLabel:(layout:string)=>layout,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
-  host:{read:async()=>data,fullscreen:async()=>{}},admitReading:async()=>p,assertSelectedTransposition(){},selectPresentation:async()=>p,
+  host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>p,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
   loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>wrongCollection?'other':'source',
   installPreparedScore:async()=>{calls.push('install');if(wrongCollection)throw Error('Calculated score belongs to a different source.');return {entry,personal};},
   activateScore:async(next:any)=>{calls.push('activate');assert.equal(next.entry,entry);assert.equal(next.personal,personal);return next;},saveReadingPreferences:async()=>{},checkReadingOwner(){},notify(){},finishReading(_op:any,success:boolean){calls.push(success?'complete':'failed');},
@@ -26,4 +26,33 @@ test('actual changed preparation keeps the installation path even when its byte 
 });
 test('actual identical bytes cannot bypass the source collection gate',async()=>{
  const f=await run('ready',false,true);assert.match(String(f.error),/different source/);assert.deepEqual(f.calls,['install','failed']);
+});
+
+// A Guitar Pro reading: its archive admits, then its source is checked.
+function reading(overrides:Record<string,unknown>){
+ const entry={id:'part',file:'part.tuna'},p={manifest:{version:3},reading:{dual:{}}},calls:string[]=[],op={keyboard:'janko-four-row',controller:new AbortController()},context:any={
+  beginReading:()=>op,openingLoading:()=>undefined,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},checkReadingOwner(){},
+  host:{read:async()=>new Uint8Array([1]),fullscreen:async()=>{}},importReading:async()=>p,admitReadingSource:async()=>{calls.push('source');},
+  readingProgress:(_op:unknown,step:string)=>calls.push(step),readingExecution:()=>({}),
+  reengraveReadingArchive:async()=>{calls.push('engraved');return new Uint8Array([2]);},
+  admitReading:async()=>{calls.push('admit-again');return p;},guitarProContext:()=>({groupId:'group'}),
+  assertSelectedTransposition(){},selectPresentation:async()=>p,loadPersonal:async()=>({}),prepareScore:async()=>({q:{package:p,packageBytes:new Uint8Array([1])},running:{}}),
+  collectionId:()=>'part',installPreparedScore:async()=>({entry,personal:{}}),activateScore:async(next:any)=>next,saveReadingPreferences:async()=>{},notify:(text:string)=>calls.push(text),
+  finishReading(_op:unknown,success:boolean){calls.push(success?'complete':'failed');},...overrides,
+ };
+ runInNewContext(open,context);
+ return {calls,open:(group?:string)=>context.open(entry,group).then(()=>undefined,(error:unknown)=>error)};
+}
+test('a Guitar Pro source refusal after the archive admits is shown, never answered by engraving the archive again',async()=>{
+ const f=reading({admitReadingSource:async()=>{throw Error('Receiving dual admission does not match the converted source');}});
+ assert.match(String(await f.open()),/does not match the converted source/);
+ assert.ok(!f.calls.includes('engrave-again')&&!f.calls.includes('engraved'));assert.deepEqual(f.calls.slice(-1),['failed']);
+});
+test('a reading engraved again is opened with its Guitar Pro source and part group checked',async()=>{
+ const refused=()=>{throw Error('Reading page differs from its shared source preparation');};
+ const f=reading({importReading:async()=>refused()});
+ assert.equal(await f.open('group'),undefined);
+ assert.deepEqual(f.calls.filter(c=>['engraved','admit-again','complete'].includes(c)),['engraved','admit-again','complete']);
+ const other=reading({importReading:async()=>refused()});
+ assert.match(String(await other.open('another-group')),/belongs to another original input/);
 });

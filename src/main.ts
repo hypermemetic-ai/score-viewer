@@ -172,13 +172,17 @@ function beginReading(entryId:string,loading?:LoadingProgress){
    options:dialog?.dataset.kind==='options'?optionsSection:undefined,optionsFocus:(document.activeElement as HTMLElement)?.dataset.optionsKey,loading};
  readingOperation=op;job=running;practice?.pause();readingDialog(op);return op;
 }
-async function admitReading(bytes:Uint8Array,op:ReadingOperation){
+async function admitReading(bytes:Uint8Array,op:ReadingOperation){const p=await importReading(bytes,op);await admitReadingSource(p,op);return p;}
+async function importReading(bytes:Uint8Array,op:ReadingOperation){
  await readerAdmission.waitForIdle(op.controller.signal);checkReading(op);
  readingProgress(op,'check');
- const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
+ const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);return p;
+}
+/** An admitted archive's Guitar Pro source is checked after the archive: a
+ * refusal here is about the source, never a reason to engrave the archive again. */
+async function admitReadingSource(p:ScorePackage,op:ReadingOperation){
  if(p.manifest.files[GUITAR_PRO_FILES.descriptor]&&guitarProPreparedByEarlierConverter(p))notify(EARLIER_GUITAR_PRO_CONVERTER);
  else if(p.manifest.files[GUITAR_PRO_FILES.descriptor]){readingProgress(op,'check');await admitGuitarProContext(p,{signal:op.controller.signal,checkpoint:()=>readingCheckpoint(op)});await readingCheckpoint(op);}
- return p;
 }
 /** An edition other than the one being opened is read for its own facts
  * (source, hands, journals). One that must be engraved again is read as
@@ -850,7 +854,8 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
 }
 
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
- let prior:ScorePackage;try{prior=await admitReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}await openRebuiltEdition(entry,data,error,op);return;}
+ let prior:ScorePackage;try{prior=await importReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}await openRebuiltEdition(entry,data,error,op,sourceGroup);return;}
+ await admitReadingSource(prior,op);
  if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);
  // Every piano score opens on the player's keyboard layout, gaining it when its edition lacks it.
  const layout=op.keyboard,
@@ -907,10 +912,10 @@ function gainedNotice(g:GainedLayout,shown:ScorePackage,imported:boolean):string
 /** A saved edition whose pages the current engraving no longer reproduces is
  * engraved again from its own content and installed like an Earlier edition:
  * the earlier archive and its journals stay saved. */
-async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation){
+async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string){
  readingProgress(op,'engrave-again');
  const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
- if(reading){await openReengravedReading(entry,reading,op);return;}
+ if(reading){await openReengravedReading(entry,reading,op,sourceGroup);return;}
  const rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
  await readingCheckpoint(op);
  const {q,running}=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op),
@@ -923,9 +928,11 @@ async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown
 /** A musical reading engraved again is installed like any new edition of
  * the score: the earlier archive and its journals stay saved. Its journals
  * are named for the score alone, so the reader's place and practice stay. */
-async function openReengravedReading(entry:Entry,bytes:Uint8Array,op:ReadingOperation){
+async function openReengravedReading(entry:Entry,bytes:Uint8Array,op:ReadingOperation,sourceGroup?:string){
  await readingCheckpoint(op);
- const p=await readerAdmission.import(bytes,{allowLegacyTempo:true,execution:readingExecution(op)});await readingCheckpoint(op);
+ // Opened like any admitted reading: its Guitar Pro source and part group are checked too.
+ const p=await admitReading(bytes,op);
+ if(sourceGroup&&guitarProContext(p)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');
  const {q,running}=await prepareScore(bytes,op.keyboard,await loadPersonal(entry,p),p,op,entry,false,true),
   installed=await installPreparedScore(entry,q,running,q.personal??await loadPersonal(entry,q.package));await readingCheckpoint(op);
  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});

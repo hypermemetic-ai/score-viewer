@@ -4,7 +4,8 @@ import {prepareInstrumentReading,validateInstrumentReadingScore,instrumentReadin
 import type {QuantizedGridScore,InstrumentReadingPolicy} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,importPackageForReading,readEditionContent,type Manifest,type Metadata} from './package';
 import type {ReadingExecution} from './reading-execution';
-import {admitDualReadingContent,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
+import {admitDualReadingContent,prepareDualReadingPacket,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
+import {currentReadingOptions} from './reading-options';
 
 export interface LegacyReadingDescriptor {
   version:'instrument-reading-package-v1';
@@ -29,17 +30,6 @@ function boundedScore(score:QuantizedGridScore):void {
     !Array.isArray(score.notes)||score.notes.length>10_000||!Array.isArray(score.sourceBarTicks)||
     score.sourceBarTicks.length>2_001)throw Error('Reading preparation needs a complete score of at most 10,000 events and 2,000 measures.');
   validateInstrumentReadingScore(score);
-}
-// The page and spacing dimensions a reading may choose, as the shared reading
-// admission lists them. Every other option a reading records is the shared
-// engraving rule of the day it was drawn.
-const READING_DIMENSIONS=['pageWidth','pageHeight','pageMargin','pageMarginLeft','pageMarginRight','pageMarginTop','pageMarginBottom',
-  'headerHeight','footerHeight','runningHeaderHeight','measuresPerSystem','systemsPerPage','measureInset','interStaffGap'] as const;
-/** A reading drawn afresh keeps its own page dimensions and takes the current
- * shared engraving rules, so a rule changed since (slur routing, say) is not
- * replayed from the earlier archive. */
-function currentReadingOptions(options:Partial<IsoLayoutOptions>):Partial<IsoLayoutOptions>{
-  return Object.fromEntries(READING_DIMENSIONS.filter(key=>Object.hasOwn(options,key)).map(key=>[key,options[key]])) as Partial<IsoLayoutOptions>;
 }
 function checkedPreparation(score:QuantizedGridScore,options:Partial<IsoLayoutOptions>,tokens:Partial<IsoTokens>){
   const result=prepareInstrumentReading(score,options,tokens);
@@ -81,7 +71,7 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,r
   score:QuantizedGridScore;pages:string[];reading:ReadingContent
 } {
   const d=m.reading;
-  if(d?.version==='instrument-reading-package-v2')return admitDualReadingContent(m,files);
+  if(d?.version==='instrument-reading-package-v2')return admitDualReadingContent(m,files,contentOnly);
   if(!d||!object(d)||Object.keys(d).some(k=>!['version','engineId','policy','owners','layout','options','tokens'].includes(k))||
     d.version!=='instrument-reading-package-v1'||typeof d.engineId!=='string'||m.engineVersion!==d.engineId||
     d.owners!=='reading-owners.json'||d.layout!=='reading-layout.json'||!object(d.options)||!object(d.tokens)||
@@ -92,7 +82,9 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,r
     throw Error('Unsupported or incomplete musical reading package.');
   const score=parse(files,'score.json') as QuantizedGridScore;
   boundedScore(score);
-  if(d.engineId!==instrumentReadingEngine(score.readingPolicy!))
+  // Content read for engraving again is drawn by today's engine, whatever
+  // engine drew the archive.
+  if(!contentOnly&&d.engineId!==instrumentReadingEngine(score.readingPolicy!))
     throw Error('Reading preparation authority differs from its admitted musical policy.');
   if(score.id!==m.scoreId||score.title!==m.metadata.title||score.composer!==m.metadata.composer||
     JSON.stringify(score.readingPolicy)!==JSON.stringify(d.policy)||strFromU8(files['seats.json']??strToU8('null'))!=='[]')
@@ -105,9 +97,9 @@ export function admitReadingContent(m:Manifest,files:Record<string,Uint8Array>,r
     const pages=m.pages.map(name=>{if(!files[name])throw Error('Missing reading page: '+name);return strFromU8(files[name]);});
     return {score,pages,reading:{owners,layoutMetadata:layout,geometryEvidence:receipt.geometryEvidence}};
   }
-  const result=checkedPreparation(score,contentOnly?currentReadingOptions(d.options):d.options,d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
-  if(result.engineId!==d.engineId)throw Error('Reading preparation authority differs from its musical source.');
+  const result=checkedPreparation(score,contentOnly?currentReadingOptions(d.options):d.options,contentOnly?{}:d.tokens),owners=parse(files,d.owners),layout=parse(files,d.layout);
   if(contentOnly)return {score,pages:result.pages,reading:{owners:result.owners,layoutMetadata:result.layoutMetadata,geometryEvidence:result.geometryEvidence}};
+  if(result.engineId!==d.engineId)throw Error('Reading preparation authority differs from its musical source.');
   if(result.pages.length!==m.pages.length||JSON.stringify(result.owners)!==JSON.stringify(owners)||
     JSON.stringify(result.layoutMetadata)!==JSON.stringify(layout))throw Error('Reading event ownership or geometry differs from its musical source.');
   const pages=m.pages.map((name,index)=>{
@@ -155,26 +147,39 @@ export async function prepareReadingPackage(input:{score:QuantizedGridScore;meta
 const manifestOf=(bytes:Uint8Array):Manifest|undefined=>{
   try{return JSON.parse(strFromU8(unzipSync(bytes,{filter:f=>f.name==='manifest.json'})['manifest.json'])) as Manifest;}catch{return;}
 };
-/** A single-reading archive whose pages the pinned engraving no longer draws
- * byte for byte (an earlier shared engraving, say) is engraved again from its
- * own content: the same score bytes, metadata, creation time, font, notices,
- * page dimensions and tokens, under the current shared engraving rules.
- * Pages, owners and layout are drawn afresh;
- * nothing is calculated and the earlier archive is not changed. Returns
- * undefined for any other kind of archive. When the archive's content itself
- * doesn't read, carries members this would not keep, or would come out with
- * another source revision, `refusal` is thrown. A refusal from engraving the
- * content afresh at the current pin (too many pages, say) is thrown as it is,
- * since it says truthfully why the reading can't open. */
+/** A reading archive whose pages the pinned engraving no longer draws byte
+ * for byte (an earlier shared engraving, say) is engraved again from its own
+ * content: the same score bytes, metadata, creation time, font, notices and
+ * page dimensions, under the current shared engraving rules and tokens. A
+ * single reading is drawn afresh with its owners and layout; a dual reading
+ * draws both its ISO and tab views afresh and keeps the source files it was
+ * imported with. Nothing is calculated and the earlier archive is not
+ * changed. Returns undefined for any other kind of archive. When the
+ * archive's content itself doesn't read, carries members this would not keep,
+ * or would come out with another source revision, `refusal` is thrown. A
+ * refusal from engraving the content afresh at the current pin (too many
+ * pages, say) is thrown as it is, since it says truthfully why the reading
+ * can't open. */
 export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown,execution?:ReadingExecution):Promise<Uint8Array|undefined>{
-  const peek=manifestOf(bytes);
-  if(peek?.version!==3||peek.reading?.version!=='instrument-reading-package-v1')return;
+  const peek=manifestOf(bytes),version=peek?.version===3?peek.reading?.version:undefined;
+  if(version!=='instrument-reading-package-v1'&&version!=='instrument-reading-package-v2')return;
   const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError')throw error;throw refusal;};
-  const content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),m=content.manifest,d=m.reading as LegacyReadingDescriptor,files=content.files;
-  const members=new Set(['score.json','seats.json',d.owners,d.layout,m.font,...m.notices,...m.pages]);
-  if(Object.keys(m.files).length!==members.size||Object.keys(m.files).some(name=>!members.has(name)))return refuse(Error('This reading carries files engraving it again would not keep.'));
-  const again=await prepareReadingPackage({score:JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore,metadata:structuredClone(m.metadata),createdAt:m.createdAt,
-    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]])),options:currentReadingOptions(d.options),tokens:d.tokens},execution);
+  const content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),m=content.manifest,files=content.files;
+  const score=JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore,common={score,metadata:structuredClone(m.metadata),createdAt:m.createdAt,
+    font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]]))};
+  let again:Uint8Array;
+  if(m.reading?.version==='instrument-reading-package-v2'){
+    const d=m.reading,drawn=new Set(['score.json','seats.json',m.font,...m.notices,...Object.values(d.views).flatMap(v=>[...v.pages,v.owners,v.scene,v.geometry])]),
+      retained=Object.keys(m.files).filter(name=>!drawn.has(name));
+    // Imported source files come along; anything else under the drawn views would be stale ink.
+    if(retained.some(name=>name.startsWith('reading/')))return refuse(Error('This reading carries files engraving it again would not keep.'));
+    again=(await prepareDualReadingPacket({...common,retainedFiles:Object.fromEntries(retained.map(name=>[name,files[name]])),
+      options:currentReadingOptions(d.options)},execution)).bytes;
+  }else{
+    const d=m.reading as LegacyReadingDescriptor,members=new Set(['score.json','seats.json',d.owners,d.layout,m.font,...m.notices,...m.pages]);
+    if(Object.keys(m.files).length!==members.size||Object.keys(m.files).some(name=>!members.has(name)))return refuse(Error('This reading carries files engraving it again would not keep.'));
+    again=await prepareReadingPackage({...common,options:currentReadingOptions(d.options)},execution);
+  }
   // The score's identity is its source bytes; engraving again never changes them.
   if(manifestOf(again)?.revision!==m.revision)return refuse(Error('Engraving this reading again would change its musical source.'));
   return again;

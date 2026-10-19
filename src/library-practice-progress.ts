@@ -11,7 +11,7 @@ import {planManualPractice} from './manual-practice-plan';
 import {readManualPracticeWithLegacy} from './manual-practice-state';
 import {selectReadingNotation} from './dual-reading-package';
 import {scoreCapabilities} from './score-capabilities';
-import {ReadingPresentationController} from './reading-presentation';
+import {readingRevision} from './reading-presentation';
 import {manualReferenceStorageName,readManualReference} from './manual-reference-context';
 import {LIBRARY_DERIVED_CACHE_FILE,LIBRARY_SUMMARY_POLICY,libraryCanonical,libraryCacheKey,readLibraryDerivedCache,libraryCacheBytes,createLibraryDerivedRow,verifyLibraryDependencies,captureLibraryDependencies,type LibraryDerivedRow} from './library-derived-cache';
 
@@ -42,13 +42,15 @@ export async function readLibraryPracticeSummary(entry:Entry,keyboard:PhysicalKe
  const options={allowLegacyTempo:true,execution:{onCheckpoint:()=>{if(!isCurrent())throw new DOMException('Library reading was superseded.','AbortError');}}};
  // An edition that must be engraved again still shows the progress saved
  // with it; opening the score is what engraves it again.
- const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options)).catch(async error=>await editionNeedsEngravingAgain(bytes,error)??Promise.reject(error));
+ let content=false;
+ const imported=await (admission?admission.import(bytes,options):importPackage(bytes,options)).catch(async error=>{const read=await editionNeedsEngravingAgain(bytes,error,options.execution);if(!read)throw error;content=true;return read;});
  if(!isCurrent())return;
  if(collectionId(imported)!==entry.id)return;
  if(imported.reading?.dual&&scoreCapabilities(imported).manualPractice){
   assertSelectedTransposition(entry,imported);
-  const iso=selectReadingNotation(imported,'iso');let fallback;
-  if(iso.score.referencePerformanceTempo===undefined){const context=await ReadingPresentationController.open(iso),identity={partId:iso.reading!.dual!.sourcePartId,musicalRevision:context.revision};
+  // A dual reading read for engraving again is already its ISO content; it is read for its facts and never shown.
+  const iso=content?imported:selectReadingNotation(imported,'iso');let fallback;
+  if(iso.score.referencePerformanceTempo===undefined){const identity={partId:iso.reading!.dual!.sourcePartId,musicalRevision:await readingRevision(iso)};
    fallback=readManualReference(await reader.readRecord(await manualReferenceStorageName(identity)),identity);if(!fallback)return;
   }
   const plan=await planManualPractice(iso,'bounded-exercises-v1',fallback),{state}=await readManualPracticeWithLegacy(plan,file=>reader.readRecord(file));
