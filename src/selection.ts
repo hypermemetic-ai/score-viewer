@@ -1,9 +1,14 @@
 import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage,Seat} from './package';
-/** One keyboard stop per physical contact, independent of SVG position or duplicate heads. */
+/** One keyboard stop per physical contact, independent of SVG position or
+ * duplicate heads. Fingering follows one hand's voice at a time: through each
+ * printed system the right hand left to right, then the left hand, each chord
+ * bottom to top. */
 export function editUnits(p:Pick<ScorePackage,'score'|'seats'>):Seat[]{
- const notes=new Map(p.score.notes.map(n=>[n.id,n]));
- const order=(a:Seat,b:Seat)=>a.writtenBar-b.writtenBar||(requirePitchedEvent(notes.get(a.ownerIds[0])!).startTick-requirePitchedEvent(notes.get(b.ownerIds[0])!).startTick)||(requirePitchedEvent(notes.get(a.ownerIds[0])!).pitch.octave*12+requirePitchedEvent(notes.get(a.ownerIds[0])!).pitch.pitchClass)-(requirePitchedEvent(notes.get(b.ownerIds[0])!).pitch.octave*12+requirePitchedEvent(notes.get(b.ownerIds[0])!).pitch.pitchClass)||(notes.get(a.ownerIds[0])!.hand??'').localeCompare(notes.get(b.ownerIds[0])!.hand??'')||a.page-b.page||a.system-b.system||a.id.localeCompare(b.id);
+ const notes=new Map(p.score.notes.map(n=>[n.id,n])),event=(s:Seat)=>requirePitchedEvent(notes.get(s.ownerIds[0])!),
+  hand=(s:Seat)=>{const h=notes.get(s.ownerIds[0])?.hand;return h==='RH'?0:h==='LH'?1:2;},
+  pitch=(s:Seat)=>{const e=event(s);return e.pitch.octave*12+e.pitch.pitchClass;};
+ const order=(a:Seat,b:Seat)=>a.page-b.page||a.system-b.system||hand(a)-hand(b)||a.writtenBar-b.writtenBar||event(a).startTick-event(b).startTick||pitch(a)-pitch(b)||a.id.localeCompare(b.id);
  const seats=[...p.seats].sort((a,b)=>Number(!!a.continuation)-Number(!!b.continuation)||order(a,b)),seen=new Set<string>();
  return seats.filter(s=>{if(seen.has(s.contactId))return false;seen.add(s.contactId);return true;}).sort(order);
 }
