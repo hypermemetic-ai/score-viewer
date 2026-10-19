@@ -92,7 +92,7 @@ export class PracticeView {
   this.app.querySelector('.practice-surface')!.addEventListener('change',e=>{const field=e.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'){this.browser.setIncludeManual(field.checked);this.paintBrowser(false);this.app.querySelector<HTMLInputElement>('[data-practice-display="manual"]')?.focus();return;}this.settingChanged(field);});
   this.app.querySelector('.practice-surface')!.addEventListener('keydown',e=>{const event=e as KeyboardEvent,field=event.target as HTMLInputElement;if(field.dataset.practiceDisplay==='manual'&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&['Enter','Escape'].includes(actionCode(event))){event.preventDefault();if(!event.repeat){if(actionCode(event)==='Enter')field.click();else void this.action('back');}}});window.addEventListener('resize',this.refitCue);this.refit(false);this.paint();
   if(context?.study==='fingers'&&this.options.saveFinger){this.study='fingers';this.browser.verb='Finger';}
-  if(context?.fingering&&this.study==='fingers'){const chunk=reconcilePassages(this.plan,this.state).all.get(context.fingering.passage);if(chunk)this.openFingering(chunk,context.fingering.contactId);}
+  if(context?.fingering&&this.study==='fingers'){const chunk=reconcilePassages(this.plan,this.state).all.get(context.fingering.passage);if(chunk)this.openFingering(chunk,context.fingering.contactId);else this.status('The section being fingered is unavailable after the practice update. Choose a section.');}
   else if(context?.passage){const chunk=reconcilePassages(this.plan,this.state).all.get(context.passage);if(chunk){this.selectPassage(chunk,false);this.pause();if(context.mode&&['reading','timed','free'].includes(context.mode)){this.mode=context.mode;this.previousMode=context.previousMode==='timed'?'timed':'reading';if(this.mode!=='free')this.previousMode=this.mode;}if(context.readingWindow!==undefined)this.reading?.selectWindow(context.readingWindow);if(this.mode==='reading')this.showReadingWindow();else if(context.window)this.slots?.showRange(...context.window);this.paint();}else this.status('The previous passage is unavailable in this edition. Choose a passage.');}
   // A newly set player tempo is remembered before any practice is earned.
   if(context&&!saved||prepared.rememberTempo)await this.save(false);
@@ -210,7 +210,9 @@ export class PracticeView {
  private paintBrowser(focus=!this.settingsDialog){this.browser.render(this.app.querySelector<HTMLElement>('.practice-overview')!,this.state,(bars,clip)=>{const p=this.options.package,mount=this.app.querySelector<HTMLElement>('.practice-leaf-preview')!,policy=annotationInkPolicyFor(p);if(policy)assertAnnotationInkPolicyReady(policy);if(clip)return renderPracticeClip(p,this.plan,clip,mount).svg;return this.previewFrames.get(bars,mount,p.pages,()=>{const crops=bars.map(bar=>cropMeasure(p,this.plan,bar)),track=fitPassageFrame(p,this.plan,crops,fitPassageRelations(p,this.plan,crops,passageTrack(crops,mount,p,true),'compact',[bars]),'compact',[bars],mount);return composePassage(crops,track,'compact',bars,projectRelations(p,this.plan,crops,track,'compact',bars)).svg;});},focus);}
  private studyControl(){const label={fingers:'Fingers',mechanics:'Mechanics',memory:'Memory'} as const,title={fingers:'Finger a section, one hand at a time; nothing is checked',mechanics:'Bring a section up to speed; every note is checked',memory:'Commit a section to memory; coming later'} as const;
   return `<div class="practice-study" role="group" aria-label="Study">${(['fingers','mechanics','memory'] as const).map(study=>`<button data-practice="study:${study}" aria-pressed="${this.study===study}" title="${title[study]}"${study==='memory'||study==='fingers'&&!this.options.saveFinger?' disabled':''}>${label[study]}</button>`).join('')}</div>`;}
- private selectStudy(study:PracticeStudy){if(study==='memory'||study==='fingers'&&!this.options.saveFinger||study===this.study)return;this.study=study;this.browser.verb=study==='fingers'?'Finger':'Practice';this.paint();this.app.querySelector<HTMLElement>(`[data-practice="study:${study}"]`)?.focus();}
+ private selectStudy(study:PracticeStudy){if(study==='memory'||study==='fingers'&&!this.options.saveFinger||study===this.study)return;this.study=study;this.browser.verb=study==='fingers'?'Finger':'Practice';this.paint();
+  // Back to the section list, so the arrows and Enter act on the chosen section.
+  this.app.querySelector<HTMLElement>('.practice-overview [data-passage-id][tabindex="0"]')?.focus();}
  /** A chosen section opens in the current study mode. */
  private choosePassage(chunk:PracticeChunk){if(this.study==='fingers')this.openFingering(chunk);else this.selectPassage(chunk);}
  private openFingering(chunk:PracticeChunk,contactId?:string){
@@ -437,12 +439,14 @@ export class PracticeView {
  }
  overlay(active:boolean){if(this.inspection===active)return;this.inspection=active;this.session?.inspect(active);this.paintVisibility();}
  key(code:string,repeated=false,shift=false){
-  if(this.personalChoicesPending){if(code==='Escape')void this.action('back');return true;}
+  // While hand choices update, the fingering stage stays put; elsewhere Esc leaves.
+  if(this.personalChoicesPending){if(code==='Escape'&&!this.fingering)void this.action('back');return true;}
   if(this.settingsDialog)return false;
   if(this.canAdjustWorking&&(code==='ArrowLeft'||code==='ArrowRight')){if(!repeated)this.manual.begin(code,(again,elapsed)=>this.adjustManual('working',code==='ArrowRight'?1:-1,again,elapsed));return true;}
+  // Held arrows walk the pass; any other held key does nothing more.
+  if(this.fingering){if(repeated)return ['ArrowLeft','ArrowRight','Backspace'].includes(code)?this.fingering.key(code,shift):true;if(code==='Escape'&&!this.fingering.labelling){void this.action('overview');return true;}return this.fingering.key(code,shift);}
   if(repeated&&!(this.overview&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(code)))return ['ArrowLeft','ArrowRight'].includes(code);
   this.cancelTempoHold();
-  if(this.fingering){if(code==='Escape'){void this.action('overview');return true;}return this.fingering.key(code,shift);}
   if(this.overview){const result=this.browser.key(code,this.state);if(result==='practice'&&document.activeElement?.closest('.practice-overview')){const chunk=this.browser.current(this.state);if(chunk)this.choosePassage(chunk);return true;}if(result==='exclusion'){void this.save(false);this.paintBrowser(true);return true;}if(result==='handled'){this.paintBrowser(true);return true;}}
   else{if(code==='Space'){void this.action('ready');return true;}if(code==='KeyK'&&this.mode==='timed'){this.state.keepTempo=!this.state.keepTempo;void this.save();this.paintControls();return true;}if(code==='ArrowLeft'||code==='ArrowRight')return true;}
   if(code==='Escape'){void this.action(this.overview?'back':'overview');return true;}return false;

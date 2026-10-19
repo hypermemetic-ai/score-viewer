@@ -1,4 +1,4 @@
-// Production PracticeView in Chromium: the Fingering study mode on a bundled
+// Production PracticeView in Chromium: the Fingers study mode on a bundled
 // review score. Chromium layout is source evidence, not installed WebView or
 // human musical acceptance.
 import assert from 'node:assert/strict';
@@ -45,6 +45,8 @@ try{
  for(const code of ['Digit1','Digit2','Digit3'])await press(code);
  console.log('typed',await state(),await page.evaluate(()=>saved));assert.equal(await page.evaluate(()=>saved.length),3);
  // Jump straight back to the second note typed and correct it.
+ // Esc with labels showing puts them away and keeps the stage.
+ await press('KeyJ');await press('Escape');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);assert.ok(await page.isVisible('.section-fingering'));
  await press('KeyJ');await page.screenshot({path:output+'/3-jump-labels.png'});
  const target=await page.evaluate(()=>saved[1][0]),label=await page.getAttribute(`[data-jump-seat="${target}"]`,'data-jump-label');
  for(const letter of label)await press('Key'+letter.toUpperCase());
@@ -67,6 +69,10 @@ try{
  const before=await state();await press('KeyJ');await press('KeyR');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);await page.waitForFunction(()=>hands.length===1&&document.querySelector('.section-fingering:not([hidden]) svg'));
  const rebuilt=await state();console.log('rebuilt',rebuilt);assert.deepEqual(rebuilt.selected,before.selected);assert.equal(rebuilt.status,before.status);
  await press('Escape');assert.ok(await page.isVisible('.practice-overview'));assert.ok(await page.isHidden('.section-fingering'));
+ // The score's last section: every measure is reachable, to the end.
+ const last=await page.evaluate(()=>practice.plan.chunks.at(-1).id);await page.evaluate(id=>practice.action('passage:'+id),last);await page.waitForSelector('.section-fingering:not([hidden]) svg');
+ for(let i=0;i<80;i++)await press('ArrowRight');await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^Left hand|^Right hand/);
+ await page.screenshot({path:output+'/7-last-section.png'});await press('Escape');
  await page.click('[data-practice="study:mechanics"]');assert.match(await page.textContent('.practice-overview [data-practice^="passage:"]'),/^Practice /);
  assert.deepEqual(errors,[]);console.log('ok',output);
 }finally{await browser?.close();await vite?.close();server.close();}

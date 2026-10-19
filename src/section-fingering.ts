@@ -45,7 +45,8 @@ interface FingeringWindow {bar:number;svg:SVGSVGElement;crops:Crop[]}
 export class SectionFingering {
  readonly units:Seat[];private cursor?:Seat;private readonly positions;private readonly hand;
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
- private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';
+ private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;
+ private missing?:{personal:PersonalState;count:number};
  constructor(readonly mount:HTMLElement,readonly chunk:PracticeChunk,readonly options:SectionFingeringOptions){
   this.positions=annotationPositions(options.package);this.hand=handOf(options.package);
   this.units=sectionUnits(options.package,chunk);
@@ -53,18 +54,21 @@ export class SectionFingering {
   this.cursor=options.start&&options.package.seats.find(s=>s.contactId===options.start)||this.units.find(s=>fingerFor(options.basePackage,options.personal(),s)===undefined)||this.units[0];
   mount.addEventListener('click',this.click);
  }
- dispose(){this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
+ dispose(){this.disposed=true;this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
  /** Footer hints for the fingering keys. */
- static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Note</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd>/<kbd>R</kbd> Choose hand</span><span><kbd>J</kbd> Jump to a note</span><span><kbd>Backspace</kbd> Back one</span></span>`;}
+ static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Previous, next note</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
  private click=(e:MouseEvent)=>{
   const el=(e.target as Element).closest<SVGElement>('[data-viewer-seat],[data-finger-seat]');if(!el||!this.shown)return;
   const id=el.dataset.viewerSeat??el.dataset.fingerSeat,seat=this.shown.crops.flatMap(c=>c.seats).find(s=>s.id===id);
   if(seat)this.go(seat);
  };
+ /** Measures in the score; the plan's bar ticks also hold the closing boundary. */
+ private get barCount(){return this.options.plan.barTicks.length-1;}
+ get labelling(){return !!this.labels;}
  private crop(bar:number){let crop=this.cropCache.get(bar);if(!crop){crop=cropMeasure(this.options.package,this.options.plan,bar);this.cropCache.set(bar,crop);}return crop;}
  private window(bar:number):FingeringWindow{
   const cached=this.windows.get(bar);if(cached)return cached;
-  const p=this.options.package,plan=this.options.plan,{bars,ghosts}=fingeringWindow(plan.barTicks.length,bar),crops=bars.map(b=>this.crop(b));
+  const p=this.options.package,plan=this.options.plan,{bars,ghosts}=fingeringWindow(this.barCount,bar),crops=bars.map(b=>this.crop(b));
   const track=fitPassageFrame(p,plan,crops,fitPassageRelations(p,plan,crops,passageTrack(crops,this.mount,p,true),'compact',[bars]),'compact',[bars],this.mount);
   const passage=composePassage(crops,track,'compact',bars,projectRelations(p,plan,crops,track,'compact',bars));
   for(const b of bars){const group=passage.svg.querySelector(`[data-practice-bar="${b+1}"]`);group?.classList.toggle('section-fingering-ghost',ghosts.has(b));group?.classList.toggle('section-fingering-outside',!ghosts.has(b)&&(b<this.chunk.firstBar||b>this.chunk.lastBar));}
@@ -76,7 +80,10 @@ export class SectionFingering {
    const left=shift+crop.left,right=shift+crop.right,veil=document.createElementNS(ns,'rect'),x0=crop.bar<bar?view[0]:left-1,x1=crop.bar<bar?right+1:view[0]+view[2];
    veil.setAttribute('class','section-fingering-veil');veil.setAttribute('x',String(x0));veil.setAttribute('y',String(view[1]));veil.setAttribute('width',String(x1-x0));veil.setAttribute('height',String(view[3]));passage.svg.append(veil);
   }
-  const made={bar,svg:passage.svg,crops:passage.crops.filter(c=>!ghosts.has(c.bar))};this.windows.set(bar,made);return made;
+  const made={bar,svg:passage.svg,crops:passage.crops.filter(c=>!ghosts.has(c.bar))};this.windows.set(bar,made);
+  // Keep a handful of windows; layout is cheap to redo, memory on a long score is not.
+  for(const key of this.windows.keys()){if(this.windows.size<=6)break;if(key!==bar&&key!==this.shown?.bar)this.windows.delete(key);}
+  return made;
  }
  /** Recompose for a new stage size or rotation; otherwise only repaint, so
   * saving a finger never pays for layout. */
@@ -88,7 +95,13 @@ export class SectionFingering {
   const bar=(this.cursor?.writtenBar??this.chunk.firstBar+1)-1,next=this.window(bar);
   if(this.shown!==next){this.mount.replaceChildren(next.svg);this.shown=next;}
   this.fitted=`${this.mount.clientWidth}x${this.mount.clientHeight}`;
-  this.paint();this.announce();
+  this.paint();this.announce();this.prefetch(bar);
+ }
+ /** Compose the neighbouring windows while idle, so crossing a measure on a
+  * slow computer does not wait for layout. */
+ private prefetch(bar:number){
+  const later=(f:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(f,{timeout:400}):setTimeout(f,60);
+  for(const next of [bar+1,bar-1])if(next>=0&&next<this.barCount&&!this.windows.has(next))later(()=>{if(!this.disposed&&this.shown?.bar===bar&&!this.windows.has(next))try{this.window(next);}catch{/* composed again, with its error, when reached */}});
  }
  /** Paint every finger in reach; the cursor carries the editor's selection mark. */
  paint(){
@@ -102,38 +115,54 @@ export class SectionFingering {
   }
   this.paintLabels();
  }
+ /** Jump labels sit in one layer above the passage: never clipped by a
+  * measure, never faded with a context measure. */
  private paintLabels(){
-  this.mount.querySelectorAll('.section-fingering-label').forEach(el=>el.remove());
+  this.mount.querySelectorAll('.section-fingering-labels').forEach(el=>el.remove());
   if(!this.labels||!this.shown)return;
+  const root=this.shown.svg,inverse=root.getScreenCTM()?.inverse();if(!inverse)return;
+  const layer=document.createElementNS(ns,'g');layer.setAttribute('class','section-fingering-labels');layer.setAttribute('aria-hidden','true');
   for(const [label,seat] of this.labels.targets){
    if(!label.startsWith(this.labels.typed))continue;
-   const text=this.shown.crops.map(c=>c.svg.querySelector<SVGTextElement>(`[data-viewer-seat="${CSS.escape(seat.id)}"]`)).find(Boolean);if(!text)continue;
-   const box=text.getBBox(),size=box.height*.5,width=size*.68*label.length+size*.5,g=document.createElementNS(ns,'g'),rect=document.createElementNS(ns,'rect'),t=document.createElementNS(ns,'text');
-   g.setAttribute('class','section-fingering-label');g.setAttribute('aria-hidden','true');g.setAttribute('data-jump-label',label);g.setAttribute('data-jump-seat',seat.id);
-   const x=box.x-width-size*.15,y=box.y+box.height/2-size*.62;
+   const text=this.shown.crops.map(c=>c.svg.querySelector<SVGTextElement>(`[data-viewer-seat="${CSS.escape(seat.id)}"]`)).find(Boolean),matrix=text?.getScreenCTM();if(!text||!matrix)continue;
+   const b=text.getBBox(),to=inverse.multiply(matrix),a=new DOMPoint(b.x,b.y).matrixTransform(to),z=new DOMPoint(b.x+b.width,b.y+b.height).matrixTransform(to);
+   const height=z.y-a.y,size=height*.5,width=size*.68*label.length+size*.5,x=a.x-width-size*.15,y=a.y+height/2-size*.62;
+   const g=document.createElementNS(ns,'g'),rect=document.createElementNS(ns,'rect'),t=document.createElementNS(ns,'text');
+   g.setAttribute('class','section-fingering-label');g.setAttribute('data-jump-label',label);g.setAttribute('data-jump-seat',seat.id);
    rect.setAttribute('x',String(x));rect.setAttribute('y',String(y));rect.setAttribute('width',String(width));rect.setAttribute('height',String(size*1.24));rect.setAttribute('rx',String(size*.35));
    t.setAttribute('x',String(x+width/2));t.setAttribute('y',String(y+size*.95));t.setAttribute('font-size',String(size));t.setAttribute('text-anchor','middle');t.textContent=label.toUpperCase();
-   g.append(rect,t);text.parentNode!.appendChild(g);
+   g.append(rect,t);layer.append(g);
   }
+  root.append(layer);
  }
  get cursorContact(){return this.cursor?.contactId;}
  private index(){return this.cursor?this.units.findIndex(s=>s.contactId===this.cursor!.contactId):-1;}
  private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.render();}
- private move(step:number){const i=this.index();this.go(i<0?(step>0?this.units[0]:this.units.at(-1)):this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);}
+ private move(step:number){
+  const i=this.index();
+  if(i>=0){this.go(this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);return;}
+  // From a context measure, re-enter the section at its nearer edge, in the same hand.
+  const c=this.cursor;if(!c)return;const same=this.units.filter(s=>this.hand(s)===this.hand(c)),pool=same.length?same:this.units;
+  this.go(c.writtenBar-1<this.chunk.firstBar?pool[0]:pool.at(-1));
+ }
  /** The other hand's note nearest the cursor: up to the right hand, down to
  * the left, as the score's arrows move between hand rows. */
  private hands(direction:-1|1){
   const c=this.cursor;if(!c||!this.shown)return;
   const rank=(s:Seat)=>{const h=this.hand(s);return h==='RH'?0:h==='LH'?1:2;},target=rank(c)+direction;
-  const row=this.shown.crops.flatMap(crop=>crop.seats).filter(s=>rank(s)===target);
-  return row.sort((a,b)=>Math.abs(a.x-c.x)-Math.abs(b.x-c.x)||a.writtenBar-b.writtenBar)[0];
+  // The same measure first (x positions only compare within a system), then
+  // the nearest, then pass order so a chord gives its lowest note.
+  const order=new Map(this.units.map((s,i)=>[s.contactId,i])),row=this.shown.crops.flatMap(crop=>crop.seats).filter(s=>rank(s)===target);
+  const seat=row.sort((a,b)=>Math.abs(a.writtenBar-c.writtenBar)-Math.abs(b.writtenBar-c.writtenBar)||Math.abs(a.x-c.x)-Math.abs(b.x-c.x)||(order.get(a.contactId)??Infinity)-(order.get(b.contactId)??Infinity)||b.baseline-a.baseline)[0];
+  if(!seat&&target>=0&&target<=1)this.options.status(`No ${target===0?'right':'left'}-hand notes in reach.`);
+  return seat;
  }
  private startLabels(){
   if(!this.shown||!this.cursor)return;
   // Only the cursor's hand: about half as many labels, each shorter to reach.
-  const hand=this.hand(this.cursor),seats=this.shown.crops.flatMap(c=>c.seats).filter((s,i,all)=>this.hand(s)===hand&&all.findIndex(o=>o.contactId===s.contactId)===i).sort((a,b)=>a.writtenBar-b.writtenBar||a.x-b.x||b.baseline-a.baseline);
+  const cursor=this.cursor,hand=this.hand(cursor),seats=this.shown.crops.flatMap(c=>c.seats).filter((s,i,all)=>this.hand(s)===hand&&s.contactId!==cursor.contactId&&all.findIndex(o=>o.contactId===s.contactId)===i).sort((a,b)=>a.writtenBar-b.writtenBar||a.x-b.x||b.baseline-a.baseline);
   const labels=jumpLabels(seats.length);this.labels={targets:new Map(seats.map((s,i)=>[labels[i],s])),typed:''};this.paintLabels();
-  this.options.status(`${hand==='RH'?'Right hand':hand==='LH'?'Left hand':'Notes'} · type the letter beside a note to move there · ↑↓ other hand · Esc cancels`);
+  this.options.status(`${hand==='RH'?'Right hand':hand==='LH'?'Left hand':'Notes without a hand'} · type the letter beside a note to move there · ↑↓ other hand · Esc cancels`);
  }
  private label(code:string){
   const labels=this.labels!,letter=/^Key([A-Z])$/.exec(code)?.[1].toLowerCase();
@@ -146,7 +175,10 @@ export class SectionFingering {
   const i=this.index(),seat=this.cursor;
   if(!seat){this.options.status('This section has no notes to finger.');return;}
   const hand=this.hand(seat)==='RH'?'Right hand':this.hand(seat)==='LH'?'Left hand':'No hand',
-   missing=this.units.filter(s=>fingerFor(this.options.basePackage,this.options.personal(),s)===undefined).length;
+   personal=this.options.personal();
+  // Counted once per saved state, not on every move.
+  if(this.missing?.personal!==personal)this.missing={personal,count:this.units.filter(s=>fingerFor(this.options.basePackage,personal,s)===undefined).length};
+  const missing=this.missing.count;
   this.options.status(`${hand} · measure ${seat.writtenBar}${i<0?' · outside this section':` · note ${i+1} of ${this.units.length}`} · ${missing?`${missing} without a finger`:'every note fingered'}`);
  }
  private async choose(finger:number){
