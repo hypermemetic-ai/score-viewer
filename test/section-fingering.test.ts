@@ -55,14 +55,15 @@ test('fingering window shows two bars either side and ghosts the outer two',()=>
  assert.deepEqual(fingeringWindow(1,0),{bars:[0],ghosts:new Set()});
 });
 
-// The alphabet has 23 letters (LETTERS in src/section-fingering.ts); two letters give 529 labels.
-test('jump labels are single letters up to the alphabet, then pairs',()=>{
+// The alphabet has 24 letters (LETTERS in src/section-fingering.ts); two letters give 576 labels.
+test('jump labels are single letters up to the alphabet, then pairs, then triples',()=>{
  assert.deepEqual(jumpLabels(0),[]);
  assert.equal(jumpLabels(1)[0],'a');
- assert.ok(jumpLabels(23).every(l=>l.length===1));
- assert.ok(jumpLabels(24).every(l=>l.length===2));
- assert.equal(jumpLabels(24)[0],'aa');
+ assert.ok(jumpLabels(24).every(l=>l.length===1));
+ assert.ok(jumpLabels(25).every(l=>l.length===2));
+ assert.equal(jumpLabels(25)[0],'aa');
+ const many=jumpLabels(577);assert.ok(many.every(l=>l.length===3));assert.equal(new Set(many).size,577);
 });
-test('jump labels are unique and avoid the hand and side keys',()=>{
- for(let n=0;n<=529;n++){const labels=jumpLabels(n);assert.equal(labels.length,n,`count ${n}`);assert.equal(new Set(labels).size,n,`unique ${n}`);assert.ok(labels.every(l=>!/[hlr]/.test(l)),`keys ${n}`);}
+test('jump labels are unique and avoid L and R, which choose a hand',()=>{
+ for(let n=0;n<=576;n++){const labels=jumpLabels(n);assert.equal(labels.length,n,`count ${n}`);assert.equal(new Set(labels).size,n,`unique ${n}`);assert.ok(labels.every(l=>!/[lr]/.test(l)),`keys ${n}`);}
 });

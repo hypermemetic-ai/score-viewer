@@ -8,9 +8,8 @@ import {projectRelations} from './practice-relations';
 import type {PracticeChunk,PracticePlan} from './practice';
 
 const ns='http://www.w3.org/2000/svg';
-/** Jump labels, home row first. H switches hands while labelling; L and R
- * always choose a hand, so none of them is a label. */
-const LETTERS='asdfgjkqwetyuiopzxcvbnm';
+/** Jump labels, home row first. L and R always choose a hand, so neither is a label. */
+const LETTERS='asdfghjkqwetyuiopzxcvbnm';
 const handOf=(p:Pick<ScorePackage,'score'>)=>{const notes=new Map(p.score.notes.map(n=>[n.id,n.hand]));return (s:Seat)=>notes.get(s.ownerIds[0]);};
 
 /** The section's notes in fingering order: the whole right hand left to right,
@@ -46,7 +45,7 @@ interface FingeringWindow {bar:number;svg:SVGSVGElement;crops:Crop[]}
 export class SectionFingering {
  readonly units:Seat[];private cursor?:Seat;private readonly positions;private readonly hand;
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
- private labels?:{targets:Map<string,Seat>;typed:string};
+ private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';
  constructor(readonly mount:HTMLElement,readonly chunk:PracticeChunk,readonly options:SectionFingeringOptions){
   this.positions=annotationPositions(options.package);this.hand=handOf(options.package);
   this.units=sectionUnits(options.package,chunk);
@@ -56,7 +55,7 @@ export class SectionFingering {
  }
  dispose(){this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
  /** Footer hints for the fingering keys. */
- static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Note</span><span><kbd>↑↓</kbd> Above, below</span><span><kbd>H</kbd> Other hand</span><span><kbd>L</kbd>/<kbd>R</kbd> Choose hand</span><span><kbd>J</kbd> Jump to a note</span><span><kbd>Backspace</kbd> Back one</span></span>`;}
+ static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Note</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd>/<kbd>R</kbd> Choose hand</span><span><kbd>J</kbd> Jump to a note</span><span><kbd>Backspace</kbd> Back one</span></span>`;}
  private click=(e:MouseEvent)=>{
   const el=(e.target as Element).closest<SVGElement>('[data-viewer-seat],[data-finger-seat]');if(!el||!this.shown)return;
   const id=el.dataset.viewerSeat??el.dataset.fingerSeat,seat=this.shown.crops.flatMap(c=>c.seats).find(s=>s.id===id);
@@ -79,9 +78,16 @@ export class SectionFingering {
   }
   const made={bar,svg:passage.svg,crops:passage.crops.filter(c=>!ghosts.has(c.bar))};this.windows.set(bar,made);return made;
  }
+ /** Recompose for a new stage size or rotation; otherwise only repaint, so
+  * saving a finger never pays for layout. */
+ refit(){
+  const size=`${this.mount.clientWidth}x${this.mount.clientHeight}`;
+  if(this.fitted&&size!==this.fitted){this.windows.clear();this.shown=undefined;this.mount.replaceChildren();this.render();}else this.paint();
+ }
  render(){
   const bar=(this.cursor?.writtenBar??this.chunk.firstBar+1)-1,next=this.window(bar);
   if(this.shown!==next){this.mount.replaceChildren(next.svg);this.shown=next;}
+  this.fitted=`${this.mount.clientWidth}x${this.mount.clientHeight}`;
   this.paint();this.announce();
  }
  /** Paint every finger in reach; the cursor carries the editor's selection mark. */
@@ -114,22 +120,20 @@ export class SectionFingering {
  private index(){return this.cursor?this.units.findIndex(s=>s.contactId===this.cursor!.contactId):-1;}
  private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.render();}
  private move(step:number){const i=this.index();this.go(i<0?(step>0?this.units[0]:this.units.at(-1)):this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);}
- /** The note printed directly above or below the cursor, at the same moment. */
- private stack(direction:-1|1){
+ /** The other hand's note nearest the cursor: up to the right hand, down to
+ * the left, as the score's arrows move between hand rows. */
+ private hands(direction:-1|1){
   const c=this.cursor;if(!c||!this.shown)return;
-  const near=this.shown.crops.flatMap(crop=>crop.seats).filter(s=>s.writtenBar===c.writtenBar&&s.contactId!==c.contactId&&Math.abs(s.x-c.x)<c.fontSize*.8&&(direction<0?s.baseline<c.baseline:s.baseline>c.baseline));
-  this.go(near.sort((a,b)=>direction*(a.baseline-b.baseline))[0]);
- }
- private otherHand(){
-  const c=this.cursor;if(!c)return;const hand=this.hand(c)==='RH'?'LH':'RH',theirs=this.units.filter(s=>this.hand(s)===hand);
-  this.go(theirs.find(s=>s.writtenBar>=c.writtenBar)??theirs.at(-1));
+  const rank=(s:Seat)=>{const h=this.hand(s);return h==='RH'?0:h==='LH'?1:2;},target=rank(c)+direction;
+  const row=this.shown.crops.flatMap(crop=>crop.seats).filter(s=>rank(s)===target);
+  return row.sort((a,b)=>Math.abs(a.x-c.x)-Math.abs(b.x-c.x)||a.writtenBar-b.writtenBar)[0];
  }
  private startLabels(){
   if(!this.shown||!this.cursor)return;
   // Only the cursor's hand: about half as many labels, each shorter to reach.
   const hand=this.hand(this.cursor),seats=this.shown.crops.flatMap(c=>c.seats).filter((s,i,all)=>this.hand(s)===hand&&all.findIndex(o=>o.contactId===s.contactId)===i).sort((a,b)=>a.writtenBar-b.writtenBar||a.x-b.x||b.baseline-a.baseline);
   const labels=jumpLabels(seats.length);this.labels={targets:new Map(seats.map((s,i)=>[labels[i],s])),typed:''};this.paintLabels();
-  this.options.status(`${hand==='RH'?'Right hand':hand==='LH'?'Left hand':'Notes'} · type the letter beside a note to move there · H other hand · Esc cancels`);
+  this.options.status(`${hand==='RH'?'Right hand':hand==='LH'?'Left hand':'Notes'} · type the letter beside a note to move there · ↑↓ other hand · Esc cancels`);
  }
  private label(code:string){
   const labels=this.labels!,letter=/^Key([A-Z])$/.exec(code)?.[1].toLowerCase();
@@ -155,15 +159,19 @@ export class SectionFingering {
   try{await this.options.save(seat,finger);}catch(error){this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
   this.announce();
  }
- /** Escape is answered here only while labels are showing. */
  key(code:string,shift=false):boolean{
-  if(this.labels){if(code==='KeyH'&&this.cursor){const other=this.hand(this.cursor)==='RH'?'LH':'RH',seat=this.shown?.crops.flatMap(c=>c.seats).find(s=>this.hand(s)===other);if(seat){this.cursor=seat;this.paint();this.startLabels();}return true;}if(code==='Escape'){this.labels=undefined;this.paintLabels();this.announce();return true;}this.label(code);return true;}
+  if(this.labels){
+   if(code==='ArrowUp'||code==='ArrowDown'){const seat=this.hands(code==='ArrowUp'?-1:1);if(seat){this.cursor=seat;this.paint();this.startLabels();}return true;}
+   if(code==='Escape'){this.labels=undefined;this.paintLabels();this.announce();return true;}
+   if(LETTERS.includes(/^Key([A-Z])$/.exec(code)?.[1].toLowerCase()??'-')){this.label(code);return true;}
+   // Any other key puts the labels away and does its ordinary work.
+   this.labels=undefined;this.paintLabels();
+  }
   const digit=/^(?:Digit|Numpad)([1-5])$/.exec(code);
   if(digit){void this.choose(Number(digit[1]));return true;}
   if(code==='ArrowRight'||code==='Tab'&&!shift){this.move(1);return true;}
   if(code==='ArrowLeft'||code==='Backspace'||code==='Tab'&&shift){this.move(-1);return true;}
-  if(code==='ArrowUp'||code==='ArrowDown'){this.stack(code==='ArrowUp'?-1:1);return true;}
-  if(code==='KeyH'){this.otherHand();return true;}
+  if(code==='ArrowUp'||code==='ArrowDown'){this.go(this.hands(code==='ArrowUp'?-1:1));return true;}
   // L and R choose the note's hand, as in the score; the cursor stays put.
   if((code==='KeyL'||code==='KeyR')&&this.cursor&&this.options.saveHand){const seat=this.cursor,hand=code==='KeyL'?'LH':'RH';void this.options.saveHand(seat,hand).catch(error=>this.options.status(`The hand was not saved: ${error instanceof Error?error.message:String(error)}`));return true;}
   if(code==='KeyJ'){this.startLabels();return true;}

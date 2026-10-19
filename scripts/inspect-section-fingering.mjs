@@ -53,14 +53,18 @@ try{
  assert.equal(await page.evaluate(t=>document.querySelector(`.section-fingering [data-finger-seat="${t}"]`)?.textContent,target),'4');
  await page.screenshot({path:output+'/4-corrected.png'});
  await press('Backspace');assert.deepEqual((await state()).selected,[target]);
- await press('KeyH');const left=await state();console.log('left',left);assert.match(left.status,/^Left hand/);
- await press('ArrowUp');console.log('above',await state());
+ await press('ArrowDown');const left=await state();console.log('left',left);assert.match(left.status,/^Left hand/);
+ await press('ArrowUp');const up=await state();console.log('up',up);assert.match(up.status,/^Right hand/);
  // Walk the right hand into measure 3: the window slides with it.
- await press('KeyH');let walked=await state();
+ let walked=await state();
  for(let i=0;i<40&&!/measure 3/.test(walked.status);i++){await press('ArrowRight');walked=await state();}
  console.log('slid',walked);assert.match(walked.status,/measure 3/);
  await page.screenshot({path:output+'/5-slid.png'});
- const before=await state();await press('KeyR');await page.waitForFunction(()=>hands.length===1&&document.querySelector('.section-fingering:not([hidden]) svg'));
+ // A resize recomposes the window; a save only repaints it.
+ await page.evaluate(()=>document.querySelector('.section-fingering-stage svg').dataset.earlier='1');await page.setViewportSize({width:1000,height:720});await page.evaluate(()=>practice.refit());
+ assert.equal(await page.evaluate(()=>!!document.querySelector('.section-fingering-stage svg[data-earlier]')),false);await page.screenshot({path:output+'/6-narrower.png'});await page.setViewportSize({width:1280,height:720});await page.evaluate(()=>practice.refit());
+ // Labels showing, R still chooses the hand: the labels go away and the key does its work.
+ const before=await state();await press('KeyJ');await press('KeyR');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);await page.waitForFunction(()=>hands.length===1&&document.querySelector('.section-fingering:not([hidden]) svg'));
  const rebuilt=await state();console.log('rebuilt',rebuilt);assert.deepEqual(rebuilt.selected,before.selected);assert.equal(rebuilt.status,before.status);
  await press('Escape');assert.ok(await page.isVisible('.practice-overview'));assert.ok(await page.isHidden('.section-fingering'));
  await page.click('[data-practice="study:mechanics"]');assert.match(await page.textContent('.practice-overview [data-practice^="passage:"]'),/^Practice /);
