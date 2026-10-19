@@ -29,10 +29,15 @@ export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:Pract
 }
 
 /** Navigation/group structure only. No played evidence or completion claim. */
+/** How a section is studied: fingered without checking, its mechanics
+ * brought up with every note checked, or committed to memory (not yet built). */
+export type PracticeStudy='fingers'|'mechanics'|'memory';
 export interface PracticeViewContext {
  partition:PracticePartition;composites:Record<string,string[]>;
  selected:string;parent?:string;component?:string;includeManual:boolean;
  passage?:string;window?:[number,number];mode?:PracticeMode;previousMode?:PracticePrimaryMode;readingWindow?:number;
+ /** The study mode, and the section being fingered with its cursor, kept when practice is rebuilt after a hand choice. */
+ study?:PracticeStudy;fingering?:{passage:string;contactId?:string};
  preferences?:PracticePreferences;
 }
 export function restorePracticeGrouping(plan:PracticePassagePlan,state:PracticeState,context:PracticeViewContext):PracticeState {

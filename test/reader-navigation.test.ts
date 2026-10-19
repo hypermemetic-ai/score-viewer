@@ -22,18 +22,25 @@ test('equal horizontal distances break by vertical proximity, then written sourc
  later.baseline=150;assert.equal(systemSelection(q,start,1).id,earlier.id);
  assert.equal(systemSelection({...q,seats:[...q.seats].reverse()},start,1).id,earlier.id);
 });
-test('both shipped piano presentations navigate their printed systems independently of page breaks',async()=>{
+test('both shipped piano presentations step through each system\'s hands, then on past page breaks',async()=>{
  const {selectPresentation}=await import('../src/package'),{systemSelection}=await import('../src/selection');
  const conventional=await importPackage(readFileSync(new URL('../vendor/iso-notation/public/review/schumann-no14-conventional-20261006.tuna',import.meta.url)));
  for(const pkg of [conventional,await selectPresentation(conventional,'janko-four-row')]){
+  const hands=new Map(pkg.score.notes.map(n=>[n.id,n.hand])),hand=(s:{ownerIds:string[]})=>hands.get(s.ownerIds[0]);
   const systems=[...new Map(pkg.seats.map(s=>[`${s.page}:${s.system}`,{page:s.page,system:s.system}])).values()].sort((a,b)=>a.page-b.page||a.system-b.system);
-  let crossings=0;
+  const row=(at:{page:number;system:number},h:string)=>pkg.seats.filter(s=>s.page===at.page&&s.system===at.system&&hand(s)===h);
+  let crossings=0,within=0;
   for(let i=0;i<systems.length-1;i++){
-   const source=pkg.seats.find(s=>s.page===systems[i].page&&s.system===systems[i].system)!,next=systemSelection(pkg,source,1);
-   assert.equal(next.system,systems[i+1].system);assert.equal(next.page,systems[i+1].page);
-   const targets=pkg.seats.filter(s=>s.page===next.page&&s.system===next.system);assert.equal(Math.abs(next.x-source.x),Math.min(...targets.map(s=>Math.abs(s.x-source.x))));
+   const right=row(systems[i],'RH'),left=row(systems[i],'LH');
+   // Down from the right hand stays in the system, on its left hand.
+   if(right.length&&left.length){const down=systemSelection(pkg,right[0],1);assert.equal(hand(down),'LH');assert.equal(down.system,systems[i].system);assert.equal(down.page,systems[i].page);assert.equal(systemSelection(pkg,down,-1).contactId===right[0].contactId||hand(systemSelection(pkg,down,-1))==='RH',true);within++;}
+   // Down from the outer (left) hand continues into the next system's right hand.
+   const source=left[0]??right[0],next=systemSelection(pkg,source,1),entering=row(systems[i+1],'RH').length?'RH':'LH';
+   assert.equal(next.system,systems[i+1].system);assert.equal(next.page,systems[i+1].page);assert.equal(hand(next),entering);
+   const targets=row(systems[i+1],entering);assert.equal(Math.abs(next.x-source.x),Math.min(...targets.map(s=>Math.abs(s.x-source.x))));
    if(source.page!==next.page)crossings++;
   }
+  assert.ok(within>0);
   assert.ok(crossings>0);
  }
 });

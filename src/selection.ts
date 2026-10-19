@@ -22,14 +22,18 @@ export function selectionOnPage(p:Pick<ScorePackage,'score'|'seats'>,contactId:s
  return visible.find(seat=>seat.contactId===contactId)??visible[0];
 }
 
-/** Navigate the printed systems, including visible aliases of earlier contacts.
- * Source coordinates keep musical movement independent of screen rotation. */
+/** Navigate printed rows: each system's right hand, then its left hand (notes
+ * without a hand after both). Past a system's outer hand the move continues
+ * into the neighbouring system. Visible aliases of earlier contacts stay
+ * destinations; source coordinates keep musical movement independent of
+ * screen rotation. */
 export function systemSelection(p:Pick<ScorePackage,'score'|'seats'>,current:Seat,direction:-1|1):Seat {
- const order=editUnits(p),rank=new Map(order.map((seat,index)=>[seat.contactId,index]));
- const systems=new Map<string,Seat[]>();
- for(const seat of p.seats){if(!rank.has(seat.contactId))continue;const key=`${seat.page}:${seat.system}`,seats=systems.get(key)??[];seats.push(seat);systems.set(key,seats);}
- const rows=[...systems.values()].sort((a,b)=>a[0].page-b[0].page||a[0].system-b[0].system);
- const index=rows.findIndex(seats=>seats[0].page===current.page&&seats[0].system===current.system),target=rows[index+direction];
+ const order=editUnits(p),rank=new Map(order.map((seat,index)=>[seat.contactId,index])),hands=new Map(p.score.notes.map(n=>[n.id,n.hand])),
+  hand=(s:Seat)=>{const h=hands.get(s.ownerIds[0]);return h==='RH'?0:h==='LH'?1:2;};
+ const groups=new Map<string,Seat[]>();
+ for(const seat of p.seats){if(!rank.has(seat.contactId))continue;const key=`${seat.page}:${seat.system}:${hand(seat)}`,seats=groups.get(key)??[];seats.push(seat);groups.set(key,seats);}
+ const rows=[...groups.values()].sort((a,b)=>a[0].page-b[0].page||a[0].system-b[0].system||hand(a[0])-hand(b[0]));
+ const index=rows.findIndex(seats=>seats[0].page===current.page&&seats[0].system===current.system&&hand(seats[0])===hand(current)),target=rows[index+direction];
  if(index<0||!target)return current;
  return [...target].sort((a,b)=>Math.abs(a.x-current.x)-Math.abs(b.x-current.x)||Math.abs(a.baseline-current.baseline)-Math.abs(b.baseline-current.baseline)||(rank.get(a.contactId)!-rank.get(b.contactId)!)||a.id.localeCompare(b.id))[0];
 }
