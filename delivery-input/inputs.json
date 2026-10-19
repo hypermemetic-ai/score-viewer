@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "9c23896201a8162a71c7ad102dfb9f25941ec9f1",
-    "tree": "298d7dcbcbb2d0a18b3f7a214849dcbe4569207e",
-    "timestamp": "2026-10-18T00:22:59.000Z"
+    "revision": "d41c19e0bf9504f2c40d3ad10bc5880c47534ee6",
+    "tree": "5fd845a59c953885b136d473cc66b9238240002a",
+    "timestamp": "2026-10-18T23:58:05.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
-    "revision": "bee8c67fce60b5a87875d3ff0d5ae54a0b326506"
+    "revision": "916245c5ba526885b210fdd6645006b1477a9811"
   },
   "nativeFiles": {
     ".cargo/config.toml": {
@@ -248,13 +248,17 @@
       "sha256": "b5927b6c5e8d9fecad0ec7161c4974c6749903a393c5aa99b031f48b0823b226",
       "size": 5071
     },
+    "src-tauri/src/derived_cache.rs": {
+      "sha256": "8d53c3a071aa9dac5453388196812f80a1b942187642d013e2ea29fc4375df3e",
+      "size": 12601
+    },
     "src-tauri/src/main.rs": {
-      "sha256": "6b6bebc48645144580a2a25d3e6a48489870ecdf3644e88e2052a64b0b9a5786",
-      "size": 6814
+      "sha256": "a0e1693fdc03e4158958b2552870cf662c8cc68708dd0ae59d622be0ff177114",
+      "size": 9064
     },
     "src-tauri/src/managed_files.rs": {
-      "sha256": "13c7034ec44666dec3c6e08bbc333ed0045d4a57097bcf22accf5206bd749a21",
-      "size": 6678
+      "sha256": "8ff5012ee7eb77b4c2a57bc786841aa3628793dfb635bdc35c2aaeb6d8f353bb",
+      "size": 10787
     },
     "src-tauri/src/metronome_stream.rs": {
       "sha256": "34d510de61c2c6b2d52e0c6a0e916e2aff67f015d09585897991a95641d15014",
@@ -309,8 +313,8 @@
       "size": 3117
     },
     "src-tauri/src/score_save.rs": {
-      "sha256": "99f36a83040eb12ed1c16cfa1e16f9a9e46842983c8de8ce1fe08f3c5d8cbdf4",
-      "size": 1807
+      "sha256": "d17345968a1d7181d4c1007c1541164090249c8a1ab65e418de8927b28c37964",
+      "size": 1802
     },
     "src-tauri/tauri.conf.json": {
       "sha256": "7c9594534f0766f8d7561280cb3363d68c20494526efdbbaef1feff99f68b7bb",
@@ -7615,29 +7619,33 @@
   },
   "frontend": {
     "files": {
-      "assets/authored-calculated-preparation-v2-C3PzANFK.isoscore": {
+      "assets/authored-calculated-preparation-v2-C3PzANFK.tuna": {
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-Dn-hPw_w.js": {
-        "sha256": "0f4024e6727b2273b7bf5de2dbd470fb1432d59f4c8edf00f66c246d3c759aae",
-        "size": 8776
+      "assets/footer-ink-probe-CaMGZEmQ.js": {
+        "sha256": "157310c86c0f964c067e1cdc9f112842f3f59242383fd96926ca25f8f829699c",
+        "size": 8768
       },
-      "assets/footer-probe-calculated-edition-CRqyU34U.isoscore": {
-        "sha256": "dec7f831b48d5a2cc316640e71fac3c49e0dffd12dfea0bbe60899dfc4ed1d50",
-        "size": 89887
+      "assets/footer-probe-calculated-edition-MudBwqqr.tuna": {
+        "sha256": "e94adc39471cca60671ce21157cd5750e8a021060e42c2c81224bae6282d8040",
+        "size": 89653
       },
       "assets/fretted-preparation-assets-D_5Ay36F.js": {
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
+      "assets/index-Bf-PxvaR.js": {
+        "sha256": "5da09c0350f25faa7672bae149cd5faab90a689c1c6e7528a11e3499f50ab3f6",
+        "size": 663377
+      },
       "assets/index-CjEh9wH2.css": {
         "sha256": "a9741a0935610397f786d517743a56cae2c2dab1f255c7d4450704523f845b2b",
         "size": 48103
       },
-      "assets/index-CUDhkWu3.js": {
-        "sha256": "8753f49b3d4998dcedebe3e7ec792b4f7cb88231501ff4f7defd276c7c9ee737",
-        "size": 651528
+      "assets/layout-peer-worker-DP_ZoUDN.js": {
+        "sha256": "cb56373eebea79aec34c0ff0e4c7205885911ba0e79c4f883c0cb9ce7eff2109",
+        "size": 1237260
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7647,21 +7655,21 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/musescore-import-CEbKGOQT.js": {
-        "sha256": "f1c96089730885135e04d1737bd39b5d56f7ffce9b740ec0a8c3a82213b46d33",
+      "assets/musescore-import-1dGdRSxa.js": {
+        "sha256": "b0b50f86c3e81088195a47357db71d4c869cf2012521ba3d23731a58f06a4deb",
         "size": 3943
       },
-      "assets/musicxml-import-5QK9aX3x.js": {
-        "sha256": "e4cfda8f7d2e526e738f0273624ec274c31fd8755cc52cbb9bf18df8ab2870a7",
-        "size": 3692
+      "assets/musicxml-import-npZ8dxpC.js": {
+        "sha256": "50467c0ca05b25b34f429e9d402cee650d28c80ea6d76fbcca62824271133d0a",
+        "size": 3809
       },
-      "assets/personal-projection-worker-DBnG4qMK.js": {
-        "sha256": "2614875867fca4d14ba0b13be491772b3496c98f1c163570328707a25120a77f",
-        "size": 1481217
+      "assets/personal-projection-worker-CoQKBLRb.js": {
+        "sha256": "1072947a81a07d6277ca960764bb66a11d01eccd74d02c0de7f6750de0ad3d6e",
+        "size": 1550150
       },
-      "assets/piano-readiness-bqEEQfHh.js": {
-        "sha256": "81aea8ba8c585fa26bf118110b1f7b1bea5b785e0e4efd78f31dd8633ef58176",
-        "size": 2398122
+      "assets/piano-readiness-DzwngW4O.js": {
+        "sha256": "ad3b4966a05ae63f543b70cc8f171e902516c254bd7b6c28b2484004b33abb31",
+        "size": 2468978
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
@@ -7696,30 +7704,30 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "bf232f4d4f1c560a624d4b92b657428c2e0a63dd38e94b351e9f2675b70f3a0e",
+        "sha256": "53c43a494a8688da75268d5c1ef6224100eba1a4191a492dc2c947b1a5289183",
         "size": 323
       },
       "index.html": {
-        "sha256": "e7f50fba60e8eb51a5cf1532352da56e3da070291d6ed3810d7236a813c5677a",
+        "sha256": "975e6f72300cc7a88521e5adcb43f3bfaa8c8167f12d11fdf117124bc3baf571",
         "size": 969
       },
-      "review/schumann-no14-conventional-20261006.isoscore": {
+      "review/schumann-no14-conventional-20261006.tuna": {
         "sha256": "2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d",
         "size": 423909
       }
     },
-    "digest": "a5480c60e49e77d750745a549197d84d744b68bb0d2dfcc1c8aa6c61c33b598a"
+    "digest": "dff59deacd420aab2e6bf880daf75e9814425c03ea119bfd2293fc459381e0e7"
   },
   "checks": {
-    "sha256": "b4cc2708c91032c645725348ad8771f7713b5e9dfb1f3670e6094ea9e2c3b710",
-    "size": 6972
+    "sha256": "5cdc89f5eb6d8ebc8037762308ca36c048d17dd16ebb4742cc2b6d66ed161727",
+    "size": 5637
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
     "policySha256": "6618039ed2781380a85399f82c8342fab74a0c6bc3e68406b1b221b08860f532",
     "metricsLiteral": "{\"drawingAllowancePageUnits\":2,\"fontSha256\":\"eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242\",\"glyphs\":{\" \":{\"advance\":512,\"bounds\":null,\"glyph\":\"space\"},\"0\":{\"advance\":1024,\"bounds\":[79,-20,998,1362],\"glyph\":\"zero\"},\"1\":{\"advance\":1024,\"bounds\":[73,0,804,1352],\"glyph\":\"one\"},\"2\":{\"advance\":1024,\"bounds\":[1,0,979,1356],\"glyph\":\"two\"},\"3\":{\"advance\":1024,\"bounds\":[-3,-20,953,1356],\"glyph\":\"three\"},\"4\":{\"advance\":1024,\"bounds\":[5,0,978,1348],\"glyph\":\"four\"},\"5\":{\"advance\":1024,\"bounds\":[32,-20,963,1341],\"glyph\":\"five\"},\"6\":{\"advance\":1024,\"bounds\":[83,-20,1014,1356],\"glyph\":\"six\"},\"7\":{\"advance\":1024,\"bounds\":[120,0,1094,1341],\"glyph\":\"seven\"},\"8\":{\"advance\":1024,\"bounds\":[43,-20,1001,1362],\"glyph\":\"eight\"},\"9\":{\"advance\":1024,\"bounds\":[60,-20,991,1356],\"glyph\":\"nine\"},\"P\":{\"advance\":1251,\"bounds\":[-11,0,1199,1341],\"glyph\":\"P\"},\"a\":{\"advance\":1024,\"bounds\":[61,-21,947,964],\"glyph\":\"a\"},\"e\":{\"advance\":909,\"bounds\":[63,-20,863,965],\"glyph\":\"e\"},\"f\":{\"advance\":569,\"bounds\":[23,-436,805,1442],\"glyph\":\"f\"},\"g\":{\"advance\":1024,\"bounds\":[1,-436,964,964],\"glyph\":\"g\"},\"o\":{\"advance\":1024,\"bounds\":[61,-20,963,965],\"glyph\":\"o\"}},\"unitsPerEm\":2048,\"version\":\"viewer-footer-serif-metrics-v1\",\"verticalCell\":{\"head\":[-621,2009],\"hhea\":[-443,1825],\"typo\":[-442,1422],\"win\":[-443,1825]}}",
     "fixture": {
-      "path": "assets/authored-calculated-preparation-v2-C3PzANFK.isoscore",
+      "path": "assets/authored-calculated-preparation-v2-C3PzANFK.tuna",
       "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
       "size": 79632,
       "sourceSha256": "22f340b457e1873dc7f0bd2f5224a14ef9d31cb3d1f79f5bb7eb3be7e6b7cc3d",
