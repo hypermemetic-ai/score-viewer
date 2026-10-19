@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {importPackage,hashBytes} from '../src/package';
+import {importPackage,hashBytes,type Manifest} from '../src/package';
+import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {prepareDualReadingPackage,selectReadingNotation} from '../src/dual-reading-package';
 import {authoredFrettedInput} from './support/fretted-dual-fixture';
 import {planManualPractice} from '../src/manual-practice-plan';
@@ -39,4 +40,14 @@ test('another genuine source part and malformed manual evidence cannot borrow th
  await assert.rejects(readLibraryPracticeSummary(otherEntry,'conventional-piano',{readPackage:async()=>otherBytes,readRecord:async()=>JSON.parse(raw)}),/source or part differs/);
  const cache=new LibraryPracticeSummaries();await cache.refresh([entry],'janko-four-row',{readPackage:async()=>bytes,readRecord:async()=>({...JSON.parse(raw),musicalRevision:'changed'})},()=>true);
  assert.equal(cache.get(entry,'janko-four-row'),undefined);assert.equal(JSON.stringify(record),untouched);
+});
+
+test('a dual reading that must be engraved again still shows the progress saved with it',async()=>{
+ const files=unzipSync(bytes),m=JSON.parse(strFromU8(files['manifest.json'])) as Manifest,page=(m.reading as {views:{tab:{pages:string[]}}}).views.tab.pages[0];
+ delete files['manifest.json'];files[page]=strToU8(strFromU8(files[page]).replace('</svg>','<g data-earlier-engraving=""/></svg>'));
+ m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,b])=>[name,await hashBytes(b)])));files['manifest.json']=strToU8(JSON.stringify(m));
+ const stale=zipSync(files);await assert.rejects(importPackage(stale),/page differs/);
+ const saved={...entry,file:`package-${await hashBytes(stale)}.tuna`};
+ const summary=await readLibraryPracticeSummary(saved,'janko-four-row',{readPackage:async()=>stale,readRecord:async(name:string)=>name===storage?JSON.parse(raw):null});
+ assert.deepEqual(summary,{entryId:entry.id,file:saved.file,assessment:'manual',sections:displayedPracticeTotal(plan,state),whole:false});
 });
