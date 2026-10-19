@@ -1,25 +1,25 @@
 {
   "schema": 1,
-  "viewerRevision": "38333d557d62ea217b01582db6c8d611fbe88ee2",
+  "viewerRevision": "42d59bb4cd298e40d3eb714cf45e94ce024ec8c7",
   "notationRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
-  "frontendDigest": "177d3fa4adcb00d3053ea748a502087dc6bc9c11dc7f3c317f28b7b80451601b",
+  "frontendDigest": "00bf726fadbb7176c6fa87313e7e4c5f1840d85a6e86d6c2a89c32defac4bb42",
   "checks": {
     "tests": {
       "status": "passed",
-      "sourceCommit": "38333d557d62ea217b01582db6c8d611fbe88ee2",
+      "sourceCommit": "42d59bb4cd298e40d3eb714cf45e94ce024ec8c7",
       "command": "npm test",
       "tests": 1259,
       "passed": 1251,
       "failed": 0,
       "todo": 8,
-      "durationMs": 92788,
+      "durationMs": 92818,
       "additional": [
         {
           "command": "node --test test/*.test.mjs",
           "tests": 47,
           "passed": 47,
           "failed": 0,
-          "durationMs": 5569
+          "durationMs": 5645
         },
         {
           "command": "npx tsc --noEmit -p .",
@@ -27,66 +27,53 @@
         }
       ],
       "todoNote": "3 todo tests are half-handed MusicXML unison keys that ISO refuses on import (source-beam-coverage), todo since PR 121. 5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved at bee8c67; each is todo only on that exact refusal (PR 128).",
-      "scope": "Complete suite on a clean clone of merged main 38333d5 (PR 151 merge onto PR 150's merge bc05091), after PRs 150-151 since the e99acdc seal (merged as 2054197)."
+      "scope": "Complete suite on a clean clone of merged main 42d59bb (PR 154: practice crops own the stem duration marks and grace notes), after PRs 153-154 since the 38333d5 seal."
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "38333d557d62ea217b01582db6c8d611fbe88ee2",
+      "sourceCommit": "42d59bb4cd298e40d3eb714cf45e94ce024ec8c7",
       "configured": "npm run build: TypeScript + source pin validation + fingering-assistance pin + Vite",
       "frontendFiles": 24,
-      "frontendDigest": "177d3fa4adcb00d3053ea748a502087dc6bc9c11dc7f3c317f28b7b80451601b"
+      "frontendDigest": "00bf726fadbb7176c6fa87313e7e4c5f1840d85a6e86d6c2a89c32defac4bb42"
     },
     "browserInspection": {
       "status": "passed",
       "ownerLibraryRehearsal": {
-        "sourceCommit": "38333d557d62ea217b01582db6c8d611fbe88ee2",
-        "frontend": "The frozen frontend itself (/tmp/sv-d19/seal/frontend, built from the clean 38333d5 clone).",
+        "sourceCommit": "42d59bb4cd298e40d3eb714cf45e94ce024ec8c7",
+        "frontend": "The frozen frontend itself (/tmp/sv-d21/seal/frontend, built from the clean 42d59bb clone).",
         "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints (worker-src unchanged)",
-        "data": "Read-only copy of the owner's laptop data taken 2026-10-19 17:20 UTC with the d41c19e install running (piano sample bank excluded); every write kept in memory, three sessions against the same in-memory disk",
+        "data": "Read-only copy of the owner's laptop data taken 2026-10-19 18:49 with the e9c8adf install running (piano sample bank excluded); every write kept in memory",
         "firstOpenMs": {
-          "No. 13": 3889,
-          "No. 14": 5436,
-          "Zelda's Lullaby": 3352,
-          "Add It Up": 16652,
-          "Bach Goldberg Var. 1": 1430
+          "No. 14": 5395,
+          "Zelda's Lullaby": 2741,
+          "No. 13": 3181,
+          "Bach Goldberg Var. 1": 2184
         },
-        "reopenMs": {
-          "No. 13": 3119,
-          "No. 14": 5511,
-          "Zelda's Lullaby": 2601,
-          "Add It Up": 4230,
-          "Bach Goldberg Var. 1": 2233
-        },
-        "observed": "No. 13 and No. 14 open on their saved editions with no notice. Zelda and Bach engrave again once with 'This score was engraved again with the current engraving. Your hands, fingers and choices came along.'; Add It Up with '... Your place and practice came along.'. Reopening shows no notice; no page errors. Hand edit right after opening No. 13: the preparation step answered in 31 ms; leaving saved nothing. Personal fingering memory compared order-independently: 197 = 197 facts, 0 lost, 0 gained; 64 = 64 with fields.",
-        "fingers": "On No. 14, Practice, Fingers, first section (measures 61-64): the stage drew in 102 ms with 'Right hand · measure 61 · note 1 of 19 · every note fingered'; four right arrows reached measure 62 note 5; down switched to 'Left hand · measure 62 · note 16 of 19'; J labelled 5 left-hand notes; Esc cancelled the labels and kept the stage; Esc returned to the overview; Mechanics relabelled the section 'Practice these measures'. No finger was typed, so nothing was saved.",
-        "screenshots": "/tmp/sv-d19/rehearsal/seal-full on the build host"
+        "observed": "The installed e9c8adf build could not practise No. 13 (Mechanics: 'Measure 1: unresolved duration dot ownership'; Fingers: an empty stage), reproduced on this copy. With 42d59bb, every section of every piano score in the library opens in Mechanics and in Fingers with no failure text and a drawn stage: No. 13 18 sections, Bach 15, Zelda 7, No. 14 6 (its completed 1-4/57-60 group has no single passage to open). Bach was given a stand-in tempo of 80 at its tempo prompt. No page errors. scripts/check-practice-crops.mjs crops every measure of No. 13 (54) and No. 14 (64) on both layouts.",
+        "screenshots": "/tmp/sv-d21/rehearsal on the build host"
       },
-      "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. The dual-reading path was not rehearsed again: notation and reading code are unchanged since the e99acdc seal, which rehearsed it. Fingers typing and saving on real data were not rehearsed (covered by scripts/inspect-section-fingering.mjs on the No. 14 fixture)."
+      "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. Add It Up is not a piano score and offers no practice."
     },
     "independentReview": {
       "status": "passed",
-      "sourceCommit": "38333d557d62ea217b01582db6c8d611fbe88ee2",
+      "sourceCommit": "42d59bb4cd298e40d3eb714cf45e94ce024ec8c7",
       "reviews": [
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/151",
-          "verdict": "round 1 (fresh-context agent, 4bf06d5): changes needed - a stale score selection survived leaving practice after a Fingers save (high) and further findings; fixed in c813d20, whose delta was re-reviewed by a fresh-context agent. Polish review (fresh-context Opus agent, c813d20): three defects (last two measures could not be fingered, Esc in jump labels left the stage, a leftover selection broke Mechanics shortcuts) and polish items; all fixed in 7857bef, which was not re-reviewed"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/154",
+          "verdict": "author-reviewed urgent fix (the installed build could not practise No. 13); no independent review"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/150",
-          "verdict": "fresh-context agent approved b5202e2: no defects; ad6f5ee (wording of where notes without a hand fall) was not re-reviewed"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/153",
+          "verdict": "author-reviewed: jump labels survive a modifier key; covered by scripts/inspect-section-fingering.mjs"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/149",
-          "verdict": "the e99acdc seal; reviewed in its own PR (regenerated byte for byte)"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/152",
+          "verdict": "the 38333d5 seal; reviewed in its own PR"
         }
       ],
-      "scope": "PRs 150-151 merged after the e99acdc seal; application code only (fingering order per hand, Fingers study mode, hand-row arrows). Notation pin 94978ca unchanged. The seal itself is reviewed in its delivery PR.",
-      "reviewedCommits": [
-        "b5202e2 (PR 150)",
-        "4bf06d5 (PR 151, round 1)",
-        "c813d20 (PR 151, delta and polish review)"
-      ],
-      "note": "No review ran on 38333d5 itself; it differs from the reviewed c813d20 by 7857bef (the polish review's fixes, with the inspection script extended to cover them) and from the reviewed b5202e2 by ad6f5ee (wording)."
+      "scope": "PRs 153-154 merged after the 38333d5 seal; application code only. Notation pin 94978ca unchanged.",
+      "reviewedCommits": [],
+      "note": "No independent review ran on 153 or 154."
     }
   }
 }
