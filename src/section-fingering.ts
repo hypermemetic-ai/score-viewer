@@ -18,6 +18,17 @@ export function sectionUnits(p:Pick<ScorePackage,'score'|'seats'>,chunk:Pick<Pra
  const hand=handOf(p),rank=(s:Seat)=>{const h=hand(s);return h==='RH'?0:h==='LH'?1:2;};
  return editUnits(p).filter(s=>s.writtenBar-1>=chunk.firstBar&&s.writtenBar-1<=chunk.lastBar).map((s,i)=>({s,i})).sort((a,b)=>rank(a.s)-rank(b.s)||a.i-b.i).map(({s})=>s);
 }
+/** The whole piece in fingering order, one practice section at a time (the
+ * sections stay unseen): each section's right hand, then its left hand. */
+export function pieceUnits(p:Pick<ScorePackage,'score'|'seats'>,plan:Pick<PracticePlan,'chunks'|'barTicks'>):Seat[]{
+ const bars=plan.barTicks.length-1,spans:{firstBar:number;lastBar:number}[]=[];let next=0;
+ for(const c of [...plan.chunks].filter(c=>!c.components?.length&&c.kind!=='contrast').sort((a,b)=>a.firstBar-b.firstBar||a.lastBar-b.lastBar))if(c.firstBar===next&&c.lastBar<bars){spans.push(c);next=c.lastBar+1;}
+ // Measures the sections leave out are one more run.
+ if(next<bars)spans.push({firstBar:next,lastBar:bars-1});
+ return spans.flatMap(span=>sectionUnits(p,span));
+}
+/** Where each score's fingering was left, for reopening during this run of the viewer. */
+const resumeAt=new Map<string,string>();
 /** The window around the cursor's measure: the previous, current and next
  * measures, with the two beyond them ghosted. Zero-based bars. */
 export function fingeringWindow(barCount:number,bar:number):{bars:number[];ghosts:Set<number>}{
@@ -39,24 +50,36 @@ export interface SectionFingeringOptions {
  start?:string;status:(message:string)=>void;
 }
 interface FingeringWindow {bar:number;svg:SVGSVGElement;crops:Crop[]}
-/** Finger one section, one hand at a time, from the keyboard. Nothing is
- * played or checked. The view slides with the cursor; any note in reach can
- * be targeted directly with a jump label. */
+/** Finger the whole piece from the keyboard, one hand of one section at a
+ * time. Nothing is played or checked. It opens on the first note without a
+ * finger, or where it was left; each finger moves on to the next note without
+ * one. The view slides with the cursor; any note in reach can be targeted
+ * directly with a jump label. */
 export class SectionFingering {
- readonly units:Seat[];private cursor?:Seat;private readonly positions;private readonly hand;
+ readonly units:Seat[];readonly chunk:{firstBar:number;lastBar:number};private cursor?:Seat;private readonly positions;private readonly hand;private readonly resumeKey:string;
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
  private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;
  private missing?:{personal:PersonalState;count:number};
- constructor(readonly mount:HTMLElement,readonly chunk:PracticeChunk,readonly options:SectionFingeringOptions){
+ constructor(readonly mount:HTMLElement,readonly options:SectionFingeringOptions){
   this.positions=annotationPositions(options.package);this.hand=handOf(options.package);
-  this.units=sectionUnits(options.package,chunk);
-  // Resume at the first note still without a finger.
-  this.cursor=options.start&&options.package.seats.find(s=>s.contactId===options.start)||this.units.find(s=>fingerFor(options.basePackage,options.personal(),s)===undefined)||this.units[0];
+  this.chunk={firstBar:0,lastBar:this.barCount-1};this.units=pieceUnits(options.package,options.plan);
+  this.resumeKey=options.plan.sourcePracticeIdentity??options.package.manifest.metadata.title;
+  // A rebuilt practice keeps its exact note; reopening goes to the first gap
+  // from where fingering was left, else the first in the piece.
+  const left=this.units.findIndex(s=>s.contactId===resumeAt.get(this.resumeKey));
+  this.cursor=options.start&&options.package.seats.find(s=>s.contactId===options.start)||this.gap(Math.max(0,left),1,true)||this.units[0];
   mount.addEventListener('click',this.click);
+ }
+ /** The next note without a finger from index i in the given direction,
+  * wrapping round the piece; i itself counts only when inclusive. */
+ private gap(i:number,step:1|-1,inclusive=false,except?:string){
+  const personal=this.options.personal(),n=this.units.length;
+  for(let k=inclusive?0:1;k<=n;k++){const seat=this.units[((i+step*k)%n+n)%n];if(seat&&seat.contactId!==except&&fingerFor(this.options.basePackage,personal,seat)===undefined)return seat;}
+  return undefined;
  }
  dispose(){this.disposed=true;this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
  /** Footer hints for the fingering keys. */
- static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Previous, next note</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
+ static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>Tab</kbd> Next without a finger</span><span><kbd>←→</kbd> Previous, next note</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
  private click=(e:MouseEvent)=>{
   const el=(e.target as Element).closest<SVGElement>('[data-viewer-seat],[data-finger-seat]');if(!el||!this.shown)return;
   const id=el.dataset.viewerSeat??el.dataset.fingerSeat,seat=this.shown.crops.flatMap(c=>c.seats).find(s=>s.id===id);
@@ -92,7 +115,10 @@ export class SectionFingering {
   if(this.fitted&&size!==this.fitted){this.windows.clear();this.shown=undefined;this.mount.replaceChildren();this.render();}else this.paint();
  }
  render(){
-  const bar=(this.cursor?.writtenBar??this.chunk.firstBar+1)-1,next=this.window(bar);
+  const bar=(this.cursor?.writtenBar??1)-1;if(this.cursor)resumeAt.set(this.resumeKey,this.cursor.contactId);
+  let next:FingeringWindow;
+  // A measure that cannot be drawn says so on the stage, never a blank page.
+  try{next=this.window(bar);}catch(error){this.shown=undefined;const message=document.createElement('p');message.className='section-fingering-error';message.textContent=`Measure ${bar+1} cannot be drawn for fingering: ${error instanceof Error?error.message:String(error)}`;this.mount.replaceChildren(message);this.options.status('Use ← → to move to another measure.');return;}
   if(this.shown!==next){this.mount.replaceChildren(next.svg);this.shown=next;}
   this.fitted=`${this.mount.clientWidth}x${this.mount.clientHeight}`;
   this.paint();this.announce();this.prefetch(bar);
@@ -173,20 +199,20 @@ export class SectionFingering {
  }
  private announce(){
   const i=this.index(),seat=this.cursor;
-  if(!seat){this.options.status('This section has no notes to finger.');return;}
+  if(!seat){this.options.status('This piece has no notes to finger.');return;}
   const hand=this.hand(seat)==='RH'?'Right hand':this.hand(seat)==='LH'?'Left hand':'No hand',
    personal=this.options.personal();
   // Counted once per saved state, not on every move.
   if(this.missing?.personal!==personal)this.missing={personal,count:this.units.filter(s=>fingerFor(this.options.basePackage,personal,s)===undefined).length};
   const missing=this.missing.count;
-  this.options.status(`${hand} · measure ${seat.writtenBar}${i<0?' · outside this section':` · note ${i+1} of ${this.units.length}`} · ${missing?`${missing} without a finger`:'every note fingered'}`);
+  this.options.status(`${hand} · measure ${seat.writtenBar} of ${this.barCount}${i<0?' · not in the fingering order':''} · ${missing?`${missing} ${missing===1?'note':'notes'} without a finger`:'every note fingered'}`);
  }
  private async choose(finger:number){
   const seat=this.cursor;if(!seat)return;
   const i=this.index();
-  // Move on at once; the finger paints when it is saved. A correction
-  // outside the section keeps its place.
-  if(i>=0&&i<this.units.length-1)this.cursor=this.units[i+1];
+  // Move on at once to the next note without a finger; the finger paints
+  // when it is saved. Once every note has one, the cursor stays.
+  if(i>=0)this.cursor=this.gap(i,1,false,seat.contactId)??seat;
   this.render();
   try{await this.options.save(seat,finger);}catch(error){this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
   this.announce();
@@ -202,8 +228,9 @@ export class SectionFingering {
   }
   const digit=/^(?:Digit|Numpad)([1-5])$/.exec(code);
   if(digit){void this.choose(Number(digit[1]));return true;}
-  if(code==='ArrowRight'||code==='Tab'&&!shift){this.move(1);return true;}
-  if(code==='ArrowLeft'||code==='Backspace'||code==='Tab'&&shift){this.move(-1);return true;}
+  if(code==='Tab'){const seat=this.gap(Math.max(0,this.index()),shift?-1:1);if(seat)this.go(seat);else this.options.status('Every note has a finger.');return true;}
+  if(code==='ArrowRight'){this.move(1);return true;}
+  if(code==='ArrowLeft'||code==='Backspace'){this.move(-1);return true;}
   if(code==='ArrowUp'||code==='ArrowDown'){this.go(this.hands(code==='ArrowUp'?-1:1));return true;}
   // L and R choose the note's hand, as in the score; the cursor stays put.
   if((code==='KeyL'||code==='KeyR')&&this.cursor&&this.options.saveHand){const seat=this.cursor,hand=code==='KeyL'?'LH':'RH';void this.options.saveHand(seat,hand).catch(error=>this.options.status(`The hand was not saved: ${error instanceof Error?error.message:String(error)}`));return true;}
