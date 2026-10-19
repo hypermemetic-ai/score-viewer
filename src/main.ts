@@ -1215,6 +1215,7 @@ window.addEventListener('keydown',e=>{if(!startupReady){if(!startupFailed)e.prev
  if(!dialog&&practice&&practice.bindingContext.active&&uiCode==='Space'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&!capture&&!inField&&!controls.matchKey(e)&&readerFocused&&!document.hidden){const held=input.held.has(inputCode(e));input.down(e,false,true);controls.keyDown(e,false);e.preventDefault();if(!e.repeat&&!held)void practice.action('ready');return;}
  if(!dialog&&practice&&focused.matches('[data-practice-display=manual]')&&['ArrowDown','ArrowRight'].includes(e.code)&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();app.querySelector<HTMLElement>('.practice-overview [data-passage-id][tabindex="0"]')?.focus();return;}
  if(activePracticeFooter&&!inField&&['Enter','Space'].includes(uiCode))e.preventDefault();
+ if(practice instanceof PracticeView&&practice.claimsFingersKey&&!dialog&&!inField&&!capture&&uiCode==='KeyF'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey){e.preventDefault();if(!e.repeat)practice.key('KeyF');return;}
  const repeatedDown=input.held.has(inputCode(e)),selectionDigit=!!selection&&(directFingerKey(e)!==undefined||!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.shiftKey&&['KeyL','KeyR'].includes(inputCode(e)));input.down(e,false,true);const result=controls.keyDown(e,(!!current||controls.matchKey(e)?.action==='practiceSettings')&&readerFocused&&!document.hidden&&!dialog&&!inField&&!selectionDigit&&!practice?.modalOpen);
  if(capture||inField){practice?.cancelTempoHold();return;}
  if(e.ctrlKey||e.altKey||e.metaKey)practice?.cancelTempoHold();
