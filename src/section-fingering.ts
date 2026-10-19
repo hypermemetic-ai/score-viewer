@@ -196,8 +196,9 @@ export class SectionFingering {
    if(code==='ArrowUp'||code==='ArrowDown'){const seat=this.hands(code==='ArrowUp'?-1:1);if(seat){this.cursor=seat;this.paint();this.startLabels();}return true;}
    if(code==='Escape'){this.labels=undefined;this.paintLabels();this.announce();return true;}
    if(LETTERS.includes(/^Key([A-Z])$/.exec(code)?.[1].toLowerCase()??'-')){this.label(code);return true;}
-   // Any other key puts the labels away and does its ordinary work.
-   this.labels=undefined;this.paintLabels();
+   // A modifier alone keeps the labels; any other key puts them away and does its ordinary work.
+   if(/^(?:Shift|Control|Alt|Meta)(?:Left|Right)$|^CapsLock$/.test(code))return true;
+   this.labels=undefined;this.paintLabels();this.announce();
   }
   const digit=/^(?:Digit|Numpad)([1-5])$/.exec(code);
   if(digit){void this.choose(Number(digit[1]));return true;}
