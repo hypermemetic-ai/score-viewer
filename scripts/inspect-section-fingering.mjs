@@ -1,4 +1,4 @@
-// Production PracticeView in Chromium: the Fingers study mode on a bundled
+// Production PracticeView in Chromium: Fingers on the whole of a bundled
 // review score. Chromium layout is source evidence, not installed WebView or
 // human musical acceptance.
 import assert from 'node:assert/strict';
@@ -14,13 +14,15 @@ const server=createServer((req,res)=>{if(req.url==='/__fit'){res.setHeader('Cont
 try{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root,configFile:root+'/vite.config.ts',server:{middlewareMode:true,hmr:false,ws:{server,clientPort:server.address().port,host:'127.0.0.1'}},appType:'custom'});
  browser=await chromium.launch({headless:true});
- const bytes=await readFile('vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna');
+ const bytes=await readFile('fixtures/schumann-op68-no14.tuna');
  const page=await (await browser.newContext({viewport:{width:1280,height:720},deviceScaleFactor:2})).newPage();page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+server.address().port+'/__fit');
  await page.evaluate(async encoded=>{
   const [{PracticeView},{importPackage},{initialPersonal,collectionId,corrected}]=await Promise.all([import('/src/practice-view.ts'),import('/src/package.ts'),import('/src/state.ts')]);
   const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));let p=await importPackage(bytes,{allowLegacyTempo:true});
   if(!p.score.referencePerformanceTempo){const {addReferencePerformanceTempo}=await import('/src/reference-tempo-update.ts');p=(await addReferencePerformanceTempo(bytes,{version:'reference-performance-tempo-v1',bpm:180,beat:{numerator:3,denominator:8},provenance:{kind:'editorial',reference:'Isolated section-fingering inspection clock'}})).after;}
+  // Start with no fingers, as a newly imported score does, so every note is a gap to fill.
+  p={...p,fingerLayer:p.fingerLayer&&{...p.fingerLayer,attacks:p.fingerLayer.attacks.map(({finger,...a})=>a)}};
   await document.fonts.load('700 20px "URW Gothic"');await document.fonts.ready;window.saved=[];
   // The score's editor stands in: save, then hand the view its new state.
   const options={package:p,personal:initialPersonal(p),entryId:collectionId(p),connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back:()=>{},settings:()=>{},changed:()=>{},
@@ -33,17 +35,22 @@ try{
  // This harness has no application key listener; keys go to the view as main.ts routes them.
  const press=code=>page.evaluate(k=>practice.key(k),code);
  const state=()=>page.evaluate(()=>({status:document.querySelector('.section-fingering-status').textContent,selected:[...document.querySelectorAll('.section-fingering [data-edit-selected=true]')].map(e=>e.dataset.viewerSeat),bars:[...document.querySelectorAll('.section-fingering [data-practice-bar]')].map(g=>g.dataset.practiceBar+(g.classList.contains('section-fingering-ghost')?'g':g.classList.contains('section-fingering-outside')?'o':'')).join(' ')}));
- await page.click('[data-practice="study:fingers"]');
- assert.equal(await page.getAttribute('[data-practice="study:fingers"]','aria-pressed'),'true');
+ // The overview says how to get there: F on the Fingers button and in the footer.
+ assert.match(await page.textContent('[data-practice="study:fingers"]'),/Fingers\s*F/);assert.match(await page.textContent('.practice-controls'),/F Fingers/);
  assert.ok(await page.isDisabled('[data-practice="study:memory"]'));
- assert.match(await page.textContent('.practice-overview [data-practice^="passage:"]'),/^Finger /);
- await page.screenshot({path:output+'/1-selector.png'});
- await page.click('.practice-overview [data-practice^="passage:"]');
+ await page.screenshot({path:output+'/1-overview.png'});
+ // F opens the whole piece straight away: no section to choose.
+ await press('KeyF');
  await page.waitForSelector('.section-fingering:not([hidden]) svg');
- const opened=await state();console.log('opened',opened);assert.equal(opened.selected.length,1);assert.match(opened.status,/^Right hand · measure 1 · note 1 of/);
+ const opened=await state();console.log('opened',opened);assert.equal(opened.selected.length,1);assert.match(opened.status,/^Right hand · measure 1 of 64 · \d+ notes without a finger/);
+ assert.equal(await page.textContent('[data-practice-range]'),'Fingers · whole piece');
  await page.screenshot({path:output+'/2-opened.png'});
  for(const code of ['Digit1','Digit2','Digit3'])await press(code);
  console.log('typed',await state(),await page.evaluate(()=>saved));assert.equal(await page.evaluate(()=>saved.length),3);
+ // Tab goes to the next note without a finger, Shift+Tab to the one before; neither lands on a fingered note.
+ const fingered=()=>page.evaluate(()=>saved.map(s=>s[0]));
+ await press('Tab');assert.ok(!(await fingered()).includes((await state()).selected[0]));
+ await page.evaluate(()=>practice.key('Tab',false,true));assert.ok(!(await fingered()).includes((await state()).selected[0]));
  // Jump straight back to the second note typed and correct it.
  // Esc with labels showing puts them away and keeps the stage.
  await press('KeyJ');await press('Escape');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);assert.ok(await page.isVisible('.section-fingering'));
@@ -57,7 +64,8 @@ try{
  await press('Digit4');assert.deepEqual(await page.evaluate(()=>saved.at(-1)),[target,4]);
  assert.equal(await page.evaluate(t=>document.querySelector(`.section-fingering [data-finger-seat="${t}"]`)?.textContent,target),'4');
  await page.screenshot({path:output+'/4-corrected.png'});
- await press('Backspace');assert.deepEqual((await state()).selected,[target]);
+ // A correction, too, moves on to the next note still without a finger.
+ assert.ok(!(await fingered()).includes((await state()).selected[0]));
  await press('ArrowDown');const left=await state();console.log('left',left);assert.match(left.status,/^Left hand/);
  await press('ArrowUp');const up=await state();console.log('up',up);assert.match(up.status,/^Right hand/);
  // Walk the right hand into measure 3: the window slides with it.
@@ -72,10 +80,12 @@ try{
  const before=await state();await press('KeyJ');await press('KeyR');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);await page.waitForFunction(()=>hands.length===1&&document.querySelector('.section-fingering:not([hidden]) svg'));
  const rebuilt=await state();console.log('rebuilt',rebuilt);assert.deepEqual(rebuilt.selected,before.selected);assert.equal(rebuilt.status,before.status);
  await press('Escape');assert.ok(await page.isVisible('.practice-overview'));assert.ok(await page.isHidden('.section-fingering'));
- // The score's last section: every measure is reachable, to the end.
- const last=await page.evaluate(()=>practice.plan.chunks.at(-1).id);await page.evaluate(id=>practice.action('passage:'+id),last);await page.waitForSelector('.section-fingering:not([hidden]) svg');
- for(let i=0;i<80;i++)await press('ArrowRight');await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^Left hand|^Right hand/);
- await page.screenshot({path:output+'/7-last-section.png'});await press('Escape');
- await page.click('[data-practice="study:mechanics"]');assert.match(await page.textContent('.practice-overview [data-practice^="passage:"]'),/^Practice /);
+ // Reopening goes back to where fingering was left.
+ await page.click('[data-practice="study:fingers"]');await page.waitForSelector('.section-fingering:not([hidden]) svg');
+ const reopened=await state();console.log('reopened',reopened);assert.deepEqual(reopened.selected,rebuilt.selected);
+ // Every measure is reachable, to the end of the piece.
+ await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^(?:Left|Right) hand · measure \d+ of 64/);
+ await page.screenshot({path:output+'/7-end.png'});await press('Escape');
+ assert.equal(await page.getAttribute('[data-practice="study:mechanics"]','aria-pressed'),'true');assert.match(await page.textContent('.practice-overview [data-practice^="passage:"]'),/^Practice /);
  assert.deepEqual(errors,[]);console.log('ok',output);
 }finally{await browser?.close();await vite?.close();server.close();}

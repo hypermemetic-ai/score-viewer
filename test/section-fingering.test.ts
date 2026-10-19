@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits} from '../src/selection';import {sectionUnits,fingeringWindow,jumpLabels} from '../src/section-fingering';
+import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits} from '../src/selection';import {sectionUnits,pieceUnits,fingeringWindow,jumpLabels} from '../src/section-fingering';import {planPractice} from '../src/practice';
 const importPackage=(bytes:Uint8Array)=>importPackageStrict(bytes,{allowLegacyTempo:true});
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
 // Zero-based bars 8..11 are written bars 9..12: both hands are present.
@@ -44,6 +44,17 @@ test('a section spanning the whole score holds every unit once',()=>{
  const units=sectionUnits(p,{firstBar:0,lastBar:63});
  assert.equal(units.length,editUnits(p).length);
  assert.equal(new Set(units.map(s=>s.contactId)).size,units.length);
+});
+
+test('the piece is fingered once through, section by section, each right hand before its left',()=>{
+ const plan=planPractice(p,undefined,undefined,{version:'reference-performance-tempo-v1',bpm:80,beat:{numerator:1,denominator:4},provenance:{kind:'editorial',reference:'test'}}),units=pieceUnits(p,plan);
+ assert.equal(units.length,editUnits(p).length);
+ assert.equal(new Set(units.map(s=>s.contactId)).size,units.length);
+ // Measures never go backwards except where a section's left hand starts again at its first measure.
+ const sections=plan.chunks.filter(c=>!c.components?.length&&c.kind!=='contrast');
+ const of=(s:Seat)=>sections.find(c=>s.writtenBar-1>=c.firstBar&&s.writtenBar-1<=c.lastBar)!.firstBar;
+ for(let i=1;i<units.length;i++){assert.ok(of(units[i])>=of(units[i-1]),'sections in order');if(of(units[i])===of(units[i-1]))assert.ok(rank(p,units[i])>=rank(p,units[i-1]),'right hand before left within a section');}
+ assert.deepEqual(pieceUnits({...p},{chunks:[],barTicks:plan.barTicks}).map(s=>s.contactId),sectionUnits(p,{firstBar:0,lastBar:plan.barTicks.length-2}).map(s=>s.contactId),'without sections the piece is one run');
 });
 
 test('fingering window shows two bars either side and ghosts the outer two',()=>{
