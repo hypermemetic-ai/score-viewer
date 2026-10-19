@@ -1,25 +1,25 @@
 {
   "schema": 1,
-  "viewerRevision": "d41c19e0bf9504f2c40d3ad10bc5880c47534ee6",
-  "notationRevision": "916245c5ba526885b210fdd6645006b1477a9811",
-  "frontendDigest": "dff59deacd420aab2e6bf880daf75e9814425c03ea119bfd2293fc459381e0e7",
+  "viewerRevision": "e99acdc5e1168580665cbea2834cab8e750f111c",
+  "notationRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
+  "frontendDigest": "4dfd360f3b244349090c2c7cd05681ed95da95028abd514ad446305c5364ca98",
   "checks": {
     "tests": {
       "status": "passed",
-      "sourceCommit": "d41c19e0bf9504f2c40d3ad10bc5880c47534ee6",
+      "sourceCommit": "e99acdc5e1168580665cbea2834cab8e750f111c",
       "command": "npm test",
-      "tests": 1242,
-      "passed": 1234,
+      "tests": 1250,
+      "passed": 1242,
       "failed": 0,
       "todo": 8,
-      "durationMs": 103637,
+      "durationMs": 158559,
       "additional": [
         {
           "command": "node --test test/*.test.mjs",
           "tests": 47,
           "passed": 47,
           "failed": 0,
-          "durationMs": 5804
+          "durationMs": 7680
         },
         {
           "command": "npx tsc --noEmit -p .",
@@ -27,67 +27,66 @@
         }
       ],
       "todoNote": "3 todo tests are half-handed MusicXML unison keys that ISO refuses on import (source-beam-coverage), todo since PR 121. 5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved at bee8c67; each is todo only on that exact refusal (PR 128).",
-      "scope": "Complete suite on a clean clone of merged main d41c19e (PR 145 merge, which adds -text for src-tauri/src/derived_cache.rs to PR 144's merge 800c5f8), after PRs 130-145 since the 9c23896 seal."
+      "scope": "Complete suite on a clean clone of merged main e99acdc (PR 147 merge onto PR 148's merge 47d959f), after PRs 146-148 since the d41c19e seal."
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "d41c19e0bf9504f2c40d3ad10bc5880c47534ee6",
+      "sourceCommit": "e99acdc5e1168580665cbea2834cab8e750f111c",
       "configured": "npm run build: TypeScript + source pin validation + fingering-assistance pin + Vite",
       "frontendFiles": 24,
-      "frontendDigest": "dff59deacd420aab2e6bf880daf75e9814425c03ea119bfd2293fc459381e0e7"
+      "frontendDigest": "4dfd360f3b244349090c2c7cd05681ed95da95028abd514ad446305c5364ca98"
     },
     "browserInspection": {
       "status": "passed",
       "ownerLibraryRehearsal": {
-        "sourceCommit": "fba8af5",
-        "frontend": "Byte-identical to the frozen frontend (diff -r of the fba8af5 build and the clean 800c5f8 and d41c19e builds: no differences; 824bfb9 changes docs only and d41c19e .gitattributes only).",
+        "sourceCommit": "e99acdc5e1168580665cbea2834cab8e750f111c",
+        "frontend": "The frozen frontend itself (/tmp/sv-d18f/seal/frontend, built from the clean e99acdc clone).",
         "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints (worker-src unchanged)",
-        "data": "Read-only copy of the owner's laptop data taken 2026-10-18 (piano sample bank excluded); every write kept in memory, two sessions against the same in-memory disk",
+        "data": "Read-only copy of the owner's laptop data taken 2026-10-19 02:29 UTC, after the d41c19e install (piano sample bank excluded); every write kept in memory, two sessions against the same in-memory disk",
         "firstOpenMs": {
-          "No. 13 (approved-v3)": 4909,
-          "No. 14 (retained no14-recovery)": 5487,
-          "Zelda's Lullaby (calculated)": 2932,
-          "Add It Up (reading v1)": 24677,
-          "Bach Goldberg Var. 1 (approved-v3)": 2783
+          "No. 13": 3988,
+          "No. 14 (retained no14-recovery)": 7318,
+          "Zelda's Lullaby (calculated)": 3889,
+          "Add It Up (reading v1)": 20372,
+          "Bach Goldberg Var. 1 (approved-v3)": 1984
         },
         "reopenMs": {
-          "No. 13": 5677,
-          "No. 14": 9932,
-          "Zelda's Lullaby": 4041,
-          "Add It Up": 7851,
-          "Bach Goldberg Var. 1": 2922
+          "No. 13": 4250,
+          "No. 14": 8004,
+          "Zelda's Lullaby": 3352,
+          "Add It Up": 5155,
+          "Bach Goldberg Var. 1": 2835
         },
-        "observed": "No. 13, Zelda and Bach engrave again once with 'This score was engraved again with the current engraving. Your hands, fingers and choices came along.'; Add It Up engraves again with '... Your place and practice came along.'; No. 14 opens its stored pages with no notice (a retained recipe keeps its earlier slurs); reopening shows no notice; no page errors. No. 13 page 1 screenshot inspected: note-gesture slurs and hand marks visible (stem '+1/2' marks not resolvable at that resolution); the engraved-again notice covers part of the fourth system while shown. Hand edit right after opening No. 13: 'Preparing hand editing' panel in 17 ms; leaving saved nothing and said so. Personal fingering memory compared order-independently: 186 = 186 facts, 0 lost, 0 gained. The same rehearsal at 0445ef6 (ISO 53c4c98) found Add It Up refused with 'Unsupported reading option phraseRouting', fixed in fba8af5.",
-        "screenshots": "/tmp/sv-d18/rehearsal/out3 on the build host"
+        "observed": "No. 13 and No. 14 open on their saved editions with no notice and no new package. Zelda and Bach (last saved before the d41c19e install and not opened since) engrave again once with 'This score was engraved again with the current engraving. Your hands, fingers and choices came along.'; Add It Up with '... Your place and practice came along.'. Reopening shows no notice; no page errors. Hand edit right after opening No. 13: the preparation panel in 56 ms; leaving saved nothing. Personal fingering memory compared order-independently: 186 = 186 facts, 0 lost, 0 gained; 53 = 53 with fields.",
+        "dualReading": "A stale dual reading (the authored fretted fixture with phraseRouting 'optical-open' recorded, as a pre-#421 dual archive would carry) added to a second copy of the same data: refused on import, engraved again on opening in 2421 ms with '... Your place and practice came along.', ISO view shown; reopened in 916 ms with no notice; its library row shows 'Sections 0%'; no page errors.",
+        "screenshots": "/tmp/sv-d18f/rehearsal/seal-full and seal-dual on the build host"
       },
-      "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. Dual readings (instrument-reading-package-v2) saved before ISO 53c4c98 are refused without being engraved again (the owner has none)."
+      "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. The owner's library has no dual reading; the dual-reading path was exercised only with the authored fixture. No. 14's #424 slur change (expected sub-visible) is not measured."
     },
     "independentReview": {
       "status": "passed",
-      "sourceCommit": "fba8af5",
+      "sourceCommit": "e99acdc5e1168580665cbea2834cab8e750f111c",
       "reviews": [
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/143",
-          "verdict": "fresh-context agent reviewed 9659740 from a clean clone (numeric arc cross-check, full suite): approve with nits; nits 1-3 fixed in aa04bc5, which was not re-reviewed"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/148",
+          "verdict": "fresh-context agent approved 9a1e709 (ISO pin 94978ca): no viewer plumbing needed for #424's settled routes, tieProportion is optional and Brahms-only; 36706a2 (provenance wording replacing an unverified claim with the rehearsal's observation) was not re-reviewed"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/144",
-          "verdict": "fresh-context agent approved 0445ef6 (proved stale editions are engraved again, not refused); a second fresh-context agent approved fba8af5 (reading options fix, ISO 916245c) but recommended settling the dual-reading (instrument-reading-package-v2) refusal before delivering this pin, or at the least recording it as a known limitation; this seal records it as a known limitation (owner has no dual readings). 824bfb9 (provenance wording for #422's visual impact and that limit) was not re-reviewed"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/147",
+          "verdict": "round 1 (fresh-context agent, b089b11): changes needed - a Guitar Pro source refusal after admission was answered by engraving again (medium), re-engraved readings skipped their Guitar Pro context (low), stale dual library progress threw (low); fixed in d861175. Round 2 (fresh-context agent, 9900432): approve; its non-blocking speed note (stale dual content read uncancellably on the main thread during the library scan) answered in 6d9d2a9, which was not re-reviewed"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/145",
-          "verdict": "fresh-context agent: approve, no findings; checked every native input freeze-inputs selects for -text"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/146",
+          "verdict": "the d41c19e seal; reviewed in its own PR (regenerated byte for byte)"
         }
       ],
-      "scope": "PRs 130-142 merged after the 9c23896 seal: 131, 133, 134, 137, 139 and 141 mention an independent review in their bodies; 142 cites ISO #414's review for its claim; 130, 132, 135, 136, 138 and 140 record none. Their behaviour is covered by the complete suite and the owner-library rehearsal above. The pinned notation 916245c is recorded in docs/source-provenance.json with each ISO PR's review record; none carries a GitHub review record. The seal itself is reviewed in its delivery PR.",
+      "scope": "PRs 146-148 merged after the d41c19e seal. The pinned notation 94978ca is recorded in docs/source-provenance.json with each ISO PR's review record (#423-#425 record independent reviews in their bodies; none carries a GitHub review record). The seal itself is reviewed in its delivery PR.",
       "reviewedCommits": [
-        "9659740 (PR 143)",
-        "0445ef6 (PR 144)",
-        "fba8af5 (PR 144)",
-        "b920282 (PR 145)",
-        "a901482 (this seal, regenerated byte for byte)"
+        "9a1e709 (PR 148)",
+        "b089b11 (PR 147, round 1)",
+        "9900432 (PR 147, round 2)"
       ],
-      "note": "No review ran on d41c19e itself; it differs from the reviewed fba8af5 by 824bfb9 (provenance wording) and PR 145 (.gitattributes), whose frontend is byte-identical."
+      "note": "No review ran on e99acdc itself; it differs from the reviewed 9900432 by 6d9d2a9 (cooperative content read in the library scan, with tests) and from the reviewed 9a1e709 by 36706a2 (provenance wording)."
     }
   }
 }

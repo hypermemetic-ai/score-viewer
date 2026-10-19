@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "d41c19e0bf9504f2c40d3ad10bc5880c47534ee6",
-    "tree": "5fd845a59c953885b136d473cc66b9238240002a",
-    "timestamp": "2026-10-18T23:58:05.000Z"
+    "revision": "e99acdc5e1168580665cbea2834cab8e750f111c",
+    "tree": "506e5ee560a48d2b9f20c428b142560572fabef3",
+    "timestamp": "2026-10-19T02:48:08.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
-    "revision": "916245c5ba526885b210fdd6645006b1477a9811"
+    "revision": "94978cace6832c64f47366a3269c2e9d2efd403f"
   },
   "nativeFiles": {
     ".cargo/config.toml": {
@@ -7623,8 +7623,8 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-CaMGZEmQ.js": {
-        "sha256": "157310c86c0f964c067e1cdc9f112842f3f59242383fd96926ca25f8f829699c",
+      "assets/footer-ink-probe-3FXmw3Lc.js": {
+        "sha256": "cec044c85759af1dc391ca72d72c0409b5dd62c53f1e21dae317938f7d26c612",
         "size": 8768
       },
       "assets/footer-probe-calculated-edition-MudBwqqr.tuna": {
@@ -7635,17 +7635,17 @@
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-Bf-PxvaR.js": {
-        "sha256": "5da09c0350f25faa7672bae149cd5faab90a689c1c6e7528a11e3499f50ab3f6",
-        "size": 663377
-      },
       "assets/index-CjEh9wH2.css": {
         "sha256": "a9741a0935610397f786d517743a56cae2c2dab1f255c7d4450704523f845b2b",
         "size": 48103
       },
-      "assets/layout-peer-worker-DP_ZoUDN.js": {
-        "sha256": "cb56373eebea79aec34c0ff0e4c7205885911ba0e79c4f883c0cb9ce7eff2109",
-        "size": 1237260
+      "assets/index-DTJHSELR.js": {
+        "sha256": "5b88d4dc43411cc696747b61d154331950342c6d3cedc526398544ae71a2efaa",
+        "size": 663629
+      },
+      "assets/layout-peer-worker-gxSeY0a-.js": {
+        "sha256": "22446873c28b53e14909d6dccf46d7497d530aa5bf1db706e775283e1e71aa04",
+        "size": 1240196
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7655,21 +7655,21 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/musescore-import-1dGdRSxa.js": {
-        "sha256": "b0b50f86c3e81088195a47357db71d4c869cf2012521ba3d23731a58f06a4deb",
+      "assets/musescore-import-CMEa4hDT.js": {
+        "sha256": "861d8c558eb8a9983bf78e7f4a2a100eb6851615b22b60ea85a386a3ca40b071",
         "size": 3943
       },
-      "assets/musicxml-import-npZ8dxpC.js": {
-        "sha256": "50467c0ca05b25b34f429e9d402cee650d28c80ea6d76fbcca62824271133d0a",
+      "assets/musicxml-import-DMytN3Sk.js": {
+        "sha256": "bc0a8374942565211b7ac9afe5f00d48190c1c6553ce215cc9debd792107d7bf",
         "size": 3809
       },
-      "assets/personal-projection-worker-CoQKBLRb.js": {
-        "sha256": "1072947a81a07d6277ca960764bb66a11d01eccd74d02c0de7f6750de0ad3d6e",
-        "size": 1550150
+      "assets/personal-projection-worker-Dnq8GlRn.js": {
+        "sha256": "7cd0ad2e0e500d15fd7891a771aabeabf99e5e039f59ae00d0fc4dc3a5701a3d",
+        "size": 1553281
       },
-      "assets/piano-readiness-DzwngW4O.js": {
-        "sha256": "ad3b4966a05ae63f543b70cc8f171e902516c254bd7b6c28b2484004b33abb31",
-        "size": 2468978
+      "assets/piano-readiness-ByjYzK5F.js": {
+        "sha256": "259130a58d44d6c49d8337e8618962255fbc34a519d16ce63f71f3c4f466dedc",
+        "size": 2473208
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
@@ -7704,11 +7704,11 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "53c43a494a8688da75268d5c1ef6224100eba1a4191a492dc2c947b1a5289183",
+        "sha256": "46ebe74692313ac874aaa6d49e6c54fb3ba62b6230643278e95219679b765040",
         "size": 323
       },
       "index.html": {
-        "sha256": "975e6f72300cc7a88521e5adcb43f3bfaa8c8167f12d11fdf117124bc3baf571",
+        "sha256": "b58fd447c73c8d174b8797bfaeabc7c1a0cd95d050d6bc4c222ac14ee7e4c0da",
         "size": 969
       },
       "review/schumann-no14-conventional-20261006.tuna": {
@@ -7716,11 +7716,11 @@
         "size": 423909
       }
     },
-    "digest": "dff59deacd420aab2e6bf880daf75e9814425c03ea119bfd2293fc459381e0e7"
+    "digest": "4dfd360f3b244349090c2c7cd05681ed95da95028abd514ad446305c5364ca98"
   },
   "checks": {
-    "sha256": "35ab728f354c4df4778c7166a21666bbae72e0d97e5e26ca5a140e30fb788985",
-    "size": 6376
+    "sha256": "6213e52c97b08de99a2a4d7f7c658d605b79ccc992cc9e61804f76c90aadb9c0",
+    "size": 6287
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
