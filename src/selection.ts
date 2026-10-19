@@ -2,8 +2,8 @@ import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-even
 import type {ScorePackage,Seat} from './package';
 /** One keyboard stop per physical contact, independent of SVG position or
  * duplicate heads. Fingering follows one hand's voice at a time: through each
- * printed system the right hand left to right, then the left hand, each chord
- * bottom to top. */
+ * printed system the right hand left to right, then the left hand (notes without
+ * a hand last), each chord bottom to top. */
 export function editUnits(p:Pick<ScorePackage,'score'|'seats'>):Seat[]{
  const notes=new Map(p.score.notes.map(n=>[n.id,n])),event=(s:Seat)=>requirePitchedEvent(notes.get(s.ownerIds[0])!),
   hand=(s:Seat)=>{const h=notes.get(s.ownerIds[0])?.hand;return h==='RH'?0:h==='LH'?1:2;},
