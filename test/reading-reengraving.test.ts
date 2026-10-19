@@ -48,6 +48,22 @@ test('a reading saved under an earlier engraving rule is engraved again under th
   assert.deepEqual((await importPackage(again!)).pages,(await importPackage(current)).pages);
 });
 
+test('a reading drawn with earlier shared tokens or an earlier engine is engraved again with today\'s',async()=>{
+  // Readings record the resolved tokens of the day; no producer chooses them.
+  const d=(m:Manifest)=>m.reading as unknown as {engineId:string;tokens:Record<string,unknown>};
+  const earlierWeight=await earlier((_files,m)=>{d(m).tokens={...d(m).tokens,digitFontSize:(d(m).tokens.digitFontSize as number)*.9};});
+  const removed=await earlier((_files,m)=>{d(m).tokens={...d(m).tokens,earlierToken:1};});
+  const earlierEngine=await earlier((_files,m)=>{d(m).engineId=m.engineVersion='janko-real-engine-instrument-reading-v0-earlier';});
+  for(const [stale,refused] of [[earlierWeight,/page differs|geometry differs/],[removed,/Unknown reading token/],[earlierEngine,/authority differs/]] as const){
+    const refusal=await importPackage(stale).then(()=>undefined,error=>error);
+    assert.match(String(refusal),refused);
+    assert.ok(await editionNeedsEngravingAgain(stale,refusal));
+    const again=await reengraveReadingArchive(stale,refusal);assert.ok(again);
+    assert.deepEqual(members(again!),members(current));
+    const {files:_a,...next}=manifest(again!),{files:_b,...today}=manifest(current);assert.deepEqual(next,today);
+  }
+});
+
 test('engraving a reading again keeps every refusal it cannot answer',async()=>{
   const refusal=Error('refused');
   // Not a single-reading archive: someone else's question.

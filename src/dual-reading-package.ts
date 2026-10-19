@@ -6,6 +6,7 @@ import {hashBytes,importPackageForReading,type Manifest,type Metadata,type Score
 import type {ReadingContent} from './reading-package';
 import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
 import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
+import {currentReadingOptions} from './reading-options';
 
 export type ReadingNotation='iso'|'tab';
 type PreparedViews=ReturnType<typeof prepareFrettedViews>;
@@ -102,7 +103,7 @@ function content(prepared:PreparedViews):ReadingContent {
 }
 /** Exact receiving-realm replay of BOTH presentations. A page hash or saved
  * geometry certificate never substitutes for this shared-source preparation. */
-function captureDualSource(m:Manifest,files:Record<string,Uint8Array>){
+function captureDualSource(m:Manifest,files:Record<string,Uint8Array>,contentOnly=false){
  const d=m.reading;
  if(!d||d.version!=='instrument-reading-package-v2'||!exactKeys(d,['version','sourcePartId','sourceStaffId','policy','options','tokens','views'])||
   !exactKeys(d.views,['iso','tab'])||!object(d.options)||!object(d.tokens)||forbidden.some(k=>k in m)||files['fingers.json']||
@@ -111,7 +112,7 @@ function captureDualSource(m:Manifest,files:Record<string,Uint8Array>){
  const score=parse(files,'score.json') as QuantizedGridScore;
  scoreBounds(score);
  if(score.id!==m.scoreId||score.title!==m.metadata.title||score.composer!==m.metadata.composer||!same(score.readingPolicy,d.policy)||
-  m.engineVersion!==FRETTED_ISO_ENGINE||!same(m.pages,d.views.iso.pages))throw Error('Dual reading source identity or default presentation differs.');
+  !contentOnly&&m.engineVersion!==FRETTED_ISO_ENGINE||!same(m.pages,d.views.iso.pages))throw Error('Dual reading source identity or default presentation differs.');
  return {score,descriptor:d};
 }
 function* finishDualReading(m:Manifest,files:Record<string,Uint8Array>,score:QuantizedGridScore,prepared:PreparedViews):Generator<PreparationStage,{score:QuantizedGridScore;pages:string[];reading:ReadingContent;manifest:Manifest},void>{
@@ -137,7 +138,18 @@ function* finishDualReading(m:Manifest,files:Record<string,Uint8Array>,score:Qua
  admittedViews.set(reading,{score,manifest:m,reading});
  return {score,pages:prepared.iso.pages,reading,manifest:m};
 }
-export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Array>){
+/** `contentOnly` reads a dual reading for its musical content: the same source
+ * and policy checks, but both views are drawn by today's engine and shared
+ * rules at the archive's own page dimensions instead of compared with the
+ * stored ones, which the archive's member hashes already bind. Such content
+ * is for engraving the archive again, never for display: it is not an
+ * admission {@link selectReadingNotation} accepts. */
+function freshContent(score:QuantizedGridScore,d:DualReadingDescriptor,prepared:PreparedViews){
+ if(d.sourcePartId!==prepared.sourcePartId||d.sourceStaffId!==prepared.sourceStaffId)throw Error('Dual reading selected source part differs.');
+ return {score,pages:prepared.iso.pages,reading:content(prepared)};
+}
+export function admitDualReadingContent(m:Manifest,files:Record<string,Uint8Array>,contentOnly=false){
+ if(contentOnly){const {score,descriptor}=captureDualSource(m,files,true);return freshContent(score,descriptor,checkedViews(score,currentReadingOptions(descriptor.options),{}));}
  const {score,descriptor}=captureDualSource(m,files),steps=finishDualReading(m,files,score,checkedViews(score,descriptor.options,descriptor.tokens));
  for(;;){const next=steps.next();if(next.done){const {manifest:_manifest,...reading}=next.value;return reading;}}
 }
@@ -146,6 +158,13 @@ export async function admitDualReadingContentAsync(inputManifest:Manifest,inputF
  checkReadingExecution(execution);
  const prepared=completeViews(score,await prepareFrettedViewsAsync(score,descriptor.options,descriptor.tokens,execution));
  return drainReadingChecks(finishDualReading(m,files,score,prepared),execution);
+}
+/** The cooperative form of reading a dual reading's content only. */
+export async function dualReadingContentAsync(inputManifest:Manifest,inputFiles:Record<string,Uint8Array>,inputExecution:ReadingExecution){
+ const m=literalCopy(inputManifest),files=literalCopy(inputFiles),execution=capturedReadingExecution(inputExecution),{score,descriptor}=captureDualSource(m,files,true);
+ checkReadingExecution(execution);
+ const prepared=completeViews(score,await prepareFrettedViewsAsync(score,currentReadingOptions(descriptor.options),{},execution));
+ checkReadingExecution(execution);return freshContent(score,descriptor,prepared);
 }
 
 /** One owned graph before asynchronous hashing. This path remains generic
