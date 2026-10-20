@@ -54,6 +54,11 @@ test('reverse projection completion preserves ordered navigation without replaci
  // The earlier snapshot, still waiting for its projection's turn, is superseded by the later whole state.
  assert.equal(f.writes.length,1);assert.equal(f.writes[0].choices.a.finger,4);assert.equal(f.writes[0].view.page,5);assert.equal(f.disk.view.page,5);assert.equal(f.target.personal.view.page,5);
 });
+test('an earlier snapshot already writing when a later choice lands still writes first, with its own navigation',async()=>{
+ const f=fixture(5,6),gate=deferred();let calls=0;f.setProject(async()=>++calls===1?gate.promise:f.projected);
+ const first=f.context.saveHandChoice('RH');await new Promise(r=>setTimeout(r,0));await f.context.saveFingerDigit(4);assert.equal(f.target.personal.view.page,5);gate.resolve({...f.p,seats:f.seats});await first;await f.editor.queue.flush();
+ assert.equal(f.writes.length,2);assert.equal(f.writes[0].view.page,0);assert.equal(f.writes[1].choices.a.finger,4);assert.equal(f.disk.view.page,5);assert.equal(f.target.personal.view.page,5);
+});
 test('a generic restore/history command captures and durably resolves its selected source alias across reflow',async()=>{
  const f=fixture(5,6);f.context.selection=f.seats[1];f.target.personal.editContactId=f.seats[1].contactId;f.target.personal.view.page=4;
  await f.context.commitPersonal(f.target,(s:any)=>{s.choices.b.hand='LH';return s;});await f.editor.queue.flush();
