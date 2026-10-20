@@ -1172,7 +1172,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
  // An admitted context has already resolved its tempo.
  if(admitted){if(admitted.plan.playerTempo)tempo=admitted.plan.referencePerformanceTempo;}
  // Fingers asks for no tempo: a remembered one, else a stand-in, only lays out the measures.
- else if(fingersOnly){requirePracticeHands(target.package,target.personal);const start=++practiceStartGeneration,prior=practice;tempo=savedPlayerTempo(target.package.score,await PracticeView.savedJournal(target.package,target.entry.id),context?.preferences)??playerTempo(target.package.score,FINGERS_LAYOUT_TEMPO);if(start!==practiceStartGeneration||current!==target||practice!==prior)return;}
+ else if(fingersOnly){requirePracticeHands(target.package,target.personal);const start=++practiceStartGeneration,prior=practice;tempo=savedPlayerTempo(target.package.score,await PracticeView.savedJournal(target.package,target.entry.id),context?.preferences)??playerTempo(target.package.score,FINGERS_LAYOUT_TEMPO);if(start!==practiceStartGeneration||current!==target||practice!==prior||readingPresentation)return;}
  else if(target.package.score.referencePerformanceTempo===undefined){
   // Refuse what practice cannot plan before asking for a tempo.
   requirePracticeHands(target.package,target.personal);

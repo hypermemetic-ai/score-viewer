@@ -431,7 +431,7 @@ export class PracticeView {
  /** Fingers has no practice settings: nothing in it is timed or saved. */
  optionsMarkup(){if(this.options.fingersOnly)return '';return practiceOptionsMarkup(this.plan.playerTempo?requireReferencePerformanceTempo(this.plan):requireReferencePerformanceTempo(this.options.package.score),this.state,this.speedInput('start',this.state.start,5,500,'Starting speed percent'),this.speedInput('step',this.state.step,.025,100,'Increase percent of target'),this.speedInput('connectionStart',this.state.connectionStart??this.state.target*.5,5,500,'Connection speed percent'),!!this.plan.playerTempo);}
  mountOptions(d:HTMLDialogElement,close:()=>void){
-  if(this.options.fingersOnly)return ()=>{};
+  if(this.options.fingersOnly)return ()=>{if(!this.disposed)this.paint();};
   this.settingsDialog=d;const section=d.querySelector<HTMLElement>('[data-practice-options]')!,abort=new AbortController();
   section.addEventListener('change',e=>this.settingChanged(e.target as HTMLInputElement),{signal:abort.signal});
   section.querySelector('[data-use-reference]')?.addEventListener('click',()=>{const next=setPracticeGoal(this.state,this.plan);delete this.state.personalGoal;Object.assign(this.state,next);this.contacts.clear();this.session?.pause();this.stopClock();void this.save(false);this.refreshSettings();this.paint();},{signal:abort.signal});
