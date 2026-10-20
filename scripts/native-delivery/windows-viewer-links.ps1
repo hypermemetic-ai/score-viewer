@@ -46,7 +46,7 @@ function Is-Viewer([string]$target){
  if($full -ieq $currentExe){return $true}
  return $full.StartsWith($packages,[StringComparison]::OrdinalIgnoreCase) -and [IO.Path]::GetFileName($full) -ieq 'iso-score-viewer.exe'
 }
-$Destination=(Resolve-Path -LiteralPath $Destination).ProviderPath
+$Destination=(Resolve-Path -LiteralPath $Destination).ProviderPath.TrimEnd('\')
 $exe=Join-Path $Destination 'iso-score-viewer.exe'
 if(-not (Test-Path -LiteralPath $exe -PathType Leaf)){throw "New package missing: $exe"}
 if(-not (Is-Viewer $exe) -or $exe -ieq $currentExe){throw "Not an installed viewer package: $exe"}
@@ -105,7 +105,7 @@ foreach($step in @($plan|Where-Object kind -eq 'desktop')){
  Move-Item -LiteralPath $step.link -Destination $step.backup
  $out.desktop+=[ordered]@{link=$step.link;target=$step.target;kept=$step.backup}
 }
-$pinned=@(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue|Where-Object{$t=$shell.CreateShortcut($_.FullName).TargetPath;$t -and ([IO.Path]::GetFullPath($t) -ieq $currentExe)})
+$pinned=@(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue|Where-Object{$t=$shell.CreateShortcut($_.FullName).TargetPath;$t -and (Is-Viewer $t) -and ([IO.Path]::GetFullPath($t) -ieq $currentExe)})
 $out.pinned=@($pinned|ForEach-Object FullName)
 if(-not $pinned.Count){$out.warning="No taskbar pin targets the viewer. Start $currentExe, pin it from the television's taskbar, close it and run this again; nothing was created."}
 $out|ConvertTo-Json -Depth 4
