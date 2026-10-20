@@ -1,25 +1,25 @@
 {
   "schema": 1,
-  "viewerRevision": "083d6e5761314917471f25c7adb5ffd265555c2c",
+  "viewerRevision": "735e4b9eed29833e22a656e10f963ef5d2a1908b",
   "notationRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
-  "frontendDigest": "f1ada46dc231f932a91680f37840e293f7e2455719d80b12f44a35b309e76f77",
+  "frontendDigest": "4a16363eaa3abdc6e1b91533f90170b9ec077bef9c76235e5c1f335ccbb9e1a5",
   "checks": {
     "tests": {
       "status": "passed",
-      "sourceCommit": "083d6e5761314917471f25c7adb5ffd265555c2c",
+      "sourceCommit": "735e4b9eed29833e22a656e10f963ef5d2a1908b",
       "command": "npm test",
-      "tests": 1260,
-      "passed": 1252,
+      "tests": 1262,
+      "passed": 1254,
       "failed": 0,
       "todo": 8,
-      "durationMs": 109779,
+      "durationMs": 94143,
       "additional": [
         {
           "command": "node --test test/*.test.mjs",
           "tests": 47,
           "passed": 47,
           "failed": 0,
-          "durationMs": 6602
+          "durationMs": 5772
         },
         {
           "command": "npx tsc --noEmit -p .",
@@ -27,53 +27,56 @@
         }
       ],
       "todoNote": "3 todo tests are half-handed MusicXML unison keys that ISO refuses on import (source-beam-coverage), todo since PR 121. 5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved at bee8c67; each is todo only on that exact refusal (PR 128).",
-      "scope": "Complete suite on a clean clone of merged main 083d6e5 (PRs 156-157: Fingers on the whole piece from the first gap; F opens it), after the 42d59bb seal."
+      "scope": "Complete suite on a clean clone of merged main 735e4b9 (PRs 159-161: practice menu and whole-piece Fingers; batched finger saves; taskbar pin script), after the 083d6e5 seal."
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "083d6e5761314917471f25c7adb5ffd265555c2c",
+      "sourceCommit": "735e4b9eed29833e22a656e10f963ef5d2a1908b",
       "configured": "npm run build: TypeScript + source pin validation + fingering-assistance pin + Vite",
       "frontendFiles": 24,
-      "frontendDigest": "f1ada46dc231f932a91680f37840e293f7e2455719d80b12f44a35b309e76f77"
+      "frontendDigest": "4a16363eaa3abdc6e1b91533f90170b9ec077bef9c76235e5c1f335ccbb9e1a5"
     },
     "browserInspection": {
       "status": "passed",
       "ownerLibraryRehearsal": {
-        "sourceCommit": "083d6e5761314917471f25c7adb5ffd265555c2c",
-        "frontend": "The frozen frontend itself (/tmp/sv-d23/seal/frontend, built from the clean 083d6e5 clone).",
+        "sourceCommit": "735e4b9eed29833e22a656e10f963ef5d2a1908b",
+        "frontend": "The frozen frontend itself (/tmp/sv-d25/seal/frontend, built from the clean 735e4b9 clone).",
         "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints (worker-src unchanged)",
         "data": "Read-only copy of the owner's laptop data taken 2026-10-19 18:49 with the e9c8adf install running (piano sample bank excluded); every write kept in memory",
         "firstOpenMs": {
-          "No. 14": 6085,
-          "Zelda's Lullaby": 3909,
-          "No. 13": 4458,
-          "Bach Goldberg Var. 1": 2504
+          "No. 13": 3183,
+          "No. 14": 5561,
+          "Zelda's Lullaby": 2782,
+          "Bach Goldberg Var. 1": 2210
         },
-        "observed": "Real key presses through main.ts on each piano score: P, F opens Fingers on the whole piece (No. 14 87 ms, Zelda 52 ms, No. 13 203 ms, Bach 123 ms) at the first note without a finger (No. 13: right hand, measure 3, 734 without a finger; Bach: measure 1, 550; No. 14 and Zelda fully fingered: measure 1, Tab says every note has a finger); Tab, 30 right arrows and End slide the strip to the last measure; Esc returns to the overview; reopening returns to where it was left (measure 54 / 32). Every Mechanics section of every score opened with a drawn stage and no failure text (No. 13 18, Bach 15, Zelda 7, No. 14 5). No page errors.",
-        "screenshots": "/tmp/sv-d23/rehearsal on the build host"
+        "observed": "Real key presses through main.ts at 1920x1080 on each piano score. P opens the practice menu (F Fingers, S Sections at tempo; arrows and Enter work, focus starts on Fingers); no practice toggles remain at the top right. F opens Fingers without asking for a tempo (No. 13 788 ms, No. 14 563 ms, Zelda 244 ms, Bach 300 ms) and says where it starts (No. 13: resuming at measure 2, the first with a note still without a finger; Bach: starting at the beginning; No. 14 and Zelda: every note has a finger). Walking every measure keeps the current measure centred to 0 px, with both neighbours fully in view, at one size (No. 14: two sizes 0.4% apart). Frame median 31-42 ms; at 4x CPU throttling 39-125 ms. No. 13 was fingered through with 315 key presses to 100% in both hands, then reopened 'Every note has a finger. Starting at the beginning.' Sections asked for a tempo only on Bach (no saved tempo) and opened every section (No. 13 18, Bach 15, Zelda 7, No. 14 5). No page errors.",
+        "screenshots": "/tmp/sv-d25/rehearsal on the build host"
       },
       "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. Add It Up is not a piano score and offers no practice."
     },
     "independentReview": {
       "status": "passed",
-      "sourceCommit": "083d6e5761314917471f25c7adb5ffd265555c2c",
+      "sourceCommit": "735e4b9eed29833e22a656e10f963ef5d2a1908b",
       "reviews": [
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/157",
-          "verdict": "author-reviewed; found by the full-app rehearsal of #156"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/159",
+          "verdict": "independent review: two defects (Fingers options showed and dropped the stand-in tempo; stand-in became the goal), fixed in 09581fd and 41316d0, then re-reviewed"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/156",
-          "verdict": "author-reviewed; scripts/inspect-section-fingering.mjs extended"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/160",
+          "verdict": "independent review: two defects (recovery order on a key-sorting store; refused view save cancelled a queued one), fixed in 7f14b9a, re-reviewed clean"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/155",
-          "verdict": "the 42d59bb seal; reviewed in its own PR"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/161",
+          "verdict": "independent review: $keep/$Keep clash and partial-change risks, rewritten in add293f and 933f89d, re-reviewed clean for PowerShell 5.1"
+        },
+        {
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/158",
+          "verdict": "the 083d6e5 seal; reviewed in its own PR"
         }
       ],
-      "scope": "PRs 156-157 merged after the 42d59bb seal; application code only. Notation pin 94978ca unchanged.",
-      "reviewedCommits": [],
-      "note": "No independent review ran on 156 or 157."
+      "scope": "PRs 159-161 merged after the 083d6e5 seal. Notation pin 94978ca unchanged.",
+      "reviewedCommits": []
     }
   }
 }
