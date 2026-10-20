@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "735e4b9eed29833e22a656e10f963ef5d2a1908b",
-    "tree": "522f3f57801b43018861bebf25d757a5c9b15f2a",
-    "timestamp": "2026-10-20T01:55:08.000Z"
+    "revision": "f42ab2cdd878f3579a67130a3b12c306db87d2d7",
+    "tree": "9424e8dc502cfbb623596282b92e4363649ce20a",
+    "timestamp": "2026-10-20T02:42:15.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
@@ -253,8 +253,8 @@
       "size": 12601
     },
     "src-tauri/src/main.rs": {
-      "sha256": "a0e1693fdc03e4158958b2552870cf662c8cc68708dd0ae59d622be0ff177114",
-      "size": 9064
+      "sha256": "7a997b34396b363fec06d6803e7e92c797d5ffdd6cfdfcd0e00f42b9545edd68",
+      "size": 9567
     },
     "src-tauri/src/managed_files.rs": {
       "sha256": "8ff5012ee7eb77b4c2a57bc786841aa3628793dfb635bdc35c2aaeb6d8f353bb",
@@ -277,8 +277,8 @@
       "size": 31622
     },
     "src-tauri/src/piano_bank.rs": {
-      "sha256": "97f2468e1b76bb0de64aa4b64e5e7170f9c8c098d2f04193146caeb7aa49bb5b",
-      "size": 9052
+      "sha256": "a540cce94512bbc1f761858bdd89dc274c24490a2fbe3887ff0e2475c6bc6489",
+      "size": 9092
     },
     "src-tauri/src/piano_engine.rs": {
       "sha256": "0106fbd30a5e0588d689c42573285a4fd5ae6062dceb896a84b584634d7e4e4d",
@@ -7719,8 +7719,8 @@
     "digest": "4a16363eaa3abdc6e1b91533f90170b9ec077bef9c76235e5c1f335ccbb9e1a5"
   },
   "checks": {
-    "sha256": "bc10996b593c0f0f3439c1fa9ccc0b4260ac2bc2c7a49a65b6748b18a9580acb",
-    "size": 5089
+    "sha256": "35b2eeda556b4ce7f9df70ef3da320ce530823db9b987e7322ca551ca5d65382",
+    "size": 5848
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
