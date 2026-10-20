@@ -27,7 +27,7 @@ test('MusicXML import is on for players; MuseScore stays behind its development 
  const host=readFileSync(new URL('../src/host.ts',import.meta.url),'utf8');
  assert.match(host,/invoke<string\|null>\('pick_score',\{musescore:MUSESCORE_IMPORT_ENABLED\}\)/);
  const rust=readFileSync(new URL('../src-tauri/src/main.rs',import.meta.url),'utf8');
- assert.match(rust,/async fn pick_score\(musescore:Option<bool>\)/);
+ assert.match(rust,/async fn pick_score\(window:tauri::WebviewWindow,musescore:Option<bool>\)/);
  assert.match(rust,/let mut kinds=vec!\["tuna","gp","gpx","gp3","gp4","gp5","musicxml","xml","mxl"\];if musescore==Some\(true\)\{kinds\.extend\(\["mscz","mscx"\]\);\}/);
  assert.equal(scoreImportKind(fixture('cross-staff-arpeggio.mscz')),'musescore');
  assert.equal(scoreImportKind(fixture('original-piano-clarinet.mscx')),'musescore');

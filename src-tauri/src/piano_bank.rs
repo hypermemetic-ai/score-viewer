@@ -169,6 +169,7 @@ pub async fn piano_bank_status(
 #[tauri::command]
 pub async fn piano_bank_install(
     app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     state: tauri::State<'_, State>,
 ) -> Result<Status, String> {
     let root = cache_root(&app)?;
@@ -190,7 +191,7 @@ pub async fn piano_bank_install(
     let state = state.inner().clone();
     let worker = state.clone();
     match tauri::async_runtime::spawn_blocking(move || {
-        let result = match rfd::FileDialog::new()
+        let result = match crate::owned_dialog(&window)
             .add_filter("Accurate-Salamander piano", &["zip"])
             .pick_file()
         {
