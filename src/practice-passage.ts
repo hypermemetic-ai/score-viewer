@@ -25,8 +25,10 @@ export interface Crop {bar:number;empty?:boolean;svg:SVGSVGElement;
  /** Detached ordinary rule of the measure's own system, for continuing its style at a system break. */
  separator?:SVGLineElement;seats:Seat[];width:number;height:number;left:number;right:number;leftAir:number;rightAir:number;endingType?:string;frame:number;lanes:number[];owned:Array<{el:SVGElement;groups:string[]}>}
 /** Copy real-engine ink; attach source group ownership to existing vector elements, never invent notes. */
-export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
- const seats=p.seats.filter(s=>s.writtenBar===bar+1);let first=seats[0],doc:Document,system:Element;
+/** A measure's source system and its left and right rules, read from the
+ * printed boundary map without copying any ink. */
+export function measureBounds(p:ScorePackage,plan:PracticePlan,bar:number):{seats:Seat[];first:Pick<Seat,'page'|'system'>;doc:Document;system:Element;all:Seat[];left:number;right:number;gridLeft:number;gridRight:number} {
+ const seats=p.seats.filter(s=>s.writtenBar===bar+1);let first:Pick<Seat,'page'|'system'>=seats[0],doc:Document,system:Element;
  if(first){doc=sourcePage(p,first.page);system=doc.querySelector(`#system-${first.system+1}`)!;}
  else {
   // A rest-only bar has no pitch seat. Use the real engine's printed system
@@ -48,6 +50,10 @@ export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
   left=offset===0?gridLeft:rules[offset-1];right=rules[offset]??gridRight;
  }
  if(!Number.isFinite(left)||!Number.isFinite(right)||right!<=left!)throw Error('Vector measure boundaries are unsupported.');
+ return {seats,first,doc,system,all,left:left!,right:right!,gridLeft,gridRight};
+}
+export function cropMeasure(p:ScorePackage,plan:PracticePlan,bar:number):Crop {
+ const {seats,first,doc,system,all,left,right,gridLeft,gridRight}=measureBounds(p,plan,bar);
  const beat=system.querySelector<SVGLineElement>('.janko-beat-line')??system.querySelector<SVGLineElement>('.janko-barline')!;const top=Number(beat.getAttribute('y1'))-30,bottom=Number(beat.getAttribute('y2'))+32;
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`${left!} ${top} ${right!-left!} ${bottom-top}`);svg.setAttribute('preserveAspectRatio','xMidYMid meet');svg.dataset.practiceBar=String(bar+1);for(const resource of [...doc.documentElement.children].filter(el=>['style','defs'].includes(el.localName)))svg.append(document.importNode(resource,true));svg.append(document.importNode(system,true));applyAnnotationInkPolicy(svg,annotationInkPolicyFor(p));const clone=svg.querySelector(`#system-${first.system+1}`)!;clone.removeAttribute('id');clone.querySelectorAll('.janko-measure-num,.janko-system-bracket').forEach(e=>e.remove());
  // The system's ordinary rule style, kept before this bar's entering rule is

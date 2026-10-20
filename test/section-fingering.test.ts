@@ -1,60 +1,39 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits} from '../src/selection';import {sectionUnits,pieceUnits,fingeringWindow,jumpLabels} from '../src/section-fingering';import {planPractice} from '../src/practice';
+import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits} from '../src/selection';import {pieceUnits,fingeringProgress,percent,fingeringWindow,jumpLabels} from '../src/section-fingering';
 const importPackage=(bytes:Uint8Array)=>importPackageStrict(bytes,{allowLegacyTempo:true});
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
-// Zero-based bars 8..11 are written bars 9..12: both hands are present.
-const chunk={firstBar:8,lastBar:11};const inSection=(s:Seat)=>s.writtenBar-1>=chunk.firstBar&&s.writtenBar-1<=chunk.lastBar;
 const handOf=(q:Pick<ScorePackage,'score'>,s:Seat)=>q.score.notes.find(n=>n.id===s.ownerIds[0])?.hand;
 const rank=(q:Pick<ScorePackage,'score'>,s:Seat)=>{const h=handOf(q,s);return h==='RH'?0:h==='LH'?1:2;};
 
-test('section units list the right hand, then the left, then hand-less notes',()=>{
- const units=sectionUnits(p,chunk),ranks=units.map(s=>rank(p,s));
- assert.ok(units.length>0);
- assert.deepEqual(ranks,[...ranks].sort((a,b)=>a-b));
- assert.ok(ranks.includes(0)&&ranks.includes(1));
-});
-test('section units are exactly the seats written inside the section, once per contact',()=>{
- const units=sectionUnits(p,chunk);
- assert.ok(units.every(inSection));
- assert.equal(units.length,p.seats.filter(inSection).length);
- assert.deepEqual(new Set(units.map(s=>s.writtenBar)),new Set([9,10,11,12]));
+test('the piece is fingered a measure at a time, each measure\'s right hand before its left',()=>{
+ const units=pieceUnits(p);
+ assert.equal(units.length,editUnits(p).length);
  assert.equal(new Set(units.map(s=>s.contactId)).size,units.length);
+ for(let i=1;i<units.length;i++){const a=units[i-1],b=units[i];assert.ok(b.writtenBar>=a.writtenBar,'measures in order');if(b.writtenBar===a.writtenBar)assert.ok(rank(p,b)>=rank(p,a),'right hand before left within a measure');}
+ // Within one measure and hand, the editor's order is kept.
+ const all=editUnits(p);
+ for(const hand of ['RH','LH'])for(const bar of [1,9,30])assert.deepEqual(units.filter(s=>s.writtenBar===bar&&handOf(p,s)===hand).map(s=>s.id),all.filter(s=>s.writtenBar===bar&&handOf(p,s)===hand).map(s=>s.id),`${hand} ${bar}`);
 });
 test('held aliases of one contact add no second unit',()=>{
- const seat=p.seats.find(inSection)!;
+ const seat=p.seats.find(s=>s.writtenBar===9)!;
  const q={...p,seats:[...p.seats,{...seat,id:'held-alias',continuation:true},{...seat,id:'repeat-alias'}]};
- const units=sectionUnits(q,chunk);
- assert.equal(units.length,sectionUnits(p,chunk).length);
- assert.equal(new Set(units.map(s=>s.contactId)).size,units.length);
+ const units=pieceUnits(q);
+ assert.equal(units.length,pieceUnits(p).length);
  assert.equal(units.filter(s=>s.contactId===seat.contactId).length,1);
 });
-test('each hand keeps the editUnits order, filtered to the section',()=>{
- const units=sectionUnits(p,chunk),all=editUnits(p);
- for(const hand of ['RH','LH'])assert.deepEqual(units.filter(s=>handOf(p,s)===hand).map(s=>s.id),all.filter(s=>inSection(s)&&handOf(p,s)===hand).map(s=>s.id),hand);
-});
-test('hand-less notes come last and keep the editUnits order',()=>{
- const handless=new Set(sectionUnits(p,chunk).filter((_,i)=>i%4===0).map(s=>s.ownerIds[0]));
+test('notes without a hand come after both hands of their measure',()=>{
+ const handless=new Set(pieceUnits(p).filter((_,i)=>i%4===0).map(s=>s.ownerIds[0]));
  const q={...p,score:{...p.score,notes:p.score.notes.map(n=>handless.has(n.id)?{...n,hand:undefined}:n)}} as ScorePackage;
- const units=sectionUnits(q,chunk),all=editUnits(q),ranks=units.map(s=>rank(q,s));
- assert.deepEqual(ranks,[...ranks].sort((a,b)=>a-b));
- assert.equal(ranks.filter(r=>r===2).length,sectionUnits(p,chunk).filter((_,i)=>i%4===0).length);
- assert.deepEqual(units.filter(s=>rank(q,s)===2).map(s=>s.id),all.filter(s=>inSection(s)&&handOf(q,s)===undefined).map(s=>s.id));
+ const units=pieceUnits(q);
+ for(let i=1;i<units.length;i++)if(units[i].writtenBar===units[i-1].writtenBar)assert.ok(rank(q,units[i])>=rank(q,units[i-1]));
 });
-test('a section spanning the whole score holds every unit once',()=>{
- const units=sectionUnits(p,{firstBar:0,lastBar:63});
- assert.equal(units.length,editUnits(p).length);
- assert.equal(new Set(units.map(s=>s.contactId)).size,units.length);
-});
-
-test('the piece is fingered once through, section by section, each right hand before its left',()=>{
- const plan=planPractice(p,undefined,undefined,{version:'reference-performance-tempo-v1',bpm:80,beat:{numerator:1,denominator:4},provenance:{kind:'editorial',reference:'test'}}),units=pieceUnits(p,plan);
- assert.equal(units.length,editUnits(p).length);
- assert.equal(new Set(units.map(s=>s.contactId)).size,units.length);
- // Measures never go backwards except where a section's left hand starts again at its first measure.
- const sections=plan.chunks.filter(c=>!c.components?.length&&c.kind!=='contrast');
- const of=(s:Seat)=>sections.find(c=>s.writtenBar-1>=c.firstBar&&s.writtenBar-1<=c.lastBar)!.firstBar;
- for(let i=1;i<units.length;i++){assert.ok(of(units[i])>=of(units[i-1]),'sections in order');if(of(units[i])===of(units[i-1]))assert.ok(rank(p,units[i])>=rank(p,units[i-1]),'right hand before left within a section');}
- assert.deepEqual(pieceUnits({...p},{chunks:[],barTicks:plan.barTicks}).map(s=>s.contactId),sectionUnits(p,{firstBar:0,lastBar:plan.barTicks.length-2}).map(s=>s.contactId),'without sections the piece is one run');
+test('progress counts the fingered share of the piece and of each hand',()=>{
+ const units=pieceUnits(p),done=new Set(units.filter((_,i)=>i%3===0).map(s=>s.id)),hand=(s:Seat)=>handOf(p,s);
+ const progress=fingeringProgress(units,s=>done.has(s.id),hand);
+ assert.equal(progress.total,units.length);assert.equal(progress.done,done.size);
+ assert.equal(progress.hands.RH.total+progress.hands.LH.total,units.filter(s=>hand(s)).length);
+ assert.equal(progress.hands.RH.done,units.filter(s=>hand(s)==='RH'&&done.has(s.id)).length);
+ assert.equal(percent(0,10),0);assert.equal(percent(5,10),50);assert.equal(percent(999,1000),99,'never 100 until every note');assert.equal(percent(10,10),100);assert.equal(percent(0,0),100);
 });
 
 test('fingering window shows two bars either side and ghosts the outer two',()=>{

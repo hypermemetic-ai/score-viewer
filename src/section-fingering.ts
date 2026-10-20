@@ -3,32 +3,30 @@ import {fingerFor,type PersonalState} from './state';
 import type {FingerPresentation} from './input';
 import {annotationPositions,paintFinger} from './fingering-presentation';
 import {editUnits} from './selection';
-import {cropMeasure,composePassage,passageTrack,fitPassageRelations,fitPassageFrame,type Crop} from './practice-passage';
+import {cropMeasure,measureBounds,composePassage,passageTrack,fitPassageRelations,type Crop} from './practice-passage';
 import {projectRelations} from './practice-relations';
-import type {PracticeChunk,PracticePlan} from './practice';
+import type {PracticePlan} from './practice';
 
 const ns='http://www.w3.org/2000/svg';
 /** Jump labels, home row first. L and R always choose a hand, so neither is a label. */
 const LETTERS='asdfghjkqwetyuiopzxcvbnm';
 const handOf=(p:Pick<ScorePackage,'score'>)=>{const notes=new Map(p.score.notes.map(n=>[n.id,n.hand]));return (s:Seat)=>notes.get(s.ownerIds[0]);};
 
-/** The section's notes in fingering order: the whole right hand left to right,
- * then the whole left hand, each chord bottom to top. */
-export function sectionUnits(p:Pick<ScorePackage,'score'|'seats'>,chunk:Pick<PracticeChunk,'firstBar'|'lastBar'>):Seat[]{
+/** The whole piece in fingering order, a measure at a time: each measure's
+ * right hand, then its left hand, each in the editor's order. */
+export function pieceUnits(p:Pick<ScorePackage,'score'|'seats'>):Seat[]{
  const hand=handOf(p),rank=(s:Seat)=>{const h=hand(s);return h==='RH'?0:h==='LH'?1:2;};
- return editUnits(p).filter(s=>s.writtenBar-1>=chunk.firstBar&&s.writtenBar-1<=chunk.lastBar).map((s,i)=>({s,i})).sort((a,b)=>rank(a.s)-rank(b.s)||a.i-b.i).map(({s})=>s);
+ return editUnits(p).map((s,i)=>({s,i})).sort((a,b)=>a.s.writtenBar-b.s.writtenBar||rank(a.s)-rank(b.s)||a.i-b.i).map(({s})=>s);
 }
-/** The whole piece in fingering order, one practice section at a time (the
- * sections stay unseen): each section's right hand, then its left hand. */
-export function pieceUnits(p:Pick<ScorePackage,'score'|'seats'>,plan:Pick<PracticePlan,'chunks'|'barTicks'>):Seat[]{
- const bars=plan.barTicks.length-1,spans:{firstBar:number;lastBar:number}[]=[];let next=0;
- for(const c of [...plan.chunks].filter(c=>!c.components?.length&&c.kind!=='contrast').sort((a,b)=>a.firstBar-b.firstBar||a.lastBar-b.lastBar))if(c.firstBar===next&&c.lastBar<bars){spans.push(c);next=c.lastBar+1;}
- // Measures the sections leave out are one more run.
- if(next<bars)spans.push({firstBar:next,lastBar:bars-1});
- return spans.flatMap(span=>sectionUnits(p,span));
+export interface FingeringProgress {done:number;total:number;hands:{RH:{done:number;total:number};LH:{done:number;total:number}}}
+/** How much of the piece carries a finger, overall and for each hand. */
+export function fingeringProgress(units:readonly Seat[],fingered:(s:Seat)=>boolean,hand:(s:Seat)=>string|undefined):FingeringProgress {
+ const result:FingeringProgress={done:0,total:units.length,hands:{RH:{done:0,total:0},LH:{done:0,total:0}}};
+ for(const s of units){const done=fingered(s),h=hand(s);if(done)result.done++;if(h==='RH'||h==='LH'){result.hands[h].total++;if(done)result.hands[h].done++;}}
+ return result;
 }
-/** Where each score's fingering was left, for reopening during this run of the viewer. */
-const resumeAt=new Map<string,string>();
+/** Whole percent, never rounded up to 100 before every note is done. */
+export const percent=(done:number,total:number)=>total?Math.min(Math.round(done/total*100),done<total?99:100):100;
 /** The window around the cursor's measure: the previous, current and next
  * measures, with the two beyond them ghosted. Zero-based bars. */
 export function fingeringWindow(barCount:number,bar:number):{bars:number[];ghosts:Set<number>}{
@@ -48,27 +46,37 @@ export interface SectionFingeringOptions {
  save:(seat:Seat,finger:number)=>Promise<unknown>;saveHand?:(seat:Seat,hand:'LH'|'RH')=>Promise<unknown>;
  /** The note to start on, as left when practice was rebuilt. */
  start?:string;status:(message:string)=>void;
+ /** Called whenever the share of fingered notes may have changed. */
+ progress?:(progress:FingeringProgress)=>void;
 }
-interface FingeringWindow {bar:number;svg:SVGSVGElement;crops:Crop[]}
-/** Finger the whole piece from the keyboard, one hand of one section at a
- * time. Nothing is played or checked. It opens on the first note without a
- * finger, or where it was left; each finger moves on to the next note without
- * one. The view slides with the cursor; any note in reach can be targeted
- * directly with a jump label. */
+/** A composed window: each measure's displayed interval, and the staff's
+ * middle and the ink's vertical reach, all in the passage's own units. */
+interface FingeringWindow {bar:number;svg:SVGSVGElement;crops:Crop[];spans:Map<number,[number,number]>;middle:number;top:number;bottom:number}
+/** Finger the whole piece from the keyboard, a measure at a time, right hand
+ * then left. Nothing is played or checked, and nothing is enforced: any note
+ * can be visited and any can stay without a finger. It opens at the first
+ * note without a finger; each finger moves on to the next note without one.
+ * The current measure is always centred, with its neighbours either side and
+ * the two beyond them ghosted. */
 export class SectionFingering {
- readonly units:Seat[];readonly chunk:{firstBar:number;lastBar:number};private cursor?:Seat;private readonly positions;private readonly hand;private readonly resumeKey:string;
+ readonly units:Seat[];private cursor?:Seat;private readonly positions;private readonly hand;
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
- private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;
- private missing?:{personal:PersonalState;count:number};
+ private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;private scale?:number;private half?:number;private resize:ResizeObserver;
+ private counted?:{personal:PersonalState;progress:FingeringProgress};
+ /** What opening said about where it started, shown until the first move. */
+ private opening?:string;
  constructor(readonly mount:HTMLElement,readonly options:SectionFingeringOptions){
   this.positions=annotationPositions(options.package);this.hand=handOf(options.package);
-  this.chunk={firstBar:0,lastBar:this.barCount-1};this.units=pieceUnits(options.package,options.plan);
-  this.resumeKey=options.plan.sourcePracticeIdentity??options.package.manifest.metadata.title;
-  // A rebuilt practice keeps its exact note; reopening goes to the first gap
-  // from where fingering was left, else the first in the piece.
-  const left=this.units.findIndex(s=>s.contactId===resumeAt.get(this.resumeKey));
-  this.cursor=options.start&&options.package.seats.find(s=>s.contactId===options.start)||this.gap(Math.max(0,left),1,true)||this.units[0];
+  this.units=pieceUnits(options.package);
+  // A rebuilt practice keeps its exact note; otherwise start at the first
+  // note without a finger, which is the beginning for an unfingered piece.
+  const kept=options.start?options.package.seats.find(s=>s.contactId===options.start):undefined;
+  this.cursor=kept??this.gap(0,1,true)??this.units[0];
+  if(!kept&&this.cursor){const bar=this.cursor.writtenBar;this.opening=bar>1||this.cursor!==this.units[0]?`Resuming at measure ${bar}, the first with a note still without a finger.`:'Starting at the beginning.';if(!this.gap(0,1,true))this.opening='Every note has a finger. Starting at the beginning.';}
   mount.addEventListener('click',this.click);
+  // The stage settles after the header and status first paint; any change of
+  // its size re-centres the shown measure without composing anything again.
+  this.resize=new ResizeObserver(()=>{if(!this.shown||this.disposed)return;this.scale=undefined;this.centre(this.shown);this.paintLabels();});this.resize.observe(mount);
  }
  /** The next note without a finger from index i in the given direction,
   * wrapping round the piece; i itself counts only when inclusive. */
@@ -77,9 +85,9 @@ export class SectionFingering {
   for(let k=inclusive?0:1;k<=n;k++){const seat=this.units[((i+step*k)%n+n)%n];if(seat&&seat.contactId!==except&&fingerFor(this.options.basePackage,personal,seat)===undefined)return seat;}
   return undefined;
  }
- dispose(){this.disposed=true;this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
+ dispose(){this.disposed=true;this.resize.disconnect();this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
  /** Footer hints for the fingering keys. */
- static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>Tab</kbd> Next without a finger</span><span><kbd>←→</kbd> Previous, next note</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
+ static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>Tab</kbd> Next without a finger</span><span><kbd>←→</kbd> Note</span><span><kbd>PgUp</kbd><kbd>PgDn</kbd> Measure</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
  private click=(e:MouseEvent)=>{
   const el=(e.target as Element).closest<SVGElement>('[data-viewer-seat],[data-finger-seat]');if(!el||!this.shown)return;
   const id=el.dataset.viewerSeat??el.dataset.fingerSeat,seat=this.shown.crops.flatMap(c=>c.seats).find(s=>s.id===id);
@@ -92,18 +100,22 @@ export class SectionFingering {
  private window(bar:number):FingeringWindow{
   const cached=this.windows.get(bar);if(cached)return cached;
   const p=this.options.package,plan=this.options.plan,{bars,ghosts}=fingeringWindow(this.barCount,bar),crops=bars.map(b=>this.crop(b));
-  const track=fitPassageFrame(p,plan,crops,fitPassageRelations(p,plan,crops,passageTrack(crops,this.mount,p,true),'compact',[bars]),'compact',[bars],this.mount);
+  // The frame is set by centring, not by the ink, so no ink is measured here.
+  const track=fitPassageRelations(p,plan,crops,passageTrack(crops,this.mount,p,true),'compact',[bars]);
   const passage=composePassage(crops,track,'compact',bars,projectRelations(p,plan,crops,track,'compact',bars));
-  for(const b of bars){const group=passage.svg.querySelector(`[data-practice-bar="${b+1}"]`);group?.classList.toggle('section-fingering-ghost',ghosts.has(b));group?.classList.toggle('section-fingering-outside',!ghosts.has(b)&&(b<this.chunk.firstBar||b>this.chunk.lastBar));}
-  // Veil each ghost above all ink, so its slurs, pedal lines and both of its
-  // rules fade with it.
-  const view=passage.svg.getAttribute('viewBox')!.split(' ').map(Number);
-  for(const crop of crops)if(ghosts.has(crop.bar)){
-   const group=passage.svg.querySelector(`[data-practice-bar="${crop.bar+1}"]`),shift=Number(/translate\(([-\d.e]+)/.exec(group?.getAttribute('transform')??'')?.[1]);if(!Number.isFinite(shift))continue;
-   const left=shift+crop.left,right=shift+crop.right,veil=document.createElementNS(ns,'rect'),x0=crop.bar<bar?view[0]:left-1,x1=crop.bar<bar?right+1:view[0]+view[2];
-   veil.setAttribute('class','section-fingering-veil');veil.setAttribute('x',String(x0));veil.setAttribute('y',String(view[1]));veil.setAttribute('width',String(x1-x0));veil.setAttribute('height',String(view[3]));passage.svg.append(veil);
+  const view=passage.svg.getAttribute('viewBox')!.split(' ').map(Number),spans=new Map<number,[number,number]>();
+  for(const crop of crops){
+   const group=passage.svg.querySelector<SVGGElement>(`[data-practice-bar="${crop.bar+1}"]`),shift=Number(/translate\(([-\d.e]+)/.exec(group?.getAttribute('transform')??'')?.[1]);if(!group||!Number.isFinite(shift))continue;
+   const left=shift+crop.left,right=shift+crop.right;spans.set(crop.bar,[left,right]);group.dataset.span=`${left} ${right}`;
+   group.classList.toggle('section-fingering-ghost',ghosts.has(crop.bar));
+   // Veil each ghost above all ink, out to the edge of the view, so its
+   // slurs, pedal lines and both of its rules fade with it.
+   if(ghosts.has(crop.bar)){const veil=document.createElementNS(ns,'rect'),x0=crop.bar<bar?left-1e4:left-1,x1=crop.bar<bar?right+1:right+1e4;
+    veil.setAttribute('class','section-fingering-veil');veil.setAttribute('x',String(x0));veil.setAttribute('y',String(view[1]-1e3));veil.setAttribute('width',String(x1-x0));veil.setAttribute('height',String(view[3]+2e3));passage.svg.append(veil);}
   }
-  const made={bar,svg:passage.svg,crops:passage.crops.filter(c=>!ghosts.has(c.bar))};this.windows.set(bar,made);
+  const lanes=crops[0].lanes,middle=(Math.min(...lanes)+Math.max(...lanes))/2;
+  passage.svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  const made={bar,svg:passage.svg,crops:passage.crops.filter(c=>!ghosts.has(c.bar)),spans,middle,top:view[1],bottom:view[1]+view[3]};this.windows.set(bar,made);
   // Keep a handful of windows; layout is cheap to redo, memory on a long score is not.
   for(const key of this.windows.keys()){if(this.windows.size<=6)break;if(key!==bar&&key!==this.shown?.bar)this.windows.delete(key);}
   return made;
@@ -112,15 +124,15 @@ export class SectionFingering {
   * saving a finger never pays for layout. */
  refit(){
   const size=`${this.mount.clientWidth}x${this.mount.clientHeight}`;
-  if(this.fitted&&size!==this.fitted){this.windows.clear();this.shown=undefined;this.mount.replaceChildren();this.render();}else this.paint();
+  if(this.fitted&&size!==this.fitted){this.windows.clear();this.shown=undefined;this.scale=undefined;this.mount.replaceChildren();this.render();}else this.paint();
  }
  render(){
-  const bar=(this.cursor?.writtenBar??1)-1;if(this.cursor)resumeAt.set(this.resumeKey,this.cursor.contactId);
+  const bar=(this.cursor?.writtenBar??1)-1;
   let next:FingeringWindow;
   // A measure that cannot be drawn says so on the stage, never a blank page.
   try{next=this.window(bar);}catch(error){this.shown=undefined;const message=document.createElement('p');message.className='section-fingering-error';message.textContent=`Measure ${bar+1} cannot be drawn for fingering: ${error instanceof Error?error.message:String(error)}`;this.mount.replaceChildren(message);this.options.status('Use ← → to move to another measure.');return;}
   if(this.shown!==next){this.mount.replaceChildren(next.svg);this.shown=next;}
-  this.fitted=`${this.mount.clientWidth}x${this.mount.clientHeight}`;
+  this.fitted=`${this.mount.clientWidth}x${this.mount.clientHeight}`;this.centre(next);
   this.paint();this.announce();this.prefetch(bar);
  }
  /** Compose the neighbouring windows while idle, so crossing a measure on a
@@ -128,6 +140,26 @@ export class SectionFingering {
  private prefetch(bar:number){
   const later=(f:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(f,{timeout:400}):setTimeout(f,60);
   for(const next of [bar+1,bar-1])if(next>=0&&next<this.barCount&&!this.windows.has(next))later(()=>{if(!this.disposed&&this.shown?.bar===bar&&!this.windows.has(next))try{this.window(next);}catch{/* composed again, with its error, when reached */}});
+ }
+ /** Half the width of the widest three-measure window in the piece, read from
+  * the printed measure rules alone. Bars abut in the passage, so a window
+  * needs its measure's half plus its wider neighbour. */
+ private pieceHalf(){
+  if(this.half===undefined){const widths=Array.from({length:this.barCount},(_,bar)=>{try{const {left,right}=measureBounds(this.options.package,this.options.plan,bar);return right-left;}catch{return 0;}});
+   this.half=Math.max(0,...widths.map((w,i)=>w/2+Math.max(widths[i-1]??0,widths[i+1]??0)));}
+  return this.half;
+ }
+ /** Centre the current measure exactly on the stage, its neighbours in full
+  * either side. One scale serves the whole piece, set by its widest window, so
+  * crossing a measure is a pure slide and the notation never changes size. */
+ private centre(w:FingeringWindow){
+  const width=this.mount.clientWidth,height=this.mount.clientHeight,span=w.spans.get(w.bar);if(!width||!height||!span)return;
+  const centre=(span[0]+span[1])/2,before=w.spans.get(w.bar-1)?.[0]??span[0],after=w.spans.get(w.bar+1)?.[1]??span[1];
+  const half=Math.max(centre-before,after-centre,this.pieceHalf())*1.04+3,reach=Math.max(w.middle-w.top,w.bottom-w.middle)*1.06;
+  // Only a taller window than any yet seen may widen it.
+  this.scale=Math.max(this.scale??0,2*half/width,2*reach/height);
+  const vw=width*this.scale,vh=height*this.scale;
+  w.svg.setAttribute('viewBox',`${centre-vw/2} ${w.middle-vh/2} ${vw} ${vh}`);w.svg.dataset.centre=String(centre);
  }
  /** Paint every finger in reach; the cursor carries the editor's selection mark. */
  paint(){
@@ -163,14 +195,10 @@ export class SectionFingering {
  }
  get cursorContact(){return this.cursor?.contactId;}
  private index(){return this.cursor?this.units.findIndex(s=>s.contactId===this.cursor!.contactId):-1;}
- private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.render();}
- private move(step:number){
-  const i=this.index();
-  if(i>=0){this.go(this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);return;}
-  // From a context measure, re-enter the section at its nearer edge, in the same hand.
-  const c=this.cursor;if(!c)return;const same=this.units.filter(s=>this.hand(s)===this.hand(c)),pool=same.length?same:this.units;
-  this.go(c.writtenBar-1<this.chunk.firstBar?pool[0]:pool.at(-1));
- }
+ private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.opening=undefined;this.render();}
+ private move(step:number){const i=Math.max(0,this.index());this.go(this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);}
+ /** The first note of the measure step measures away, in fingering order. */
+ private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const seat=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(seat)this.go(seat);}
  /** The other hand's note nearest the cursor: up to the right hand, down to
  * the left, as the score's arrows move between hand rows. */
  private hands(direction:-1|1){
@@ -198,14 +226,18 @@ export class SectionFingering {
   labels.typed=typed;this.paintLabels();
  }
  private announce(){
-  const i=this.index(),seat=this.cursor;
+  const seat=this.cursor;
   if(!seat){this.options.status('This piece has no notes to finger.');return;}
-  const hand=this.hand(seat)==='RH'?'Right hand':this.hand(seat)==='LH'?'Left hand':'No hand',
-   personal=this.options.personal();
-  // Counted once per saved state, not on every move.
-  if(this.missing?.personal!==personal)this.missing={personal,count:this.units.filter(s=>fingerFor(this.options.basePackage,personal,s)===undefined).length};
-  const missing=this.missing.count;
-  this.options.status(`${hand} · measure ${seat.writtenBar} of ${this.barCount}${i<0?' · not in the fingering order':''} · ${missing?`${missing} ${missing===1?'note':'notes'} without a finger`:'every note fingered'}`);
+  const hand=this.hand(seat)==='RH'?'Right hand':this.hand(seat)==='LH'?'Left hand':'No hand',progress=this.progress(),missing=progress.total-progress.done;
+  this.options.progress?.(progress);
+  const where=`${hand} · measure ${seat.writtenBar} of ${this.barCount} · ${missing?`${missing} ${missing===1?'note':'notes'} without a finger`:'every note fingered'}`;
+  this.options.status(this.opening?`${this.opening} ${where}`:where);
+ }
+ /** Counted once per saved state, not on every move. */
+ progress():FingeringProgress {
+  const personal=this.options.personal();
+  if(this.counted?.personal!==personal)this.counted={personal,progress:fingeringProgress(this.units,s=>fingerFor(this.options.basePackage,personal,s)!==undefined,this.hand)};
+  return this.counted.progress;
  }
  private async choose(finger:number){
   const seat=this.cursor;if(!seat)return;
@@ -213,7 +245,7 @@ export class SectionFingering {
   // Move on at once to the next note without a finger; the finger paints
   // when it is saved. Once every note has one, the cursor stays.
   if(i>=0)this.cursor=this.gap(i,1,false,seat.contactId)??seat;
-  this.render();
+  this.opening=undefined;this.render();
   try{await this.options.save(seat,finger);}catch(error){this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
   this.announce();
  }
@@ -235,6 +267,7 @@ export class SectionFingering {
   // L and R choose the note's hand, as in the score; the cursor stays put.
   if((code==='KeyL'||code==='KeyR')&&this.cursor&&this.options.saveHand){const seat=this.cursor,hand=code==='KeyL'?'LH':'RH';void this.options.saveHand(seat,hand).catch(error=>this.options.status(`The hand was not saved: ${error instanceof Error?error.message:String(error)}`));return true;}
   if(code==='KeyJ'){this.startLabels();return true;}
+  if(code==='PageDown'||code==='PageUp'){this.measure(code==='PageDown'?1:-1);return true;}
   if(code==='Home'){this.go(this.units[0]);return true;}
   if(code==='End'){this.go(this.units.at(-1));return true;}
   return false;
