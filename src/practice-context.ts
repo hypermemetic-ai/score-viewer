@@ -2,7 +2,7 @@ import {initialPractice,readPractice,passageHierarchy,planPractice,requirePracti
 import type {PracticeMode,PracticePrimaryMode} from './practice-view';
 import type {PersonalState} from './state';
 import type {ScorePackage} from './package';
-import {savedPlayerTempo} from './player-tempo';
+import {savedPlayerTempo,playerTempo} from './player-tempo';
 import type {ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 
 export type PracticePreferences=Pick<PracticeState,'start'|'connectionStart'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'|'countInBars'|'resumeCooldownSeconds'>;
@@ -15,29 +15,32 @@ export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,c
  const fresh=initialPractice(plan),state=readPractice(saved??(context?.preferences?{...fresh,...context.preferences,working:context.preferences.start}:undefined),plan);
  return context?restorePracticeGrouping(plan,state,context):state;
 }
+/** Lays out measures for Fingers only; nothing is timed against it. */
+export const FINGERS_LAYOUT_TEMPO=80;
 export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean;rememberTempo?:true}
 /** A score without a reference tempo uses the remembered player tempo, else
- * the newly chosen one; the journal keeps it as the personal goal. */
-export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo):AdmittedPracticeContext {
+ * the newly chosen one; the journal keeps it as the personal goal. Fingers
+ * alone needs no tempo: a stand-in lays out the measures, is never saved and
+ * never asked for. */
+export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo,fingersOnly=!!context?.fingersOnly):AdmittedPracticeContext {
  requirePracticeHands(p,personal);
- const player=savedPlayerTempo(p.score,saved,context?.preferences)??(p.score.referencePerformanceTempo===undefined?chosenTempo:undefined);
+ const remembered=savedPlayerTempo(p.score,saved,context?.preferences),standIn=fingersOnly&&!remembered&&p.score.referencePerformanceTempo===undefined;
+ const player=standIn?playerTempo(p.score,FINGERS_LAYOUT_TEMPO):remembered??(p.score.referencePerformanceTempo===undefined?chosenTempo:undefined);
  const plan=planPractice(p,'bounded-exercises-v1',personal,player);
  let state=practiceStateForContext(plan,saved,context);
- const rememberTempo=!!plan.playerTempo&&!state.personalGoal;
+ // The stand-in never becomes the player's goal, so no snapshot can carry it.
+ const rememberTempo=!!plan.playerTempo&&!state.personalGoal&&!standIn;
  if(rememberTempo)state=setPracticeGoal(state,plan,plan.referencePerformanceTempo!.bpm);
  return {plan,state,saved:!!saved,...(rememberTempo?{rememberTempo:true as const}:{})};
 }
 
 /** Navigation/group structure only. No played evidence or completion claim. */
-/** How a section is studied: fingered without checking, its mechanics
- * brought up with every note checked, or committed to memory (not yet built). */
-export type PracticeStudy='fingers'|'mechanics'|'memory';
 export interface PracticeViewContext {
  partition:PracticePartition;composites:Record<string,string[]>;
  selected:string;parent?:string;component?:string;includeManual:boolean;
  passage?:string;window?:[number,number];mode?:PracticeMode;previousMode?:PracticePrimaryMode;readingWindow?:number;
- /** The study mode, and the section being fingered with its cursor, kept when practice is rebuilt after a hand choice. */
- study?:PracticeStudy;fingering?:{passage:string;contactId?:string};
+ /** Fingers alone, and its cursor, kept when practice is rebuilt after a hand choice. */
+ fingersOnly?:true;fingering?:{passage:string;contactId?:string};
  preferences?:PracticePreferences;
 }
 export function restorePracticeGrouping(plan:PracticePassagePlan,state:PracticeState,context:PracticeViewContext):PracticeState {

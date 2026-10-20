@@ -51,6 +51,21 @@ test('starting practice with a chosen tempo plans on it and remembers it as the 
  assert.equal(carried.state.target,96);assert.equal(carried.plan.referencePerformanceTempo!.bpm,96);
 });
 
+test('Fingers lays out a score without a tempo on a stand-in that is never the player\'s goal',()=>{
+ const admitted=admitPracticeContext(none,undefined,undefined,undefined,undefined,true);
+ assert.equal(admitted.plan.playerTempo,true);assert.equal(admitted.plan.referencePerformanceTempo!.bpm,80);
+ assert.equal(admitted.rememberTempo,undefined);assert.equal(admitted.state.personalGoal,undefined);
+ // Nothing a rebuilt view carries can make the stand-in a remembered tempo, so Sections still asks.
+ const preferences=practicePreferences(admitted.state);assert.equal(savedPlayerTempo(none.score,json(admitted.state),preferences),undefined);
+ const context:PracticeViewContext={partition:admitted.plan.partition,composites:{},selected:admitted.plan.chunks[0].id,includeManual:true,preferences,fingersOnly:true};
+ assert.equal(admitPracticeContext(none,json(admitted.state),context).state.personalGoal,undefined);
+ assert.throws(()=>admitPracticeContext(none,undefined,{...context,fingersOnly:undefined}),/explicit reference performance tempo/);
+ // A remembered tempo is used as it is, and a chosen one is ignored.
+ const remembered=admitPracticeContext(none,undefined,undefined,undefined,playerTempo(none.score,96)).state;
+ const known=admitPracticeContext(none,json(remembered),undefined,undefined,playerTempo(none.score,150),true);
+ assert.equal(known.plan.referencePerformanceTempo!.bpm,96);assert.equal(known.state.personalGoal!.bpm,96);
+ assert.equal(admitPracticeContext(none,undefined,undefined,undefined,playerTempo(none.score,150),true).state.personalGoal,undefined);
+});
 test('a changed tempo persists, keeps earned evidence and moves Speed and progress with it',()=>{
  const {plan,state}=admitPracticeContext(none,undefined,undefined,undefined,playerTempo(none.score,96)),chunk=plan.chunks[0];
  state.working=48;state.best[chunk.pattern]=96;
