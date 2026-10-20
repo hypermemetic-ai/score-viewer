@@ -7,7 +7,10 @@ export class PersonalEditQueue<T> {
  private pending=new Map<number,T>();
  private failure?:Error;
  private recovering=false;
- constructor(readonly sourceKey:string,private write:(snapshot:T,sequence:number)=>Promise<void>){}
+ /** With `superseded`, each snapshot is a whole state: one still waiting when a
+  * later one is accepted is never written, and `superseded` releases it. */
+ constructor(readonly sourceKey:string,private write:(snapshot:T,sequence:number)=>Promise<void>,private superseded?:(sequence:number)=>void){}
+ private later(sequence:number){if(!this.superseded)return false;for(const key of this.pending.keys())if(key>sequence)return true;return false;}
  get error(){return this.failure;}
  get recovery(){return [...this.pending].map(([sequence,snapshot])=>({sequence,snapshot:structuredClone(snapshot)}));}
  accept(snapshot:T):{sequence:number;saved:Promise<void>} {
@@ -16,6 +19,7 @@ export class PersonalEditQueue<T> {
   this.pending.set(sequence,structuredClone(snapshot));
   const saved=this.tail.then(async()=>{
    if(this.failure)throw this.failure;
+   if(this.later(sequence)){this.pending.delete(sequence);this.superseded!(sequence);return;}
    try{await this.write(structuredClone(this.pending.get(sequence)!),sequence);this.pending.delete(sequence);}
    catch(error){this.failure=error instanceof Error?error:new Error(String(error));throw this.failure;}
   });
@@ -30,6 +34,7 @@ export class PersonalEditQueue<T> {
   await this.tail;
   this.failure=undefined;
   for(const [sequence,snapshot] of this.pending){
+   if(this.later(sequence)){this.pending.delete(sequence);this.superseded!(sequence);continue;}
    try{await this.write(structuredClone(snapshot),sequence);this.pending.delete(sequence);}
    catch(error){this.failure=error instanceof Error?error:new Error(String(error));throw this.failure;}
   }

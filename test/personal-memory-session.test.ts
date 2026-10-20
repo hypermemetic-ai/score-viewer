@@ -112,6 +112,40 @@ test('failed effective commit leaves durable source intent recoverable after res
  const restarted=session(store,[input]);await restarted.initialize();assert.equal(restarted.recovery.length,1);assert.throws(()=>restarted.accept(input,action('b0n2',4)),/paused/);
  fail=false;await restarted.retry();const raw=await load(restarted,input);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal(finger(restarted,{...input,personal:raw},'b3n1'),2);assert.equal(restarted.recovery.length,0);
 });
+test('fingers entered while a save is running persist together, in order, and stay recoverable together',async()=>{
+ const input=fixture(),base=storage();let gate!:()=>void,held=false,fail=false;const opened=new Promise<void>(r=>{gate=r;}),commits:string[][]=[];
+ const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{commits.push(Object.keys(args.changes));if(held){held=false;await opened;}if(fail&&args.changes[personalMemoryDocument])throw Error('disk full');return base.commit(args);}};
+ const s=session(store,[input]);await s.initialize();commits.length=0;held=true;
+ // The store holds the first commit; all five fingers, one note twice, wait together.
+ const ids=['b0n1','b1n1','b1n2','b2n1','b1n1'],saves=ids.map((id,i)=>s.accept(input,action(id,((i%5)+1) as 1|2|3|4|5,`${id}:${i}`)).saved);
+ fail=true;gate();await assert.rejects(Promise.all(saves),/disk full/);
+ // A batch that fails leaves every one of its decisions journalled for recovery.
+ assert.equal(s.recovery.length,5);fail=false;await s.retry();assert.equal(s.recovery.length,0);
+ const raw=await load(s,input);assert.equal(raw.assignments?.choices.b0n1.finger,1);assert.equal(raw.assignments?.choices.b1n2.finger,3);assert.equal(raw.assignments?.choices.b2n1.finger,4);
+ assert.equal(raw.assignments?.choices.b1n1.finger,5,'the later of two decisions on one note wins');
+ assert.deepEqual((await base.read()).documents['personal-fingering-pending'],{});
+ // Before: two commits per finger. Now the held finger, then one stage and one apply for the rest.
+ const durable=commits.filter(keys=>keys.includes(personalMemoryDocument)).length;assert.ok(durable<=3,`${durable} effective commits`);
+});
+test('decisions journalled together replay in the order they were made after a restart on a key-sorting store',async()=>{
+ const input=fixture(),underlying=storage(),reorder=<T>(value:T):T=>JSON.parse(canonicalJson(value));let fail=false;
+ // Like the native store: JSON objects come back with sorted keys, so journal order is lost.
+ const store:AssistanceStore={read:async id=>reorder(await underlying.read(id)),commit:async args=>{if(fail&&args.changes[personalMemoryDocument])throw Error('disk full');return reorder(await underlying.commit(reorder(args)));}};
+ const first=session(store,[input]);await first.initialize();fail=true;
+ // The correction's id sorts before the original's.
+ const saves=[first.accept(input,action('b0n1',3,'z-original')),first.accept(input,action('b0n1',5,'a-correction'))].map(a=>a.saved);
+ await assert.rejects(Promise.all(saves),/disk full/);assert.equal(first.recovery.length,2);
+ const restarted=session(store,[input]);await restarted.initialize();assert.deepEqual(restarted.recovery.map(i=>i.id),['z-original','a-correction']);
+ fail=false;await restarted.retry();const raw=await load(restarted,input);assert.equal(raw.assignments?.choices.b0n1.finger,5);assert.equal(restarted.recovery.length,0);
+});
+test('a view save refused during recovery does not cancel the earlier one waiting for it',async()=>{
+ const input=fixture(),base=storage();let fail=false;const store:AssistanceStore={read:id=>base.read(id),commit:args=>{if(fail)throw Error('temporary write failure');return base.commit(args);}};
+ const s=session(store,[input]);await s.initialize();fail=true;await assert.rejects(s.accept(input,action('b0n1',2)).saved,/temporary/);
+ const kept=structuredClone(input.personal);kept.view.rotation=90;await assert.rejects(s.saveView({...input,personal:kept}),/temporary/);fail=false;
+ const retrying=s.retry(),refused=structuredClone(input.personal);refused.view.rotation=180;
+ await assert.rejects(s.saveView({...input,personal:refused}),/maintenance/);await retrying;
+ const raw=await load(s,input);assert.equal(raw.view.rotation,90);assert.equal(raw.assignments?.choices.b0n1.finger,2);
+});
 test('lost commit acknowledgement retries without re-authoring the accepted decision',async()=>{
  const input=fixture(),base=storage();let lose=false;
  const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{const result=await base.commit(args);if(lose&&args.changes[personalMemoryDocument]){lose=false;throw Error('reply lost');}return result;}};
