@@ -14,8 +14,8 @@
 # Run it after the old viewer has stopped and the new package is installed.
 # Every link is classified and every backup name checked before anything
 # changes, so a refusal leaves all links as they were. Running it again after
-# success changes nothing. -Pins and -Desktops default to the real folders; a
-# rehearsal points them at copies.
+# success changes nothing. -Pins, -UserDesktop and -PublicDesktop default to
+# the real folders; a rehearsal points them at copies.
 param(
  [Parameter(Mandatory=$true)][string]$Destination,
  [Parameter(Mandatory=$true)][string]$Keep,
@@ -40,7 +40,7 @@ $shell=New-Object -ComObject WScript.Shell
 
 # Plan every change first.
 $plan=@()
-foreach($link in @(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue)){
+foreach($link in @(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue|Where-Object Name -notlike '.sv-update-*')){
  $target=$shell.CreateShortcut($link.FullName).TargetPath
  if(-not (Is-Viewer $target)){continue}
  if([IO.Path]::GetFullPath($target) -ieq $exe){continue}
@@ -70,8 +70,8 @@ foreach($step in @($plan|Where-Object kind -eq 'pin')){
  $temp=Join-Path $Pins ('.sv-update-'+[Guid]::NewGuid().ToString('N')+'.lnk')
  Copy-Item -LiteralPath $step.link -Destination $temp
  try{
-  $n=$shell.CreateShortcut($temp);$oldDirectory=Split-Path -Parent ([IO.Path]::GetFullPath($step.target))
-  if($n.IconLocation -and $n.IconLocation.StartsWith($oldDirectory,[StringComparison]::OrdinalIgnoreCase)){$n.IconLocation="$exe,0"}
+  $n=$shell.CreateShortcut($temp);$icon=[Environment]::ExpandEnvironmentVariables(($n.IconLocation -split ',')[0])
+  if($icon -and $icon.StartsWith($packages,[StringComparison]::OrdinalIgnoreCase)){$n.IconLocation="$exe,0"}
   $n.TargetPath=$exe;$n.WorkingDirectory=$Destination;$n.Save()
   [IO.File]::Replace($temp,$step.link,[NullString]::Value)
  }finally{if(Test-Path -LiteralPath $temp){Remove-Item -LiteralPath $temp}}
@@ -83,7 +83,7 @@ foreach($step in @($plan|Where-Object kind -eq 'desktop')){
  Move-Item -LiteralPath $step.link -Destination $step.backup
  $out.desktop+=[ordered]@{link=$step.link;target=$step.target;kept=$step.backup}
 }
-$current=@(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue|Where-Object{$t=$shell.CreateShortcut($_.FullName).TargetPath;$t -and (Is-Viewer $t) -and ([IO.Path]::GetFullPath($t) -ieq $exe)})
+$current=@(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue|Where-Object{$_.Name -notlike '.sv-update-*'} |Where-Object{$t=$shell.CreateShortcut($_.FullName).TargetPath;$t -and (Is-Viewer $t) -and ([IO.Path]::GetFullPath($t) -ieq $exe)})
 $out.current=@($current|ForEach-Object FullName)
 if(-not $current.Count){$out.warning='No taskbar pin targets the viewer. Open the viewer and pin it from the television''s taskbar; nothing was created.'}
 $out|ConvertTo-Json -Depth 4
