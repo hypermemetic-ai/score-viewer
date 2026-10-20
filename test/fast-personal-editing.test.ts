@@ -38,14 +38,17 @@ test('actual editor reserves hand then finger on the same source before digit ad
  const sourceBefore=JSON.stringify(p.score),f=await fixture(),owner=f.context.selection.ownerIds[0],first=f.context.saveHandChoice('RH'),second=f.context.saveFingerDigit(2);
  assert.equal(f.target.personal.assignments!.choices[owner].hand,'RH');assert.equal(f.target.personal.assignments!.choices[owner].finger,2);assert.equal(f.context.selection.contactId,f.units[1].contactId);
  await Promise.all([first,second]);assert.ok(f.frames.length);assert.equal(f.written.length,0);
- f.disk.resolve();await f.flush();assert.equal(f.written.length,2);assert.equal(f.written[0].assignments.choices[owner].hand,'RH');assert.equal(f.written[1].assignments.choices[owner].finger,2);
+ f.disk.resolve();await f.flush();
+ // Queued decisions persist in order, together in one atomic commit when they wait together.
+ const durable=f.written.at(-1)!;assert.ok(f.written.length>=1&&f.written.length<=2);assert.equal(durable.assignments.choices[owner].hand,'RH');assert.equal(durable.assignments.choices[owner].finger,2);
  assert.equal(JSON.stringify(p.score),sourceBefore);
 });
 test('a stale projection cannot publish over a later accepted choice and navigation is never redirected',async()=>{
  const f=await fixture(),gate=deferred();let count=0;f.editor.session.project=async(personal:any)=>{if(++count===1)return gate.promise;return {...p,projection:personal.assignments};};
  const first=f.context.saveHandChoice('LH');f.context.selection=f.units[1];const second=f.context.saveHandChoice('RH');await second;
  const latest=f.editor.view;gate.resolve({...p,projection:'stale'});await first;assert.equal(f.editor.view,latest);assert.equal(f.context.selection.ownerIds[0],f.units[1].ownerIds[0]);
- f.disk.resolve();await f.flush();assert.equal(f.written.length,2);
+ const firstOwner=f.units[0].ownerIds[0],secondOwner=f.units[1].ownerIds[0];
+ f.disk.resolve();await f.flush();const durable=f.written.at(-1)!;assert.ok(f.written.length>=1&&f.written.length<=2);assert.equal(durable.assignments.choices[firstOwner].hand,'LH');assert.equal(durable.assignments.choices[secondOwner].hand,'RH');
 });
 
 test('switching score editions during a pending projection cannot paint or redirect its saved choice',async()=>{

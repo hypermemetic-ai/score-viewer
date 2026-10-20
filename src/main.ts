@@ -239,7 +239,7 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  // engraver refused is answered where it was made; it is not a failed save,
  // so it never holds the score open behind "Choices haven't been saved".
  // Any other projection failure keeps its snapshot for recovery.
- editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{const projected=await editor.projections.get(sequence)?.catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});editor.projections.delete(sequence);});
+ editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{const projected=await editor.projections.get(sequence)?.catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});editor.projections.delete(sequence);},sequence=>{editor.projections.delete(sequence);});
  livePersonalEditors.set(target,editor);return editor;
 }
 function readerPackage(){if(!current)throw Error('No open score.');return livePersonalEditors.get(current)?.view??current.package;}

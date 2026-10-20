@@ -112,6 +112,21 @@ test('failed effective commit leaves durable source intent recoverable after res
  const restarted=session(store,[input]);await restarted.initialize();assert.equal(restarted.recovery.length,1);assert.throws(()=>restarted.accept(input,action('b0n2',4)),/paused/);
  fail=false;await restarted.retry();const raw=await load(restarted,input);assert.equal(raw.assignments?.choices.b0n1.finger,2);assert.equal(finger(restarted,{...input,personal:raw},'b3n1'),2);assert.equal(restarted.recovery.length,0);
 });
+test('fingers entered while a save is running persist together, in order, and stay recoverable together',async()=>{
+ const input=fixture(),base=storage();let gate!:()=>void,held=false,fail=false;const opened=new Promise<void>(r=>{gate=r;}),commits:string[][]=[];
+ const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{commits.push(Object.keys(args.changes));if(held){held=false;await opened;}if(fail&&args.changes[personalMemoryDocument])throw Error('disk full');return base.commit(args);}};
+ const s=session(store,[input]);await s.initialize();commits.length=0;held=true;
+ // The first finger's save is held at the store; four more, one twice, queue behind it.
+ const ids=['b0n1','b1n1','b1n2','b2n1','b1n1'],saves=ids.map((id,i)=>s.accept(input,action(id,((i%5)+1) as 1|2|3|4|5,`${id}:${i}`)).saved);
+ fail=true;gate();await assert.rejects(Promise.all(saves),/disk full/);
+ // A batch that fails leaves every one of its decisions journalled for recovery.
+ assert.equal(s.recovery.length,5);fail=false;await s.retry();assert.equal(s.recovery.length,0);
+ const raw=await load(s,input);assert.equal(raw.assignments?.choices.b0n1.finger,1);assert.equal(raw.assignments?.choices.b1n2.finger,3);assert.equal(raw.assignments?.choices.b2n1.finger,4);
+ assert.equal(raw.assignments?.choices.b1n1.finger,5,'the later of two decisions on one note wins');
+ assert.deepEqual((await base.read()).documents['personal-fingering-pending'],{});
+ // Before: two commits per finger. Now the held finger, then one stage and one apply for the rest.
+ const durable=commits.filter(keys=>keys.includes(personalMemoryDocument)).length;assert.ok(durable<=3,`${durable} effective commits`);
+});
 test('lost commit acknowledgement retries without re-authoring the accepted decision',async()=>{
  const input=fixture(),base=storage();let lose=false;
  const store:AssistanceStore={read:id=>base.read(id),commit:async args=>{const result=await base.commit(args);if(lose&&args.changes[personalMemoryDocument]){lose=false;throw Error('reply lost');}return result;}};

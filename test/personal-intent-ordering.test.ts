@@ -91,7 +91,9 @@ test('generic write failure retains both ordered intents and stops editing until
  const f=fixture();let broken=true;f.setWrite(async s=>{if(broken)throw Error('disk unavailable');f.writeDefault(s);});
  const first=f.context.commitPersonal(f.target,(s:any)=>({...s,calculatedVersion:1}));
  const rejected=assert.rejects(first,/disk unavailable/);await f.context.saveHandChoice('RH');await rejected;await assert.rejects(f.editor.queue.flush(),/disk unavailable/);
- assert.equal(f.target.personal.choices['note-0'].hand,'RH');assert.equal(f.editor.queue.recovery.length,2);assert.ok(f.errors.length);
+ assert.equal(f.target.personal.choices['note-0'].hand,'RH');
+ // Both intents stay journalled; the view queue keeps only the later whole snapshot.
+ assert.equal(f.context.personalMemory.recovery.length,2);assert.equal(f.editor.queue.recovery.length,1);assert.ok(f.errors.length);
  const retained=JSON.stringify(f.target.personal);await assert.rejects(f.context.saveFingerDigit(3),/disk unavailable/);await assert.rejects(f.context.commitPersonal(f.target,(s:any)=>({...s,calculatedVersion:2})),/disk unavailable/);assert.equal(JSON.stringify(f.target.personal),retained);
  broken=false;await f.context.personalMemory.retry();await f.editor.queue.retry();assert.deepEqual(f.written.map(s=>s.choices['note-0'].hand),['LH','RH']);assert.equal(f.disk.calculatedVersion,1);assert.equal(f.editor.queue.recovery.length,0);
 });

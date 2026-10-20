@@ -84,6 +84,10 @@ export class PersonalMemorySession {
  private initializing?:Promise<void>;
  private tail:Promise<void>=Promise.resolve();
  private queued:Array<()=>Promise<void>>=[];
+ // Queued work that persists one accepted decision, by decision identity.
+ private persisting=new WeakMap<()=>Promise<void>,string>();
+ // The newest queued view save of each score; older ones are superseded.
+ private views=new Map<string,object>();
  private failed?:Error;
  private maintenance=false;
  private inputs=new Map<string,MemoryScoreInput>();
@@ -214,7 +218,8 @@ export class PersonalMemorySession {
  accept(input:MemoryScoreInput,action:PersonalMemoryAction):PersonalMemoryAccepted {
   const intent=this.capture(input,action),result=this.apply(this.memory,{...input,personal:rawMemoryPersonal(input.personal)},intent);
   this.optimistic=result.document;this.inputs.set(intent.personalKey,{...input,personal:result.personal});this.pending.set(intent.id,intent);
-  const saved=this.schedule(()=>this.persist(intent));
+  const work=()=>this.persist(intent);this.persisting.set(work,intent.id);
+  const saved=this.schedule(work);
   return{intent,personal:clone(result.personal),memory:clone(result.document),saved};
  }
  private apply(document:PersonalFingeringMemory,input:MemoryScoreInput,intent:CapturedPersonalMemoryIntent){
@@ -259,26 +264,37 @@ export class PersonalMemorySession {
   const next=this.tail.then(async()=>{if(this.failed)throw this.failed;try{await work();this.queued.splice(this.queued.indexOf(work),1);}catch(error){this.failed=error instanceof Error?error:Error(String(error));throw this.failed;}});
   this.tail=next.catch(()=>{});return next;
  }
+ /** Persist this decision together with every decision queued directly
+ * behind it: one staging commit, then one commit applying them in order. Each
+ * stays journalled until applied, exactly as when saved alone, but a run of
+ * fingers costs one store cycle rather than one per finger. A decision already
+ * saved by an earlier batch costs nothing. */
  private async persist(intent:CapturedPersonalMemoryIntent){
-  const fingerprint=await hashBytes(JSON.stringify(intent));
+  if(!this.pending.has(intent.id))return;
+  const batch:CapturedPersonalMemoryIntent[]=[];let reached=false;
+  for(const work of this.queued){const id=this.persisting.get(work);if(id===intent.id)reached=true;if(!reached)continue;if(id===undefined)break;const queued=this.pending.get(id);if(queued)batch.push(queued);}
+  if(!batch.length)batch.push(intent);
+  const fingerprints=new Map(await Promise.all(batch.map(async i=>[i.id,await hashBytes(JSON.stringify(i))] as const)));
   for(let attempt=0;attempt<maxAttempts;attempt++){
    const current=await this.store.read(),applied=record(current.documents[appliedDocument]),pending=record(current.documents[pendingDocument]);
-   if(applied[intent.id]){if(applied[intent.id]!==fingerprint)throw Error('Personal decision identity was reused.');this.pending.delete(intent.id);this.rebase(current);return;}
+   const todo=batch.filter(i=>{if(!applied[i.id])return true;if(applied[i.id]!==fingerprints.get(i.id))throw Error('Personal decision identity was reused.');return false;});
+   if(!todo.length){for(const i of batch)this.pending.delete(i.id);this.rebase(current);return;}
    // Native JSON storage reorders object fields. Compare the decision's values,
    // not insertion order, while still rejecting a genuinely different intent.
-   if(pending[intent.id]&&canonicalJson(pending[intent.id])!==canonicalJson(intent))throw Error('Pending personal decision identity was reused.');
-   if(!pending[intent.id]){
-    pending[intent.id]=intent;const stage=await this.store.commit({expectedRevision:current.revision,changes:{[pendingDocument]:pending}});
+   for(const i of todo)if(pending[i.id]&&canonicalJson(pending[i.id])!==canonicalJson(i))throw Error('Pending personal decision identity was reused.');
+   const unstaged=todo.filter(i=>!pending[i.id]);
+   if(unstaged.length){
+    for(const i of unstaged)pending[i.id]=i;const stage=await this.store.commit({expectedRevision:current.revision,changes:{[pendingDocument]:pending}});
     if(stage.status==='conflict')continue;
     // Restart from the durable journal, so no successful stage can be lost by
     // a concurrent writer before effective state and journal removal activate.
     continue;
    }
-   const target=this.target(intent),input={...target,personal:this.personalAt(current,target)},document=readPersonalFingeringMemory(current.documents[personalMemoryDocument]);
-   const result=this.apply(document,input,intent);delete pending[intent.id];applied[intent.id]=fingerprint;
-   const committed=await this.store.commit({expectedRevision:current.revision,changes:json({[personalMemoryDocument]:result.document,[intent.personalKey]:result.personal,[pendingDocument]:pending,[appliedDocument]:applied})});
+   let document=readPersonalFingeringMemory(current.documents[personalMemoryDocument]);const personal=new Map<string,PersonalState>();
+   for(const i of todo){const target=this.target(i),input={...target,personal:personal.get(i.personalKey)??this.personalAt(current,target)},result=this.apply(document,input,i);document=result.document;personal.set(i.personalKey,result.personal);delete pending[i.id];applied[i.id]=fingerprints.get(i.id)!;}
+   const committed=await this.store.commit({expectedRevision:current.revision,changes:json({[personalMemoryDocument]:document,...Object.fromEntries(personal),[pendingDocument]:pending,[appliedDocument]:applied})});
    if(committed.status==='conflict')continue;
-   this.pending.delete(intent.id);this.rebase(committed.snapshot);return;
+   for(const i of batch)this.pending.delete(i.id);this.rebase(committed.snapshot);return;
   }
   throw Error('Personal library remained busy; pending edit retained for retry.');
  }
@@ -299,9 +315,10 @@ export class PersonalMemorySession {
  }
  /** The callback is replayed on the latest raw state after CAS conflicts. It
  * must change only intended fields, and must not return an old UI snapshot. */
- updatePersonal(input:MemoryScoreInput,update:(latest:PersonalState)=>PersonalState):Promise<void>{
+ updatePersonal(input:MemoryScoreInput,update:(latest:PersonalState)=>PersonalState,superseded?:()=>boolean):Promise<void>{
   if(this.maintenance)return Promise.reject(Error('Personal maintenance is running; retry this save afterward.'));
   this.remember([input]);return this.schedule(async()=>{
+   if(superseded?.())return;
    for(let attempt=0;attempt<maxAttempts;attempt++){
     const current=await this.store.read(),latest=this.personalAt(current,input),personal=readPersonal(rawMemoryPersonal(update(latest)),input.p);
     const result=await this.store.commit({expectedRevision:current.revision,changes:json({[inputKey(input)]:personal})});
@@ -309,9 +326,12 @@ export class PersonalMemorySession {
    }throw Error('Personal library remained busy; view save was not applied.');
   });
  }
+ /** A view save sets only the view, navigation and edit position, so one
+ * superseded by a newer queued save of the same score is skipped. */
  saveView(input:MemoryScoreInput):Promise<void>{
-  const raw=rawMemoryPersonal(input.personal),view=clone(raw.view),navigation=clone(raw.navigation),editContactId=raw.editContactId;
-  return this.updatePersonal(input,latest=>{latest.view=view;if(navigation===undefined)delete latest.navigation;else latest.navigation=navigation;if(editContactId===undefined)delete latest.editContactId;else latest.editContactId=editContactId;return latest;});
+  const raw=rawMemoryPersonal(input.personal),view=clone(raw.view),navigation=clone(raw.navigation),editContactId=raw.editContactId,key=inputKey(input);
+  const token={};this.views.set(key,token);
+  return this.updatePersonal(input,latest=>{latest.view=view;if(navigation===undefined)delete latest.navigation;else latest.navigation=navigation;if(editContactId===undefined)delete latest.editContactId;else latest.editContactId=editContactId;return latest;},()=>this.views.get(key)!==token);
  }
  async deleteEntry(entryId:string):Promise<void>{
   await this.initialize();if(this.maintenance)throw Error('Personal maintenance is running; retry deletion afterward.');return this.schedule(async()=>{
