@@ -22,12 +22,14 @@ export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;
  * the newly chosen one; the journal keeps it as the personal goal. Fingers
  * alone needs no tempo: a stand-in lays out the measures, is never saved and
  * never asked for. */
-export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo):AdmittedPracticeContext {
+export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo,fingersOnly=!!context?.fingersOnly):AdmittedPracticeContext {
  requirePracticeHands(p,personal);
- const player=savedPlayerTempo(p.score,saved,context?.preferences)??(p.score.referencePerformanceTempo===undefined?chosenTempo??(context?.fingersOnly?playerTempo(p.score,FINGERS_LAYOUT_TEMPO):undefined):undefined);
+ const remembered=savedPlayerTempo(p.score,saved,context?.preferences),standIn=fingersOnly&&!remembered&&p.score.referencePerformanceTempo===undefined;
+ const player=standIn?playerTempo(p.score,FINGERS_LAYOUT_TEMPO):remembered??(p.score.referencePerformanceTempo===undefined?chosenTempo:undefined);
  const plan=planPractice(p,'bounded-exercises-v1',personal,player);
  let state=practiceStateForContext(plan,saved,context);
- const rememberTempo=!!plan.playerTempo&&!state.personalGoal;
+ // The stand-in never becomes the player's goal, so no snapshot can carry it.
+ const rememberTempo=!!plan.playerTempo&&!state.personalGoal&&!standIn;
  if(rememberTempo)state=setPracticeGoal(state,plan,plan.referencePerformanceTempo!.bpm);
  return {plan,state,saved:!!saved,...(rememberTempo?{rememberTempo:true as const}:{})};
 }

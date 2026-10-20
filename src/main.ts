@@ -1098,13 +1098,13 @@ async function connectMidi(source:string){const operation=++midiTransition;bindi
 async function disconnectMidi(){midiTransition++;bindingOptions?.connectionChanged();musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();midiConnection=undefined;resetInput();midiOptions?.cancelListening();await host.midiDisconnect();bindingOptions?.paint();}
 function options(section?:string){
  const activePractice=practice,focused=document.activeElement as HTMLElement,practiceFocus=activePractice?.bindingContext.active?'.practice-stage':activePractice&&app.contains(focused)?focused.dataset.practice?`[data-practice="${CSS.escape(focused.dataset.practice)}"]`:focused.dataset.practiceSetting?`[data-practice-setting="${CSS.escape(focused.dataset.practiceSetting)}"]`:'.practice-stage':undefined;activePractice?.pause();
- const p=current?.package,s=current?.personal;
+ const p=current?.package,s=current?.personal,practiceOptions=activePractice?.optionsMarkup();
 
  let transpose={steps:p?getScoreTransposition(p):0,min:0,max:0,error:undefined as string|undefined};
  if(p&&scoreCapabilities(p).pianoPreparation)try{transpose={...transpose,...scoreTranspositionRange(p)};}catch(error){transpose.error=(error as Error).message;}
  const scoreOptions=current&&p&&s?scoreOptionsMarkup(current.entry,p,s,transpose,job,readingParts.control(entries,current.entry),!activePractice):'';
  const sections:OptionsSection[]=[
-  ...(activePractice?[{id:'practice',label:'Practice',content:activePractice.optionsMarkup()}]:[]),
+  ...(practiceOptions?[{id:'practice',label:'Practice',content:practiceOptions}]:[]),
   ...(scoreOptions?[{id:'score',label:'Score',content:scoreOptions}]:[]),
   {id:'input-output',label:'Input / output',content:'<h3>Input / output</h3><div class="options-setup"><div data-audio-panel><p class="control-error">Loading outputs…</p></div><div data-midi-panel><p class="control-error">Loading inputs…</p></div></div>'},
   {id:'piano',label:'Piano',content:'<section class="piano-options" data-piano-panel><p class="control-error">Checking piano…</p></section>'},
@@ -1161,7 +1161,7 @@ function practiceMenu(){
  const kinds=[{key:'F',action:'practice-fingers',name:'Fingers',help:'Write your fingering through the whole piece, a measure at a time. No tempo, nothing checked.'},{key:'S',action:'practice-sections',name:'Sections at tempo',help:'Play the piece section by section, building up to your tempo. Every note is checked and progress is kept.'}];
  const d=showDialog(`<h2>Practise</h2><div class="practice-menu" role="menu" aria-label="Practise">${kinds.map(k=>`<button type="button" role="menuitem" data-action="${k.action}" data-menu-key="Key${k.key}"><kbd>${k.key}</kbd><span><strong>${k.name}</strong><small>${k.help}</small></span></button>`).join('')}</div><p class="options-nav-hint"><span><kbd>↑↓</kbd> Choose</span><span><kbd>Enter</kbd> Open</span><span><kbd>Esc</kbd> Close</span></p>`,'practice-menu');
  const items=[...d.querySelectorAll<HTMLButtonElement>('.practice-menu button')];items[0]?.focus();
- d.addEventListener('keydown',e=>{if(e.ctrlKey||e.altKey||e.metaKey)return;const code=actionCode(e),item=items.find(i=>i.dataset.menuKey===code)??items[Number(/^(?:Digit|Numpad)([1-9])$/.exec(code)?.[1])-1];
+ d.addEventListener('keydown',e=>{if(e.ctrlKey||e.altKey||e.metaKey||e.shiftKey)return;const code=actionCode(e),item=items.find(i=>i.dataset.menuKey===code)??items[Number(/^(?:Digit|Numpad)([1-9])$/.exec(code)?.[1])-1];
   if(item){e.preventDefault();e.stopPropagation();if(!e.repeat)item.click();return;}
   if(code==='ArrowDown'||code==='ArrowUp'){e.preventDefault();e.stopPropagation();const i=items.indexOf(document.activeElement as HTMLButtonElement);items[(i+(code==='ArrowDown'?1:items.length-1))%items.length]?.focus();}});
 }
@@ -1172,7 +1172,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
  // An admitted context has already resolved its tempo.
  if(admitted){if(admitted.plan.playerTempo)tempo=admitted.plan.referencePerformanceTempo;}
  // Fingers asks for no tempo: a remembered one, else a stand-in, only lays out the measures.
- else if(fingersOnly){requirePracticeHands(target.package,target.personal);tempo=savedPlayerTempo(target.package.score,await PracticeView.savedJournal(target.package,target.entry.id),context?.preferences)??playerTempo(target.package.score,FINGERS_LAYOUT_TEMPO);if(current!==target)return;}
+ else if(fingersOnly){requirePracticeHands(target.package,target.personal);const start=++practiceStartGeneration,prior=practice;tempo=savedPlayerTempo(target.package.score,await PracticeView.savedJournal(target.package,target.entry.id),context?.preferences)??playerTempo(target.package.score,FINGERS_LAYOUT_TEMPO);if(start!==practiceStartGeneration||current!==target||practice!==prior)return;}
  else if(target.package.score.referencePerformanceTempo===undefined){
   // Refuse what practice cannot plan before asking for a tempo.
   requirePracticeHands(target.package,target.personal);

@@ -42,7 +42,7 @@ try{
  // Fingers opens the whole piece straight away, at the beginning of an unfingered score: no section, no tempo.
  await page.waitForSelector('.section-fingering:not([hidden]) svg');
  const opened=await state();console.log('opened',opened);assert.equal(opened.selected.length,1);assert.match(opened.status,/^Starting at the beginning\. Right hand · measure 1 of 64 · \d+ notes without a finger/);
- assert.equal(await page.textContent('[data-practice-range]'),'Fingers');assert.match(await page.textContent('[data-fingering-progress]'),/^0% fingered · right hand 0% · left hand 0%$/);
+ assert.equal(await page.textContent('[data-practice-range]'),'Fingers');assert.equal(await page.evaluate(()=>window.practice.optionsMarkup()),'','Fingers has no practice settings');assert.match(await page.textContent('[data-fingering-progress]'),/^0% fingered · right hand 0% · left hand 0%$/);
  assert.equal(await page.locator('.practice-study,[data-practice^="study:"]').count(),0);
  await page.screenshot({path:output+'/2-opened.png'});
  // Every measure, PgDn by PgDn: centred to the pixel, neighbours on the stage. The width is

@@ -198,7 +198,7 @@ export class SectionFingering {
  private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.opening=undefined;this.render();}
  private move(step:number){const i=Math.max(0,this.index());this.go(this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);}
  /** The first note of the measure step measures away, in fingering order. */
- private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const seat=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(seat)this.go(seat);}
+ private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const near=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(near)this.go(this.units.find(s=>s.writtenBar===near.writtenBar));}
  /** The other hand's note nearest the cursor: up to the right hand, down to
  * the left, as the score's arrows move between hand rows. */
  private hands(direction:-1|1){
