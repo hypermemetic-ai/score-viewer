@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
+import {writtenOutReader} from './helpers/written-out-reader';
 
 const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const body=(start:string,end:string)=>stripTypeScriptTypes(main.slice(main.indexOf(start),main.indexOf(end,main.indexOf(start))));
@@ -12,7 +13,7 @@ function fixture(){
  const view={page:4,rotation:90,scale:1.25,count:2,advance:'slide',labelMode:'pitch',fingerSet:'yours'},personal=(v:any)=>({view:structuredClone(v),editContactId:'prior-cursor',choices:{untouched:{finger:3}}});
  const a={entry:entryA,package:packageA,personal:personal(view)},b={entry:entryB,package:packageB,personal:personal({...view,page:0,rotation:0,count:1})},opens:string[]=[],saved:any[]=[],paints:string[]=[],imports:string[]=[],presentations:string[]=[];
  let admitted:any={...packageB,availablePresentations:['janko-four-row']},returnPackage=packageA,gate:Promise<void>|undefined;
- const context:any={current:a,selection:aliases[2],entries:[entryA,entryB],sourceReturn:undefined,sourceNavigating:false,editNavigation:'measures',selectionPitchToggle:true,
+ const context:any={...writtenOutReader,current:a,selection:aliases[2],entries:[entryA,entryB],sourceReturn:undefined,sourceNavigating:false,editNavigation:'measures',selectionPitchToggle:true,
   memoryInput:(target:any)=>({entryId:target.entry.id,p:target.package,personal:target.personal}),resolveMemoryInput:()=>({}),memoryReferenceTarget:()=>({entryId:'reference',sourceRevision:'reference-source',writtenBar:2,ownerId:'reference-owner'}),
   readerPackage:()=>context.current.package,host:{async read(file:string){imports.push(file);await gate;return new Uint8Array([1]);}},readerAdmission:{import:async()=>admitted},admitOrContent:async()=>admitted,selectPresentation:async(archive:any,layout:string)=>{presentations.push(layout);return archive;},
   async open(entry:any){opens.push(entry.id);context.current=entry.id==='reference'?b:{...a,package:returnPackage,personal:personal({...view,page:0,rotation:0})};context.selection=undefined;context.editNavigation='notes';context.selectionPitchToggle=false;},

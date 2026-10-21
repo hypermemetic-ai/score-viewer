@@ -11,6 +11,7 @@ import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {nextInHand} from '../src/selection';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
+import {writtenOutReader} from './helpers/written-out-reader';
 
 // Run the actual application intent and persistence functions. Geometry and
 // storage are bounded fakes so their independently delayed completions can be
@@ -30,7 +31,7 @@ function fixture(){
  const written:any[]=[],frames:any[]=[],errors:Error[]=[],messages:string[]=[];let disk:any=structuredClone(target.personal),persist=Promise.resolve();
  let write=(snapshot:any)=>{disk=structuredClone(snapshot);written.push(structuredClone(snapshot));};
  let project=async(personal:any)=>({...target.package,choiceSnapshot:structuredClone(personal)});
- const context:any={structuredClone,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
+ const context:any={structuredClone,...writtenOutReader,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}project(personal:any){return project(structuredClone(personal));}},
   personalStorageName:()=> 'source-bound-journal',personalContext:async(owner:any)=>({p:owner.package,file:'source-bound-journal',entry:owner.entry,active:context.current===owner?owner:undefined}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.then(()=>{},()=>{});return result;},

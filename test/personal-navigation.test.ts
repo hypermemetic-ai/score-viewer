@@ -4,6 +4,7 @@ import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {nextInHand} from '../src/selection';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
+import {writtenOutReader} from './helpers/written-out-reader';
 const main=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),state=readFileSync(new URL('../src/state.ts',import.meta.url),'utf8'),selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
 const body=(source:string,start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))).replace(/^export /gm,''));
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
@@ -12,7 +13,7 @@ function fixture(basePages=2,projectedPages=basePages){
  const seats=[seat('a',0,1),seat('b',basePages-1,9)],p={manifest:{version:1,revision:'source'},sourceSha256:'source',pages:Array.from({length:basePages},()=>'<svg/>'),seats,score:{notes:seats.map(s=>({id:s.ownerIds[0]}))}},
   target:any={entry:{id:'source',file:'source.tuna'},package:p,personal:{version:1,revision:'source',view:{page:0,rotation:0,scale:1,count:1,advance:'slide',labelMode:'pitch',fingerSet:'yours'},editContactId:seats[0].contactId,overrides:{},history:[],choices:{a:{hand:'LH',finger:1},b:{hand:'RH',finger:2}}}};
  const projected={...p,pages:Array.from({length:projectedPages},()=>'<svg/>'),seats:[seats[0],{...seats[1],id:'projected-b',contactId:'projected-contact-b',page:projectedPages-1}]},writes:any[]=[],frames:any[]=[],errors:any[]=[];let disk:any=structuredClone(target.personal),persist=Promise.resolve(),project=async(_s:any)=>projected;
- const context:any={structuredClone,PersonalEditQueue,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),
+ const context:any={structuredClone,...writtenOutReader,PersonalEditQueue,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),
   personalBinding:()=>undefined,initialPersonal:()=>target.personal,readPersonalAssignments:(v:any)=>v,isPitchedEvent:()=>true,
   PersonalPresentationSession:class{handChoiceCheck(){return undefined;}project(s:any){return project(structuredClone(s));}},
   personalStorageName:()=> 'source-journal',personalContext:async(owner:any)=>({entry:owner.entry,p:owner.package,file:'source-journal'}),

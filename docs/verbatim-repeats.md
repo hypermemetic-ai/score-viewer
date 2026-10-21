@@ -43,8 +43,9 @@ Each folded note is shown by its twins, one in each pass (`src/repeat-fold.ts`).
 The reader's pages and Save as PDF show the fold. Practice, Fingers and playback
 go through the written-out score in performed order, as before. Saved
 navigation names written-out notes, so it stays valid whether or not a repeat
-is folded. Bar numbers on folded pages are the written bars, as on any score
-with repeats; practice counts performed bars.
+is folded. Folded pages number their printed bars, as any score with repeats
+does (Op. 68 No. 13's printed bar 12 is stored bar 22); practice and Fingers
+count the stored bars in playing order.
 
 ## Cost
 
