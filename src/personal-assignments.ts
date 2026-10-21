@@ -20,6 +20,8 @@ const validFinger=(v:unknown)=>Number.isInteger(v)&&Number(v)>=1&&Number(v)<=5;
 const sourceRevision=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
 const pitch=(n:ScorePackage['score']['notes'][number])=>{if(!isPitchedEvent(n))throw Error('Personal assignments require a pitched piano owner.');return n.pitch.octave*12+n.pitch.pitchClass;};
 const guard=(n:ScorePackage['score']['notes'][number])=>({pitch:pitch(n),startTick:n.startTick,durationTicks:n.durationTicks});
+/** What an untouched note reads from its twin in a repeat the reader shows once. */
+const repeatChoice=(p:ScorePackage,s:PersonalState,id:string)=>s.repeatResolved?.sourceRevision===sourceRevision(p)?s.repeatResolved.choices[id]:undefined;
 const baseFinger=(p:ScorePackage,s:PersonalState,id:string)=>{const layer=s.layer??p.fingerLayer;return layer?.attacks.find(a=>a.id===layer.sourceOwnerToAttack[id])?.finger;};
 /** Only admitted shared contact owners establish aliases; coincident pitches do not. */
 const aliases=(p:ScorePackage,id:string)=>{if(!p.score.notes.some(n=>n.id===id))throw Error('Personal choice names an unknown source owner.');const ids=new Set([id]);let changed=true;while(changed){changed=false;for(const seat of p.seats)if(seat.ownerIds.some(owner=>ids.has(owner)))for(const owner of seat.ownerIds)if(!ids.has(owner)){ids.add(owner);changed=true;}}return [...ids];};
@@ -52,14 +54,14 @@ export function handlessMessage(count:number,purpose:string):string {
 /** The owner's effective hand, or null when neither the source nor the player gives one. */
 export function handFor(p:ScorePackage,s:PersonalState,ownerId:string):PersonalHand|null {
  const n=p.score.notes.find(n=>n.id===ownerId);if(!n||n.hand!==undefined&&!validHand(n.hand))throw Error('No piano owner at this source owner.');
- return s.assignments?.choices[ownerId]?.hand??n.hand??null;
+ return s.assignments?.choices[ownerId]?.hand??repeatChoice(p,s,ownerId)?.hand??n.hand??null;
 }
 export function effectiveAssignments(p:ScorePackage,s:PersonalState):EffectivePersonalAssignment[] {
  readPersonalAssignments(s.assignments,p);
  const legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
  return p.score.notes.filter(isPitchedEvent).map(n=>{
-  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??fingers.get(n.id);
-  return{id:n.id,...guard(n),hand:c?.hand??n.hand??null,...(finger===undefined?{}:{finger})};
+  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,repeat=repeatChoice(p,s,n.id),finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??repeat?.finger??fingers.get(n.id);
+  return{id:n.id,...guard(n),hand:c?.hand??repeat?.hand??n.hand??null,...(finger===undefined?{}:{finger})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 /** Canonical content key is synchronous; durable digests can be computed away from key handling. */

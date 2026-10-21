@@ -61,7 +61,7 @@ const source=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
 const clone=<T>(value:T):T=>structuredClone(value);
 /** Projection is derived, never a donor or durable authority. */
 export function rawMemoryPersonal(personal:PersonalState):PersonalState {
- const raw=clone(personal) as PersonalState&{memoryResolved?:unknown};delete raw.memoryResolved;return raw;
+ const raw=clone(personal) as PersonalState&{memoryResolved?:unknown};delete raw.memoryResolved;delete raw.repeatResolved;return raw;
 }
 const json=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
 const inputKey=(input:MemoryScoreInput)=>personalStorageName(input.entryId,input.p);

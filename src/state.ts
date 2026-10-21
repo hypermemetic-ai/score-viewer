@@ -18,7 +18,10 @@ export interface PersonalBinding {sourceRevision:string;keyboardLayout:'conventi
 export interface PersonalSourceAnchor {owners:string[];writtenBar:number;actionId:string;continuation:boolean;alias:number}
 export interface PersonalNavigation {version:1;page?:PersonalSourceAnchor;edit?:PersonalSourceAnchor;followEdit:boolean}
 export interface PersonalMemoryResolution {revision:number;sourceRevision:string;choices:Record<string,{finger:number|null}>}
-export interface PersonalState {calculatedOwners?:Record<string,true>;undoCalculatedOwners?:Record<string,true>;memoryResolved?:PersonalMemoryResolution;version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
+/** Derived, never saved: what a note the player has not touched reads from its
+ * twin in a written-out repeat that the reader shows once (`repeat-fold.ts`). */
+export interface PersonalRepeatResolution {sourceRevision:string;choices:Record<string,{hand?:'LH'|'RH';finger?:number}>}
+export interface PersonalState {calculatedOwners?:Record<string,true>;undoCalculatedOwners?:Record<string,true>;memoryResolved?:PersonalMemoryResolution;repeatResolved?:PersonalRepeatResolution;version:1|2;binding?:PersonalBinding;revision:string;view:ViewState;editContactId?:string;navigation?:PersonalNavigation;overrides:Record<string,Correction>;undo?:Record<string,Correction>;assignments?:PersonalAssignments;undoAssignments?:PersonalAssignments;layer?:FingerLayer;history:FingerLayer[];calculatedVersion?:number}
 const personalBinding=(p:ScorePackage):PersonalBinding|undefined=>{
  if(p.manifest.version!==2)return;
  if(!p.sourceRevision||!p.keyboardLayout||!p.profileId||!p.profileSha256||!p.effectiveHandSha256)throw Error('Incomplete presentation state identity');
@@ -46,7 +49,7 @@ export const initialPersonal=(p:ScorePackage):PersonalState=>({version:p.manifes
 export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJanko?:boolean}={}):PersonalState{
  if(!raw)return initialPersonal(p);
  if(typeof raw!=='object'||Array.isArray(raw))throw Error('Invalid saved personal state; original data retained');
- let s=structuredClone(raw) as PersonalState;delete s.memoryResolved;const binding=personalBinding(p);
+ let s=structuredClone(raw) as PersonalState;delete s.memoryResolved;delete s.repeatResolved;const binding=personalBinding(p);
  const legacy=options.allowLegacyJanko&&!!legacyPersonalStorageName(p)&&s.version===1&&s.revision===p.manifest.revision;
  if(legacy)s={...s,version:2,binding};
  const matchesBinding=binding?!!s.binding&&typeof s.binding==='object'&&!Array.isArray(s.binding)&&
@@ -84,11 +87,13 @@ export function readPersonal(raw:unknown,p:ScorePackage,options:{allowLegacyJank
  return s;
 }
 export const activeLayer=(p:ScorePackage,s:PersonalState)=>s.layer??p.fingerLayer;
-/** The finger shown at a seat: the player's own choice, else the edition's.
+/** The finger shown at a seat: the player's own choice, else its twin's in a
+ * repeat the reader shows once, else the edition's.
  * A saved 'calculated' view or earlier calculated version from older releases
  * is kept in the journal but no longer changes what is shown. */
-export function fingerFor(p:ScorePackage,s:PersonalState,seat:Seat):number|undefined{const display=activeLayer(p,s),a=display?.attacks.find(a=>a.id===(display.sourceOwnerToAttack[seat.ownerIds[0]]??seat.actionId)),legacy=s.overrides[seat.contactId]??Object.values(s.overrides).find(c=>c.ownerIds.includes(seat.ownerIds[0]));const shared=s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?s.memoryResolved.choices[seat.ownerIds[0]]:undefined;return s.calculatedOwners?.[seat.ownerIds[0]]?a?.finger:shared?shared.finger??undefined:s.assignments?.choices[seat.ownerIds[0]]?.finger??legacy?.replacement??a?.finger;}
-export function fingerDisplayAvailable(p:ScorePackage,s:PersonalState,presentation:FingerPresentation):boolean{return (!!activeLayer(p,s)||Object.values(s.assignments?.choices??{}).some(c=>c.finger!==undefined)||s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)&&Object.values(s.memoryResolved.choices).some(c=>c.finger!==null))&&(presentation==='annotations'||p.fingerEligibility.eligible);}
+export function fingerFor(p:ScorePackage,s:PersonalState,seat:Seat):number|undefined{const display=activeLayer(p,s),a=display?.attacks.find(a=>a.id===(display.sourceOwnerToAttack[seat.ownerIds[0]]??seat.actionId)),legacy=s.overrides[seat.contactId]??Object.values(s.overrides).find(c=>c.ownerIds.includes(seat.ownerIds[0]));const shared=s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?s.memoryResolved.choices[seat.ownerIds[0]]:undefined;return s.calculatedOwners?.[seat.ownerIds[0]]?a?.finger:shared?shared.finger??undefined:s.assignments?.choices[seat.ownerIds[0]]?.finger??legacy?.replacement??repeatFinger(p,s,seat.ownerIds[0])??a?.finger;}
+const repeatFinger=(p:ScorePackage,s:PersonalState,id:string)=>s.repeatResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?s.repeatResolved.choices[id]?.finger:undefined;
+export function fingerDisplayAvailable(p:ScorePackage,s:PersonalState,presentation:FingerPresentation):boolean{return (!!activeLayer(p,s)||Object.values(s.assignments?.choices??{}).some(c=>c.finger!==undefined)||s.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)&&Object.values(s.memoryResolved.choices).some(c=>c.finger!==null)||s.repeatResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)&&Object.values(s.repeatResolved.choices).some(c=>c.finger!==undefined))&&(presentation==='annotations'||p.fingerEligibility.eligible);}
 export function corrected(p:ScorePackage,s:PersonalState,seat:Seat,replacement:number):PersonalState{
  if(!Number.isInteger(replacement)||replacement<1||replacement>5)throw Error('Use a finger from 1 to 5');if(seat.ownerIds.some(id=>s.assignments?.choices[id]))return assigned(p,s,seat,{finger:replacement});const a=activeLayer(p,s)?.attacks.find(a=>a.id===seat.actionId);if(!a)throw Error('This note has no edition finger to replace.');
  const next=structuredClone(s),prior=next.overrides[seat.contactId],layer=activeLayer(p,s)!;

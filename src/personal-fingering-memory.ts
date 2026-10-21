@@ -50,7 +50,8 @@ export function projectPersonalMemoryScore(input:MemoryScoreInput):PersonalMemor
  const {p,personal,entryId}=input,bars=p.score.sourceBarTicks,tpq=p.score.ticksPerBeat;
  if(!entryId||!bars||bars.length<2||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||bars.some((n,i)=>!Number.isSafeInteger(n)||i>0&&n<=bars[i-1])||!Number.isSafeInteger(tpq)||tpq<=0)fail('complete exact written-measure map required');
  const keyboardId=p.keyboardLayout??p.manifest.keyboardLayout??'janko-four-row',profileId=p.profileSha256??p.manifest.profileSha256??p.profileId??p.manifest.profileId??`legacy:${source(p)}`;
- const effective=new Map(effectiveAssignments(p,personal).map(a=>[a.id,a])),notes=p.score.notes.filter(isPitchedEvent);
+ // Shared memory reads the player's own hands; a repeat's inherited hands are the reader's, not another pattern.
+ const {repeatResolved:_inherited,...own}=personal,effective=new Map(effectiveAssignments(p,own).map(a=>[a.id,a])),notes=p.score.notes.filter(isPitchedEvent);
  const parent=new Map(notes.map(n=>[n.id,n.id]));
  const find=(id:string):string=>{const q=parent.get(id);if(q===undefined)return fail('unknown admitted alias owner');if(q!==id)parent.set(id,find(q));return parent.get(id)!;};
  for(const seat of p.seats){const ids=seat.ownerIds.filter(id=>parent.has(id));for(const id of ids.slice(1))parent.set(find(id),find(ids[0]));}

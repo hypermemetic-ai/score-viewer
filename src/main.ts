@@ -93,6 +93,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
+import {FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenView,type FoldedPackage} from './repeat-fold';
 import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
@@ -119,7 +120,7 @@ const readerAdmission=new PackageAdmissionSession({maxEntries:2,maxRetainedBytes
 // pages, and a development server's source can change under one identity.
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
- usePersonalProjectionCache(derived);
+ usePersonalProjectionCache(derived);useVerbatimFoldCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});
 }
@@ -232,12 +233,13 @@ const memoryResolutions=new PersonalMemoryResolutionCache();
 const resolveMemoryInput=(input:MemoryScoreInput)=>memoryResolutions.resolve(input,personalMemory.memoryGeneration,q=>personalMemory.resolve(q));
 let memoryDocumentCache:PersonalFingeringMemory|undefined,memoryDocumentGeneration=-1;
 function memoryDocument(){if(!memoryDocumentCache||memoryDocumentGeneration!==personalMemory.memoryGeneration){memoryDocumentCache=personalMemory.memory;memoryDocumentGeneration=personalMemory.memoryGeneration;}return memoryDocumentCache;}
-function resolveMemory(target:NonNullable<typeof current>){const input=memoryInput(target);memoryLibrary.remember(input);return withResolvedMemory(input,resolveMemoryInput(input),personalMemory.memoryRevision);}
-interface LivePersonalEditor {view:ScorePackage;visiblePersonal:PersonalState;session:PersonalPresentationSession;generation:number;recovering?:boolean;queue:PersonalEditQueue<PersonalState>;projections:Map<number,Promise<ScorePackage>>}
+/** Shared fingering memory resolves first; a written-out repeat's untouched pass then reads its twin's choices. */
+function resolveMemory(target:NonNullable<typeof current>){const input=memoryInput(target);memoryLibrary.remember(input);const resolved=withResolvedMemory(input,resolveMemoryInput(input),personalMemory.memoryRevision);return scoreCapabilities(target.package).pianoPreparation?withRepeatInheritance(target.package,resolved):resolved;}
+interface LivePersonalEditor {view:ScorePackage;visiblePersonal:PersonalState;session:PersonalPresentationSession;fold:FoldedReader;generation:number;recovering?:boolean;queue:PersonalEditQueue<PersonalState>;projections:Map<number,Promise<ScorePackage>>}
 const livePersonalEditors=new WeakMap<NonNullable<typeof current>,LivePersonalEditor>();
 function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  const existing=livePersonalEditors.get(target);if(existing)return existing;
- const editor:LivePersonalEditor={view:target.package,visiblePersonal:structuredClone(target.personal),session:new PersonalPresentationSession(target.package),generation:0,queue:undefined!,projections:new Map()};
+ const editor:LivePersonalEditor={view:target.package,visiblePersonal:structuredClone(target.personal),session:new PersonalPresentationSession(target.package),fold:new FoldedReader(target.package),generation:0,queue:undefined!,projections:new Map()};
  // The page drawn for a choice only places the saved view. A choice the
  // engraver refused is answered where it was made; it is not a failed save,
  // so it never holds the score open behind "Choices haven't been saved".
@@ -246,6 +248,12 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  livePersonalEditors.set(target,editor);return editor;
 }
 function readerPackage(){if(!current)throw Error('No open score.');return livePersonalEditors.get(current)?.view??current.package;}
+/** The reader shows a passage written out twice once, as a repeat; a fold it can't draw leaves the pages written out. */
+async function readerView(target:NonNullable<typeof current>,written:ScorePackage,personal:PersonalState,execution?:ReadingExecution):Promise<ScorePackage>{
+ if(!scoreCapabilities(target.package).pianoPreparation)return written;
+ try{return await personalEditor(target).fold.view(personal,written,execution)??written;}
+ catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);return written;}
+}
 function visibleSourceSeat(p:ScorePackage,seat:Seat):Seat|undefined {
  const aliases=p.seats.filter(s=>s.ownerIds.some(id=>seat.ownerIds.includes(id)));
  return aliases.find(s=>s.id===seat.id)??aliases.find(s=>s.page===seat.page&&!!s.continuation===!!seat.continuation)??aliases.find(s=>!s.continuation)??aliases[0];
@@ -254,11 +262,13 @@ function sourceNavigationAliases(p:ScorePackage,anchor:Pick<PersonalSourceAnchor
  return p.seats.filter(s=>s.writtenBar===anchor.writtenBar&&s.actionId===anchor.actionId&&!!s.continuation===anchor.continuation&&s.ownerIds.some(id=>anchor.owners.includes(id))).sort((a,b)=>a.page-b.page||a.system-b.system||a.x-b.x||a.id.localeCompare(b.id));
 }
 function sourceNavigationAnchor(p:ScorePackage,seat:Seat|undefined):PersonalSourceAnchor|undefined {
+ // Saved navigation names written-out notes, whether or not a repeat is folded.
+ const fold=(p as FoldedPackage).verbatimFold;if(fold)return sourceNavigationAnchor(fold.written,seat&&fold.writtenSeat(seat));
  if(!seat||!Number.isSafeInteger(seat.writtenBar)||!seat.actionId||!seat.ownerIds.length)return;
  const anchor={owners:[...seat.ownerIds].sort(),writtenBar:seat.writtenBar,actionId:seat.actionId,continuation:!!seat.continuation},aliases=sourceNavigationAliases(p,anchor);
  return {...anchor,alias:Math.max(0,aliases.findIndex(s=>s.id===seat.id))};
 }
-function sourceNavigationSeat(p:ScorePackage,anchor:PersonalSourceAnchor|undefined){if(!anchor)return;const aliases=sourceNavigationAliases(p,anchor);return aliases[Math.min(anchor.alias,aliases.length-1)];}
+function sourceNavigationSeat(p:ScorePackage,anchor:PersonalSourceAnchor|undefined):Seat|undefined{if(!anchor)return;const fold=(p as FoldedPackage).verbatimFold;if(fold){const seat=sourceNavigationSeat(fold.written,anchor);return seat&&fold.foldedSeat(seat);}const aliases=sourceNavigationAliases(p,anchor);return aliases[Math.min(anchor.alias,aliases.length-1)];}
 function capturePersonalNavigation(state:PersonalState,p:ScorePackage,edit:Seat|undefined,followEdit:boolean){
  const page=p.seats.filter(s=>s.page===state.view.page).sort((a,b)=>a.system-b.system||a.x-b.x||a.id.localeCompare(b.id))[0],cursor=edit??sourceNavigationSeat(p,state.navigation?.edit)??p.seats.find(s=>s.contactId===state.editContactId);
  const pageAnchor=sourceNavigationAnchor(p,page),editAnchor=sourceNavigationAnchor(p,cursor);
@@ -280,7 +290,7 @@ function paintPersonalSaveError(target:NonNullable<typeof current>,error:Error){
 }
 async function retryPersonalEdits(target:NonNullable<typeof current>){
  const editor=personalEditor(target);if(editor.recovering)throw Error('Personal edit recovery is already running.');editor.recovering=true;try{
- await personalMemory.retry();for(const {sequence,snapshot} of editor.queue.recovery)editor.projections.set(sequence,editor.session.project(snapshot));await editor.queue.retry();const view=target.personal.view,navigation=target.personal.navigation,editContactId=target.personal.editContactId;target.personal=await loadPersonal(target.entry,target.package);target.personal.view=view;target.personal.navigation=navigation;target.personal.editContactId=editContactId;target.personal=resolveMemory(target);const generation=++editor.generation,projected=await editor.session.project(target.personal);
+ await personalMemory.retry();for(const {sequence,snapshot} of editor.queue.recovery)editor.projections.set(sequence,editor.session.project(snapshot).then(view=>readerView(target,view,snapshot)));await editor.queue.retry();const view=target.personal.view,navigation=target.personal.navigation,editContactId=target.personal.editContactId;target.personal=await loadPersonal(target.entry,target.package);target.personal.view=view;target.personal.navigation=navigation;target.personal.editContactId=editContactId;target.personal=resolveMemory(target);const generation=++editor.generation,projected=await readerView(target,await editor.session.project(target.personal),target.personal);
  if(current===target&&editor.generation===generation){
   const cursor=sourceNavigationAnchor(editor.view,selection);editor.view=projected;resolvePersonalNavigation(target.personal,projected);editor.visiblePersonal=structuredClone(target.personal);
   if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
@@ -322,7 +332,7 @@ async function savePersonal(){if(!current)return;const target=current,snapshot=s
   if(practice instanceof ManualPracticeView)controller.adoptView(practice.options.context.viewRecord());
   const record=practice instanceof ManualPracticeView?controller.record():retainManualReaderView(controller,view);await enqueue(()=>writeJson(controller.storageName,record));return;}
  // A page the engraver refuses still leaves the view to save: leaving is never held by that refusal.
- if(scoreCapabilities(target.package).pianoPreparation){const projected=await personalEditor(target).session.project(snapshot).catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});return;}
+ if(scoreCapabilities(target.package).pianoPreparation){const projected=await personalEditor(target).session.project(snapshot).then(view=>readerView(target,view,snapshot)).catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});return;}
  await enqueue(async()=>{const {entry,p,file}=await personalContext(target),latest=await loadPersonalJournal(host,entry,p);latest.view=snapshot.view;latest.editContactId=snapshot.editContactId;latest.navigation=snapshot.navigation;await writeJson(file,latest);});
 }
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
@@ -336,7 +346,7 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
   attempted=next,projection=editor.session.project(next).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
    if(editor.generation===generation)next=target.personal;
    if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}
-   return kept.view;}),
+   return kept.view;}).then(view=>readerView(target,view,next)),
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const ownerPractice=target===current&&practice instanceof PracticeView?practice:undefined,
@@ -564,7 +574,7 @@ async function visitMemorySource(){
   const departure:SourceReturn={entryId:current.entry.id,file:current.entry.file,sourceRevision:current.package.sourceRevision??current.package.manifest.revision,view:{...current.personal.view},selection:sourceNavigationAnchor(readerPackage(),selection),mode:editNavigation,pitchToggle:selectionPitchToggle};
   if(current.entry.id!==entry.id)await open(entry);
   if(!current||current.package.sourceRevision!==reference.sourceRevision&&current.package.manifest.revision!==reference.sourceRevision)throw Error('The reference edition is unavailable; its shared choices are retained.');
-  const seat=readerPackage().seats.find(s=>s.writtenBar===reference.writtenBar&&s.ownerIds.includes(reference.ownerId));if(!seat)throw Error('The reference note is unavailable in this edition.');
+  const shown=readerPackage(),written=writtenView(shown).seats.find(s=>s.writtenBar===reference.writtenBar&&s.ownerIds.includes(reference.ownerId)),seat=written&&((shown as FoldedPackage).verbatimFold?.foldedSeat(written)??written);if(!seat)throw Error('The reference note is unavailable in this edition.');
   sourceReturn=departure;selection=seat;current.personal.view.page=seat.page;current.personal.editContactId=seat.contactId;editNavigation=departure.mode;
  }
  editSequence.reset();resetInput();renderPages();renderToolbar();focusSelection();savePersonalQuietly();
@@ -824,7 +834,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // hand choices' projection. With a projection worker the engraver settles
  // for editing in the worker after opening; without one it settles here, as before.
  cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
-  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});check();nextEditor.view=await readerView(next,nextEditor.view,next.personal,readingExecution(op));resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
  op.running.state='installing';readingProgress(op,'open');op.loading.saving('Almost ready. This part can’t be cancelled.');
@@ -1177,7 +1187,7 @@ async function earlierEditions(){
 }
 function closeDialog(returnParent=true){adviceOptions?.dispose();adviceOptions=undefined;if(['piano-preparation','score-reading'].includes(dialog?.dataset.kind??'')&&job?.state==='installing')return;if(dialog&&readingOperation?.dialog===dialog&&readingOperation.running.state==='working')readingOperation.running.cancel();const back=dialogBack;dialogBack=undefined;practiceOptionsCleanup?.();practiceOptionsCleanup=undefined;transposeControls?.dispose();transposeControls=undefined;optionsNavigation?.dispose();optionsNavigation=undefined;dialogNavigation?.dispose();dialogNavigation=undefined;bindingOptions?.dispose();bindingOptions=undefined;midiOptions?.dispose();midiOptions=undefined;audioOptions?.dispose();audioOptions=undefined;pianoOptions?.dispose();pianoOptions=undefined;if(!dialog)return;dialog.close();dialog.remove();dialog=undefined;input.capture=undefined;resetInput();const practiceFocus=practiceFocusReturn?app.querySelector<HTMLElement>(practiceFocusReturn):undefined;practiceFocusReturn=undefined;if(selection)focusSelection();else if(practiceFocus)practiceFocus.focus();else if(focusReturn?.isConnected)focusReturn.focus();else app.querySelector<HTMLElement>('.practice-overview:not([hidden]) .practice-chunks [aria-current=true],.practice-stage,.reader')?.focus();focusReturn=undefined;if(libraryRepaintPending&&!current&&!practice)repaintLibrary();if(returnParent)back?.();}
 function showDialog(html:string,kind='options'){const parentSection=dialog?.dataset.kind==='options'&&kind==='earlier-editions'?optionsSection:undefined,opener=document.activeElement as HTMLElement,openerAction=opener?.dataset.action;closeDialog(false);if(parentSection)dialogBack=()=>{options(parentSection);if(openerAction)dialog?.querySelector<HTMLElement>(`[data-action="${CSS.escape(openerAction)}"]`)?.focus();};focusReturn=document.activeElement as HTMLElement;dialog=document.createElement('dialog');dialog.innerHTML=html;arrangeDialogNavigation(dialog);dialog.dataset.kind=kind;dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});document.body.append(dialog);dialog.showModal();fitDialog(dialog,orientation.rotation);resetInput();if(kind!=='options')dialogNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});dialog.querySelector<HTMLElement>('input:not([hidden]),button:not([hidden]),select:not([hidden])')?.focus();return dialog;}
-async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore edition finger','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{await acceptMemoryAction(target,{kind:'calculated',ownerId:seat.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
+async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore edition finger','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{for(const ownerId of editOwners(seat))await acceptMemoryAction(target,{kind:'calculated',ownerId,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
 function onMidi(event:MidiCC){if(!startupReady)return;if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;syncControls();
  midiOptions?.receive(event);
  if([120,121,123].includes(event.controller)){bindingOptions?.cancel('Input reset. Start again.');musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();resetInput();return;}
@@ -1285,7 +1295,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
    const bpm=known?.confident?wholeTempoOnBeat(known.bpm,known.beat,beat):await hearAndSetTempo(target,{piece:known},'Practice at this tempo',true);
    if(bpm===undefined||!owns())return;tempo=playerTempo(target.package.score,Math.min(500,Math.max(5,bpm)));}
  }
- selection=undefined;editNavigation='notes';resetInput();const next=new PracticeView(app,{playerTempo:tempo,fingersOnly,work:target.entry.metadata,rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),modeKeys:()=>({reading:actionControlLabel(effectiveControls(),'practiceReading'),timed:actionControlLabel(effectiveControls(),'practiceTimed')}),...{navigationKeys:()=>{const bindings=effectiveControls();return {previous:actionControlLabel(bindings,'previous'),next:actionControlLabel(bindings,'next')};}},package:readerPackage(),basePackage:target.package,personal:target.personal,presentation:()=>currentFingerPresentation(target.package),audioOutput:()=>preferences.audioOutput??'',sustain:()=>musicalSustain.snapshot(),entryId:target.entry.id,connected:()=>!!midiConnection,source:()=>midiConnection?.source??preferences.midi?.source??'',connect:connectMidi,disconnect:disconnectMidi,back:()=>{practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;resetInput();render();},saveFinger:(seat,finger)=>{if(!current)return Promise.reject(Error('No open score.'));
+ selection=undefined;editNavigation='notes';resetInput();const next=new PracticeView(app,{playerTempo:tempo,fingersOnly,work:target.entry.metadata,rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),modeKeys:()=>({reading:actionControlLabel(effectiveControls(),'practiceReading'),timed:actionControlLabel(effectiveControls(),'practiceTimed')}),...{navigationKeys:()=>{const bindings=effectiveControls();return {previous:actionControlLabel(bindings,'previous'),next:actionControlLabel(bindings,'next')};}},package:writtenView(readerPackage()),basePackage:target.package,personal:target.personal,presentation:()=>currentFingerPresentation(target.package),audioOutput:()=>preferences.audioOutput??'',sustain:()=>musicalSustain.snapshot(),entryId:target.entry.id,connected:()=>!!midiConnection,source:()=>midiConnection?.source??preferences.midi?.source??'',connect:connectMidi,disconnect:disconnectMidi,back:()=>{practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;resetInput();render();},saveFinger:(seat,finger)=>{if(!current)return Promise.reject(Error('No open score.'));
    // The editor reads the note before its first await; practice keeps no score selection.
    selection=seat;const saving=saveSelectedChoice({finger},false);selection=undefined;return saving.catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});},saveHand:(seat,hand)=>{if(!current)return Promise.reject(Error('No open score.'));selection=seat;const saving=saveHandChoice(hand);selection=undefined;return saving;},settings:()=>settings()});practice=next;await next.mount(context,admitted);}
 
@@ -1377,11 +1387,14 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
   if(wait){wait.queue.add({key:chosenSeat!.ownerIds[0],hand:choice.hand,bar:chosenSeat!.writtenBar});wait.status.queue(wait.queue.list());return;}
  }
  const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=seat?units.findIndex(s=>s.contactId===seat.contactId):-1,nextSeat=waitedOwner||!seat?selection:advance?nextInHand(readerPackage(),units,index)??seat:seat;
- const decisionId=crypto.randomUUID(),authoredAt=new Date().toISOString(),ownerId=waitedOwner??seat!.ownerIds[0];
+ const authoredAt=new Date().toISOString(),ownerIds=waitedOwner?[waitedOwner]:editOwners(seat!);
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');
- const action:PersonalMemoryAction=choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
+ const action=(ownerId:string,decisionId=crypto.randomUUID()):PersonalMemoryAction=>choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
- const receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
+ // A folded note whose passes both carry the player's choice changes in both, so they stay one repeat.
+ let receipt=personalMemory.accept(memoryInput(target),action(ownerIds[0]));const saved=[receipt.saved];
+ for(const ownerId of ownerIds.slice(1)){receipt=personalMemory.accept({...memoryInput(target),personal:receipt.personal},action(ownerId));saved.push(receipt.saved);}
+ receipt={...receipt,saved:Promise.all(saved).then(()=>{})};const next=receipt.personal;
  if(waitedOwner||!nextSeat)return presentPersonalChange(target,next,receipt.saved);
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
