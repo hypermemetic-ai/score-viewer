@@ -36,11 +36,25 @@ test('the editorial variant is not part of the name',()=>{
 });
 
 test('MusicXML work numbers give the catalogue and number',()=>{
- assert.deepEqual(musicXmlCatalogue('Op. 68, No. 13','13'),{opusLabel:'Op. 68',opus:68,piece:13});
- assert.deepEqual(musicXmlCatalogue('BWV 988',undefined),{opusLabel:'BWV 988'});
- assert.deepEqual(musicXmlCatalogue('Op. 28','2'),{opusLabel:'Op. 28',opus:28,piece:2});
- assert.deepEqual(musicXmlCatalogue(undefined,'13'),{},'A movement number alone names no catalogue');
- assert.deepEqual(musicXmlCatalogue('Lullaby',undefined),{});
+ assert.deepEqual(musicXmlCatalogue('Op. 68, No. 13'),{opusLabel:'Op. 68',opus:68,piece:13});
+ assert.deepEqual(musicXmlCatalogue('Op. 68, Nr. 13'),{opusLabel:'Op. 68',opus:68,piece:13});
+ assert.deepEqual(musicXmlCatalogue('BWV 988'),{opusLabel:'BWV 988'});
+ assert.deepEqual(musicXmlCatalogue('Op. 13'),{opusLabel:'Op. 13',opus:13},'A sonata movement is not a number within the opus');
+ assert.deepEqual(musicXmlCatalogue(undefined),{});
+ assert.deepEqual(musicXmlCatalogue('Lullaby'),{});
+});
+
+test('stored catalogue facts are kept; a leading number is dropped only when it is a prefix',()=>{
+ assert.equal(workName({...bach,piece:2}).number,2,'A stored piece survives a catalogue parsed from the title');
+ assert.equal(workName({...zelda,opus:64,opusLabel:'Opus 64'}).catalogue,'Opus 64','An unfamiliar label is shown as stored');
+ assert.equal(workName({...zelda,title:'No. 1 in B-flat minor',opusLabel:'Op. 9',piece:1}).title,'No. 1 in B-flat minor');
+ assert.equal(workName({...zelda,title:'Waltz, Op. 64, Nr. 2: Tempo giusto'}).number,2);
+});
+
+test('within a composer, each catalogue is its own run',()=>{
+ const b=(opusLabel:string,title:string):Metadata=>({title,composer:'Ludwig van Beethoven',opusLabel,provenance:[]});
+ const sorted=[b('WoO 59','Für Elise'),b('Op. 101','Sonata'),b('Op. 27','Moonlight'),b('WoO 80','Variations')].sort(workOrder).map(m=>m.opusLabel);
+ assert.deepEqual(sorted,['Op. 27','Op. 101','WoO 59','WoO 80']);
 });
 
 const entry=(id:string,metadata:Metadata):Entry=>({id,file:`${id}.tuna`,metadata,importedAt:'2026-10-20T00:00:00Z'});
@@ -58,4 +72,10 @@ test('the library lists composers, catalogue entries and numbered pieces in orde
   'composer-entry:Other scores','score-entry:Add It Up']);
  assert.doesNotMatch(html,/Sections|Updated hands|<small>/,'Rows carry no progress figure or editorial note');
  assert.equal((html.match(/data-library-row=/g)??[]).length,9,'Catalogue headings are not stops for the arrow keys');
+});
+
+test('a composer written with stray spaces stays one group',()=>{
+ const selection=new LibrarySelection();
+ selection.update([entry('a',{...zelda,composer:'Koji Kondo '}),entry('b',zelda),entry('c',{...other,composer:' '}),entry('d',other)]);
+ assert.deepEqual(selection.allRows().filter(r=>!r.entry).map(r=>r.key),['composer:Koji Kondo','composer:']);
 });

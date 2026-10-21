@@ -6,21 +6,19 @@ import type {Metadata} from './package';
 export interface WorkName {composer:string;catalogue?:string;catalogueNumber?:number;collection?:string;number?:number;title:string}
 
 const CATALOGUES='Op\\.|BWV|KV|K\\.|D\\.|Hob\\.|WoO|HWV|RV|Sz\\.|S\\.|L\\.';
-const catalogueLabel=new RegExp(`^(?:${CATALOGUES})\\s*\\d`);
 // "Goldberg Variations, BWV 988: Variatio 1" or "Album für die Jugend, Op. 68, No. 13: Mai".
-const titled=new RegExp(`^(.+?),\\s*((?:${CATALOGUES})\\s*\\d[\\w./]*)(?:,?\\s*No\\.\\s*(\\d+))?(?::\\s*(.+))?$`);
+const titled=new RegExp(`^(.+?),\\s*((?:${CATALOGUES})\\s*\\d[\\w./]*)(?:,?\\s*(?:No\\.|Nr\\.)\\s*(\\d+))?(?::\\s*(.+))?$`);
 // "Op. 68, No. 13" as MusicXML writes a work number.
 const workNumber=new RegExp(`^((?:${CATALOGUES})\\s*\\d[\\w./]*)(?:,?\\s*(?:No\\.|Nr\\.)\\s*(\\d+))?$`);
 
 const firstNumber=(label:string)=>{const n=/\d+/.exec(label);return n?Number(n[0]):undefined;};
-/** A leading "Nr. 14 ·" repeats the number the catalogue already shows. */
-const withoutNumber=(title:string,number:number)=>title.replace(new RegExp(`^(?:Nr\\.|No\\.|Nº|N\\.)\\s*${number}(?!\\d)\\s*[·.:,–—-]?\\s*`,'i'),'').trim()||title;
+/** A leading "Nr. 14 ·" repeats the number the catalogue already shows; "No. 1 in B-flat" is a title. */
+const withoutNumber=(title:string,number:number)=>title.replace(new RegExp(`^(?:Nr\\.|No\\.|Nº|N\\.)\\s*${number}(?!\\d)\\s*[·.:,–—-]\\s*`,'i'),'').trim()||title;
 
 export function workName(m:Metadata):WorkName {
  const composer=(m.composer??'').trim();
  let catalogue=m.opusLabel?.trim()||(m.opus!==undefined?`Op. ${m.opus}`:undefined),number=m.piece,collection:string|undefined,title=(m.title??'').trim();
- if(!catalogue){const t=titled.exec(title);if(t){collection=t[1].trim();catalogue=t[2].trim();number=t[3]?Number(t[3]):undefined;title=t[4]?.trim()||collection;if(title===collection)collection=undefined;}}
- else if(!catalogueLabel.test(catalogue))catalogue=undefined;
+ if(!catalogue){const t=titled.exec(title);if(t){collection=t[1].trim();catalogue=t[2].trim();number=t[3]?Number(t[3]):number;title=t[4]?.trim()||collection;if(title===collection)collection=undefined;}}
  if(number!==undefined)title=withoutNumber(title,number);
  return {composer,...(catalogue?{catalogue,catalogueNumber:m.opus??firstNumber(catalogue)}:{}),...(collection?{collection}:{}),...(number!==undefined?{number}:{}),title};
 }
@@ -32,19 +30,21 @@ export function catalogueHeading(name:WorkName){return [name.catalogue,name.coll
 /** Composer, catalogue and number in reading order, before the title. */
 export function workContext(name:WorkName){return [name.composer,catalogueLine(name)].filter(Boolean).join(' · ');}
 
+/** "Op." of "Op. 68": Op. and WoO works, or Op. and D. numbers, are separate runs. */
+const catalogueSystem=(name:WorkName)=>/^\D*/.exec(name.catalogue??'')![0].trim();
 /** Composer, then catalogued works by catalogue and number, then the rest by title. */
 export function workOrder(a:Metadata,b:Metadata){
  const x=workName(a),y=workName(b);
  return (!x.composer?1:0)-(!y.composer?1:0)||x.composer.localeCompare(y.composer)
-  ||(x.catalogue?0:1)-(y.catalogue?0:1)||(x.catalogueNumber??0)-(y.catalogueNumber??0)||(x.catalogue??'').localeCompare(y.catalogue??'',undefined,{numeric:true})
+  ||(x.catalogue?0:1)-(y.catalogue?0:1)||catalogueSystem(x).localeCompare(catalogueSystem(y))||(x.catalogueNumber??0)-(y.catalogueNumber??0)||(x.catalogue??'').localeCompare(y.catalogue??'',undefined,{numeric:true})
   ||((x.number??Infinity)-(y.number??Infinity)||0)||x.title.localeCompare(y.title);
 }
 
-/** A MusicXML work number such as "Op. 68, No. 13"; a bare movement number
- * counts only beside a catalogue. */
-export function musicXmlCatalogue(workNumberText:string|undefined,movementNumber:string|undefined):Pick<Metadata,'opus'|'opusLabel'|'piece'> {
+/** A MusicXML work number such as "Op. 68, No. 13". A movement number is not
+ * a number within the catalogue entry (a sonata's second movement is not No. 2). */
+export function musicXmlCatalogue(workNumberText:string|undefined):Pick<Metadata,'opus'|'opusLabel'|'piece'> {
  const w=workNumber.exec(workNumberText?.trim()??'');if(!w)return {};
- const opusLabel=w[1].replace(/\s+/g,' '),piece=w[2]?Number(w[2]):/^\d+$/.test(movementNumber?.trim()??'')?Number(movementNumber):undefined;
+ const opusLabel=w[1].replace(/\s+/g,' '),piece=w[2]?Number(w[2]):undefined;
  return {opusLabel,...(/^Op\./.test(opusLabel)&&firstNumber(opusLabel)!==undefined?{opus:firstNumber(opusLabel)}:{}),...(piece!==undefined?{piece}:{})};
 }
 

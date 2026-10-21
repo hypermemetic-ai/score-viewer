@@ -33,8 +33,8 @@ function decodeXml(bytes:Uint8Array){
 
 /** The work's catalogue as the file states it, e.g. <work-number>Op. 68, No. 13</work-number>. */
 function sourceCatalogue(text:string){
- const field=(name:string)=>{const m=new RegExp(`<${name}>([^<]*)</${name}>`).exec(text);return m?.[1].replace(/&amp;/g,'&');};
- return musicXmlCatalogue(field('work-number'),field('movement-number'));
+ const m=/<work-number>([^<]*)<\/work-number>/.exec(text);
+ return musicXmlCatalogue(m?.[1].replace(/&#(x[0-9a-f]+|\d+);/gi,(_,n:string)=>String.fromCodePoint(n[0].toLowerCase()==='x'?parseInt(n.slice(1),16):Number(n))).replace(/&nbsp;|\u00a0/g,' ').replace(/&amp;/g,'&'));
 }
 
 /** One printed piano part becomes a native .tuna archive. Hands come from the

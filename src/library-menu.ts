@@ -5,6 +5,8 @@ import {catalogueHeading,workName,workOrder} from './score-catalog';
 
 const escape=(text:string)=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 export interface LibraryRow {key:string;composer:string;entry?:Entry}
+/** The composer a score is grouped under; sorting uses the same name. */
+const composerOf=(entry:Entry)=>workName(entry.metadata).composer;
 
 /** Highlight belongs to the current visit; only opening a score records work. */
 export class LibrarySelection {
@@ -14,10 +16,10 @@ export class LibrarySelection {
   const known=this.allRows();
   if(!known.some(row=>row.key===this.selected)){
    const entry=this.entries.find(entry=>entry.id===lastWorked)??this.entries[0];
-   this.selected=entry?`score:${entry.id}`:undefined;this.expanded=entry?.metadata.composer;
+   this.selected=entry?`score:${entry.id}`:undefined;this.expanded=entry&&composerOf(entry);
   }
  }
- allRows():LibraryRow[]{const rows:LibraryRow[]=[];let composer:string|undefined;for(const entry of this.entries){if(composer!==entry.metadata.composer){composer=entry.metadata.composer;rows.push({key:`composer:${composer}`,composer});}rows.push({key:`score:${entry.id}`,composer,entry});}return rows;}
+ allRows():LibraryRow[]{const rows:LibraryRow[]=[];let composer:string|undefined;for(const entry of this.entries){if(composer!==composerOf(entry)){composer=composerOf(entry);rows.push({key:`composer:${composer}`,composer});}rows.push({key:`score:${entry.id}`,composer,entry});}return rows;}
  visibleRows(){return this.allRows().filter(row=>!row.entry||row.composer===this.expanded);}
  select(key:string,expand=true){const row=this.allRows().find(row=>row.key===key);if(!row)return;this.selected=key;if(expand)this.expanded=row.composer;}
  move(step:number){const rows=this.visibleRows();if(!rows.length)return;const index=rows.findIndex(row=>row.key===this.selected);this.select(rows[Math.max(0,Math.min(rows.length-1,(index<0?0:index)+step))].key);}

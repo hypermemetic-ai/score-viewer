@@ -46,6 +46,14 @@ test('MusicXML text honours its declared encoding',()=>{
  assert.throws(()=>musicXmlText(strToU8(xml.replace('encoding="UTF-8"','encoding="X-NOPE"'))),/unsupported text encoding/);
 });
 
+test('the file\'s work number files the imported score under its catalogue',async()=>{
+ const numbered=strToU8(xml.replace('<work><work-title>','<work><work-number>Op.&#160;68, No. 13</work-number><work-title>'));
+ const p=await importPackage((await prepareMusicXmlScore(numbered,assets)).bytes,{allowLegacyTempo:true});
+ assert.equal(p.manifest.metadata.opusLabel,'Op. 68');assert.equal(p.manifest.metadata.opus,68);assert.equal(p.manifest.metadata.piece,13);
+ const plain=await importPackage((await prepareMusicXmlScore(fixture,assets)).bytes,{allowLegacyTempo:true});
+ assert.equal(plain.manifest.metadata.opusLabel,undefined);
+});
+
 test('a two-staff piano part becomes an admitted .tuna with hands from the printed staves',async()=>{
  const {bytes,filename}=await prepareMusicXmlScore(fixture,assets);
  assert.equal(filename,'Two-staff-study.tuna');
