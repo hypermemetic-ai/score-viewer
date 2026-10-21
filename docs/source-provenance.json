@@ -1424,15 +1424,24 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
+  "dependencyRevision": "a8ba1bac0aa63bf9b648687558ce34968b9db9d3",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/426"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/427",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/433"
     ],
-    "previousRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
-    "scope": "A hand change engraved as the source would have written it, 2026-10-21. #426: a note the pianist moves to the other hand joins a chord that hand already plays at the same onset with the same duration and written value, taking that chord's staff, voice, beam and source records; otherwise it keeps its own stem as before. A slur whose anchor leaves its written chord re-anchors to the lowest note left in it. No. 13 m11 now shows 1 A 6 4 on one stem and B 6 3 over the LH B with the hand corner, identical to a source written that way; the m5 slur stays on the RH 1-B. One shared rule changes: sixteenth beam levels are built per stem column, so a sixteenth chord ending a dotted-eighth group gets the partial beam a single note gets; all nine reference fixtures lay out byte-identically. Incremental layout treats a note whose written placement changes (joined or left a chord) as changed. Stopgap at this pin: a moved note that is the only end of its slur, where the slur would lie on the new hand's stem side, keeps its own stem (18 of 248 possible joins in No. 13), because slur placement cannot yet seat such a slur even in a source written that way; its proper fix is in progress in a stacked ISO PR. Enumerating every single-note hand change in No. 13 (778): none accepted at 94978ca is refused, 38 refused there are now accepted. Two independent review rounds are recorded in the PR body; merged without GitHub review records."
+    "previousRevision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
+    "scope": "Bach's repeats in Goldberg Var. 1, 2026-10-21. #433 (unmerged branch at this pin; repin to its merge): Goldberg Var. 1 was encoded by hand with a double bar at m. 17 and a final bar, so no repeat signs were drawn. ISO now records Bach's repeats (each half twice, after the 1741 Clavier-Übung IV print) and the score carries them as a written presentation: notes written once, every performed visit mapped, `:||:` after m. 16 and `:||` at the end. withKnownComposerRepeats gives the same repeats to a stored Goldberg source saved before them, matched by identity and bar grid, without changing its bytes; the viewer applies it on admission, so the owner's entry keeps its id, hand identity and personal keys and is engraved again once with the signs. #427 (merged) lets a slur end beside its head on a joined chord and drops #426's stopgap."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/426"
+      ],
+      "previousRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
+      "scope": "A hand change engraved as the source would have written it, 2026-10-21. #426: a note the pianist moves to the other hand joins a chord that hand already plays at the same onset with the same duration and written value, taking that chord's staff, voice, beam and source records; otherwise it keeps its own stem as before. A slur whose anchor leaves its written chord re-anchors to the lowest note left in it. No. 13 m11 now shows 1 A 6 4 on one stem and B 6 3 over the LH B with the hand corner, identical to a source written that way; the m5 slur stays on the RH 1-B. One shared rule changes: sixteenth beam levels are built per stem column, so a sixteenth chord ending a dotted-eighth group gets the partial beam a single note gets; all nine reference fixtures lay out byte-identically. Incremental layout treats a note whose written placement changes (joined or left a chord) as changed. Stopgap at this pin: a moved note that is the only end of its slur, where the slur would lie on the new hand's stem side, keeps its own stem (18 of 248 possible joins in No. 13), because slur placement cannot yet seat such a slur even in a source written that way; its proper fix is in progress in a stacked ISO PR. Enumerating every single-note hand change in No. 13 (778): none accepted at 94978ca is refused, 38 refused there are now accepted. Two independent review rounds are recorded in the PR body; merged without GitHub review records."
+    },
     {
       "revision": "94978cace6832c64f47366a3269c2e9d2efd403f",
       "pullRequests": [

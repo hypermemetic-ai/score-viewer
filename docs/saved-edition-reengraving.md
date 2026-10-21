@@ -20,6 +20,10 @@ A saved edition can stop opening because its pages no longer reproduce under the
 
 Integrity is still checked first: member hashes, the linked source, and the original of a transposed edition. A damaged or foreign archive is refused as before, and so is a linked edition with no source. Only pages that don't reproduce, or a missing keyboard layout, are a reason to engrave again.
 
+## Composer repeats a saved source lacks
+
+Goldberg Var. 1 was encoded by hand in ISO with a double bar at m. 17 and a final bar, so editions saved from it carry no repeats. ISO now records Bach's repeats for that score (each half twice: `:||:` after m. 16, `:||` at the end) in `KNOWN_COMPOSER_REPEATS` (`vendor/iso-notation/src/scores/composer-repeats.ts`). Admission (`src/package.ts`) adds them in memory to the source and every keyboard view, through `withKnownComposerRepeats`, when the score's identity and bar grid match exactly and it carries no repeats of its own. The stored bytes stay as saved, so the entry id (the source's SHA-256), the hand identity and every personal, practice and performance key stay the same. Pages saved without the repeat signs are refused with "This saved engraving lacks the score's repeat signs" and engraved again on opening like any other edition. The rebuilt edition keeps the original source bytes and draws the signs.
+
 ## Either keyboard layout
 
 The conventional and Jankó layouts are two key layouts of the same piano, not two instruments (owner direction, 2026-10-18). ISO notation reads the same on both, so the engine draws the same pages for both: `renderScorePresentation` takes no layout, and an engraving shows identical pages and note heads on each layout. Only fingerings can differ. There is no such thing as a Jankó-only score: every piano score opens on the player's layout, and importing, opening or switching layout never refuses because of the layout. When the edition has no pages for the chosen layout, its existing pages serve it (owner decision, 2026-10-18):

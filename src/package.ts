@@ -25,6 +25,7 @@ import {validatePianoPreparationIdentity,type PianoPreparationIdentity} from './
 import {validateDerivedHandPresentation,sourceFactsProjection,CALCULATED_HAND_SCORE_RENDERING_ENGINE,type PresentationAnnotationGeometry,type PresentationWrittenHead} from '../vendor/iso-notation/src/score-presentation';
 import {admitCalculatedHandEdition,calculatedAdmissionKey,type CalculatedAdmissionEvidence,type CalculatedAdmissionEvidenceStore,type CalculatedHandReceipt} from './calculated-hand-edition';
 import {admitScoreTransposition,type ScoreTransposition} from './score-transposition';
+import {withKnownComposerRepeats} from '../vendor/iso-notation/src/scores/composer-repeats';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
 export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
 export interface Seat {id:string;page:number;ownerIds:string[];actionId:string;contactId:string;pitchDigit:string;x:number;baseline:number;fontSize:number;system:number;writtenBar:number;continuation?:boolean}
@@ -335,9 +336,13 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
    fingerEligibility:{eligible:false,reason:'This score is available for musical reading.'}};
  }
  if(m.reading!==undefined)fail('Legacy piano packages cannot carry a musical reading descriptor.');
+ let pagesLackRepeats=false;
  async function presentation(viewManifest:Manifest,scoreName:string,seatsName:string,fingersName?:string,context:Partial<ScorePackage>={}):Promise<ScorePackage>{
   const m=viewManifest;
- const score=normalizeLegacyScoreEvents(parse(scoreName) as QuantizedGridScore),seats=parse(seatsName) as Seat[];
+ const stored=normalizeLegacyScoreEvents(parse(scoreName) as QuantizedGridScore),seats=parse(seatsName) as Seat[];
+ // A linked score saved before its composer's repeats were encoded shows
+ // them; its stored bytes, identity and hands stay as saved.
+ const score=context.sourceSha256?withKnownComposerRepeats(stored,context.sourceSha256):stored;
  if(score.id!==m.scoreId||!Array.isArray(score.notes)||!Number.isInteger(score.ticksPerBeat)||score.ticksPerBeat<=0||!Number.isInteger(score.totalTicks)||!Array.isArray(seats))fail('Invalid semantic score');
  if(score.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(score.referencePerformanceTempo);else if(!options.allowLegacyTempo&&(m.version===1||!!fingersName&&!!files[fingersName]))requireReferencePerformanceTempo(score);
  const notes=new Map(score.notes.map(n=>[n.id,n]));if(notes.size!==score.notes.length)fail('Duplicate source owner');
@@ -355,6 +360,8 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});yield 'commit';
  }
  if(execution)await drainReadingChecks(pianoChecks(),execution);else for(const _ of pianoChecks()){}
+ // Pages engraved before those repeats were known carry no repeat sign.
+ if(score!==stored&&!pages.some(svg=>svg.includes('data-repeat="repeat-end"')))pagesLackRepeats=true;
 
   const p:ScorePackage={manifest:m,score,seats,pages,files,archiveSha256:await hashBytes(bytes),...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages)};
   if(fingersName&&files[fingersName])p.fingerLayer=await validateLayerAsync(parse(fingersName),p);
@@ -369,7 +376,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   return options.keyboardLayout?selectPresentation(p,options.keyboardLayout):p;
  }
  if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
- const source=normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore);
+ const source=withKnownComposerRepeats(normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore),m.sourceSha256!);
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
  const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore],execution,contentOnly);
  if(transposition&&JSON.stringify(m.referenceMidi)!==JSON.stringify((transposition.original.collectionManifest??transposition.original.manifest).referenceMidi))fail('Transpose reference attachment differs from its original archive.');
@@ -411,6 +418,9 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   views.set(key,p);
  }
  if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');
+ // Opening a score whose pages lack its repeat signs engraves it again
+ // from its content.
+ if(pagesLackRepeats&&!contentOnly)fail('This saved engraving lacks the score\'s repeat signs. Open the score again to engrave it afresh.');
  const primary=views.get(m.keyboardLayout)!;
  const d=m.presentations[m.keyboardLayout]!;
  if(!primary||d.score!=='score.json'||d.seats!=='seats.json'||d.fingers!==('fingers.json' in m.files?'fingers.json':undefined)||
