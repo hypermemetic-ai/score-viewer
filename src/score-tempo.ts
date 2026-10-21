@@ -5,12 +5,13 @@ import {scoreBeatUnit} from './player-tempo';
  * long things take to play. It is resolved from what the score and the player
  * already say and is never written into the score file:
  *   1. the tempo you set (owner state in preferences.json, keyed by library entry);
- *   2. your practice tempo (the practice journal's goal; read only, never changed here);
- *   3. the edition's reference performance tempo;
- *   4. a printed metronome mark in the source;
- *   5. a number the source file encodes beside a tempo word;
- *   6. an opening tempo word interpreted from the marking table below.
- * Anything else is not confident: the player hears the piece and sets it. */
+ *   2. the edition's reference performance tempo;
+ *   3. a printed metronome mark in the source;
+ *   4. a number the source file encodes beside a tempo word;
+ *   5. an opening tempo word interpreted from the marking table below;
+ *   6. your practice goal, when the score says nothing (read only, never changed here).
+ * Anything else is not confident: the player hears the piece and sets it.
+ * The piece tempo and the practice goal stay distinct: practice keeps its own goal. */
 
 export type Beat={numerator:number;denominator:number};
 export type ScoreTempoOrigin='yours'|'practice'|'reference'|'metronome'|'encoded'|'marking'|'unmarked';
@@ -60,7 +61,7 @@ const MARKINGS:readonly (readonly [string,number])[]=[
  // Italian
  ['larghissimo',40],['grave',40],['largo',46],['lento',52],['larghetto',60],['adagio',66],['adagietto',72],['andante',80],['andantino',88],
  ['moderato',108],['allegretto',112],['allegro moderato',116],['allegro',132],['vivace',156],['vivacissimo',172],['presto',180],['prestissimo',200],
- ['tempo di minuetto',112],['tempo di menuetto',112],['alla marcia',112],['comodo',100],['tempo giusto',108],['maestoso',72],['tranquillo',72],['sostenuto',66],
+ ['tempo di minuetto',112],['tempo di menuetto',112],['alla marcia',112],['comodo',100],['tempo giusto',108],['maestoso',72],
  // German
  ['langsam',60],['getragen',56],['breit',56],['ruhig',72],['gemachlich',88],['gehend',84],['massig',96],['maessig',96],['bewegt',120],['lebhaft',144],
  ['frisch',132],['munter',138],['rasch',160],['schnell',160],['geschwind',160],['eilig',172],
@@ -72,9 +73,12 @@ const MARKINGS:readonly (readonly [string,number])[]=[
  ['slow',60],['slowly',60],['moderate',100],['moderately',100],['with motion',112],['lively',144],['brisk',138],['quick',152],['quickly',152],['fast',160],
  ['not fast',76],['not too fast',112],['not slow',100],['not too slow',76],['walking',84],['at a walking pace',84],['steady',100],['steadily',100],
 ];
-// A word just before the marking moves it away from (or toward) a moderate pace.
-const INTENSIFY=['molto','assai','sehr','tres','very','ganz','recht'],SOFTEN=['poco','un poco','etwas','ziemlich','un peu','assez','a little','somewhat','rather','fairly'];
-const RESTRAIN=['ma non troppo','non troppo','ma non tanto','non tanto','doch nicht zu','aber nicht zu','mais pas trop','but not too'];
+// Character words (dolce, tranquillo, sostenuto, cantabile…) are not in the table: they say how, not how fast.
+// A word just before the marking, or molto/assai just after it, moves it away from (or toward) a moderate pace.
+const INTENSIFY=['molto','assai','sehr','tres','very','ganz','recht'],AFTER_INTENSIFY=['molto','assai','di molto'];
+const SOFTEN=['poco','un poco','etwas','ziemlich','un peu','assez','a little','somewhat','rather','fairly'];
+// After the marking, a restraint moves it toward a moderate pace: "Lebhaft, nicht zu schnell".
+const RESTRAIN=['ma non troppo','non troppo','ma non tanto','non tanto','non molto','nicht zu','pas trop','but not too','not too'];
 const MODERATE=108;
 const normalize=(text:string)=>` ${text.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replaceAll('ß','ss').replace(/[^a-z]+/g,' ').trim()} `;
 const NORMALIZED=MARKINGS.map(([phrase,rate])=>[normalize(phrase),rate] as const).sort((a,b)=>b[0].length-a[0].length);
@@ -82,16 +86,25 @@ const NORMALIZED=MARKINGS.map(([phrase,rate])=>[normalize(phrase),rate] as const
 /** Faster counted beats for shorter beats, but not proportionally: one rule for every meter. */
 function feltRate(quarterRate:number,beat:Beat):number {return quarterRate*Math.pow(.25/beatWholes(beat),.6);}
 
-/** Interpret an opening tempo word, counted on the score's beat; undefined when it is not a tempo word. */
+/** Every table phrase in normalised text, earliest first; at one place the longest phrase wins. */
+function phrasesIn(words:string):{at:number;phrase:string;rate:number}[] {
+ const hits:{at:number;phrase:string;rate:number}[]=[];
+ for(const [phrase,rate] of NORMALIZED)for(let at=words.indexOf(phrase);at>=0;at=words.indexOf(phrase,at+1))hits.push({at,phrase,rate});
+ return hits.sort((a,b)=>a.at-b.at||b.phrase.length-a.phrase.length);
+}
+/** Interpret an opening tempo word, counted on the score's beat; undefined when it is not a tempo word.
+ * The first tempo word governs ("Lent et grave" is lent); later words only qualify it. */
 export function interpretTempoMarking(text:string,beat:Beat):{bpm:number;beat:Beat;marking:string}|undefined {
- const words=normalize(text);
- const hit=NORMALIZED.find(([phrase])=>words.includes(phrase));if(!hit)return;
- const [phrase,base]=hit,at=words.indexOf(phrase),before=words.slice(0,at+1),after=words.slice(at+phrase.length-1);
+ const words=normalize(text),hits=phrasesIn(words);if(!hits.length)return;
+ const {at,phrase,rate:base}=hits[0],end=at+phrase.length-1,before=words.slice(0,at+1),after=words.slice(end);
  const fast=base>MODERATE,away=fast?1.1:1/1.1,toward=fast?1/1.05:1.05;
  let rate=base;
- if(INTENSIFY.some(word=>before.endsWith(` ${word} `)))rate*=away;
+ if(INTENSIFY.some(word=>before.endsWith(` ${word} `))||AFTER_INTENSIFY.some(word=>after.startsWith(` ${word} `)))rate*=away;
  else if(SOFTEN.some(word=>before.endsWith(` ${word} `)))rate*=toward;
- if(RESTRAIN.some(words=>after.includes(` ${words} `)))rate*=fast?1/1.08:1.08;
+ // "Andante, quasi allegretto" sits between the two.
+ const quasi=hits.find(h=>h.at>=end&&words.slice(0,h.at+1).endsWith(' quasi '));
+ if(quasi)rate=(rate+quasi.rate)/2;
+ else if(RESTRAIN.some(words=>after.includes(` ${words} `)))rate*=rate>MODERATE?1/1.08:1.08;
  return {bpm:Math.round(feltRate(rate,beat)),beat,marking:text.trim()};
 }
 
@@ -101,39 +114,54 @@ function markBeat(unit:{type:string;dots:number}):Beat|undefined {
  const wholes=base*(2-Math.pow(.5,unit.dots)),denominator=Math.round(1/base)*Math.pow(2,unit.dots)||1;
  return canonicalBeat({numerator:Math.round(wholes*denominator),denominator});
 }
-/** Source ticks before the first written barline: where an opening instruction lives. */
+/** Source ticks of the opening, where an opening instruction lives: before the first
+ * written barline, or with a pickup, through the first full bar's downbeat. */
 function openingEnd(score:TempoScore):number {
- const bars=score.sourceBarTicks;if(bars&&bars.length>1)return bars[1];
- const meter=score.timeSignatures[0];return meter?score.ticksPerBeat*4*meter.numerator/meter.denominator:score.ticksPerBeat*4;
+ const meter=score.timeSignatures[0],bar=meter?score.ticksPerBeat*4*meter.numerator/meter.denominator:score.ticksPerBeat*4;
+ const bars=score.sourceBarTicks;if(!bars||bars.length<2)return bar;
+ return bars[1]<bar?bars[1]+1:bars[1];
 }
 /** What the score itself says about its tempo, without any player state. */
 export function sourceScoreTempo(score:TempoScore):ScoreTempo|undefined {
  const reference=score.referencePerformanceTempo;
  if(reference&&validRate(reference.bpm)&&validBeat(reference.beat))return {bpm:reference.bpm,beat:canonicalBeat(reference.beat),origin:'reference',confident:true};
- const opening=openingEnd(score),first=[...(score.tempos??[])].filter(t=>t.tick<opening).sort((a,b)=>a.tick-b.tick)[0];
- const unit=first?.sourceUnit&&markBeat(first.sourceUnit);
- if(first&&unit&&validRate(first.sourceUnit!.perMinute))return {bpm:first.sourceUnit!.perMinute,beat:unit,origin:'metronome',confident:true,...(first.description?{marking:first.description}:{})};
+ const opening=openingEnd(score),tempos=[...(score.tempos??[])].filter(t=>t.tick<opening).sort((a,b)=>a.tick-b.tick);
+ const wordAt=(tick:number)=>tempos.find(t=>t.tick===tick&&t.description?.trim())?.description?.trim();
+ // A printed metronome mark wins over a word at the same place.
+ const metronome=tempos.find(t=>t.sourceUnit&&markBeat(t.sourceUnit)&&validRate(t.sourceUnit.perMinute));
+ if(metronome){const marking=metronome.description?.trim()||wordAt(metronome.tick);return {bpm:metronome.sourceUnit!.perMinute,beat:markBeat(metronome.sourceUnit!)!,origin:'metronome',confident:true,...(marking?{marking}:{})};}
  let beat:Beat;try{beat=countedBeat(score);}catch{return;}
  // MusicXML sound tempo counts quarter notes per minute.
- if(first&&validRate(first.bpm)&&first.description?.trim())return {bpm:first.bpm,beat:{numerator:1,denominator:4},origin:'encoded',confident:true,marking:first.description.trim()};
- const words=[first?.description,score.performingInstruction?.text,score.performingInstruction?.encodingText,
+ const rated=tempos.find(t=>validRate(t.bpm)),ratedWord=rated&&(rated.description?.trim()||wordAt(rated.tick));
+ if(rated&&ratedWord)return {bpm:rated.bpm,beat:{numerator:1,denominator:4},origin:'encoded',confident:true,marking:ratedWord};
+ const words=[...tempos.map(t=>t.description),score.performingInstruction?.text,score.performingInstruction?.encodingText,
   ...(score.sourceTexts??[]).filter(t=>t.tick<opening).sort((a,b)=>a.tick-b.tick).map(t=>t.text)].filter((t):t is string=>!!t?.trim());
  for(const text of words){const found=interpretTempoMarking(text,beat);if(found)return {...found,origin:'marking',confident:true};}
  // A bare number with no unit or word may be an encoder's default: only a starting point.
- if(first&&validRate(first.bpm))return {bpm:first.bpm,beat:{numerator:1,denominator:4},origin:'encoded',confident:false};
+ if(rated)return {bpm:rated.bpm,beat:{numerator:1,denominator:4},origin:'encoded',confident:false};
 }
-/** The score's performance tempo, owner choices first. */
+/** A practice goal (a journal's personal goal, or reading practice's tempo), read only. */
+export function readPracticeGoal(raw:unknown):{bpm:number;beat:Beat}|undefined {
+ const goal=raw as {version?:unknown;bpm?:unknown;beat?:unknown}|undefined;
+ if(!goal||(goal.version!=='personal-performance-goal-v1'&&goal.version!=='reference-performance-tempo-v1')||!validRate(goal.bpm)||!validBeat(goal.beat))return;
+ return {bpm:goal.bpm,beat:canonicalBeat(goal.beat)};
+}
+/** The piece's performance tempo: yours, then what the score says, then your practice
+ * goal when the score says nothing. Practice keeps its own goal either way. */
 export function resolveScoreTempo(score:TempoScore,owner?:{tempo?:unknown;practiceGoal?:unknown}):ScoreTempo|undefined {
  const yours=readOwnerScoreTempo(owner?.tempo);
  if(yours)return {bpm:yours.bpm,beat:yours.beat,origin:'yours',confident:true};
- const goal=owner?.practiceGoal as {version?:unknown;bpm?:unknown;beat?:unknown}|undefined;
- if(goal&&goal.version==='personal-performance-goal-v1'&&validRate(goal.bpm)&&validBeat(goal.beat))return {bpm:goal.bpm,beat:canonicalBeat(goal.beat),origin:'practice',confident:true};
- return sourceScoreTempo(score);
+ const source=sourceScoreTempo(score);if(source?.confident)return source;
+ const goal=readPracticeGoal(owner?.practiceGoal);
+ if(goal)return {...goal,origin:'practice',confident:true};
+ return source;
 }
+/** A tempo counted on another beat, as a whole number a metronome shows. */
+export function wholeTempoOnBeat(bpm:number,from:Beat,to:Beat):number {return Math.max(5,Math.min(500,Math.round(tempoOnBeat(bpm,from,to))));}
 /** Where the hear-and-set flow starts: the known tempo on the counted beat, else a moderate pace. */
 export function auditionStartTempo(score:TempoScore,tempo?:ScoreTempo):number {
- const beat=countedBeat(score),bpm=tempo?tempoOnBeat(tempo.bpm,tempo.beat,beat):nearestScaleTempo(feltRate(80,beat));
- return Math.min(MAX_SCORE_TEMPO,Math.max(MIN_SCORE_TEMPO,Math.round(bpm*100)/100));
+ const beat=countedBeat(score),bpm=tempo?wholeTempoOnBeat(tempo.bpm,tempo.beat,beat):nearestScaleTempo(feltRate(80,beat));
+ return Math.min(MAX_SCORE_TEMPO,Math.max(MIN_SCORE_TEMPO,bpm));
 }
 
 /* Maelzel's metronome scale, extended at both ends: the steps pianists already know. */
@@ -151,7 +179,7 @@ export function scoreTempoOriginText(tempo:ScoreTempo|undefined):string {
  const words=tempo.marking?`“${tempo.marking}”`:'';
  switch(tempo.origin){
   case 'yours':return 'Set by you';
-  case 'practice':return 'Your practice tempo';
+  case 'practice':return 'From your practice goal';
   case 'reference':return 'This edition’s reference tempo';
   case 'metronome':return words?`Metronome mark in the score · ${words}`:'Metronome mark in the score';
   case 'encoded':return tempo.confident?`${words}, as the score file plays it`:'A number in the score file, without a marking';

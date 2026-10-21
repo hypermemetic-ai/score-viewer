@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Every score has a resolvable performance tempo
-The viewer SHALL resolve a score's performance tempo, in order, from the tempo the owner set, the owner's practice tempo, the edition's reference performance tempo, a printed source metronome mark, an encoded source rate beside a tempo word, and an opening tempo word interpreted from the marking table. It SHALL NOT write a derived tempo into the score package.
+The viewer SHALL resolve a score's piece tempo, in order, from the tempo the owner set, the edition's reference performance tempo, a printed source metronome mark, an encoded source rate beside a tempo word, an opening tempo word interpreted from the marking table, and, when the score says nothing confident, the practice goal. The first tempo word at the opening SHALL govern; character words SHALL NOT make a tempo. It SHALL NOT write a derived tempo into the score package.
 
 #### Scenario: Exact metronome mark
 - **WHEN** a score's opening source tempo has a printed beat unit and rate
@@ -12,12 +12,35 @@ The viewer SHALL resolve a score's performance tempo, in order, from the tempo t
 - **THEN** the table rate, counted on the score's beat, is the score's tempo, used without asking and shown with its source word
 
 #### Scenario: Owner choices first
-- **WHEN** the owner has set a tempo or has a practice tempo for the score
+- **WHEN** the owner has set a piece tempo for the score
 - **THEN** that tempo outranks anything the score says
+
+#### Scenario: Metronome mark beside a word
+- **WHEN** a printed metronome mark and a tempo word share the opening
+- **THEN** the metronome mark is the tempo
+
+#### Scenario: Pickup
+- **WHEN** a score opens with a pickup and its tempo word stands on the first full bar's downbeat
+- **THEN** that word is read as the opening word
+
+#### Scenario: Character words
+- **WHEN** the only opening words are character words such as "dolce e tranquillo" or "sempre sostenuto"
+- **THEN** the score has no confident tempo
 
 #### Scenario: Nothing usable
 - **WHEN** the score has no reference, mark or recognised tempo word
 - **THEN** it has no confident tempo, and features that need one open hear-and-set
+
+### Requirement: Piece tempo and practice goal stay distinct
+The piece tempo and the practice goal SHALL be shown as two plainly labelled values whenever practice has a goal. Keeping a piece tempo SHALL NOT change the practice goal, and the viewer SHALL say so when it keeps one.
+
+#### Scenario: Practice already has a goal
+- **WHEN** a score with practice goal 80 is heard and set to 88 from Options
+- **THEN** the dialog shows "Piece tempo 88 · practice goal 80", Enter saves 88 as the piece tempo, a notice says practice keeps its goal of 80 and where to change it, and Options shows both
+
+#### Scenario: Practice has no goal yet
+- **WHEN** practice opens hear-and-set because it has no goal
+- **THEN** Enter sets the piece tempo and practice remembers the same tempo as its goal
 
 ### Requirement: Owner tempo is owner state
 A tempo set by the owner SHALL be stored only in the additive `scoreTempos` preferences map keyed by library entry, preserving every other preference, and SHALL NOT change practice journals, progress, scores, fingerings, hands or the library.
@@ -41,6 +64,14 @@ Hear-and-set SHALL play a metronome count-in and then a performance synthesised 
 - **WHEN** the owner presses Esc
 - **THEN** sound stops and nothing is saved
 
+#### Scenario: Following the score
+- **WHEN** the performance plays
+- **THEN** the status names the printed bar and its pass through a repeat, the reader shows the playing bar's page with the bar lightly marked, and closing returns to the owner's page without changing the saved view
+
+#### Scenario: Count-in with a pickup
+- **WHEN** the score opens with a pickup
+- **THEN** the count-in starts on an accented "1" in whole bars and the pickup lands in place
+
 #### Scenario: No sound available
 - **WHEN** audio cannot start
 - **THEN** the dialog says so and ← → and Enter still set the tempo
@@ -50,4 +81,8 @@ Piano and reading practice on a score without a reference tempo or saved practic
 
 #### Scenario: Confident marking
 - **WHEN** practice starts on a score whose tempo comes from a confident marking and no practice tempo is saved
-- **THEN** practice starts at that tempo and remembers it as the practice goal, as a chosen tempo always was
+- **THEN** practice starts at that tempo, as a whole number on the counted beat, and remembers it as the practice goal, as a chosen tempo always was
+
+#### Scenario: No meter
+- **WHEN** reading practice needs a first tempo for a score without a meter
+- **THEN** it asks for a duration and rate as before, and Options does not offer hear-and-set

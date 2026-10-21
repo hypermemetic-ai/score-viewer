@@ -26,10 +26,10 @@ import {ControlResolver,readControlBindings,actionControlLabel,practiceControlBi
 import {freeViewControlBindings,readFreeViewControlOverrides,changeScopedControls,type FreeViewControlOverrides} from './free-view-controls';
 import {requireReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {playerTempo,savedPlayerTempo,scoreBeatUnit} from './player-tempo';
-import {metronomeMark} from './metronome-mark';
+import {beatUnitSvg,metronomeMark,perMinuteSuffix,tempoRateNumber} from './metronome-mark';
 import {ManualTempoControls,manualTempoField} from './manual-tempo-control';
 import {scoreOptionsMarkup,transposeDraft} from './score-options';
-import {auditionStartTempo,countedBeat,ownerScoreTempo,playingTimeLabel,resolveScoreTempo,scoreTempoOriginText,tempoOnBeat,withOwnerScoreTempo,type ScoreTempo} from './score-tempo';
+import {auditionStartTempo,countedBeat,ownerScoreTempo,playingTimeLabel,readPracticeGoal,resolveScoreTempo,scoreTempoOriginText,tempoOnBeat,wholeTempoOnBeat,withOwnerScoreTempo,type ScoreTempo} from './score-tempo';
 import {buildPerformanceSchedule,performanceSeconds} from './score-performance';
 import {TempoAudition} from './tempo-audition';
 import {mountTempoAudition,tempoAuditionMarkup} from './tempo-audition-dialog';
@@ -455,7 +455,7 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
 function render(){if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><div class="editor-navigation" hidden></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;renderPages();renderToolbar();paintHandPreparation();app.querySelector<HTMLElement>('.reader')?.focus();}
 function renderPages(){
  if(practice||!current)return;
- const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(s.view),mode=labelMode(),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
+ const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(followedPage===undefined?s.view:{...s.view,page:followedPage}),mode=labelMode(),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
  transformSurface(surface,v.rotation);const fit=viewportFit(innerWidth,innerHeight,v,p.pages.length),positions=annotationPositions(p,fit.pages),pages:HTMLElement[]=[];
  for(const index of fit.pages){
   const cached=readerPages.get(p,index),page=cached.element;paintReaderSeats(cached,current.package,p,s,mode,positions,true);
@@ -589,37 +589,98 @@ let keyboardChanging=false;
 function currentFingerPresentation(p=current?.package){return preferences.fingerPresentation==='replacement'&&p&&!p.fingerEligibility.eligible?'annotations':preferences.fingerPresentation;}
 /** Without a fixed beat the player also chooses the counted duration (manual
  * reading); a piano score's own beat unit is fixed and only the rate is asked. */
+/** A score without a meter has no counted beat to hear: choose a duration and rate, as before. */
+async function chooseReference(actionLabel:'Practice'):Promise<ReferencePerformanceTempo|undefined>{
+ return new Promise(resolve=>{
+  const units=[{name:'Quarter',numerator:1,denominator:4},{name:'Dotted quarter',numerator:3,denominator:8},{name:'Half',numerator:1,denominator:2},{name:'Whole',numerator:1,denominator:1},{name:'Eighth',numerator:1,denominator:8}],d=showDialog(`<h2>Choose a playing tempo</h2><p class="help">Choose your working rate, from 5 to 500 per minute. The printed score is retained.</p><form><label class="dialog-row">Duration<select data-reference-unit>${units.map((u,i)=>`<option value="${i}">${u.name}</option>`).join('')}</select></label><label class="dialog-row">Rate<span class="metronome-mark"><input data-reference-rate aria-label="Duration units per minute" inputmode="decimal" type="number" min="5" max="500" step="any" required><span class="metronome-rate-unit"><span data-reference-glyph>${beatUnitSvg(units[0])}</span>${perMinuteSuffix()}</span></span></label>`+`<p class="error" role="alert"></p><div class="dialog-actions">${button('Cancel','close','Esc')}<button type="submit">${actionLabel}</button></div></form>`,'piano-reference');
+  let finished=false;d.addEventListener('close',()=>{if(!finished){finished=true;resolve(undefined);}},{once:true});
+  d.querySelector('[data-reference-unit]')!.addEventListener('change',()=>{const index=Number(d.querySelector<HTMLSelectElement>('[data-reference-unit]')!.value);d.querySelector('[data-reference-glyph]')!.innerHTML=beatUnitSvg(units[index]);});
+  d.querySelector('form')!.addEventListener('submit',event=>{event.preventDefault();const bpm=Number(d.querySelector<HTMLInputElement>('[data-reference-rate]')!.value),unit=units[Number(d.querySelector<HTMLInputElement|HTMLSelectElement>('[data-reference-unit]')!.value)];if(!Number.isFinite(bpm)||bpm<5||bpm>500){d.querySelector('.error')!.textContent='Enter a rate from 5 to 500 per minute.';return;}finished=true;resolve({version:'reference-performance-tempo-v1',bpm,beat:{numerator:unit.numerator,denominator:unit.denominator},provenance:{kind:'editorial',reference:'Explicit player working-rate choice in Score Viewer; not a printed source marking.'}});closeDialog();});
+ });
+}
 type OpenScore=NonNullable<typeof current>;
-/** The score's performance tempo: yours, your practice tempo, then what the score says. */
-async function scoreTempoFor(target:OpenScore):Promise<ScoreTempo|undefined>{
- let practiceGoal:unknown;
- if(scoreCapabilities(target.package).pianoPreparation)try{practiceGoal=((await PracticeView.savedJournal(target.package,target.entry.id)) as {personalGoal?:unknown}|undefined)?.personalGoal;}catch{/* An unreadable journal is practice's to report. */}
- return resolveScoreTempo(target.package.score,{tempo:preferences.scoreTempos?.[target.entry.id],practiceGoal});
+interface ScoreTempos {piece?:ScoreTempo;goal?:{bpm:number;beat:ScoreTempo['beat']}}
+/** Practice's goal, read only: the journal's personal goal (or the edition's reference
+ * it otherwise practises toward), or reading practice's saved tempo. */
+async function practiceGoalFor(target:OpenScore):Promise<unknown>{
+ const score=target.package.score;
+ try{
+  if(scoreCapabilities(target.package).pianoPreparation)return ((await PracticeView.savedJournal(target.package,target.entry.id)) as {personalGoal?:unknown}|undefined)?.personalGoal??score.referencePerformanceTempo;
+  const controller=readingPresentation;
+  if(target===current&&controller&&target.package.reading?.dual&&score.referencePerformanceTempo===undefined){
+   const identity={partId:target.package.reading.dual.sourcePartId,musicalRevision:controller.revision};
+   return readManualReference(await readJson(await manualReferenceStorageName(identity)),identity);
+  }
+ }catch{/* An unreadable journal is practice's to report. */}
+ return score.referencePerformanceTempo;
+}
+/** The piece tempo (yours, then what the score says) and practice's own goal, kept distinct. */
+async function scoreTempoFor(target:OpenScore):Promise<ScoreTempos>{
+ const practiceGoal=await practiceGoalFor(target);
+ return {piece:resolveScoreTempo(target.package.score,{tempo:preferences.scoreTempos?.[target.entry.id],practiceGoal}),goal:readPracticeGoal(practiceGoal)};
+}
+const meterBeat=(score:ScorePackage['score'])=>{try{return countedBeat(score);}catch{return undefined;}};
+/* While hear-and-set plays, the reader shows the playing bar: it turns to the bar's
+ * page and marks the bar lightly. The owner's own view is never changed; closing
+ * shows it again. */
+let followedPage:number|undefined;
+function followPlayingBar(target:OpenScore){
+ const clear=()=>{for(const mark of app.querySelectorAll('[data-tempo-follow]'))mark.remove();};
+ return (bar:number|undefined)=>{
+  clear();if(current!==target||practice)return;
+  const p=readerPackage(),seats=bar===undefined?[]:p.seats.filter(seat=>seat.writtenBar===bar);
+  if(!seats.length){if(followedPage!==undefined){followedPage=undefined;renderPages();}placeTempoDialog();return;}
+  const page=Math.min(...seats.map(seat=>seat.page)),fit=viewportFit(innerWidth,innerHeight,effectiveView({...target.personal.view,page:followedPage??target.personal.view.page}),p.pages.length);
+  if(!fit.pages.includes(page)){followedPage=page===target.personal.view.page?undefined:page;renderPages();}
+  const svg=app.querySelector<SVGSVGElement>(`.page-group .page[data-page="${page}"] svg`);if(!svg)return;
+  const onPage=seats.filter(seat=>seat.page===page),system=onPage[0].system,row=p.seats.filter(seat=>seat.page===page&&seat.system===system);
+  const size=Math.max(...onPage.map(seat=>seat.fontSize)),next=row.filter(seat=>seat.writtenBar>bar!).map(seat=>seat.x);
+  const left=Math.min(...onPage.map(seat=>seat.x))-size*.9,right=next.length?Math.min(...next)-size*.9:Math.max(...onPage.map(seat=>seat.x))+size*1.6;
+  const top=Math.min(...row.map(seat=>seat.baseline))-size*1.6,bottom=Math.max(...row.map(seat=>seat.baseline))+size*.7;
+  const mark=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  for(const [name,value] of Object.entries({x:left,y:top,width:Math.max(size,right-left),height:bottom-top,rx:size*.4,class:'tempo-follow','data-tempo-follow':''}))mark.setAttribute(name,String(value));
+  // Drawn over the page and multiplied, so the notation stays black under the tint.
+  svg.append(mark);
+  // The dialog moves to the other half of the screen from the playing bar.
+  const box=svg.viewBox.baseVal,lower=box&&box.height?(top+bottom)/2>box.y+box.height/2:false;placeTempoDialog(lower?'high':'low');
+ };
+}
+function placeTempoDialog(place?:'high'|'low'){
+ if(dialog?.dataset.kind!=='score-tempo')return;
+ if(place)dialog.dataset.place=place;else delete dialog.dataset.place;fitDialog(dialog,orientation.rotation);
 }
 /** Hear the piece after a count-in and set its tempo by ear. Resolves with the
- * chosen rate on the counted beat, saved as yours, or undefined when left. */
-function hearAndSetTempo(target:OpenScore,known:ScoreTempo|undefined,confirmLabel:string):Promise<number|undefined>{
- const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,known);
- const view={heading:workHeadingMarkup(target.entry.metadata),tempo:known,beat,bpm,confirmLabel};
- const audition=new TempoAudition(buildPerformanceSchedule(score,beat),bpm);
+ * chosen rate on the counted beat, saved as yours, or undefined when left. When
+ * practice already has a goal, it keeps it, and the dialog says so. */
+function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string,setsPracticeGoal=false):Promise<number|undefined>{
+ const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,tempos.piece);
+ const goal=!setsPracticeGoal&&tempos.goal?wholeTempoOnBeat(tempos.goal.bpm,tempos.goal.beat,beat):undefined;
+ const view={heading:workHeadingMarkup(target.entry.metadata),tempo:tempos.piece,beat,bpm,confirmLabel,setsPracticeGoal,...(goal!==undefined?{practiceGoal:goal}:{})};
+ const audition=new TempoAudition(buildPerformanceSchedule(score,beat),bpm),follow=followPlayingBar(target);
  return new Promise(resolve=>{
   const d=showDialog(tempoAuditionMarkup(view),'score-tempo');d.setAttribute('aria-labelledby','tempo-audition-title');
-  let settled=false;const finish=(value:number|undefined)=>{if(settled)return;settled=true;dispose();resolve(value);};
-  const dispose=mountTempoAudition({dialog:d,audition,view,cancel:()=>{finish(undefined);if(dialog===d)closeDialog();},confirm:chosen=>{
-   const record=ownerScoreTempo(chosen,beat);
-   void enqueue(async()=>{const next=withOwnerScoreTempo(preferences,target.entry.id,record);await writeJson('preferences.json',next);preferences.scoreTempos=next.scoreTempos;}).catch(error=>notify(`Tempo was not saved: ${error.message}`));
-   finish(chosen);if(dialog===d)closeDialog();}});
+  let settled=false;const finish=(value:number|undefined)=>{if(settled)return;settled=true;dispose();if(followedPage!==undefined&&current===target){followedPage=undefined;renderPages();}followedPage=undefined;resolve(value);};
+  const dispose=mountTempoAudition({dialog:d,audition,view,follow,cancel:()=>{finish(undefined);if(dialog===d)closeDialog();},confirm:chosen=>{
+   // Shown at once; written after. Every other preference stays as it is.
+   preferences.scoreTempos=withOwnerScoreTempo(preferences,target.entry.id,ownerScoreTempo(chosen,beat)).scoreTempos;
+   void savePreferences().catch(error=>notify(`Tempo was not saved: ${(error as Error).message}`));
+   finish(chosen);if(dialog===d)closeDialog();
+   if(goal!==undefined)notify(`Piece tempo ${tempoRateNumber(chosen)} kept. Practice keeps its goal of ${tempoRateNumber(goal)}; change that in practice Options.`);}});
   d.addEventListener('close',()=>finish(undefined),{once:true});
  });
 }
-/** Options shows the tempo and how long the piece takes at it. */
+const tempoMark=(bpm:number,beat:ScoreTempo['beat'])=>metronomeMark({version:'reference-performance-tempo-v1',bpm,beat,provenance:{kind:'editorial',reference:'Score Viewer performance tempo'}},bpm);
+/** Options shows the piece tempo, how long the piece takes at it, and practice's own goal. */
 async function paintScoreTempo(d:HTMLDialogElement,target:OpenScore){
  const slot=d.querySelector<HTMLElement>('[data-score-tempo-value]');if(!slot)return;
  try{
-  const tempo=await scoreTempoFor(target);if(dialog!==d||current!==target)return;
-  if(!tempo||!tempo.confident){slot.innerHTML=`<span>Not set</span><small>${esc(scoreTempoOriginText(undefined))}</small>`;return;}
-  const beat=countedBeat(target.package.score),schedule=buildPerformanceSchedule(target.package.score,beat),seconds=performanceSeconds(schedule,tempoOnBeat(tempo.bpm,tempo.beat,beat));
-  slot.innerHTML=`<span>${metronomeMark({version:'reference-performance-tempo-v1',bpm:tempo.bpm,beat:tempo.beat,provenance:{kind:'editorial',reference:'Score Viewer performance tempo'}},tempo.bpm)}</span><small>${esc(scoreTempoOriginText(tempo))} · about ${playingTimeLabel(seconds)}</small>`;
+  const {piece,goal}=await scoreTempoFor(target);if(dialog!==d||current!==target)return;
+  const beat=meterBeat(target.package.score),hear=d.querySelector<HTMLButtonElement>('[data-action=score-tempo]');
+  if(!beat&&hear){hear.disabled=true;hear.title='Hearing needs a meter; this score has none.';}
+  const practiceLine=goal&&piece?.origin!=='practice'?`<small data-score-practice-goal>Practice goal ${tempoMark(goal.bpm,goal.beat)}</small>`:'';
+  if(!piece||!piece.confident){slot.innerHTML=`<span>Not set</span><small>${esc(scoreTempoOriginText(undefined))}</small>${practiceLine}`;return;}
+  const counted=beat??piece.beat,seconds=performanceSeconds(buildPerformanceSchedule(target.package.score,counted),tempoOnBeat(piece.bpm,piece.beat,counted));
+  slot.innerHTML=`<span>${tempoMark(piece.bpm,piece.beat)}</span><small>${esc(scoreTempoOriginText(piece))} · about ${playingTimeLabel(seconds)}</small>${practiceLine}`;
  }catch(error){if(dialog===d)slot.textContent=(error as Error).message;}
 }
 /** Open one saved keyboard view of a score inside a reading operation. */
@@ -1166,9 +1227,11 @@ async function startManualPractice(snapshot?:PracticeViewContext){
   if(!live())return;const raw=await readJson(name);if(!live())return;fallback=readManualReference(raw,identity);
   if(!fallback){
    // The score's own tempo when it is confident; otherwise hear it and set it.
-   const known=resolveScoreTempo(target.package.score,{tempo:preferences.scoreTempos?.[target.entry.id]}),beat=countedBeat(target.package.score);
+   // A score without a meter chooses a duration and rate, as before.
+   const known=resolveScoreTempo(target.package.score,{tempo:preferences.scoreTempos?.[target.entry.id]}),beat=meterBeat(target.package.score);
    if(known?.confident)fallback={version:'reference-performance-tempo-v1',bpm:known.bpm,beat:known.beat,provenance:{kind:'editorial',reference:`Score Viewer performance tempo: ${scoreTempoOriginText(known)}`}};
-   else{const bpm=await hearAndSetTempo(target,known,'Practise at this tempo');if(!live()||bpm===undefined)return;fallback={version:'reference-performance-tempo-v1',bpm,beat,provenance:{kind:'editorial',reference:'Score Viewer performance tempo: set by you'}};}
+   else if(!beat){fallback=await chooseReference('Practice');if(!live()||!fallback)return;}
+   else{const bpm=await hearAndSetTempo(target,{piece:known},'Practice at this tempo',true);if(!live()||bpm===undefined)return;fallback={version:'reference-performance-tempo-v1',bpm,beat,provenance:{kind:'editorial',reference:'Score Viewer performance tempo: set by you'}};}
    if(!live())return;
    const record=manualReferenceRecord(identity,fallback);await enqueue(async()=>{if(live())await writeJson(name,record);});if(!live())return;
   }
@@ -1213,15 +1276,15 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
   const start=++practiceStartGeneration,prior=practice,owns=()=>start===practiceStartGeneration&&current===target&&practice===prior&&!readingPresentation;
   tempo=savedPlayerTempo(target.package.score,await PracticeView.savedJournal(target.package,target.entry.id),context?.preferences);if(!owns())return;
   // No practice tempo yet: the score's own tempo when it is confident, otherwise hear it and set it.
-  if(!tempo){const known=await scoreTempoFor(target);if(!owns())return;const beat=scoreBeatUnit(target.package.score);
-   const bpm=known?.confident?tempoOnBeat(known.bpm,known.beat,beat):await hearAndSetTempo(target,known,'Practise at this tempo');
+  if(!tempo){const {piece:known}=await scoreTempoFor(target);if(!owns())return;const beat=scoreBeatUnit(target.package.score);
+   const bpm=known?.confident?wholeTempoOnBeat(known.bpm,known.beat,beat):await hearAndSetTempo(target,{piece:known},'Practice at this tempo',true);
    if(bpm===undefined||!owns())return;tempo=playerTempo(target.package.score,Math.min(500,Math.max(5,bpm)));}
  }
  selection=undefined;editNavigation='notes';resetInput();const next=new PracticeView(app,{playerTempo:tempo,fingersOnly,work:target.entry.metadata,rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),modeKeys:()=>({reading:actionControlLabel(effectiveControls(),'practiceReading'),timed:actionControlLabel(effectiveControls(),'practiceTimed')}),...{navigationKeys:()=>{const bindings=effectiveControls();return {previous:actionControlLabel(bindings,'previous'),next:actionControlLabel(bindings,'next')};}},package:readerPackage(),basePackage:target.package,personal:target.personal,presentation:()=>currentFingerPresentation(target.package),audioOutput:()=>preferences.audioOutput??'',sustain:()=>musicalSustain.snapshot(),entryId:target.entry.id,connected:()=>!!midiConnection,source:()=>midiConnection?.source??preferences.midi?.source??'',connect:connectMidi,disconnect:disconnectMidi,back:()=>{practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;resetInput();render();},saveFinger:(seat,finger)=>{if(!current)return Promise.reject(Error('No open score.'));
    // The editor reads the note before its first await; practice keeps no score selection.
    selection=seat;const saving=saveSelectedChoice({finger},false);selection=undefined;return saving.catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});},saveHand:(seat,hand)=>{if(!current)return Promise.reject(Error('No open score.'));selection=seat;const saving=saveHandChoice(hand);selection=undefined;return saving;},settings:()=>settings()});practice=next;await next.mount(context,admitted);}
 
-async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='pdf'){await savePdf();return;}if(action==='score-tempo'){if(current&&!practice){const target=current,known=await scoreTempoFor(target);if(current===target){await hearAndSetTempo(target,known,'Use this tempo');if(current===target&&!dialog&&!practice){options('score');document.querySelector<HTMLElement>('dialog[data-kind=options] [data-action=score-tempo]')?.focus();}}}return;}if(action==='practice'){if(current&&!readingPresentation)practiceMenu();else await startPractice();return;}if(action==='practice-fingers'||action==='practice-sections'){closeDialog(false);await startPractice(undefined,undefined,action==='practice-fingers');return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
+async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='pdf'){await savePdf();return;}if(action==='score-tempo'){if(current&&!practice){const target=current,tempos=await scoreTempoFor(target);if(current===target){await hearAndSetTempo(target,tempos,'Keep this tempo');if(current===target&&!dialog&&!practice){options('score');document.querySelector<HTMLElement>('dialog[data-kind=options] [data-action=score-tempo]')?.focus();}}}return;}if(action==='practice'){if(current&&!readingPresentation)practiceMenu();else await startPractice();return;}if(action==='practice-fingers'||action==='practice-sections'){closeDialog(false);await startPractice(undefined,undefined,action==='practice-fingers');return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
  if(['toggle','edit','feedback','restore-all','undo-restore','earlier-editions','restore-header'].includes(action))requirePianoCapability(p,'pianoPreparation');
  if(action==='library'){adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
  if(selection&&!practice&&['editorNavigation','editorPrevious','editorNext'].includes(action)){

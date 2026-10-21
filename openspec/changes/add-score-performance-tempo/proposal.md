@@ -4,9 +4,10 @@ Most imported scores carry no numeric tempo. Practice asks for one through a bar
 
 ## What Changes
 
-- Resolve a performance tempo for every score from what already exists, without re-import or changing any score file: the tempo you set, your practice tempo, the edition's reference tempo, a printed metronome mark, a number the source encodes beside a tempo word, and an opening tempo word interpreted from a marking table (Italian, German, French, English) on the score's counted beat.
+- Resolve a piece tempo for every score from what already exists, without re-import or changing any score file: the tempo you set, the edition's reference tempo, a printed metronome mark, a number the source encodes beside a tempo word, an opening tempo word interpreted from a marking table (Italian, German, French, English) on the score's counted beat, and otherwise your practice goal.
+- Keep the piece tempo and the practice goal distinct and plainly labelled; keeping a piece tempo never changes practice's goal, and the viewer says so.
 - Store a tempo you set as owner state: an additive `scoreTempos` map in `preferences.json`, keyed by library entry. It never changes practice journals, progress or other preferences.
-- Add a keyboard-first hear-and-set dialog: metronome count-in, then a performance synthesised from the score's notes (both hands, durations, ties, repeats, dynamics, pedal) on a light built-in piano voice; ← → change the tempo live on the metronome scale, Space pauses, Home restarts, Enter keeps, Esc leaves.
+- Add a keyboard-first hear-and-set dialog: metronome count-in, then a performance synthesised from the score's notes (both hands, durations, ties, repeats, dynamics, pedal, grace notes, later tempo marks) on a light built-in piano voice; the reader behind it follows the playing bar; ← → change the tempo live on the metronome scale, Space pauses, Home restarts, Enter keeps, Esc leaves.
 - Show the tempo, where it came from and the piece's playing time in Options → Score, with Hear and set.
 - Practice on a score without a reference or saved practice tempo starts at a confident score tempo without asking; otherwise it opens hear-and-set instead of the number dialog.
 

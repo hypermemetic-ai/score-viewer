@@ -19,7 +19,7 @@ The ordinary score viewer and editor are passive: played notes do not turn pages
 
 Practice offers bounded original sections, overlapping connections of two consecutive sections, and separate A/B contrast excerpts for similar sections. Excluding an exercise changes the displayed total while preserving its progress. Current modes and controls are described in [Reading and Timed practice](docs/practice-reading-timed.md).
 
-Every score has a performance tempo: the player's own, the practice tempo, the edition's reference, or what the score's metronome mark or tempo word says. A score that says nothing can be heard after a count-in and set by ear; see [score tempo](docs/score-tempo.md).
+Every score has a piece tempo: the player's own, the edition's reference, or what the score's metronome mark or tempo word says, and otherwise the practice goal. Practice keeps its own goal. A score that says nothing can be heard after a count-in and set by ear; see [score tempo](docs/score-tempo.md).
 
 Save as PDF exports every page as the reader shows it, including personal hands and the current label mode; see [Save as PDF](docs/pdf-export.md).
 

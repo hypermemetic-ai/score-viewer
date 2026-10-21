@@ -1,4 +1,4 @@
-import {measureAt,performanceSeconds,type PerformanceSchedule} from './score-performance';
+import {evenTicks,performanceSeconds,tickAtEven,writtenBarAt,type PerformanceSchedule} from './score-performance';
 
 /* Hear a score at a tempo: a metronome count-in, then the piece, on a light built-in
  * piano voice. The tempo can change while it plays; the music keeps its place.
@@ -18,7 +18,8 @@ export interface AuditionTimers {set(fn:()=>void,ms:number):unknown;clear(id:unk
 const browserTimers:AuditionTimers={set:(fn,ms)=>setInterval(fn,ms),clear:id=>clearInterval(id as ReturnType<typeof setInterval>)};
 
 export type AuditionPhase='idle'|'count-in'|'playing'|'paused'|'finished';
-export interface AuditionPosition {phase:AuditionPhase;tick:number;measure:number;measures:number;countBeat?:number}
+/** `measure` is the written bar as the reader numbers it, `pass` its visit through a repeat, `measures` the written bars. */
+export interface AuditionPosition {phase:AuditionPhase;tick:number;measure:number;pass:number;measures:number;countBeat?:number}
 /** A scheduled sound, kept so a tempo change can move it. */
 interface Voice {tick:number;release:number;start:number;nodes:AuditionOscillator[];gains:AuditionGain[];click:boolean;entry?:object}
 
@@ -28,18 +29,20 @@ const frequency=(midi:number)=>440*Math.pow(2,(midi-69)/12);
 export class TempoAudition {
  private context?:AuditionContext;private master?:AuditionGain;private waves=new Map<string,unknown>();
  private timer?:unknown;private voices:Voice[]=[];private nextNote=0;private nextClick=0;
- private anchor={time:0,tick:0};private pausedTick=0;private phaseValue:AuditionPhase='idle';
+ private anchor={time:0,tick:0};private pausedTick=0;private phaseValue:AuditionPhase='idle';private readonly endTick:number;
  /** Every attack the audition has scheduled, for inspection: tick, midi or click, audio time. */
  readonly log:{tick:number;sound:number|'click'|'accent';at:number}[]=[];
- constructor(readonly schedule:PerformanceSchedule,private bpmValue:number,private readonly createContext:()=>AuditionContext=()=>new AudioContext({latencyHint:'interactive'}) as unknown as AuditionContext,private readonly timers:AuditionTimers=browserTimers){}
+ constructor(readonly schedule:PerformanceSchedule,private bpmValue:number,private readonly createContext:()=>AuditionContext=()=>new AudioContext({latencyHint:'interactive'}) as unknown as AuditionContext,private readonly timers:AuditionTimers=browserTimers){
+  this.endTick=schedule.notes.reduce((end,n)=>Math.max(end,n.release),schedule.totalTicks);
+ }
  get bpm(){return this.bpmValue;}
  get phase(){return this.phaseValue;}
  get seconds(){return performanceSeconds(this.schedule,this.bpmValue);}
  private get secondsPerTick(){return 60/this.bpmValue/this.schedule.beatTicks;}
- private timeAt(tick:number){return this.anchor.time+(tick-this.anchor.tick)*this.secondsPerTick;}
- private tickAt(time:number){return this.anchor.tick+(time-this.anchor.time)/this.secondsPerTick;}
+ // Later tempos in the score stretch the clock; the chosen tempo is the opening one.
+ private timeAt(tick:number){return this.anchor.time+(evenTicks(this.schedule,tick)-evenTicks(this.schedule,this.anchor.tick))*this.secondsPerTick;}
+ private tickAt(time:number){return tickAtEven(this.schedule,evenTicks(this.schedule,this.anchor.tick)+(time-this.anchor.time)/this.secondsPerTick);}
  private get firstTick(){return this.schedule.countIn[0]?.tick??0;}
- private get endTick(){return Math.max(this.schedule.totalTicks,...this.schedule.notes.map(n=>n.release));}
 
  /** Start audio; resolves once sound is running or rejects with a reason to show. */
  async open(){
@@ -86,11 +89,12 @@ export class TempoAudition {
   this.pump();
  }
  position():AuditionPosition {
-  const measures=this.schedule.bars.length-1,context=this.context;
-  if(!context||this.phaseValue==='idle')return {phase:this.phaseValue,tick:0,measure:1,measures};
+  const measures=this.schedule.writtenBars,context=this.context,start=writtenBarAt(this.schedule,0);
+  if(!context||this.phaseValue==='idle')return {phase:this.phaseValue,tick:0,measure:start.bar,pass:1,measures};
   const tick=this.phaseValue==='paused'?this.pausedTick:this.phaseValue==='finished'?this.schedule.totalTicks:this.tickAt(context.currentTime);
-  if(tick<0){const beat=Math.floor((tick-this.firstTick)/this.schedule.beatTicks)+1;return {phase:'count-in',tick,measure:1,measures,countBeat:Math.max(1,beat)};}
-  return {phase:this.phaseValue==='count-in'?'playing':this.phaseValue,tick,measure:Math.min(measures,measureAt(this.schedule,tick)),measures};
+  if(tick<0){const beat=Math.floor((tick-this.firstTick)/this.schedule.beatTicks)+1;return {phase:'count-in',tick,measure:start.bar,pass:1,measures,countBeat:Math.max(1,beat)};}
+  const at=writtenBarAt(this.schedule,Math.min(tick,this.schedule.totalTicks-1e-9));
+  return {phase:this.phaseValue==='count-in'?'playing':this.phaseValue,tick,measure:at.bar,pass:at.pass,measures};
  }
  async close(){
   this.stopTimer();this.silence();this.phaseValue='idle';
