@@ -31,7 +31,8 @@ import {ManualTempoControls,manualTempoField} from './manual-tempo-control';
 import {scoreOptionsMarkup,transposeDraft} from './score-options';
 import {auditionStartTempo,countedBeat,ownerScoreTempo,playingTimeLabel,readPracticeGoal,resolveScoreTempo,scoreTempoOriginText,tempoOnBeat,wholeTempoOnBeat,withOwnerScoreTempo,type ScoreTempo} from './score-tempo';
 import {buildPerformanceSchedule,performanceSeconds} from './score-performance';
-import {TempoAudition} from './tempo-audition';
+import {TempoAudition,type Audition} from './tempo-audition';
+import {NativeTempoAudition} from './native-tempo-audition';
 import {mountTempoAudition,tempoAuditionMarkup} from './tempo-audition-dialog';
 import {workHeadingMarkup} from './score-catalog';
 import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
@@ -654,18 +655,28 @@ function placeTempoDialog(place?:'high'|'low'){
  if(dialog?.dataset.kind!=='score-tempo')return;
  if(place)dialog.dataset.place=place;else delete dialog.dataset.place;fitDialog(dialog,orientation.rotation);
 }
+/** The installed piano plays the preview when it is on and sounding; installed
+ * but off, the built-in voice plays and the dialog offers to turn it on. */
+async function auditionVoice():Promise<{voice:'piano'|'built-in';offerPiano?:boolean;voiceNote?:string}>{
+ try{
+  if(pianoSettings.enabled){const audio=await nativePiano.audioStatus();if(audio.mode==='browser')return {voice:'built-in'};return audio.enabled&&audio.running&&!audio.error?{voice:'piano'}:{voice:'built-in',voiceNote:`Your piano is not sounding${audio.error?`: ${audio.error.replace(/\.$/,'')}`:''}.`};}
+  return {voice:'built-in',offerPiano:(await nativePiano.bankStatus()).installed};
+ }catch{return {voice:'built-in'};}
+}
 /** Hear the piece after a count-in and set its tempo by ear. Resolves with the
  * chosen rate on the counted beat, saved as yours, or undefined when left. When
  * practice already has a goal, it keeps it, and the dialog says so. */
-function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string,setsPracticeGoal=false):Promise<number|undefined>{
- const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,tempos.piece);
+async function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string,setsPracticeGoal=false):Promise<number|undefined>{
+ const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,tempos.piece),schedule=buildPerformanceSchedule(score,beat),voice=await auditionVoice();
  const goal=!setsPracticeGoal&&tempos.goal?wholeTempoOnBeat(tempos.goal.bpm,tempos.goal.beat,beat):undefined;
- const view={heading:workHeadingMarkup(target.entry.metadata),tempo:tempos.piece,beat,bpm,confirmLabel,setsPracticeGoal,...(goal!==undefined?{practiceGoal:goal}:{})};
- const audition=new TempoAudition(buildPerformanceSchedule(score,beat),bpm),follow=followPlayingBar(target);
+ const view={heading:workHeadingMarkup(target.entry.metadata),tempo:tempos.piece,beat,bpm,confirmLabel,setsPracticeGoal,...(goal!==undefined?{practiceGoal:goal}:{}),...voice};
+ const audition:Audition=voice.voice==='piano'?new NativeTempoAudition(schedule,bpm):new TempoAudition(schedule,bpm),follow=followPlayingBar(target);
+ // Turning the piano on here is the Options › Piano switch: it stays on.
+ const usePiano=async(chosen:number)=>{const status=await savePiano({...pianoSettings,enabled:true});if(!status.running)throw Error(status.error??'Its output is not running.');return new NativeTempoAudition(schedule,chosen);};
  return new Promise(resolve=>{
   const d=showDialog(tempoAuditionMarkup(view),'score-tempo');d.setAttribute('aria-labelledby','tempo-audition-title');
   let settled=false;const finish=(value:number|undefined)=>{if(settled)return;settled=true;dispose();if(followedPage!==undefined&&current===target){followedPage=undefined;renderPages();}followedPage=undefined;resolve(value);};
-  const dispose=mountTempoAudition({dialog:d,audition,view,follow,cancel:()=>{finish(undefined);if(dialog===d)closeDialog();},confirm:chosen=>{
+  const dispose=mountTempoAudition({dialog:d,audition,view,follow,usePiano,fallback:chosen=>new TempoAudition(schedule,chosen),cancel:()=>{finish(undefined);if(dialog===d)closeDialog();},confirm:chosen=>{
    // Shown at once; written after. Every other preference stays as it is.
    preferences.scoreTempos=withOwnerScoreTempo(preferences,target.entry.id,ownerScoreTempo(chosen,beat)).scoreTempos;
    void savePreferences().catch(error=>notify(`Tempo was not saved: ${(error as Error).message}`));

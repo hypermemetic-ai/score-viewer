@@ -11,6 +11,8 @@ use std::{
 };
 #[path = "audio_queue.rs"]
 mod queue;
+#[path = "audio_schedule.rs"]
+pub mod schedule;
 // Internal sampler quantum; device buffers may be larger and are chunked.
 pub const MAX_BLOCK: usize = 256;
 
@@ -30,6 +32,8 @@ pub struct MidiBus {
     panic: AtomicU64,
     enabled: AtomicBool,
     pub overflow: AtomicU64,
+    /// Scheduled web-layer notes; independent of live connection and panic.
+    pub schedule: schedule::ScheduleBus,
 }
 impl MidiBus {
     pub fn enable(&self, value: bool) {
@@ -105,51 +109,56 @@ impl Synth for crate::piano_engine::PianoEngine {
 /// A single piano timbre combines contacts across16channels. Same-pitch attacks
 /// retrigger within a channel; an overlapping second channel retains contact
 /// without creating a voice that channel-less sfizz note-off would also kill.
+/// Channel 17 holds the scheduled stream's contacts, beside live MIDI.
 struct Contacts {
-    held: [[bool; 128]; 16],
-    sustain: [u8; 16],
+    held: [[bool; 128]; 17],
+    sustain: [u8; 17],
 }
 impl Default for Contacts {
     fn default() -> Self {
         Self {
-            held: [[false; 128]; 16],
-            sustain: [0; 16],
+            held: [[false; 128]; 17],
+            sustain: [0; 17],
         }
     }
 }
 impl Contacts {
     fn apply(&mut self, e: Midi, synth: &mut dyn Synth) {
+        self.apply_at(e, 0, synth)
+    }
+    /// `offset` is the event's frame within the next sampler quantum.
+    fn apply_at(&mut self, e: Midi, offset: u32, synth: &mut dyn Synth) {
         let ch = (e.channel - 1) as usize;
         let key = e.key as usize;
         match e.kind {
             1 if e.value > 0 => {
-                let others = (0..16).any(|c| c != ch && self.held[c][key]);
+                let others = (0..self.held.len()).any(|c| c != ch && self.held[c][key]);
                 self.held[ch][key] = true;
                 if !others {
-                    synth.note_on(0, e.key, e.value);
+                    synth.note_on(offset, e.key, e.value);
                 }
             }
             1 | 2 => {
                 self.held[ch][key] = false;
                 if !self.held.iter().any(|h| h[key]) {
-                    synth.note_off(0, e.key, e.value);
+                    synth.note_off(offset, e.key, e.value);
                 }
             }
             3 if e.key == 64 => {
                 self.sustain[ch] = e.value;
-                synth.cc(0, 64, *self.sustain.iter().max().unwrap());
+                synth.cc(offset, 64, *self.sustain.iter().max().unwrap());
             }
             3 if matches!(e.key, 120 | 123) => {
                 for note in 0..128 {
                     if self.held[ch][note] {
                         self.held[ch][note] = false;
                         if !self.held.iter().any(|h| h[note]) {
-                            synth.note_off(0, note as u8, 0);
+                            synth.note_off(offset, note as u8, 0);
                         }
                     }
                 }
                 self.sustain[ch] = 0;
-                synth.cc(0, 64, *self.sustain.iter().max().unwrap());
+                synth.cc(offset, 64, *self.sustain.iter().max().unwrap());
                 if e.key == 120
                     && !self.held.iter().flatten().any(|h| *h)
                     && self.sustain.iter().all(|v| *v == 0)
@@ -159,9 +168,9 @@ impl Contacts {
             }
             3 if e.key == 121 => {
                 self.sustain[ch] = 0;
-                synth.cc(0, 64, *self.sustain.iter().max().unwrap());
+                synth.cc(offset, 64, *self.sustain.iter().max().unwrap());
             }
-            3 => synth.cc(0, e.key, e.value),
+            3 => synth.cc(offset, e.key, e.value),
             _ => {}
         }
     }
@@ -335,6 +344,7 @@ pub struct Mixer {
     contacts: Contacts,
     panic: u64,
     cue: *mut Cue,
+    player: schedule::Player,
     pub frames: Arc<AtomicU64>,
     pub peak_bits: Arc<AtomicU64>,
     #[cfg(test)]
@@ -414,11 +424,19 @@ impl Mixer {
             contacts: Contacts::default(),
             panic: u64::MAX,
             cue: ptr::null_mut(),
+            player: schedule::Player::default(),
             frames: Arc::new(AtomicU64::new(0)),
             peak_bits: Arc::new(AtomicU64::new(0)),
             #[cfg(test)]
             capture: None,
         }
+    }
+    /// Scheduled notes and clicks need the output rate. A new output starts a
+    /// fresh schedule epoch, so nothing submitted for an earlier one sounds.
+    pub fn at_rate(mut self, rate: u32) -> Self {
+        self.bus.schedule.restart();
+        self.player = schedule::Player::new(&self.bus.schedule, rate);
+        self
     }
     pub fn fill<T: Copy>(
         &mut self,
@@ -489,6 +507,24 @@ impl Mixer {
                 }
             }
             let frames = chunk.len() / channels;
+            let scheduled = self.player.rate() as u64;
+            if scheduled > 0 {
+                let start = base.saturating_add(frame_offset * 1_000_000 / scheduled);
+                let (synth, contacts) = (&mut self.synth, &mut self.contacts);
+                self.player
+                    .quantum(&self.bus.schedule, start, frames, |kind, key, value, offset| {
+                        if let Some(s) = synth.as_mut() {
+                            let e = Midi {
+                                kind,
+                                channel: schedule::CHANNEL,
+                                key,
+                                value,
+                                ..Default::default()
+                            };
+                            contacts.apply_at(e, offset, s.as_mut());
+                        }
+                    });
+            }
             self.left[..frames].fill(0.0);
             self.right[..frames].fill(0.0);
             if let Some(s) = self.synth.as_mut() {
@@ -515,6 +551,7 @@ impl Mixer {
                         })
                     }
                 };
+                let cue = cue + self.player.click_sample(i);
                 let l = self.left[i] * gain + cue;
                 let r = self.right[i] * gain + cue;
                 for (c, sample) in frame.iter_mut().enumerate() {
@@ -544,7 +581,14 @@ impl Mixer {
                 }
                 frame_offset += 1;
             }
+            self.player.advance(frames);
             self.frames.fetch_add(frames as u64, Ordering::Relaxed);
+        }
+        let scheduled = self.player.rate() as u64;
+        if scheduled > 0 {
+            let span = (frames as u64 * 1_000_000).div_ceil(scheduled);
+            self.player
+                .rendered(&self.bus.schedule, base.saturating_add(span), span);
         }
         self.peak_bits
             .store((peak as f64).to_bits(), Ordering::Relaxed);
@@ -1714,6 +1758,98 @@ mod tests {
         bus.send(7, 1, 1, 60, 90);
         assert!(bus.queue.pop().is_none());
         assert_eq!(bus.overflow.load(Ordering::Relaxed), 0);
+    }
+    #[test]
+    fn scheduled_stream_reaches_sampler_offsets_without_allocation_and_spares_live_contacts() {
+        use schedule::{Event, Submitter, CLICK, NOTE_OFF, NOTE_ON};
+        type Log = Arc<std::sync::Mutex<Vec<(u8, u8, u32)>>>;
+        struct Recorder(Log);
+        impl Synth for Recorder {
+            fn note_on(&mut self, o: u32, n: u8, _: u8) {
+                self.0.lock().unwrap().push((1, n, o));
+            }
+            fn note_off(&mut self, o: u32, n: u8, _: u8) {
+                self.0.lock().unwrap().push((2, n, o));
+            }
+            fn cc(&mut self, o: u32, c: u8, _: u8) {
+                self.0.lock().unwrap().push((3, c, o));
+            }
+            fn all_off(&mut self) {
+                self.0.lock().unwrap().push((4, 0, 0));
+            }
+            fn render(&mut self, l: &mut [f32], r: &mut [f32]) -> bool {
+                l.fill(0.);
+                r.fill(0.);
+                true
+            }
+        }
+        let log: Log = Arc::new(std::sync::Mutex::new(Vec::with_capacity(256)));
+        let bus = Arc::new(MidiBus::default());
+        bus.enable(true);
+        bus.connect(1);
+        let mut mixer = Mixer::new(
+            Some(Box::new(Recorder(log.clone()))),
+            bus.clone(),
+            Arc::new(CueMailbox::default()),
+            Arc::new(AtomicU64::new(1f64.to_bits())),
+        )
+        .at_rate(48000);
+        let mut out = vec![0f32; 1024 * 2];
+        let mut now = 10_000_000u64;
+        let step = 1024 * 1_000_000 / 48000;
+        mixer.fill(&mut out, 2, now, 0, |v| v);
+        now += step;
+        // The player holds middle C on the keyboard throughout.
+        bus.send(1, 1, 1, 60, 100);
+        let mut sub = Submitter::default();
+        let first = now + bus.schedule.lead(now).unwrap() + 2_000;
+        let events = [
+            Event { at: first, kind: CLICK, key: 0, value: 1 },
+            Event { at: first + 7_000, kind: NOTE_ON, key: 64, value: 90 },
+            Event { at: first + 7_000, kind: NOTE_ON, key: 60, value: 90 },
+            Event { at: first + 30_000, kind: NOTE_OFF, key: 64, value: 0 },
+        ];
+        bus.schedule.replace(&mut sub, now, None, &events).unwrap();
+        let mut peak = 0f32;
+        let mut starts = vec![];
+        for _ in 0..4 {
+            starts.push(now);
+            WATCH.with(|w| w.set(Some((0, 0))));
+            mixer.fill(&mut out, 2, now, 0, |v| v);
+            let counts = WATCH.with(|w| {
+                let v = w.get().unwrap();
+                w.set(None);
+                v
+            });
+            assert_eq!(counts, (0, 0));
+            peak = out.iter().fold(peak, |m, v| m.max(v.abs()));
+            now += step;
+        }
+        assert!(peak > 0.1, "the count-in click sounds through the mixer");
+        let heard = log.lock().unwrap().clone();
+        // Live C first; the scheduled C joins the held key without a second
+        // attack; E sounds and lifts at its sample offsets.
+        let quantum_offset = |at: u64| {
+            let base = starts.iter().rev().find(|s| **s <= at).unwrap();
+            let frame = (at - base) * 48000 / 1_000_000;
+            (frame % 256) as u32
+        };
+        assert_eq!(
+            heard.iter().filter(|e| e.0 == 1 || e.0 == 2).cloned().collect::<Vec<_>>(),
+            [
+                (1, 60, 0),
+                (1, 64, quantum_offset(first + 7_000)),
+                (2, 64, quantum_offset(first + 30_000)),
+            ]
+        );
+        log.lock().unwrap().clear();
+        // Stopping the preview releases only its own contacts.
+        bus.schedule.replace(&mut sub, now, None, &[]).unwrap();
+        mixer.fill(&mut out, 2, now, 0, |v| v);
+        assert!(log.lock().unwrap().iter().all(|e| e.0 == 3), "live C keeps sounding");
+        bus.send(1, 2, 1, 60, 0);
+        mixer.fill(&mut out, 2, now + step, 0, |v| v);
+        assert_eq!(log.lock().unwrap().last(), Some(&(2, 60, 0)));
     }
     #[test]
     fn render_replacement_performs_zero_rust_allocations_or_deallocations() {

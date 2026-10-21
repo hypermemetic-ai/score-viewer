@@ -43,6 +43,42 @@ storage. The existing monotonic MIDI clock and cue onset/count-in/repeat formula
 remain authoritative. The allocator test covers host Rust; it does not assert
 that all internals of the C++ sampler are allocation-free.
 
+## Scheduled notes
+
+The web layer can play a scheduled stream on the piano through the selected
+output: `piano_schedule_open`, `piano_schedule_replace` and `piano_schedule_submit`.
+An event is `[atMicros, kind, key, value]`, a presentation instant on the native
+MIDI clock: note-on, note-off, controller, or metronome click (value 1 accents).
+Calls carry at most 512 nondecreasing events no more than 60 s ahead. The commands
+refuse while Piano is off or its output is not running, so they never create a
+worker, sampler, sample load or stream.
+
+A fixed 2048-entry lock-free queue carries events to the callback, which holds a
+single lookahead event and applies events at their sample offsets within each
+256-frame sampler chunk, at most 512 per chunk. Offsets never decrease within a
+chunk. Scheduled notes play on a seventeenth contact channel, so live MIDI keys
+and sustain are unaffected and the stream's own release lifts only its notes.
+Clicks use the practice metronome voice on the same clock, unscaled by piano
+volume. The callback publishes the frame it has rendered and its transfer size.
+From these the commands return `leadMicros`, the earliest instant a new event can
+be sounded on time. A note-on or click more than 50 ms late is dropped and counted.
+
+Each replacement starts a new epoch, and late submits to an old epoch are
+rejected. A plain replacement releases the stream: earlier events are discarded
+and its sounding notes and clicks stop at once. A replacement with `keepUntil`
+keeps the earlier epoch's events before that cut and drops them after it, so a
+tempo change keeps sounding notes. The ring remembers the last eight cuts. While
+the callback lags four epochs behind, a replacement waits briefly and then reports
+that the schedule is busy. A new output (`Mixer::at_rate`) restarts the stream.
+Practice cues, panic, live MIDI and the cue formulas are unchanged. The callback
+still takes no locks, emits no events, does no file work and does not allocate;
+the allocator test covers the scheduled path.
+
+`node scripts/check-piano-audio-core.mjs` (inside qq-job) compiles the portable
+core and its tests without Tauri, GUI or outputs. Stand-in `tauri` crates
+type-check the commands. The paired native build compiles the Windows and macOS
+hosts.
+
 Ordinary native tests do not open audio outputs. The explicitly ignored Windows
 test `practice_audio::stream_diagnostic::initialized_windows_stream_and_virtual_midi_pcm`
 requires `VIEWER_AUDIO_DIAGNOSTIC_SFZ`, `VIEWER_AUDIO_DIAGNOSTIC_OUTPUT_ID` and
@@ -57,5 +93,7 @@ normal Tauri exit hook, which acknowledges shutdown and preserves restoration
 errors in a small native audit file.
 
 These checks establish source/stream behavior. Final package launch, physical
-MIDI, audible quality, pedal response and sound-to-ear latency need their separate
-native and human acceptance evidence.
+MIDI, audible quality, pedal response, sound-to-ear latency and the timing of
+scheduled notes on a real output need their separate native and human acceptance
+evidence. A scheduled instant is when the frame leaves the mixer; output latency
+after that is not included.

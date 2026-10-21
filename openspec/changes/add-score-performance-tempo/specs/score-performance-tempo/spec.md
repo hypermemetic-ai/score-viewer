@@ -88,6 +88,21 @@ Hear-and-set SHALL play a metronome count-in and then a performance synthesised 
 - **WHEN** audio cannot start
 - **THEN** the dialog says so and ← → and Enter still set the tempo
 
+### Requirement: The preview plays on the owner's piano when it is on
+Hear-and-set SHALL play the count-in and performance on the native piano through the output selected in Piano settings when Piano is enabled and running, scheduled on the native MIDI clock, and SHALL otherwise use the built-in voice. The dialog SHALL say which voice plays. When Piano is installed but off it SHALL offer to turn it on, saying plainly that it stays on like Options › Piano.
+
+#### Scenario: Piano on
+- **WHEN** Piano is enabled and its output is running
+- **THEN** the count-in and the notes sound on the piano on one clock, and a tempo change keeps sounding notes and continues from the same place
+
+#### Scenario: Piano installed but off
+- **WHEN** the bank is installed and Piano is off
+- **THEN** the built-in voice plays and the dialog offers "Turn on your piano — stays on, like Options › Piano"; choosing it enables Piano as the Options switch does and continues on the piano
+
+#### Scenario: Piano cannot start
+- **WHEN** the native piano refuses or stops
+- **THEN** the built-in voice plays, or the status says the piano stopped, and the reason is shown
+
 ### Requirement: Practice uses the score tempo
 Piano and reading practice on a score without a reference tempo or saved practice tempo SHALL start at the score's confident tempo without asking, and SHALL otherwise ask through hear-and-set. Saved practice tempos and progress SHALL keep authority.
 

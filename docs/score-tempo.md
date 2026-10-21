@@ -71,4 +71,13 @@ A score without a meter has no counted beat to hear. Hear and set is unavailable
 
 ## Sound
 
-The preview plays on a simple built-in WebAudio piano voice with the practice metronome click, through the system's default output. The optional native Salamander piano (`docs/native-piano-audio.md`) does not play it yet. Native playback needs the Rust audio engine to accept a scheduled note stream from the frontend, which is a separate native change.
+When Piano is on and its output is running, your piano plays the preview: the Salamander bank through the output chosen in Options › Piano. The count-in clicks come from the same native clock (`docs/native-piano-audio.md`, Scheduled notes). The dialog says "Your piano plays this preview."
+
+Otherwise a simple built-in WebAudio piano voice plays it, with the practice metronome click, through the system's default output:
+
+- **Installed but off.** The dialog shows "Your piano is installed and turned off. [Turn on your piano] — stays on, like Options › Piano." The button switches Piano on exactly as Options › Piano does, and Piano stays on afterwards. The preview then continues on your piano from the start.
+- **On but not sounding.** The dialog says why, and the built-in voice plays.
+- **Cannot start or stops.** If the piano cannot start, the built-in voice takes over and the dialog says why. If it stops while playing, the status says so, and Space plays it again.
+- **Browser.** In the browser, which has no native piano, the built-in voice always plays.
+
+The tempo, ← →, Enter and Esc behave the same for both voices. A tempo change on your piano takes effect a few tens of milliseconds ahead, the queued output plus a call allowance. Notes already sounding keep sounding. Pause releases the piano's notes, and continuing has no second count-in. The pedal's effect is folded into each note's release; the native stream does not send pedal controllers yet.
