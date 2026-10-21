@@ -10,6 +10,9 @@ export interface PersonalOwnerChoice {
  original:{hand:PersonalHand|null;finger?:number};hand?:PersonalHand;finger?:number;createdAt:string;
  /** Absent on legacy records: display values alone do not prove field authorship. */
  intent?:{hand?:PersonalFieldIntent;finger?:PersonalFieldIntent};
+ /** `'local'`: this hand applies here only. It is not carried to matching bars,
+  * and a hand carried from another bar does not replace it. */
+ handScope?:'local';
 }
 export interface PersonalAssignments {version:'personal-owner-assignments-v1';sourceRevision:string;choices:Record<string,PersonalOwnerChoice>}
 /** `hand: null` is a hand-less owner: the source gives none and the player has not chosen one. */
@@ -33,7 +36,7 @@ export function readPersonalAssignments(raw:unknown,p:ScorePackage):PersonalAssi
   const n=notes.get(id);
   if(!n||!object(c)||c.ownerId!==id||!object(c.guard)||Object.keys(c.guard).length!==3||Object.entries(guard(n)).some(([k,v])=>c.guard[k]!==v)||
    !object(c.original)||c.original.hand!==(n.hand??null)||c.original.finger!==undefined&&!validFinger(c.original.finger)||
-   c.hand!==undefined&&!validHand(c.hand)||c.finger!==undefined&&!validFinger(c.finger)||c.hand===undefined&&c.finger===undefined||
+   c.hand!==undefined&&!validHand(c.hand)||c.finger!==undefined&&!validFinger(c.finger)||c.hand===undefined&&c.finger===undefined||c.handScope!==undefined&&(c.handScope!=='local'||c.hand===undefined)||
    typeof c.createdAt!=='string'||!Number.isFinite(Date.parse(c.createdAt)))throw Error('Personal assignment owner guard differs; original data retained.');
   if(c.intent!==undefined){if(!object(c.intent)||Object.keys(c.intent).some(k=>k!=='hand'&&k!=='finger'))throw Error('Personal assignment intent differs; original data retained.');for(const [field,intent] of Object.entries(c.intent)){if(c[field]===undefined||!object(intent)||Object.keys(intent).some(k=>!['decisionId','authoredAt','lineageId'].includes(k))||typeof intent.decisionId!=='string'||!intent.decisionId||typeof intent.lineageId!=='string'||!intent.lineageId||typeof intent.authoredAt!=='string'||!Number.isFinite(Date.parse(intent.authoredAt)))throw Error('Personal assignment intent differs; original data retained.');}}
  }
@@ -52,14 +55,15 @@ export function handlessMessage(count:number,purpose:string):string {
 /** The owner's effective hand, or null when neither the source nor the player gives one. */
 export function handFor(p:ScorePackage,s:PersonalState,ownerId:string):PersonalHand|null {
  const n=p.score.notes.find(n=>n.id===ownerId);if(!n||n.hand!==undefined&&!validHand(n.hand))throw Error('No piano owner at this source owner.');
- return s.assignments?.choices[ownerId]?.hand??n.hand??null;
+ return handRecurrences(p,s).carried.get(ownerId)?.hand??s.assignments?.choices[ownerId]?.hand??n.hand??null;
 }
-export function effectiveAssignments(p:ScorePackage,s:PersonalState):EffectivePersonalAssignment[] {
+/** `carry: false` reads the owner's records alone, without hands carried from matching bars. */
+export function effectiveAssignments(p:ScorePackage,s:PersonalState,options:{carry?:boolean}={}):EffectivePersonalAssignment[] {
  readPersonalAssignments(s.assignments,p);
- const legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
+ const carried=options.carry===false?undefined:handRecurrences(p,s).carried,legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
  return p.score.notes.filter(isPitchedEvent).map(n=>{
   const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??fingers.get(n.id);
-  return{id:n.id,...guard(n),hand:c?.hand??n.hand??null,...(finger===undefined?{}:{finger})};
+  return{id:n.id,...guard(n),hand:carried?.get(n.id)?.hand??c?.hand??n.hand??null,...(finger===undefined?{}:{finger})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 /** Canonical content key is synchronous; durable digests can be computed away from key handling. */
@@ -75,8 +79,12 @@ export function handChoiceOwners(p:ScorePackage,seat:Seat):string[] {
  for(const n of p.score.notes)if(!ids.has(n.id)&&isPitchedEvent(n)&&keys.has(key(n)))for(const id of aliases(p,n.id))ids.add(id);
  return [...ids];
 }
-/** Surgical owner choice. Duplicate/continuation appearances share source ownership; recurrences do not. */
-export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:PersonalHand;finger?:number}):PersonalState {
+/** Owner choice on one contact. Duplicate/continuation appearances share source
+ * ownership. Recurrences are not written: a hand change reaches matching bars
+ * through `handRecurrences`, and a finger through the fingering memory.
+ * `local` makes the hand apply here only (true) or follow matching bars again
+ * (false); left out, the contact keeps the scope it had. */
+export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:PersonalHand;finger?:number;local?:boolean}):PersonalState {
  if(choice.hand!==undefined&&!validHand(choice.hand)||choice.finger!==undefined&&!validFinger(choice.finger)||choice.hand===undefined&&choice.finger===undefined)throw Error('Choose Left or Right and a finger from 1 to 5.');
  const next=structuredClone(s),contact=new Set(seat.ownerIds.flatMap(id=>aliases(p,id))),ids=choice.hand===undefined?[...contact]:handChoiceOwners(p,seat);
  if(!ids.length)throw Error('No editable source owner.');
@@ -88,8 +96,9 @@ export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:
   const chosenFinger=contact.has(id)?choice.finger:undefined;
   const finger=chosenFinger??old?.finger??Object.values(s.overrides).find(c=>c.ownerIds.includes(id))?.replacement,hand=choice.hand??old?.hand,intent={...old?.intent,...(editIntent.hand&&choice.hand!==undefined?{hand:editIntent.hand}:{}),...(editIntent.finger&&chosenFinger!==undefined?{finger:editIntent.finger}:{})};
   if(chosenFinger!==undefined&&next.calculatedOwners)delete next.calculatedOwners[id];
+  const local=hand!==undefined&&(choice.hand!==undefined&&choice.local!==undefined?choice.local:old?.handScope==='local');
   next.assignments.choices[id]={ownerId:id,guard:guard(n),original:old?.original??{hand:n.hand??null,...(baseFinger(p,s,id)===undefined?{}:{finger:baseFinger(p,s,id)})},...(hand===undefined?{}:{hand}),intent,
-   ...(finger===undefined?{}:{finger}),createdAt:old?.createdAt??new Date().toISOString()};
+   ...(finger===undefined?{}:{finger}),...(local?{handScope:'local' as const}:{}),createdAt:old?.createdAt??new Date().toISOString()};
  }
  if(choice.hand!==undefined)requireDrawableHands(p,next);
  next.view.fingerSet='yours';readPersonalAssignments(next.assignments,p);return next;
@@ -98,7 +107,7 @@ export function assigned(p:ScorePackage,s:PersonalState,seat:Seat,choice:{hand?:
  * when no key still mixes a hand with no hand. The source's own pages already
  * draw such keys, so only a changed hand is refused, before it is saved. */
 function requireDrawableHands(p:ScorePackage,s:PersonalState):void {
- const notes=p.score.notes.filter(isPitchedEvent),hand=(n:typeof notes[number])=>s.assignments?.choices[n.id]?.hand??n.hand??null;
+ const notes=p.score.notes.filter(isPitchedEvent),carried=handRecurrences(p,s).carried,hand=(n:typeof notes[number])=>carried.get(n.id)?.hand??s.assignments?.choices[n.id]?.hand??n.hand??null;
  if(notes.every(n=>hand(n)===(n.hand??null)))return;
  const keys=new Map<string,typeof notes>();for(const n of notes){const k=`${n.startTick}:${pitch(n)}`;keys.set(k,[...keys.get(k)??[],n]);}
  const mixed=(of:(n:typeof notes[number])=>PersonalHand|null)=>[...keys.values()].filter(key=>key.some(n=>of(n)===null)&&key.some(n=>of(n)!==null));
@@ -115,6 +124,93 @@ export function restorePersonalAssignment(p:ScorePackage,s:PersonalState,seat:Se
  const next=structuredClone(s);for(const id of seat.ownerIds.flatMap(id=>aliases(p,id)))if(next.assignments)delete next.assignments.choices[id];
  if(next.assignments&&!Object.keys(next.assignments.choices).length)delete next.assignments;
  return next;
+}
+
+/** A hand carried to a note from the same music in another bar. */
+export interface CarriedHand {hand:PersonalHand;fromBar:number;fromOwnerId:string}
+export interface SkippedHandCarry {fromBar:number;toBar:number;reason:string}
+export interface HandRecurrences {
+ /** Receiving note → the hand it takes and where that hand was chosen. */
+ carried:ReadonlyMap<string,CarriedHand>;
+ /** Each bar whose hand changes are carried → the bars receiving them. */
+ targets:ReadonlyMap<number,readonly number[]>;
+ /** Matching bars the change does not reach, because it could not be drawn there. */
+ skipped:readonly SkippedHandCarry[];
+}
+const noRecurrences:HandRecurrences={carried:new Map(),targets:new Map(),skipped:[]};
+const recurrenceCache=new WeakMap<ScorePackage,{key:string;value:HandRecurrences}>();
+/** A hand change the owner made and that follows the same music: an explicitly
+ * authored hand away from the source's hand, not marked "only here". A legacy
+ * hand without recorded intent stays where it is: its value alone does not
+ * prove the owner chose it. */
+const carriesHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null):c is PersonalOwnerChoice&{hand:PersonalHand}=>!!c&&c.hand!==undefined&&!!c.intent?.hand&&c.handScope===undefined&&source!==null&&c.hand!==source;
+/** The owner's own hand for this note, which a carried hand never replaces. */
+const ownsHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null)=>!!c&&c.hand!==undefined&&(!!c.intent?.hand||c.handScope!==undefined||c.hand!==source);
+/** The owner's hand changes carried to the same music elsewhere in the score,
+ * derived from their records and never written back as records of their own.
+ * The changes made in one written bar travel together. Another bar matches
+ * when, from the downbeat to the end of the shorter of the two bars, every
+ * sounding note — both hands, held notes included, with the hands the source
+ * writes — has the same pitch, hand, duration and place in the bar, and that
+ * stretch holds every changed note. A bar written shorter, as a return whose
+ * pickup moves to the next bar, still matches over what both bars play; the
+ * same notes among other notes do not. A note with the owner's own hand
+ * keeps it, and a bar where the result could not be drawn is skipped. */
+export function handRecurrences(p:ScorePackage,s:PersonalState):HandRecurrences {
+ const choices=s.assignments&&s.assignments.sourceRevision===sourceRevision(p)?s.assignments.choices:undefined,bars=choices?p.score.sourceBarTicks:undefined;
+ if(!choices||!bars||bars.length<2)return noRecurrences;
+ const notes=new Map(p.score.notes.map(n=>[n.id,n]));
+ const moves=Object.values(choices).filter(c=>{const n=notes.get(c.ownerId);return !!n&&isPitchedEvent(n)&&carriesHand(c,n.hand??null);}) as Array<PersonalOwnerChoice&{hand:PersonalHand}>;
+ if(!moves.length)return noRecurrences;
+ const key=JSON.stringify(Object.values(choices).filter(c=>c.hand!==undefined).map(c=>[c.ownerId,c.hand,c.handScope??'',c.intent?.hand?1:0]));
+ const cached=recurrenceCache.get(p);if(cached?.key===key)return cached.value;
+ const value=findHandRecurrences(p,choices,moves,bars);recurrenceCache.set(p,{key,value});return value;
+}
+function findHandRecurrences(p:ScorePackage,choices:PersonalAssignments['choices'],moves:Array<PersonalOwnerChoice&{hand:PersonalHand}>,bars:readonly number[]):HandRecurrences {
+ type Note=ScorePackage['score']['notes'][number];
+ const pitched=p.score.notes.filter(isPitchedEvent).sort((a,b)=>a.startTick-b.startTick),notes=new Map<string,Note>(pitched.map(n=>[n.id,n])),longest=Math.max(0,...pitched.map(n=>n.durationTicks));
+ const barOf=(tick:number)=>{let lo=0,hi=bars.length-2;while(lo<hi){const mid=(lo+hi+1)>>1;if(bars[mid]<=tick)lo=mid;else hi=mid-1;}return lo;};
+ const firstFrom=(tick:number)=>{let lo=0,hi=pitched.length;while(lo<hi){const mid=(lo+hi)>>1;if(pitched[mid].startTick<tick)lo=mid+1;else hi=mid;}return lo;};
+ const sounding=(from:number,to:number)=>{const list:Note[]=[];for(let i=firstFrom(from-longest);i<pitched.length&&pitched[i].startTick<to;i++){const n=pitched[i];if(n.startTick+n.durationTicks>from)list.push(n);}return list;};
+ const tuple=(n:Note,start:number)=>`${n.hand??'-'}:${pitch(n)}:${n.startTick-start}:${n.durationTicks}`;
+ const signature=(list:Note[],start:number)=>list.map(n=>tuple(n,start)).sort().join('|');
+ const keys=new Map<string,Note[]>();for(const n of pitched){const k=`${n.startTick}:${pitch(n)}`;keys.set(k,[...keys.get(k)??[],n]);}
+ const groups=new Map<number,typeof moves>();for(const c of moves){const b=barOf(notes.get(c.ownerId)!.startTick);groups.set(b,[...groups.get(b)??[],c]);}
+ const carried=new Map<string,CarriedHand>(),targets=new Map<number,number[]>(),skipped:SkippedHandCarry[]=[];
+ const handOf=(n:Note,adding:ReadonlyMap<string,PersonalHand>)=>adding.get(n.id)??carried.get(n.id)?.hand??choices[n.id]?.hand??n.hand??null;
+ for(const [b,group] of [...groups].sort((x,y)=>x[0]-y[0])){
+  const start=bars[b],extent=bars[b+1]-start,moved=group.map(c=>notes.get(c.ownerId)!),last=Math.max(...moved.map(n=>n.startTick))-start;
+  const hands=new Map(group.map(c=>[tuple(notes.get(c.ownerId)!,start),{hand:c.hand,ownerId:c.ownerId}]));
+  for(let t=0;t<bars.length-1;t++){
+   const at=bars[t],shared=Math.min(extent,bars[t+1]-at);if(t===b||last>=shared)continue;
+   const context=sounding(at,at+shared);if(signature(context,at)!==signature(sounding(start,start+shared),start))continue;
+   const adding=new Map<string,PersonalHand>(),sources=new Map<string,string>();
+   for(const n of context){const move=hands.get(tuple(n,at));if(!move||ownsHand(choices[n.id],n.hand??null))continue;const prior=carried.get(n.id);if(prior&&prior.hand!==move.hand)continue;adding.set(n.id,move.hand);sources.set(n.id,move.ownerId);}
+   if(!adding.size)continue;
+   // A struck key written as two notes is drawn only when all of its notes have a hand, or none.
+   const mixed=[...adding.keys()].some(id=>{const n=notes.get(id)!,key=keys.get(`${n.startTick}:${pitch(n)}`)!;return key.some(q=>handOf(q,adding)===null)&&key.some(q=>handOf(q,adding)!==null);});
+   if(mixed){skipped.push({fromBar:b+1,toBar:t+1,reason:'a key there is written as two notes, and only one of them has a hand'});continue;}
+   for(const [id,hand] of adding)carried.set(id,{hand,fromBar:b+1,fromOwnerId:sources.get(id)!});
+   targets.set(b+1,[...targets.get(b+1)??[],t+1]);
+  }
+ }
+ return{carried,targets,skipped};
+}
+/** Where the selected note's hand comes from, for the editor to say. `follows`
+ * is the bar a local hand would follow again if it stopped being local. */
+export type HandProvenance=
+ | {kind:'carried';hand:PersonalHand;fromBar:number}
+ | {kind:'shared';hand:PersonalHand;toBars:readonly number[]}
+ | {kind:'local';hand:PersonalHand;follows?:number};
+export function handProvenance(p:ScorePackage,s:PersonalState,ownerId:string):HandProvenance|undefined {
+ const n=p.score.notes.find(n=>n.id===ownerId),c=s.assignments?.choices[ownerId];if(!n||!isPitchedEvent(n))return;
+ const recurrences=handRecurrences(p,s),carried=recurrences.carried.get(ownerId);
+ if(carried)return{kind:'carried',hand:carried.hand,fromBar:carried.fromBar};
+ if(!c||c.hand===undefined)return;
+ if(carriesHand(c,n.hand??null)){const bars=p.score.sourceBarTicks;const bar=bars?bars.findLastIndex(t=>t<=n.startTick)+1:0;return{kind:'shared',hand:c.hand,toBars:recurrences.targets.get(bar)??[]};}
+ if(c.handScope!=='local')return;
+ const without=structuredClone(s);delete without.assignments!.choices[ownerId];const follows=handRecurrences(p,without).carried.get(ownerId)?.fromBar;
+ return{kind:'local',hand:c.hand,...(follows===undefined?{}:{follows})};
 }
 
 /** Semantic planning view only: never archive or admit this as a calculated package. */

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {handCarryNotice} from '../src/hand-recurrence-text';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
@@ -109,7 +110,7 @@ test('only fit refusals pass the save queue; integrity failures still wait for r
 /** personalEditor from main.ts: its save queue, with the memory replaced. */
 function editorHarness(){
  const body=stripTypeScriptTypes(source.slice(source.indexOf('function personalEditor('),source.indexOf('function readerPackage(')));
- const views:unknown[]=[],context:any={structuredClone,PersonalEditQueue,engravingRefusal,livePersonalEditors:new WeakMap(),
+ const views:unknown[]=[],context:any={structuredClone,handCarryNotice,PersonalEditQueue,engravingRefusal,livePersonalEditors:new WeakMap(),
   PersonalPresentationSession:class{},personalStorageName:()=>'state.json',resolvePersonalNavigation(){},memoryInput:()=>({}),
   personalMemory:{saveView:async(input:any)=>{views.push(input.personal);}}};
  runInNewContext(body,context);
