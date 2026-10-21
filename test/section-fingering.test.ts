@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits} from '../src/selection';import {pieceUnits,fingeringProgress,percent,fingeringWindow,jumpLabels} from '../src/section-fingering';
+import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits,nextInHand} from '../src/selection';import {pieceUnits,fingeringProgress,percent,fingeringWindow,jumpLabels} from '../src/section-fingering';
 const importPackage=(bytes:Uint8Array)=>importPackageStrict(bytes,{allowLegacyTempo:true});
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
 const handOf=(q:Pick<ScorePackage,'score'>,s:Seat)=>q.score.notes.find(n=>n.id===s.ownerIds[0])?.hand;
@@ -56,4 +56,36 @@ test('jump labels are single letters up to the alphabet, then pairs, then triple
 });
 test('jump labels are unique and avoid L and R, which choose a hand',()=>{
  for(let n=0;n<=576;n++){const labels=jumpLabels(n);assert.equal(labels.length,n,`count ${n}`);assert.equal(new Set(labels).size,n,`unique ${n}`);assert.ok(labels.every(l=>!/[lr]/.test(l)),`keys ${n}`);}
+});
+
+test('after a finger the score editor moves on in the same hand, past the end of the system',()=>{
+ const units=editUnits(p);
+ // The last right-hand note of the first system: the next stop in editor order is the left hand.
+ const i=units.findIndex((s,k)=>handOf(p,s)==='RH'&&units[k+1]&&handOf(p,units[k+1])==='LH');
+ assert.ok(i>=0);
+ const next=nextInHand(p,units,i)!;
+ assert.equal(handOf(p,next),'RH');assert.ok(next.system>units[i].system||next.page>units[i].page,'onto the next system');
+ assert.ok(units.slice(i+1,units.indexOf(next)).every(s=>handOf(p,s)!=='RH'),'the next right-hand note, none skipped');
+ const lastLeft=units.map((s,k)=>({s,k})).filter(({s})=>handOf(p,s)==='LH').at(-1)!;
+ assert.equal(nextInHand(p,units,lastLeft.k),lastLeft.s,'at the hand\'s last note the selection stays');
+ assert.equal(nextInHand(p,units,-1),undefined);
+});
+test('each hand keeps its place: a hand that runs out goes back to where the other was left, and L or R on the cursor loses neither',async()=>{
+ const {SectionFingering}=await import('../src/section-fingering');const {initialPersonal,corrected}=await import('../src/state');
+ (globalThis as any).ResizeObserver??=class{observe(){}disconnect(){}};
+ const mount={addEventListener(){},removeEventListener(){},replaceChildren(){}} as unknown as HTMLElement;
+ const bare:ScorePackage={...p,fingerLayer:p.fingerLayer&&{...p.fingerLayer,attacks:p.fingerLayer.attacks.map(({finger,...a})=>a)}} as ScorePackage;
+ const units=pieceUnits(bare),rh=units.filter(s=>handOf(bare,s)==='RH'),lh=units.filter(s=>handOf(bare,s)==='LH');
+ const make=(q:ScorePackage,personal:ReturnType<typeof initialPersonal>,start?:string,marks?:Record<string,string>)=>new SectionFingering(mount,{package:q,basePackage:q,plan:undefined as never,personal:()=>personal,presentation:()=>'annotations',save:async()=>{},start,marks,status:()=>{}}) as any;
+ // Every right-hand note fingered but the last; the left hand was left in measure 11.
+ let personal=initialPersonal(bare);for(const s of rh.slice(0,-1))personal=corrected(bare,personal,s,1);
+ const lastRh=rh.at(-1)!,leftAt=lh.find(s=>s.writtenBar===11)!;
+ const view=make(bare,personal,lastRh.contactId,{LH:leftAt.contactId});
+ assert.equal(view.nextGap(view.index(),1,lastRh.contactId).contactId,leftAt.contactId,'on to where the left hand was left, not the next note in the piece');
+ // L on the cursor's right-hand note: the note is now the left hand's, and both marks stand.
+ const moved=rh[20],near=rh[21],q={...bare,score:{...bare.score,notes:bare.score.notes.map(n=>n.id===moved.ownerIds[0]?{...n,hand:'LH'}:n)}} as ScorePackage;
+ const rebuilt=make(q,initialPersonal(q),moved.contactId,{RH:moved.contactId,LH:leftAt.contactId});
+ assert.deepEqual(rebuilt.handMarks,{RH:moved.contactId,LH:leftAt.contactId});
+ assert.equal(rebuilt.mark('RH').contactId,near.contactId,'the right hand resumes at its next note');
+ assert.equal(rebuilt.mark('LH').contactId,leftAt.contactId);
 });

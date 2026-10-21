@@ -69,7 +69,7 @@ import {prepareRebuiltEdition,addKeyboardView,canAddKeyboardView,canShareKeyboar
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {AdmittedReading} from '../vendor/iso-notation/src/score-presentation';
 
-import {editUnits,moveSelection,selectionOnPage,systemSelection,measureSelection} from './selection';
+import {editUnits,moveSelection,nextInHand,selectionOnPage,systemSelection,measureSelection} from './selection';
 import {LibraryMenu,instrumentPickerMarkup,libraryFocusKey,libraryFocusElement} from './library-menu';
 import {EditSequence} from './edit-sequence';
 import {PersonalEditQueue} from './personal-edit-queue';
@@ -1269,7 +1269,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
   const wait=handEditingWait(chosenScore);
   if(wait){wait.queue.add({key:chosenSeat!.ownerIds[0],hand:choice.hand,bar:chosenSeat!.writtenBar});wait.status.queue(wait.queue.list());return;}
  }
- const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=seat?units.findIndex(s=>s.contactId===seat.contactId):-1,nextSeat=waitedOwner||!seat?selection:advance?units[Math.min(units.length-1,index+1)]??seat:seat;
+ const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=seat?units.findIndex(s=>s.contactId===seat.contactId):-1,nextSeat=waitedOwner||!seat?selection:advance?nextInHand(readerPackage(),units,index)??seat:seat;
  const decisionId=crypto.randomUUID(),authoredAt=new Date().toISOString(),ownerId=waitedOwner??seat!.ownerIds[0];
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');
  const action:PersonalMemoryAction=choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};

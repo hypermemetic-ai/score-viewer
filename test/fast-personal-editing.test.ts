@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:mo
 import {scoreCapabilities} from '../src/score-capabilities';
 import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {importPackage} from '../src/package';import {initialPersonal,readPersonal,viewportFit,personalStorageName} from '../src/state';
-import {assigned,effectiveAssignmentKey} from '../src/personal-assignments';import {editUnits} from '../src/selection';import {PersonalEditQueue} from '../src/personal-edit-queue';
+import {assigned,effectiveAssignmentKey} from '../src/personal-assignments';import {editUnits,nextInHand} from '../src/selection';import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {PersonalMemorySession,rawMemoryPersonal,personalMemoryDocument} from '../src/personal-memory-session';
 import {browserAssistanceStore,type AssistanceStore} from '../src/durable-assistance-store';
 import {withResolvedMemory} from '../src/personal-assistance';
@@ -23,7 +23,7 @@ async function fixture(){
  }};
  const memoryInput=(owner:any)=>({entryId:owner.entry.id,importedAt:owner.entry.importedAt,p:owner.package,personal:rawMemoryPersonal(owner.personal)});
  const personalMemory=new PersonalMemorySession(store,{scanLibrary:async()=>[memoryInput(target)]});await personalMemory.initialize();active=true;
- const context:any={structuredClone,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
+ const context:any={structuredClone,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}async project(personal:any){return {...p,projection:personal.assignments};}},personalStorageName,personalMemory,memoryInput,rawMemoryPersonal,
   resolveMemory:(owner:any)=>withResolvedMemory(memoryInput(owner),personalMemory.resolve(memoryInput(owner)),personalMemory.memory.revision),effectiveAssignmentKey,
   adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){},
