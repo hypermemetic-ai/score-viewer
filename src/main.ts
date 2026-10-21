@@ -451,7 +451,7 @@ function render(){if(!current){renderLibrary();return;}orientation.admitReader(c
 function renderPages(){
  if(practice||!current)return;
  const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(s.view),mode=labelMode(),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
- transformSurface(surface,v.rotation);const fit=viewportFit(innerWidth,innerHeight,v,p.pages.length),positions=readerAnnotationPositions(p,fit.pages),pages:HTMLElement[]=[];
+ transformSurface(surface,v.rotation);const fit=viewportFit(innerWidth,innerHeight,v,p.pages.length),positions=annotationPositions(p,fit.pages),pages:HTMLElement[]=[];
  for(const index of fit.pages){
   const cached=readerPages.get(p,index),page=cached.element;paintReaderSeats(cached,current.package,p,s,mode,positions,true);
   for(const {seat,text} of cached.seats){
@@ -463,17 +463,12 @@ function renderPages(){
  mountReaderPages(group,pages);group.style.transform=`scale(${fit.scale})`;app.dataset.notation=p.reading?.dual?.notation??'iso';app.dataset.mode=mode;app.dataset.fingerSet=v.fingerSet;app.dataset.page=String(v.page);app.dataset.rotation=String(v.rotation);app.dataset.selecting=String(!!selection);
  if(selection&&!dialog&&!app.querySelector('.toolbar')?.contains(document.activeElement))focusSelection();
 }
-/** Finger placement never stands between the pianist and the page: a
- * placement failure leaves those numbers unshown, and the page still turns. */
-function readerAnnotationPositions(p:ScorePackage,pages:readonly number[]):ReadonlyMap<string,AnnotationPosition>{
- try{return annotationPositions(p,pages);}catch(error){console.error(error);return new Map();}
-}
 /** Reader and PDF pages share one finger/hand paint; only interaction differs. */
 function paintReaderSeats(page:ReaderPage,base:ScorePackage,p:ScorePackage,s:PersonalState,mode:'pitch'|'finger',positions:ReadonlyMap<string,AnnotationPosition>,interactive:boolean){
  page.element.dataset.fingers=String(mode==='finger');const presentation=currentFingerPresentation(p);
  for(const {seat,text} of page.seats){
   const finger=fingerFor(base,s,seat),hand=handFor(base,s,seat.ownerIds[0]);
-  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined&&(presentation==='replacement'||positions.has(seat.id)),presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
+  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
   if(hand)text.dataset.performingHand=hand;else delete text.dataset.performingHand;
  }
 }
@@ -485,7 +480,7 @@ async function savePdf(){
  // One export at a time: the save dialog leaves the reader clickable.
  if(!current||practice||pdfSaving)return;pdfSaving=true;
  try{
-  const target=current,p=readerPackage(),s={...(livePersonalEditors.get(target)?.visiblePersonal??target.personal),view:target.personal.view},mode=labelMode(),indices=p.pages.map((_,index)=>index),positions=readerAnnotationPositions(p,indices);
+  const target=current,p=readerPackage(),s={...(livePersonalEditors.get(target)?.visiblePersonal??target.personal),view:target.personal.view},mode=labelMode(),indices=p.pages.map((_,index)=>index),positions=annotationPositions(p,indices);
   await document.fonts.ready;
   // Drawing every page holds the reader for a moment; say so first.
   notify(`Preparing ${indices.length} page${indices.length===1?'':'s'} for the PDF…`);await paintCheckpoint();if(current!==target||practice)return;
