@@ -40,12 +40,39 @@ Each folded note is shown by its twins, one in each pass (`src/repeat-fold.ts`).
 
 ## Where it shows
 
-The reader's pages and Save as PDF show the fold. Practice, Fingers and playback
-go through the written-out score in performed order, as before. Saved
-navigation names written-out notes, so it stays valid whether or not a repeat
-is folded. Folded pages number their printed bars, as any score with repeats
-does (Op. 68 No. 13's printed bar 12 is stored bar 22); practice and Fingers
-count the stored bars in playing order.
+The reader's pages and Save as PDF show the fold. Practice and Fingers go
+through the folded edition as they go through a score with composer repeats:
+each printed bar once, both endings where there are endings. A choice made
+there is written to every twin that carries one, else to the first pass.
+Saved navigation names written-out notes, so it stays valid whether or not a
+repeat is folded.
+
+Every bar number the player reads is the printed number of the pages shown:
+seats, practice sections, Fingers ("measure N of 28" for Op. 68 No. 13) and
+fingering-memory labels (`printedBar`). Op. 68 No. 13's stored bar 22 is
+printed bar 12. Playback in performed order and its "· 2nd time" label belong
+to the tempo preview (score-viewer #172, not merged yet); when it lands it reads
+the folded edition's performed order and labels printed bars.
+
+## When passes disagree
+
+A repeat whose passes carry different choices stays written out, and the reader
+says why, for example "Bar 21 has a different finger than bar 11, so the repeat
+is written out." The notice offers <kbd>U</kbd> Use bar 11's finger, which
+copies the first pass's choice onto the differing notes so the repeat folds
+again, and <kbd>K</kbd> Keep written out, which hides the notice for this
+opening. A hand moved "only here" (`handScope: 'local'`) counts as such a
+difference: its twin keeps its written hand.
+
+## With carried hand changes
+
+Score-viewer #175 carries a deliberate hand change to the bars that repeat it
+(bar 11 to bar 21), also derived and never saved. Both read stored records only,
+so they compose: the fold reads the owner's stored hand records, and a carried
+hand gives a twin the same hand the fold would give it, so no note gets two
+answers and nothing is applied twice. A hand kept "only here" is not carried by
+#175 and writes the repeat out here. Whichever of the two merges second rebases
+onto the other.
 
 ## Cost
 
