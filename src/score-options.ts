@@ -1,3 +1,4 @@
+import {workHeadingMarkup} from './score-catalog';
 import {annotationInkPolicyFor,footerFontNoticeUrl} from './annotation-ink-policy';
 import {scoreCapabilities} from './score-capabilities';
 import {manualTempoField} from './manual-tempo-control';
@@ -13,7 +14,7 @@ const button=(label:string,action:string,disabled=false)=>`<button type="button"
 export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string},instrumentControl='',pdf=false){
  const pdfAction=pdf?button('Save as PDF','pdf'):'';
  if(!scoreCapabilities(p).pianoPreparation)return `<section class="score-options" aria-labelledby="score-options-heading">
-  <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${escape(entry.metadata.title)}</p></header>
+  <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${workHeadingMarkup(entry.metadata)}</p></header>
   ${instrumentControl?`<label class="option-setting" data-options-row><span>Instrument</span>${instrumentControl}</label>`:''}
   ${p.reading?.dual?`<label class="option-setting" data-options-row><span>Notation</span>${readingNotationControl(p)}</label>`:'<p class="help">Read the score with its notes, rhythm and articulations.</p>'}
   <div class="dialog-actions score-primary-actions" data-options-row>${button('Share score','share')}${pdfAction}</div>
@@ -32,7 +33,7 @@ export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,tr
   p.fingerLayer?'Fingers come from the edition and from your own choices.':transpose.steps?'Fingers come from your own choices; the edition’s printed fingerings stay with the score at its original pitch.':'Fingers come from your own choices.',
   'When you transpose, your own choices move with their notes.'].join(' ');
  return `<section class="score-options" aria-labelledby="score-options-heading">
-  <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${escape(entry.metadata.title)}</p></header>
+  <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${workHeadingMarkup(entry.metadata)}</p></header>
   <label class="option-setting score-transpose-setting" data-options-row><span>Transpose</span>${field}</label>
   <p class="control-error score-setting-help" data-transpose-error role="alert">${escape(transpose.error??'')}</p>
   <div class="dialog-actions score-primary-actions" data-options-row>${primary}</div>

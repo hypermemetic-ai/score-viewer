@@ -7,7 +7,6 @@ import {practiceOptionsMarkup} from '../src/practice-options-markup';
 import {playerTempoNote} from '../src/practice-browser';
 import {scoreTickMs} from '../src/score-clock';
 import {speedNumber,snapPracticeSpeed} from '../src/tempo-presentation';
-import {readLibraryPracticeSummary} from '../src/library-practice-progress';
 import {collectionId,practiceStorageName,type Entry} from '../src/state';
 import {transferPracticeEdition} from '../src/practice-edition-transfer';
 import {mergeEditionPractice} from '../src/practice-edition-install';
@@ -127,21 +126,6 @@ test('scores with a reference tempo are unchanged by the player tempo path',()=>
  const goal=setPracticeGoal(plain.state,plain.plan,150);assert.equal(goal.target,150);assert.equal(setPracticeGoal(goal,plain.plan).target,180);
  assert.deepEqual(json(readPractice(json(goal),offered.plan)),json(readPractice(json(goal),plain.plan)));
 });
-
-test('library progress appears only once a player tempo is remembered, and counts toward it',async()=>{
- const entry:Entry={id:collectionId(none),file:`package-${await hashBytes(bytes)}.tuna`,importedAt:'2026-10-17T00:00:00Z',metadata:none.manifest.metadata};
- const records=new Map<string,unknown>(),reader={readPackage:async()=>bytes,readRecord:async(name:string)=>records.has(name)?json(records.get(name)):null};
- assert.equal(await readLibraryPracticeSummary(entry,'janko-four-row',reader),undefined);
- const {plan,state}=admitPracticeContext(none,undefined,undefined,undefined,playerTempo(none.score,96));
- for(const chunk of plan.chunks)state.best[chunk.pattern]=96;
- records.set(practiceStorageName(entry.id,none),state);
- const summary=await readLibraryPracticeSummary(entry,'janko-four-row',reader);
- assert.ok(summary&&summary.sections>0);
- records.set(practiceStorageName(entry.id,none),setPracticeGoal(state,plan,192));
- const slower=await readLibraryPracticeSummary(entry,'janko-four-row',reader);
- assert.ok(slower&&slower.sections<summary!.sections&&!slower.whole);
-});
-
 
 test('an edition transfer or install merge keeps the remembered player tempo',()=>{
  const from=structuredClone(none);from.sourceScore=structuredClone(from.score);from.sourceSha256='a'.repeat(64);from.sourceRevision='a'.repeat(64);from.keyboardLayout='janko-four-row';

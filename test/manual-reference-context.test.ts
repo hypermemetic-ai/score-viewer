@@ -8,7 +8,6 @@ import {manualReferenceRecord,manualReferenceStorageName,readManualReference} fr
 import {manualPracticeRecord,manualPracticeStorageName} from '../src/manual-practice-state';
 import {initialPractice} from '../src/practice';
 import {scoreCapabilities} from '../src/score-capabilities';
-import {readLibraryPracticeSummary} from '../src/library-practice-progress';
 import {collectionId} from '../src/state';
 import {authoredFrettedInput} from './support/fretted-dual-fixture';
 
@@ -43,13 +42,9 @@ test('planner owns the full fallback before hashing, and canonical references re
  await assert.rejects(planManualPractice(malformed,'connection-boundary-v1',reference),/positive numeric BPM/);
 });
 
-test('saved reference and library progress are part/source bound without archive changes',async()=>{
+test('a saved reference is part/source bound without archive changes',async()=>{
  const reader=await ReadingPresentationController.open(p),identity={partId:p.reading!.dual!.sourcePartId,musicalRevision:reader.revision},
-  refRecord=manualReferenceRecord(identity,reference),refName=await manualReferenceStorageName(identity),plan=await planManualPractice(p,'connection-boundary-v1',reference),
-  journal=manualPracticeRecord(plan,initialPractice(plan)),entry={id:collectionId(p),file:`package-${await hashBytes(bytes)}.tuna`,importedAt:'2026-10-09T00:00:00Z',metadata:p.manifest.metadata},reads:string[]=[];
- const summary=await readLibraryPracticeSummary(entry,'janko-four-row',{readPackage:async()=>bytes,readRecord:async name=>{reads.push(name);return name===refName?refRecord:name===manualPracticeStorageName(plan)?journal:undefined;}});
- assert.equal(summary!.assessment,'manual');assert.equal(summary!.sections,0);assert.deepEqual(reads,[refName,manualPracticeStorageName(await planManualPractice(p,'bounded-exercises-v1',reference)),manualPracticeStorageName(plan)]);
- assert.equal(await readLibraryPracticeSummary(entry,'conventional-piano',{readPackage:async()=>bytes,readRecord:async()=>null}),undefined);
+  refRecord=manualReferenceRecord(identity,reference),refName=await manualReferenceStorageName(identity);
  assert.throws(()=>readManualReference(refRecord,{...identity,partId:'P2'}),/different source part/);
  assert.throws(()=>readManualReference(refRecord,{...identity,musicalRevision:'1'.repeat(64)}),/different source part/);
  assert.notEqual(await manualReferenceStorageName({...identity,partId:'P2'}),refName);

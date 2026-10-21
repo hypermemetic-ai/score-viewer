@@ -31,7 +31,7 @@ async function fixture(){
   HandPreparationStatus:class{queued:any[]=[];closed=false;stage(){}queue(list:any[]){this.queued=[...list];}show(){}close(){this.closed=true;}}};
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
- runInNewContext(body('async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
+ runInNewContext(body('async function saveSelectedChoice(','\nfunction repaintLibrary('),context);
  return {context,target,store,editor:context.personalEditor(target),personalMemory,disk,written,frames,messages,units,setBroken(value:boolean){broken=value;},async flush(){await personalMemory.flush();await context.personalEditor(target).queue.flush();}};
 }
 test('actual editor reserves hand then finger on the same source before digit advance, painting without disk completion',async()=>{

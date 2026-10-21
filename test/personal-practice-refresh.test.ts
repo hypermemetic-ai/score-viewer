@@ -43,7 +43,7 @@ function fixture(){
   readPersonal:(s:any)=>structuredClone(s),personalContext:async(t:any)=>({p:t.package,file:'bound-personal'}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.catch(()=>{});return result;},writeJson:async(_file:string,s:any)=>save(s),paintPersonalSaveError:(_t:any,error:any)=>errors.push(error),
   app:{querySelector:()=>null},readingPresentation:undefined,requirePianoCapability(){},requirePracticeHands(){},resetInput(){},orientation:{rotation:0},actionControlLabel:()=>'',effectiveControls:()=>({}),controls:{match:()=>false},renderPages(){readerPaints.push('pages');},renderToolbar(){readerPaints.push('toolbar');},
-  currentFingerPresentation:()=> 'annotations',preferences:{keyboardLayout:'conventional-piano'},musicalSustain:{snapshot:()=>({})},midiConnection:undefined,connectMidi(){},disconnectMidi(){},settings(){},entries:[target.entry],practiceSummaries:{record:()=>false},paintLibrarySummaries(){},render(){}};
+  currentFingerPresentation:()=> 'annotations',preferences:{keyboardLayout:'conventional-piano'},musicalSustain:{snapshot:()=>({})},midiConnection:undefined,connectMidi(){},disconnectMidi(){},settings(){},entries:[target.entry],repaintLibrary(){},render(){}};
  personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await save(s);disk=structuredClone(s);});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);

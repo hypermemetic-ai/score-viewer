@@ -1,23 +1,25 @@
 import type {Entry} from './state';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {keyboardLabel} from './keyboard-selection';
-import {libraryOrder} from './package';
+import {catalogueHeading,workName,workOrder} from './score-catalog';
 
 const escape=(text:string)=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 export interface LibraryRow {key:string;composer:string;entry?:Entry}
+/** The composer a score is grouped under; sorting uses the same name. */
+const composerOf=(entry:Entry)=>workName(entry.metadata).composer;
 
 /** Highlight belongs to the current visit; only opening a score records work. */
 export class LibrarySelection {
  entries:Entry[]=[];selected?:string;expanded?:string;
  update(entries:Entry[],lastWorked?:string){
-  this.entries=[...entries].sort((a,b)=>libraryOrder(a.metadata,b.metadata));
+  this.entries=[...entries].sort((a,b)=>workOrder(a.metadata,b.metadata));
   const known=this.allRows();
   if(!known.some(row=>row.key===this.selected)){
    const entry=this.entries.find(entry=>entry.id===lastWorked)??this.entries[0];
-   this.selected=entry?`score:${entry.id}`:undefined;this.expanded=entry?.metadata.composer;
+   this.selected=entry?`score:${entry.id}`:undefined;this.expanded=entry&&composerOf(entry);
   }
  }
- allRows():LibraryRow[]{const rows:LibraryRow[]=[];let composer:string|undefined;for(const entry of this.entries){if(composer!==entry.metadata.composer){composer=entry.metadata.composer;rows.push({key:`composer:${composer}`,composer});}rows.push({key:`score:${entry.id}`,composer,entry});}return rows;}
+ allRows():LibraryRow[]{const rows:LibraryRow[]=[];let composer:string|undefined;for(const entry of this.entries){if(composer!==composerOf(entry)){composer=composerOf(entry);rows.push({key:`composer:${composer}`,composer});}rows.push({key:`score:${entry.id}`,composer,entry});}return rows;}
  visibleRows(){return this.allRows().filter(row=>!row.entry||row.composer===this.expanded);}
  select(key:string,expand=true){const row=this.allRows().find(row=>row.key===key);if(!row)return;this.selected=key;if(expand)this.expanded=row.composer;}
  move(step:number){const rows=this.visibleRows();if(!rows.length)return;const index=rows.findIndex(row=>row.key===this.selected);this.select(rows[Math.max(0,Math.min(rows.length-1,(index<0?0:index)+step))].key);}
@@ -30,6 +32,18 @@ export function libraryFocusKey(element:Element|null):string|undefined {
 }
 export function libraryFocusElement(root:HTMLElement,key:string|undefined):HTMLElement|undefined {
  return [...root.querySelectorAll<HTMLElement>('[data-instrument-popup],[data-action],[data-library-row]')].find(element=>libraryFocusKey(element)===key);
+}
+
+/** Composer, then a heading per catalogue entry ("Op. 68"), then its pieces by
+ * number and title. Headings are not stops for the arrow keys. */
+export function libraryMarkup(rows:LibraryRow[],details:(entry:Entry)=>string){
+ let heading:string|undefined;
+ return rows.map(row=>{
+  if(!row.entry){heading=undefined;return `<button class="composer-entry" data-library-row="${escape(row.key)}" data-composer="${escape(row.composer)}" aria-expanded="false"><span class="composer-arrow" aria-hidden="true">›</span>${escape(row.composer.trim()?row.composer:'Other scores')}</button>`;}
+  const name=workName(row.entry.metadata),next=catalogueHeading(name),extra=details(row.entry);
+  const head=next&&next!==heading?`<div class="catalogue-entry" data-composer="${escape(row.composer)}" data-catalogue>${escape(next)}</div>`:'';heading=next||undefined;
+  return `${head}<button class="score-entry${next?' catalogued':''}" data-library-row="${escape(row.key)}" data-composer="${escape(row.composer)}" data-open="${escape(row.entry.id)}"><span class="work-number">${name.number!==undefined?`No. ${name.number}`:''}</span><strong>${escape(name.title)}</strong>${extra?`<small>${extra}</small>`:''}</button>`;
+ }).join('');
 }
 
 export const instrumentChoices:PhysicalKeyboardId[]=['conventional-piano','janko-four-row'];
@@ -48,7 +62,7 @@ export class LibraryMenu {
  get choosingInstrument(){return this.instrument.pending!==undefined;}
  mount(root:HTMLElement,entries:Entry[],lastWorked:string|undefined,details:(entry:Entry)=>string,layout:PhysicalKeyboardId,commitInstrument:(value:PhysicalKeyboardId)=>Promise<void>){
   this.root=root;this.commitInstrument=commitInstrument;this.selection.update(entries,lastWorked);const scores=root.querySelector<HTMLElement>('.scores')!;
-  scores.innerHTML=this.selection.allRows().map(row=>row.entry?`<button class="score-entry" data-library-row="${escape(row.key)}" data-composer="${escape(row.composer)}" data-open="${escape(row.entry.id)}"><strong>${escape(row.entry.metadata.title)}</strong><small>${details(row.entry)}</small></button>`:`<button class="composer-entry" data-library-row="${escape(row.key)}" data-composer="${escape(row.composer)}" aria-expanded="false"><span class="composer-arrow" aria-hidden="true">›</span>${escape(row.composer.trim()?row.composer:'Other scores')}</button>`).join('');
+  scores.innerHTML=libraryMarkup(this.selection.allRows(),details);
   let pointerComposer:string|undefined;
   scores.addEventListener('pointerdown',event=>{pointerComposer=(event.target as HTMLElement).closest<HTMLElement>('.composer-entry')?.dataset.libraryRow;});
   scores.addEventListener('focusin',event=>{const row=(event.target as HTMLElement).closest<HTMLElement>('[data-library-row]');if(row&&this.selection.selected!==row.dataset.libraryRow){this.selection.select(row.dataset.libraryRow!,row.dataset.libraryRow!==pointerComposer);this.paint();}pointerComposer=undefined;});
@@ -66,7 +80,7 @@ export class LibraryMenu {
   if(!this.choosingInstrument)return false;if(code==='Tab'&&!this.instrument.committing){this.endInstrument(false);return false;}if(this.instrument.committing)return true;
   if(code==='ArrowUp'||code==='ArrowDown'){this.instrument.move(code==='ArrowUp'?-1:1);this.paintInstrument();}else if(code==='Enter')void this.acceptInstrument();else if(code==='Escape')this.endInstrument();return true;
  }
- paint(){if(!this.root)return;for(const row of this.root.querySelectorAll<HTMLElement>('[data-library-row]')){const expanded=row.dataset.composer===this.selection.expanded;row.hidden=row.hasAttribute('data-open')&&!expanded;row.dataset.selected=String(row.dataset.libraryRow===this.selection.selected);if(row.classList.contains('composer-entry'))row.setAttribute('aria-expanded',String(expanded));}}
+ paint(){if(!this.root)return;for(const row of this.root.querySelectorAll<HTMLElement>('[data-library-row]')){const expanded=row.dataset.composer===this.selection.expanded;row.hidden=row.hasAttribute('data-open')&&!expanded;row.dataset.selected=String(row.dataset.libraryRow===this.selection.selected);if(row.classList.contains('composer-entry'))row.setAttribute('aria-expanded',String(expanded));}for(const heading of this.root.querySelectorAll<HTMLElement>('[data-catalogue]'))heading.hidden=heading.dataset.composer!==this.selection.expanded;}
  focus(key=this.selection.selected){const target=this.root&&libraryFocusElement(this.root,key);target?.focus();target?.scrollIntoView({block:'nearest'});}
  key(code:string,focused:Element|null):boolean {
   if(!this.root||focused?.closest('input,select,textarea,[contenteditable=true]'))return false;
