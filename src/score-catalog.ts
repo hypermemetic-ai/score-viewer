@@ -11,14 +11,16 @@ const titled=new RegExp(`^(.+?),\\s*((?:${CATALOGUES})\\s*\\d[\\w./]*)(?:,?\\s*(
 // "Op. 68, No. 13" as MusicXML writes a work number.
 const workNumber=new RegExp(`^((?:${CATALOGUES})\\s*\\d[\\w./]*)(?:,?\\s*(?:No\\.|Nr\\.)\\s*(\\d+))?$`);
 
+/** "Op.68" and "Op. 68" are one catalogue entry. */
+const spaced=(label:string|undefined)=>label?.trim().replace(/\s+/g,' ').replace(/^(\D*?\.)(?=\d)/,'$1 ');
 const firstNumber=(label:string)=>{const n=/\d+/.exec(label);return n?Number(n[0]):undefined;};
 /** A leading "Nr. 14 ·" repeats the number the catalogue already shows; "No. 1 in B-flat" is a title. */
 const withoutNumber=(title:string,number:number)=>title.replace(new RegExp(`^(?:Nr\\.|No\\.|Nº|N\\.)\\s*${number}(?!\\d)\\s*[·.:,–—-]\\s*`,'i'),'').trim()||title;
 
 export function workName(m:Metadata):WorkName {
  const composer=(m.composer??'').trim();
- let catalogue=m.opusLabel?.trim()||(m.opus!==undefined?`Op. ${m.opus}`:undefined),number=m.piece,collection:string|undefined,title=(m.title??'').trim();
- if(!catalogue){const t=titled.exec(title);if(t){collection=t[1].trim();catalogue=t[2].trim();number=t[3]?Number(t[3]):number;title=t[4]?.trim()||collection;if(title===collection)collection=undefined;}}
+ let catalogue=spaced(m.opusLabel)||(m.opus!==undefined?`Op. ${m.opus}`:undefined),number=m.piece,collection:string|undefined,title=(m.title??'').trim();
+ if(!catalogue){const t=titled.exec(title);if(t){collection=t[1].trim();catalogue=spaced(t[2])!;number=t[3]?Number(t[3]):number;title=t[4]?.trim()||collection;if(title===collection)collection=undefined;}}
  if(number!==undefined)title=withoutNumber(title,number);
  return {composer,...(catalogue?{catalogue,catalogueNumber:m.opus??firstNumber(catalogue)}:{}),...(collection?{collection}:{}),...(number!==undefined?{number}:{}),title};
 }

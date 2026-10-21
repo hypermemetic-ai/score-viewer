@@ -49,6 +49,7 @@ test('stored catalogue facts are kept; a leading number is dropped only when it 
  assert.equal(workName({...zelda,opus:64,opusLabel:'Opus 64'}).catalogue,'Opus 64','An unfamiliar label is shown as stored');
  assert.equal(workName({...zelda,title:'No. 1 in B-flat minor',opusLabel:'Op. 9',piece:1}).title,'No. 1 in B-flat minor');
  assert.equal(workName({...zelda,title:'Waltz, Op. 64, Nr. 2: Tempo giusto'}).number,2);
+ assert.equal(workName({...zelda,opusLabel:'Op.68 '}).catalogue,'Op. 68','Spacing does not make a second catalogue entry');
 });
 
 test('within a composer, each catalogue is its own run',()=>{
