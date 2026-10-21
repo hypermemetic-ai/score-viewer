@@ -5,3 +5,5 @@
 - [x] 1.3 Skip and report undrawable receiving bars; include carried hands in the editor's drawability check.
 - [x] 1.4 Repartition fingering memory for receiving bars and preserve shown fingers; opening registers nothing new.
 - [x] 1.5 Editor provenance text, actions and change notice; rehearse every owner score, section and Fingers on a copy of the owner data, with ringed evidence for No. 13 bars 11 and 21.
+- [x] 1.6 Turn carried hands into personal-choice hand constraints in `pianoRequestAuthority`; verify that practice packages and calculator constraints give bar 21 the hand the page shows, and that an exception there wins.
+- [x] 1.7 State the composition with the repeat fold (#173): one answer per note, the same exceptions, no double application.

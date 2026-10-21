@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {browserAssistanceStore,type AssistanceBrowserLocks} from '../src/durable-assistance-store';
-import {assigned,effectiveAssignments,handFor,handProvenance,handRecurrences,readPersonalAssignments,type PersonalHand} from '../src/personal-assignments';
+import {assigned,effectiveAssignments,handFor,handProvenance,handRecurrences,personalPracticePackage,readPersonalAssignments,type PersonalHand} from '../src/personal-assignments';
+import {pianoRequestAuthority} from '../src/piano-request-authority';
 import {handCarryNotice,handChoiceView} from '../src/hand-recurrence-text';
 import {bootstrapPersonalFingeringMemory,preservePersonalMemoryHandChange,projectPersonalMemoryScore,resolvePersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
 import {PersonalMemorySession,personalMemoryDocument} from '../src/personal-memory-session';
@@ -26,7 +27,7 @@ const no13=(bars:Record<number,Row[]>={10:bar10,11:[...chords,['RH',59,72,12],['
  return{entryId:'no13',importedAt:'2026-10-17T16:12:02.659Z',p,personal:initialPersonal(p)} as MemoryScoreInput;
 };
 // Bar 11, left hand 4 and 3: E4 at the second chord and D#4 at the third.
-const e4=(bar:number)=>`m${bar}:n5`,dSharp4=(bar:number)=>`m${bar}:n10`;
+const e4=(bar:number)=>`m${bar}:n5`,dSharp4=(bar:number)=>`m${bar}:n10`,m21bass='m21:n0';
 const seat=(input:MemoryScoreInput,id:string)=>input.p.seats.find(s=>s.ownerIds.includes(id))!;
 /** The owner's own choice, with its recorded intent, as the editor writes it. */
 function choose(input:MemoryScoreInput,id:string,hand:PersonalHand,options:{local?:boolean;at?:string}={}):PersonalState {
@@ -91,6 +92,21 @@ test('the owner’s own hand in the receiving bar wins, note by note',()=>{
  const undone=choose({...input,personal:owners(input)},e4(11),'LH');
  assert.equal(handCarryNotice(input.p,owners(input),undone,e4(11)),'Bar 21: one note keeps its own hand again.');
  assert.equal(handCarryNotice(input.p,owners(input),input.personal),'Bar 21 keeps its own hands again.');
+});
+
+test('practice plays and the calculator keeps the hand the page shows in bar 21',()=>{
+ const input=no13(),personal=owners(input);
+ const practiced=personalPracticePackage(input.p,personal).score.notes;
+ for(const id of [e4(21),dSharp4(21),e4(11),dSharp4(11)])assert.equal(practiced.find(n=>n.id===id)!.hand,'RH');
+ const hands=(s:PersonalState)=>new Map(pianoRequestAuthority(input.p,{...input.p.score,totalTicks:2016,sourceBarTicks:[...barTicks,2016]} as never,'janko-four-row',undefined,s,'calculate').filter(c=>c.hand!==undefined).map(c=>[c.ownerId,[c.hand,c.provenance.kind]]));
+ const authority=hands(personal);
+ assert.deepEqual(authority.get(e4(21)),['RH','personal-choice']);assert.deepEqual(authority.get(dSharp4(21)),['RH','personal-choice']);
+ assert.deepEqual(authority.get(e4(11)),['RH','personal-choice']);assert.equal(authority.get(m21bass),undefined);
+ // An exception at bar 21 is what the calculator keeps there.
+ const exception=choose({...input,personal},e4(21),'LH',{local:true,at:'2026-10-22T00:00:00.000Z'});
+ assert.deepEqual(hands(exception).get(e4(21)),['LH','personal-choice']);assert.deepEqual(hands(exception).get(dSharp4(21)),['RH','personal-choice']);
+ // Nothing carried, nothing added.
+ assert.equal(hands(input.personal).size,0);
 });
 
 test('a matching bar the result could not be drawn in is skipped and said, not refused',()=>{

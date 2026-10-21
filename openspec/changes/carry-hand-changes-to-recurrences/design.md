@@ -29,6 +29,30 @@ The carry is derived on every read and cached per package and hand-record set. E
 
 When carried hands would leave a key in a receiving bar with one hand-less head and one handed head, the bar is skipped and listed with its reason. The editor's whole-score drawability check reads carried hands, so a skipped carry never makes another edit fail.
 
-## Composition with the repeat fold
+## Practice and calculation
 
-The fold (ISO PR #430 and its viewer counterpart) inherits edits through a source-to-folded note map. Carries read only the owner's stored records, never folded or inherited values. The fold should read effective hands (`handFor` / `effectiveAssignments`) and must not treat a carried hand as a new donor. For a verbatim repeat both paths produce the same hand, so applying both is idempotent. In both, an explicit local record wins.
+Practice (`personalPracticePackage`), the Fingers view (the projected package) and the pages read `effectiveAssignments`, so they play and prompt the carried hand. `pianoRequestAuthority` now also turns each carried hand into a personal-choice hand constraint for any request that passes the player's state. The calculator therefore keeps what the page shows: the carried hand, or the exception the player made there. Admission of a saved calculated edition passes no personal state and is unchanged.
+
+## Older hand records (No. 14)
+
+Hand records saved before recorded intent existed (No. 14 has seven) are not migrated and do not travel. Pressing R (or L) once on such a note records the choice with intent, and from then on it reaches matching bars (bar 14 → bar 30 in No. 14).
+
+## Composition with the repeat fold (viewer #173, ISO #430)
+
+#173 shows a verbatim repeat once. A note the player has not touched reads its twin's hand and finger on read (`repeatResolved`), and touched twins that disagree keep the repeat written out. Both mechanisms are derived and never stored. Together they give one answer per note, taking the first that exists:
+
+1. **The note's own stored hand**, including an exception at a receiving note.
+2. **A hand carried from a matching bar** (this change): only deliberate hands, not marked "Only here".
+3. **The repeat twin's stored hand** (#173), when the note is untouched.
+4. **The written hand.**
+
+For notes the fold pairs, rules 2 and 3 name the same donor note, so whenever both apply they agree. A carried hand is never stored or treated as touched, so nothing is applied twice and nothing becomes a new donor.
+
+The exceptions are the same in both:
+
+- **An exception at bar 21** (L there, `handScope: 'local'`) is the note's own record. The twins disagree, so the repeat stays written out with bar 21 in its own hand.
+- **"Only here" at bar 11** (`handScope: 'local'`) must not reach the twin either. Repeat inheritance must skip a hand whose choice has `handScope: 'local'`, and treat the twins as disagreeing (bar 11's own hand against bar 21's written hand), so the repeat is written out. This is the one rule #173 adds when it rebases on this change.
+- **Hand edits on a folded seat** write the hand only to twins that already hold their own hand record. The others take it through rules 2 and 3, so a finger-only record does not become a hand donor.
+- **Fingering memory** reads the player's own and carried hands, never repeat-inherited ones.
+
+Whichever of the two merges second rebases and keeps this order.

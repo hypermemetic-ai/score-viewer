@@ -29,6 +29,10 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **THEN** that note or bar keeps its own hand, while the other bar keeps its own effective hand
 - **AND** Use bar 11's hand or Use for matching bars returns to the shared hand, and choosing the written hand at bar 11 undoes the change in both bars
 
+#### Scenario: Practice follows the page
+- **WHEN** bar 21 takes bar 11's right hand
+- **THEN** practice, Fingers and calculator requests use the right hand for bar 21's E4 and D#4, and an exception made there wins
+
 #### Scenario: Undrawable recurrence
 - **WHEN** a matching bar would be left with a key that is half without a hand
 - **THEN** that bar keeps its hands, the player is told which bar and why, and the change itself is saved
