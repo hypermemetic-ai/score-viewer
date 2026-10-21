@@ -25,7 +25,7 @@ try{
   p={...p,fingerLayer:p.fingerLayer&&{...p.fingerLayer,attacks:p.fingerLayer.attacks.map(({finger,...a})=>a)}};
   await document.fonts.load('700 20px "URW Gothic"');await document.fonts.ready;window.saved=[];
   // The score's editor stands in: save, then hand the view its new state.
-  const options={package:p,personal:initialPersonal(p),entryId:collectionId(p),fingersOnly:true,connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back:()=>{window.backs++;},settings:()=>{},changed:()=>{},
+  const options={package:p,personal:initialPersonal(p),entryId:collectionId(p),fingersOnly:true,connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back:()=>{window.backs++;},settings:()=>{},
    saveFinger:async(seat,finger)=>{window.saved.push([seat.id,finger]);practice.options.personal=corrected(p,practice.options.personal,seat,finger);practice.refit();},
    // A hand choice rebuilds practice from its context, as main.ts does.
    saveHand:async(seat,hand)=>{window.hands.push([seat.id,hand]);const context=practice.contextSnapshot(),personal=practice.options.personal;practice.close();practice=window.practice=new PracticeView(document.querySelector('#app'),{...options,personal});await practice.mount(context);}};
@@ -41,7 +41,7 @@ try{
   return {off:x((l+r)/2)-(stage.left+stage.width/2),prevIn:!prev||x(prev[0])>=stage.left-.5,nextIn:!next||x(next[1])<=stage.right+.5,scale:ctm.a};});
  // Fingers opens the whole piece straight away, at the beginning of an unfingered score: no section, no tempo.
  await page.waitForSelector('.section-fingering:not([hidden]) svg');
- const opened=await state();console.log('opened',opened);assert.equal(opened.selected.length,1);assert.match(opened.status,/^Starting at the beginning\. Right hand · measure 1 of 64 · \d+ notes without a finger/);
+ const opened=await state();console.log('opened',opened);assert.equal(opened.selected.length,1);assert.match(opened.status,/^RH · measure 1 of 64 · \d+ notes without a finger$/);
  assert.equal(await page.textContent('[data-practice-range]'),'Fingers');assert.equal(await page.evaluate(()=>window.practice.optionsMarkup()),'','Fingers has no practice settings');assert.match(await page.textContent('[data-fingering-progress]'),/^0% fingered · right hand 0% · left hand 0%$/);
  assert.equal(await page.locator('.practice-study,[data-practice^="study:"]').count(),0);
  await page.screenshot({path:output+'/2-opened.png'});
@@ -60,7 +60,7 @@ try{
  await press('KeyJ');await press('Escape');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);assert.ok(await page.isVisible('.section-fingering'));
  // Shift alone keeps the labels; a key the labels do not use puts them away and says where the cursor is.
  const labelCount=()=>page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length);
- await press('KeyJ');await press('ShiftLeft');assert.ok(await labelCount()>0);await press('Comma');assert.equal(await labelCount(),0);assert.match((await state()).status,/^Right hand · measure /);
+ await press('KeyJ');await press('ShiftLeft');assert.ok(await labelCount()>0);await press('Comma');assert.equal(await labelCount(),0);assert.match((await state()).status,/^RH · measure /);
  await press('KeyJ');await page.screenshot({path:output+'/3-jump-labels.png'});
  const target=await page.evaluate(()=>saved[1][0]),label=await page.getAttribute(`[data-jump-seat="${target}"]`,'data-jump-label');
  for(const letter of label)await press('Key'+letter.toUpperCase());
@@ -70,8 +70,8 @@ try{
  await page.screenshot({path:output+'/4-corrected.png'});
  // A correction, too, moves on to the next note still without a finger.
  assert.ok(!(await fingered()).includes((await state()).selected[0]));
- await press('ArrowDown');const left=await state();console.log('left',left);assert.match(left.status,/^Left hand/);
- await press('ArrowUp');const up=await state();console.log('up',up);assert.match(up.status,/^Right hand/);
+ await press('ArrowDown');const left=await state();console.log('left',left);assert.match(left.status,/^LH · /);
+ await press('ArrowUp');const up=await state();console.log('up',up);assert.match(up.status,/^RH · /);
  // Walk the right hand into measure 3: the window slides with it.
  let walked=await state();
  for(let i=0;i<40&&!/measure 3/.test(walked.status);i++){await press('ArrowRight');walked=await state();}
@@ -87,7 +87,7 @@ try{
  await press('Escape');assert.equal(await page.evaluate(()=>backs),1);
  // Reopening resumes at the first note still without a finger, and says so.
  await page.evaluate(()=>reopen());await page.waitForSelector('.section-fingering:not([hidden]) svg');
- const reopened=await state();console.log('reopened',reopened);assert.match(reopened.status,/^(?:Resuming at measure 1, the first with a note still without a finger|Starting at the beginning)\./);assert.ok(!(await fingered()).includes(reopened.selected[0]));
+ const reopened=await state();console.log('reopened',reopened);assert.match(reopened.status,/^[RL]H · measure 1 of 64 · /,'Reopening says where the cursor is, without narrating it');assert.ok(!(await fingered()).includes(reopened.selected[0]));
  assert.match(await page.textContent('[data-fingering-progress]'),/^[1-9]\d?% fingered/);
  // Every measure is reachable, to the end of the piece.
  await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^(?:Left|Right) hand · measure \d+ of 64/);

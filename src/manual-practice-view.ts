@@ -1,3 +1,4 @@
+import type {Metadata} from './package';
 import {workHeadingMarkup} from './score-catalog';
 import {arrangeBottomNavigation} from './application-navigation';
 import {practiceOptionsMarkup,integerPracticeSetting,adjustPracticeInteger} from './practice-options-markup';
@@ -29,7 +30,8 @@ import type {ReadingNotation} from './dual-reading-package';
 import type {MidiNote,MidiCC} from './midi';
 
 const escape=(text:string)=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
-export interface ManualPracticeViewOptions {
+export interface ManualPracticeViewOptions {/** The library's name for the work; the package's own metadata otherwise. */
+ work?:Metadata;
  context:ManualReadingContext;personal:PersonalState;
  /** Must build a joined window from the locally admitted source scene. */
  passage:(bars:readonly number[],notation:ReadingNotation,clip?:ExerciseClip)=>string;
@@ -96,7 +98,7 @@ export class ManualPracticeView {
  private selectPassage(chunk:PracticeChunk,resetWorking=true){this.transport?.close();this.transport=undefined;this.freeView=false;this.exercise=chunk;this.browser.select(this.state,chunk.id);if(resetWorking)this.state.working=passageStartTempo(this.plan,this.state,chunk);this.options.context.selectPassage(chunk.kind==='contrast'?practiceClipChunk(chunk,0):chunk);this.overview=false;this.rendered='';this.renderError=undefined;}
  private totalLabel(){const assessment=displayedPracticeAssessment(this.plan,this.state,this.browser.includeManual);return assessment.included?`Total progress · ${practicePercent(assessment.progress??0)}%`:'No exercises included';}
  private paint(){if(this.disposed)return;const p=this.options.context.package,s=this.session,root=this.app.querySelector('.practice-header')!;
-  root.innerHTML=`<h1>${workHeadingMarkup(p.manifest.metadata)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>${s.chunk.kind==='contrast'?`Contrast · ${s.chunk.clipIndex===1?'B':'A'} · ${escape(practiceClipLabel(s.chunk))}`:`Measure${s.chunk.firstBar===s.chunk.lastBar?'':'s'} ${escape(practiceChunkRange(s.chunk))}${activePracticeClip(s.chunk,this.plan.barTicks)?' · excerpt':''}`}</small><small data-practice-total>${this.totalLabel()}</small>`:''}</div>`;
+  root.innerHTML=`<h1>${workHeadingMarkup(this.options.work??p.manifest.metadata)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>${s.chunk.kind==='contrast'?`Contrast · ${s.chunk.clipIndex===1?'B':'A'} · ${escape(practiceClipLabel(s.chunk))}`:`Measure${s.chunk.firstBar===s.chunk.lastBar?'':'s'} ${escape(practiceChunkRange(s.chunk))}${activePracticeClip(s.chunk,this.plan.barTicks)?' · excerpt':''}`}</small><small data-practice-total>${this.totalLabel()}</small>`:''}</div>`;
   this.app.querySelector<HTMLElement>('.practice-overview')!.hidden=!this.overview;this.app.querySelector<HTMLElement>('.practice-stage')!.hidden=this.overview;this.app.dataset.practicePhase=this.overview?'overview':s?.phase??'ready';
   this.paintControls();if(this.overview)this.paintBrowser(!this.settingsDialog);else if(!this.renderError)this.paintScore();this.paintCue();this.status();
  }
