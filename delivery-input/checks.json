@@ -1,25 +1,25 @@
 {
   "schema": 1,
-  "viewerRevision": "bbd4e41a973cd0fbe35c86949355ce48bacc4b7c",
-  "notationRevision": "94978cace6832c64f47366a3269c2e9d2efd403f",
-  "frontendDigest": "1ebd7f201f8298ca2956342c46ba71f9a96c23f547d78ce431b40071c3a9e7ce",
+  "viewerRevision": "103f554e0c28984db4730e2df6f0ff6ea0d192a9",
+  "notationRevision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
+  "frontendDigest": "ebd417c226003d3048c3b9241858480e481ee112e98152e7e3a3bcfaefdf4100",
   "checks": {
     "tests": {
       "status": "passed",
-      "sourceCommit": "bbd4e41a973cd0fbe35c86949355ce48bacc4b7c",
+      "sourceCommit": "103f554e0c28984db4730e2df6f0ff6ea0d192a9",
       "command": "npm test",
-      "tests": 1240,
-      "passed": 1232,
+      "tests": 1244,
+      "passed": 1236,
       "failed": 0,
       "todo": 8,
-      "durationMs": 84830,
+      "durationMs": 89591,
       "additional": [
         {
           "command": "node --test test/*.test.mjs",
           "tests": 47,
           "passed": 47,
           "failed": 0,
-          "durationMs": 5670
+          "durationMs": 5650
         },
         {
           "command": "npx tsc --noEmit -p .",
@@ -27,51 +27,59 @@
         }
       ],
       "todoNote": "3 todo tests are half-handed MusicXML unison keys that ISO refuses on import (source-beam-coverage), todo since PR 121. 5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved at bee8c67; each is todo only on that exact refusal (PR 128).",
-      "scope": "Complete suite on a clean clone of merged main bbd4e41 (PR 166: works named by composer, catalogue and number; library rows without progress figures; the library summaries pass removed; Fingers wording), after the f42ab2c seal (PR 164). The suite count fell from 1262 to 1240 because the removed library-summaries modules took their tests with them."
+      "scope": "Complete suite on a clean clone of merged main 103f554, after the bbd4e41 seal (PR 167): PR 168 (finger placement never blocks a page; integrity refusals still surface), PR 169 (Fingers keeps each hand's place: a finger, Tab, arrows, PgUp/PgDn and Home/End stay in the hand; up/down return to where the other hand was left; the score editor's auto-advance stays in the hand) and PR 170 (iso-notation 7b53664, ISO #426: a hand change engraves as the source would have written it)."
     },
     "build": {
       "status": "passed",
-      "sourceCommit": "bbd4e41a973cd0fbe35c86949355ce48bacc4b7c",
+      "sourceCommit": "103f554e0c28984db4730e2df6f0ff6ea0d192a9",
       "configured": "npm run build: TypeScript + source pin validation + fingering-assistance pin + Vite",
       "frontendFiles": 24,
-      "frontendDigest": "1ebd7f201f8298ca2956342c46ba71f9a96c23f547d78ce431b40071c3a9e7ce"
+      "frontendDigest": "ebd417c226003d3048c3b9241858480e481ee112e98152e7e3a3bcfaefdf4100"
     },
     "browserInspection": {
       "status": "passed",
       "ownerLibraryRehearsal": {
-        "sourceCommit": "bbd4e41a973cd0fbe35c86949355ce48bacc4b7c",
-        "frontend": "The frozen bbd4e41 frontend built from the clean clone (/tmp/sv-d26/frontend), the exact payload sealed here.",
+        "sourceCommit": "103f554e0c28984db4730e2df6f0ff6ea0d192a9",
+        "frontend": "The frozen 103f554 frontend built from the clean clone (/tmp/sv-d28/frontend), the exact payload sealed here.",
         "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints (worker-src unchanged)",
-        "data": "Read-only copy of the owner's laptop data taken 2026-10-20 with the f42ab2c install running (piano sample bank excluded), with the one-time catalogue correction for the No. 13 entry (opus 68, opusLabel 'Op. 68', piece 13) applied to the copy; every write kept in memory",
+        "data": "Read-only copy of the owner's laptop data taken 2026-10-21 with the bbd4e41 install running (piano sample bank excluded); every write kept in memory",
         "firstOpenMs": {
-          "No. 13": 3148,
-          "No. 14": 5372,
-          "Zelda's Lullaby": 2683,
-          "Bach Goldberg Var. 1": 2209
+          "No. 13": 5268,
+          "No. 14": 5964,
+          "Zelda's Lullaby": 2997,
+          "Bach Goldberg Var. 1": 2222
         },
-        "observed": "Real key presses through main.ts at 1920x1080. Library: J. S. Bach > BWV 988 · Goldberg Variations > Variatio 1. a 1 Clav.; Koji Kondo > Zelda's Lullaby; Robert Schumann > Op. 68 > No. 13 Mai, lieber Mai, – Bald bist du wieder da!, No. 14 Kleine Studie; Other scores > Add It Up. No progress figures or editorial variants on rows; the arrow keys skip catalogue headings (two downs from No. 13 land on No. 14). The instrument button matches the other buttons. Fingers headers read 'Robert Schumann · Op. 68, No. 13' then the title, a boxed 'Fingers' label and '3% fingered · RH 5% · LH 1%'; no resuming narration; status 'LH · measure 2 of 54 · 734 notes without a finger'; hints 1–5 Finger · ←→ Note · ↑↓ Hand · PgUp PgDn Measure · Tab Next without a finger · L R Set the note's hand · J Jump to a note. Every measure walked on No. 13 (54), No. 14 (64), Zelda (38) and Bach (32) without problems; Sections opened every section (No. 13 18, No. 14 6, Zelda 7, Bach 15) with music present. No alerts, no page errors.",
-        "screenshots": "/tmp/sv-rehearsal/out-final on the build host"
+        "observed": "Real key presses through main.ts at 1920x1080. Holding F on every page: No. 13 reaches 5/5 (147, 130, 68, 8, 60 finger numbers; page 3 used to stop with 'Calculated finger annotations cannot fit actual page ink'), No. 14 3/3, Zelda 3/3, Bach 4/4 (no fingers yet). No. 13 page 1 m11 shows the owner's moved notes as 1 A 6 4 on one stem and B 6 3 over the LH B with the hand corner. Fingers opens on every score (No. 13 at 'RH · measure 21 of 54 · 351 notes without a finger'); on No. 13 and Bach, Tab then eight fingers stay in the RH and carry into the next measure, down goes to the LH and up returns exactly to where the RH was left. Every measure walked on No. 13 (54), No. 14 (64), Zelda (38) and Bach (32) without problems; Sections opened every section (No. 13 18, No. 14 5 of 6 with one heading without a passage, Zelda 7, Bach 15) with music present. Zelda and Bach say once that they were engraved again with the current engraving, hands and fingers kept. No alerts, no page errors.",
+        "screenshots": "/tmp/sv-n1/out-final on the build host"
       },
       "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice with a keyboard and pianist musical acceptance were not observed. Add It Up is not a piano score and offers no practice.",
       "nativeObservation": {
-        "package": "0.1.0-viewerf42ab2cd-carrierf8ea86c0-native installed on the laptop 2026-10-20",
-        "observed": "Fingers on Mai open on the television from the taskbar pin before this change; the owner's feedback on that build (library naming and rows, instrument button size, Fingers title, wording, narration and key hints) is what PR 166 addresses."
+        "package": "0.1.0-viewerbbd4e41a-carrierd8e7a3fa-native installed on the laptop 2026-10-20",
+        "observed": "The owner fingered No. 13 in this build and reported: progression switched hands every measure; moved notes engraved on their own stems and a slur following the moved note; holding F past page 2 stopped with a technical message. PRs 168-170 address these."
       }
     },
     "independentReview": {
       "status": "passed",
-      "sourceCommit": "bbd4e41a973cd0fbe35c86949355ce48bacc4b7c",
+      "sourceCommit": "103f554e0c28984db4730e2df6f0ff6ea0d192a9",
       "reviews": [
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/166",
-          "verdict": "independent review: nine defects (composer grouping vs sort key, lost stored piece, erased unfamiliar label, Nr. unparsed, movement number taken as piece, undecoded work-number entities, Op./WoO interleaved, 'No. 1 in B-flat' stripped, stale scripts/doc), fixed in 43dd671, a896ad0 and 25fa1fe; re-review found one more (impossible character reference threw on import), fixed in ab7baf8"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/168",
+          "verdict": "independent review: the reader catch-all hid integrity refusals and let Save as PDF claim numbers it never painted; removed in 5f5dc54"
         },
         {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/164",
-          "verdict": "the f42ab2c seal; reviewed in its own PR"
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/169",
+          "verdict": "independent review: a hand running out of gaps, L/R on the cursor, PgUp/PgDn, Home/End and fast typing could lose a hand's place; fixed in df4ddb4"
+        },
+        {
+          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/426",
+          "verdict": "two independent rounds: five No. 13 moves refused that main accepted, and join-status changes missing from incremental layout; fixed in 6e80d0e; round 2 found no confirmed defects (nine reference fixtures byte-identical, 778 No. 13 hand changes: none newly refused)"
+        },
+        {
+          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/170",
+          "verdict": "pin of the reviewed ISO #426; viewer suite and owner-library rehearsal at this pin"
         }
       ],
-      "scope": "PR 166 merged after the f42ab2c seal. Notation pin 94978ca unchanged.",
+      "scope": "PRs 168, 169 and 170 merged after the bbd4e41 seal. Notation pin moves 94978ca -> 7b53664.",
       "reviewedCommits": []
     }
   }
