@@ -18,10 +18,13 @@ const pageCache=new WeakMap<object,Map<number,Map<string,AnnotationPosition>>>()
  * retained editions preserve their original exact-column preference.
  * Candidate boundaries come from actual obstacles, not guessed text widths. */
 export function affiliatedAnnotationPosition(input:{x:number;top:number;direction:-1|1;gap:number;height:number;em:number;
- width:[number,number];columns:readonly number[];page:{width:number;height:number;boxes:AnnotationBox[]};occupied:AnnotationBox[];preferNearest?:boolean}):{x:number;top:number}|undefined{
+ width:[number,number];columns:readonly number[];page:{width:number;height:number;boxes:AnnotationBox[]};occupied:AnnotationBox[];preferNearest?:boolean;admitOwnColumn?:boolean}):{x:number;top:number}|undefined{
  const {x,top,direction,gap,height,em,width,columns,page,occupied}=input,lower=columns.filter(c=>c<x),upper=columns.filter(c=>c>x),
-  left=lower.length?(Math.max(...lower)+x)/2:0,right=upper.length?(Math.min(...upper)+x)/2:page.width,
-  min=Math.max(x-em/2,left-width[0],-width[0]),max=Math.min(x+em/2,right-width[1],page.width-width[1]),ink=[...page.boxes,...occupied];
+  left=lower.length?(Math.max(...lower)+x)/2:0,right=upper.length?(Math.min(...upper)+x)/2:page.width,ink=[...page.boxes,...occupied];
+ let min=Math.max(x-em/2,left-width[0],-width[0]),max=Math.min(x+em/2,right-width[1],page.width-width[1]);
+ // Columns closer than the digit is wide leave no space between their
+ // midpoints; the note's own column remains its own reading space.
+ if(input.admitOwnColumn){min=Math.min(min,x);max=Math.max(max,x);}
  let best:{x:number;top:number}|undefined;
  for(let step=0;step<=32;step++){const y=top+direction*step*gap/2;if(y<0||y+height>page.height)continue;
   const relevant=ink.filter(b=>y<b[3]+.2&&y+height>b[1]-.2),candidates=[x,min,max,
@@ -36,6 +39,20 @@ export function affiliatedAnnotationPosition(input:{x:number;top:number;directio
   if(best&&(input.preferNearest||best.x===x))break;
  }
  return best;
+}
+type AnnotationRequest=Parameters<typeof affiliatedAnnotationPosition>[0];
+/** A personal reading always shows the finger. When no clear air exists in the
+ * note's own reading space, keep the note's own column even where neighbouring
+ * columns crowd it, and failing that take the step with the least ink beneath
+ * the digits, nearest the note on a tie. */
+export function personalAnnotationPosition(input:AnnotationRequest):{x:number;top:number}{
+ const clear=affiliatedAnnotationPosition(input)??affiliatedAnnotationPosition({...input,admitOwnColumn:true});if(clear)return clear;
+ const {x,top,direction,gap,height,width,page,occupied}=input,ink=[...page.boxes,...occupied];let best:{x:number;top:number;area:number}|undefined;
+ for(let step=0;step<=32;step++){const y=Math.min(Math.max(top+direction*step*gap/2,0),Math.max(page.height-height,0)),b:AnnotationBox=[x+width[0],y,x+width[1],y+height];
+  const area=ink.reduce((sum,o)=>sum+Math.max(0,Math.min(b[2],o[2])-Math.max(b[0],o[0]))*Math.max(0,Math.min(b[3],o[3])-Math.max(b[1],o[1])),0);
+  if(!best||area<best.area-1e-9)best={x,top:y,area};
+ }
+ return {x:best!.x,top:best!.top};
 }
 /** Reserve all 1–5 outlines beyond the frozen carrier. Shared stems form one
  * pitch-ordered vertical stack; changing a finger changes only its value. */
@@ -90,9 +107,13 @@ function computeAnnotationPositions(p:AnnotationScore,selected?:ReadonlySet<numb
   let top=carrier.direction===-1?carrier.edge-gap-stackHeight:carrier.edge+gap,annotationX=carrier.x;
   if(obstacles){const page=obstacles[group[0].page]!,smallEm=Math.max(...group.map(s=>s.fontSize))*ANNOTATION_SIZE_RATIO*4/3,
    width:[number,number]=[(metric[0]-280)*smallEm/1000,(metric[2]-280)*smallEm/1000],
-   fit=affiliatedAnnotationPosition({x:carrier.x,top,direction:carrier.direction,gap,height:stackHeight,
+   personal=annotationInkPolicyFor(p)?.version==='viewer-personal-annotation-ink-policy-v1',
+   request:AnnotationRequest={x:carrier.x,top,direction:carrier.direction,gap,height:stackHeight,
     em:Math.min(...group.map(s=>s.fontSize))*4/3,width,columns:columns.get(group[0].page+':'+group[0].system)!,page,
-    occupied:occupiedByPage.get(group[0].page)??[],preferNearest:annotationInkPolicyFor(p)?.version==='viewer-personal-annotation-ink-policy-v1'});
+    occupied:occupiedByPage.get(group[0].page)??[],preferNearest:personal},
+   // Retained calculated editions keep their admission refusal; the owner's
+   // own hands and fingers are always shown.
+   fit=personal?personalAnnotationPosition(request):affiliatedAnnotationPosition(request);
    if(!fit)throw Error('Calculated finger annotations cannot fit actual page ink for '+group.map(s=>s.id).join(', '));
    top=fit.top;annotationX=fit.x;
   }

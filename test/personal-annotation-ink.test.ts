@@ -8,7 +8,7 @@ import {importPackage,selectPresentation} from '../src/package';
 import {initialPersonal} from '../src/state';
 import {assigned} from '../src/personal-assignments';
 import {PersonalPresentationSession} from '../src/personal-presentation';
-import {annotationPositions,affiliatedAnnotationPosition} from '../src/fingering-presentation';
+import {annotationPositions,affiliatedAnnotationPosition,personalAnnotationPosition} from '../src/fingering-presentation';
 const css='.janko-measure-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:normal;font-size:7pt;text-anchor:end}';
 const page=(attrs='',text='37')=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${css}</style><text class="janko-measure-num" x="25" y="130" ${attrs}>${text}</text></svg>`;
 
@@ -113,4 +113,25 @@ test('source expression words receive verified finite glyph coverage and matchin
   const b=actualPageObstacles(svg,new Map(),PERSONAL_ANNOTATION_INK_POLICY).boxes[0];assert.equal(b[0],0);assert.equal(b[2],600);
  }
  assert.throws(()=>actualPageObstacles(expression('dy="100"'),new Map(),PERSONAL_ANNOTATION_INK_POLICY),/Unsupported/);
+});
+
+// Geometry of No. 13, bar 38 (owner's hands): a left-hand note whose carrier
+// sits 1.3 units from the next column, with the bottom staff line just below.
+const crowded={x:379.39,top:393.84,direction:1 as const,gap:3.09,height:4.02,em:7.73,width:[-1.47,1.31] as [number,number],
+ columns:[331.89,378.09,379.39,383.55,401.99],page:{width:595.28,height:841.89,boxes:[[30.4,395.1,576.7,397.9],[378.1,390.5,383.5,391.5]] as [number,number,number,number][]},occupied:[],preferNearest:true};
+test('crowded columns keep a personal finger in its own column, clear of the staff line',()=>{
+ assert.equal(affiliatedAnnotationPosition(crowded),undefined,'midpoints of columns 1.3 units apart leave no room for the digit');
+ const fit=personalAnnotationPosition(crowded),digit:[number,number,number,number]=[fit.x-1.47,fit.top,fit.x+1.31,fit.top+4.02];
+ assert.equal(fit.x,379.39,'the finger stays on its own note');
+ assert.ok(fit.top>=397.9&&fit.top<404,'just below the staff line, not far away');
+ assert.ok(crowded.page.boxes.every(b=>!boxesOverlap(digit,b)));
+});
+test('a personal finger is always placed: unchanged where clear, least ink where nothing is clear',()=>{
+ const clear={...crowded,columns:[300,379.39,460]};
+ assert.deepEqual(personalAnnotationPosition(clear),affiliatedAnnotationPosition(clear),'a clear placement is exactly the existing one');
+ const ink=[[0,0,595.28,841.89],[379.39-1.47,393.84+4*3.09/2,379.39+1.31,841.89]] as [number,number,number,number][],
+  covered={...crowded,page:{...crowded.page,boxes:ink}},fit=personalAnnotationPosition(covered);
+ assert.equal(affiliatedAnnotationPosition({...covered,admitOwnColumn:true}),undefined);
+ assert.equal(fit.x,379.39);assert.ok(fit.top<393.84+4*3.09/2,'least ink: above the second layer');
+ assert.ok(fit.top>=0&&fit.top+4.02<=841.89,'inside the page');
 });
