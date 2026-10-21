@@ -77,12 +77,28 @@ try{
  for(let i=0;i<40&&!/measure 3/.test(walked.status);i++){await press('ArrowRight');walked=await state();}
  console.log('slid',walked);assert.match(walked.status,/measure 3/);
  await page.screenshot({path:output+'/5-slid.png'});
+ // Each hand keeps its own place: fingers move on through the same hand from
+ // measure to measure, and ↑ ↓ return to exactly where the other hand was left.
+ const handOfSeat=id=>page.evaluate(i=>{const p=practice.options.package,seat=p.seats.find(s=>s.id===i);return p.score.notes.find(n=>n.id===seat.ownerIds[0])?.hand;},id);
+ const bar=status=>Number(/measure (\d+)/.exec(status)[1]);
+ await press('Tab');const rhFrom=await state();assert.match(rhFrom.status,/^RH · /);
+ const savedBefore=await page.evaluate(()=>saved.length);for(let i=0;i<14;i++)await press('Digit'+(1+i%5));
+ const rhSaved=await page.evaluate(n=>saved.slice(n).map(s=>s[0]),savedBefore);
+ for(const id of rhSaved)assert.equal(await handOfSeat(id),'RH','a finger moves on in the same hand');
+ const rhMark=await state();console.log('right hand on',rhFrom.status,'→',rhMark.status);assert.match(rhMark.status,/^RH · /);assert.ok(bar(rhMark.status)>bar(rhFrom.status),'the right hand carries on into the next measure');
+ await press('ArrowDown');const lhFrom=await state();assert.match(lhFrom.status,/^LH · /);
+ await press('Digit2');await press('Digit3');const lhMark=await state();assert.match(lhMark.status,/^LH · /);
+ await press('ArrowRight');await press('ArrowRight');const lhMoved=await state();assert.match(lhMoved.status,/^LH · /,'← → stay in the hand');
+ await press('ArrowUp');const back=await state();console.log('back to the right hand',back);assert.deepEqual(back.selected,rhMark.selected,'↑ returns to where the right hand was left');
+ await press('ArrowDown');assert.deepEqual((await state()).selected,lhMoved.selected,'↓ returns to where the left hand was left');
+ await press('ArrowUp');
  // A resize recomposes the window; a save only repaints it.
  await page.evaluate(()=>document.querySelector('.section-fingering-stage svg').dataset.earlier='1');await page.setViewportSize({width:1000,height:720});await page.evaluate(()=>practice.refit());
  assert.equal(await page.evaluate(()=>!!document.querySelector('.section-fingering-stage svg[data-earlier]')),false);await page.screenshot({path:output+'/6-narrower.png'});await page.setViewportSize({width:1280,height:720});await page.evaluate(()=>practice.refit());
  // Labels showing, R still chooses the hand: the labels go away and the key does its work.
  const before=await state();await press('KeyJ');await press('KeyR');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);await page.waitForFunction(()=>hands.length===1&&document.querySelector('.section-fingering:not([hidden]) svg'));
  const rebuilt=await state();console.log('rebuilt',rebuilt);assert.deepEqual(rebuilt.selected,before.selected);assert.equal(rebuilt.status,before.status);
+ await press('ArrowDown');assert.deepEqual((await state()).selected,lhMoved.selected,'a rebuilt practice keeps where each hand was left');await press('ArrowUp');assert.deepEqual((await state()).selected,before.selected);
  // Esc leaves Fingers for the score.
  await press('Escape');assert.equal(await page.evaluate(()=>backs),1);
  // Reopening resumes at the first note still without a finger, and says so.

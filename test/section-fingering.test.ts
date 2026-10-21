@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits} from '../src/selection';import {pieceUnits,fingeringProgress,percent,fingeringWindow,jumpLabels} from '../src/section-fingering';
+import {importPackage as importPackageStrict,type ScorePackage,type Seat} from '../src/package';import {editUnits,nextInHand} from '../src/selection';import {pieceUnits,fingeringProgress,percent,fingeringWindow,jumpLabels} from '../src/section-fingering';
 const importPackage=(bytes:Uint8Array)=>importPackageStrict(bytes,{allowLegacyTempo:true});
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)));
 const handOf=(q:Pick<ScorePackage,'score'>,s:Seat)=>q.score.notes.find(n=>n.id===s.ownerIds[0])?.hand;
@@ -56,4 +56,17 @@ test('jump labels are single letters up to the alphabet, then pairs, then triple
 });
 test('jump labels are unique and avoid L and R, which choose a hand',()=>{
  for(let n=0;n<=576;n++){const labels=jumpLabels(n);assert.equal(labels.length,n,`count ${n}`);assert.equal(new Set(labels).size,n,`unique ${n}`);assert.ok(labels.every(l=>!/[lr]/.test(l)),`keys ${n}`);}
+});
+
+test('after a finger the score editor moves on in the same hand, past the end of the system',()=>{
+ const units=editUnits(p);
+ // The last right-hand note of the first system: the next stop in editor order is the left hand.
+ const i=units.findIndex((s,k)=>handOf(p,s)==='RH'&&units[k+1]&&handOf(p,units[k+1])==='LH');
+ assert.ok(i>=0);
+ const next=nextInHand(p,units,i)!;
+ assert.equal(handOf(p,next),'RH');assert.ok(next.system>units[i].system||next.page>units[i].page,'onto the next system');
+ assert.ok(units.slice(i+1,units.indexOf(next)).every(s=>handOf(p,s)!=='RH'),'the next right-hand note, none skipped');
+ const lastLeft=units.map((s,k)=>({s,k})).filter(({s})=>handOf(p,s)==='LH').at(-1)!;
+ assert.equal(nextInHand(p,units,lastLeft.k),lastLeft.s,'at the hand\'s last note the selection stays');
+ assert.equal(nextInHand(p,units,-1),undefined);
 });

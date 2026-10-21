@@ -13,6 +13,15 @@ export function editUnits(p:Pick<ScorePackage,'score'|'seats'>):Seat[]{
  return seats.filter(s=>{if(seen.has(s.contactId))return false;seen.add(s.contactId);return true;}).sort(order);
 }
 export const moveSelection=(index:number,step:number,length:number)=>Math.max(0,Math.min(length-1,index+step));
+/** After a finger, the next note of the same hand, past the end of the system
+ * and onto later pages; the other hand waits until the pianist goes to it. At
+ * the hand's last note the selection stays. */
+export function nextInHand(p:Pick<ScorePackage,'score'>,units:readonly Seat[],index:number):Seat|undefined{
+ const hands=new Map(p.score.notes.map(n=>[n.id,n.hand])),hand=(s:Seat)=>hands.get(s.ownerIds[0])??'none',own=units[index];
+ if(!own)return undefined;
+ for(let i=index+1;i<units.length;i++)if(hand(units[i])===hand(own))return units[i];
+ return own;
+}
 export function resumeSelection(p:Pick<ScorePackage,'score'|'seats'>,contactId:string|undefined,page:number):Seat{const units=editUnits(p);return units.find(s=>s.contactId===contactId)??units.find(s=>s.page>=page)??units[0];}
 
 /** Initial Edit is anchored to the page being read, including visible held aliases. */

@@ -45,21 +45,26 @@ export interface SectionFingeringOptions {
  personal:()=>PersonalState;presentation:()=>FingerPresentation;
  save:(seat:Seat,finger:number)=>Promise<unknown>;saveHand?:(seat:Seat,hand:'LH'|'RH')=>Promise<unknown>;
  /** The note to start on, as left when practice was rebuilt. */
- start?:string;status:(message:string)=>void;
+ start?:string;
+ /** Where each hand was left when practice was last built. */
+ marks?:Readonly<Record<string,string>>;status:(message:string)=>void;
  /** Called whenever the share of fingered notes may have changed. */
  progress?:(progress:FingeringProgress)=>void;
 }
 /** A composed window: each measure's displayed interval, and the staff's
  * middle and the ink's vertical reach, all in the passage's own units. */
 interface FingeringWindow {bar:number;svg:SVGSVGElement;crops:Crop[];spans:Map<number,[number,number]>;middle:number;top:number;bottom:number}
-/** Finger the whole piece from the keyboard, a measure at a time, right hand
- * then left. Nothing is played or checked, and nothing is enforced: any note
- * can be visited and any can stay without a finger. It opens at the first
- * note without a finger; each finger moves on to the next note without one.
+/** Finger the whole piece from the keyboard. Nothing is played or checked,
+ * and nothing is enforced: any note can be visited and any can stay without a
+ * finger. It opens at the first note without a finger. Each hand is fingered
+ * on its own: a finger, Tab and ← → move on through the same hand from measure
+ * to measure, and ↑ ↓ change hands, returning to where that hand was left.
  * The current measure is always centred, with its neighbours either side and
  * the two beyond them ghosted. */
 export class SectionFingering {
  readonly units:Seat[];private cursor?:Seat;private readonly positions;private readonly hand;
+ /** Where each hand was left, by note; the cursor's own hand is the cursor. */
+ private readonly marks:Map<string,string>;
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
  private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;private scale?:number;private half?:number;private resize:ResizeObserver;
  private counted?:{personal:PersonalState;progress:FingeringProgress};
@@ -69,19 +74,28 @@ export class SectionFingering {
   // A rebuilt practice keeps its exact note; otherwise start at the first
   // note without a finger, which is the beginning for an unfingered piece.
   const kept=options.start?options.package.seats.find(s=>s.contactId===options.start):undefined;
-  this.cursor=kept??this.gap(0,1,true)??this.units[0];
+  this.marks=new Map(Object.entries(options.marks??{}));
+  this.at(kept??this.gap(0,1,true)??this.units[0]);
   mount.addEventListener('click',this.click);
   // The stage settles after the header and status first paint; any change of
   // its size re-centres the shown measure without composing anything again.
   this.resize=new ResizeObserver(()=>{if(!this.shown||this.disposed)return;this.scale=undefined;this.centre(this.shown);this.paintLabels();});this.resize.observe(mount);
  }
  /** The next note without a finger from index i in the given direction,
-  * wrapping round the piece; i itself counts only when inclusive. */
- private gap(i:number,step:1|-1,inclusive=false,except?:string){
+  * wrapping round the piece; i itself counts only when inclusive. Given a
+  * hand, only that hand's notes count. */
+ private gap(i:number,step:1|-1,inclusive=false,except?:string,hand?:string){
   const personal=this.options.personal(),n=this.units.length;
-  for(let k=inclusive?0:1;k<=n;k++){const seat=this.units[((i+step*k)%n+n)%n];if(seat&&seat.contactId!==except&&fingerFor(this.options.basePackage,personal,seat)===undefined)return seat;}
+  for(let k=inclusive?0:1;k<=n;k++){const seat=this.units[((i+step*k)%n+n)%n];if(seat&&seat.contactId!==except&&(hand===undefined||this.stream(seat)===hand)&&fingerFor(this.options.basePackage,personal,seat)===undefined)return seat;}
   return undefined;
  }
+ /** A hand's own line through the piece; notes without a hand form their own. */
+ private stream(seat:Seat){return this.hand(seat)??'none';}
+ /** The next note without a finger in the cursor's hand, then in any hand. */
+ private nextGap(i:number,step:1|-1,except?:string){const hand=this.cursor&&this.stream(this.cursor);return this.gap(i,step,false,except,hand)??this.gap(i,step,false,except);}
+ private at(seat:Seat|undefined){this.cursor=seat;if(seat)this.marks.set(this.stream(seat),seat.contactId);}
+ /** Where each hand was left, kept when practice is rebuilt. */
+ get handMarks(){return Object.fromEntries(this.marks);}
  dispose(){this.disposed=true;this.resize.disconnect();this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
  /** Footer hints for the fingering keys. */
  static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Note</span><span><kbd>↑↓</kbd> Hand</span><span><kbd>PgUp</kbd><kbd>PgDn</kbd> Measure</span><span><kbd>Tab</kbd> Next without a finger</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
@@ -192,10 +206,24 @@ export class SectionFingering {
  }
  get cursorContact(){return this.cursor?.contactId;}
  private index(){return this.cursor?this.units.findIndex(s=>s.contactId===this.cursor!.contactId):-1;}
- private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.render();}
- private move(step:number){const i=Math.max(0,this.index());this.go(this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);}
- /** The first note of the measure step measures away, in fingering order. */
- private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const near=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(near)this.go(this.units.find(s=>s.writtenBar===near.writtenBar));}
+ private go(seat:Seat|undefined){if(!seat)return;this.at(seat);this.labels=undefined;this.render();}
+ /** The next or previous note of the cursor's hand; at either end it stays. */
+ private move(step:1|-1){const i=Math.max(0,this.index()),hand=this.cursor&&this.stream(this.cursor);
+  for(let k=i+step;k>=0&&k<this.units.length;k+=step)if(hand===undefined||this.stream(this.units[k])===hand){this.go(this.units[k]);return;}}
+ /** The first note of the measure step measures away, in the cursor's hand
+  * when it plays there. */
+ private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const near=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(!near)return;
+  const hand=this.cursor&&this.stream(this.cursor),inBar=this.units.filter(s=>s.writtenBar===near.writtenBar);this.go(inBar.find(s=>this.stream(s)===hand)??inBar[0]);}
+ /** Change hands: back to where the other hand was left, or else its first
+  * note without a finger, or else its note nearest the cursor. Up is the right
+  * hand, down the left, as the score's arrows move between hand rows. */
+ private switchHands(direction:-1|1){
+  const c=this.cursor;if(!c)return;
+  const rank=this.stream(c)==='RH'?0:this.stream(c)==='LH'?1:2,target=rank+direction===0?'RH':rank+direction===1?'LH':undefined;
+  if(target){const mark=this.marks.get(target),kept=mark===undefined?undefined:this.units.find(s=>s.contactId===mark&&this.stream(s)===target);
+   const seat=kept??this.gap(0,1,true,undefined,target);if(seat)return seat;}
+  return this.hands(direction);
+ }
  /** The other hand's note nearest the cursor: up to the right hand, down to
  * the left, as the score's arrows move between hand rows. */
  private hands(direction:-1|1){
@@ -241,14 +269,14 @@ export class SectionFingering {
   const i=this.index();
   // Move on at once to the next note without a finger; the finger paints
   // when it is saved. Once every note has one, the cursor stays.
-  if(i>=0)this.cursor=this.gap(i,1,false,seat.contactId)??seat;
+  if(i>=0)this.at(this.nextGap(i,1,seat.contactId)??seat);
   this.render();
   try{await this.options.save(seat,finger);}catch(error){this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
   this.announce();
  }
  key(code:string,shift=false):boolean{
   if(this.labels){
-   if(code==='ArrowUp'||code==='ArrowDown'){const seat=this.hands(code==='ArrowUp'?-1:1);if(seat){this.cursor=seat;this.paint();this.startLabels();}return true;}
+   if(code==='ArrowUp'||code==='ArrowDown'){const seat=this.hands(code==='ArrowUp'?-1:1);if(seat){this.at(seat);this.paint();this.startLabels();}return true;}
    if(code==='Escape'){this.labels=undefined;this.paintLabels();this.announce();return true;}
    if(LETTERS.includes(/^Key([A-Z])$/.exec(code)?.[1].toLowerCase()??'-')){this.label(code);return true;}
    // A modifier alone keeps the labels; any other key puts them away and does its ordinary work.
@@ -257,10 +285,10 @@ export class SectionFingering {
   }
   const digit=/^(?:Digit|Numpad)([1-5])$/.exec(code);
   if(digit){void this.choose(Number(digit[1]));return true;}
-  if(code==='Tab'){const seat=this.gap(Math.max(0,this.index()),shift?-1:1);if(seat)this.go(seat);else this.options.status('Every note has a finger.');return true;}
+  if(code==='Tab'){const seat=this.nextGap(Math.max(0,this.index()),shift?-1:1);if(seat)this.go(seat);else this.options.status('Every note has a finger.');return true;}
   if(code==='ArrowRight'){this.move(1);return true;}
   if(code==='ArrowLeft'||code==='Backspace'){this.move(-1);return true;}
-  if(code==='ArrowUp'||code==='ArrowDown'){this.go(this.hands(code==='ArrowUp'?-1:1));return true;}
+  if(code==='ArrowUp'||code==='ArrowDown'){this.go(this.switchHands(code==='ArrowUp'?-1:1));return true;}
   // L and R choose the note's hand, as in the score; the cursor stays put.
   if((code==='KeyL'||code==='KeyR')&&this.cursor&&this.options.saveHand){const seat=this.cursor,hand=code==='KeyL'?'LH':'RH';void this.options.saveHand(seat,hand).catch(error=>this.options.status(`The hand was not saved: ${error instanceof Error?error.message:String(error)}`));return true;}
   if(code==='KeyJ'){this.startLabels();return true;}

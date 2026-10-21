@@ -2,6 +2,7 @@ import {test} from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
 import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
+import {nextInHand} from '../src/selection';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 const main=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),state=readFileSync(new URL('../src/state.ts',import.meta.url),'utf8'),selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
 const body=(source:string,start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))).replace(/^export /gm,''));
@@ -18,7 +19,7 @@ function fixture(basePages=2,projectedPages=basePages){
   enqueue(fn:()=>Promise<any>){const pending=persist.then(fn);persist=pending.then(()=>{},()=>{});return pending;},
   writeJson:async(_file:string,s:any)=>{disk=structuredClone(s);writes.push(structuredClone(s));},loadPersonalJournal:async()=>structuredClone(disk),host:{},
   assigned(_p:any,s:any,owner:any,choice:any){const next=structuredClone(s),id=owner.ownerIds[0];next.choices[id]={...next.choices[id],...choice};return next;},
-  editUnits:(view:any)=>[...view.seats],viewportFit:(_w:any,_h:any,v:any)=>({pages:[v.page]}),effectiveView:(v:any)=>v,innerWidth:1280,innerHeight:720,
+  editUnits:(view:any)=>[...view.seats],nextInHand,viewportFit:(_w:any,_h:any,v:any)=>({pages:[v.page]}),effectiveView:(v:any)=>v,innerWidth:1280,innerHeight:720,
   renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},paintPersonalSaveError(_owner:any,e:any){errors.push(e);},notify(){},practice:undefined,readingPresentation:undefined,ManualPracticeView:class{},readingViewError:undefined};
  personalMemoryBoundary(context,()=>disk,async(s,kind)=>{disk=structuredClone(s);if(kind==='navigation')writes.push(structuredClone(s));});
  runInNewContext(body(state,'export function readPersonal(','export const activeLayer='),context);

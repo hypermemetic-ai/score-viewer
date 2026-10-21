@@ -9,6 +9,7 @@ import {runInNewContext} from 'node:vm';
 import {scoreCapabilities} from '../src/score-capabilities';
 import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
+import {nextInHand} from '../src/selection';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
 
 // Run the actual application intent and persistence functions. Geometry and
@@ -35,7 +36,8 @@ function fixture(){
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.then(()=>{},()=>{});return result;},
   async writeJson(_file:string,snapshot:any){await write(snapshot);},readPersonal:(value:any)=>structuredClone(value),
   assigned(_p:any,s:any,seat:any,choice:any){const next=structuredClone(s),id=seat.ownerIds[0];next.choices[id]={...next.choices[id],...choice};return next;},
-  editUnits:()=>seats,viewportFit:()=>({pages:[0]}),innerWidth:1280,innerHeight:720,effectiveView:(v:any)=>v,
+  // These synthetic notes have no hands, so a finger moves on to the next note.
+  editUnits:()=>seats,nextInHand:(view:any,units:any[],index:number)=>nextInHand({score:view.score??{notes:[]}} as any,units,index),viewportFit:()=>({pages:[0]}),innerWidth:1280,innerHeight:720,effectiveView:(v:any)=>v,
   renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},practice:undefined,
   paintPersonalSaveError(_owner:any,error:Error){errors.push(error);},notify(message:string){messages.push(message);},
   loadPersonalJournal:async()=>structuredClone(disk),host:{}};

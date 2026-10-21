@@ -40,7 +40,7 @@ export interface PracticeViewContext {
  selected:string;parent?:string;component?:string;includeManual:boolean;
  passage?:string;window?:[number,number];mode?:PracticeMode;previousMode?:PracticePrimaryMode;readingWindow?:number;
  /** Fingers alone, and its cursor, kept when practice is rebuilt after a hand choice. */
- fingersOnly?:true;fingering?:{passage:string;contactId?:string};
+ fingersOnly?:true;fingering?:{passage:string;contactId?:string;marks?:Record<string,string>};
  preferences?:PracticePreferences;
 }
 export function restorePracticeGrouping(plan:PracticePassagePlan,state:PracticeState,context:PracticeViewContext):PracticeState {
