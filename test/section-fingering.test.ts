@@ -70,3 +70,22 @@ test('after a finger the score editor moves on in the same hand, past the end of
  assert.equal(nextInHand(p,units,lastLeft.k),lastLeft.s,'at the hand\'s last note the selection stays');
  assert.equal(nextInHand(p,units,-1),undefined);
 });
+test('each hand keeps its place: a hand that runs out goes back to where the other was left, and L or R on the cursor loses neither',async()=>{
+ const {SectionFingering}=await import('../src/section-fingering');const {initialPersonal,corrected}=await import('../src/state');
+ (globalThis as any).ResizeObserver??=class{observe(){}disconnect(){}};
+ const mount={addEventListener(){},removeEventListener(){},replaceChildren(){}} as unknown as HTMLElement;
+ const bare:ScorePackage={...p,fingerLayer:p.fingerLayer&&{...p.fingerLayer,attacks:p.fingerLayer.attacks.map(({finger,...a})=>a)}} as ScorePackage;
+ const units=pieceUnits(bare),rh=units.filter(s=>handOf(bare,s)==='RH'),lh=units.filter(s=>handOf(bare,s)==='LH');
+ const make=(q:ScorePackage,personal:ReturnType<typeof initialPersonal>,start?:string,marks?:Record<string,string>)=>new SectionFingering(mount,{package:q,basePackage:q,plan:undefined as never,personal:()=>personal,presentation:()=>'annotations',save:async()=>{},start,marks,status:()=>{}}) as any;
+ // Every right-hand note fingered but the last; the left hand was left in measure 11.
+ let personal=initialPersonal(bare);for(const s of rh.slice(0,-1))personal=corrected(bare,personal,s,1);
+ const lastRh=rh.at(-1)!,leftAt=lh.find(s=>s.writtenBar===11)!;
+ const view=make(bare,personal,lastRh.contactId,{LH:leftAt.contactId});
+ assert.equal(view.nextGap(view.index(),1,lastRh.contactId).contactId,leftAt.contactId,'on to where the left hand was left, not the next note in the piece');
+ // L on the cursor's right-hand note: the note is now the left hand's, and both marks stand.
+ const moved=rh[20],near=rh[21],q={...bare,score:{...bare.score,notes:bare.score.notes.map(n=>n.id===moved.ownerIds[0]?{...n,hand:'LH'}:n)}} as ScorePackage;
+ const rebuilt=make(q,initialPersonal(q),moved.contactId,{RH:moved.contactId,LH:leftAt.contactId});
+ assert.deepEqual(rebuilt.handMarks,{RH:moved.contactId,LH:leftAt.contactId});
+ assert.equal(rebuilt.mark('RH').contactId,near.contactId,'the right hand resumes at its next note');
+ assert.equal(rebuilt.mark('LH').contactId,leftAt.contactId);
+});

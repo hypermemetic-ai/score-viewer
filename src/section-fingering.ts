@@ -9,6 +9,7 @@ import type {PracticePlan} from './practice';
 
 const ns='http://www.w3.org/2000/svg';
 /** Jump labels, home row first. L and R always choose a hand, so neither is a label. */
+const STREAMS=['RH','LH','none'];
 const LETTERS='asdfghjkqwetyuiopzxcvbnm';
 const handOf=(p:Pick<ScorePackage,'score'>)=>{const notes=new Map(p.score.notes.map(n=>[n.id,n.hand]));return (s:Seat)=>notes.get(s.ownerIds[0]);};
 
@@ -65,6 +66,9 @@ export class SectionFingering {
  readonly units:Seat[];private cursor?:Seat;private readonly positions;private readonly hand;
  /** Where each hand was left, by note; the cursor's own hand is the cursor. */
  private readonly marks:Map<string,string>;
+ /** Notes given a finger here, which the cursor passes over even before the
+  * saved state shows it; a failed save takes the note out again. */
+ private readonly pending=new Set<string>();
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
  private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;private scale?:number;private half?:number;private resize:ResizeObserver;
  private counted?:{personal:PersonalState;progress:FingeringProgress};
@@ -75,7 +79,10 @@ export class SectionFingering {
   // note without a finger, which is the beginning for an unfingered piece.
   const kept=options.start?options.package.seats.find(s=>s.contactId===options.start):undefined;
   this.marks=new Map(Object.entries(options.marks??{}));
-  this.at(kept??this.gap(0,1,true)??this.units[0]);
+  // L or R on the cursor's note moves it to the other hand; both hands keep
+  // where they were left rather than the note taking the other's place.
+  const filed=kept&&[...this.marks].find(([,id])=>id===kept.contactId)?.[0];
+  if(kept&&filed!==undefined&&filed!==this.stream(kept))this.cursor=kept;else this.at(kept??this.gap(0,1,true)??this.units[0]);
   mount.addEventListener('click',this.click);
   // The stage settles after the header and status first paint; any change of
   // its size re-centres the shown measure without composing anything again.
@@ -86,13 +93,26 @@ export class SectionFingering {
   * hand, only that hand's notes count. */
  private gap(i:number,step:1|-1,inclusive=false,except?:string,hand?:string){
   const personal=this.options.personal(),n=this.units.length;
-  for(let k=inclusive?0:1;k<=n;k++){const seat=this.units[((i+step*k)%n+n)%n];if(seat&&seat.contactId!==except&&(hand===undefined||this.stream(seat)===hand)&&fingerFor(this.options.basePackage,personal,seat)===undefined)return seat;}
+  for(let k=inclusive?0:1;k<=n;k++){const seat=this.units[((i+step*k)%n+n)%n];if(seat&&seat.contactId!==except&&!this.pending.has(seat.contactId)&&(hand===undefined||this.stream(seat)===hand)&&fingerFor(this.options.basePackage,personal,seat)===undefined)return seat;}
   return undefined;
  }
  /** A hand's own line through the piece; notes without a hand form their own. */
  private stream(seat:Seat){return this.hand(seat)??'none';}
- /** The next note without a finger in the cursor's hand, then in any hand. */
- private nextGap(i:number,step:1|-1,except?:string){const hand=this.cursor&&this.stream(this.cursor);return this.gap(i,step,false,except,hand)??this.gap(i,step,false,except);}
+ /** The next note without a finger in the cursor's hand; once that hand has
+  * none, the other hand's first from where it was left. */
+ private nextGap(i:number,step:1|-1,except?:string){
+  const own=this.cursor&&this.stream(this.cursor),gap=this.gap(i,step,false,except,own);if(gap)return gap;
+  for(const hand of STREAMS)if(hand!==own){const seat=this.gap(Math.max(0,this.markIndex(hand)),1,true,except,hand);if(seat)return seat;}
+  return this.gap(i,step,false,except);
+ }
+ private markIndex(hand:string){const id=this.marks.get(hand);return id===undefined?-1:this.units.findIndex(s=>s.contactId===id);}
+ /** Where a hand was left; if that note has since changed hands, the hand's
+  * next note after it in the music, else its last before it. */
+ private mark(hand:string){
+  const i=this.markIndex(hand);if(i<0)return undefined;const at=this.units[i],own=this.units.filter(s=>this.stream(s)===hand);
+  if(this.stream(at)===hand)return at;
+  return own.find(s=>s.writtenBar>at.writtenBar||s.writtenBar===at.writtenBar&&s.x>=at.x)??own.at(-1);
+ }
  private at(seat:Seat|undefined){this.cursor=seat;if(seat)this.marks.set(this.stream(seat),seat.contactId);}
  /** Where each hand was left, kept when practice is rebuilt. */
  get handMarks(){return Object.fromEntries(this.marks);}
@@ -210,18 +230,22 @@ export class SectionFingering {
  /** The next or previous note of the cursor's hand; at either end it stays. */
  private move(step:1|-1){const i=Math.max(0,this.index()),hand=this.cursor&&this.stream(this.cursor);
   for(let k=i+step;k>=0&&k<this.units.length;k+=step)if(hand===undefined||this.stream(this.units[k])===hand){this.go(this.units[k]);return;}}
- /** The first note of the measure step measures away, in the cursor's hand
-  * when it plays there. */
- private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const near=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(!near)return;
-  const hand=this.cursor&&this.stream(this.cursor),inBar=this.units.filter(s=>s.writtenBar===near.writtenBar);this.go(inBar.find(s=>this.stream(s)===hand)??inBar[0]);}
+ /** The first note of the cursor's hand in the measure step measures away. */
+ private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step)),hand=this.cursor&&this.stream(this.cursor);
+  // A measure where this hand rests is passed over, so the hand stays itself;
+  // past its last note the other hand still reaches the end of the piece.
+  const find=(seats:Seat[])=>seats.find(s=>s.writtenBar===bar)??(step<0?[...seats].reverse().find(s=>s.writtenBar<bar):seats.find(s=>s.writtenBar>bar));
+  const own=this.units.filter(s=>hand===undefined||this.stream(s)===hand),near=find(own)??find(this.units);if(!near)return;
+  const inBar=this.units.filter(s=>s.writtenBar===near.writtenBar);this.go(inBar.find(s=>this.stream(s)===hand)??inBar[0]);}
+ /** The first or last note of the cursor's hand. */
+ private end(last:boolean){const hand=this.cursor&&this.stream(this.cursor),own=this.units.filter(s=>hand===undefined||this.stream(s)===hand);this.go(last?own.at(-1):own[0]);}
  /** Change hands: back to where the other hand was left, or else its first
   * note without a finger, or else its note nearest the cursor. Up is the right
   * hand, down the left, as the score's arrows move between hand rows. */
  private switchHands(direction:-1|1){
   const c=this.cursor;if(!c)return;
   const rank=this.stream(c)==='RH'?0:this.stream(c)==='LH'?1:2,target=rank+direction===0?'RH':rank+direction===1?'LH':undefined;
-  if(target){const mark=this.marks.get(target),kept=mark===undefined?undefined:this.units.find(s=>s.contactId===mark&&this.stream(s)===target);
-   const seat=kept??this.gap(0,1,true,undefined,target);if(seat)return seat;}
+  if(target){const seat=this.mark(target)??this.gap(0,1,true,undefined,target);if(seat)return seat;}
   return this.hands(direction);
  }
  /** The other hand's note nearest the cursor: up to the right hand, down to
@@ -269,9 +293,10 @@ export class SectionFingering {
   const i=this.index();
   // Move on at once to the next note without a finger; the finger paints
   // when it is saved. Once every note has one, the cursor stays.
+  this.pending.add(seat.contactId);
   if(i>=0)this.at(this.nextGap(i,1,seat.contactId)??seat);
   this.render();
-  try{await this.options.save(seat,finger);}catch(error){this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
+  try{await this.options.save(seat,finger);}catch(error){this.pending.delete(seat.contactId);this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
   this.announce();
  }
  key(code:string,shift=false):boolean{
@@ -293,8 +318,7 @@ export class SectionFingering {
   if((code==='KeyL'||code==='KeyR')&&this.cursor&&this.options.saveHand){const seat=this.cursor,hand=code==='KeyL'?'LH':'RH';void this.options.saveHand(seat,hand).catch(error=>this.options.status(`The hand was not saved: ${error instanceof Error?error.message:String(error)}`));return true;}
   if(code==='KeyJ'){this.startLabels();return true;}
   if(code==='PageDown'||code==='PageUp'){this.measure(code==='PageDown'?1:-1);return true;}
-  if(code==='Home'){this.go(this.units[0]);return true;}
-  if(code==='End'){this.go(this.units.at(-1));return true;}
+  if(code==='Home'||code==='End'){this.end(code==='End');return true;}
   return false;
  }
 }

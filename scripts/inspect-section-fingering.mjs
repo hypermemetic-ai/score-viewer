@@ -28,7 +28,7 @@ try{
   const options={package:p,personal:initialPersonal(p),entryId:collectionId(p),fingersOnly:true,connected:()=>false,source:()=>'',connect:async()=>{},disconnect:async()=>{},back:()=>{window.backs++;},settings:()=>{},
    saveFinger:async(seat,finger)=>{window.saved.push([seat.id,finger]);practice.options.personal=corrected(p,practice.options.personal,seat,finger);practice.refit();},
    // A hand choice rebuilds practice from its context, as main.ts does.
-   saveHand:async(seat,hand)=>{window.hands.push([seat.id,hand]);const context=practice.contextSnapshot(),personal=practice.options.personal;practice.close();practice=window.practice=new PracticeView(document.querySelector('#app'),{...options,personal});await practice.mount(context);}};
+   saveHand:async(seat,hand)=>{window.hands.push([seat.id,hand]);const context=practice.contextSnapshot(),personal=practice.options.personal,q=options.package;options.package={...q,score:{...q.score,notes:q.score.notes.map(n=>seat.ownerIds.includes(n.id)?{...n,hand}:n)}};practice.close();practice=window.practice=new PracticeView(document.querySelector('#app'),{...options,personal});await practice.mount(context);}};
   window.hands=[];window.backs=0;window.reopen=async()=>{practice.close();practice=window.practice=new PracticeView(document.querySelector('#app'),{...options,personal:practice.options.personal});await practice.mount();};let practice=window.practice=new PracticeView(document.querySelector('#app'),options);
   await practice.mount();
  },bytes.toString('base64'));
@@ -48,7 +48,10 @@ try{
  // Every measure, PgDn by PgDn: centred to the pixel, neighbours on the stage. The width is
  // the piece's widest window; only a taller passage than any before may shrink the notation, never grow it back.
  const scales=[];for(let i=0;i<64;i++){const c=await centring();assert.ok(Math.abs(c.off)<.5&&c.prevIn&&c.nextIn,JSON.stringify(c));if(scales.at(-1)?.[0]!==c.scale)scales.push([c.scale,i+1]);if(i<63)await press('PageDown');}
- assert.match((await state()).status,/measure 64 of 64/);console.log('sizes',JSON.stringify(scales));assert.ok(scales.every((s,i)=>!i||s[0]<scales[i-1][0]),'never grows back');await press('Home');
+ assert.match((await state()).status,/measure 64 of 64/);console.log('sizes',JSON.stringify(scales));assert.ok(scales.every((s,i)=>!i||s[0]<scales[i-1][0]),'never grows back');
+ // The right hand rests in the last measure, so the left hand is there; Home stays in it.
+ assert.match((await state()).status,/^LH · /);await press('Home');assert.match((await state()).status,/^LH · measure 1 of /,'Home stays in the hand');
+ await press('ArrowUp');await press('Home');assert.match((await state()).status,/^RH · measure 1 of /);
  for(const code of ['Digit1','Digit2','Digit3'])await press(code);
  console.log('typed',await state(),await page.evaluate(()=>saved));assert.equal(await page.evaluate(()=>saved.length),3);
  // Tab goes to the next note without a finger, Shift+Tab to the one before; neither lands on a fingered note.
@@ -88,6 +91,7 @@ try{
  const rhMark=await state();console.log('right hand on',rhFrom.status,'→',rhMark.status);assert.match(rhMark.status,/^RH · /);assert.ok(bar(rhMark.status)>bar(rhFrom.status),'the right hand carries on into the next measure');
  await press('ArrowDown');const lhFrom=await state();assert.match(lhFrom.status,/^LH · /);
  await press('Digit2');await press('Digit3');const lhMark=await state();assert.match(lhMark.status,/^LH · /);
+ await press('PageDown');assert.match((await state()).status,/^LH · /,'PgDn stays in the hand');await press('PageUp');
  await press('ArrowRight');await press('ArrowRight');const lhMoved=await state();assert.match(lhMoved.status,/^LH · /,'← → stay in the hand');
  await press('ArrowUp');const back=await state();console.log('back to the right hand',back);assert.deepEqual(back.selected,rhMark.selected,'↑ returns to where the right hand was left');
  await press('ArrowDown');assert.deepEqual((await state()).selected,lhMoved.selected,'↓ returns to where the left hand was left');
@@ -99,6 +103,11 @@ try{
  const before=await state();await press('KeyJ');await press('KeyR');assert.equal(await page.evaluate(()=>document.querySelectorAll('.section-fingering-label').length),0);await page.waitForFunction(()=>hands.length===1&&document.querySelector('.section-fingering:not([hidden]) svg'));
  const rebuilt=await state();console.log('rebuilt',rebuilt);assert.deepEqual(rebuilt.selected,before.selected);assert.equal(rebuilt.status,before.status);
  await press('ArrowDown');assert.deepEqual((await state()).selected,lhMoved.selected,'a rebuilt practice keeps where each hand was left');await press('ArrowUp');assert.deepEqual((await state()).selected,before.selected);
+ // L on the cursor's note gives it to the left hand; neither hand loses its place.
+ await press('KeyL');await page.waitForFunction(()=>hands.length===2&&document.querySelector('.section-fingering:not([hidden]) svg'));
+ const given=await state();assert.match(given.status,/^LH · /);assert.deepEqual(given.selected,before.selected,'the cursor stays on the note');
+ await press('ArrowUp');const resumed=await state();assert.match(resumed.status,/^RH · /);const step=bar(resumed.status)-bar(before.status);assert.ok(step===0||step===1,'the right hand resumes at its next note after the one it gave away');
+ await press('ArrowDown');assert.deepEqual((await state()).selected,lhMoved.selected,'the left hand is still where it was left');
  // Esc leaves Fingers for the score.
  await press('Escape');assert.equal(await page.evaluate(()=>backs),1);
  // Reopening resumes at the first note still without a finger, and says so.
@@ -106,7 +115,7 @@ try{
  const reopened=await state();console.log('reopened',reopened);assert.match(reopened.status,/^[RL]H · measure 1 of 64 · /,'Reopening says where the cursor is, without narrating it');assert.ok(!(await fingered()).includes(reopened.selected[0]));
  assert.match(await page.textContent('[data-fingering-progress]'),/^[1-9]\d?% fingered/);
  // Every measure is reachable, to the end of the piece.
- await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^[LR]H · measure \d+ of 64/);
+ await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^[LR]H · measure \d+ of 64/);assert.equal(end.status.slice(0,2),reopened.status.slice(0,2),'End stays in the hand');
  await page.screenshot({path:output+'/7-end.png'});await press('Escape');assert.equal(await page.evaluate(()=>backs),2);
  assert.deepEqual(errors,[]);console.log('ok',output);
 }finally{await browser?.close();await vite?.close();server.close();}
