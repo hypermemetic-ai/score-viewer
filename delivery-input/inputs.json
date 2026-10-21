@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "f42ab2cdd878f3579a67130a3b12c306db87d2d7",
-    "tree": "9424e8dc502cfbb623596282b92e4363649ce20a",
-    "timestamp": "2026-10-20T02:42:15.000Z"
+    "revision": "bbd4e41a973cd0fbe35c86949355ce48bacc4b7c",
+    "tree": "e88b9d4a9cc67832290f9fe20c02e3b47bd75e12",
+    "timestamp": "2026-10-21T02:36:11.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
@@ -7623,8 +7623,8 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-3FXmw3Lc.js": {
-        "sha256": "cec044c85759af1dc391ca72d72c0409b5dd62c53f1e21dae317938f7d26c612",
+      "assets/footer-ink-probe-DnQbTAqh.js": {
+        "sha256": "9dd31a5f80aa9ef942a4da5b58fa54ec8cd92b37b3c6498fd14e859fbd0b885b",
         "size": 8768
       },
       "assets/footer-probe-calculated-edition-MudBwqqr.tuna": {
@@ -7635,13 +7635,13 @@
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-CDnnkccb.js": {
-        "sha256": "6f514e9b1f6071b71a49169101fbc1958182de6c9b845a27939c53a9fa4d08f3",
-        "size": 683822
+      "assets/index-DIrr3PXV.css": {
+        "sha256": "5fdfb5bf5d84ba91538a0c39d9c146ba9212f1007cc83822da162004842d83d6",
+        "size": 49626
       },
-      "assets/index-QkzX52At.css": {
-        "sha256": "6f107cd578a6a59ccffdbb35d4f55bb750fb61ae88bae0c5161fedb6728151c0",
-        "size": 49379
+      "assets/index-DWJON7ZF.js": {
+        "sha256": "af0aaaf59510788a9bfe0c7e634d4c7272456cd9c574870ea9e0a2b605f6e96c",
+        "size": 674632
       },
       "assets/layout-peer-worker-gxSeY0a-.js": {
         "sha256": "22446873c28b53e14909d6dccf46d7497d530aa5bf1db706e775283e1e71aa04",
@@ -7655,21 +7655,21 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/musescore-import-BH4l86CY.js": {
-        "sha256": "aab126789df2eaf4678255607875a8b8d8ad9b78d8cd05659edf3a5dbe815e08",
+      "assets/musescore-import-D6xOnqnA.js": {
+        "sha256": "05b26cc5c2626987457fde5f365d622c42056099676693f3773c91dbad56da52",
         "size": 3943
       },
-      "assets/musicxml-import-B_u00fXM.js": {
-        "sha256": "b273b9b687071e4980b09486dc12172c9b1cc0e554856f6f930dfaf3b354738c",
-        "size": 3809
+      "assets/musicxml-import-CVrXM-oF.js": {
+        "sha256": "f2c841d51227cad09fc7cd615a831ebd1a961d805ad1c79778a6022a7be79270",
+        "size": 4119
       },
       "assets/personal-projection-worker-Dnq8GlRn.js": {
         "sha256": "7cd0ad2e0e500d15fd7891a771aabeabf99e5e039f59ae00d0fc4dc3a5701a3d",
         "size": 1553281
       },
-      "assets/piano-readiness-ByjYzK5F.js": {
-        "sha256": "259130a58d44d6c49d8337e8618962255fbc34a519d16ce63f71f3c4f466dedc",
-        "size": 2473208
+      "assets/piano-readiness-DZUL8tZH.js": {
+        "sha256": "34a29f77da97d144788cd84f652bbbb935d99c3f6fe1f2c2af27e195d0cc8e70",
+        "size": 2473060
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
@@ -7704,11 +7704,11 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "46ebe74692313ac874aaa6d49e6c54fb3ba62b6230643278e95219679b765040",
+        "sha256": "c3498cc551a3d5131f92bcd55d7998700af1d37ac708f6f305348aa84392e29b",
         "size": 323
       },
       "index.html": {
-        "sha256": "e670e88c46f9c6e7f5e3fd95d66a0118feafaa7c16c143bcaa7881289c7bf1d0",
+        "sha256": "f1ea4dcbec381f4744e81d729d906ea5bb961e830c6c19aa43f8ca6b72efb421",
         "size": 969
       },
       "review/schumann-no14-conventional-20261006.tuna": {
@@ -7716,11 +7716,11 @@
         "size": 423909
       }
     },
-    "digest": "4a16363eaa3abdc6e1b91533f90170b9ec077bef9c76235e5c1f335ccbb9e1a5"
+    "digest": "1ebd7f201f8298ca2956342c46ba71f9a96c23f547d78ce431b40071c3a9e7ce"
   },
   "checks": {
-    "sha256": "35b2eeda556b4ce7f9df70ef3da320ce530823db9b987e7322ca551ca5d65382",
-    "size": 5848
+    "sha256": "7617deb392a31a09e99831e886dd53baf49d02cfbcbd6da774a1c6a9f325b038",
+    "size": 5555
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
