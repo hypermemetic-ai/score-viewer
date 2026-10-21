@@ -42,7 +42,7 @@ try{
  // Fingers opens the whole piece straight away, at the beginning of an unfingered score: no section, no tempo.
  await page.waitForSelector('.section-fingering:not([hidden]) svg');
  const opened=await state();console.log('opened',opened);assert.equal(opened.selected.length,1);assert.match(opened.status,/^RH · measure 1 of 64 · \d+ notes without a finger$/);
- assert.equal(await page.textContent('[data-practice-range]'),'Fingers');assert.equal(await page.evaluate(()=>window.practice.optionsMarkup()),'','Fingers has no practice settings');assert.match(await page.textContent('[data-fingering-progress]'),/^0% fingered · right hand 0% · left hand 0%$/);
+ assert.equal(await page.textContent('[data-practice-range]'),'Fingers');assert.equal(await page.evaluate(()=>window.practice.optionsMarkup()),'','Fingers has no practice settings');assert.match(await page.textContent('[data-fingering-progress]'),/^0% fingered · RH 0% · LH 0%$/);
  assert.equal(await page.locator('.practice-study,[data-practice^="study:"]').count(),0);
  await page.screenshot({path:output+'/2-opened.png'});
  // Every measure, PgDn by PgDn: centred to the pixel, neighbours on the stage. The width is
@@ -90,7 +90,7 @@ try{
  const reopened=await state();console.log('reopened',reopened);assert.match(reopened.status,/^[RL]H · measure 1 of 64 · /,'Reopening says where the cursor is, without narrating it');assert.ok(!(await fingered()).includes(reopened.selected[0]));
  assert.match(await page.textContent('[data-fingering-progress]'),/^[1-9]\d?% fingered/);
  // Every measure is reachable, to the end of the piece.
- await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^(?:Left|Right) hand · measure \d+ of 64/);
+ await press('End');const end=await state();console.log('end',end);assert.match(end.status,/^[LR]H · measure \d+ of 64/);
  await page.screenshot({path:output+'/7-end.png'});await press('Escape');assert.equal(await page.evaluate(()=>backs),2);
  assert.deepEqual(errors,[]);console.log('ok',output);
 }finally{await browser?.close();await vite?.close();server.close();}
