@@ -87,13 +87,13 @@ function downbeatBars(p:ScorePackage):boolean[] {
  return Array.from({length:count},(_,i)=>meters.length>0&&(!short(i)||i>0&&!completed(i-1)&&(i===count-1||completed(i))));
 }
 interface SpanDonor {donor:PersonalMemoryOccurrence;owners:ReadonlyMap<string,string>}
+const spanCache=new WeakMap<ScorePackage,{key:string;value:Map<string,SpanDonor[]>}>();
 /** Bars of unequal length whose notes in one hand are the same from the
  * downbeat to the end of the shorter bar: pitch, place in the bar and length,
  * with the hands the player has. Equal bars already share through their exact
  * measure key. Each receiving hand projection lists its donors by bar, and each
  * of its notes in that stretch the donor note it takes fingers from. Notes after
  * the stretch, such as a pickup at the end of the longer bar, are not paired. */
-const spanCache=new WeakMap<ScorePackage,{key:string;value:Map<string,SpanDonor[]>}>();
 function spanDonors(p:ScorePackage,all:readonly PersonalMemoryOccurrence[]):Map<string,SpanDonor[]> {
  // Pairs depend only on the bars and the hand partition, which the occurrence identities name.
  const key=all.filter(r=>r.occurrence.scope).map(r=>identity(r.occurrence)).join('\n'),cached=spanCache.get(p);if(cached?.key===key)return cached.value;
