@@ -6,7 +6,6 @@ import {editionNeedsEngravingAgain,hashBytes,importPackage,readEditionContent,se
 import {PersonalMemoryLibrary} from '../src/personal-memory-library';
 import {ConsolidationDeferred,PersonalMemorySession} from '../src/personal-memory-session';
 import {browserAssistanceStore,type AssistanceBrowserLocks} from '../src/durable-assistance-store';
-import {readLibraryPracticeSummary,type LibraryPracticeReader} from '../src/library-practice-progress';
 import {initialPractice,planPractice} from '../src/practice';
 import {collectionId,practiceStorageName,type Entry} from '../src/state';
 import {packageFile} from '../src/edition-rebuild';
@@ -63,13 +62,3 @@ test('a fingering update for a score that must be engraved again waits, and chan
  const receipt=await session.consolidate({entryIds:[freshEntry.id],receiptId:'fresh',isSafe:()=>true});assert.ok(receipt);
 });
 
-test('the library still shows practice saved with an edition that must be engraved again',async()=>{
- const p=await selectPresentation(staleContent,'conventional-piano'),plan=planPractice(p,'bounded-exercises-v1'),saved=initialPractice(plan);
- for(const c of plan.chunks)saved.best[c.pattern]=saved.target;
- const reader:LibraryPracticeReader={readPackage:async()=>stale,readRecord:async name=>name===practiceStorageName(staleEntry.id,p)?structuredClone(saved):null};
- const summary=await readLibraryPracticeSummary(staleEntry,'conventional-piano',reader);
- assert.equal(summary?.entryId,staleEntry.id);assert.equal(summary?.keyboard,'conventional-piano');
- assert.ok(summary!.sections>0,'the saved progress is shown');
- // Without saved progress the score shows none, rather than failing the library.
- assert.equal((await readLibraryPracticeSummary(staleEntry,'conventional-piano',{...reader,readRecord:async()=>null}))?.sections??0,0);
-});

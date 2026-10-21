@@ -42,7 +42,7 @@ function fixture(){
  const navigationWrites:any[]=[];personalMemoryBoundary(context,()=>disk,async(s,kind)=>{if(kind==='intent')await write(s);else{disk=structuredClone(s);navigationWrites.push(structuredClone(s));}});
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
- runInNewContext(body('async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
+ runInNewContext(body('async function saveSelectedChoice(','\nfunction repaintLibrary('),context);
  return {context,target,seats,written,navigationWrites,frames,errors,messages,get disk(){return disk;},get editor(){return context.personalEditor(target);},
   setWrite(fn:(s:any)=>any){write=fn;},setProject(fn:(s:any)=>Promise<any>){project=fn;},writeDefault(s:any){disk=structuredClone(s);written.push(structuredClone(s));}};
 }

@@ -8,7 +8,6 @@ export const LOADING_STEPS={
  settings:'Restoring your settings',
  fingerings:'Checking saved fingering choices',
  input:'Connecting keyboard and pedal input',
- summaries:'Reading your practice progress',
  sound:'Preparing piano sound',
  engrave:'Engraving the music',
  'engrave-again':'Engraving this edition again',

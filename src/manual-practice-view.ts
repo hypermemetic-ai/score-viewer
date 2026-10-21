@@ -1,3 +1,4 @@
+import {workHeadingMarkup} from './score-catalog';
 import {arrangeBottomNavigation} from './application-navigation';
 import {practiceOptionsMarkup,integerPracticeSetting,adjustPracticeInteger} from './practice-options-markup';
 import {actionCode} from './input';
@@ -11,9 +12,9 @@ import {ManualPracticeTransport,type ManualClock} from './manual-practice-transp
 import {PracticeClock} from './practice-clock';
 import {PracticeBrowser,practiceChunkRange} from './practice-browser';
 import {practicePreferences,type PracticeViewContext} from './practice-context';
-import {displayedPracticeAssessment,displayedPracticeTotal} from './practice-display';
+import {displayedPracticeAssessment} from './practice-display';
 import {hasDone} from './practice-attainment';
-import {practiceClipChunk,practicePercent,passageStartTempo,reconcilePassages,setPracticeGoal,wholePracticeProgress,type PracticeChunk,type PracticeState} from './practice';
+import {practiceClipChunk,practicePercent,passageStartTempo,reconcilePassages,setPracticeGoal,type PracticeChunk,type PracticeState} from './practice';
 import {ManualTempoControls,manualTempoField,practiceSpeedField,refreshPracticeSpeedDisplay,refreshPracticeSpeedDisplays} from './manual-tempo-control';
 import {tempoRateEdit,speedNumber,speedEdit,adjustDuration,adjustPracticePercent as adjustPercent,adjustProgression,snapPracticeSpeed,snapPracticeStep} from './tempo-presentation';
 import {requireReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
@@ -35,7 +36,7 @@ export interface ManualPracticeViewOptions {
  save:(record:ManualPracticeRecord,view:ReturnType<ManualReadingContext['viewRecord']>)=>Promise<void>;
  rotation?:()=>Rotation;doneKey?:()=>string;settingsKey?:()=>string;freeViewKey?:()=>string;
  workingEditKey?:()=>string;navigationKeys?:()=>{previous:string;next:string};audioOutput?:()=>string;
- createClock?:()=>ManualClock;back:()=>void;settings:()=>void;changed:(progress:number,whole:boolean)=>void;
+ createClock?:()=>ManualClock;back:()=>void;settings:()=>void;
 }
 /** Musical manual practice owns its loop clock and all visible ink. The player
  * chooses window turns; MIDI never accepts notes, retires ink or creates bests. */
@@ -77,7 +78,7 @@ export class ManualPracticeView {
   node.title=this.feedback;node.setAttribute('aria-label',this.feedback);node.hidden=!this.feedback;
  }
 
- private save(){if(this.session)this.state.workingByPattern[this.session.chunk.pattern]=this.state.working;const record=this.options.context.record(),view=this.options.context.viewRecord();this.saves=this.saves.then(()=>this.options.save(record,view)).then(()=>{this.saveError=undefined;if(this.disposed)return;this.options.changed(displayedPracticeTotal(this.plan,record.state),wholePracticeProgress(this.plan,record.state)>=1);}).catch(error=>{this.saveError=`Progress has not saved: ${(error as Error).message}`;this.pause();this.status();});return this.saves;}
+ private save(){if(this.session)this.state.workingByPattern[this.session.chunk.pattern]=this.state.working;const record=this.options.context.record(),view=this.options.context.viewRecord();this.saves=this.saves.then(()=>this.options.save(record,view)).then(()=>{this.saveError=undefined;}).catch(error=>{this.saveError=`Progress has not saved: ${(error as Error).message}`;this.pause();this.status();});return this.saves;}
  async flush(){this.pause();await this.save();await this.saves;if(this.saveError)throw Error(this.saveError);}
  private passage(bars:readonly number[],clip?:ExerciseClip){const notation=this.options.context.view.notation,key=`${notation}:${bars.join(',')}:${clip?.id??''}`;let source=this.frames.get(key);if(source!==undefined){this.frames.delete(key);this.frames.set(key,source);}else{source=clip?manualPassageScene(this.options.context.package,bars,clip).svg:this.options.passage(bars,notation);this.frames.set(key,source);if(this.frames.size>16)this.frames.delete(this.frames.keys().next().value!);}
   const document=new DOMParser().parseFromString(source,'image/svg+xml'),svg=document.documentElement as unknown as SVGSVGElement;
@@ -95,7 +96,7 @@ export class ManualPracticeView {
  private selectPassage(chunk:PracticeChunk,resetWorking=true){this.transport?.close();this.transport=undefined;this.freeView=false;this.exercise=chunk;this.browser.select(this.state,chunk.id);if(resetWorking)this.state.working=passageStartTempo(this.plan,this.state,chunk);this.options.context.selectPassage(chunk.kind==='contrast'?practiceClipChunk(chunk,0):chunk);this.overview=false;this.rendered='';this.renderError=undefined;}
  private totalLabel(){const assessment=displayedPracticeAssessment(this.plan,this.state,this.browser.includeManual);return assessment.included?`Total progress · ${practicePercent(assessment.progress??0)}%`:'No exercises included';}
  private paint(){if(this.disposed)return;const p=this.options.context.package,s=this.session,root=this.app.querySelector('.practice-header')!;
-  root.innerHTML=`<h1>${escape(p.manifest.metadata.title)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>${s.chunk.kind==='contrast'?`Contrast · ${s.chunk.clipIndex===1?'B':'A'} · ${escape(practiceClipLabel(s.chunk))}`:`Measure${s.chunk.firstBar===s.chunk.lastBar?'':'s'} ${escape(practiceChunkRange(s.chunk))}${activePracticeClip(s.chunk,this.plan.barTicks)?' · excerpt':''}`}</small><small data-practice-total>${this.totalLabel()}</small>`:''}</div>`;
+  root.innerHTML=`<h1>${workHeadingMarkup(p.manifest.metadata)}</h1><div class="practice-head-actions"><small>Manual practice · ${this.options.context.view.notation==='tab'?'TAB':'ISO'}</small>${s&&!this.overview?`<small data-practice-range>${s.chunk.kind==='contrast'?`Contrast · ${s.chunk.clipIndex===1?'B':'A'} · ${escape(practiceClipLabel(s.chunk))}`:`Measure${s.chunk.firstBar===s.chunk.lastBar?'':'s'} ${escape(practiceChunkRange(s.chunk))}${activePracticeClip(s.chunk,this.plan.barTicks)?' · excerpt':''}`}</small><small data-practice-total>${this.totalLabel()}</small>`:''}</div>`;
   this.app.querySelector<HTMLElement>('.practice-overview')!.hidden=!this.overview;this.app.querySelector<HTMLElement>('.practice-stage')!.hidden=this.overview;this.app.dataset.practicePhase=this.overview?'overview':s?.phase??'ready';
   this.paintControls();if(this.overview)this.paintBrowser(!this.settingsDialog);else if(!this.renderError)this.paintScore();this.paintCue();this.status();
  }

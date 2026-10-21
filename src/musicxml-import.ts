@@ -1,3 +1,4 @@
+import {musicXmlCatalogue} from './score-catalog';
 import {unzipSync} from 'fflate';
 import {parseMusicXmlAsync,projectMusicXml} from '../vendor/iso-notation/src/musicxml';
 import {hashBytes} from './package';
@@ -30,6 +31,12 @@ function decodeXml(bytes:Uint8Array){
  catch{throw new MusicXmlImportRefusal(`This MusicXML file isn't valid ${decoder.encoding.toUpperCase()} text.`);}
 }
 
+/** The work's catalogue as the file states it, e.g. <work-number>Op. 68, No. 13</work-number>. */
+function sourceCatalogue(text:string){
+ const field=(name:string)=>{const m=new RegExp(`<${name}>([^<]*)</${name}>`).exec(text);return m?.[1].replace(/&amp;/g,'&');};
+ return musicXmlCatalogue(field('work-number'),field('movement-number'));
+}
+
 /** One printed piano part becomes a native .tuna archive. Hands come from the
  * source: the upper staff is the right hand, the lower staff the left, and an
  * explicit source hand mark (m.s., m.d., l.h., r.h.) overrides its staff.
@@ -39,8 +46,8 @@ function decodeXml(bytes:Uint8Array){
  * ordinary admission. */
 export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAssets,inputExecution:ReadingExecution={}):ReturnType<typeof publishNativePianoScore> {
  const execution=capturedReadingExecution(inputExecution),inputSha256=await hashBytes(bytes);checkReadingExecution(execution);
- let written;
- try{written=await parseMusicXmlAsync(musicXmlText(bytes),'import.musicxml');}
+ let written;const text=musicXmlText(bytes);
+ try{written=await parseMusicXmlAsync(text,'import.musicxml');}
  catch(error){if(error instanceof MusicXmlImportRefusal)throw error;throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);}
  checkReadingExecution(execution);
  const parts=written.parts?.length??new Set(written.measures.map(m=>m.part)).size;
@@ -54,6 +61,6 @@ export async function prepareMusicXmlScore(bytes:Uint8Array,assets:MusicXmlAsset
   throw new MusicXmlImportRefusal(`This MusicXML file can't be read yet: ${(error as Error).message}`);
  }
  score.title||='Untitled score';score.composer??='';
- return publishNativePianoScore(score,{metadata:{title:score.title,composer:score.composer,provenance:[`MusicXML import ${inputSha256}; hands from printed staves and source hand marks.`]},
+ return publishNativePianoScore(score,{metadata:{title:score.title,composer:score.composer,...sourceCatalogue(text),provenance:[`MusicXML import ${inputSha256}; hands from printed staves and source hand marks.`]},
   assets,execution,refusal:MusicXmlImportRefusal});
 }

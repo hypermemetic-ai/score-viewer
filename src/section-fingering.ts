@@ -63,8 +63,6 @@ export class SectionFingering {
  private readonly windows=new Map<number,FingeringWindow>();private readonly cropCache=new Map<number,Crop>();private shown?:FingeringWindow;
  private labels?:{targets:Map<string,Seat>;typed:string};private fitted='';private disposed=false;private scale?:number;private half?:number;private resize:ResizeObserver;
  private counted?:{personal:PersonalState;progress:FingeringProgress};
- /** What opening said about where it started, shown until the first move. */
- private opening?:string;
  constructor(readonly mount:HTMLElement,readonly options:SectionFingeringOptions){
   this.positions=annotationPositions(options.package);this.hand=handOf(options.package);
   this.units=pieceUnits(options.package);
@@ -72,7 +70,6 @@ export class SectionFingering {
   // note without a finger, which is the beginning for an unfingered piece.
   const kept=options.start?options.package.seats.find(s=>s.contactId===options.start):undefined;
   this.cursor=kept??this.gap(0,1,true)??this.units[0];
-  if(!kept&&this.cursor){const bar=this.cursor.writtenBar;this.opening=bar>1||this.cursor!==this.units[0]?`Resuming at measure ${bar}, the first with a note still without a finger.`:'Starting at the beginning.';if(!this.gap(0,1,true))this.opening='Every note has a finger. Starting at the beginning.';}
   mount.addEventListener('click',this.click);
   // The stage settles after the header and status first paint; any change of
   // its size re-centres the shown measure without composing anything again.
@@ -87,7 +84,7 @@ export class SectionFingering {
  }
  dispose(){this.disposed=true;this.resize.disconnect();this.mount.removeEventListener('click',this.click);this.mount.replaceChildren();this.windows.clear();this.cropCache.clear();}
  /** Footer hints for the fingering keys. */
- static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>Tab</kbd> Next without a finger</span><span><kbd>←→</kbd> Note</span><span><kbd>PgUp</kbd><kbd>PgDn</kbd> Measure</span><span><kbd>↑↓</kbd> Right, left hand</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
+ static hints(){return `<span class="options-nav-hint section-fingering-keys"><span><kbd>1–5</kbd> Finger</span><span><kbd>←→</kbd> Note</span><span><kbd>↑↓</kbd> Hand</span><span><kbd>PgUp</kbd><kbd>PgDn</kbd> Measure</span><span><kbd>Tab</kbd> Next without a finger</span><span><kbd>L</kbd><kbd>R</kbd> Set the note's hand</span><span><kbd>J</kbd> Jump to a note</span></span>`;}
  private click=(e:MouseEvent)=>{
   const el=(e.target as Element).closest<SVGElement>('[data-viewer-seat],[data-finger-seat]');if(!el||!this.shown)return;
   const id=el.dataset.viewerSeat??el.dataset.fingerSeat,seat=this.shown.crops.flatMap(c=>c.seats).find(s=>s.id===id);
@@ -195,7 +192,7 @@ export class SectionFingering {
  }
  get cursorContact(){return this.cursor?.contactId;}
  private index(){return this.cursor?this.units.findIndex(s=>s.contactId===this.cursor!.contactId):-1;}
- private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.opening=undefined;this.render();}
+ private go(seat:Seat|undefined){if(!seat)return;this.cursor=seat;this.labels=undefined;this.render();}
  private move(step:number){const i=Math.max(0,this.index());this.go(this.units[Math.max(0,Math.min(this.units.length-1,i+step))]);}
  /** The first note of the measure step measures away, in fingering order. */
  private measure(step:number){const bar=Math.max(1,Math.min(this.barCount,(this.cursor?.writtenBar??1)+step));const near=this.units.find(s=>s.writtenBar===bar)??(step<0?[...this.units].reverse().find(s=>s.writtenBar<bar):this.units.find(s=>s.writtenBar>bar));if(near)this.go(this.units.find(s=>s.writtenBar===near.writtenBar));}
@@ -216,7 +213,7 @@ export class SectionFingering {
   // Only the cursor's hand: about half as many labels, each shorter to reach.
   const cursor=this.cursor,hand=this.hand(cursor),seats=this.shown.crops.flatMap(c=>c.seats).filter((s,i,all)=>this.hand(s)===hand&&s.contactId!==cursor.contactId&&all.findIndex(o=>o.contactId===s.contactId)===i).sort((a,b)=>a.writtenBar-b.writtenBar||a.x-b.x||b.baseline-a.baseline);
   const labels=jumpLabels(seats.length);this.labels={targets:new Map(seats.map((s,i)=>[labels[i],s])),typed:''};this.paintLabels();
-  this.options.status(`${hand==='RH'?'Right hand':hand==='LH'?'Left hand':'Notes without a hand'} · type the letter beside a note to move there · ↑↓ other hand · Esc cancels`);
+  this.options.status(`${hand==='RH'||hand==='LH'?hand:'Notes without a hand'} · type the letter beside a note to move there · ↑↓ other hand · Esc cancels`);
  }
  private label(code:string){
   const labels=this.labels!,letter=/^Key([A-Z])$/.exec(code)?.[1].toLowerCase();
@@ -228,10 +225,10 @@ export class SectionFingering {
  private announce(){
   const seat=this.cursor;
   if(!seat){this.options.status('This piece has no notes to finger.');return;}
-  const hand=this.hand(seat)==='RH'?'Right hand':this.hand(seat)==='LH'?'Left hand':'No hand',progress=this.progress(),missing=progress.total-progress.done;
+  const hand=this.hand(seat)??'No hand',progress=this.progress(),missing=progress.total-progress.done;
   this.options.progress?.(progress);
   const where=`${hand} · measure ${seat.writtenBar} of ${this.barCount} · ${missing?`${missing} ${missing===1?'note':'notes'} without a finger`:'every note fingered'}`;
-  this.options.status(this.opening?`${this.opening} ${where}`:where);
+  this.options.status(where);
  }
  /** Counted once per saved state, not on every move. */
  progress():FingeringProgress {
@@ -245,7 +242,7 @@ export class SectionFingering {
   // Move on at once to the next note without a finger; the finger paints
   // when it is saved. Once every note has one, the cursor stays.
   if(i>=0)this.cursor=this.gap(i,1,false,seat.contactId)??seat;
-  this.opening=undefined;this.render();
+  this.render();
   try{await this.options.save(seat,finger);}catch(error){this.go(seat);this.options.status(`Finger ${finger} was not saved: ${error instanceof Error?error.message:String(error)}`);return;}
   this.announce();
  }

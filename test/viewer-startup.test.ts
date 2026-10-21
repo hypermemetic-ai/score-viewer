@@ -23,18 +23,18 @@ function fixture(){
   keyboardPreference:(value:any)=>value,readBindings:(value:any)=>value,fingerPreferences:()=>({}),readMidiMapping:()=>undefined,readMidiBindings:()=>undefined,
   readFingeringAdviceSettings,pendingPersonalConsolidation,readPianoPreferences,defaultPianoPreferences,ViewerOrientation,InputController:class {},readControlBindings:()=>({}),readFreeViewControlOverrides:()=>({}),controls:{configure(){}},
   host:{assistanceStore,onFocusChange:async()=>{},onMidi:async()=>{},fullscreen:async()=>{}},onMidi(){},onMidiNote(){},
-  refreshLibrarySummaries:async()=>{phases.push('summaries accepted');},configurePiano:async()=>({enabled:true,ready:true,error:null}),resetInput(){},render(){rendered++;},notify:(message:string)=>warnings.push(message),
+  configurePiano:async()=>({enabled:true,ready:true,error:null}),resetInput(){},render(){rendered++;},notify:(message:string)=>warnings.push(message),
   esc:(value:string)=>value,button:()=>'<button data-action="exit">Close Viewer</button>',validEntryStorage:()=>true,
  };
  runInNewContext(extracted('async function applyPendingConsolidation(){','function keyboardControl('),context);
  runInNewContext(extracted('async function boot(){','\nvoid boot();'),context);
  return {context,phases,warnings,reads,classes,assistanceData,get rendered(){return rendered;}};
 }
-test('actual startup withholds the library until summaries and enabled sound settle, without writing settings',async()=>{
+test('actual startup withholds the library until enabled sound settles, without writing settings',async()=>{
  const f=fixture();let finish!:(value:any)=>void,reached!:()=>void;const configuring=new Promise<void>(resolve=>{reached=resolve;});
  f.context.configurePiano=()=>new Promise(resolve=>{finish=resolve;reached();});
  const pending=f.context.boot();await Promise.race([configuring,pending]);
- assert.ok(finish);assert.ok(f.phases.includes('summaries accepted'));assert.equal(f.context.startupReady,false);assert.equal(f.rendered,0);assert.ok(f.classes.has('viewer-startup'));
+ assert.ok(finish);assert.ok(!f.phases.includes('summaries'),'The library opens without reading every practice record');assert.equal(f.context.startupReady,false);assert.equal(f.rendered,0);assert.ok(f.classes.has('viewer-startup'));
  finish({enabled:true,ready:true,error:null});await pending;
  assert.equal(f.context.startupReady,true);assert.equal(f.rendered,1);assert.equal(f.classes.has('viewer-startup'),false);assert.deepEqual(f.warnings,[]);
  assert.equal(f.context.preferences.piano.enabled,true);assert.deepEqual(f.reads,['library.json','preferences.json']);assert.deepEqual(f.context.preferences.retainedUnknown,{value:'keep'});

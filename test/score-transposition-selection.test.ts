@@ -8,7 +8,6 @@ import {prepareRetainedEdition} from '../src/retained-editions';
 import {assertSelectedTransposition,nextTranspositionSelection,retainedTranspositionFile} from '../src/score-transposition-selection';
 import {getScoreTransposition,getOriginalScorePackageBytes,prepareSourceTransposition} from '../src/score-transposition';
 import {initialPractice,planPractice} from '../src/practice';
-import {readLibraryPracticeSummary,LibraryPracticeSummaries} from '../src/library-practice-progress';
 
 // A source-owned edition: its hands come from the score (no calculated hands).
 const bytes=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url))),original=await importPackage(bytes),
@@ -70,12 +69,3 @@ test('a changed retained original is refused instead of overwritten from the emb
  assert.deepEqual(stored.get(file),changedOriginal);
 });
 
-test('library progress cold-opens the selected pitch edition and never borrows original achievement or a late callback',async()=>{
- const derivedFile=`package-${await hashBytes(derivedBytes)}.tuna`,selected={...entry,file:derivedFile,retainedPackages:[file],transposition:nextTranspositionSelection(entry,derivedFile,{steps:1,layout:'janko-four-row',originalFile:file})!},
-  plan=planPractice(original),earned=initialPractice(plan);earned.best[plan.chunks[0].pattern]=earned.target;const record=encode(earned),originalRecord=practiceStorageName(entry.id,original),reads:string[]=[];
- const reader={readPackage:async()=>derivedBytes,readRecord:async(name:string)=>{reads.push(name);return name===originalRecord?JSON.parse(new TextDecoder().decode(record)):null;}};
- const summary=await readLibraryPracticeSummary(selected,'janko-four-row',reader);assert.equal(summary!.sections,0);assert.equal(reads.includes(originalRecord),false);
- const cache=new LibraryPracticeSummaries();cache.record(entry,entry,original,'janko-four-row',1,false);assert.equal(cache.get(selected,'janko-four-row'),undefined);
- assert.equal(cache.record(selected,entry,original,'janko-four-row',1,false),false);await cache.refresh([selected],'janko-four-row',reader,()=>true);assert.equal(cache.get(selected,'janko-four-row')!.sections,0);
- await assert.rejects(()=>readLibraryPracticeSummary({...selected,transposition:{...selected.transposition,steps:0}},'janko-four-row',reader),/saved transposition differs/);
-});

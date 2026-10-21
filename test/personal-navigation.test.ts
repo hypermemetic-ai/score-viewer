@@ -24,7 +24,7 @@ function fixture(basePages=2,projectedPages=basePages){
  runInNewContext(body(state,'export function readPersonal(','export const activeLayer='),context);
  runInNewContext(body(main,'function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body(main,'async function savePersonal(','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
- runInNewContext(body(main,'async function saveSelectedChoice(','\nfunction paintLibrarySummaries('),context);
+ runInNewContext(body(main,'async function saveSelectedChoice(','\nfunction repaintLibrary('),context);
  runInNewContext(body(selection,'export function selectionOnPage(','/** Navigate the printed systems'),context);
  return {context,target,p,projected,seats,writes,frames,errors,get disk(){return disk;},get editor(){return context.personalEditor(target);},setProject(fn:(s:any)=>Promise<any>){project=fn;},cold(){const loaded=context.readPersonal(disk,p);context.resolvePersonalNavigation(loaded,projected);return loaded;}};
 }

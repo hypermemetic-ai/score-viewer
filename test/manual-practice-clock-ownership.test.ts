@@ -17,7 +17,7 @@ async function setup(t:any){
  }
  Object.assign(globalThis,{document:new EventTarget(),window:Object.assign(new EventTarget(),{setInterval:()=>1}),AudioContext:Audio,cancelAnimationFrame:()=>{}});host.midiClock=async()=>0;
  const context=await ManualReadingContext.open(p),app={contains:()=>false,removeAttribute(){},querySelector:()=>({focus(){}})} as unknown as HTMLElement;
- const view=new ManualPracticeView(app,{context,personal:{} as never,passage:()=>'',save:async()=>{},back(){},settings(){},changed(){}}) as any;
+ const view=new ManualPracticeView(app,{context,personal:{} as never,passage:()=>'',save:async()=>{},back(){},settings(){}}) as any;
  view.paint=()=>{};view.status=(message:string)=>messages.push(message);
  t.after(()=>{view.close();host.midiClock=midiClock;for(const [key,descriptor]of Object.entries(prior)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else Reflect.deleteProperty(globalThis,key);}});
  await view.action('passage:'+context.plan.chunks[0].id);await view.action('ready');assert.equal(context.session!.phase,'countin');
