@@ -7,7 +7,8 @@ import {importPackage,type ScorePackage,type Seat} from '../src/package';
 import {fingerFor,initialPersonal,readPersonal,type PersonalState} from '../src/state';
 import {effectiveAssignments,handFor} from '../src/personal-assignments';
 import {rawMemoryPersonal} from '../src/personal-memory-session';
-import {FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenView} from '../src/repeat-fold';
+import {FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
+import {requirePracticeHands} from '../src/practice';
 
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
  notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>
@@ -59,6 +60,9 @@ test('twins the player fingered differently keep the passage written out; agreei
  const differ=fingered(p,initialPersonal(p),{[first]:4,[second]:2});
  assert.equal(verbatimRepeats(p,differ)?.fold,undefined);
  assert.deepEqual(verbatimRepeats(p,differ)?.kept.map(k=>k.reason),['owner-choices-differ']);
+ // The reader says why, in bars as printed, and offers the first time's choice.
+ assert.deepEqual(writtenOutRepeat(p,differ),{text:'Bar 9 has a different finger than bar 1, so the repeat is written out.',use:'Use bar 1’s finger',restore:[{ownerId:second,finger:4}]});
+ assert.equal(writtenOutRepeat(p,fingered(p,initialPersonal(p),{[first]:4})),undefined,'nothing to say when it folds');
  assert.equal(withRepeatInheritance(p,differ).repeatResolved,undefined);
  assert.equal(fingerFor(p,withRepeatInheritance(p,differ),seatOf(p,second)),2,'each pass keeps its own finger');
  const agree=fingered(p,initialPersonal(p),{[first]:4,[second]:4});
@@ -70,7 +74,7 @@ test('the folded reader names written-out notes and finds its way back to them',
  const personal=withRepeatInheritance(p,fingered(p,initialPersonal(p),{[first]:4,[second]:4,[ownerAt(p,10)]:3}));
  const view=await new FoldedReader(p,null).view(personal,p);
  assert.ok(view?.verbatimFold);
- assert.equal(writtenView(view),p,'practice and Fingers go through the written-out score');
+ assert.equal(writtenView(view),p,'saved navigation names the stored edition');
  assert.ok(view.pages.length<=p.pages.length&&view.seats.length<p.seats.length,'the return is drawn once');
  const ids=new Set(p.score.notes.map(n=>n.id));
  for(const seat of view.seats){
@@ -121,4 +125,28 @@ test('a hand moved in one pass moves its untouched twin', async()=>{
  assert.equal(effectiveAssignments(p,personal).find(a=>a.id===second)?.hand,'LH','practice plays the return in the same hand');
  const view=await new FoldedReader(p,null).view(personal,p);
  assert.deepEqual(view?.seats.find(s=>s.ownerIds.includes(first))?.ownerIds,[first]);
+ // A hand kept to its own bar (hand-change carries' "hand here only") is a choice there, even the written hand: the passes differ.
+ const m=p.score.notes.find(n=>n.id===second)! as typeof n,local=structuredClone(moved);
+ local.assignments!.choices[second]={ownerId:second,guard:{pitch:m.pitch.octave*12+m.pitch.pitchClass,startTick:m.startTick,durationTicks:m.durationTicks},original:{hand:'RH'},hand:'RH',createdAt:new Date(0).toISOString(),...{handScope:'local'}};
+ assert.equal(verbatimRepeats(p,local)?.fold,undefined);
+ assert.match(writtenOutRepeat(p,local)!.text,/^Bar 9 has a different hand than bar 1/);
+});
+
+test('practice and Fingers visit each printed bar once, reading every pass\'s choices, and edit the stored notes', async()=>{
+ const p=await returning(),first=ownerAt(p,1),second=ownerAt(p,9),late=ownerAt(p,10);
+ const personal=withRepeatInheritance(p,fingered(p,initialPersonal(p),{[first]:4,[late]:3}));
+ const view=await new FoldedReader(p,null).view(personal);
+ assert.ok(view,'the folded pages are drawn from the stored edition alone');
+ const {edition,practice}=view.verbatimFold!,folded=view.verbatimFold!.personal(personal);
+ assert.equal(edition.score.sourceBarTicks!.length-1,9,'nine printed bars, as a score with composer repeats');
+ assert.ok(edition.score.writtenPresentation,'played through its repeat');
+ requirePracticeHands(edition,folded);
+ const ids=new Set(edition.score.notes.map(n=>n.id));
+ for(const seat of practice.seats)assert.ok(seat.ownerIds.every(id=>ids.has(id)),'practice seats name the folded notes');
+ const at=(id:string)=>practice.seats.find(s=>s.ownerIds.includes(id)&&!s.continuation)!;
+ assert.equal(fingerFor(edition,folded,at(first)),4);
+ assert.equal(fingerFor(edition,folded,at(ownerAt(p,2))),3,'a finger given only in the second pass shows on the printed bar');
+ assert.deepEqual(editOwners(at(ownerAt(p,2))),[late],'and an edit there reaches the note that carries it');
+ assert.equal(folded.assignments?.choices[second],undefined,'no second-pass note is in the folded score');
+ assert.deepEqual([view.verbatimFold!.printedBar(10),view.verbatimFold!.printedBar(17),view.verbatimFold!.printedBar(3)],[2,9,3],'stored bars name their printed bars');
 });

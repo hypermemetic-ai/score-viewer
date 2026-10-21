@@ -53,9 +53,11 @@ export function repeatOwnerFacts(p:ScorePackage,s:PersonalState):Map<string,Verb
  for(const n of source.notes){
   if(!isPitchedEvent(n))continue;
   const choice=personal.assignments?.choices[n.id],hand=choice?.hand!==undefined&&choice.hand!==(n.hand??null)?choice.hand:undefined;
+  // A hand kept to its own bar ("only here", or "hand here only"; hand-change carries) is a choice even where it is the written hand.
+  const local=(choice as {handScope?:string}|undefined)?.handScope==='local'&&choice?.hand!==undefined;
   const restored=!!personal.calculatedOwners?.[n.id],remembered=!restored&&Object.hasOwn(shared,n.id);
   const finger=restored?layer?.attacks.find(a=>a.id===layer.sourceOwnerToAttack[n.id])?.finger:remembered?shared[n.id].finger??undefined:choice?.finger??legacy.get(n.id);
-  if(hand!==undefined||finger!==undefined||restored||remembered)facts.set(n.id,{...(hand?{hand}:{}),...(finger!==undefined?{finger:String(finger)}:{})});
+  if(hand!==undefined||finger!==undefined||restored||remembered||local)facts.set(n.id,{...(hand?{hand}:{}),...(finger!==undefined?{finger:String(finger)}:{}),...(local?{local}:{})});
  }
  return facts;
 }
@@ -64,6 +66,33 @@ export function repeatOwnerFacts(p:ScorePackage,s:PersonalState):Map<string,Verb
 export function verbatimRepeats(p:ScorePackage,s:PersonalState):VerbatimRepeatResult|undefined{
  const source=foldable(p);if(!source)return;
  return foldVerbatimRepeats(source,{ownerFacts:repeatOwnerFacts(p,s),sourceHash:p.sourceSha256});
+}
+
+/** A repeat the reader writes out because the player's choices differ between
+ * its passes: why, in bars as printed, and the choices that would fold it again. */
+export interface WrittenOutRepeat {text:string;use:string;restore:{ownerId:string;hand?:PersonalHand;finger?:number}[]}
+export function writtenOutRepeat(p:ScorePackage,s:PersonalState,printed:(bar:number)=>number=bar=>bar):WrittenOutRepeat|undefined{
+ const source=foldable(p),kept=source&&verbatimRepeats(p,s)?.kept;if(!source||!kept?.length)return;
+ const facts=repeatOwnerFacts(p,own(s)),notes=new Map(source.notes.map(n=>[n.id,n])),bars=source.sourceBarTicks!;
+ const barOf=(id:string)=>{const tick=notes.get(id)!.startTick;let b=0;while(b<bars.length-2&&bars[b+1]<=tick)b++;return printed(b+1);};
+ const restore:WrittenOutRepeat['restore']=[],places=new Map<string,{second:number;first:number;kinds:Set<string>}>();
+ for(const {second,first} of kept.flatMap(k=>k.differs)){
+  const a=facts.get(first),b=facts.get(second),written=notes.get(first)?.hand as PersonalHand|undefined,hand=a?.hand??written,kinds=new Set<string>();
+  const change:WrittenOutRepeat['restore'][number]={ownerId:second};
+  if((b?.hand??written)!==hand&&hand){change.hand=hand as PersonalHand;kinds.add('hand');}
+  if(a?.finger!==undefined&&a.finger!==b?.finger){change.finger=Number(a.finger);kinds.add('finger');}
+  if(!kinds.size)continue;
+  restore.push(change);
+  const at={second:barOf(second),first:barOf(first)},key=`${at.second}|${at.first}`,place=places.get(key)??{...at,kinds:new Set()};for(const k of kinds)place.kinds.add(k);places.set(key,place);
+ }
+ if(!restore.length)return;
+ const list=[...places.values()],kinds=[...new Set(list.flatMap(x=>[...x.kinds]))].sort(),what=kinds.join(' and ');
+ const join=(xs:number[])=>xs.length<2?String(xs[0]):`${xs.slice(0,-1).join(', ')} and ${xs.at(-1)}`;
+ const seconds=[...new Set(list.map(x=>x.second))],firsts=[...new Set(list.map(x=>x.first))];
+ const text=seconds.length===1?`Bar ${seconds[0]} has a different ${what} than bar ${firsts.join(' and ')}, so the repeat is written out.`
+  :`Bars ${join(seconds)} have a different ${what} than bars ${join(firsts)}, so the repeat is written out.`;
+ const use=firsts.length===1?`Use bar ${firsts[0]}’s ${kinds.length>1?'choices':what}`:'Use the first time’s choices';
+ return {text,use,restore};
 }
 
 /** The player's state with what each untouched note reads from its twin. */
@@ -84,8 +113,16 @@ export function withRepeatInheritance(p:ScorePackage,s:PersonalState):PersonalSt
 export interface FoldedReaderView {
  /** Written-out note → the folded note that shows it. */
  shownBy:ReadonlyMap<string,string>;
- /** The written-out view the reader folds: what practice, Fingers and playback go through. */
+ /** The stored, written-out edition the reader folds; saved navigation names its seats. */
  written:ScorePackage;
+ /** The folded edition, as composer repeats are: practice and Fingers visit each printed bar once. */
+ edition:ScorePackage;
+ /** The folded pages with the player's hands, each seat naming its folded note; edits on it reach every twin that carries a choice. */
+ practice:ScorePackage;
+ /** The player's choices on the folded notes: each note's own, else its twin's. */
+ personal(personal:PersonalState):PersonalState;
+ /** The printed bar (1-based) that shows a stored bar (1-based). */
+ printedBar(storedBar:number):number;
  /** The written-out seat of a folded seat. */
  writtenSeat(seat:Seat):Seat|undefined;
  /** The folded seat that shows a written-out seat. */
@@ -126,8 +163,12 @@ export class FoldedReader {
  private readonly editions=new Map<QuantizedGridScore,Promise<{base:ScorePackage;session:PersonalPresentationSession}>>();
  private readonly cache:DerivedFileCache|null;
  constructor(private readonly base:ScorePackage,cache?:DerivedFileCache|null){this.cache=cache===undefined?defaultCache??null:cache;}
- /** The folded view of a written-out view for these choices, or undefined when nothing folds. */
- async view(personal:PersonalState,written:ScorePackage,input?:ReadingExecution):Promise<FoldedPackage|undefined>{
+ /** Whether these choices show a repeat folded: then the written-out pages need not be drawn at all. */
+ folds(personal:PersonalState):boolean{return !!verbatimRepeats(this.base,personal)?.fold;}
+ /** The folded view for these choices, or undefined when nothing folds. Its
+  * seats are named after the stored edition's (`written`, by default the
+  * stored pages), so it is drawn without drawing the written-out pages. */
+ async view(personal:PersonalState,written:ScorePackage=this.base,input?:ReadingExecution):Promise<FoldedPackage|undefined>{
   const execution=input?capturedReadingExecution(input):undefined;
   const fold=verbatimRepeats(this.base,personal)?.fold;if(!fold)return;
   let edition=this.editions.get(fold.score);
@@ -138,15 +179,20 @@ export class FoldedReader {
   // A folded note is named by its twins that carry a choice, else by itself.
   const named=new Map<string,string[]>(),notes=new Map(projected.score.notes.map(n=>[n.id,n]));
   for(const n of projected.score.notes){const twins=fold.shows.get(n.id)??[n.id],carriers=twins.filter(id=>facts.has(id));named.set(n.id,carriers.length?carriers:[n.id]);}
-  const foldedIds=new Map<string,readonly string[]>();
+  const foldedIds=new Map<string,readonly string[]>(),practiceSeats:FoldedSeat[]=[];
   const seats=projected.seats.map(seat=>{
    const owners=[...new Set(seat.ownerIds.flatMap(id=>named.get(id)??[id]))],own=writtenOf(owners[0],seat),verbatimTwins=named.get(seat.ownerIds[0])??owners.slice(0,1);foldedIds.set(seat.id,seat.ownerIds);
-   return own?{...seat,ownerIds:owners,actionId:own.actionId,contactId:own.contactId,verbatimTwins}:{...seat,ownerIds:owners,verbatimTwins};
+   const shown=own?{...seat,ownerIds:owners,actionId:own.actionId,contactId:own.contactId,verbatimTwins}:{...seat,ownerIds:owners,verbatimTwins};
+   practiceSeats.push({...shown,ownerIds:seat.ownerIds});return shown;
   });
   // Seats name written-out notes; each reads as the folded note it is drawn as.
   const aliases=[...named].flatMap(([id,ids])=>ids.filter(other=>other!==id&&!notes.has(other)).map(other=>({...notes.get(id)!,id:other})));
   const foldedOf=seatIndex(seats,seat=>foldedIds.get(seat.id)??[]);
-  return {...projected,score:{...projected.score,notes:[...projected.score.notes,...aliases]},seats,verbatimFold:{shownBy:fold.shownBy,written,
+  const printed=new Map<number,number>();for(const segment of fold.segments)if(!printed.has(segment.sourceBar))printed.set(segment.sourceBar,segment.writtenBar+1);
+  return {...projected,score:{...projected.score,notes:[...projected.score.notes,...aliases]},seats,verbatimFold:{shownBy:fold.shownBy,written,edition:base,
+   practice:{...projected,seats:practiceSeats},
+   personal:next=>foldedPersonal(base,this.base,next),
+   printedBar:bar=>printed.get(bar-1)??bar,
    writtenSeat:seat=>writtenOf(seat.ownerIds[0],seat),
    foldedSeat:seat=>{const id=seat.ownerIds[0];return foldedOf(fold.shownBy.get(id)??id,seat);}}};
  }
@@ -171,6 +217,26 @@ export class FoldedReader {
   if(reading)await adoptImportedReading(edition,reading,execution).catch(error=>{if(error instanceof DOMException&&error.name==='AbortError')throw error;});
   return {base:edition,session:new PersonalPresentationSession(edition)};
  }
+}
+
+/** The player's choices on the folded notes, as practice and Fingers read
+ * them: each folded note's own hand and finger, else its twin's, guarded by
+ * the folded notes' own clocks. Derived for display; edits go to the stored
+ * notes (`editOwners`). */
+function foldedPersonal(edition:ScorePackage,base:ScorePackage,personal:PersonalState):PersonalState{
+ const inherited=withRepeatInheritance(base,personal),rev=revision(base),choices:PersonalAssignments['choices']={};
+ const shared=inherited.memoryResolved?.sourceRevision===rev?inherited.memoryResolved.choices:{},repeat=inherited.repeatResolved?.choices??{};
+ const legacy=new Map(Object.values(inherited.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c.replacement] as const)));
+ for(const n of edition.score.notes){
+  if(!isPitchedEvent(n))continue;
+  const own=inherited.assignments?.choices[n.id],hand=own?.hand??repeat[n.id]?.hand;
+  const finger=inherited.calculatedOwners?.[n.id]?undefined:Object.hasOwn(shared,n.id)?shared[n.id].finger??undefined:own?.finger??legacy.get(n.id)??repeat[n.id]?.finger;
+  if(hand===undefined&&finger===undefined)continue;
+  choices[n.id]={ownerId:n.id,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand??null},
+   ...(hand!==undefined?{hand}:{}),...(finger!==undefined?{finger}:{}),createdAt:own?.createdAt??new Date(0).toISOString()};
+ }
+ const {assignments:_a,repeatResolved:_r,memoryResolved:_m,overrides:_o,undoAssignments:_u,...rest}=inherited;
+ return {...rest,overrides:{},...(Object.keys(choices).length?{assignments:{version:'personal-owner-assignments-v1',sourceRevision:rev,choices}}:{})};
 }
 
 /** The player's hands on the folded notes, guarded by the folded notes' own clocks. */

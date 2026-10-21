@@ -34,8 +34,9 @@ export function memoryReferenceTarget(input:MemoryScoreInput,resolution:MemoryRe
 export function memoryChoiceLabel(resolution:MemoryResolution,ownerId:string):'Shared'|'Local'|undefined {
  const finger=resolution.byOwner[ownerId]?.finger;return finger?finger.provenance==='local'?'Local':'Shared':undefined;
 }
-export function memorySourceLabel(document:PersonalFingeringMemory,resolution:MemoryResolution,ownerId:string,title:(entryId:string)=>string):string {
+/** `bar` names a stored bar as the reader prints it (a folded repeat prints fewer bars). */
+export function memorySourceLabel(document:PersonalFingeringMemory,resolution:MemoryResolution,ownerId:string,title:(entryId:string)=>string,bar:(entryId:string,writtenBar:number)=>number=(_,b)=>b):string {
  const r=resolution.byOwner[ownerId],decision=r?.finger?.decision;
  const ref=r?.reference,donor=decision&&Object.values(document.occurrences).find(q=>q.occurrence.occurrenceId===decision.donor.occurrenceId&&q.occurrence.sourceRevision===decision.donor.sourceRevision&&q.occurrence.scope===decision.donor.scope);
- return [ref?`Reference: ${title(ref.entryId)}, measure ${ref.writtenBar}.`:r?.finger?'Reference unavailable.':'',donor?`Choice from ${title(donor.entryId)}, measure ${donor.writtenBar}.`:''].filter(Boolean).join(' ');
+ return [ref?`Reference: ${title(ref.entryId)}, measure ${bar(ref.entryId,ref.writtenBar)}.`:r?.finger?'Reference unavailable.':'',donor?`Choice from ${title(donor.entryId)}, measure ${bar(donor.entryId,donor.writtenBar)}.`:''].filter(Boolean).join(' ');
 }

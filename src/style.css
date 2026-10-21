@@ -114,6 +114,10 @@ dialog{width:min(var(--viewer-dialog-max,640px),calc(var(--viewer-logical-width,
 .personal-edit-status{position:fixed;z-index:30;left:50%;bottom:5rem;transform:translateX(-50%);display:flex;align-items:center;gap:.65rem;max-width:min(90vw,48rem);padding:.75rem 1rem;border:1px solid #c9b8a4;border-radius:.6rem;background:#fffaf2;color:#594a3d;box-shadow:0 3px 16px #00000012;font-size:.85rem}
 .personal-edit-status button{white-space:nowrap}
 @media(max-width:700px){.personal-edit-status{flex-wrap:wrap}.personal-edit-status span{flex-basis:100%}}
+/* A repeat written out because its passes differ: why, and how to fold it again. Above the pages' top margin, clear of the toolbar. */
+.repeat-written-out{position:fixed;z-index:29;left:50%;top:.75rem;transform:translateX(-50%);display:flex;align-items:center;gap:.65rem;max-width:min(90vw,48rem);padding:.5rem .85rem;border:1px solid #c9b8a4;border-radius:.6rem;background:#fffaf2;color:#594a3d;box-shadow:0 3px 16px #0002;font-size:.95rem}
+.repeat-written-out button{white-space:nowrap}
+@media(max-width:700px){.repeat-written-out{flex-wrap:wrap}.repeat-written-out span{flex-basis:100%}}
 
 /* Exclusion changes assessment membership without moving or erasing the row. */
 .practice-catalog-label{margin:14px 6px 4px;color:#8d9695;font-size:11px;letter-spacing:.06em}
