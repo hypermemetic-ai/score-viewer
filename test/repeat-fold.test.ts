@@ -130,6 +130,11 @@ test('a hand moved in one pass moves its untouched twin', async()=>{
  local.assignments!.choices[second]={ownerId:second,guard:{pitch:m.pitch.octave*12+m.pitch.pitchClass,startTick:m.startTick,durationTicks:m.durationTicks},original:{hand:'RH'},hand:'RH',createdAt:new Date(0).toISOString(),...{handScope:'local'}};
  assert.equal(verbatimRepeats(p,local)?.fold,undefined);
  assert.match(writtenOutRepeat(p,local)!.text,/^Bar 9 has a different hand than bar 1/);
+ // "Only here" on the moved note: its untouched twin keeps its written hand, so the passes differ.
+ const here=structuredClone(moved);Object.assign(here.assignments!.choices[first],{handScope:'local'});
+ assert.equal(verbatimRepeats(p,here)?.fold,undefined);
+ assert.equal(handFor(p,withRepeatInheritance(p,here),second),'RH');
+ assert.match(writtenOutRepeat(p,here)!.text,/^Bar 9 has a different hand than bar 1/);
 });
 
 test('practice and Fingers visit each printed bar once, reading every pass\'s choices, and edit the stored notes', async()=>{
