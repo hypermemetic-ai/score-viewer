@@ -224,3 +224,22 @@ test('speed: bars of other lengths sharing a hand’s opening cost a resolve abo
   assert.ok(ratio<2,`${fresh?'a first':'a later'} resolve with matching bars took ${ratio.toFixed(2)}× the CPU of one without (${(median(times[0])/1000).toFixed(0)} ms against ${(median(times[1])/1000).toFixed(0)} ms)`);
  }
 });
+
+test('reopened after a refused carried hand, bar 21’s hands as written are registered with the fingering memory',async()=>{
+ // Its own source revision, since the session's refusals are kept per score and layout.
+ const input=no13();(input.p as {sourceRevision?:string}).sourceRevision='reopened';input.personal=initialPersonal(input.p);
+ const stored={...input,personal:movedHands(input,owners(input))},data=new Map<string,string>();
+ const store=browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},new Locks());
+ const session=new PersonalMemorySession(store,{scanLibrary:async()=>[structuredClone(stored)],validateInputs:async()=>true});await session.initialize();
+ const open=async()=>{const personal=await session.loadPersonalCurrent({id:'no13',importedAt:input.importedAt!},input.p,async()=>stored.personal);await session.flush();return personal;};
+ // Bar 21's LH as written: B3 at each chord with E4 and D#4, which bar 11's LH no longer plays.
+ const bar21LH=async()=>Object.values(((await store.read()).documents[personalMemoryDocument] as unknown as {occurrences:Record<string,{writtenBar:number;occurrence:{scope?:string};ownerIds:string[]}>}).occurrences)
+  .some(r=>r.writtenBar===21&&r.occurrence.scope==='LH'&&r.ownerIds.includes('m21:n5')&&r.ownerIds.includes('m21:n10'));
+ let personal=await open();const before=(await store.read()).revision;
+ assert.equal(handFor(input.p,personal,'m21:n10'),'RH');assert.equal(await bar21LH(),false,'only the carried split is known');
+ // Opening it again unchanged writes nothing.
+ personal=await open();assert.equal((await store.read()).revision,before);
+ assert.equal(dropHandCarry(input.p,personal,'m21:n5'),21);assert.equal(handFor(input.p,personal,'m21:n10'),'LH');
+ // Reopened in the same session, the score is known with bar 21's hands as written only once they are registered.
+ await open();assert.equal(await bar21LH(),true);assert.ok((await store.read()).revision>before);
+});
