@@ -114,3 +114,17 @@ test('leaving the score says at once that its waiting choices were not applied',
  assert.equal(f.messages.length,1);assert.match(f.messages[0],/^LH for the note in bar \d+ was not applied/);
  f.disk.resolve();prep.ready();await new Promise(r=>setTimeout(r,20));assert.equal(f.messages.length,1,'said once');assert.equal(f.target.personal.assignments,undefined);
 });
+test('a hand choice waiting on a folded note applies to every pass, even a return with its own hand',async()=>{
+ const f=await fixture(),a=f.units[0],b=f.units.find((s:any)=>s.writtenBar===13)!,owners=[a.ownerIds[0],b.ownerIds[0]];
+ // Both passes are the player's right hand, so they fold; bar 13's is its own choice.
+ await f.context.saveHandChoice('RH');f.context.selection=b;await f.context.saveHandChoice('RH');
+ assert.deepEqual(owners.map(id=>handFor(p,f.target.personal,id)),['RH','RH']);
+ const prep=preparing(f);f.context.selection={...a,verbatimTwins:owners};
+ await f.context.saveHandChoice('LH');
+ assert.deepEqual(handWait(f).status.queued.map((c:any)=>[c.key,c.owners,c.hand]),[[a.ownerIds[0],owners,'LH']],'one choice waits, for both passes');
+ f.disk.resolve();prep.ready();await settle(f);
+ assert.deepEqual(owners.map(id=>handFor(p,f.target.personal,id)),['LH','LH'],'the left hand reaches bar 1 and bar 13');
+ assert.match(f.messages.at(-1)!,/^Hand editing is ready\. LH applied to the note in bar 1\.$/);
+ await f.flush();
+ assert.deepEqual(owners.map(id=>f.written.at(-1)!.assignments.choices[id].hand),['LH','LH'],'and both are saved');
+});

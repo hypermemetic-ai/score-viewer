@@ -96,9 +96,10 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage} from './repeat-fold';
+import {FoldedReader,editOwners,foldFailureText,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
+import {noteMemoryActions,type NoteMemoryCommand} from './note-memory-actions';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache,VIEWER_DERIVED_IDENTITY} from './derived-file-cache';
 import {RetainedScore,underMemoryPressure,type RetentionConditions} from './retained-score';
@@ -111,7 +112,7 @@ import {readMidiMapping,readMidiBindings,type MidiBindings,type MidiMapping,type
 import {scoreCapabilities,requirePianoCapability} from './score-capabilities';
 const app=document.querySelector<HTMLElement>('#app')!;
 let startupReady=false,startupFailed=false;
-let entries:Entry[]=[],preferences:{version:1;libraryRotation:Rotation;displayRotation?:Rotation;bindings:Bindings;fingerBehavior:FingerBehavior;fingerPresentation:FingerPresentation;keyboardLayout:PhysicalKeyboardId;notationSystem?:'iso';midi?:MidiMapping;midiBindings?:MidiBindings;controlBindings?:ControlBindings;freeViewControls?:FreeViewControlOverrides;lastWorkedEntryId?:string;audioOutput?:string;piano?:PianoPreferences;fingeringAdvice?:FingeringAdviceSettings;scoreTempos?:Record<string,unknown>}={version:1,libraryRotation:0,bindings:defaultBindings(),...fingerPreferences(),keyboardLayout:'conventional-piano'},input=new InputController();
+let entries:Entry[]=[],preferences:{version:1;libraryRotation:Rotation;displayRotation?:Rotation;bindings:Bindings;fingerBehavior:FingerBehavior;fingerPresentation:FingerPresentation;keyboardLayout:PhysicalKeyboardId;notationSystem?:'iso';midi?:MidiMapping;midiBindings?:MidiBindings;controlBindings?:ControlBindings;freeViewControls?:FreeViewControlOverrides;lastWorkedEntryId?:string;audioOutput?:string;piano?:PianoPreferences;fingeringAdvice?:FingeringAdviceSettings;scoreTempos?:Record<string,unknown>;writtenOutRepeats?:string[]}={version:1,libraryRotation:0,bindings:defaultBindings(),...fingerPreferences(),keyboardLayout:'conventional-piano'},input=new InputController();
 let pianoSettings=defaultPianoPreferences(),pianoWarning='',pianoOptions:PianoOptionsPanel|undefined;
 let current:{entry:Entry;package:ScorePackage;personal:PersonalState}|undefined;let toolbarVisible=false,timer:number|undefined,dialog:HTMLDialogElement|undefined,focusReturn:HTMLElement|undefined;
 let readingPresentation:ReadingPresentationController|undefined,readingViewError:string|undefined;const readingParts=new ReadingPartCatalog();
@@ -349,7 +350,9 @@ function shownSession(target:NonNullable<typeof current>):PersonalPresentationSe
 async function presentReader(target:NonNullable<typeof current>,personal:PersonalState,written:()=>Promise<ScorePackage>,execution?:ReadingExecution):Promise<ScorePackage>{
  if(scoreCapabilities(target.package).pianoPreparation){const fold=personalEditor(target).fold;
   if(fold.folds(personal))try{const view=await fold.view(personal,target.package,execution);if(view)return view;}
-  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);
+   // Said once a score: the pages are right, only longer.
+   if(!foldFailureSaid.has(target.package)){foldFailureSaid.add(target.package);notify(foldFailureText(error));}}
  }
  return written();
 }
@@ -357,11 +360,20 @@ async function presentReader(target:NonNullable<typeof current>,personal:Persona
 function printedBar(entryId:string,bar:number):number{const fold=current?.entry.id===entryId?(readerPackage() as FoldedPackage).verbatimFold:undefined;return fold?fold.printedBar(bar):bar;}
 /** A score's stored bars as printed, for notices that name bars. */
 const printedBars=(target:{entry:{id:string}}):PrintedBar=>bar=>printedBar(target.entry.id,bar);
-/** Scores whose written-out repeat the player chose to keep this session. */
-const keptWrittenOut=new WeakSet<NonNullable<typeof current>>();
+/** Written-out repeats the player keeps (K), remembered with the settings for
+ * each score package: the notice returns only when its passes differ otherwise. */
+const KEPT_WRITTEN_OUT=200,repeatKept=(target:NonNullable<typeof current>,found:WrittenOutRepeat)=>`${personalStorageName(target.entry.id,target.package)}\n${found.text}`;
+const keepsWrittenOut=(target:NonNullable<typeof current>,found:WrittenOutRepeat)=>!!preferences.writtenOutRepeats?.includes(repeatKept(target,found));
+async function keepWrittenOut(target:NonNullable<typeof current>,found:WrittenOutRepeat){
+ const key=repeatKept(target,found),package_=personalStorageName(target.entry.id,target.package)+'\n';if(keepsWrittenOut(target,found))return;
+ // One kept repeat per score package: the one its notice last offered.
+ await enqueue(async()=>{const next={...preferences,writtenOutRepeats:[...(preferences.writtenOutRepeats??[]).filter(k=>!k.startsWith(package_)),key].slice(-KEPT_WRITTEN_OUT)};await writeJson('preferences.json',next);preferences=next;});
+}
+/** Scores told this session that their folded pages couldn't be drawn. */
+const foldFailureSaid=new WeakSet<ScorePackage>();
 /** Why a repeat the reader would fold is written out, and how to fold it again. */
 function paintRepeatNotice(){
- const target=current,found=target&&!practice&&!keptWrittenOut.has(target)&&scoreCapabilities(target.package).pianoPreparation?writtenOutRepeat(target.package,target.personal,bar=>printedBar(target.entry.id,bar)):undefined;
+ const target=current,shown=target&&!practice&&scoreCapabilities(target.package).pianoPreparation?writtenOutRepeat(target.package,target.personal,bar=>printedBar(target.entry.id,bar)):undefined,found=shown&&!keepsWrittenOut(target!,shown)?shown:undefined;
  let notice=app.querySelector<HTMLElement>('.repeat-written-out');
  if(!found){notice?.remove();return;}
  if(!notice){notice=document.createElement('aside');notice.className='repeat-written-out';notice.setAttribute('role','status');app.querySelector('.surface')?.append(notice);}
@@ -552,12 +564,16 @@ async function keepDrawableHands(target:NonNullable<typeof current>,attempted:Pe
   try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{}),dropped:[...dropped],unshared};}catch(next){error=next;}
  }
 }
-async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat):Promise<ReturnType<typeof personalMemory.accept>&{kept?:string}>{
+/** Accept one action, or one per pass of a folded note (`editOwners`) shown together, so the passes never part between them. */
+async function acceptMemoryAction(target:NonNullable<typeof current>,actions:PersonalMemoryAction|readonly PersonalMemoryAction[],nextSeat?:Seat):Promise<ReturnType<typeof personalMemory.accept>&{kept?:string}>{
+ const all:readonly PersonalMemoryAction[]=Array.isArray(actions)?actions:[actions as PersonalMemoryAction],action=all[0];
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  // Actions that can give a note a personal hand are refused on a score whose own engraving is refused.
- if(['hand','handScope','reference','calculated','undoRestore'].includes(action.kind)&&scoreCapabilities(target.package).pianoPreparation){
+ if(all.some(action=>['hand','handScope','reference','calculated','undoRestore'].includes(action.kind))&&scoreCapabilities(target.package).pianoPreparation){
   const wait=handEditingWait(target);if(wait&&(!await wait.ready||current!==target))throw cancelledReading();}
- const receipt=personalMemory.accept(memoryInput(target),action);
+ let receipt=personalMemory.accept(memoryInput(target),action);const saved=[receipt.saved];
+ for(const later of all.slice(1)){receipt=personalMemory.accept({...memoryInput(target),personal:receipt.personal},later);saved.push(receipt.saved);}
+ if(saved.length>1)receipt={...receipt,saved:Promise.all(saved).then(()=>{})};
  const {keptReason}=await presentPersonalChange(target,receipt.personal,receipt.saved,nextSeat);return keptReason?{...receipt,kept:keptReason}:receipt;
 }
 /** Replace both notation and hand grouping together, retaining the exact saved
@@ -1405,7 +1421,7 @@ async function earlierEditions(){
 }
 function closeDialog(returnParent=true){adviceOptions?.dispose();adviceOptions=undefined;if(['piano-preparation','score-reading'].includes(dialog?.dataset.kind??'')&&job?.state==='installing')return;if(dialog&&readingOperation?.dialog===dialog&&readingOperation.running.state==='working')readingOperation.running.cancel();const back=dialogBack;dialogBack=undefined;practiceOptionsCleanup?.();practiceOptionsCleanup=undefined;transposeControls?.dispose();transposeControls=undefined;optionsNavigation?.dispose();optionsNavigation=undefined;dialogNavigation?.dispose();dialogNavigation=undefined;bindingOptions?.dispose();bindingOptions=undefined;midiOptions?.dispose();midiOptions=undefined;audioOptions?.dispose();audioOptions=undefined;pianoOptions?.dispose();pianoOptions=undefined;if(!dialog)return;dialog.close();dialog.remove();dialog=undefined;input.capture=undefined;resetInput();const practiceFocus=practiceFocusReturn?app.querySelector<HTMLElement>(practiceFocusReturn):undefined;practiceFocusReturn=undefined;if(selection)focusSelection();else if(practiceFocus)practiceFocus.focus();else if(focusReturn?.isConnected)focusReturn.focus();else app.querySelector<HTMLElement>('.practice-overview:not([hidden]) .practice-chunks [aria-current=true],.practice-stage,.reader')?.focus();focusReturn=undefined;if(libraryRepaintPending&&!current&&!practice)repaintLibrary();if(returnParent)back?.();}
 function showDialog(html:string,kind='options'){const parentSection=dialog?.dataset.kind==='options'&&kind==='earlier-editions'?optionsSection:undefined,opener=document.activeElement as HTMLElement,openerAction=opener?.dataset.action;closeDialog(false);if(parentSection)dialogBack=()=>{options(parentSection);if(openerAction)dialog?.querySelector<HTMLElement>(`[data-action="${CSS.escape(openerAction)}"]`)?.focus();};focusReturn=document.activeElement as HTMLElement;dialog=document.createElement('dialog');dialog.innerHTML=html;arrangeDialogNavigation(dialog);dialog.dataset.kind=kind;dialog.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});document.body.append(dialog);dialog.showModal();fitDialog(dialog,orientation.rotation);resetInput();if(kind!=='options')dialogNavigation=new OptionsNavigation(dialog,()=>{},()=>false,{focusOnPrepare:false});dialog.querySelector<HTMLElement>('input:not([hidden]),button:not([hidden]),select:not([hidden])')?.focus();return dialog;}
-async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore edition finger','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{for(const ownerId of editOwners(seat))await acceptMemoryAction(target,{kind:'calculated',ownerId,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
+async function edit(seat:Seat,point?:{x:number;y:number}){editSequence.reset();if(!current||(!selection&&labelMode()!=='finger'))return;current.personal.editContactId=seat.contactId;savePersonalQuietly();const value=fingerFor(current.package,current.personal,seat)!;const d=showDialog(`<h2>Finger · bar ${seat.writtenBar}</h2><form class="edit-form"><label>Finger <input aria-label="Finger number" inputmode="numeric" maxlength="1" value="${value??''}" autocomplete="off"></label><button type="submit">Save <kbd>Enter</kbd></button>${button('Cancel','close','Esc')}${button('Restore edition finger','restore-one','',!resolveMemoryInput(memoryInput(current)).byOwner[seat.ownerIds[0]]?.personal)}</form><p class="error" role="alert"></p>`,'edit');if(point){d.style.margin='0';d.style.position='fixed';const box=d.getBoundingClientRect(),cx=Math.max(box.width/2+10,Math.min(innerWidth-box.width/2-10,point.x+box.width/2-30)),cy=Math.max(box.height/2+10,Math.min(innerHeight-box.height/2-10,point.y+box.height/2+16));d.style.left=`${cx-d.offsetWidth/2}px`;d.style.top=`${cy-d.offsetHeight/2}px`;}const field=d.querySelector<HTMLInputElement>('input')!;field.select();let submitting=false;d.querySelector('form')!.addEventListener('submit',async e=>{e.preventDefault();const target=current;if(submitting||!target||dialog!==d)return;submitting=true;try{const replacement=Number(field.value);if(!selection)editNavigation='notes';selection=seat;await saveFingerDigit(replacement);if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){d.querySelector('.error')!.textContent=(error as Error).message;}finally{submitting=false;}});d.querySelector('[data-action=restore-one]')?.addEventListener('click',async()=>{const target=current;if(!target||dialog!==d)return;try{const authoredAt=new Date().toISOString();await acceptMemoryAction(target,editOwners(seat).map(ownerId=>({kind:'calculated',ownerId,decisionId:crypto.randomUUID(),authoredAt})));if(dialog===d)closeDialog();if(current===target){renderPages();renderToolbar();}}catch(error){paintPersonalSaveError(target,error as Error);}});}
 function onMidi(event:MidiCC){if(!startupReady)return;if(event.generation!==midiConnection?.generation||event.source!==midiConnection.source||!pitchInput.accepts(event))return;syncControls();
  midiOptions?.receive(event);
  if([120,121,123].includes(event.controller)){bindingOptions?.cancel('Input reset. Start again.');musicalSustain.clear();if(practice instanceof PracticeView)practice.clearHeldInput();practice?.pause();resetInput();return;}
@@ -1521,20 +1537,19 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
 
 async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='pdf'){await savePdf();return;}if(action==='score-tempo'){if(current&&!practice){const target=current,tempos=await scoreTempoFor(target);if(current===target){await hearAndSetTempo(target,tempos,'Keep this tempo');if(current===target&&!dialog&&!practice){options('score');document.querySelector<HTMLElement>('dialog[data-kind=options] [data-action=score-tempo]')?.focus();}}}return;}if(action==='practice'){if(current&&!readingPresentation)practiceMenu();else await startPractice();return;}if(action==='practice-fingers'||action==='practice-sections'){closeDialog(false);await startPractice(undefined,undefined,action==='practice-fingers');return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
  if(['toggle','edit','feedback','restore-all','undo-restore','earlier-editions','restore-header'].includes(action))requirePianoCapability(p,'pianoPreparation');
- if(action==='library'){const closed=current?.entry.id,leaving=current;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();const abandoning=!!handWait;leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();if(leaving&&!abandoning)retainScore(leaving);aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-keep'){keptWrittenOut.add(current);paintRepeatNotice();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-use'){await useFirstPassChoices(current);renderPages();renderToolbar();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
+ if(action==='library'){const closed=current?.entry.id,leaving=current;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();const abandoning=!!handWait;leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();if(leaving&&!abandoning)retainScore(leaving);aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-keep'){const found=writtenOutRepeat(current.package,current.personal,printedBars(current));if(found)await keepWrittenOut(current,found);paintRepeatNotice();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-use'){await useFirstPassChoices(current);renderPages();renderToolbar();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
  if(selection&&!practice&&['editorNavigation','editorPrevious','editorNext'].includes(action)){
   if(action==='editorNavigation'){editNavigation=editNavigation==='notes'?'measures':'notes';renderEditorNavigation();}
   else if(editNavigation==='measures')selectFingerMeasure(action==='editorPrevious'?-1:1);else selectFinger(action==='editorPrevious'?-1:1);return;
  }
  if(selection&&!practice&&action==='editorSource'){await visitMemorySource();return;}
  if(selection&&!practice&&['hand-not-here','hand-only-here','hand-shared'].includes(action)){
-  const target=current,before=target.personal,ownerId=selection.ownerIds[0],decisionId=crypto.randomUUID(),authoredAt=new Date().toISOString(),written=target.package.score.notes.find(n=>n.id===ownerId)?.hand;
-  // Keep this note’s written hand: an exception to the bar it would follow, for this note only.
-  if(action==='hand-not-here'&&!written)return;
-  const kept=(await acceptMemoryAction(target,action==='hand-not-here'?{kind:'hand',ownerId,hand:written!,local:true,decisionId,authoredAt}:{kind:'handScope',ownerId,scope:action==='hand-only-here'?'local':'shared',decisionId,authoredAt})).kept;
+  // A folded note's passes change together, so the repeat stays folded.
+  const target=current,before=target.personal,actions=noteMemoryActions(target.package,target.personal,selection,action as HandChoiceAction);if(!actions.length)return;
+  const ownerId=(actions[0] as {ownerId:string}).ownerId,kept=(await acceptMemoryAction(target,actions)).kept;
   const notice=kept?undefined:handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction,printedBars(target));if(notice)notify(notice);return;
  }
- if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,{kind:action==='memory-reference'?'reference':'reset',ownerId:selection.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});return;}
+ if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,noteMemoryActions(target.package,target.personal,selection,action as NoteMemoryCommand));return;}
  if(action==='restore-all'||action==='undo-restore'){if(action==='restore-all'||s.undo||s.undoAssignments||s.undoCalculatedOwners){const target=current,ownerDialog=dialog,ownerSection=optionsSection;await acceptMemoryAction(target,{kind:action==='restore-all'?'restoreAll':'undoRestore',ownerId:p.seats[0].ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(current===target){if(dialog===ownerDialog)options(ownerSection);if(practice)practice.refit();else{renderPages();renderToolbar();}}}return;}
  if((selection||practice)&&['next','previous','count','scale'].includes(action))return;
  if(action==='next'||action==='previous'){const shown=readerPackage();current.personal.view=turnPage(v,action==='next'?1:-1,shown.pages.length,viewportFit(innerWidth,innerHeight,effectiveView(v),shown.pages.length).count);}
@@ -1605,16 +1620,17 @@ function onMidiNote(event:MidiNote){
 
 /** A choice from a key press applies to the selected note; a waiting hand
  * choice applies to the note it was made on, leaving the selection as it is. */
-async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},advance:boolean,waitedOwner?:string){
+async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},advance:boolean,waitedOwners?:readonly string[]){
+ const waitedOwner=waitedOwners?.[0];
  if(!current||!selection&&!waitedOwner)return;
  const chosenScore=current,chosenSeat=selection;
  // The choice belongs to the note it was made on, even if hand editing is not ready yet.
  if(choice.hand&&!waitedOwner&&scoreCapabilities(chosenScore.package).pianoPreparation){
   const wait=handEditingWait(chosenScore);
-  if(wait){wait.queue.add({key:chosenSeat!.ownerIds[0],hand:choice.hand,bar:chosenSeat!.writtenBar});wait.status.queue(wait.queue.list());return;}
+  if(wait){wait.queue.add({key:chosenSeat!.ownerIds[0],owners:editOwners(chosenSeat!),hand:choice.hand,bar:chosenSeat!.writtenBar});wait.status.queue(wait.queue.list());return;}
  }
  const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=seat?units.findIndex(s=>s.contactId===seat.contactId):-1,nextSeat=waitedOwner||!seat?selection:advance?nextInHand(readerPackage(),units,index)??seat:seat;
- const authoredAt=new Date().toISOString(),ownerIds=waitedOwner?[waitedOwner]:editOwners(seat!);
+ const authoredAt=new Date().toISOString(),ownerIds=waitedOwners?.length?[...waitedOwners]:editOwners(seat!);
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');
  const action=(ownerId:string,decisionId=crypto.randomUUID()):PersonalMemoryAction=>choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
@@ -1661,7 +1677,7 @@ async function applyWaitingHandChoices(wait:HandEditingWait,ready:boolean){
   if(!ready||current!==wait.target){const choices=wait.queue.take();if(choices.length)notify(abandonedChoicesText(choices));return;}
   for(let choice=wait.queue.shift();choice;choice=wait.queue.shift()){
    if(current!==wait.target){const unapplied=[choice,...wait.queue.take()];notify(applied.length||kept.length?waitingOutcomeText({applied,kept,keptReason,unapplied,reason:'the score was closed or changed first'}):abandonedChoicesText(unapplied));return;}
-   try{keptReason=(await saveSelectedChoice({hand:choice.hand},false,choice.key))?.keptReason??keptReason;}
+   try{keptReason=(await saveSelectedChoice({hand:choice.hand},false,choice.owners??[choice.key]))?.keptReason??keptReason;}
    catch(error){
     // As with a direct press, a refused or unsaved choice is not counted as applied; the save panel offers its retry.
     const unapplied=[choice,...wait.queue.take()];
@@ -1704,6 +1720,8 @@ async function boot(){
   if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');
   try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}
   preferences.fingeringAdvice=readFingeringAdviceSettings(preferences.fingeringAdvice);
+  // Kept written-out repeats only hide a notice: an unreadable list is forgotten, never fatal.
+  if(preferences.writtenOutRepeats!==undefined)preferences.writtenOutRepeats=Array.isArray(preferences.writtenOutRepeats)?preferences.writtenOutRepeats.filter((k:unknown):k is string=>typeof k==='string').slice(-KEPT_WRITTEN_OUT):undefined;
   orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);
   mainControls=readControlBindings(preferences.controlBindings,preferences);
   preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);
