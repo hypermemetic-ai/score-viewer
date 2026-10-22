@@ -16,11 +16,13 @@ import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {sourcePackage,transferStudy,calculatedStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
 import {assigned} from '../src/personal-assignments';
-import {importPackage,useReadingAdmissionReceipts,useCalculatedAdmissionEvidence,admittedWrittenHeads,hashBytes} from '../src/package';
+import {importPackage,selectPresentation,useReadingAdmissionReceipts,useCalculatedAdmissionEvidence,admittedWrittenHeads,hashBytes} from '../src/package';
 import {calculatedAdmissionEvidence,type CalculatedAdmissionEvidence} from '../src/calculated-hand-edition';
 import {readingAdmissionReceipt,type ReadingAdmissionReceipt} from '../src/reading-package';
 import {authoredReadingPackage} from './support/instrument-reading-fixture';
 import {PersonalMemoryLibrary,readingOnlyArchive} from '../src/personal-memory-library';
+import {rebuildEdition} from '../src/edition-rebuild';
+import {rememberEngravedReading,takeEngravedReading} from '../src/engraved-readings';
 
 const sha=(c:string)=>c.repeat(64);
 function memoryStore(){
@@ -250,6 +252,39 @@ test('an imported score hands its reading engrave to hand editing, which engrave
  // With nothing kept, the choice is engraved from the score, as before.
  const third=fakeWorker(spying),none=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(third.spawn),cache:null});
  assert.deepEqual((await none.project(choice)).pages,cold.pages);assert.deepEqual(third.log.map(m=>m.kind),['project']);assert.deepEqual(restores,[true,true]);
+});
+
+test('an edition engraved again hands its reading engrave to hand editing, which engraves nothing again',async()=>{
+ // A saved edition whose pages no longer reproduce at the ISO pin.
+ const stale=new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url)));
+ const rebuilt=await rebuildEdition(stale,{refusal:Error('refused')}),p=await selectPresentation(await importPackage(rebuilt.bytes),'conventional-piano');
+ const seat=p.seats.find(s=>s.ownerIds.length===1&&p.score.notes.find(n=>n.id===s.ownerIds[0])?.hand==='RH')!,choice=assigned(p,initialPersonal(p),seat,{hand:'LH'});
+ const restores:boolean[]=[],warms:number[]=[],spying=(inputs:ProjectionCoreInputs)=>{
+  const core=createHostedCore(inputs),restore=core.restoreAsync!,warm=core.warmAsync;
+  return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;},
+   warmAsync:async(...a:Parameters<typeof warm>)=>{if(!core.exportState!())warms.push(1);return warm(...a);}});
+ };
+ // Hand editing that starts and is stopped at once keeps the engrave for later.
+ const first=fakeWorker(spying),opened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(first.spawn),cache:null});
+ opened.prefetch();cancelPersonalPrefetch();await new Promise(r=>setTimeout(r,50));
+ // The first hand choice resumes from the adopted engrave and places only the choice.
+ const view=await opened.project(choice);
+ assert.deepEqual(restores,[true]);assert.deepEqual(warms,[]);
+ assert.deepEqual(first.log.filter(m=>m.kind!=='save').map(m=>m.kind),['warm','project']);assert.ok((first.log[0] as {saved?:unknown}).saved);
+ // The engrave is taken once: another session of the edition engraves the choice, and draws the same pages.
+ const second=fakeWorker(spying),cold=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(second.spawn),cache:null});
+ const fresh=await cold.project(choice);assert.deepEqual(second.log.map(m=>m.kind),['project']);assert.deepEqual(restores,[true]);
+ assert.notDeepEqual(view.pages,p.pages);
+ assert.deepEqual(view.pages,fresh.pages);assert.deepEqual(view.seats,fresh.seats);assert.deepEqual(view.score,fresh.score);assert.deepEqual(view.annotationGeometry,fresh.annotationGeometry);
+});
+
+test('only the latest reading engraves are kept, each for the pages it made',()=>{
+ const recipe=(n:number)=>({sourceSha256:sha('a'),baseline:{pageSha256:[sha(String(n))],seatSha256:sha('s')}}),reading=(n:number)=>({score:{id:n},layouts:[],rawPages:[]}) as any;
+ for(const n of [1,2,3])rememberEngravedReading(recipe(n),reading(n));
+ assert.equal(takeEngravedReading(recipe(1)),undefined,'the oldest is let go');
+ assert.equal(takeEngravedReading({...recipe(2),sourceSha256:sha('b')}),undefined,'another source never takes it');
+ assert.equal(takeEngravedReading(recipe(2))?.score.id,2);assert.equal(takeEngravedReading(recipe(2)),undefined,'taken once');
+ assert.equal(takeEngravedReading(recipe(3))?.score.id,3);assert.equal(takeEngravedReading(undefined),undefined);
 });
 
 test('prefetch settles the engraving only in a worker and never without one',async()=>{

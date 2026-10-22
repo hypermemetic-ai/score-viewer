@@ -5,6 +5,7 @@ import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical
 import {hashBytes,importPackage,readEditionContent,type ScorePackage,type FingerLayer} from './package';
 import {CALCULATED_HAND_SCORE_RENDERING_ENGINE,renderScorePresentationAsync} from '../vendor/iso-notation/src/score-presentation';
 import {withLayoutPeer} from './layout-peer';
+import {rememberEngravedReading} from './engraved-readings';
 import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_RECIPE_VERSION,validateScoreRenderingRecipe} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 import {resolveIsoTokens} from '../vendor/iso-notation/src/render/iso/types';
@@ -198,6 +199,8 @@ export async function engraveEdition(request:{
   catch(error){if((error as Error).name==='AbortError')throw error;throw Error(request.refusal,{cause:error});}
   checkReadingExecution(execution);
   recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
+  // The edition is opened next: hand editing can start from this engrave.
+  rememberEngravedReading(recipe,{score:rendered.score,layouts:rendered.layouts,rawPages:rendered.rawPages});
   const names={score:prefix+'score.json',seats:prefix+'seats.json',recipe:prefix+'rendering-recipe.json',
    pages:rendered.pages.map((page,i)=>{const name=`${prefix}pages/${i+1}.svg`;shared[name]=strToU8(page);return name;})};
   // A view that shows exactly the source keeps the source's own bytes.

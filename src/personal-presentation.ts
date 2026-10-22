@@ -12,6 +12,7 @@ import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} fr
 import type {ProjectionCoreInputs,ProjectionView} from './personal-projection-protocol';
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,projectionWorkerClient} from './personal-projection-client';
 import type {DerivedFileCache} from './derived-file-cache';
+import {rememberEngravedReading,takeEngravedReading} from './engraved-readings';
 
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
@@ -156,11 +157,16 @@ const importedEngines=new WeakMap<ScorePackage,PersonalHandEngineState>();
  * other is refused (false), and hand editing engraves as before. */
 export async function adoptImportedReading(base:ScorePackage,reading:AdmittedReading,input?:ReadingExecution):Promise<boolean>{
  if(!base.renderingRecipe||!base.sourceSha256)return false;
- const execution=input?capturedReadingExecution(input):undefined,inputs=await coreInputs(base,execution);
- const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
- if(!(execution?await core.adoptReadingAsync(reading,execution):core.adoptReading(reading)))return false;
- const state=core.exportState();checkReadingExecution(execution);if(!state)return false;
+ const state=await adoptedEngine(base,reading,input?capturedReadingExecution(input):undefined);if(!state)return false;
  importedEngines.set(base,state);return true;
+}
+/** The settled hand engine `base` takes from its reading engrave, or
+ * undefined when ISO notation refuses that engrave as the engine's own. */
+async function adoptedEngine(base:ScorePackage,reading:AdmittedReading,execution?:ReadingExecution):Promise<PersonalHandEngineState|undefined>{
+ const inputs=await coreInputs(base,execution);
+ const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
+ if(!(execution?await core.adoptReadingAsync(reading,execution):core.adoptReading(reading)))return undefined;
+ const state=core.exportState();checkReadingExecution(execution);return state;
 }
 /** Engraving refusals arrive in ISO notation's terms; players see what failed
  * in theirs, and the original diagnosis stays attached as the cause. */
@@ -318,7 +324,7 @@ export class PersonalPresentationSession {
  /** Settle the engraving for hand editing: from the engine saved on disk
   * when there is one that reproduces, else by engraving, which is then saved. */
  private async settle(core:Core,execution?:ReadingExecution,offThreadOnly=false):Promise<boolean>{
-  const saved=await this.savedState();checkReadingExecution(execution);
+  const saved=await this.savedState(execution);checkReadingExecution(execution);
   const settled=await core.warm(execution,offThreadOnly,saved);
   // A settled core holds the engine now; the saved copy is not kept in memory.
   if(settled)this.savedEngine=Promise.resolve(undefined);
@@ -327,14 +333,28 @@ export class PersonalPresentationSession {
   if(settled==='engraved'||settled==='restored'&&this.imported)this.rememberEngine();else if(settled==='restored'||settled==='already'&&saved&&!this.imported)this.engineSaved=true;
   return !!settled;
  }
- /** Whether the saved engine is the one the import of this package adopted. */
+ /** Whether the saved engine is the one adopted from this package's reading
+  * engrave (its import, or its edition engraved again), not yet on disk. */
  private imported=false;
- private savedState():Promise<PersonalHandEngineState|undefined>{
+ private savedState(execution?:ReadingExecution):Promise<PersonalHandEngineState|undefined>{
   if(this.savedEngine)return this.savedEngine;
   const state=importedEngines.get(this.base);
   if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
-  const cache=this.cache;if(!cache)return Promise.resolve(undefined);
-  return this.savedEngine=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+  const cache=this.cache,saved=cache?this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined):Promise.resolve(undefined);
+  return this.savedEngine=saved.then(state=>state??this.engravedEngine(execution));
+ }
+ /** An edition this session just engraved again has no engine on disk, but
+  * its reading engrave is the engine's own first preparation: adopting it
+  * costs a repaint, not a second engrave. Adoption runs on the reader's
+  * thread, so always cooperatively. A refusal engraves as before; a stopped
+  * adoption keeps the engrave for the next settle. */
+ private async engravedEngine(execution?:ReadingExecution):Promise<PersonalHandEngineState|undefined>{
+  const recipe=this.base.renderingRecipe,reading=this.base.sourceSha256?takeEngravedReading(recipe):undefined;if(!reading)return undefined;
+  try{const state=await adoptedEngine(this.base,reading,execution??{});if(state)this.imported=true;return state;}
+  catch(error){
+   if(!(error instanceof DOMException&&error.name==='AbortError'))return undefined;
+   rememberEngravedReading(recipe!,reading);this.savedEngine=undefined;throw error;
+  }
  }
  private async engineKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,(await this.prepare()).digest]));
@@ -385,7 +405,7 @@ export class PersonalPresentationSession {
   if(!result){
    // A saved engine settles the core first, so this choice only places what
    // changed, even when its projection is no longer on disk.
-   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState())await this.settle(core,e);return core.project(owners,digest,e);},execution).catch(error=>this.refusal(error,execution)),
+   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState(e))await this.settle(core,e);return core.project(owners,digest,e);},execution).catch(error=>this.refusal(error,execution)),
     UNDRAWABLE_HAND_CHOICES,
     "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
    this.baseline??=true;this.remember(result);this.rememberEngine();
