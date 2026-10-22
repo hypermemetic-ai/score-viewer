@@ -1,5 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext} from 'node:vm';
+import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {FOLD_FAILURE_TEXT,FoldFailure} from '../src/repeat-fold';
+import {runInNewContext} from 'node:vm';
 
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),body=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
 
@@ -7,7 +8,8 @@ function sandbox(){
  const made:string[]=[],prefetched:string[]=[];
  class PersonalPresentationSession{constructor(){made.push('written');}prefetch(){prefetched.push('written');}}
  class FoldedReader{constructor(readonly p:unknown){made.push('folded reader');}}
- const context:any={structuredClone,livePersonalEditors:new WeakMap(),PersonalPresentationSession,FoldedReader,PersonalEditQueue:class{},personalStorageName:(id:string)=>id,made,prefetched};
+ const context:any={structuredClone,livePersonalEditors:new WeakMap(),PersonalPresentationSession,FoldedReader,PersonalEditQueue:class{},personalStorageName:(id:string)=>id,made,prefetched,freed:[] as string[]};
+ context.retained={free(){context.freed.push('retained');}};
  runInNewContext(body('function personalEditor(','async function presentReader('),context);
  const target=(id:string,revision='r1')=>({entry:{id},package:{sourceRevision:revision,sourceSha256:'s',keyboardLayout:'janko'},personal:{}});
  return {context,made,prefetched,target};
@@ -38,17 +40,31 @@ test('reopening a score in the session reuses its folded reader; another revisio
  assert.notEqual(context.foldedReader(target('no13')),first);
 });
 
-test('a fold that can\'t be drawn opens written out and says so, once a score', async()=>{
- const said:string[]=[],warned:unknown[]=[];
- const context:any={said,scoreCapabilities:()=>({pianoPreparation:true}),foldFailureSaid:new WeakSet(),notify:(text:string)=>said.push(text),
-  foldFailureText:(error:Error)=>`folded pages failed: ${error.message}`,console:{warn:(...args:unknown[])=>warned.push(args)},DOMException,
-  personalEditor:()=>({fold:{folds:()=>true,view:async()=>{throw Error('no room for bar 12');}}})};
- runInNewContext(body('async function presentReader(','/** A stored bar as the reader prints it'),context);
- const target={package:{}},written={pages:['written']};
+test('under memory pressure the folded readers kept for closed scores are let go, with the retained score', ()=>{
+ const {context,target}=sandbox(),no13=target('no13'),first=context.foldedReader(no13);
+ assert.equal(context.foldedReader(no13),first,'kept while there is room');
+ context.releaseUnderPressure();
+ assert.deepEqual(context.freed,['retained']);
+ assert.notEqual(context.foldedReader(no13),first,'reopened, its folded reader is made again');
+ assert.match(body('function retainScore(','\nasync function open('),/underMemoryPressure\(heapMemory\(\)\)\)releaseUnderPressure\(\)/,'the retention watch releases them');
+});
+
+test('a fold that can\'t be drawn opens written out and says so plainly, once a score; the reason goes to the console once', async()=>{
+ const said:string[]=[],warned:unknown[][]=[],reason=Error('Matching hand engraving failed physical admission: repeat-geometry (error), system 8');
+ let remembered=false;
+ const context:any={said,scoreCapabilities:()=>({pianoPreparation:true}),notify:(text:string)=>said.push(text),FoldFailure,FOLD_FAILURE_TEXT,
+  console:{warn:(...args:unknown[])=>warned.push(args)},DOMException,
+  personalEditor:()=>({fold:{folds:()=>true,view:async()=>{const failure=new FoldFailure('edition-1',reason,remembered);remembered=true;throw failure;}}})};
+ // FoldedReader logs the reason when the fold fails; the reader adds nothing for a FoldFailure, and logs anything else.
+ runInNewContext(body('async function presentReader(','/** A stored bar as the reader prints it')+body('/** Scores (and their folds) told this session','/** Why a repeat the reader would fold'),context);
+ const target={entry:{id:'no13'},package:{}},written={pages:['written']};
  assert.equal(await context.presentReader(target,{},async()=>written),written,'the written-out pages are shown');
- assert.equal(await context.presentReader(target,{},async()=>written),written);
- assert.deepEqual(said,['folded pages failed: no room for bar 12'],'said once, with the reason');
- await context.presentReader({package:{}},{},async()=>written);assert.equal(said.length,2,'and once for another score');
+ assert.equal(await context.presentReader({...target,package:{}},{},async()=>written),written,'reopened: a fresh package of the score');
+ assert.deepEqual(said,['This score’s repeats are written out: its folded pages couldn’t be drawn.'],'said once, without the reason');
+ assert.deepEqual(warned,[],'FoldedReader logged the reason when the fold failed');
+ await context.presentReader({entry:{id:'no14'},package:{}},{},async()=>written);assert.equal(said.length,2,'and once for another score');
+ const other=Error('worker lost');context.personalEditor=()=>({fold:{folds:()=>true,view:async()=>{throw other;}}});
+ await context.presentReader({entry:{id:'no15'},package:{}},{},async()=>written);assert.deepEqual(warned,[['Repeats stay written out:',other]],'any other error is logged by the reader');
 });
 
 test('Keep written out is remembered with the settings for the score package, until its passes differ otherwise', async()=>{

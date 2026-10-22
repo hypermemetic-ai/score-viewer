@@ -11,7 +11,7 @@ import {browserAssistanceStore,type AssistanceBrowserLocks} from '../src/durable
 import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache';
 import {projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
-import {VERBATIM_FOLD_CACHE_KIND,FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
+import {VERBATIM_FOLD_CACHE_KIND,FoldFailure,FoldedReader,forgetFoldFailures,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
 import {requirePracticeHands} from '../src/practice';
 import {noteMemoryActions} from '../src/note-memory-actions';
 import type {PersonalMemoryAction} from '../src/personal-memory-session';
@@ -54,14 +54,14 @@ async function accepting(p:ScorePackage,s:PersonalState,actions:readonly Persona
  return personal;
 }
 /** U: the first time's choices, through the editor's memory session as the notice's button applies them. */
-async function useFirstPass(p:ScorePackage,s:PersonalState,found:{restore:readonly {ownerId:string;hand?:PersonalHand;finger?:number}[]}):Promise<PersonalState>{
+async function useFirstPass(p:ScorePackage,s:PersonalState,found:{restore:readonly {ownerId:string;hand?:PersonalHand;local?:true;finger?:number}[]}):Promise<PersonalState>{
  class Locks implements AssistanceBrowserLocks {private tail:Promise<unknown>=Promise.resolve();request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}}
  const data=new Map<string,string>(),store=browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},new Locks());
  const input={entryId:'returns',importedAt:'2026-10-22T00:00:00.000Z',p,personal:s},session=new PersonalMemorySession(store,{scanLibrary:async()=>[structuredClone(input)],validateInputs:async()=>true});
  await session.initialize();
  let personal=s;
  for(const change of found.restore){
-  if(change.hand){const receipt=session.accept({...input,personal},{kind:'hand',ownerId:change.ownerId,hand:change.hand,decisionId:`use-hand-${change.ownerId}`,authoredAt:'2026-10-22T00:00:02.000Z'});await receipt.saved;personal=receipt.personal;}
+  if(change.hand){const receipt=session.accept({...input,personal},{kind:'hand',ownerId:change.ownerId,hand:change.hand,...(change.local?{local:true}:{}),decisionId:`use-hand-${change.ownerId}`,authoredAt:'2026-10-22T00:00:02.000Z'});await receipt.saved;personal=receipt.personal;}
   if(change.finger!==undefined){const receipt=session.accept({...input,personal},{kind:'finger',edit:{ownerId:change.ownerId,finger:change.finger as 1|2|3|4|5,decisionId:`use-finger-${change.ownerId}`,authoredAt:'2026-10-22T00:00:02.000Z'}});await receipt.saved;personal=receipt.personal;}
  }
  return personal;
@@ -288,6 +288,46 @@ test('one hand order: a carried left hand against the player\'s own right hand i
   assert.deepEqual([first,second].map(id=>handFor(p,inherited,id)),[first_,first_],`${where}: both passes play bar 1's hand`);
   assert.equal(handFor(view!.verbatimFold!.edition,folded,first),first_,`${where}: the printed bar shows it`);
  }
+});
+
+test('a fold that can\'t be drawn is remembered for the session: opening it again, or a fresh package of it, does not draw it again', async()=>{
+ forgetFoldFailures();
+ const p=await closingReturn(),broken={...p,renderingRecipe:{...p.renderingRecipe!,engineId:'no-such-engine'}} as ScorePackage,s=initialPersonal(p);
+ const warned:unknown[][]=[],warn=console.warn;console.warn=(...args:unknown[])=>{warned.push(args);};
+ const failing=async(reader:FoldedReader)=>{try{await reader.view(s);}catch(error){return error;}assert.fail('the fold draws');};
+ const first=await failing(new FoldedReader(broken,null));
+ assert.ok(first instanceof FoldFailure&&!first.remembered,'drawn once, and it fails');
+ assert.ok(first.detail instanceof Error&&first.detail.message,'the reason is kept');
+ assert.deepEqual(warned,[['Repeats stay written out:',first.detail]],'and logged to the console');
+ const again=await failing(new FoldedReader({...broken,score:structuredClone(broken.score)},null));
+ assert.ok(again instanceof FoldFailure&&again.remembered&&again.key===first.key,'a fresh package of the score is not drawn again');
+ forgetFoldFailures();
+ assert.equal(warned.length,1,'logged once');
+ const retried=await failing(new FoldedReader(broken,null));assert.ok(retried instanceof FoldFailure&&!retried.remembered,'a new session draws it again');
+ console.warn=warn;forgetFoldFailures();
+});
+
+test('U after a hand kept "this note only" in one pass keeps it to the repeat: the closing bar, matching music outside it, keeps its hand', async()=>{
+ const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17),at='2026-10-22T00:00:01.000Z';
+ const hands=(s:PersonalState)=>[first,second,closing].map(id=>handFor(p,withRepeatInheritance(p,s),id));
+ // L in bar 1, "this note only": the return in bar 9 and the closing bar keep their written RH.
+ const only=await accepting(p,initialPersonal(p),[{kind:'hand',ownerId:first,hand:'LH',local:true,decisionId:'only-first',authoredAt:at}]);
+ assert.deepEqual(hands(only),['LH','RH','RH']);
+ const found=writtenOutRepeat(p,only)!;
+ assert.equal(found.text,'Bar 9 has a different hand than bar 1, so the repeat is written out.');
+ assert.deepEqual(found.restore,[{ownerId:second,hand:'LH',local:true}]);
+ const used=await useFirstPass(p,only,found);
+ assert.deepEqual(hands(used),['LH','LH','RH'],'both passes play L; the closing bar is not moved');
+ assert.ok(verbatimRepeats(p,used)?.fold,'and the repeat folds');
+ assert.equal(writtenOutRepeat(p,used),undefined);
+ // The other way round: L in bar 9 "this note only"; U gives bar 9 its written hand back, for that note only.
+ const back=await accepting(p,initialPersonal(p),[{kind:'hand',ownerId:second,hand:'LH',local:true,decisionId:'only-second',authoredAt:at}]);
+ assert.deepEqual(hands(back),['RH','LH','RH']);
+ const again=writtenOutRepeat(p,back)!;
+ assert.deepEqual(again.restore,[{ownerId:second,hand:'RH',local:true}]);
+ const restored=await useFirstPass(p,back,again);
+ assert.deepEqual(hands(restored),['RH','RH','RH']);
+ assert.ok(verbatimRepeats(p,restored)?.fold);
 });
 
 test('one hand order: a hand carried from matching music outranks an old record of the written hand, so no notice is shown that U could never clear', async()=>{

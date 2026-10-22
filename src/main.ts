@@ -96,7 +96,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {FoldedReader,editOwners,foldFailureText,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
+import {FOLD_FAILURE_TEXT,FoldFailure,FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {noteMemoryActions,type NoteMemoryCommand} from './note-memory-actions';
@@ -335,6 +335,9 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
 /** Folded readers kept for the session, per score, revision and keyboard: reopening
  * a folded score reuses its folded pages and their engraving instead of drawing them again. */
 const foldedReaders=new Map<string,FoldedReader>(),KEPT_FOLDED_READERS=4;
+/** Under memory pressure: the score kept after Back and the folded readers kept for
+ * closed scores are let go. The open score's reader stays with its editor. */
+function releaseUnderPressure(){retained.free();foldedReaders.clear();}
 function foldedReader(target:NonNullable<typeof current>):FoldedReader{
  const p=target.package,key=JSON.stringify([target.entry?.id,p.sourceRevision??p.manifest?.revision,p.sourceSha256,p.keyboardLayout,p.renderingRecipe?.baseline]);
  const reader=foldedReaders.get(key)??new FoldedReader(p);foldedReaders.delete(key);foldedReaders.set(key,reader);
@@ -350,9 +353,11 @@ function shownSession(target:NonNullable<typeof current>):PersonalPresentationSe
 async function presentReader(target:NonNullable<typeof current>,personal:PersonalState,written:()=>Promise<ScorePackage>,execution?:ReadingExecution):Promise<ScorePackage>{
  if(scoreCapabilities(target.package).pianoPreparation){const fold=personalEditor(target).fold;
   if(fold.folds(personal))try{const view=await fold.view(personal,target.package,execution);if(view)return view;}
-  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);
-   // Said once a score: the pages are right, only longer.
-   if(!foldFailureSaid.has(target.package)){foldFailureSaid.add(target.package);notify(foldFailureText(error));}}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;
+   // A fold that failed is remembered for the session and not drawn again; its reason was logged when it failed.
+   const failure=error instanceof FoldFailure?error:undefined;if(!failure)console.warn('Repeats stay written out:',error);
+   // Said once a score and fold: the pages are right, only longer.
+   const said=`${target.entry.id}\n${failure?.key??''}`;if(!foldFailureSaid.has(said)){foldFailureSaid.add(said);notify(FOLD_FAILURE_TEXT);}}
  }
  return written();
 }
@@ -369,8 +374,8 @@ async function keepWrittenOut(target:NonNullable<typeof current>,found:WrittenOu
  // One kept repeat per score package: the one its notice last offered.
  await enqueue(async()=>{const next={...preferences,writtenOutRepeats:[...(preferences.writtenOutRepeats??[]).filter(k=>!k.startsWith(package_)),key].slice(-KEPT_WRITTEN_OUT)};await writeJson('preferences.json',next);preferences=next;});
 }
-/** Scores told this session that their folded pages couldn't be drawn. */
-const foldFailureSaid=new WeakSet<ScorePackage>();
+/** Scores (and their folds) told this session that their folded pages couldn't be drawn. */
+const foldFailureSaid=new Set<string>();
 /** Why a repeat the reader would fold is written out, and how to fold it again. */
 function paintRepeatNotice(){
  const target=current,shown=target&&!practice&&scoreCapabilities(target.package).pianoPreparation?writtenOutRepeat(target.package,target.personal,bar=>printedBar(target.entry.id,bar)):undefined,found=shown&&!keepsWrittenOut(target!,shown)?shown:undefined;
@@ -386,7 +391,7 @@ async function useFirstPassChoices(target:NonNullable<typeof current>){
  if(found.restore.some(c=>c.hand)&&scoreCapabilities(target.package).pianoPreparation){const wait=handEditingWait(target);if(wait&&(!await wait.ready||current!==target))throw cancelledReading();}
  const authoredAt=new Date().toISOString(),saved:Promise<unknown>[]=[];let personal=target.personal;
  for(const change of found.restore){
-  const actions:PersonalMemoryAction[]=[...(change.hand?[{kind:'hand' as const,ownerId:change.ownerId,hand:change.hand,decisionId:crypto.randomUUID(),authoredAt}]:[]),
+  const actions:PersonalMemoryAction[]=[...(change.hand?[{kind:'hand' as const,ownerId:change.ownerId,hand:change.hand,...(change.local?{local:true}:{}),decisionId:crypto.randomUUID(),authoredAt}]:[]),
    ...(change.finger!==undefined?[{kind:'finger' as const,edit:{ownerId:change.ownerId,finger:change.finger as 1|2|3|4|5,decisionId:crypto.randomUUID(),authoredAt}}]:[])];
   for(const action of actions){const receipt=personalMemory.accept({...memoryInput(target),personal},action);personal=receipt.personal;saved.push(receipt.saved);}
  }
@@ -1176,11 +1181,12 @@ function retentionConditions(entry:Entry):RetentionConditions|undefined {
 function retainScore(target:NonNullable<typeof current>){
  const entry=entries.find(e=>e.id===target.entry.id);
  // A reading whose library entry moved on (a new edition, transposition) is opened afresh.
- if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error||underMemoryPressure(heapMemory()))return;
+ if(underMemoryPressure(heapMemory())){releaseUnderPressure();return;}
+ if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error)return;
  if(JSON.stringify(entry)!==JSON.stringify(target.entry))return;
  const conditions=retentionConditions(entry);if(!conditions)return;
  retained.keep(entry.id,conditions,target);
- retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))retained.free();},30000);
+ retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))releaseUnderPressure();},30000);
 }
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);
  // The score just closed, with nothing it rests on changed, is drawn again as it was left: no read, admission or projection.
