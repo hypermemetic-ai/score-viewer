@@ -16,6 +16,7 @@ import {initialPersonal,type PersonalState} from '../src/state';
 import {withRepeatInheritance} from '../src/repeat-fold';
 import {scoreCapabilities} from '../src/score-capabilities';
 import type {ScorePackage} from '../src/package';
+import {threadCpuMs} from './support/thread-cpu';
 
 // Schumann Op. 68 No. 13 in 2/4, 48 ticks a beat, as the owner's edition writes
 // it: bar 1 is a pickup; bar 11 is a full bar whose last half beat holds the RH
@@ -212,18 +213,21 @@ function mixedMeters(matching:boolean):MemoryScoreInput {
  return{entryId:matching?'mixed':'unmatched',importedAt:'2026-10-17T16:12:02.659Z',p,personal:initialPersonal(p)};
 }
 test('speed: bars of other lengths sharing a hand’s opening cost a resolve about what the same score costs without them',()=>{
- // CPU time of the same process, compared with a score of the same bars and notes whose hands match nowhere, so machine load cancels out.
+ // CPU time of the resolving thread, compared with a score of the same bars and notes whose hands match nowhere, so machine load cancels out.
+ // The process's CPU time also counts V8's collector and compiler threads, whose share swings with the host's load: one sample in a busy
+ // full suite measured 2.18× for scores that cost about 1.1× each other.
  const scores=[mixedMeters(true),mixedMeters(false)].map(input=>({input,document:bootstrapPersonalFingeringMemory([input])}));
  // A fresh package is a score read again: nothing derived from it is cached yet, the matching bars included.
- const cpu=({input,document}:typeof scores[number],fresh:boolean)=>{const p=fresh?{...input.p}:input.p,start=process.cpuUsage();resolvePersonalFingeringMemory(document,input.entryId,p,input.personal);const used=process.cpuUsage(start);return used.user+used.system;};
+ const cpu=({input,document}:typeof scores[number],fresh:boolean)=>{const p=fresh?{...input.p}:input.p,start=threadCpuMs();resolvePersonalFingeringMemory(document,input.entryId,p,input.personal);return threadCpuMs()-start;};
  assert.equal(scores[0].input.p.score.notes.length,scores[1].input.p.score.notes.length);
  const median=(xs:number[])=>[...xs].sort((a,b)=>a-b)[xs.length>>1];
  for(const fresh of [false,true]){
   for(const score of scores)cpu(score,fresh);
-  const times:number[][]=[[],[]];for(let k=0;k<7;k++)scores.forEach((score,i)=>times[i].push(cpu(score,fresh)));
+  // Interleaved, so both scores meet the same conditions.
+  const times:number[][]=[[],[]];for(let k=0;k<11;k++)scores.forEach((score,i)=>times[i].push(cpu(score,fresh)));
   // Each bar's LH has dozens of matching bars of another length; carrying from them used to cost five to six times as much.
   const ratio=median(times[0])/median(times[1]);
-  assert.ok(ratio<2,`${fresh?'a first':'a later'} resolve with matching bars took ${ratio.toFixed(2)}× the CPU of one without (${(median(times[0])/1000).toFixed(0)} ms against ${(median(times[1])/1000).toFixed(0)} ms)`);
+  assert.ok(ratio<2,`${fresh?'a first':'a later'} resolve with matching bars took ${ratio.toFixed(2)}× the CPU of one without (${median(times[0]).toFixed(0)} ms against ${median(times[1]).toFixed(0)} ms)`);
  }
 });
 
