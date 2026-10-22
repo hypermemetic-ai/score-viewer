@@ -27,12 +27,18 @@ export type AheadOfTimeQuiet=()=>Promise<void>;
 /** What one preparation is given besides its stop signal. */
 export interface AheadOfTimeWork {
  quiet:AheadOfTimeQuiet;
+ /** Everything the preparation is made for has just been read: its basis is
+  * fixed now. Until then it has read nothing, and any opening may take it over. */
+ started():void;
  /** What opening reads is written: an opening that took this work over goes on now. */
  ready():void;
 }
+/** The preparation under way: its basis once it has read its inputs, and
+ * whether an opening has taken it over. */
+interface Running {entryId:string;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>}
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
- private running?:{entryId:string;basis:string;done:Promise<void>;ready:Promise<void>};
+ private running?:Running;
  private queue:string[]=[];
  /** The next score, between its turn coming and idle time to start it. */
  private waiting?:string;
@@ -48,7 +54,8 @@ export class AheadOfTimeEngraving {
   release?:()=>void;
   /** Everything a preparation of this score is made for, as it stands now
    * (the keyboard layout, the score's files and stored hand choices). Read
-   * when it starts; an opening takes it over only while it is unchanged. */
+   * when the preparation has read those; an opening takes it over only while
+   * it is unchanged. */
   basis?:(entryId:string)=>string}={}){}
  get active(){return this.running?.entryId;}
  private get delay(){return this.options.delayMs??3000;}
@@ -63,16 +70,18 @@ export class AheadOfTimeEngraving {
  resume(entryIds:readonly string[]):void {
   const running=this.running;if(!running||!this.current(running)){this.start(entryIds);return;}
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
-  this.waiting=undefined;this.queue=[...new Set(entryIds)].filter(id=>id!==running.entryId);this.hold();
+  running.taken=false;this.waiting=undefined;this.queue=[...new Set(entryIds)].filter(id=>id!==running.entryId);this.hold();
  }
  private basis(entryId:string){return this.options.basis?.(entryId)??'';}
- private current(running:{entryId:string;basis:string}){return this.basis(running.entryId)===running.basis;}
+ private current(running:{entryId:string;basis?:string}){return running.basis===undefined||this.basis(running.entryId)===running.basis;}
  /** The work under way for `entryId`, which an opening of that score awaits
   * until its pages are written, then reads them from disk instead of
   * engraving them a second time. Work made for anything else stops at once. */
  joined(entryId:string,signal?:AbortSignal):Promise<void>{
   const running=this.running;if(running?.entryId!==entryId)return Promise.resolve();
-  if(!this.current(running)){this.end(true);return Promise.resolve();}
+  // An opening that took the work over has already checked it; what the
+  // opening itself changes on the way (its memory, its entry) is no reason to stop.
+  if(!running.taken&&!this.current(running)){this.end(true);return Promise.resolve();}
   return new Promise<void>(resolve=>{
    const stop=()=>resolve();signal?.addEventListener('abort',stop,{once:true});
    void Promise.race([running.ready,running.done]).finally(()=>{signal?.removeEventListener('abort',stop);resolve();});
@@ -91,7 +100,7 @@ export class AheadOfTimeEngraving {
  yieldTo(entryId:string):void {
   const running=this.running;if(running?.entryId!==entryId||!this.current(running)){this.end(true);return;}
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
-  this.queue=[];this.waiting=undefined;this.unhold();
+  running.taken=true;this.queue=[];this.waiting=undefined;this.unhold();
  }
  /** The player is doing something in the library: hold the work, and go on
   * with the same list, the score under way or waiting first, after another
@@ -127,12 +136,12 @@ export class AheadOfTimeEngraving {
   idle(()=>{
    if(generation!==this.generation||this.running)return;
    this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
-   let ready!:()=>void;const written=new Promise<void>(resolve=>{ready=resolve;}),basis=this.basis(entryId);
-   const done=this.prepare(entryId,{signal:controller.signal},{quiet:this.quiet,ready}).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
+   let ready!:()=>void;const running:Running={entryId,ready:new Promise<void>(resolve=>{ready=resolve;}),done:Promise.resolve()};this.running=running;
+   const started=()=>{if(this.running===running)running.basis=this.basis(entryId);};
+   running.done=this.prepare(entryId,{signal:controller.signal},{quiet:this.quiet,started,ready}).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
     if(this.controller!==controller)return;
     this.controller=undefined;this.running=undefined;this.next();
    });
-   this.running={entryId,basis,done,ready:written};
   });
  }
 }

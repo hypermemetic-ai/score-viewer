@@ -118,10 +118,11 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
 function library(delayMs=30){
  const listeners=new Map<string,()=>void>(),window={addEventListener:(kind:string,listener:()=>void)=>{listeners.set(kind,listener);}};
  const steps:string[]=[],aborted:string[]=[],idles:Array<()=>void>=[];let released=0,engraved!:()=>void,engineDone!:()=>void;
- const state={layout:'janko-four-row',reading:undefined as string|undefined};
- const work=new AheadOfTimeEngraving(async(id,{signal},{quiet,ready})=>{
+ const state={layout:'janko-four-row',reading:undefined as string|undefined,indexed:Promise.resolve()};
+ const work=new AheadOfTimeEngraving(async(id,{signal},{quiet,started,ready})=>{
   const step=async(name:string)=>{await quiet();if(signal?.aborted){aborted.push(id);throw new DOMException('stop','AbortError');}steps.push(`${id} ${name}`);};
-  await step('admitted');await new Promise<void>(done=>{engraved=done;});await step('engraved');await step('pages');ready();
+  // Its inputs are read once the memory is indexed, a moment after it starts.
+  await state.indexed;started();await step('admitted');await new Promise<void>(done=>{engraved=done;});await step('engraved');await step('pages');ready();
   await new Promise<void>(done=>{engineDone=done;});await step('engine');
  },{delayMs,idle:run=>idles.push(run),release:()=>{released++;},basis:id=>`${state.layout} ${id}`});
  holdAheadOfTimeOnInput(window,()=>work,()=>state.reading===undefined);
@@ -183,6 +184,20 @@ test('an opening never waits for work made for another layout: it stops, and the
  assert.match(main,/basis:aheadOfTimeBasis/);
  assert.match(main,/\}else\{await enqueue\(async\(\)=>\{await writeJson\('preferences\.json',\{\.\.\.preferences,keyboardLayout:id\}\);[^]*?aheadOfTime\?\.start\(libraryOrder\(\)\);\}/);
 });
+test('a join is refused only for a change to what the work has read, never for what the opening itself changes',async()=>{
+ // The memory is not indexed when the work starts: its stored hand choices are unknown, then known.
+ // That is no change to what it was made for, and the click that opens the score still takes it over.
+ const l=library();let indexed!:()=>void;l.state.indexed=new Promise<void>(done=>{indexed=done;});
+ l.state.layout='unknown';l.work.start(['no13']);await wait(40);l.idles.shift()!();await wait(0);
+ l.state.layout='janko-four-row';indexed();await wait(0);l.input('pointerdown');
+ const opening=l.open('no13');l.engrave();await opening;
+ assert.deepEqual(l.aborted,[]);assert.deepEqual(l.steps,['no13 admitted','no13 engraved','no13 pages']);
+ // Once the opening has taken the work over, what the opening changes on its way (its own
+ // memory and entry) does not stop it at the join.
+ const m=library();m.work.start(['no13']);await wait(40);m.idles.shift()!();await wait(0);m.input('pointerdown');
+ m.work.yieldTo('no13');m.state.layout='changed by the opening';const joined=m.work.joined('no13');m.engrave();await joined;
+ assert.deepEqual(m.aborted,[]);assert.deepEqual(m.steps,['no13 admitted','no13 engraved','no13 pages']);
+});
 test('Esc during an opening that took work over pauses that work; it is not thrown away',async()=>{
  const l=library(10);l.work.start(['no13','no14']);await wait(20);l.idles.shift()!();await wait(0);l.input('pointerdown');
  const esc=new AbortController(),opening=l.open('no13',esc.signal);esc.abort();await opening;
@@ -238,27 +253,30 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
   get engineWaiting(){return this.waiting;}
   async flushEngine(){stop('engine saved');this.waiting=false;}
  }
+ const memory={adoptIndexed:async()=>{log.push('indexed');return true;},storedRefs:()=>{log.push('hand choices read');return [];},personalFor:()=>({})};
  const context:any={
   JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,
   checkReadingExecution:(e:any)=>{if(e?.signal?.aborted)throw new DOMException('stop','AbortError');},
   entries:[{id:'no13',file:'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
-  personalMemory:{adoptIndexed:async()=>true,storedRefs:()=>[],personalFor:()=>({})},host:{read:async()=>new Uint8Array([1,2,3])},
+  personalMemory:memory,host:{read:async()=>new Uint8Array([1,2,3])},
   projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>({availablePresentations:['janko-four-row']})},
   scoreCapabilities:()=>({pianoPreparation:true}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>undefined,
   ensurePianoReady:async()=>({package:{}}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
  };
  runInNewContext(source,context);
- const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},ready:()=>log.push('ready')});
+ const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready')});
  const recorded=async()=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),'janko-four-row','no13','t1',null,[]]))))!==undefined;
  return {log,run,recorded};
 }
 test('a preparation writes the pages before an opening goes on, then saves the engine, and records itself only after both',async()=>{
  const whole=preparation();await whole.run();
+ // Its basis is fixed once the memory is indexed and its inputs are read, before anything else.
+ assert.deepEqual(whole.log.splice(0,3),['indexed','hand choices read','started']);
  assert.deepEqual(whole.log,['project','pages written','ready','engine saved']);assert.equal(await whole.recorded(),true);
  // Pages an earlier reading made, without an engine: the engine is settled and saved.
- const settle=preparation({projected:true});await settle.run();
+ const settle=preparation({projected:true});await settle.run();settle.log.splice(0,3);
  assert.deepEqual(settle.log,['ready','engine settled','engine saved']);
- const both=preparation({projected:true,engineOnDisk:true});await both.run();assert.deepEqual(both.log,['ready']);assert.equal(await both.recorded(),true);
+ const both=preparation({projected:true,engineOnDisk:true});await both.run();assert.deepEqual(both.log.slice(3),['ready']);assert.equal(await both.recorded(),true);
  // A stop while either is written is no outcome: the score is prepared again on the next visit.
  for(const stopAt of ['pages written','engine saved','engine settled']){
   const stopped=preparation({stopAt,projected:stopAt==='engine settled'});
