@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {handCarryNotice} from '../src/hand-recurrence-text';
 import {engravingRefusal,undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
 import {keptHandsText} from '../src/hand-editing-wait';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
@@ -31,7 +32,7 @@ function fixture(){
  const written:any[]=[],frames:any[]=[],errors:Error[]=[],messages:string[]=[];let disk:any=structuredClone(target.personal),persist=Promise.resolve();
  let write=(snapshot:any)=>{disk=structuredClone(snapshot);written.push(structuredClone(snapshot));};
  let project=async(personal:any)=>({...target.package,choiceSnapshot:structuredClone(personal)});
- const context:any={structuredClone,...writtenOutReader,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
+ const context:any={structuredClone,...writtenOutReader,handCarryNotice,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,selection:seats[0],livePersonalEditors:new WeakMap(),PersonalEditQueue,
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}project(personal:any){return project(structuredClone(personal));}},
   personalStorageName:()=> 'source-bound-journal',personalContext:async(owner:any)=>({p:owner.package,file:'source-bound-journal',entry:owner.entry,active:context.current===owner?owner:undefined}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.then(()=>{},()=>{});return result;},
@@ -145,7 +146,7 @@ test('restore failure after Escape retains pending choices and handles its rejec
 });
 
 test('a hand the page cannot draw goes back to the hand it had; the player is told and the score stays usable',async()=>{
- const f=fixture();f.context.handFor=(_p:any,s:any,id:string)=>s.choices[id]?.hand??null;
+ const f=fixture();f.context.handFor=(_p:any,s:any,id:string)=>s.choices[id]?.hand??null;f.context.dropHandCarry=()=>undefined;
  const refused=()=>Error('These hand choices can\'t be drawn on the page yet.',{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',['note-0'])});
  f.setProject(async s=>{if(s.choices['note-0'].hand==='RH')throw refused();return {...f.target.package,choiceSnapshot:structuredClone(s)};});
  await f.context.saveHandChoice('RH');await f.context.personalMemory.flush();await f.editor.queue.flush();await settle();

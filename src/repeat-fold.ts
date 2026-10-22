@@ -5,7 +5,7 @@ import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,type ScorePackage,type Seat} from './package';
 import {activeLayer,type PersonalRepeatResolution,type PersonalState} from './state';
-import type {PersonalAssignments,PersonalHand} from './personal-assignments';
+import {handRecurrences,type PersonalAssignments,type PersonalHand} from './personal-assignments';
 import {PersonalPresentationSession,adoptImportedReading} from './personal-presentation';
 import {withLayoutPeer} from './layout-peer';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
@@ -47,12 +47,13 @@ const own=(s:PersonalState):PersonalState=>{const {repeatResolved:_derived,...re
  * moved hand, and a finger they gave, restored or share through fingering
  * memory. The edition's own fingers are no choice of theirs. */
 export function repeatOwnerFacts(p:ScorePackage,s:PersonalState):Map<string,VerbatimOwnerFact>{
- const source=foldable(p)??p.score,personal=own(s),facts=new Map<string,VerbatimOwnerFact>(),layer=activeLayer(p,personal);
+ const source=foldable(p)??p.score,personal=own(s),facts=new Map<string,VerbatimOwnerFact>(),layer=activeLayer(p,personal),carried=handRecurrences(p,personal).carried;
  const legacy=new Map(Object.values(personal.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c.replacement] as const)));
  const shared=personal.memoryResolved?.sourceRevision===revision(p)?personal.memoryResolved.choices:{};
  for(const n of source.notes){
   if(!isPitchedEvent(n))continue;
-  const choice=personal.assignments?.choices[n.id],hand=choice?.hand!==undefined&&choice.hand!==(n.hand??null)?choice.hand:undefined;
+  // A hand carried from matching music is the note's own answer, ahead of its twin's.
+  const choice=personal.assignments?.choices[n.id],chosen=carried.get(n.id)?.hand??choice?.hand,hand=chosen!==undefined&&chosen!==(n.hand??null)?chosen:undefined;
   // A hand kept to its own bar ("only here", or "hand here only"; hand-change carries) is a choice even where it is the written hand.
   const local=(choice as {handScope?:string}|undefined)?.handScope==='local'&&choice?.hand!==undefined;
   const restored=!!personal.calculatedOwners?.[n.id],remembered=!restored&&Object.hasOwn(shared,n.id);
@@ -224,12 +225,12 @@ export class FoldedReader {
  * the folded notes' own clocks. Derived for display; edits go to the stored
  * notes (`editOwners`). */
 function foldedPersonal(edition:ScorePackage,base:ScorePackage,personal:PersonalState):PersonalState{
- const inherited=withRepeatInheritance(base,personal),rev=revision(base),choices:PersonalAssignments['choices']={};
+ const inherited=withRepeatInheritance(base,personal),rev=revision(base),choices:PersonalAssignments['choices']={},carried=handRecurrences(base,inherited).carried;
  const shared=inherited.memoryResolved?.sourceRevision===rev?inherited.memoryResolved.choices:{},repeat=inherited.repeatResolved?.choices??{};
  const legacy=new Map(Object.values(inherited.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c.replacement] as const)));
  for(const n of edition.score.notes){
   if(!isPitchedEvent(n))continue;
-  const own=inherited.assignments?.choices[n.id],hand=own?.hand??repeat[n.id]?.hand;
+  const own=inherited.assignments?.choices[n.id],hand=carried.get(n.id)?.hand??own?.hand??repeat[n.id]?.hand;
   const finger=inherited.calculatedOwners?.[n.id]?undefined:Object.hasOwn(shared,n.id)?shared[n.id].finger??undefined:own?.finger??legacy.get(n.id)??repeat[n.id]?.finger;
   if(hand===undefined&&finger===undefined)continue;
   choices[n.id]={ownerId:n.id,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand??null},
@@ -239,12 +240,13 @@ function foldedPersonal(edition:ScorePackage,base:ScorePackage,personal:Personal
  return {...rest,overrides:{},...(Object.keys(choices).length?{assignments:{version:'personal-owner-assignments-v1',sourceRevision:rev,choices}}:{})};
 }
 
-/** The player's hands on the folded notes, guarded by the folded notes' own clocks. */
+/** The player's hands on the folded notes, guarded by the folded notes' own clocks:
+ * own, carried from matching music, else the twin's. */
 function foldedChoices(edition:ScorePackage,base:ScorePackage,personal:PersonalState):PersonalState{
- const choices:PersonalAssignments['choices']={},createdAt=new Date(0).toISOString();
+ const choices:PersonalAssignments['choices']={},createdAt=new Date(0).toISOString(),carried=handRecurrences(base,personal).carried;
  for(const n of edition.score.notes){
   if(!isPitchedEvent(n))continue;
-  const hand=personal.assignments?.choices[n.id]?.hand??personal.repeatResolved?.choices[n.id]?.hand;
+  const hand=carried.get(n.id)?.hand??personal.assignments?.choices[n.id]?.hand??personal.repeatResolved?.choices[n.id]?.hand;
   if(hand===undefined||hand===(n.hand??null))continue;
   choices[n.id]={ownerId:n.id,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand??null},hand,createdAt};
  }

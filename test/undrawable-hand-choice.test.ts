@@ -1,11 +1,12 @@
 import test from 'node:test';
+import {handCarryNotice} from '../src/hand-recurrence-text';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {importPackage} from '../src/package';
 import {initialPersonal,type PersonalState} from '../src/state';
-import {assigned,handFor} from '../src/personal-assignments';
+import {assigned,dropHandCarry,handFor} from '../src/personal-assignments';
 import {engravingRefusal,undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
 import {keptHandsText} from '../src/hand-editing-wait';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
@@ -24,7 +25,7 @@ const flipped=(s:PersonalState)=>assigned(p,s,seat,{hand:'RH'});
 /** keepDrawableHands from main.ts, with the memory and the engraver replaced. */
 function harness(personal:PersonalState,project:(s:PersonalState)=>Promise<unknown>){
  const accepted:any[]=[],target={package:p,personal,entry:{id:'e',importedAt:'now'}};
- const context:any={structuredClone,crypto,handFor,undrawableHandOwners,undrawableHandReason,accepted,
+ const context:any={structuredClone,crypto,handFor,dropHandCarry,undrawableHandOwners,undrawableHandReason,accepted,
   personalMemory:{accept(input:any,action:any){accepted.push(action);const s=p.seats.find(s=>s.ownerIds.includes(action.ownerId))!;
    return {personal:assigned(p,input.personal,s,{hand:action.hand}),saved:Promise.resolve()};}},
   memoryInput:(t:any)=>({personal:t.personal}),resolveMemory:(t:any)=>t.personal,paintPersonalSaveError(){},
@@ -110,7 +111,7 @@ test('only fit refusals pass the save queue; integrity failures still wait for r
 /** personalEditor from main.ts: its save queue, with the memory replaced. */
 function editorHarness(){
  const body=stripTypeScriptTypes(source.slice(source.indexOf('function personalEditor('),source.indexOf('function readerPackage(')));
- const views:unknown[]=[],context:any={structuredClone,...writtenOutReader,PersonalEditQueue,engravingRefusal,livePersonalEditors:new WeakMap(),
+ const views:unknown[]=[],context:any={structuredClone,...writtenOutReader,handCarryNotice,PersonalEditQueue,engravingRefusal,livePersonalEditors:new WeakMap(),
   PersonalPresentationSession:class{},personalStorageName:()=>'state.json',resolvePersonalNavigation(){},memoryInput:()=>({}),
   personalMemory:{saveView:async(input:any)=>{views.push(input.personal);}}};
  runInNewContext(body,context);

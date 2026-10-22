@@ -23,7 +23,7 @@ test('source navigation maps exact written source owners and evidence counts the
  const local=resolvePersonalFingeringMemory(next,input.entryId,input.p,input.personal);
  assert.equal(memoryChoiceLabel(local,'b2n1'),'Local');
  assert.deepEqual(memoryReferenceTarget(input,local,'b2n1'),{entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'});
- assert.equal(memorySourceLabel(next,local,'b2n1',()=> 'Fixture'),'Reference: Fixture, measure 1. Choice from Fixture, measure 3.');
+ assert.equal(memorySourceLabel(next,local,'b2n1',()=> 'Fixture'),'Reference: Fixture, bar 1. Choice from Fixture, bar 3.');
  assert.equal(memoryAdviceEvidence(input,local).get('b2n1')?.evidence,'personal');
 });
 test('a local hand-match exception and suppression keep navigation to their underlying shared source',()=>{

@@ -5,7 +5,7 @@ import {strToU8} from 'fflate';
 import {prepareMusicXmlScore} from '../src/musicxml-import';
 import {importPackage,type ScorePackage,type Seat} from '../src/package';
 import {fingerFor,initialPersonal,readPersonal,type PersonalState} from '../src/state';
-import {effectiveAssignments,handFor} from '../src/personal-assignments';
+import {assigned,effectiveAssignments,handFor,handRecurrences} from '../src/personal-assignments';
 import {rawMemoryPersonal} from '../src/personal-memory-session';
 import {FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
 import {requirePracticeHands} from '../src/practice';
@@ -136,6 +136,24 @@ test('a hand moved in one pass moves its untouched twin', async()=>{
  assert.equal(verbatimRepeats(p,here)?.fold,undefined);
  assert.equal(handFor(p,withRepeatInheritance(p,here),second),'RH');
  assert.match(writtenOutRepeat(p,here)!.text,/^Bar 9 has a different hand than bar 1/);
+});
+
+test('a hand carried from matching music reaches both passes, so they still fold and the folded page shows it', async()=>{
+ // The closing bar plays the passage's first bar again: a hand chosen there carries back to bar 1 and to its return.
+ const p=await prepareMusicXmlScore(strToU8(musicXml([...passage,...passage,bar(0)])),assets).then(r=>importPackage(r.bytes,{allowLegacyTempo:true}));
+ const at='2026-10-22T00:00:00.000Z',chosen=assigned(p,initialPersonal(p),seatOf(p,ownerAt(p,17)),{hand:'LH'});
+ for(const c of Object.values(chosen.assignments!.choices))c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};
+ const carried=handRecurrences(p,chosen).carried;
+ assert.deepEqual([ownerAt(p,1),ownerAt(p,9)].map(id=>carried.get(id)?.hand),['LH','LH'],'the chosen hand reaches both passes');
+ assert.ok(verbatimRepeats(p,chosen)?.fold,'passes the same hand reaches still agree');
+ const personal=withRepeatInheritance(p,chosen),view=await new FoldedReader(p,null).view(personal);
+ const {edition}=view!.verbatimFold!,folded=view!.verbatimFold!.personal(personal),shown=[1,9,17].map(b=>ownerAt(p,b)).filter(id=>edition.score.notes.some(n=>n.id===id));
+ assert.ok(shown.length>=2);
+ for(const id of shown){
+  assert.equal(handFor(p,personal,id),'LH','one answer for the stored note');
+  assert.equal(handFor(edition,folded,id),'LH','practice reads it on the printed bar');
+  assert.equal(view!.score.notes.find(n=>n.id===id)?.hand,'LH','the folded page draws it');
+ }
 });
 
 test('practice and Fingers visit each printed bar once, reading every pass\'s choices, and edit the stored notes', async()=>{

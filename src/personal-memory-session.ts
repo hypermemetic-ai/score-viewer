@@ -2,7 +2,7 @@ import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-stor
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {canonicalJson} from './piano-preparation-identity';
-import {assigned,handChoiceOwners,type PersonalHand} from './personal-assignments';
+import {assigned,handChoiceOwners,handRecurrences,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
  bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
@@ -19,7 +19,11 @@ const maxAttempts=16;
 type FingerOperation='none'|'add'|'shared'|'local'|'reset';
 export type PersonalMemoryAction=
  | {kind:'finger';edit:MemoryFingerEdit;operation?:FingerOperation}
- | {kind:'hand';ownerId:string;hand:PersonalHand;decisionId:string;authoredAt:string}
+ /** `local`: the hand applies here only. Captured when the note's hand was
+  * carried from another bar, so the choice is an exception there. */
+ | {kind:'hand';ownerId:string;hand:PersonalHand;decisionId:string;authoredAt:string;local?:boolean}
+ /** The note's own hand applies here only (`local`), or follows matching bars again (`shared`). */
+ | {kind:'handScope';ownerId:string;scope:'local'|'shared';decisionId:string;authoredAt:string}
  | {kind:'reference';ownerId:string;decisionId:string;authoredAt:string}
  | {kind:'reset'|'calculated'|'restoreAll'|'undoRestore';ownerId:string;decisionId:string;authoredAt:string};
 /** Serializable, source-bound user intent. A package and whole personal snapshot
@@ -167,9 +171,11 @@ export class PersonalMemorySession {
   }
   const personal=current.documents[key]===undefined?rawMemoryPersonal(await legacy()):readPersonal(current.documents[key],p);
   const input={entryId:entry.id,importedAt:entry.importedAt,p,personal};this.remember([input]);
+  // A score whose own records are registered is known: hands carried from matching
+  // bars are derived, so merely opening it registers nothing new. The next edit does.
   const known=(snapshot:AssistanceSnapshot,candidate:MemoryScoreInput)=>{
-   const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);
-   return projectPersonalMemoryScore(candidate).every(wanted=>Object.values(memory.occurrences).some(actual=>canonicalJson(actual.occurrence)===canonicalJson(wanted.occurrence)));
+   const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]),registered=new Set(Object.values(memory.occurrences).map(actual=>canonicalJson(actual.occurrence)));
+   return [{},{carry:false}].some(options=>projectPersonalMemoryScore(candidate,options).every(wanted=>registered.has(canonicalJson(wanted.occurrence))));
   };
   if(!known(current,input)){
    await this.schedule(async()=>{
@@ -191,7 +197,7 @@ export class PersonalMemorySession {
  resolve(input:MemoryScoreInput){return resolvePersonalFingeringMemory(this.memory,input.entryId,input.p,rawMemoryPersonal(input.personal));}
  private readIntent(raw:unknown):CapturedPersonalMemoryIntent {
   const intent=clone(raw) as CapturedPersonalMemoryIntent;
-  if(!intent||intent.version!==1||typeof intent.id!=='string'||!intent.id||typeof intent.entryId!=='string'||typeof intent.personalKey!=='string'||typeof intent.sourceRevision!=='string'||!intent.guard||!intent.action||!['finger','hand','reference','reset','calculated','restoreAll','undoRestore'].includes(intent.action.kind))throw Error('Invalid pending personal fingering intent.');
+  if(!intent||intent.version!==1||typeof intent.id!=='string'||!intent.id||typeof intent.entryId!=='string'||typeof intent.personalKey!=='string'||typeof intent.sourceRevision!=='string'||!intent.guard||!intent.action||!['finger','hand','handScope','reference','reset','calculated','restoreAll','undoRestore'].includes(intent.action.kind))throw Error('Invalid pending personal fingering intent.');
   return intent;
  }
  private target(intent:CapturedPersonalMemoryIntent):MemoryScoreInput {
@@ -210,6 +216,8 @@ export class PersonalMemorySession {
    captured.edit=captureMemoryFingerEdit(memory,raw,captured.edit);
    captured.operation=captured.edit.finger!=='inherit'&&resolvePersonalFingeringMemory(memory,input.entryId,input.p,raw.personal).byOwner[ownerId]?.finger?.value===captured.edit.finger?'none':captured.edit.captured?.operation;
   }
+  // Changing a hand carried from another bar makes an exception here, as changing an inherited finger does.
+  if(captured.kind==='hand'&&captured.local===undefined&&handRecurrences(input.p,input.personal).carried.has(ownerId))captured.local=true;
   const id=captured.kind==='finger'?captured.edit.decisionId:captured.decisionId;
   const authoredAt=captured.kind==='finger'?captured.edit.authoredAt:captured.authoredAt;
   if(!id||!Number.isFinite(Date.parse(authoredAt)))throw Error('Personal edit requires stable authorship.');
@@ -245,8 +253,22 @@ export class PersonalMemorySession {
    }
   }else if(action.kind==='hand'){
    const seat=input.p.seats.find(s=>s.ownerIds.includes(intent.ownerId));if(!seat)throw Error('Personal edit has no admitted contact.');
-   personal=assigned(input.p,personal,seat,{hand:action.hand});
+   // Choosing the hand a note already carries is no exception.
+   if(action.local&&handRecurrences(input.p,personal).carried.get(intent.ownerId)?.hand===action.hand)return{document,personal:readPersonal(personal,input.p)};
+   personal=assigned(input.p,personal,seat,{hand:action.hand,...(action.local===undefined?{}:{local:action.local})});
    for(const id of handChoiceOwners(input.p,seat)){const c=personal.assignments!.choices[id];c.intent!.hand={decisionId:action.decisionId,lineageId:action.decisionId,authoredAt:action.authoredAt};c.createdAt=input.personal.assignments?.choices[id]?.createdAt??action.authoredAt;}
+   next=preservePersonalMemoryHandChange(document,input,{...input,personal},intent.ownerId);
+  }else if(action.kind==='handScope'){
+   const seat=input.p.seats.find(s=>s.ownerIds.includes(intent.ownerId));if(!seat)throw Error('Personal edit has no admitted contact.');
+   const owners=handChoiceOwners(input.p,seat).filter(id=>personal.assignments?.choices[id]?.hand!==undefined);
+   if(action.scope==='local')for(const id of owners)personal.assignments!.choices[id].handScope='local';
+   else{
+    // Without its own hand, a note follows the hand carried to it, or the source's.
+    const without=clone(personal);for(const id of owners)delete without.assignments!.choices[id];const carried=handRecurrences(input.p,without).carried;
+    for(const id of owners){const c=personal.assignments!.choices[id],n=input.p.score.notes.find(n=>n.id===id)!;delete c.handScope;
+     if(carried.has(id)||c.hand===(n.hand??null)){delete c.hand;if(c.intent)delete c.intent.hand;if(c.finger===undefined)delete personal.assignments!.choices[id];}}
+    if(personal.assignments&&!Object.keys(personal.assignments.choices).length)delete personal.assignments;
+   }
    next=preservePersonalMemoryHandChange(document,input,{...input,personal},intent.ownerId);
   }else if(action.kind==='calculated'){
    clearFinger();personal.calculatedOwners??={};for(const id of ownerIds)personal.calculatedOwners[id]=true;

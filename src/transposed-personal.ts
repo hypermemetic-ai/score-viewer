@@ -40,7 +40,7 @@ function carryChoices(s:PersonalState|undefined,from:ScorePackage|undefined,to:S
     for(const c of Object.values(assignments)){
       owners.add(c.ownerId);const n=moved(c.ownerId,c.guard);if(!n)continue;
       choices[c.ownerId]={ownerId:c.ownerId,guard:{pitch:c.guard.pitch+delta,startTick:c.guard.startTick,durationTicks:c.guard.durationTicks},
-        original:{hand:n.hand??null},...(c.hand!==undefined?{hand:c.hand}:{}),...(c.finger!==undefined?{finger:c.finger}:{}),createdAt:c.createdAt,
+        original:{hand:n.hand??null},...(c.hand!==undefined?{hand:c.hand}:{}),...(c.handScope?{handScope:c.handScope}:{}),...(c.finger!==undefined?{finger:c.finger}:{}),createdAt:c.createdAt,
         ...(c.intent?{intent:structuredClone(c.intent)}:{})};
     }
     // Older finger corrections name their notes; their finger moves as a choice.

@@ -4,7 +4,7 @@ Personal choices automatically fill exact matching written measures, or the matc
 
 The editor shows Shared or Local for the selected personal choice. Make reference publishes the selected measure/hand's visible personal choices; calculated dispositions are excluded. Return to shared clears the local exception. Restore calculated temporarily selects calculated display without erasing the underlying shared or local knowledge. Undo restores the prior local disposition while retaining intervening shared changes. Suppressing a finger is distinct from restoring calculated display.
 
-Space toggles Notes/Measures navigation while editing. Left/Right in Measures selects the first editable contact of the next nonempty written measure, including across pages; endpoints do not wrap. Up/Down still moves systems. Digit entry and Tab retain note movement. The toggle does not move the current selection. Practice keeps its own Space action. G visits the selected choice's reference; G again returns to the original score, source-linked selection, view and navigation mode. These actions use the existing context-aware binding system.
+Space toggles Notes/Bars navigation while editing. Left/Right in Bars selects the first editable contact of the next nonempty written bar, including across pages; endpoints do not wrap. Up/Down still moves systems. Digit entry and Tab retain note movement. The toggle does not move the current selection. Practice keeps its own Space action. G visits the selected choice's reference; G again returns to the original score, source-linked selection, view and navigation mode. These actions use the existing context-aware binding system.
 
 ## Ownership and matching
 
