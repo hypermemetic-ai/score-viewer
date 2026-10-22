@@ -386,7 +386,7 @@ async function useFirstPassChoices(target:NonNullable<typeof current>){
  if(found.restore.some(c=>c.hand)&&scoreCapabilities(target.package).pianoPreparation){const wait=handEditingWait(target);if(wait&&(!await wait.ready||current!==target))throw cancelledReading();}
  const authoredAt=new Date().toISOString(),saved:Promise<unknown>[]=[];let personal=target.personal;
  for(const change of found.restore){
-  const actions:PersonalMemoryAction[]=[...(change.hand?[{kind:'hand' as const,ownerId:change.ownerId,hand:change.hand,decisionId:crypto.randomUUID(),authoredAt}]:[]),
+  const actions:PersonalMemoryAction[]=[...(change.hand?[{kind:'hand' as const,ownerId:change.ownerId,hand:change.hand,...(change.local?{local:true}:{}),decisionId:crypto.randomUUID(),authoredAt}]:[]),
    ...(change.finger!==undefined?[{kind:'finger' as const,edit:{ownerId:change.ownerId,finger:change.finger as 1|2|3|4|5,decisionId:crypto.randomUUID(),authoredAt}}]:[])];
   for(const action of actions){const receipt=personalMemory.accept({...memoryInput(target),personal},action);personal=receipt.personal;saved.push(receipt.saved);}
  }

@@ -74,7 +74,8 @@ export function verbatimRepeats(p:ScorePackage,s:PersonalState):VerbatimRepeatRe
 
 /** A repeat the reader writes out because the player's choices differ between
  * its passes: why, in bars as printed, and the choices that would fold it again. */
-export interface WrittenOutRepeat {text:string;use:string;restore:{ownerId:string;hand?:PersonalHand;finger?:number}[]}
+/** `local`: the restored hand is kept to that note, as the first pass keeps its own, so it reaches nothing beyond the repeat. */
+export interface WrittenOutRepeat {text:string;use:string;restore:{ownerId:string;hand?:PersonalHand;local?:true;finger?:number}[]}
 export function writtenOutRepeat(p:ScorePackage,s:PersonalState,printed:(bar:number)=>number=bar=>bar):WrittenOutRepeat|undefined{
  const source=foldable(p),kept=source&&verbatimRepeats(p,s)?.kept;if(!source||!kept?.length)return;
  const facts=repeatOwnerFacts(p,own(s)),notes=new Map(source.notes.map(n=>[n.id,n])),bars=source.sourceBarTicks!;
@@ -86,7 +87,8 @@ export function writtenOutRepeat(p:ScorePackage,s:PersonalState,printed:(bar:num
   const change:WrittenOutRepeat['restore'][number]={ownerId:second};
   const ha=a?.hand,hb=b?.hand,hand=ha!==undefined&&hb!==undefined?(ha!==hb?ha:undefined)
    :ha!==undefined&&a!.local&&ha!==written?ha:hb!==undefined&&b!.local&&hb!==written?written:undefined;
-  if(hand){change.hand=hand as PersonalHand;kinds.add('hand');}
+  // The first pass's own hand "this note only" stays so in the second; the written hand given back to a second pass kept "only here" is too.
+  if(hand){change.hand=hand as PersonalHand;if(ha===undefined||a!.local)change.local=true;kinds.add('hand');}
   if(a?.finger!==undefined&&b?.finger!==undefined&&a.finger!==b.finger){change.finger=Number(a.finger);kinds.add('finger');}
   if(!kinds.size)continue;
   restore.push(change);
