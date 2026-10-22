@@ -76,23 +76,21 @@ Passages with exact source musical equivalence SHALL resolve the same measured/m
 
 ## MODIFIED Requirements
 
-### Requirement: Bounded joined-passage browsing
-Completed adjacent groups SHALL retain their compact joined range and accessible list of original components. At an unchanged viewport, passage ranges, original groups and selected-group previews SHALL occupy three stable columns with compact lists and reserved middle space. Both lists SHALL anchor percentages to the right and reserve enough width for the full score's measure-number digits, including three-digit ranges, without wrapping or overlapping their percentages. Large joined selections SHALL retain component browsing; the system SHALL NOT compress an entire multi-page work into an unreadable selection image. Component and joined-run attainment SHALL remain independent unless they resolve to the exact same source-owned musical equivalence class, including repeated identical child classes. Heterogeneous runs SHALL NOT borrow component evidence.
+### Requirement: Bounded exercise browsing
+Passage selection SHALL browse original sections, independent adjacent doubles and contrast exercises through completed groups and incomplete originals, without recursive growing joins. Existing column geometry, row spacing, concrete-exercise right-aligned percentages and accessible source/component identity SHALL remain stable. Group rows SHALL open contents without being practice targets. Originals and doubles SHALL retain coherent source previews; contrasts SHALL identify both excerpt locations without implying the intervening source is played. Attainment SHALL remain independent unless it resolves to the exact same source-owned musical equivalence class, including repeated identical child classes. Heterogeneous exercises SHALL NOT borrow component evidence.
 
-#### Scenario: Selecting a large joined range and its component
-- **WHEN** completed adjacent components form a multi-page joined passage
-- **THEN** one compact joined range and its original component side list remain available
-- **AND** selecting the joined range populates the reserved middle group list without narrowing or shifting the preview pane, while selecting a component displays that component's complete original leaf strip
-- **AND** Right enters the group list, Up/Down browses its components, and Left returns to the joined range list
-- **AND** Enter starts the selected parent or component, and browsing does not change stored attainment
-- **AND** the first range and group entries align vertically and the preview area has no white placeholder until a leaf is selected
+#### Scenario: Selecting an adjacent double and its originals
+- **WHEN** A–B and B–C are available
+- **THEN** both remain distinct accessible exercises with exactly two original components, shown under their completed-original group when its constituents are completed
+- **AND** Right or Enter on a group enters its contents without starting practice, Up/Down browses the active column and Left returns to the enclosing group
+- **AND** Enter on an eligible concrete exercise starts that exercise, while a group never creates or starts a larger join
+- **AND** the first list entries remain aligned and reserved preview space does not shift
 
-#### Scenario: Recommended nested range and long component list
-- **WHEN** automatic progression recommends a retained nested joined range within a larger frontier
-- **THEN** that exact selected range has a transient visible left-column row, its whole-range action and original middle-column groups
-- **AND** focus and Enter do not silently target a different passage or an invisible component
-- **WHEN** the user navigates to a late original group in a long list
-- **THEN** that group remains visible within the bounded list and its preview stays available in the right pane
+#### Scenario: Selecting a contrast exercise
+- **WHEN** a player selects a contrast between distant sections
+- **THEN** the selector identifies A and B by their genuine ranges and excerpt locations
+- **AND** its preview does not join unrelated source measures into one continuous passage
+- **AND** selection and active practice expose which alternative is current
 
 #### Scenario: Keyboard navigation beyond a visible list edge
 - **WHEN** Down selects the next row beyond the visible lower edge of either passage list
@@ -102,37 +100,61 @@ Completed adjacent groups SHALL retain their compact joined range and accessible
 
 #### Scenario: Quiet overflowing selector lists
 - **WHEN** either selector list overflows at an ordinary or narrow viewport
-- **THEN** native scrollbars, tracks, arrows and scrollbar divider gutters SHALL remain visually hidden without adding a custom scroll control
+- **THEN** native scrollbars, tracks, arrows and scrollbar divider gutters remain visually hidden without adding a custom scroll control
 - **AND** wheel/trackpad scrolling, keyboard navigation, contextual page snaps and accessible row focus remain available
 - **AND** column widths, row alignment and component spacing remain stable without a separator between the lists
 
 ### Requirement: Quiet practice range context and progress summary
-Practice strips SHALL omit visible individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Passage selection and the active session header SHALL identify the selected range outside the notation. The selector SHALL show one overall achieved-speed figure under the Total progress heading and an Include manual checkbox checked by default. Each passage SHALL show one percentage using its highest measured rate, or its highest measured/manual rate when the checkbox is checked, relative to the current target without a preparation bonus. The chosen display criterion SHALL apply to rows, selected detail, active header, completed/unfinished grouping and sorting, and the overall summary weighted over original leaves once. Library summaries and progress reported after a practice save SHALL use the same default manual-inclusive weighted-leaf total without a preparation bonus. Component and joined-run rates SHALL remain independent unless they resolve to the exact same source-owned musical equivalence class, including repeated identical child classes. Heterogeneous runs SHALL NOT borrow component evidence. Full-score measure numbering, saved evidence/hierarchy, Done eligibility, automatic suggestions and musical advancement SHALL remain unchanged.
+Practice strips SHALL omit individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Selector and active header SHALL identify the selected exercise. Each concrete exercise row SHALL show its highest measured or manual-inclusive achieved speed relative to target, without a preparation bonus. Group rows SHALL have no percentage or assessment identity. Total SHALL equally weight all included catalog exercises, including locked exercises. Include manual SHALL remain checked by default and affect presentation only. Library/save totals SHALL use the same manual-inclusive catalog total. Exercise rates SHALL remain independent unless they resolve to the exact same source-owned musical equivalence class, including repeated identical child classes. Heterogeneous exercises SHALL NOT borrow component evidence.
+
+#### Scenario: Original and independent connections
+- **WHEN** originals A, B, C, pairs A–B, B–C and one contrast are included
+- **THEN** each of those six exercises contributes one sixth of the Total weight regardless of length
+- **AND** each concrete exercise row retains its own genuine achieved-speed percentage without borrowing similar-section or component evidence
+- **AND** locked exercises remain in the denominator before unlocking
 
 #### Scenario: Select and practise measures 1–4
-- **WHEN** the user selects and starts a passage covering measures 1–4
-- **THEN** the selector and active header identify that range once outside their unnumbered practice notation
+- **WHEN** the user selects and starts a catalog section covering measures 1–4
+- **THEN** the selector and active header identify its range once outside unnumbered practice notation
 - **AND** full-score notation keeps its original numbering
 
 #### Scenario: Different section and joined-run attainment
-- **WHEN** component progress differs from a larger joined or whole-piece run
-- **THEN** each heterogeneous passage row retains its own correct achieved-speed percentage without borrowing component or joined-run evidence
-- **AND** one Total progress summary replaces the confusing paired Sections learned and Whole piece summary without recalculating stored attainment
+- **WHEN** original and adjacent-double attainment differ, or a historical whole-piece run is retained
+- **THEN** current heterogeneous exercise rows retain their own correct achieved-speed percentages without borrowing component or long-run evidence
+- **AND** Total summarizes the included bounded catalog without rewriting historical attainment
 
 #### Scenario: Mixed completion with manual results included
-- **WHEN** some groups are completed and others are still in progress
-- **THEN** completed/connected groups appear above a divider and unfinished groups sort by decreasing own progress then chronological score order
-- **AND** each row displays a single percentage rather than separate Best or Done figures
-- **AND** a manual rate at 25% of target displays 25% without a preparation contribution
+- **WHEN** some included exercises are completed and others are in progress with Include manual checked
+- **THEN** maximal adjacent completed-original groups appear above incomplete originals on the left; incomplete originals sort by decreasing own progress then chronological source order
+- **AND** each concrete exercise row shows one percentage while group rows show none, with a manual rate at 25% of target displaying 25% without a preparation bonus
+- **AND** excluded rows retain their anchored positions and remain visibly excluded
 
 #### Scenario: Display measured results only
-- **WHEN** the user unchecks Include manual
-- **THEN** displayed rates, grouping and sorting use measured results only while retaining the selected passage and checkbox focus
-- **AND** manual marks, measured records and saved joins remain intact, and automatic suggestions, musical advancement and Done eligibility do not change
-- **AND** toggling the checkbox or pressing its native keys does not start a passage or persist practice evidence changes
+- **WHEN** the player unchecks Include manual
+- **THEN** rows, selected detail, active header and Total use measured results only while retaining selection and checkbox focus
+- **AND** manual marks, measured records and historical joins remain intact, with no change to completion eligibility and no automatic change of active exercise
+- **AND** toggling or using the checkbox's native keys neither starts practice nor persists evidence changes
+
+#### Scenario: Manual display criterion and sorting
+- **WHEN** Include manual is checked
+- **THEN** ordinary completed/unfinished grouping and sorting use manual-inclusive achieved-speed progress without a preparation contribution
+- **WHEN** the player unchecks it
+- **THEN** rows, selected detail, active header and Total use measured results only while retaining selection and checkbox focus
+- **AND** manual marks, raw measured records and history remain intact; this display choice does not change completion eligibility or persist evidence changes
+
+#### Scenario: Exclude and restore
+- **WHEN** one exercise is excluded
+- **THEN** its contribution and one unit of denominator weight are removed together
+- **AND** the player receives no earned attainment for that decision
+- **WHEN** it is restored
+- **THEN** its existing attainment contributes again without needing to be recreated
+
+#### Scenario: No included exercises
+- **WHEN** every exercise is excluded
+- **THEN** Total identifies that no exercises are included rather than claiming earned 100% completion
 
 #### Scenario: Consistent library and saved progress totals
-- **WHEN** the library loads saved practice evidence or a practice save reports its progress
-- **THEN** the total uses the highest measured or manual rate for each original leaf relative to the current target, weighted once without a preparation bonus
-- **AND** clearing Include manual changes the open practice display only; library and save totals remain manual-inclusive
-- **AND** independent whole-run completion, measured/manual provenance, joins, preparation completion and history remain intact
+- **WHEN** the library loads practice evidence or a practice save reports progress
+- **THEN** the summary uses the same equally weighted included catalog and manual-inclusive achieved-speed criterion
+- **AND** legacy whole-piece claims are not relabeled as completion of adjacent pairs or of the new catalog
+- **AND** full-score numbering, genuine attainment provenance, settings and source bytes remain intact
