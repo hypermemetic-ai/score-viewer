@@ -9,10 +9,10 @@ test('the folded edition practises in the score\'s one journal, named and read f
  const context:any={livePersonalEditors:new WeakMap()};
  runInNewContext(stripTypeScriptTypes(slice(main,'function practiceSource(','\nfunction performedScore(')),context);
  const stored={sourceSha256:'stored'},target:any={package:stored,personal:{who:'player'}},edition={sourceSha256:'folded'},practice={},folded={};
- context.livePersonalEditors.set(target,{view:{verbatimFold:{practice,edition,personal:()=>folded}}});
+ context.livePersonalEditors.set(target,{view:{verbatimFold:{practice,edition,practiceKey:'fold of stored',personal:()=>folded}}});
  const source=context.practiceSource(target);
  assert.equal(source.view,practice);assert.equal(source.base,edition);assert.equal(source.personal,folded);
- assert.equal(source.fold.key,'folded');assert.equal(source.fold.written,stored);assert.equal(source.fold.personal,target.personal);
+ assert.equal(source.fold.key,'fold of stored','kept under the fold, not its engraving');assert.equal(source.fold.written,stored);assert.equal(source.fold.personal,target.personal);
  const plain:any={package:stored,personal:{}};assert.equal(context.practiceSource(plain).fold,undefined);
  // Practice opens and is admitted again after a hand choice with the fold.
  assert.match(main,/fold:source\.fold/);assert.match(slice(main,'async function refreshPersonalPractice(','\n}\n'),/prepareContext\(source\.base,target\.entry\.id,context,source\.personal,undefined,undefined,source\.fold\)/);

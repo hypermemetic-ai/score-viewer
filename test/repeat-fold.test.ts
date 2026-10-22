@@ -456,3 +456,18 @@ test('hearing a folded score plays it in performed order, numbered by printed ba
   assert.ok(view!.seats.some(seat=>seat.writtenBar===at.bar),`performed bar ${i+1} has printed seats to follow`);
  }
 });
+
+test('the fold\'s own practice is kept under the stored score and the bars it folds, not under its engraving', async()=>{
+ const p=await closingReturn(),s=initialPersonal(p),key=async(q:ScorePackage)=>{const fold=(await new FoldedReader(q,null).view(s))!.verbatimFold!;return {key:fold.practiceKey,edition:fold.edition.sourceSha256};};
+ const first=await key(p);
+ assert.deepEqual(await key({...p,score:structuredClone(p.score),...(p.sourceScore?{sourceScore:structuredClone(p.sourceScore)}:{})}),first,'a fresh package of the score');
+ // The same fold engraved otherwise (as a later ISO might write the folded score): its own practice stays where it was.
+ const marked=(score:ScorePackage['score'])=>({...score,notes:score.notes.map(n=>({...n,engravedBy:'later'}))});
+ const later=await key({...p,score:marked(p.score),...(p.sourceScore?{sourceScore:marked(p.sourceScore)}:{})});
+ assert.notEqual(later.edition,first.edition,'the folded score is written otherwise');
+ assert.equal(later.key,first.key,'kept under the same fold');
+ // Another score has its own; so do other folded bars, even under the same score's name.
+ const other=await returning();assert.notEqual((await key(other)).key,first.key);
+ const opened=await prepareMusicXmlScore(strToU8(musicXml([bar(3),...passage,...passage,bar(0)])),assets).then(r=>importPackage(r.bytes,{allowLegacyTempo:true}));
+ assert.notEqual((await key({...opened,sourceSha256:p.sourceSha256})).key,first.key,'the bars it folds');
+});

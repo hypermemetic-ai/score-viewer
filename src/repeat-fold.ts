@@ -134,6 +134,9 @@ export interface FoldedReaderView {
  edition:ScorePackage;
  /** The folded pages with the player's hands, each seat naming its folded note; edits on it reach every twin that carries a choice. */
  practice:ScorePackage;
+ /** The fold's own practice is kept under: the stored score and which written-out bars each folded bar shows.
+  * Engraving the same fold differently keeps it; a score that folds differently has its own. */
+ practiceKey:string;
  /** The player's choices on the folded notes: each note's own, else its twin's. */
  personal(personal:PersonalState):PersonalState;
  /** The printed bar (1-based) that shows a stored bar (1-based). */
@@ -231,8 +234,11 @@ export class FoldedReader {
   const aliases=[...named].flatMap(([id,ids])=>ids.filter(other=>other!==id&&!notes.has(other)).map(other=>({...notes.get(id)!,id:other})));
   const foldedOf=seatIndex(seats,seat=>foldedIds.get(seat.id)??[]);
   const printed=new Map<number,number>();for(const segment of fold.segments)if(!printed.has(segment.sourceBar))printed.set(segment.sourceBar,segment.writtenBar+1);
+  const shape=fold.segments.map(s=>[s.sourceBar,s.sourceStart,s.sourceEnd,s.writtenBar,s.writtenStart,s.returns?1:0]);
+  const practiceKey=`verbatim-fold-v1:${this.base.sourceSha256??revision(this.base)}:${await hashBytes(JSON.stringify(shape))}`;checkReadingExecution(execution);
   return {...projected,score:{...projected.score,notes:[...projected.score.notes,...aliases]},seats,verbatimFold:{shownBy:fold.shownBy,written,edition:base,
    practice:{...projected,seats:practiceSeats},
+   practiceKey,
    personal:next=>foldedPersonal(base,this.base,next),
    printedBar:bar=>printed.get(bar-1)??bar,session,
    writtenSeat:seat=>writtenOf(seat.ownerIds[0],seat),

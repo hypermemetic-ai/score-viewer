@@ -401,7 +401,7 @@ async function useFirstPassChoices(target:NonNullable<typeof current>){
 function practiceSource(target:NonNullable<typeof current>):{view:ScorePackage;base:ScorePackage;personal:PersonalState;fold?:PracticeFoldSource}{
  const shown=livePersonalEditors.get(target)?.view??target.package,fold=(shown as FoldedPackage).verbatimFold;
  // The folded edition practises in the score's one journal, read and saved in the stored edition's terms.
- return fold?{view:fold.practice,base:fold.edition,personal:fold.personal(target.personal),fold:{key:fold.edition.sourceSha256!,written:target.package,personal:target.personal}}:{view:shown,base:target.package,personal:target.personal};
+ return fold?{view:fold.practice,base:fold.edition,personal:fold.personal(target.personal),fold:{key:fold.practiceKey,written:target.package,personal:target.personal}}:{view:shown,base:target.package,personal:target.personal};
 }
 /** The score a performance plays: the one the reader prints. A folded repeat plays twice in performed order, numbered by printed bar and pass, as a composer repeat does. */
 function performedScore(target:NonNullable<typeof current>):ScorePackage['score']{return ((livePersonalEditors.get(target)?.view??target.package) as FoldedPackage).verbatimFold?.edition.score??target.package.score;}
