@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {isoReferenceScore,prepareIsoReferenceScore} from '../src/iso-reference-score';
-import {archivePackage,editionNeedsEngravingAgain,hashBytes,importPackage,importPackageForReading,selectPresentation} from '../src/package';
+import {SavedPagesLackRepeats,archivePackage,editionNeedsEngravingAgain,hashBytes,importPackage,importPackageForReading,keepSavedPagesWithoutRepeats,selectPresentation} from '../src/package';
 import {rebuildEdition} from '../src/edition-rebuild';
 import {collectionId} from '../src/state';
 import {strFromU8,strToU8,unzipSync} from 'fflate';
@@ -89,4 +89,12 @@ test('a Goldberg edition saved before its repeats shows them after an ordinary e
   assert.deepEqual(after.score.notes.map(n=>n.hand),before.score.notes.map(n=>n.hand));
   assert.deepEqual(after.pages.join('').match(/data-repeat="[a-z-]+"/g),['data-repeat="repeat-end"','data-repeat="repeat-start"','data-repeat="repeat-end"'],layout);
  }
+
+ // Should engraving it again fail, its saved pages open as they are, without
+ // the repeats: the refusal names the source and never blocks the score.
+ assert.ok(refusal instanceof SavedPagesLackRepeats);assert.equal(refusal.sourceSha256,await hashBytes(source));
+ keepSavedPagesWithoutRepeats(refusal.sourceSha256);
+ const saved=await importPackage(bytes,{allowLegacyTempo:true});
+ assert.equal(collectionId(saved),collectionId(content));assert.equal(saved.sourceScore!.writtenPresentation,undefined);
+ for(const layout of ['conventional-piano','janko-four-row'] as const)assert.ok(!(await selectPresentation(saved,layout)).pages.join('').includes('data-repeat'),layout);
 });

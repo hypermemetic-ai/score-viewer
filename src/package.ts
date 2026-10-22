@@ -45,6 +45,18 @@ export function admittedDualArchiveSha256(p:ScorePackage):string|undefined {
  try{selectReadingNotation(p,p.reading?.dual?.notation??'iso');return record.sha256;}catch{return;}
 }
 function fail(s:string):never{throw Error(s);}
+/** Saved pages that lack the repeat signs their score's composer wrote. The
+ * edition is engraved again on opening; see {@link keepSavedPagesWithoutRepeats}. */
+export class SavedPagesLackRepeats extends Error{
+ constructor(readonly sourceSha256:string){super('This saved engraving lacks the score\'s repeat signs. Open the score again to engrave it afresh.');this.name='SavedPagesLackRepeats';}
+}
+// Sources whose edition could not be engraved again with its repeats this
+// session: they read as saved, without the repeats, so their pages open.
+const savedWithoutRepeats=new Set<string>();
+/** A score whose saved pages lack its repeats, and which could not be
+ * engraved again, opens on those pages as saved for the rest of the session. */
+export function keepSavedPagesWithoutRepeats(sourceSha256:string){savedWithoutRepeats.add(sourceSha256);}
+const withRepeats=(score:QuantizedGridScore,sourceSha256:string)=>savedWithoutRepeats.has(sourceSha256)?score:withKnownComposerRepeats(score,sourceSha256);
 /** The profile of a view whose fingers, if any, are the edition's own fixed ones. */
 export const FIXED_PAGES_PROFILE='publisher-fixed-pages-v1';
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -342,7 +354,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  const stored=normalizeLegacyScoreEvents(parse(scoreName) as QuantizedGridScore),seats=parse(seatsName) as Seat[];
  // A linked score saved before its composer's repeats were encoded shows
  // them; its stored bytes, identity and hands stay as saved.
- const score=context.sourceSha256?withKnownComposerRepeats(stored,context.sourceSha256):stored;
+ const score=context.sourceSha256?withRepeats(stored,context.sourceSha256):stored;
  if(score.id!==m.scoreId||!Array.isArray(score.notes)||!Number.isInteger(score.ticksPerBeat)||score.ticksPerBeat<=0||!Number.isInteger(score.totalTicks)||!Array.isArray(seats))fail('Invalid semantic score');
  if(score.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(score.referencePerformanceTempo);else if(!options.allowLegacyTempo&&(m.version===1||!!fingersName&&!!files[fingersName]))requireReferencePerformanceTempo(score);
  const notes=new Map(score.notes.map(n=>[n.id,n]));if(notes.size!==score.notes.length)fail('Duplicate source owner');
@@ -376,7 +388,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   return options.keyboardLayout?selectPresentation(p,options.keyboardLayout):p;
  }
  if(!m.sourceScore||!digest(m.sourceRevision)||m.sourceRevision!==m.sourceSha256||m.files[m.sourceScore]!==m.sourceSha256||!layoutId(m.keyboardLayout)||!isObject(m.presentations)||!Object.keys(m.presentations).length)fail('Unsupported/incomplete linked ISO package');
- const source=withKnownComposerRepeats(normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore),m.sourceSha256!);
+ const source=withRepeats(normalizeLegacyScoreEvents(parse(m.sourceScore) as QuantizedGridScore),m.sourceSha256!);
  if(source.id!==m.scoreId||!Array.isArray(source.notes)||!Number.isInteger(source.ticksPerBeat)||!Number.isInteger(source.totalTicks))fail('Invalid immutable source score');
  const transposition=m.transposition===undefined?undefined:await admitScoreTransposition(m.transposition,files,files[m.sourceScore],execution,contentOnly);
  if(transposition&&JSON.stringify(m.referenceMidi)!==JSON.stringify((transposition.original.collectionManifest??transposition.original.manifest).referenceMidi))fail('Transpose reference attachment differs from its original archive.');
@@ -420,7 +432,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  if(transposition&&Object.keys(transposition.envelope.handMaps).sort().join()!==[...views.keys()].sort().join())fail('Transpose hand maps differ from actual presentations.');
  // Opening a score whose pages lack its repeat signs engraves it again
  // from its content.
- if(pagesLackRepeats&&!contentOnly)fail('This saved engraving lacks the score\'s repeat signs. Open the score again to engrave it afresh.');
+ if(pagesLackRepeats&&!contentOnly)throw new SavedPagesLackRepeats(m.sourceSha256!);
  const primary=views.get(m.keyboardLayout)!;
  const d=m.presentations[m.keyboardLayout]!;
  if(!primary||d.score!=='score.json'||d.seats!=='seats.json'||d.fingers!==('fingers.json' in m.files?'fingers.json':undefined)||
