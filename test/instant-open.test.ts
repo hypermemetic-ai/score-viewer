@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {runInNewContext} from 'node:vm';
+import {stripTypeScriptTypes} from 'node:module';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,rmSync,readFileSync,readdirSync} from 'node:fs';
 import {strToU8,strFromU8} from 'fflate';
@@ -9,7 +11,7 @@ import {importPackage,archivePackage,hashBytes,usePianoPageCheckReceipts} from '
 import {PersonalPresentationSession,projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {ProjectionWorkerClient} from '../src/personal-projection-client';
-import {AheadOfTimeEngraving,preparedBefore,prepareRecorded,aheadOfTimeOrder} from '../src/ahead-of-time-engraving';
+import {AheadOfTimeEngraving,preparedBefore,prepareRecorded,aheadOfTimeOrder,holdAheadOfTimeOnInput} from '../src/ahead-of-time-engraving';
 import {derivedModuleClosure,viewerDerivedIdentity} from '../scripts/derived-identity';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -80,19 +82,89 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
  ends.get('e')!();await joined;await tick();assert.equal(released,1,'its worker is freed once nothing is left');
  const stopped=new AbortController();joint.start(['f']);await tick();const waiting=joint.joined('f',stopped.signal);stopped.abort();await waiting;
  joint.yieldTo('g');assert.equal(released,2,'stopping it frees its worker too');
- // Input in the library stops the work at once; the same list resumes, the
- // score under way first, after the next quiet moment.
+ // Input in the library holds the work: with nothing pending it starts nothing.
  const resumed:string[]=[],quiet=new AheadOfTimeEngraving((id,{signal})=>new Promise<void>((resolve,reject)=>{
   resumed.push(id);signal!.addEventListener('abort',()=>reject(new DOMException('stop','AbortError')));
  }),{delayMs:0,idle:run=>run()});
  quiet.defer();await tick();assert.deepEqual(resumed,[],'input with no work pending starts nothing');
  quiet.start(['p','q']);await tick();assert.deepEqual(resumed,['p']);
- quiet.defer();assert.equal(quiet.active,undefined,'stopped at once');await tick();
- assert.deepEqual(resumed,['p','p'],'resumed with the score under way first');
+ quiet.defer();assert.equal(quiet.active,'p','the score under way pauses; it is not thrown away');await tick();
+ assert.deepEqual(resumed,['p'],'nothing starts again');
  // A list replaced before its quiet moment never starts.
  const late=new AheadOfTimeEngraving(async id=>{started.push('late:'+id);},{delayMs:5});
  late.start(['x']);late.stop();await new Promise(r=>setTimeout(r,20));
  assert.ok(!started.includes('late:x'));
+});
+
+// The library as the viewer wires it: its input listener, and an opening that
+// yields the work to the reading (beginReading) and joins it (activateScore).
+function library(delayMs=30){
+ const listeners=new Map<string,()=>void>(),window={addEventListener:(kind:string,listener:()=>void)=>{listeners.set(kind,listener);}};
+ const steps:string[]=[],aborted:string[]=[],idles:Array<()=>void>=[];let released=0,engraved!:()=>void;
+ const work=new AheadOfTimeEngraving(async(id,{signal},quiet)=>{
+  const step=async(name:string)=>{await quiet();if(signal?.aborted){aborted.push(id);throw new DOMException('stop','AbortError');}steps.push(`${id} ${name}`);};
+  await step('admitted');await new Promise<void>(done=>{engraved=done;});await step('engraved');await step('saved');
+ },{delayMs,idle:run=>idles.push(run),release:()=>{released++;}});
+ let reading:string|undefined;holdAheadOfTimeOnInput(window,()=>work,()=>reading===undefined);
+ const open=async(id:string)=>{reading=id;work.yieldTo(id);await work.joined(id);};
+ return {work,listeners,steps,aborted,idles,released:()=>released,engrave:()=>engraved(),open,input:(kind:string)=>listeners.get(kind)!()};
+}
+const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
+test('the click or key that opens the score under way hands its work to the reading, never throwing it away',async()=>{
+ for(const kind of ['pointerdown','keydown']){
+  const l=library();l.work.start(['no13','no14']);await wait(40);l.idles.shift()!();await wait(0);
+  assert.deepEqual(l.steps,['no13 admitted']);
+  // The press reaches the viewer's listener before the opening it causes.
+  l.input('pointermove');l.input(kind);l.engrave();await wait(5);
+  assert.deepEqual(l.steps,['no13 admitted'],`${kind}: input holds the work at its next step`);
+  const opened=l.open('no13');await wait(5);
+  assert.deepEqual(l.steps,['no13 admitted','no13 engraved','no13 saved'],`${kind}: the opening takes the work over at once`);
+  await opened;assert.deepEqual(l.aborted,[],`${kind}: nothing was thrown away`);
+  assert.equal(l.released(),1,'its worker is freed once the work is done');await wait(60);assert.equal(l.idles.length,0,'the rest waits for the library');
+ }
+ // Opening another score stops the paused work and frees its worker.
+ const l=library();l.work.start(['no13']);await wait(40);l.idles.shift()!();await wait(0);l.input('pointerdown');l.engrave();
+ await l.open('zelda');await wait(5);assert.deepEqual(l.aborted,['no13']);assert.equal(l.released(),1);
+ // Left alone again, held work goes on by itself.
+ const q=library(10);q.work.start(['no13']);await wait(20);q.idles.shift()!();await wait(0);q.input('wheel');q.engrave();await wait(30);
+ assert.deepEqual(q.steps,['no13 admitted','no13 engraved','no13 saved']);
+});
+test('between two scores: a stop frees the worker, and input keeps the waiting score and holds the last one',async()=>{
+ const quick=()=>{const idles:Array<()=>void>=[],started:string[]=[];let released=0;
+  const work=new AheadOfTimeEngraving(async id=>{started.push(id);},{delayMs:5,idle:run=>idles.push(run),release:()=>{released++;}});
+  return {work,idles,started,released:()=>released,run:async()=>{for(let i=0;i<20&&!idles.length;i++)await wait(5);idles.shift()?.();await wait(0);}};};
+ // a is done; b waits for idle time. A stop now frees the worker a used.
+ const stopped=quick();stopped.work.start(['a','b','c']);await stopped.run();assert.deepEqual(stopped.started,['a']);await wait(0);
+ assert.equal(stopped.idles.length,1,'b waits for idle time');stopped.work.stop();assert.equal(stopped.released(),1);
+ stopped.idles.shift()!();await wait(20);assert.deepEqual(stopped.started,['a'],'b never starts after the stop');
+ // Input while b waits keeps b in the list.
+ const kept=quick();kept.work.start(['a','b','c']);await kept.run();await wait(0);kept.work.defer();
+ assert.equal(kept.released(),0,'a pause keeps the worker for what follows');kept.idles.shift()!();await wait(0);
+ assert.deepEqual(kept.started,['a'],'the step waiting before the input does not run');
+ await kept.run();await kept.run();assert.deepEqual(kept.started,['a','b','c']);await wait(0);assert.equal(kept.released(),1);
+ // Input while the last score waits holds it too.
+ const last=quick();last.work.start(['a']);for(let i=0;i<20&&!last.idles.length;i++)await wait(5);last.work.defer();
+ last.idles.shift()!();await wait(0);assert.deepEqual(last.started,[],'held until the next quiet moment');
+ await last.run();assert.deepEqual(last.started,['a']);
+});
+test('the viewer holds ahead-of-time work through its own listener and saves an engine before freeing its worker',()=>{
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
+ assert.match(main,/holdAheadOfTimeOnInput\(window,\(\)=>aheadOfTime,\(\)=>!current&&!readingOperation\)/);
+ assert.match(main,/function beginReading\([^]*?aheadOfTime\?\.yieldTo\(entryId\)/);
+ assert.match(main,/await session\.project\(q\.personal\?\?personal,execution\);[^]*?await session\.flushWrites\(\);[^]*?return served\?\?null;/);
+});
+
+test('an opening cancelled with Esc, or failed, returns to a library that prepares scores again',async()=>{
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),from=main.indexOf('function finishReading('),to=main.indexOf('\nconst readerPages=',from);
+ const started:string[][]=[],context:any={readingOperation:undefined,current:undefined,shownFailures:new Set(),dialog:undefined,READING_CANCELLED:'cancelled',
+  closeDialog(){},options(){},button:()=>'',libraryOrder:()=>['no13','no14'],aheadOfTime:{start:(ids:string[])=>started.push(ids)}};
+ runInNewContext(stripTypeScriptTypes(main.slice(from,to)),context);
+ const op=()=>{const op={running:{state:'working'},loading:{stop(){},fail(){}},controller:new AbortController(),options:undefined,previous:undefined};context.readingOperation=op;return op;};
+ const cancelled=op();cancelled.controller.abort();context.finishReading(cancelled,false,new DOMException('stop','AbortError'));
+ assert.deepEqual(started,[['no13','no14']]);
+ context.finishReading(op(),false,Error('Managed score file is missing'));assert.equal(started.length,2);
+ context.current={entry:{id:'no13'}};context.finishReading(op(),true);context.finishReading(op(),false,Error('kept the reader'));
+ assert.equal(started.length,2,'a reader on screen is not the library');
 });
 
 test('closing a projection worker client stops only its own worker and what waits on it',async()=>{
@@ -161,6 +233,19 @@ test('derived files are bound to the code that makes them, followed through ever
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+/** The modules main.ts hands the derived-file cache to, directly or through a name bound to it. */
+function handedModules(main:string):Set<string>{
+ const from=new Map<string,string>();
+ for(const m of main.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'\.\/([^']+)'/g))
+  for(const name of m[1].split(','))from.set(name.trim().replace(/^type\s+/,'').split(/\s+as\s+/).pop()!,`src/${m[2]}.ts`);
+ const handed=new Set<string>(),lines=main.split('\n');
+ for(const line of lines)if(/\bderived\b/.test(line))for(const call of line.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)){const module=from.get(call[1]);if(module)handed.add(module);}
+ // A name bound to something made from the cache carries it to a call on another line: `const store={…derived…}`, then `useX(store)`.
+ const carriers=new Set<string>();
+ for(const line of lines)for(const bound of line.matchAll(/\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(\{[^;]*\}|[^,;]*)/g))if(bound[1]!=='derived'&&/\bderived\b/.test(bound[2]))carriers.add(bound[1]);
+ for(const line of lines)for(const call of line.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(([^()]*)\)/g)){const module=from.get(call[1]);if(module&&[...carriers].some(name=>new RegExp(`\\b${name}\\b`).test(call[2])))handed.add(module);}
+ return handed;
+}
 test('every module that fills the derived-file cache lies inside the derived identity',()=>{
  const closure=new Set(derivedModuleClosure(process.cwd())),read=(file:string)=>readFileSync(file,'utf8');
  // Modules that hold the cache without making what goes in it.
@@ -170,13 +255,10 @@ test('every module that fills the derived-file cache lies inside the derived ide
  for(const file of sources)if(/\bDerivedFileCache\b|derived-file-cache['"]/.test(read(file))&&!holders[file])
   assert.ok(closure.has(file),`${file} uses the derived-file cache: add it to DERIVED_ENTRY_MODULES (scripts/derived-identity.ts)`);
  // Whatever main.ts hands the cache to must be inside the identity too.
- const main=read('src/main.ts'),from=new Map<string,string>();
- for(const m of main.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'\.\/([^']+)'/g))
-  for(const name of m[1].split(','))from.set(name.trim().replace(/^type\s+/,'').split(/\s+as\s+/).pop()!,`src/${m[2]}.ts`);
- const handed=new Set<string>();
- for(const line of main.split('\n'))if(/\bderived\b/.test(line))for(const call of line.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)){const module=from.get(call[1]);if(module)handed.add(module);}
+ const handed=handedModules(read('src/main.ts'));
  assert.ok(handed.has('src/personal-presentation.ts')&&handed.has('src/package.ts'),'the wiring is found');
  for(const module of handed)assert.ok(closure.has(module)||holders[module],`main.ts hands the derived-file cache to ${module}: add it to DERIVED_ENTRY_MODULES (scripts/derived-identity.ts)`);
+ assert.deepEqual([...handedModules("import {useX} from './x';\nconst store={get:(key:string)=>derived.get('x',key,read)};\nuseX(store);")],['src/x.ts'],'a cache handed on through a name on another line is found');
 });
 
 test('piano pages checked once as passive ink are not parsed again; changed pages are checked as before',async()=>{
