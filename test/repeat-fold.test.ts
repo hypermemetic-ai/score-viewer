@@ -5,7 +5,7 @@ import {strToU8} from 'fflate';
 import {prepareMusicXmlScore} from '../src/musicxml-import';
 import {importPackage,type ScorePackage,type Seat} from '../src/package';
 import {fingerFor,initialPersonal,readPersonal,type PersonalState} from '../src/state';
-import {assigned,effectiveAssignments,handFor,handRecurrences} from '../src/personal-assignments';
+import {assigned,effectiveAssignments,handFor,handRecurrences,type PersonalHand} from '../src/personal-assignments';
 import {PersonalMemorySession,rawMemoryPersonal} from '../src/personal-memory-session';
 import {browserAssistanceStore,type AssistanceBrowserLocks} from '../src/durable-assistance-store';
 import {FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
@@ -36,6 +36,20 @@ function fingered(p:ScorePackage,s:PersonalState,choices:Record<string,number>):
  for(const [id,finger] of Object.entries(choices)){const n=p.score.notes.find(n=>n.id===id)! as ScorePackage['score']['notes'][number]&{pitch:{octave:number;pitchClass:number}};
   next.assignments.choices[id]={ownerId:id,guard:{pitch:n.pitch.octave*12+n.pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand as 'LH'|'RH'},finger,createdAt};}
  return next;
+}
+
+/** U: the first time's choices, through the editor's memory session as the notice's button applies them. */
+async function useFirstPass(p:ScorePackage,s:PersonalState,found:{restore:readonly {ownerId:string;hand?:PersonalHand;finger?:number}[]}):Promise<PersonalState>{
+ class Locks implements AssistanceBrowserLocks {private tail:Promise<unknown>=Promise.resolve();request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}}
+ const data=new Map<string,string>(),store=browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},new Locks());
+ const input={entryId:'returns',importedAt:'2026-10-22T00:00:00.000Z',p,personal:s},session=new PersonalMemorySession(store,{scanLibrary:async()=>[structuredClone(input)],validateInputs:async()=>true});
+ await session.initialize();
+ let personal=s;
+ for(const change of found.restore){
+  if(change.hand){const receipt=session.accept({...input,personal},{kind:'hand',ownerId:change.ownerId,hand:change.hand,decisionId:`use-hand-${change.ownerId}`,authoredAt:'2026-10-22T00:00:02.000Z'});await receipt.saved;personal=receipt.personal;}
+  if(change.finger!==undefined){const receipt=session.accept({...input,personal},{kind:'finger',edit:{ownerId:change.ownerId,finger:change.finger as 1|2|3|4|5,decisionId:`use-finger-${change.ownerId}`,authoredAt:'2026-10-22T00:00:02.000Z'}});await receipt.saved;personal=receipt.personal;}
+ }
+ return personal;
 }
 
 test('a passage the stored score writes out twice reads as a repeat; the store keeps it written out', async()=>{
@@ -200,16 +214,69 @@ test('one hand order: a deliberate right hand in the second pass is the player\'
  assert.equal(verbatimRepeats(p,s)?.fold,undefined,'the passes differ');
  const found=writtenOutRepeat(p,s)!;
  assert.deepEqual(found,{text:'Bar 9 has a different hand than bar 1, so the repeat is written out.',use:'Use bar 1’s hand',restore:[{ownerId:second,hand:'LH'}]});
- // U: the first time's choices, through the editor's memory session as the notice's button applies them.
- class Locks implements AssistanceBrowserLocks {private tail:Promise<unknown>=Promise.resolve();request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}}
- const data=new Map<string,string>(),store=browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);}},new Locks());
- const input={entryId:'returns',importedAt:'2026-10-22T00:00:00.000Z',p,personal:s},session=new PersonalMemorySession(store,{scanLibrary:async()=>[structuredClone(input)],validateInputs:async()=>true});
- await session.initialize();
- let personal=s;
- for(const change of found.restore){const receipt=session.accept({...input,personal},{kind:'hand',ownerId:change.ownerId,hand:change.hand!,decisionId:'use',authoredAt:'2026-10-22T00:00:02.000Z'});await receipt.saved;personal=receipt.personal;}
+ const personal=await useFirstPass(p,s,found);
  assert.equal(writtenOutRepeat(p,personal),undefined,'the notice clears');
  assert.ok(verbatimRepeats(p,personal)?.fold,'and the repeat folds');
  assert.deepEqual([first,second].map(id=>handFor(p,withRepeatInheritance(p,personal),id)),['LH','LH']);
+});
+
+// The closing bar plays the passage's first bar again: L chosen there carries to bar 1 and to its return in bar 9.
+const closingReturn=()=>prepareMusicXmlScore(strToU8(musicXml([...passage,...passage,bar(0)])),assets).then(r=>importPackage(r.bytes,{allowLegacyTempo:true}));
+const handIntent=(s:PersonalState)=>{const at='2026-10-22T00:00:00.000Z';for(const c of Object.values(s.assignments!.choices))if(c.hand!==undefined&&!c.intent?.hand)c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};return s;};
+
+test('one hand order: a carried left hand against the player\'s own right hand in the other pass is written out, and U clears it, either way round', async()=>{
+ const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17);
+ for(const [own,other] of [[second,first],[first,second]]){
+  const where=own===second?'R in bar 9':'R in bar 1';
+  // R pressed on one pass (its written hand, chosen), then L in the closing bar: it carries to the other pass only.
+  const s=handIntent(assigned(p,assigned(p,initialPersonal(p),seatOf(p,own),{hand:'RH'}),seatOf(p,closing),{hand:'LH'})),carried=handRecurrences(p,s).carried;
+  assert.equal(carried.get(other)?.hand,'LH',`${where}: the carried hand reaches the other pass`);
+  assert.equal(carried.has(own),false,`${where}: nothing is carried over the player's own hand`);
+  assert.deepEqual([handFor(p,s,own),handFor(p,s,other)],['RH','LH'],`${where}: each pass plays its hand`);
+  assert.equal(verbatimRepeats(p,s)?.fold,undefined,`${where}: the passes differ`);
+  const found=writtenOutRepeat(p,s)!,first_=own===first?'RH':'LH';
+  assert.deepEqual(found,{text:'Bar 9 has a different hand than bar 1, so the repeat is written out.',use:'Use bar 1’s hand',restore:[{ownerId:second,hand:first_}]},where);
+  const personal=await useFirstPass(p,s,found);
+  assert.equal(writtenOutRepeat(p,personal),undefined,`${where}: U clears the notice`);
+  assert.ok(verbatimRepeats(p,personal)?.fold,`${where}: and the repeat folds`);
+  const inherited=withRepeatInheritance(p,personal),view=await new FoldedReader(p,null).view(inherited),folded=view!.verbatimFold!.personal(inherited);
+  assert.deepEqual([first,second].map(id=>handFor(p,inherited,id)),[first_,first_],`${where}: both passes play bar 1's hand`);
+  assert.equal(handFor(view!.verbatimFold!.edition,folded,first),first_,`${where}: the printed bar shows it`);
+ }
+});
+
+test('one hand order: a hand carried from matching music outranks an old record of the written hand, so no notice is shown that U could never clear', async()=>{
+ const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17);
+ for(const [recorded,other] of [[first,second],[second,first]]){
+  const where=recorded===first?'record in bar 1':'record in bar 9';
+  // A finger saved before 2026-10-14, which also saved the note's written hand; then L in the closing bar.
+  const old=fingered(p,initialPersonal(p),{[recorded]:2});old.assignments!.choices[recorded].hand='RH';
+  const s=handIntent(assigned(p,old,seatOf(p,closing),{hand:'LH'}));delete s.assignments!.choices[recorded].intent;
+  assert.deepEqual([recorded,other].map(id=>handRecurrences(p,s).carried.get(id)?.hand),['LH','LH'],`${where}: the carried hand reaches both passes`);
+  assert.deepEqual([handFor(p,s,recorded),handFor(p,s,other)],['LH','LH'],`${where}: the record is no hand choice`);
+  assert.equal(writtenOutRepeat(p,s),undefined,`${where}: no notice`);
+  assert.ok(verbatimRepeats(p,s)?.fold,`${where}: the passes agree`);
+  const inherited=withRepeatInheritance(p,s),view=await new FoldedReader(p,null).view(inherited),folded=view!.verbatimFold!.personal(inherited);
+  assert.deepEqual([handFor(p,inherited,other),fingerFor(p,inherited,seatOf(p,other))],['LH',2],`${where}: the other pass reads the record's finger`);
+  assert.equal(effectiveAssignments(p,inherited).find(a=>a.id===recorded)?.hand,'LH',`${where}: practice reads the carried hand`);
+  assert.equal(handFor(view!.verbatimFold!.edition,folded,first),'LH',`${where}: the printed bar shows it`);
+ }
+});
+
+test('one hand order: the player\'s own right hand in both passes folds and stays right-handed on the page and in practice, though matching music carries a left hand', async()=>{
+ const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17);
+ const s=handIntent(assigned(p,assigned(p,assigned(p,initialPersonal(p),seatOf(p,first),{hand:'RH'}),seatOf(p,second),{hand:'RH'}),seatOf(p,closing),{hand:'LH'}));
+ const carried=handRecurrences(p,s).carried;
+ assert.ok(!carried.has(first)&&!carried.has(second),'the closing bar\'s hand reaches neither pass');
+ assert.ok(verbatimRepeats(p,s)?.fold,'both passes are the player\'s right hand: they agree');
+ assert.equal(writtenOutRepeat(p,s),undefined);
+ const inherited=withRepeatInheritance(p,s),view=await new FoldedReader(p,null).view(inherited),{edition,practice}=view!.verbatimFold!,folded=view!.verbatimFold!.personal(inherited);
+ for(const id of [first,second])assert.equal(effectiveAssignments(p,inherited).find(a=>a.id===id)?.hand,'RH','the stored notes keep the right hand');
+ assert.equal(handFor(edition,folded,first),'RH','Fingers and practice read it on the printed bar');
+ assert.equal(effectiveAssignments(edition,folded).find(a=>a.id===first)?.hand,'RH');
+ assert.equal(view!.score.notes.find(n=>n.id===first)?.hand,'RH','the folded page draws it');
+ assert.equal(practice.score.notes.find(n=>n.id===first)?.hand,'RH');
+ assert.equal(handFor(p,inherited,closing),'LH','the closing bar keeps its own left hand');
 });
 
 test('practice and Fingers visit each printed bar once, reading every pass\'s choices, and edit the stored notes', async()=>{
