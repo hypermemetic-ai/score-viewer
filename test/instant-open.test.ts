@@ -80,6 +80,15 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
  ends.get('e')!();await joined;await tick();assert.equal(released,1,'its worker is freed once nothing is left');
  const stopped=new AbortController();joint.start(['f']);await tick();const waiting=joint.joined('f',stopped.signal);stopped.abort();await waiting;
  joint.yieldTo('g');assert.equal(released,2,'stopping it frees its worker too');
+ // Input in the library stops the work at once; the same list resumes, the
+ // score under way first, after the next quiet moment.
+ const resumed:string[]=[],quiet=new AheadOfTimeEngraving((id,{signal})=>new Promise<void>((resolve,reject)=>{
+  resumed.push(id);signal!.addEventListener('abort',()=>reject(new DOMException('stop','AbortError')));
+ }),{delayMs:0,idle:run=>run()});
+ quiet.defer();await tick();assert.deepEqual(resumed,[],'input with no work pending starts nothing');
+ quiet.start(['p','q']);await tick();assert.deepEqual(resumed,['p']);
+ quiet.defer();assert.equal(quiet.active,undefined,'stopped at once');await tick();
+ assert.deepEqual(resumed,['p','p'],'resumed with the score under way first');
  // A list replaced before its quiet moment never starts.
  const late=new AheadOfTimeEngraving(async id=>{started.push('late:'+id);},{delayMs:5});
  late.start(['x']);late.stop();await new Promise(r=>setTimeout(r,20));

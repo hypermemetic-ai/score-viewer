@@ -6,7 +6,9 @@ import type {ProjectionEntry} from './personal-presentation';
  * projection is a miss, and this makes it while the player is in the library
  * rather than when they open the score.
  *
- * It only ever runs while nothing else is being read. Opening a score stops
+ * It only ever runs while nothing else is being read, and only once the player
+ * has left the library alone for a few seconds: any input there stops it until
+ * the next quiet moment, so a click never waits for it. Opening a score stops
  * it, except for the score being opened: that opening joins the work already
  * under way instead of starting it again (the shared preparation pool and
  * projection worker serve both). Nothing here writes the player's data; a
@@ -32,7 +34,7 @@ export class AheadOfTimeEngraving {
  start(entryIds:readonly string[]):void {
   this.stop();
   this.queue=[...new Set(entryIds)];
-  this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.options.delayMs??1500);
+  this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.options.delayMs??3000);
  }
  /** The work under way for `entryId`, which an opening of that score awaits
   * and then reads from disk instead of engraving it a second time. */
@@ -51,6 +53,12 @@ export class AheadOfTimeEngraving {
   this.queue=[];
   if(this.running?.entryId===entryId)return;
   this.abort();
+ }
+ /** The player is doing something in the library: stop now, and resume the
+  * same list, the score under way first, after another quiet moment. */
+ defer():void {
+  if(this.timer===undefined&&!this.running&&!this.queue.length)return;
+  this.start([...(this.running?[this.running.entryId]:[]),...this.queue]);
  }
  stop():void {
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}

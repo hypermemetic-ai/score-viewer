@@ -130,6 +130,8 @@ if(isTauri()&&!import.meta.env.DEV&&host.derived){
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});
 }
+// Ahead-of-time work is for when the player leaves the library alone; any input there defers it.
+for(const kind of ['pointermove','pointerdown','keydown','wheel'])addEventListener(kind,()=>{if(!current&&!readingOperation)aheadOfTime?.defer();},{capture:true,passive:true});
 const libraryOrder=(closed?:string)=>aheadOfTimeOrder(entries.map(e=>e.id),preferences.lastWorkedEntryId,closed);
 // Its own admission and projection worker, so it never holds the reader's
 // busy, and stopping it never costs the reader's warm engines.
