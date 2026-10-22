@@ -151,8 +151,10 @@ const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:
  * indexed is left for opening, which writes what it must. */
 const idleTime=()=>new Promise<void>(resolve=>{if(typeof requestIdleCallback==='function')requestIdleCallback(()=>resolve(),{timeout:5000});else setTimeout(resolve,0);});
 async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,work:AheadOfTimeWork){
- const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout;if(!entry||!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
- const bytes=await host.read(entry.file),stored=personalMemory.storedRefs(entryId);checkReadingExecution(execution);if(!bytes||!stored)return;
+ if(!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
+ // What this preparation is made for is read here, at once; an opening takes it over only while that stands.
+ const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout,stored=personalMemory.storedRefs(entryId);if(!entry||!stored)return;work.started();
+ const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
  // Everything known before admission. A score already prepared, refused or
  // needing nothing costs a hash and a few header reads, not an admission.
  const key=await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
