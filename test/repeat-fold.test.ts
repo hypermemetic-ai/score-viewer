@@ -317,6 +317,12 @@ test('a hand command on a folded note changes every pass, so the repeat stays fo
  const moved=handIntent(assigned(p,initialPersonal(p),seatOf(p,first),{hand:'LH'}));
  assert.deepEqual(editOwners(await folded(moved)).sort(),[first,second].sort());
  assert.deepEqual(hands(moved),['LH','LH','LH']);
+ // Using a matching bar's fingers, or inheriting again, names every pass as well.
+ for(const [name,kind] of [['memory-reference','reference'],['memory-inherit','reset']] as const){
+  const actions=noteMemoryActions(p,moved,await folded(moved),name,'2026-10-22T00:00:01.000Z');
+  assert.deepEqual(actions.map(a=>a.ownerId).sort(),[first,second].sort(),name);
+  assert.ok(actions.every(a=>a.kind===kind),name);
+ }
  // "Don't share this note's hand": both passes keep it, the closing bar no longer follows.
  const only=await command(moved,'hand-only-here');
  assert.ok(verbatimRepeats(p,only)?.fold,'only here keeps the repeat folded');
