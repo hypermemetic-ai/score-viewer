@@ -1,0 +1,87 @@
+# PROBE ONLY: measures the piano on a GitHub Mac with a BlackHole loopback.
+# It builds nothing for delivery, publishes nothing, saves no cache and is
+# separate from build-score-viewer-native.yml. Runs only when started by hand
+# (Actions > Run workflow) or when someone pushes a probe/piano-playability*
+# branch, because a new workflow can be started by hand only after it is on main.
+# CI has no speakers: the numbers stop at the virtual device.
+name: Piano playability probe (manual, CI loopback only)
+run-name: Piano playability probe ${{ github.sha }}
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - probe/piano-playability*
+permissions:
+  contents: read
+env:
+  RUSTUP_TOOLCHAIN: 1.98.1
+  CARGO_INCREMENTAL: 1
+  MACOSX_DEPLOYMENT_TARGET: "13.3"
+  PIANO_URL: https://archive.org/download/httpswww.ir.isas.jaxa.jpcyamauchaccuratesalamander/AccurateSalamanderGrandPianoV6.2a_48khz24bit.zip
+  PIANO_SHA256: 3bc8623b598d7d854a14228c2f7c0e4a7970b118e8b056e39e221b8334678350
+jobs:
+  mac-loopback:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/build/native-target
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # Read-only reuse of the Mac build's compiled dependencies; never saved.
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/native-target
+          key: ${{ runner.os }}-${{ runner.arch }}-viewer-universal-macos13.3-rust1.98.1-inc1-cgu16-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml', 'src-tauri/tauri*.conf.json', 'src-tauri/build.rs') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-viewer-universal-macos13.3-rust1.98.1-
+      - name: Toolchain, dependencies and web assets
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
+          npm run build
+      - name: Install the BlackHole loopback device
+        run: |
+          brew install --cask blackhole-2ch
+          sudo launchctl kickstart -k system/com.apple.audio.coreaudiod || true
+          sleep 3
+          system_profiler SPAudioDataType | grep -i -A3 blackhole
+      - name: Download and check the piano (same archive the viewer installs)
+        run: |
+          mkdir -p "$RUNNER_TEMP/piano"
+          curl -fL --retry 3 --proto =https --proto-redir =https -o "$RUNNER_TEMP/piano/piano.zip" "$PIANO_URL"
+          echo "$PIANO_SHA256  $RUNNER_TEMP/piano/piano.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/piano/piano.zip" -d "$RUNNER_TEMP/piano/bank"
+          rm "$RUNNER_TEMP/piano/piano.zip"
+          sfz=$(find "$RUNNER_TEMP/piano/bank" -path '*sfz_live/Accurate-SalamanderGrandPiano_flat.Recommended.sfz' | head -1)
+          test -n "$sfz"
+          echo "VIEWER_PLAYABILITY_SFZ=$sfz" >> "$GITHUB_ENV"
+      - name: Measure delay and loudness through the loopback
+        env:
+          VIEWER_PLAYABILITY_REPORT_DIR: ${{ runner.temp }}/playability
+          VIEWER_PLAYABILITY_OUTPUT: BlackHole
+        run: >-
+          cargo test --locked --release --features custom-protocol
+          --manifest-path src-tauri/Cargo.toml --bin iso-score-viewer
+          --config profile.release.package.iso-score-viewer.codegen-units=16
+          playability -- --ignored --nocapture --test-threads=1
+      - name: Report
+        if: ${{ always() }}
+        run: |
+          f="$RUNNER_TEMP/playability/macos-playability.json"
+          { echo '### Piano playability probe (CI loopback, no speakers)'; echo '```json'; cat "$f" 2>/dev/null || echo '{"result":"no report"}'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() }}
+        with:
+          name: piano-playability-${{ github.sha }}
+          path: ${{ runner.temp }}/playability/macos-playability.json
+          retention-days: 14
+          if-no-files-found: warn

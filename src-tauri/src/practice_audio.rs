@@ -1037,6 +1037,9 @@ mod stream_diagnostic;
 #[cfg(all(test, target_os = "macos"))]
 #[path = "audio_diagnostic_macos.rs"]
 mod diagnostic_macos;
+#[cfg(all(test, target_os = "macos"))]
+#[path = "audio_playability_macos.rs"]
+mod playability_macos;
 
 #[cfg(test)]
 mod tests {
