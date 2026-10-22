@@ -57,12 +57,16 @@ export function handlessMessage(count:number,purpose:string):string {
 /** Each package's notes by id, built once: hands are read for every seat on every paint. */
 const noteIndexes=new WeakMap<ScorePackage,ReadonlyMap<string,ScorePackage['score']['notes'][number]>>();
 const noteIndex=(p:ScorePackage)=>{let index=noteIndexes.get(p);if(!index)noteIndexes.set(p,index=new Map(p.score.notes.map(n=>[n.id,n])));return index;};
+/** A note's hand, in one order everywhere: the owner's own hand (`ownsHand`),
+ * else a hand carried from a matching bar, else its repeat twin's (derived,
+ * #173), else a stored record that is no hand choice, else the written hand. */
+const handInOrder=(c:PersonalOwnerChoice|undefined,written:PersonalHand|null,carried:PersonalHand|undefined,twin:PersonalHand|undefined):PersonalHand|null=>
+ (ownsHand(c,written)?c!.hand!:undefined)??carried??twin??c?.hand??written;
 /** The effective hand of any note under one state, through one carried-hand
  * read: for paints and comparisons over many notes. */
 export function effectiveHands(p:ScorePackage,s:PersonalState):(ownerId:string)=>PersonalHand|null {
  const notes=noteIndex(p),carried=handRecurrences(p,s).carried,choices=s.assignments?.choices,repeat=s.repeatResolved?.sourceRevision===sourceRevision(p)?s.repeatResolved.choices:undefined;
- // A carried hand never lands on a note with its own hand; an untouched repeat twin reads its twin's.
- return ownerId=>{const n=notes.get(ownerId);if(!n||n.hand!==undefined&&!validHand(n.hand))throw Error('No piano owner at this source owner.');return carried.get(ownerId)?.hand??choices?.[ownerId]?.hand??repeat?.[ownerId]?.hand??n.hand??null;};
+ return ownerId=>{const n=notes.get(ownerId);if(!n||n.hand!==undefined&&!validHand(n.hand))throw Error('No piano owner at this source owner.');return handInOrder(choices?.[ownerId],(n.hand??null) as PersonalHand|null,carried.get(ownerId)?.hand,repeat?.[ownerId]?.hand);};
 }
 /** The owner's effective hand, or null when neither the source nor the player gives one. */
 export function handFor(p:ScorePackage,s:PersonalState,ownerId:string):PersonalHand|null {return effectiveHands(p,s)(ownerId);}
@@ -80,7 +84,7 @@ export function effectiveAssignments(p:ScorePackage,s:PersonalState,options:{car
  const carried=options.carry===false?undefined:handRecurrences(p,s).carried,legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
  return p.score.notes.filter(isPitchedEvent).map(n=>{
   const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,repeat=repeatChoice(p,s,n.id),finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??repeat?.finger??fingers.get(n.id);
-  return{id:n.id,...guard(n),hand:carried?.get(n.id)?.hand??c?.hand??repeat?.hand??n.hand??null,...(finger===undefined?{}:{finger})};
+  return{id:n.id,...guard(n),hand:handInOrder(c,(n.hand??null) as PersonalHand|null,carried?.get(n.id)?.hand,repeat?.hand),...(finger===undefined?{}:{finger})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 /** Canonical content key is synchronous; durable digests can be computed away from key handling. */
@@ -169,8 +173,14 @@ const noRecurrences:HandRecurrences={carried:new Map(),targets:new Map(),skipped
 const carriesHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null):c is PersonalOwnerChoice&{hand:PersonalHand}=>!!c&&c.hand!==undefined&&!!c.intent?.hand&&c.handScope===undefined&&source!==null&&c.hand!==source;
 /** A hand moved before choices recorded their intent: it stays where it is until chosen again. */
 const unsharedHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null):c is PersonalOwnerChoice&{hand:PersonalHand}=>!!c&&c.hand!==undefined&&!c.intent?.hand&&c.handScope===undefined&&source!==null&&c.hand!==source;
-/** The owner's own hand for this note, which a carried hand never replaces. */
-const ownsHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null)=>!!c&&c.hand!==undefined&&(!!c.intent?.hand||c.handScope!==undefined||c.hand!==source);
+/** Whether a note's record holds the owner's own hand, which a hand carried
+ * from a matching bar never replaces: a hand chosen with recorded intent, kept
+ * to this note, or moved away from the written hand. Before 2026-10-14 a finger
+ * edit also saved the note's hand as it then was (No. 14 has 44 such records,
+ * each first saved with a finger and none ever a different hand), so a hand
+ * without intent that only repeats the written hand is no choice. The pages
+ * and the calculator ask this one question, and the repeat fold (#173) is to ask it too. */
+export const ownsHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null)=>!!c&&c.hand!==undefined&&(!!c.intent?.hand||c.handScope!==undefined||c.hand!==source);
 
 /** Receiving bars whose carried hands the engraver refused in this session, per
  * score and keyboard layout. Never saved: such a bar keeps its written hands
