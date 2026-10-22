@@ -91,9 +91,10 @@ let defaultCache:DerivedFileCache|undefined;
  * the same hand choices reads its pages instead of engraving them again. */
 export function usePersonalProjectionCache(cache:DerivedFileCache|undefined){defaultCache=cache;}
 export const PERSONAL_PROJECTION_CACHE_KIND='personal-projection-v1';
-/** The projections each disk cache last served, by captured score and hand
- * choices. Reopening a score in the same window draws them without reading,
- * inflating and parsing its entry again; each is frozen, so every opening shares it. */
+/** The projections last read from, or engraved for, each disk cache, by
+ * captured score and hand choices. Reopening a score in the same window draws
+ * them without reading, inflating and parsing its entry again; each is frozen,
+ * so every opening shares it. */
 const recentProjections=new WeakMap<DerivedFileCache,Map<string,ProjectionView>>();
 function recentProjection(cache:DerivedFileCache,key:string):ProjectionView|undefined{
  const recent=recentProjections.get(cache),view=recent?.get(key);if(view){recent!.delete(key);recent!.set(key,view);}return view;
@@ -429,6 +430,9 @@ export class PersonalPresentationSession {
     UNDRAWABLE_HAND_CHOICES,
     "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
    this.baseline??=true;this.remember(result);this.rememberEngine();
+   // Reopened in this window, the pages just engraved draw from memory too.
+   const cache=this.cache,engraved=result;
+   if(cache&&Object.isFrozen(engraved))void this.cacheKey().then(cacheKey=>keepRecentProjection(cache,`${cacheKey} ${digest}`,engraved)).catch(()=>{});
   }
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;

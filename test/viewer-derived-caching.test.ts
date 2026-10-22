@@ -183,6 +183,19 @@ test('worker projection and the disk cache give the same view as the reader thre
  assert.ok(log.length>requests);assert.deepEqual(third.pages,local.pages);
 });
 
+test('pages just engraved are drawn from memory when the score reopens in the same window',async()=>{
+ const {p,bytes}=await sourcePackage(transferStudy()),reopened=await importPackage(bytes);
+ const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ // This disk never serves a projection, so only memory can.
+ const log:ProjectionRequest[]=[],worker=fakeWorker(createHostedCore,log),{store}=memoryStore(),cache=new EvictedProjections(store,'build-a');
+ const engraved=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache,cacheWriteDelayMs:0}).project(choice);
+ const projections=()=>log.filter(m=>m.kind==='project').length;assert.equal(projections(),1);
+ await new Promise(r=>setTimeout(r,0));
+ const again=assigned(reopened,initialPersonal(reopened),reopened.seats.find(s=>s.ownerIds.includes('gesture-1'))!,{hand:'RH'});
+ const drawn=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
+ assert.equal(projections(),1,'reopening engraves nothing');assert.deepEqual(drawn.pages,engraved.pages);assert.deepEqual(drawn.score,engraved.score);
+});
+
 test('reopening resumes hand editing from the saved engine instead of engraving again',async()=>{
  const {p}=await sourcePackage(transferStudy()),{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
  const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
