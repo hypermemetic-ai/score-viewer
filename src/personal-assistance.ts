@@ -37,5 +37,5 @@ export function memoryChoiceLabel(resolution:MemoryResolution,ownerId:string):'S
 export function memorySourceLabel(document:PersonalFingeringMemory,resolution:MemoryResolution,ownerId:string,title:(entryId:string)=>string):string {
  const r=resolution.byOwner[ownerId],decision=r?.finger?.decision;
  const ref=r?.reference,donor=decision&&Object.values(document.occurrences).find(q=>q.occurrence.occurrenceId===decision.donor.occurrenceId&&q.occurrence.sourceRevision===decision.donor.sourceRevision&&q.occurrence.scope===decision.donor.scope);
- return [ref?`Reference: ${title(ref.entryId)}, measure ${ref.writtenBar}.`:r?.finger?'Reference unavailable.':'',donor?`Choice from ${title(donor.entryId)}, measure ${donor.writtenBar}.`:''].filter(Boolean).join(' ');
+ return [ref?`Reference: ${title(ref.entryId)}, bar ${ref.writtenBar}.`:r?.finger?'Reference unavailable.':'',donor?`Choice from ${title(donor.entryId)}, bar ${donor.writtenBar}.`:''].filter(Boolean).join(' ');
 }
