@@ -305,6 +305,12 @@ export interface PackageReadOptions {allowLegacyTempo?:boolean;keyboardLayout?:P
 export interface ReadingAdmissionReceipts {get(archiveSha256:string):Promise<ReadingAdmissionReceipt|undefined>;put(archiveSha256:string,receipt:ReadingAdmissionReceipt):void}
 let readingReceipts:ReadingAdmissionReceipts|undefined;
 export function useReadingAdmissionReceipts(receipts:ReadingAdmissionReceipts|undefined){readingReceipts=receipts;}
+/** Piano pages this build already checked as passive ink for their seats,
+ * keyed by the digests of the exact page bytes and seats. Derived only: a
+ * missing receipt checks the pages again. */
+export interface PianoPageCheckReceipts {has(key:string):Promise<boolean>;add(key:string):void}
+let pianoPageChecks:PianoPageCheckReceipts|undefined;
+export function usePianoPageCheckReceipts(receipts:PianoPageCheckReceipts|undefined){pianoPageChecks=receipts;}
 let calculatedEvidence:CalculatedAdmissionEvidenceStore|undefined;
 /** Evidence for calculated editions this build already replayed; see {@link CalculatedAdmissionEvidence}. */
 export function useCalculatedAdmissionEvidence(store:CalculatedAdmissionEvidenceStore|undefined){calculatedEvidence=store;}
@@ -368,10 +374,13 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  // One head is one key: a hand-less owner may share it, but never two different hands.
  if(new Set(s.ownerIds.flatMap(id=>notes.get(id)!.hand??[])).size>1||s.ownerIds.some(id=>{const q=requirePitchedEvent(notes.get(id)!);return q.pitch.octave!==n.pitch.octave||q.pitch.pitchClass!==n.pitch.pitchClass||q.startTick!==n.startTick;}))fail('Incompatible shared-head identities');yield 'geometry';}
  if(covered.size!==notes.size)fail('Incomplete source-owner seating');
- for(const [i,name] of m.pages.entries()){if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);passiveSvg(svg,seats,i);pages.push(svg);yield 'paint';}
+ for(const [i,name] of m.pages.entries()){if(!files[name])fail('Missing vector page');const svg=strFromU8(files[name]);if(!pagesChecked)passiveSvg(svg,seats,i);pages.push(svg);yield 'paint';}
  m.notices.forEach(name=>{if(!files[name])fail('Missing notice');});yield 'commit';
  }
+ const receipts=pianoPageChecks,pageReceipt=receipts?await hashBytes(JSON.stringify(['piano-page-checks-v1',await Promise.all(m.pages.map(name=>files[name]?hashBytes(files[name]):null)),seats])):undefined;
+ const pagesChecked=pageReceipt?await receipts!.has(pageReceipt).catch(()=>false):false;checkReadingExecution(execution);
  if(execution)await drainReadingChecks(pianoChecks(),execution);else for(const _ of pianoChecks()){}
+ if(pageReceipt&&!pagesChecked)receipts!.add(pageReceipt);
  // Pages engraved before those repeats were known carry no repeat sign.
  if(score!==stored&&!pages.some(svg=>svg.includes('data-repeat="repeat-end"')))pagesLackRepeats=true;
 

@@ -238,3 +238,23 @@ test('cache generation changes when equal-revision optimistic authority is repla
  await accepted.saved;assert.equal(s.memoryRevision,optimisticRevision);assert.ok(s.memoryGeneration>optimisticGeneration);
  const durableGeneration=s.memoryGeneration;input.personal.view.page=1;await s.saveView(input);assert.equal(s.memoryGeneration,durableGeneration);
 });
+test('reopening reads stored memory once per change and still registers what another session removed',async()=>{
+ const a=choose(fixture('a'),'b0n1',2),b=fixture('b'),store=storage(),s=session(store,[a,b]);await s.initialize();
+ const registered=async()=>Object.values(((await store.read()).documents[personalMemoryDocument] as any).occurrences).filter((o:any)=>o.entryId==='a').length;
+ const indexed=await registered();assert.ok(indexed);
+ const first=await load(s,a),revision=(await store.read()).revision;
+ // The same score again, as its own fresh package: nothing to write, the same hands.
+ assert.deepEqual(await load(s,{...a,p:structuredClone(a.p)}),first);assert.equal((await store.read()).revision,revision);
+ assert.ok(s.storedRefs('a')?.length);assert.deepEqual(s.storedRefs('missing'),[]);
+ // Another application session forgets the score; the next opening registers it again.
+ const other=session(store,[a,b]);await other.initialize();await other.deleteEntry('a');assert.equal(await registered(),0);
+ await load(s,a);assert.equal(await registered(),indexed);assert.equal(finger(s,a,'b0n1'),2);
+});
+test('turning pages or rotating the view does not make opening project the score for memory again',async()=>{
+ const input=choose(fixture('a'),'b0n1',2),store=storage(),s=session(store,[input]);await s.initialize();
+ const snapshot=await store.read(),inner=s as unknown as {known(snapshot:unknown,candidate:MemoryScoreInput):boolean;projected:Map<string,unknown>};
+ const registered=inner.known(snapshot,input),projected=inner.projected.size;assert.ok(projected>0);
+ const looking=structuredClone(input);looking.personal.view={...looking.personal.view,page:3,rotation:90};looking.personal.editContactId='c1';
+ assert.equal(inner.known(snapshot,looking),registered);assert.equal(inner.projected.size,projected,'only where the reader looks changed');
+ inner.known(snapshot,choose(structuredClone(input),'b1n1',4,'2021-01-01'));assert.ok(inner.projected.size>projected,'a changed choice is projected');
+});

@@ -8,7 +8,10 @@ import {fingerFor,initialPersonal,readPersonal,type PersonalState} from '../src/
 import {assigned,effectiveAssignments,handFor,handRecurrences,type PersonalHand} from '../src/personal-assignments';
 import {PersonalMemorySession,rawMemoryPersonal} from '../src/personal-memory-session';
 import {browserAssistanceStore,type AssistanceBrowserLocks} from '../src/durable-assistance-store';
-import {FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
+import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache';
+import {projectionServed} from '../src/personal-presentation';
+import {PersonalPreparationPool} from '../src/personal-preparation-pool';
+import {VERBATIM_FOLD_CACHE_KIND,FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
 import {requirePracticeHands} from '../src/practice';
 import {buildPerformanceSchedule,writtenBarAt} from '../src/score-performance';
 
@@ -277,6 +280,24 @@ test('one hand order: the player\'s own right hand in both passes folds and stay
  assert.equal(view!.score.notes.find(n=>n.id===first)?.hand,'RH','the folded page draws it');
  assert.equal(practice.score.notes.find(n=>n.id===first)?.hand,'RH');
  assert.equal(handFor(p,inherited,closing),'LH','the closing bar keeps its own left hand');
+});
+
+test('a folded score is prepared ahead of time as it opens: served only while its folded pages and their projection are both on disk', async()=>{
+ const p=await returning(),s=assigned(p,initialPersonal(p),seatOf(p,ownerAt(p,1)),{hand:'LH'});
+ const files=new Map<string,Uint8Array>(),store:DerivedFileStore={async read(name){return files.get(name)??null;},async write(name,data){files.set(name,data);return true;}},cache=new DerivedFileCache(store,'build-a');
+ const reader=new FoldedReader(p,cache,{pool:new PersonalPreparationPool<any>(),options:{worker:null,cache,cacheWriteDelayMs:0}});
+ assert.equal(await reader.served(s),undefined,'nothing is served before the folded pages are drawn');
+ assert.ok(await reader.view(s));
+ const served=(await reader.served(s))!;
+ assert.equal(served.kind,VERBATIM_FOLD_CACHE_KIND);assert.equal(served.with?.length,1,'bar 1’s moved hand is projected');
+ for(let i=0;i<200&&!await projectionServed(cache,served);i++){await new Promise(r=>setTimeout(r,10));await cache.flush();}
+ assert.equal(await projectionServed(cache,served),true);
+ // Each entry it names is needed: without either the score is prepared again.
+ assert.equal((await Promise.all([...files.keys()].map(async name=>{const kept=new Map(files);kept.delete(name);return !await projectionServed(new DerivedFileCache({read:async n=>kept.get(n)??null,write:async()=>true},'build-a'),served);}))).filter(Boolean).length,2,'the folded pages and their projection');
+ assert.equal(await projectionServed(new DerivedFileCache(store,'build-b'),served),false,'another build draws them again');
+ // Choices that keep every folded note's written hand need only the folded pages.
+ const own=initialPersonal(p),plain=new FoldedReader(p,cache,{pool:new PersonalPreparationPool<any>(),options:{worker:null,cache,cacheWriteDelayMs:0}});
+ if(verbatimRepeats(p,own)?.fold){await plain.view(own);assert.deepEqual((await plain.served(own))?.with,[]);}
 });
 
 test('practice and Fingers visit each printed bar once, reading every pass\'s choices, and edit the stored notes', async()=>{

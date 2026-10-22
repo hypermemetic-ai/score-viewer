@@ -23,7 +23,7 @@ function fixture(){
   keyboardPreference:(value:any)=>value,readBindings:(value:any)=>value,fingerPreferences:()=>({}),readMidiMapping:()=>undefined,readMidiBindings:()=>undefined,
   readFingeringAdviceSettings,pendingPersonalConsolidation,readPianoPreferences,defaultPianoPreferences,ViewerOrientation,InputController:class {},readControlBindings:()=>({}),readFreeViewControlOverrides:()=>({}),controls:{configure(){}},
   host:{assistanceStore,onFocusChange:async()=>{},onMidi:async()=>{},fullscreen:async()=>{}},onMidi(){},onMidiNote(){},
-  configurePiano:async()=>({enabled:true,ready:true,error:null}),resetInput(){},render(){rendered++;},notify:(message:string)=>warnings.push(message),
+  configurePiano:async()=>({enabled:true,ready:true,error:null}),resetInput(){},render(){rendered++;},aheadOfTime:undefined,notify:(message:string)=>warnings.push(message),
   esc:(value:string)=>value,button:()=>'<button data-action="exit">Close Viewer</button>',validEntryStorage:()=>true,
  };
  runInNewContext(extracted('async function applyPendingConsolidation(){','function keyboardControl('),context);

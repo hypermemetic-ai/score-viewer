@@ -7,6 +7,7 @@ import {runInNewContext} from 'node:vm';
 import {assigned,dropHandCarry,effectiveAssignments,handFor,handProvenance,handRecurrences,ownsHand,personalPracticePackage,readPersonalAssignments,type PersonalHand} from '../src/personal-assignments';
 import {pianoRequestAuthority} from '../src/piano-request-authority';
 import {droppedCarryText,handActionNotice,handCarryNotice,handChoiceView,handKeyNotice} from '../src/hand-recurrence-text';
+import {PersonalMemoryResolutionCache} from '../src/personal-memory-cache';
 import {bootstrapPersonalFingeringMemory,preservePersonalMemoryHandChange,projectPersonalMemoryScore,resolvePersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
 import {PersonalMemorySession,personalMemoryDocument} from '../src/personal-memory-session';
 import {initialPersonal,personalStorageName,type PersonalState} from '../src/state';
@@ -368,4 +369,17 @@ test('the Hand row reads its hand first, then any key line, then its button, and
   assert.ok(html.endsWith(rest[0].startsWith('{')?'</button></span></div>':'</span></div>'),`${kind}: nothing after the button`);
   if(rest[0].startsWith('{'))assert.match(html,/<span class="editor-row-actions"><button/,`${kind}: the button starts its own line`);
  }
+});
+
+test('a reopened score is never resolved with the hands from before a refused carried hand',()=>{
+ // A source revision of its own: dropped carries last for the session.
+ const fresh=()=>{const input=no13();input.p.sourceRevision='refused-carry';input.personal=initialPersonal(input.p);return input;};
+ const input=fresh(),personal=owners(input),document=bootstrapPersonalFingeringMemory([{...input,personal}]);
+ const resolve=(q:MemoryScoreInput)=>resolvePersonalFingeringMemory(document,'no13',q.p,q.personal),cache=new PersonalMemoryResolutionCache();
+ const before=cache.resolve({...input,personal},0,resolve);assert.equal(handFor(input.p,personal,e4(21)),'RH');
+ // The engraver refuses bar 21's carried hands: E4 there goes back to the left hand.
+ assert.equal(dropHandCarry(input.p,personal,e4(21)),21);
+ const reopened=fresh(),again={...reopened,personal:structuredClone(personal)};assert.equal(handFor(again.p,again.personal,e4(21)),'LH');
+ const resolved=resolve(again);assert.notDeepEqual(resolved,before,'the refusal changes the resolution');
+ assert.deepEqual(cache.resolve(again,0,resolve),resolved);
 });

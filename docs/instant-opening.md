@@ -1,0 +1,66 @@
+# Opening a score instantly
+
+Reopening a score whose source, saved hand choices, engraver and recipe have not changed reads its pages from disk. Nothing is engraved. The pages are the ones the engraver made for exactly those inputs, so the reader sees the same pages either way.
+
+## What an opening costs
+
+An opening does these steps:
+
+1. Admit the archive: unzip, check member digests, parse.
+2. Load the player's hands and fingerings.
+3. Project the player's hand choices onto the score.
+4. Draw the pages.
+
+Step 3 is the expensive one. When any note is in a hand other than the one the score gives it, the projection engraves the whole score in the worker. No. 13 takes about 14 s on one thread on qq-box. The derived-file cache (`src/derived-file-cache.ts`) keeps the latest projection per captured package. It holds up to 2 GB, evicts the least recently used entries, stops writing when free disk falls below 5 GB, and refuses any single entry over 256 MB (`src-tauri/src/derived_cache.rs`). A hit reads the pages instead of engraving them.
+
+Before this change, two problems meant a reopen was rarely instant:
+
+- **Every app update threw away every saved engraving.** Derived files were bound to a hash of the whole viewer source, so a change to a menu label made every projection a miss. The first opening of each score after an install then engraved it again.
+- **Loading personal memory was quadratic.** Every opening compared each of the score's occurrences against every registered occurrence by re-serializing both. That cost about 6 s for No. 13, and it ran two or three times per opening, on every opening, including reopens.
+
+## What changed
+
+**Derived files are bound to the code that makes them** (`scripts/derived-identity.ts`). The identity covers every file reachable from the modules that produce derived files: package admission (`src/package.ts`), the personal projection and its two workers, the vendored engraver, and the build inputs (`package.json`, the lockfile, `tsconfig.json`, `vite.config.ts` and the identity script itself). The module graph is followed through static imports, re-exports, literal dynamic imports and `new URL('…', import.meta.url)` workers and assets. An import or worker URL that is computed at run time fails the build, so no code that makes a derived file can fall outside the identity. A change to menus, practice, styling or the library keeps every saved engraving. A change to the engraver, admission or projection makes all of them misses, as it must. `DERIVED_ENTRY_MODULES` is kept by hand, so a test (`test/instant-open.test.ts`) requires two things. Every module that uses the derived-file cache, and every module that `src/main.ts` hands the cache to, must lie inside the closure. Otherwise it must be named as a holder, with the reason it makes nothing that goes in the cache.
+
+**Scores are prepared ahead of time** (`src/ahead-of-time-engraving.ts`, `prepareAheadOfTime` in `src/main.ts`). While the player is in the library and the viewer is idle, it prepares each library score's projection for the saved hands. It starts with the last score worked on and does one score at a time. The score just closed is left out of that visit's work: its pages are in memory, and the reader writes them to disk itself. It starts only after three seconds with no input in the library, and any pointer, key or wheel input there holds it. The score under way pauses at its next step, and a score waiting for its turn waits again, until the next quiet three seconds; nothing is thrown away. Admission has stretches of up to about half a second that cannot yield, so without this a click could wait behind one of them. Between its steps the work also lets input through. It starts again whenever the player returns to the library: on Back, after an opening is cancelled with Esc or fails, and after a keyboard layout is chosen there. When Esc cancels an opening that had taken over the work under way, that work pauses as input pauses it and then goes on first; it is not thrown away. This is the same work opening would do, and it writes the same cache entry, so an opening right after an engraver update finds the pages ready. Opening a score stops the background work, except when the score being prepared is the one opening. That opening takes the work over, even if the click or key that opened it had just paused it, and waits for it instead of starting again, but only while the work is still made for what the opening will show. Each preparation keeps what it was started for: the keyboard layout, the score's archive, import and personal files, and its stored hand choices. If any of them changed (for example, the player switched from the Jankó to the conventional layout and then opened the score), the work stops and the opening engraves for the new layout itself rather than waiting for pages it will not use. The background work writes no player data. It also skips anything only an opening may do: rebuilding an edition, a layout the score lacks, or memory that is not yet indexed. Native builds only.
+
+A score already looked at costs a hash and a few header reads, not an admission. Every preparation records its outcome in a small `ahead-of-time-v2` entry, keyed by everything known before admission: the archive bytes, the keyboard layout, the entry, and the stored objects that hold the score's hand choices. The outcome is one of three:
+
+- **Served.** The record names the projection entry that serves the score. If that projection was evicted, the header check fails and the score is prepared again.
+- **Nothing to prepare.** For example, a reading-only archive, a layout the score lacks, or an edition that opening must engrave again.
+- **Refused.** The engraver refused the saved hands, or admission rejected the edition (such as one saved before its repeats were known).
+
+A refusal is recorded like a success, so a library visit never repeats a whole engrave the engraver will refuse again. Only those two answers are refusals (`refusedWhen` in `src/ahead-of-time-engraving.ts`). Anything else, such as a busy admission session, a lost or failing worker, memory, or a file that could not be read, records nothing, and a later visit tries again. The record also names each further file the preparation read after admission, such as a personal journal kept outside the store, with its digest. If one of those files changes, the score is prepared again. A stop is not an outcome and records nothing.
+
+The work runs in its own projection worker, preparation pool and admission session, and frees them when no work remains or the work stops, including a stop between two scores. A pause keeps them for the work that follows. Stopping it for another score therefore never terminates the reader's worker or discards the warm engine of the score being reopened.
+
+A preparation writes its files at its own steps, never on a timer, and lets input through before each. It writes the projection first; the worker that made the pages also serializes and compresses them, so the reader's thread only writes the file. The reader's own sessions don't ask for this, so an edit never waits for an encoding that only its last edit needs. An opening that took the work over waits only until the projection is written, and reads its pages from disk. In idle time afterwards, the preparation saves the engine it settled, before its worker is freed, so the score resumes hand editing from disk rather than engraving its engine again. When an earlier reading made the pages but saved no engine, the preparation settles the engine and saves it. The worker that holds the engine serializes, hashes and compresses it (`src/derived-payload.ts`) and hands over only the finished bytes, so the reader's thread writes a file rather than copying and compressing several megabytes; the reader's own engine saves work the same way. An opening that took the work over settles its own engine for editing only after that save, so it restores the saved engine. This holds for every settle of its session: the prefetch, and the check a first hand choice makes, which may come before the save has run. Only a preparation whose projection and engine are both written records an outcome; a stop while either is written records nothing, and the score is prepared again on the next visit.
+
+**Page checks leave receipts.** Admission checks every piano page as passive ink for its seats, which means parsing each page's SVG. A page this build already checked leaves a `piano-page-checks-v1` receipt keyed by the digests of the exact page bytes and seats, so a later start skips the parse. A changed page has a different key and is checked as before.
+
+**Personal memory is read once per change.** Stored assistance objects are named by their content. The session therefore reads and validates the memory document again only when its stored object changes. It keeps each recent score's registered occurrences, and its fingering resolution, by memory identity and hand choices, because every opening reads its package afresh. Another session's change gives the memory document a new name, which forces a fresh read.
+
+**The score just closed stays in memory.** Back keeps the reading of the score being left: its package, its pages and the projection of its hand choices. Reopening that score draws it again, with no read, admission, archive copy, identity hash or projection, when nothing it rests on has changed:
+
+- the library entry, whose archive and personal files are named by their content;
+- the score's stored hand choices and the fingering memory, also named by content;
+- the preferences, apart from which score was opened last;
+- any carried hand the engraver refused in this session, which is not stored but changes the pages;
+- the build, which carries the ISO notation pin.
+
+Comparing these needs no reads. Any difference opens the score afresh. Personal state is still loaded from the memory session on reopen, so practice progress and records are exactly what was saved. The MIDI clock is acquired again, and the selection starts empty, as on any opening. One score is held. Opening any score frees it, and so does memory pressure (more than half the script heap in use, checked at Back and every 30 s). It is not kept when hand choices were still waiting on Back, when edits are unsaved, for dual readings and reading-only scores, or for readings not opened from the library.
+
+
+| Situation | What happens |
+| --- | --- |
+| Reopen of the score just closed, nothing changed | Drawn from the kept reading: no read, admission or projection. |
+| Reopen, nothing changed, after another score or in a new session | Admission checks digests and seats; the pages' passive-ink check comes from its receipt. Personal memory and its resolution come from the memo, whose key leaves out where the reader is looking (page, rotation, selected contact). The projection comes from memory when the score was last read or engraved in this window (the last two are kept), otherwise from disk. No engraving. |
+| First opening after an app update that leaves the engraving code unchanged | The same as a reopen: the derived identity has not changed. |
+| First opening after an engraver update | Usually prepared already in the library. Otherwise one engrave, as before. |
+| Hand edit | Re-engraves in the settled engine (ISO notation's incremental path). It is not cached ahead of time. |
+| A score that must be rebuilt (policy change) | Rebuilt and installed when opened, as before. The installed archive is then prepared. |
+
+## Limits
+
+- An engrave itself is ISO notation's work: about 14 s for No. 13 on one thread, against a 3 s budget. A hand edit takes 1.2–2.4 s, against 300 ms. Making those faster belongs to the engraver, not to this cache.
+- Ahead-of-time preparation runs only while the library is idle. A score opened straight after an engraver update, before its turn comes, still engraves on opening.

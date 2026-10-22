@@ -9,9 +9,10 @@ import type {PersonalState} from './state';
 import {conservativeMaterialBytes} from './package-material';
 import {PersonalPreparationPool,type PreparationLease,type PreparationRequest} from './personal-preparation-pool';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
-import type {ProjectionCoreInputs,ProjectionView} from './personal-projection-protocol';
-import {ProjectionWorkerClient,ProjectionWorkerUnavailable,projectionWorkerClient} from './personal-projection-client';
+import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionView} from './personal-projection-protocol';
+import {ProjectionWorkerClient,ProjectionWorkerUnavailable,encodedProjections,projectionWorkerClient} from './personal-projection-client';
 import type {DerivedFileCache} from './derived-file-cache';
+import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
 
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
@@ -20,13 +21,17 @@ export interface PersonalProjectionCore {
   * resume from instead of engraving. Resolves false when the engraving did
   * not settle, else how: restored, engraved, or already settled before. */
  warm(execution?:ReadingExecution,offThreadOnly?:boolean,saved?:PersonalHandEngineState):Promise<false|'restored'|'engraved'|'already'>;
- project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>;
- /** The settled engine, for the disk cache; undefined when there is none. */
- save():Promise<PersonalHandEngineState|undefined>;
+ /** `encode`: the worker also encodes the view for the disk cache. */
+ project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution,encode?:boolean):Promise<ProjectionView>;
+ /** The settled engine, encoded for the disk cache on the thread that holds
+  * it; undefined when there is none. */
+ save():Promise<EncodedDerivedPayload|undefined>;
 }
 type Core=PersonalProjectionCore;
 type Capture=PreparationRequest<Core>&{digest:string};
 const preparations=new PersonalPreparationPool<Core>();
+/** A pool of its own, for background work that must never queue behind the reader's. */
+export const separatePreparations=()=>new PersonalPreparationPool<Core>(1);
 function localCore(inputs:ProjectionCoreInputs):Core {
  const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
  let settled=false;
@@ -38,7 +43,7 @@ function localCore(inputs:ProjectionCoreInputs):Core {
    if(e)await core.warmAsync(e);else core.warm();settled=true;return 'engraved';
   },
   async project(owners,digest,e){const view=e?await core.projectAsync(owners,digest,e):core.project(owners,digest);settled=true;return view;},
-  async save(){return core.exportState();}
+  async save(){const state=core.exportState();return state&&encodeDerivedPayload(state);}
  };
 }
 function freezeView<T>(value:T):T {
@@ -72,8 +77,8 @@ function workerCore(client:ProjectionWorkerClient,key:string,inputs:ProjectionCo
    if(local)return local.save();
    try{return await client.save(key,inputs);}catch{return undefined;}
   },
-  async project(owners,digest,e){
-   if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e));if(view)return freezeView(view);}
+  async project(owners,digest,e,encode){
+   if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e,encode));if(view)return freezeView(view);}
    return local!.project(owners,digest,e??{});
   }
  };
@@ -89,6 +94,28 @@ let defaultCache:DerivedFileCache|undefined;
  * the same hand choices reads its pages instead of engraving them again. */
 export function usePersonalProjectionCache(cache:DerivedFileCache|undefined){defaultCache=cache;}
 export const PERSONAL_PROJECTION_CACHE_KIND='personal-projection-v1';
+/** The projections last read from, or engraved for, each disk cache, by
+ * captured score and hand choices. Reopening a score in the same window draws
+ * them without reading, inflating and parsing its entry again; each is frozen,
+ * so every opening shares it. */
+const recentProjections=new WeakMap<DerivedFileCache,Map<string,ProjectionView>>();
+function recentProjection(cache:DerivedFileCache,key:string):ProjectionView|undefined{
+ const recent=recentProjections.get(cache),view=recent?.get(key);if(view){recent!.delete(key);recent!.set(key,view);}return view;
+}
+function keepRecentProjection(cache:DerivedFileCache,key:string,view:ProjectionView){
+ let recent=recentProjections.get(cache);if(!recent)recentProjections.set(cache,recent=new Map());
+ recent.delete(key);recent.set(key,view);
+ if(recent.size>2)recent.delete(recent.keys().next().value!);
+}
+/** A derived entry opening reads, and the tag it must carry: a projection
+ * unless `kind` says otherwise; `with` names the entries read together with it. */
+export interface ProjectionEntry {key:string;tag:string;kind?:string;with?:readonly ProjectionEntry[]}
+/** Whether the disk holds the projection for these hand choices, and what it is read with, from headers alone. */
+export async function projectionServed(cache:DerivedFileCache,served:ProjectionEntry):Promise<boolean>{
+ if(await cache.peek(served.kind??PERSONAL_PROJECTION_CACHE_KIND,served.key)!==served.tag)return false;
+ for(const entry of served.with??[])if(!await projectionServed(cache,entry))return false;
+ return true;
+}
 /** The settled hand engine of one captured package, so hand editing resumes
  * on reopening instead of engraving the score again. ISO notation refuses a
  * state that does not reproduce; the cache's build identity keeps another
@@ -207,7 +234,11 @@ let prefetching:AbortController|undefined;
 /** Edit-time engraving checks belong to the open score; opening another stops them. */
 let scoreWork:AbortController|undefined;
 export function cancelPersonalPrefetch(){prefetching?.abort();prefetching=undefined;scoreWork?.abort();scoreWork=undefined;}
-export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;cacheWriteDelayMs?:number}
+const whenIdle=(run:()=>void)=>{if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:30000});else run();};
+export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;
+ /** How long after a change its derived files are written in idle time;
+  * null when only the session's owner writes them, by flushing. */
+ cacheWriteDelayMs?:number|null}
 const CANNOT_DRAW="This score can't be displayed yet: the viewer can't draw its pages.";
 /** A refusal of the score's own engraving, rather than of a hand choice. A
  * mixed-hand key is drawn from the source's own pages and stays editable. */
@@ -228,13 +259,17 @@ export class PersonalPresentationSession {
  private readonly pool:PersonalPreparationPool<Core>;
  private readonly worker:ProjectionWorkerClient|null;
  private readonly cache:DerivedFileCache|null;
- private readonly cacheWriteDelayMs:number;
+ private readonly cacheWriteDelayMs:number|null;
  constructor(base:ScorePackage,pool=preparations,options:PersonalPresentationOptions={}){
   this.base=base;this.pool=pool;
   this.worker=options.worker===undefined?defaultProjectionWorker():options.worker;
   this.cache=options.cache===undefined?defaultCache??null:options.cache;
-  this.cacheWriteDelayMs=options.cacheWriteDelayMs??2000;
+  this.cacheWriteDelayMs=options.cacheWriteDelayMs===undefined?2000:options.cacheWriteDelayMs;
  }
+ /** A session that writes its pages as soon as they are made (background
+  * work) has the worker encode them. The reader's own sessions do not: an
+  * edit's pages would wait for an encoding only its last edit needs. */
+ private get encodesInWorker(){return !!this.cache&&this.cacheWriteDelayMs===null;}
  /** Without a projection worker the engraving settles cooperatively while the
   * score opens, as before, so a first hand choice never freezes the reader. */
  get settlesOnOpen(){return !this.worker?.available;}
@@ -334,8 +369,14 @@ export class PersonalPresentationSession {
   const state=importedEngines.get(this.base);
   if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
-  return this.savedEngine=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+  // The engine is read once per session, so not before a save under way has finished.
+  return this.savedEngine=(this.engineArriving??Promise.resolve()).then(()=>this.engineKey()).then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
  }
+ private engineArriving?:Promise<unknown>;
+ /** This package's engine is being saved elsewhere (work an opening took
+  * over from the library): every settle, a prefetch or a hand choice's
+  * check, restores it once that ends rather than engraving again. */
+ engineSavedBy(saving:Promise<unknown>){this.engineArriving=saving.catch(()=>undefined);}
  private async engineKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,(await this.prepare()).digest]));
  }
@@ -345,14 +386,14 @@ export class PersonalPresentationSession {
  /** The settled engine is saved once the reader is idle, once per session:
   * hand choices change only what the engine places, not what it restores. */
  private rememberEngine(){
-  const cache=this.cache;if(!cache||this.engineSaved||this.engineWrite!==undefined||this.engineAttempts>=2)return;
-  const write=()=>{
+  const cache=this.cache;if(!cache||this.engineSaved||this.engineJob!==undefined||this.engineAttempts>=2)return;
+  this.engineJob=async()=>{
    const core=this.lease?.valid?this.lease.core:undefined;if(!core||this.engineSaved)return;
    // An engine the cache refuses (too large, or the disk fails) is tried once more, not after every choice.
    this.engineAttempts++;
-   void core.save().then(async state=>{if(state&&await cache.put(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),state))this.engineSaved=true;}).catch(()=>{});
+   try{const engine=await core.save();if(engine&&await cache.putEncoded(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),engine))this.engineSaved=true;}catch{}
   };
-  this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
+  if(this.cacheWriteDelayMs!==null)this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;whenIdle(()=>void this.runEngineJob());},this.cacheWriteDelayMs);
  }
  private async cacheKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_PROJECTION_CACHE_KIND,(await this.prepare()).digest,PERSONAL_ANNOTATION_INK_POLICY]));
@@ -362,15 +403,59 @@ export class PersonalPresentationSession {
  private remember(view:ProjectionView){
   const cache=this.cache;if(!cache)return;
   if(this.cacheWrite!==undefined)clearTimeout(this.cacheWrite);
-  const value={score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry};
-  const write=()=>{void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value)).catch(()=>{});};
+  const value=cachedProjectionValue(view),encoded=encodedProjections.get(view);encodedProjections.delete(view);
+  // Tagged with its hand choices' digest, so a peek tells whether it serves them.
+  this.cacheJob=()=>this.cacheKey().then(key=>encoded?cache.putEncoded(PERSONAL_PROJECTION_CACHE_KIND,key,encoded,view.annotationGeometry?.presentationIdentity):cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).then(()=>{},()=>{});
   // Serializing pages is real work: it waits for the reader to be idle.
-  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
+  if(this.cacheWriteDelayMs!==null)this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;whenIdle(()=>void this.runCacheJob());},this.cacheWriteDelayMs);
+ }
+ private cacheJob?:()=>Promise<void>;private engineJob?:()=>Promise<void>;
+ private runCacheJob(){const job=this.cacheJob;this.cacheJob=undefined;return job?.()??Promise.resolve();}
+ private runEngineJob(){const job=this.engineJob;this.engineJob=undefined;return job?.()??Promise.resolve();}
+ /** Write now what waits for idle time: the latest projection, which
+  * opening reads. */
+ async flushProjection():Promise<void>{
+  if(this.cacheWrite!==undefined){clearTimeout(this.cacheWrite);this.cacheWrite=undefined;}
+  await this.runCacheJob();
+ }
+ /** Save now the settled engine waiting for idle time. Work that closes its
+  * worker afterwards does this first, or the engine is gone before it is
+  * saved. The worker encodes it: this thread only writes the file. */
+ async flushEngine():Promise<void>{
+  if(this.engineWrite!==undefined){clearTimeout(this.engineWrite);this.engineWrite=undefined;}
+  await this.runEngineJob();
+ }
+ async flushWrites():Promise<void>{await Promise.all([this.flushProjection(),this.flushEngine()]);}
+ /** Whether this score's settled engine is neither on disk nor waiting to be
+  * saved: background work that finds its pages made by an earlier reading
+  * then settles it, so hand editing never engraves it again. */
+ async engineMissing():Promise<boolean>{
+  const cache=this.cache;if(!cache||this.engineSaved||this.engineJob)return false;
+  if(await cache.has(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey())){this.engineSaved=true;return false;}
+  return true;
+ }
+ get engineWaiting(){return this.engineJob!==undefined;}
+ private owners(personal:PersonalState):PersonalOwnerHand[]|undefined{
+  const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
+  const hands=new Map(this.base.score.notes.map(n=>[n.id,n.hand??null]));
+  return owners.every(a=>(hands.get(a.id)??null)===a.hand)?undefined:owners;
+ }
+ /** Whether projecting these hand choices needs no engraving: they are the
+  * score's own hands, or the disk already holds their pages. */
+ async prepared(personal:PersonalState):Promise<boolean>{
+  const served=await this.projectionEntry(personal);if(!served)return true;
+  return !!this.cache&&await projectionServed(this.cache,served);
+ }
+ /** The derived entry, and the tag it must carry, that serves these hand
+  * choices; none for the score's own hands, which need no projection. */
+ async projectionEntry(personal:PersonalState):Promise<ProjectionEntry|undefined>{
+  const owners=this.owners(personal);if(!owners)return;
+  return {key:await this.cacheKey(),tag:await hashBytes(JSON.stringify(owners))};
  }
  async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
-  if(owners.every(a=>(this.base.score.notes.find(n=>n.id===a.id)?.hand??null)===a.hand))return this.base;
+  const owners=this.owners(personal);
+  if(!owners)return this.base;
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
   await ensureAnnotationInkPolicyReady(PERSONAL_ANNOTATION_INK_POLICY);checkReadingExecution(execution);
@@ -379,16 +464,22 @@ export class PersonalPresentationSession {
   // Only a session's first projection, normally the one that opens the score, reads the disk.
   if(this.cache&&!this.cacheRead){
    this.cacheRead=true;
-   result=await this.cache.get(PERSONAL_PROJECTION_CACHE_KIND,await this.cacheKey(),cachedProjection(owners,digest));
+   const cacheKey=await this.cacheKey(),recent=`${cacheKey} ${digest}`;
+   // Reopened in the same window, the pages it last read are still in memory.
+   result=recentProjection(this.cache,recent)??await this.cache.get(PERSONAL_PROJECTION_CACHE_KIND,cacheKey,cachedProjection(owners,digest));
    checkReadingExecution(execution);
+   if(result)keepRecentProjection(this.cache,recent,result);
   }
   if(!result){
    // A saved engine settles the core first, so this choice only places what
    // changed, even when its projection is no longer on disk.
-   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState())await this.settle(core,e);return core.project(owners,digest,e);},execution).catch(error=>this.refusal(error,execution)),
+   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState())await this.settle(core,e);return core.project(owners,digest,e,this.encodesInWorker);},execution).catch(error=>this.refusal(error,execution)),
     UNDRAWABLE_HAND_CHOICES,
     "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
    this.baseline??=true;this.remember(result);this.rememberEngine();
+   // Reopened in this window, the pages just engraved draw from memory too.
+   const cache=this.cache,engraved=result;
+   if(cache&&Object.isFrozen(engraved))void this.cacheKey().then(cacheKey=>keepRecentProjection(cache,`${cacheKey} ${digest}`,engraved)).catch(()=>{});
   }
   const view:ScorePackage={...this.base,score:result.score,pages:[...result.pages],seats:[...result.seats],annotationGeometry:result.annotationGeometry,personalAnnotationInkPolicy:PERSONAL_ANNOTATION_INK_POLICY};
   this.lastKey=key;this.lastView=view;return view;

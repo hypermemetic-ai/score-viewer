@@ -173,10 +173,27 @@ test('worker projection and the disk cache give the same view as the reader thre
  const cached=await second.project(again);
  assert.equal(log.length,requests,'a cached projection runs no engraving');
  assert.deepEqual(cached.pages,local.pages);assert.deepEqual(cached.score,local.score);assert.deepEqual(cached.annotationGeometry,local.annotationGeometry);
- // A corrupt entry is recomputed and written again.
+ // Reopened again in the same window, the pages come from memory: even a
+ // corrupt entry on disk is not read.
  for(const name of files.keys())files.set(name,new Uint8Array([9]));
- const third=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
+ const remembered=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
+ assert.equal(log.length,requests,'a remembered projection runs no engraving');assert.deepEqual(remembered.pages,local.pages);
+ // Another window finds the corrupt entry, and recomputes and writes it again.
+ const third=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache:new DerivedFileCache(store,'build-a')}).project(again);
  assert.ok(log.length>requests);assert.deepEqual(third.pages,local.pages);
+});
+
+test('pages just engraved are drawn from memory when the score reopens in the same window',async()=>{
+ const {p,bytes}=await sourcePackage(transferStudy()),reopened=await importPackage(bytes);
+ const seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ // This disk never serves a projection, so only memory can.
+ const log:ProjectionRequest[]=[],worker=fakeWorker(createHostedCore,log),{store}=memoryStore(),cache=new EvictedProjections(store,'build-a');
+ const engraved=await new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache,cacheWriteDelayMs:0}).project(choice);
+ const projections=()=>log.filter(m=>m.kind==='project').length;assert.equal(projections(),1);
+ await new Promise(r=>setTimeout(r,0));
+ const again=assigned(reopened,initialPersonal(reopened),reopened.seats.find(s=>s.ownerIds.includes('gesture-1'))!,{hand:'RH'});
+ const drawn=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
+ assert.equal(projections(),1,'reopening engraves nothing');assert.deepEqual(drawn.pages,engraved.pages);assert.deepEqual(drawn.score,engraved.score);
 });
 
 test('reopening resumes hand editing from the saved engine instead of engraving again',async()=>{
@@ -208,6 +225,57 @@ test('reopening resumes hand editing from the saved engine instead of engraving 
  // On the reader's thread too.
  const here=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache});
  await here.warm();assert.deepEqual((await here.project(choice)).pages,local.pages);
+});
+
+test('work that frees its worker after projecting saves the engine first',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const run=async(flush:boolean)=>{
+  const {store}=memoryStore(),cache=new DerivedFileCache(store,'build-a'),worker=fakeWorker(createHostedCore),client=new ProjectionWorkerClient(worker.spawn);
+  const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:client,cache,cacheWriteDelayMs:0});
+  await session.project(choice);if(flush)await session.flushWrites();
+  // As ahead-of-time work does once it has nothing left: its worker is closed.
+  client.close();await new Promise(r=>setTimeout(r,50));await cache.flush();
+  const restores:boolean[]=[],later=fakeWorker(inputs=>{const core=createHostedCore(inputs),restore=core.restoreAsync!;return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;}});});
+  const reader=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(later.spawn),cache,cacheWriteDelayMs:0});
+  reader.prefetch();await reader.ensureHandChoicesDrawable();
+  return restores;
+ };
+ assert.deepEqual(await run(false),[],'closed before idle time: the engine is lost, and the reader engraves again');
+ assert.deepEqual(await run(true),[true],'saved first: the reader resumes from it');
+});
+
+test('background work has the worker encode the pages it writes, byte for byte as the reader writes them; the reader does not ask',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const projection=async(cacheWriteDelayMs:number|null)=>{
+  const log:ProjectionRequest[]=[],{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+  const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore,log).spawn),cache,cacheWriteDelayMs});
+  await session.project(choice);await session.flushProjection();await cache.flush();
+  const name=[...files.keys()].find(n=>!n.includes('engine'))!;
+  return {encode:log.filter(m=>m.kind==='project').map(m=>!!(m as {encode?:boolean}).encode),bytes:files.get(name)!,name};
+ };
+ const background=await projection(null),reader=await projection(0);
+ assert.deepEqual(background.encode,[true]);assert.deepEqual(reader.encode,[false],'an edit never waits for an encoding');
+ assert.equal(background.name,reader.name);assert.deepEqual(background.bytes,reader.bytes);
+});
+
+test('a hand choice right after an opening that took library work over restores the engine that work is saving',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const run=async(told:boolean)=>{
+  const {store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+  // The library's work: pages written, its engine still to be saved in idle time.
+  const background=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore).spawn),cache,cacheWriteDelayMs:null});
+  await background.project(choice);await background.flushProjection();assert.equal(background.engineWaiting,true);
+  let saved!:()=>void;const saving=new Promise<void>(resolve=>{saved=resolve;});
+  const restores:boolean[]=[],later=fakeWorker(inputs=>{const core=createHostedCore(inputs),restore=core.restoreAsync!;return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;}});});
+  const reader=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(later.spawn),cache,cacheWriteDelayMs:0});
+  if(told)reader.engineSavedBy(saving);
+  // The player's first hand choice checks the engraving before the save has run.
+  const check=reader.ensureHandChoicesDrawable();await new Promise(r=>setTimeout(r,20));
+  await background.flushEngine();await cache.flush();saved();await check;
+  return {restores,warms:later.log.filter(m=>m.kind==='warm').map(m=>!!(m as {saved?:unknown}).saved)};
+ };
+ assert.deepEqual(await run(false),{restores:[],warms:[false]},'read too early: the reader engraves the whole score again');
+ assert.deepEqual(await run(true),{restores:[true],warms:[true]},'it waits for the save, then restores the engine');
 });
 
 const musicXml=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url));
