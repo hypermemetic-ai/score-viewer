@@ -1,4 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
+import {handCarryNotice} from '../src/hand-recurrence-text';
 import {undrawableHandOwners} from '../src/personal-presentation';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext,runInContext} from 'node:vm';
 import {scoreCapabilities} from '../src/score-capabilities';
@@ -8,7 +9,7 @@ import {assigned,effectiveAssignmentKey} from '../src/personal-assignments';impo
 import {PersonalMemorySession,rawMemoryPersonal,personalMemoryDocument} from '../src/personal-memory-session';
 import {browserAssistanceStore,type AssistanceStore} from '../src/durable-assistance-store';
 import {withResolvedMemory} from '../src/personal-assistance';
-import {handFor} from '../src/personal-assignments';
+import {dropHandCarry,handFor,handsDiffer} from '../src/personal-assignments';
 import {HandChoiceQueue,abandonedChoicesText,waitingOutcomeText} from '../src/hand-editing-wait';
 const source=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),body=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
@@ -23,11 +24,11 @@ async function fixture(){
  }};
  const memoryInput=(owner:any)=>({entryId:owner.entry.id,importedAt:owner.entry.importedAt,p:owner.package,personal:rawMemoryPersonal(owner.personal)});
  const personalMemory=new PersonalMemorySession(store,{scanLibrary:async()=>[memoryInput(target)]});await personalMemory.initialize();active=true;
- const context:any={structuredClone,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
+ const context:any={structuredClone,handCarryNotice,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}async project(personal:any){return {...p,projection:personal.assignments};}},personalStorageName,personalMemory,memoryInput,rawMemoryPersonal,
   resolveMemory:(owner:any)=>withResolvedMemory(memoryInput(owner),personalMemory.resolve(memoryInput(owner)),personalMemory.memory.revision),effectiveAssignmentKey,
   adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){},
-  handFor,HandChoiceQueue,abandonedChoicesText,waitingOutcomeText,app:{querySelector:()=>null},
+  handFor,handsDiffer,dropHandCarry,HandChoiceQueue,abandonedChoicesText,waitingOutcomeText,app:{querySelector:()=>null},
   HandPreparationStatus:class{queued:any[]=[];closed=false;stage(){}queue(list:any[]){this.queued=[...list];}show(){}close(){this.closed=true;}}};
  runInNewContext(body('function personalEditor(','function paintPersonalSaveError('),context);
  runInNewContext(body('/** Painting follows accepted intent','\nfunction labelMode(')+GENERIC_PERSONAL_COMMIT,context);
