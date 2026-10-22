@@ -227,6 +227,23 @@ test('reopening resumes hand editing from the saved engine instead of engraving 
  await here.warm();assert.deepEqual((await here.project(choice)).pages,local.pages);
 });
 
+test('work that frees its worker after projecting saves the engine first',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const run=async(flush:boolean)=>{
+  const {store}=memoryStore(),cache=new DerivedFileCache(store,'build-a'),worker=fakeWorker(createHostedCore),client=new ProjectionWorkerClient(worker.spawn);
+  const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:client,cache,cacheWriteDelayMs:0});
+  await session.project(choice);if(flush)await session.flushWrites();
+  // As ahead-of-time work does once it has nothing left: its worker is closed.
+  client.close();await new Promise(r=>setTimeout(r,50));await cache.flush();
+  const restores:boolean[]=[],later=fakeWorker(inputs=>{const core=createHostedCore(inputs),restore=core.restoreAsync!;return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;}});});
+  const reader=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(later.spawn),cache,cacheWriteDelayMs:0});
+  reader.prefetch();await reader.ensureHandChoicesDrawable();
+  return restores;
+ };
+ assert.deepEqual(await run(false),[],'closed before idle time: the engine is lost, and the reader engraves again');
+ assert.deepEqual(await run(true),[true],'saved first: the reader resumes from it');
+});
+
 const musicXml=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url));
 const musicXmlAssets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
  notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>['licenses/'+name,readFileSync(new URL('../licenses/'+name,import.meta.url))]))};

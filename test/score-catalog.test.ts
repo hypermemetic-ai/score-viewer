@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {catalogueHeading,catalogueLine,musicXmlCatalogue,workContext,workHeadingMarkup,workName,workOrder} from '../src/score-catalog';
+import {catalogueHeading,catalogueLine,musicXmlCatalogue,workContext,workHeadingMarkup,workName,workOrder,workReference} from '../src/score-catalog';
 import {libraryMarkup,LibrarySelection} from '../src/library-menu';
 import type {Entry} from '../src/state';
 import type {Metadata} from '../src/package';
@@ -79,4 +79,12 @@ test('a composer written with stray spaces stays one group',()=>{
  const selection=new LibrarySelection();
  selection.update([entry('a',{...zelda,composer:'Koji Kondo '}),entry('b',zelda),entry('c',{...other,composer:' '}),entry('d',other)]);
  assert.deepEqual(selection.allRows().filter(r=>!r.entry).map(r=>r.key),['composer:Koji Kondo','composer:']);
+});
+
+test('a work named within a sentence: composer › catalogue › number, or its title when it has no number',()=>{
+ assert.equal(workReference(no13),'Robert Schumann › Op. 68 › No. 13');
+ assert.equal(workReference(no14),'Robert Schumann › Op. 68 › No. 14');
+ assert.equal(workReference(bach),'J. S. Bach › BWV 988 › Variatio 1. a 1 Clav.');
+ assert.equal(workReference(zelda),'Koji Kondo › Zelda\'s Lullaby');
+ assert.equal(workReference(other),'Add It Up');
 });

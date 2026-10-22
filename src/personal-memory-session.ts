@@ -2,7 +2,7 @@ import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-stor
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {canonicalJson} from './piano-preparation-identity';
-import {assigned,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
+import {assigned,handCarryDropGeneration,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
  bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,memoryInputKey,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
@@ -190,7 +190,7 @@ export class PersonalMemorySession {
   const {view:_view,navigation:_navigation,editContactId:_editContactId,...authored}=candidate.personal;
   // Hands carried from matching bars are derived: the score is known with them or without them.
   return [{},{carry:false}].some(options=>{
-   const choice=JSON.stringify([memoryInputKey(candidate),candidate.p.transposition??null,candidate.importedAt??null,authored,options]);
+   const choice=JSON.stringify([memoryInputKey(candidate),candidate.p.transposition??null,candidate.importedAt??null,handCarryDropGeneration(),authored,options]);
    let wanted=this.projected.get(choice);
    if(!wanted){
     wanted=projectPersonalMemoryScore(candidate,options).map(w=>canonicalJson(w.occurrence));

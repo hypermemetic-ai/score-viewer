@@ -1,8 +1,11 @@
 import {memoryInputKey,type MemoryScoreInput,type MemoryResolution} from './personal-fingering-memory';
+import {handCarryDropGeneration} from './personal-assignments';
 /** Only musical authority participates. Cursor/page changes and the derived
- * display projection cannot invalidate the same accepted source resolution. */
+ * display projection cannot invalidate the same accepted source resolution.
+ * Hands carried from matching bars are part of it, including those dropped
+ * because the engraver refused them. */
 export function personalMemoryResolutionKey(input:MemoryScoreInput,generation:number):string {
- const s=input.personal;return JSON.stringify([input.entryId,generation,s.assignments,s.overrides,s.calculatedOwners,s.layer]);
+ const s=input.personal;return JSON.stringify([input.entryId,generation,handCarryDropGeneration(),s.assignments,s.overrides,s.calculatedOwners,s.layer]);
 }
 /** Each opening reads its package afresh, so resolutions are kept by the
  * score's memory identity rather than by package object: reopening a score

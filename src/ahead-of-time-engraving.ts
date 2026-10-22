@@ -7,34 +7,42 @@ import type {ProjectionEntry} from './personal-presentation';
  * rather than when they open the score.
  *
  * It only ever runs while nothing else is being read, and only once the player
- * has left the library alone for a few seconds: any input there stops it until
- * the next quiet moment, so a click never waits for it. Opening a score stops
- * it, except for the score being opened: that opening joins the work already
- * under way instead of starting it again (the shared preparation pool and
- * projection worker serve both). Nothing here writes the player's data; a
- * failure or a stop costs nothing but the work. */
+ * has left the library alone for a few seconds. Any input there holds it: the
+ * score under way pauses at its next step, and a score waiting its turn waits
+ * again, until the next quiet moment, so a click never waits for it. Opening
+ * a score stops it, except for the score being opened: that opening takes
+ * over the work already under way, paused or not, instead of starting it
+ * again. Every stop frees what the work held. Nothing here writes the
+ * player's data; a failure or a stop costs nothing but the work. */
 /** Library scores in the order the player is likeliest to open them, the one
  * last worked on first. The score just closed is left out: its pages are in
  * memory, and the reader writes them to disk itself. */
 export function aheadOfTimeOrder(entryIds:readonly string[],lastWorked?:string,closed?:string):string[]{
  return [...entryIds.filter(id=>id===lastWorked),...entryIds].filter(id=>id!==closed);
 }
+/** Waits while the player is busy in the library; resolves at once otherwise. */
+export type AheadOfTimeQuiet=()=>Promise<void>;
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
  private running?:{entryId:string;done:Promise<void>};
  private queue:string[]=[];
+ /** The next score, between its turn coming and idle time to start it. */
+ private waiting?:string;
  private timer?:ReturnType<typeof setTimeout>;
+ /** Input holds the score under way until the next quiet moment. */
+ private held?:{resume:()=>void;until:Promise<void>;timer?:ReturnType<typeof setTimeout>};
+ /** Some preparation ran since the last release: its worker is still alive. */
+ private holding=false;
  /** Each start or stop ends the run before it, including a step still waiting for idle time. */
  private generation=0;
- constructor(private readonly prepare:(entryId:string,execution:ReadingExecution)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
-  /** No work remains: free what the work held (its own projection worker). */
+ constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,quiet:AheadOfTimeQuiet)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
+  /** No work remains or the work stopped: free what it held (its own projection worker). */
   release?:()=>void}={}){}
  get active(){return this.running?.entryId;}
+ private get delay(){return this.options.delayMs??3000;}
  /** Prepare these scores in order, after a quiet moment. Replaces any earlier list. */
  start(entryIds:readonly string[]):void {
-  this.stop();
-  this.queue=[...new Set(entryIds)];
-  this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.options.delayMs??3000);
+  this.end(true);this.queue=[...new Set(entryIds)];this.arm();
  }
  /** The work under way for `entryId`, which an opening of that score awaits
   * and then reads from disk instead of engraving it a second time. */
@@ -45,39 +53,61 @@ export class AheadOfTimeEngraving {
    void running.done.finally(()=>{signal?.removeEventListener('abort',stop);resolve();});
   });
  }
- /** Stop for a reading of `entryId`: work on that score continues, and the
-  * reading joins it; work on any other score stops now. It runs in its own
-  * projection worker, so stopping it never costs the reader's warm engines. */
+ /** Stop for a reading of `entryId`: work on that score continues at once,
+  * even if input held it, and the reading joins it; anything else stops now.
+  * It runs in its own projection worker, so stopping it never costs the
+  * reader's warm engines. */
  yieldTo(entryId:string):void {
+  if(this.running?.entryId!==entryId){this.end(true);return;}
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
-  this.queue=[];
-  if(this.running?.entryId===entryId)return;
-  this.abort();
+  this.queue=[];this.resume();
  }
- /** The player is doing something in the library: stop now, and resume the
-  * same list, the score under way first, after another quiet moment. */
+ /** The player is doing something in the library: hold the work, and go on
+  * with the same list, the score under way or waiting first, after another
+  * quiet moment. A score under way pauses rather than stops, so opening it
+  * next still takes its work over. */
  defer():void {
-  if(this.timer===undefined&&!this.running&&!this.queue.length)return;
-  this.start([...(this.running?[this.running.entryId]:[]),...this.queue]);
+  if(this.running){this.hold();return;}
+  if(this.timer===undefined&&this.waiting===undefined&&!this.queue.length)return;
+  const entryIds=[...(this.waiting!==undefined?[this.waiting]:[]),...this.queue];
+  this.end(false);this.queue=entryIds;this.arm();
  }
- stop():void {
+ stop():void {this.end(true);}
+ private arm(){this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.delay);}
+ private hold(){
+  if(!this.held){let resume!:()=>void;const until=new Promise<void>(done=>{resume=done;});this.held={resume,until};}
+  const held=this.held;if(held.timer!==undefined)clearTimeout(held.timer);held.timer=setTimeout(()=>this.resume(),this.delay);
+ }
+ private resume(){const held=this.held;this.held=undefined;if(!held)return;if(held.timer!==undefined)clearTimeout(held.timer);held.resume();}
+ private readonly quiet:AheadOfTimeQuiet=()=>this.held?.until??Promise.resolve();
+ /** End the run: its list, the score waiting, the score under way. `release`
+  * also frees the worker; a pause in the list keeps it for what follows. */
+ private end(release:boolean){
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
-  this.queue=[];this.abort();
+  this.queue=[];this.waiting=undefined;this.generation++;
+  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.resume();
+  if(release)this.free();
  }
- private abort(){const stopped=this.controller;this.generation++;this.controller?.abort();this.controller=undefined;this.running=undefined;if(stopped)this.options.release?.();}
+ private free(){if(!this.holding)return;this.holding=false;this.options.release?.();}
  private next():void {
-  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.options.release?.();return;}
+  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.free();return;}
+  this.waiting=entryId;
   const idle=this.options.idle??((run:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(run,{timeout:5000}):setTimeout(run,0));
   idle(()=>{
    if(generation!==this.generation||this.running)return;
-   const controller=new AbortController();this.controller=controller;
-   const done=this.prepare(entryId,{signal:controller.signal}).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
+   this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
+   const done=this.prepare(entryId,{signal:controller.signal},this.quiet).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
     if(this.controller!==controller)return;
     this.controller=undefined;this.running=undefined;this.next();
    });
    this.running={entryId,done};
   });
  }
+}
+
+/** Input in the library holds ahead-of-time work: the viewer's own listener. */
+export function holdAheadOfTimeOnInput(target:Pick<EventTarget,'addEventListener'>,work:()=>AheadOfTimeEngraving|undefined,inLibrary:()=>boolean):void {
+ for(const kind of ['pointermove','pointerdown','keydown','wheel'])target.addEventListener(kind,()=>{if(inLibrary())work()?.defer();},{capture:true,passive:true});
 }
 
 /** What one ahead-of-time preparation of a score found, kept under a key made

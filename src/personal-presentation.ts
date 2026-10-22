@@ -227,6 +227,7 @@ let prefetching:AbortController|undefined;
 /** Edit-time engraving checks belong to the open score; opening another stops them. */
 let scoreWork:AbortController|undefined;
 export function cancelPersonalPrefetch(){prefetching?.abort();prefetching=undefined;scoreWork?.abort();scoreWork=undefined;}
+const whenIdle=(run:()=>void)=>{if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:30000});else run();};
 export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;cacheWriteDelayMs?:number}
 const CANNOT_DRAW="This score can't be displayed yet: the viewer can't draw its pages.";
 /** A refusal of the score's own engraving, rather than of a hand choice. A
@@ -365,14 +366,14 @@ export class PersonalPresentationSession {
  /** The settled engine is saved once the reader is idle, once per session:
   * hand choices change only what the engine places, not what it restores. */
  private rememberEngine(){
-  const cache=this.cache;if(!cache||this.engineSaved||this.engineWrite!==undefined||this.engineAttempts>=2)return;
-  const write=()=>{
+  const cache=this.cache;if(!cache||this.engineSaved||this.engineJob!==undefined||this.engineAttempts>=2)return;
+  this.engineJob=async()=>{
    const core=this.lease?.valid?this.lease.core:undefined;if(!core||this.engineSaved)return;
    // An engine the cache refuses (too large, or the disk fails) is tried once more, not after every choice.
    this.engineAttempts++;
-   void core.save().then(async state=>{if(state&&await cache.put(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),state))this.engineSaved=true;}).catch(()=>{});
+   try{const state=await core.save();if(state&&await cache.put(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),state))this.engineSaved=true;}catch{}
   };
-  this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
+  this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;whenIdle(()=>void this.runEngineJob());},this.cacheWriteDelayMs);
  }
  private async cacheKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_PROJECTION_CACHE_KIND,(await this.prepare()).digest,PERSONAL_ANNOTATION_INK_POLICY]));
@@ -384,9 +385,20 @@ export class PersonalPresentationSession {
   if(this.cacheWrite!==undefined)clearTimeout(this.cacheWrite);
   const value={score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry};
   // Tagged with its hand choices' digest, so a peek tells whether it serves them.
-  const write=()=>{void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).catch(()=>{});};
+  this.cacheJob=()=>this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).then(()=>{},()=>{});
   // Serializing pages is real work: it waits for the reader to be idle.
-  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
+  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;whenIdle(()=>void this.runCacheJob());},this.cacheWriteDelayMs);
+ }
+ private cacheJob?:()=>Promise<void>;private engineJob?:()=>Promise<void>;
+ private runCacheJob(){const job=this.cacheJob;this.cacheJob=undefined;return job?.()??Promise.resolve();}
+ private runEngineJob(){const job=this.engineJob;this.engineJob=undefined;return job?.()??Promise.resolve();}
+ /** Write now what waits for idle time: the latest projection and the settled
+  * engine. Work that closes its worker afterwards does this first, or the
+  * engine is gone before it is saved. */
+ async flushWrites():Promise<void>{
+  if(this.cacheWrite!==undefined){clearTimeout(this.cacheWrite);this.cacheWrite=undefined;}
+  if(this.engineWrite!==undefined){clearTimeout(this.engineWrite);this.engineWrite=undefined;}
+  await Promise.all([this.runCacheJob(),this.runEngineJob()]);
  }
  private owners(personal:PersonalState):PersonalOwnerHand[]|undefined{
   const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));

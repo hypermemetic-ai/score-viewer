@@ -29,6 +29,10 @@ export function workName(m:Metadata):WorkName {
 export function catalogueLine(name:WorkName){return [name.catalogue,name.number!==undefined?`No. ${name.number}`:undefined].filter(Boolean).join(', ');}
 /** Catalogue entry heading in the library: "Op. 68" or "BWV 988 · Goldberg Variations". */
 export function catalogueHeading(name:WorkName){return [name.catalogue,name.collection].filter(Boolean).join(' · ');}
+/** A work named within a sentence: composer › catalogue › number ("Robert
+ * Schumann › Op. 68 › No. 13"), with its own title instead of a number when it
+ * has none ("J. S. Bach › BWV 988 › Variatio 1. a 1 Clav."). */
+export function workReference(m:Metadata){const name=workName(m);return [name.composer,name.catalogue,name.number!==undefined?`No. ${name.number}`:name.title].filter(Boolean).join(' › ');}
 /** Composer, catalogue and number in reading order, before the title. */
 export function workContext(name:WorkName){return [name.composer,catalogueLine(name)].filter(Boolean).join(' · ');}
 
