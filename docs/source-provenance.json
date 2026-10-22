@@ -1424,14 +1424,15 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "af9be9793025e2fe3ea5739d50869a0f22e29139",
+  "dependencyRevision": "a61a09bb84c437a68b8b691f9f1915ee80c25bd9",
   "dependencyReview": {
     "pullRequests": [
       "https://github.com/hypermemetic-ai/iso-notation/pull/427",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/428",
       "https://github.com/hypermemetic-ai/iso-notation/pull/433"
     ],
     "previousRevision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
-    "scope": "Bach's repeats in Goldberg Var. 1, 2026-10-21. #433 (unmerged branch at this pin; repin to its merge): Goldberg Var. 1 was encoded by hand with a double bar at m. 17 and a final bar, so no repeat signs were drawn. ISO now records Bach's repeats (each half twice, after the 1741 Clavier-Übung IV print) and the score carries them as a written presentation: notes written once, every performed visit mapped, `:||:` after m. 16 and `:||` at the end. withKnownComposerRepeats gives the same repeats to a stored Goldberg source saved before them, matched by identity and bar grid, without changing its bytes; the viewer applies it on admission, so the owner's entry keeps its id, hand identity and personal keys and is engraved again once with the signs. #427 (merged) lets a slur end beside its head on a joined chord and drops #426's stopgap."
+    "scope": "Bach's repeats in Goldberg Var. 1, 2026-10-21. #433 (unmerged branch at this pin; repin to its merge): Goldberg Var. 1 was encoded by hand with a double bar at m. 17 and a final bar, so no repeat signs were drawn. ISO now records Bach's repeats (each half twice, after the 1741 Clavier-Übung IV print) and the score carries them as a written presentation: notes written once, every performed visit mapped, `:||:` after m. 16 and `:||` at the end. withKnownComposerRepeats gives the same repeats to a stored Goldberg source saved before them, matched by identity and bar grid, without changing its bytes; the viewer applies it on admission, so the owner's entry keeps its id, hand identity and personal keys and is engraved again once with the signs. #427 (merged) lets a slur end beside its head on a joined chord and drops #426's stopgap. #428 (merged) slopes a beam by the heads beside it, not a chord's far head, and rests a concave group's beam on the heads nearest it: in Goldberg Var. 1 its concave sixteenth groups now lie flat; No. 13's beams change as #428 lists."
   },
   "previousDependencyReviews": [
     {
