@@ -42,6 +42,14 @@ export class ProjectionWorkerClient {
   worker.onmessageerror=()=>this.lose(worker,false);
   this.worker=worker;this.known.clear();return worker;
  }
+ /** Stop the worker and everything it holds; the next request starts a fresh one. */
+ close():void {
+  const worker=this.worker;if(!worker)return;
+  try{worker.terminate();}catch{/* already gone */}
+  this.worker=undefined;this.known.clear();
+  const lost=[...this.pending.values()];this.pending.clear();
+  for(const p of lost){p.cleanup();p.reject(new DOMException('Reading preparation was cancelled.','AbortError'));}
+ }
  /** A worker that never answered cannot run here; a crash later restarts it on the next request. */
  private lose(worker:ProjectionWorkerLike,permanent:boolean){
   if(this.worker!==worker)return;

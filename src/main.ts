@@ -83,6 +83,7 @@ import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
 import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,preparedBefore,prepareRecorded} from './ahead-of-time-engraving';
+import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
@@ -94,7 +95,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
+import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,type HandChoiceAction} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
@@ -123,7 +124,7 @@ let aheadOfTime:AheadOfTimeEngraving|undefined;
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
  // What opening each score reads from disk is made while the player is in the library.
- aheadOfTime=new AheadOfTimeEngraving((entryId,execution)=>prepareAheadOfTime(derived,entryId,execution));
+ aheadOfTime=new AheadOfTimeEngraving((entryId,execution)=>prepareAheadOfTime(derived,entryId,execution),{release:()=>{aheadWorker?.close();}});
  usePersonalProjectionCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
@@ -131,7 +132,9 @@ if(isTauri()&&!import.meta.env.DEV&&host.derived){
 }
 /** Library scores in the order the player is likeliest to open them. */
 const aheadOfTimeOrder=()=>[...entries.filter(e=>e.id===preferences.lastWorkedEntryId),...entries].map(e=>e.id);
-// Its own admission, so it never holds the reader's admission busy.
+// Its own admission and projection worker, so it never holds the reader's
+// busy, and stopping it never costs the reader's warm engines.
+let aheadWorker:ProjectionWorkerClient|undefined;
 const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:64*1024*1024});
 /** Make what opening a score reads from the derived-file cache: its pages for
  * the player's saved hands, exactly as opening would project them. Read only:
@@ -156,7 +159,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);checkReadingExecution(execution);
   // An edition that must be engraved again is made, and saved, by opening it.
   if(!('package' in q))return null;
-  const session=new PersonalPresentationSession(q.package,undefined,{cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
+  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
   if(served&&!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
   return served??null;
  });
@@ -870,6 +873,8 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Opening draws only what this score shows: its own pages, or the saved
  // hand choices' projection. With a projection worker the engraver settles
  // for editing in the worker after opening; without one it settles here, as before.
+ // Opening the score being prepared ahead of time waits for it, then reads its pages from disk.
+ await aheadOfTime?.joined(next.entry.id,op.controller.signal);check();
  cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed

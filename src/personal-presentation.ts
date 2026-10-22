@@ -27,6 +27,8 @@ export interface PersonalProjectionCore {
 type Core=PersonalProjectionCore;
 type Capture=PreparationRequest<Core>&{digest:string};
 const preparations=new PersonalPreparationPool<Core>();
+/** A pool of its own, for background work that must never queue behind the reader's. */
+export const separatePreparations=()=>new PersonalPreparationPool<Core>(1);
 function localCore(inputs:ProjectionCoreInputs):Core {
  const core=createPersonalHandProjection(inputs.source,inputs.baseline,inputs.recipe);
  let settled=false;

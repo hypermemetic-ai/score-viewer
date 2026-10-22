@@ -8,6 +8,7 @@ import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache'
 import {importPackage,archivePackage,hashBytes,usePianoPageCheckReceipts} from '../src/package';
 import {PersonalPresentationSession,projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
+import {ProjectionWorkerClient} from '../src/personal-projection-client';
 import {AheadOfTimeEngraving,preparedBefore,prepareRecorded} from '../src/ahead-of-time-engraving';
 import {derivedModuleClosure,viewerDerivedIdentity} from '../scripts/derived-identity';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
@@ -70,10 +71,30 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
  work.start(['c','d']);await tick();assert.deepEqual(started,['a','b','c']);
  work.yieldTo('d');assert.deepEqual(aborted,['c']);await tick();await tick();
  assert.deepEqual(started,['a','b','c'],'nothing starts while a score is being read');
+ // An opening of the score under way joins it; it frees its worker when no work remains.
+ let released=0;const ends=new Map<string,()=>void>();
+ const joint=new AheadOfTimeEngraving((id)=>new Promise<void>(resolve=>{ends.set(id,resolve);}),{delayMs:0,idle:run=>run(),release:()=>{released++;}});
+ joint.start(['e']);await tick();let joinedDone=false;
+ const joined=joint.joined('e').then(()=>{joinedDone=true;});await joint.joined('other');
+ joint.yieldTo('e');await tick();assert.equal(joinedDone,false,'the opening waits for the work under way');
+ ends.get('e')!();await joined;await tick();assert.equal(released,1,'its worker is freed once nothing is left');
+ const stopped=new AbortController();joint.start(['f']);await tick();const waiting=joint.joined('f',stopped.signal);stopped.abort();await waiting;
+ joint.yieldTo('g');assert.equal(released,2,'stopping it frees its worker too');
  // A list replaced before its quiet moment never starts.
  const late=new AheadOfTimeEngraving(async id=>{started.push('late:'+id);},{delayMs:5});
  late.start(['x']);late.stop();await new Promise(r=>setTimeout(r,20));
  assert.ok(!started.includes('late:x'));
+});
+
+test('closing a projection worker client stops only its own worker and what waits on it',async()=>{
+ let spawned=0,terminated=0;
+ const spawn=()=>{spawned++;return {onmessage:null,onerror:null,onmessageerror:null,postMessage(){},terminate(){terminated++;}} as never;};
+ const ahead=new ProjectionWorkerClient(spawn),reader=new ProjectionWorkerClient(spawn);
+ const waiting=ahead.warm('core-b',{} as never),held=reader.warm('core-a',{} as never);
+ ahead.close();await assert.rejects(waiting,{name:'AbortError'});
+ assert.equal(terminated,1,'the reader\'s worker and its warm engines stay');assert.equal(spawned,2);
+ ahead.close();assert.equal(terminated,1,'closing an idle client does nothing');
+ void held.catch(()=>{});reader.close();
 });
 
 test('a refused or needless ahead-of-time preparation is recorded, and tried again only when what it read changes',async()=>{

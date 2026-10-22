@@ -18,7 +18,9 @@ export class AheadOfTimeEngraving {
  private timer?:ReturnType<typeof setTimeout>;
  /** Each start or stop ends the run before it, including a step still waiting for idle time. */
  private generation=0;
- constructor(private readonly prepare:(entryId:string,execution:ReadingExecution)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void}={}){}
+ constructor(private readonly prepare:(entryId:string,execution:ReadingExecution)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
+  /** No work remains: free what the work held (its own projection worker). */
+  release?:()=>void}={}){}
  get active(){return this.running?.entryId;}
  /** Prepare these scores in order, after a quiet moment. Replaces any earlier list. */
  start(entryIds:readonly string[]):void {
@@ -26,8 +28,18 @@ export class AheadOfTimeEngraving {
   this.queue=[...new Set(entryIds)];
   this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.options.delayMs??1500);
  }
+ /** The work under way for `entryId`, which an opening of that score awaits
+  * and then reads from disk instead of engraving it a second time. */
+ joined(entryId:string,signal?:AbortSignal):Promise<void>{
+  const running=this.running;if(running?.entryId!==entryId)return Promise.resolve();
+  return new Promise<void>(resolve=>{
+   const stop=()=>resolve();signal?.addEventListener('abort',stop,{once:true});
+   void running.done.finally(()=>{signal?.removeEventListener('abort',stop);resolve();});
+  });
+ }
  /** Stop for a reading of `entryId`: work on that score continues, and the
-  * reading shares it; work on any other score stops now. */
+  * reading joins it; work on any other score stops now. It runs in its own
+  * projection worker, so stopping it never costs the reader's warm engines. */
  yieldTo(entryId:string):void {
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   this.queue=[];
@@ -38,9 +50,9 @@ export class AheadOfTimeEngraving {
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   this.queue=[];this.abort();
  }
- private abort(){this.generation++;this.controller?.abort();this.controller=undefined;this.running=undefined;}
+ private abort(){const stopped=this.controller;this.generation++;this.controller?.abort();this.controller=undefined;this.running=undefined;if(stopped)this.options.release?.();}
  private next():void {
-  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined)return;
+  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.options.release?.();return;}
   const idle=this.options.idle??((run:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(run,{timeout:5000}):setTimeout(run,0));
   idle(()=>{
    if(generation!==this.generation||this.running)return;
