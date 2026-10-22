@@ -89,6 +89,11 @@ let defaultCache:DerivedFileCache|undefined;
  * the same hand choices reads its pages instead of engraving them again. */
 export function usePersonalProjectionCache(cache:DerivedFileCache|undefined){defaultCache=cache;}
 export const PERSONAL_PROJECTION_CACHE_KIND='personal-projection-v1';
+export interface ProjectionEntry {key:string;tag:string}
+/** Whether the disk holds the projection for these hand choices, from its header alone. */
+export async function projectionServed(cache:DerivedFileCache,served:ProjectionEntry):Promise<boolean>{
+ return await cache.peek(PERSONAL_PROJECTION_CACHE_KIND,served.key)===served.tag;
+}
 /** The settled hand engine of one captured package, so hand editing resumes
  * on reopening instead of engraving the score again. ISO notation refuses a
  * state that does not reproduce; the cache's build identity keeps another
@@ -363,14 +368,32 @@ export class PersonalPresentationSession {
   const cache=this.cache;if(!cache)return;
   if(this.cacheWrite!==undefined)clearTimeout(this.cacheWrite);
   const value={score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry};
-  const write=()=>{void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value)).catch(()=>{});};
+  // Tagged with its hand choices' digest, so a peek tells whether it serves them.
+  const write=()=>{void this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).catch(()=>{});};
   // Serializing pages is real work: it waits for the reader to be idle.
   this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;if(typeof requestIdleCallback==='function')requestIdleCallback(write,{timeout:30000});else write();},this.cacheWriteDelayMs);
  }
+ private owners(personal:PersonalState):PersonalOwnerHand[]|undefined{
+  const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
+  const hands=new Map(this.base.score.notes.map(n=>[n.id,n.hand??null]));
+  return owners.every(a=>(hands.get(a.id)??null)===a.hand)?undefined:owners;
+ }
+ /** Whether projecting these hand choices needs no engraving: they are the
+  * score's own hands, or the disk already holds their pages. */
+ async prepared(personal:PersonalState):Promise<boolean>{
+  const served=await this.projectionEntry(personal);if(!served)return true;
+  return !!this.cache&&await projectionServed(this.cache,served);
+ }
+ /** The derived entry, and the tag it must carry, that serves these hand
+  * choices; none for the score's own hands, which need no projection. */
+ async projectionEntry(personal:PersonalState):Promise<ProjectionEntry|undefined>{
+  const owners=this.owners(personal);if(!owners)return;
+  return {key:await this.cacheKey(),tag:await hashBytes(JSON.stringify(owners))};
+ }
  async project(personal:PersonalState,input?:ReadingExecution):Promise<ScorePackage>{
   const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
-  const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
-  if(owners.every(a=>(this.base.score.notes.find(n=>n.id===a.id)?.hand??null)===a.hand))return this.base;
+  const owners=this.owners(personal);
+  if(!owners)return this.base;
   const key=JSON.stringify(owners);
   if(key===this.lastKey&&this.lastView)return this.lastView;
   await ensureAnnotationInkPolicyReady(PERSONAL_ANNOTATION_INK_POLICY);checkReadingExecution(execution);
