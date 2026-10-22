@@ -13,7 +13,7 @@ async function run(status:string,changed=false,wrongCollection=false){
   host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>p,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
   loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>wrongCollection?'other':'source',
   installPreparedScore:async()=>{calls.push('install');if(wrongCollection)throw Error('Calculated score belongs to a different source.');return {entry,personal};},
-  activateScore:async(next:any)=>{calls.push('activate');assert.equal(next.entry,entry);assert.equal(next.personal,personal);return next;},saveReadingPreferences:async()=>{},checkReadingOwner(){},notify(){},finishReading(_op:any,success:boolean){calls.push(success?'complete':'failed');},
+  activateScore:async(next:any)=>{calls.push('activate');assert.equal(next.entry,entry);assert.equal(next.personal,personal);return next;},saveReadingPreferences:async()=>{},checkReadingOwner(){},notify(){},clearNotice(){},finishReading(_op:any,success:boolean){calls.push(success?'complete':'failed');},
  };
  runInNewContext(open,context);let error:unknown;try{await context.open(entry);}catch(e){error=e;}
  return {calls,error,entry,personal};
@@ -37,7 +37,7 @@ function reading(overrides:Record<string,unknown>){
   reengraveReadingArchive:async()=>{calls.push('engraved');return new Uint8Array([2]);},
   admitReading:async()=>{calls.push('admit-again');return p;},guitarProContext:()=>({groupId:'group'}),
   assertSelectedTransposition(){},selectPresentation:async()=>p,loadPersonal:async()=>({}),prepareScore:async()=>({q:{package:p,packageBytes:new Uint8Array([1])},running:{}}),
-  collectionId:()=>'part',installPreparedScore:async()=>({entry,personal:{}}),activateScore:async(next:any)=>next,saveReadingPreferences:async()=>{},notify:(text:string)=>calls.push(text),
+  collectionId:()=>'part',installPreparedScore:async()=>({entry,personal:{}}),activateScore:async(next:any)=>next,saveReadingPreferences:async()=>{},notify:(text:string)=>calls.push(text),clearNotice(){},
   finishReading(_op:unknown,success:boolean){calls.push(success?'complete':'failed');},...overrides,
  };
  runInNewContext(open,context);
@@ -55,4 +55,24 @@ test('a reading engraved again is opened with its Guitar Pro source and part gro
  assert.deepEqual(f.calls.filter(c=>['engraved','admit-again','complete'].includes(c)),['engraved','admit-again','complete']);
  const other=reading({importReading:async()=>refused()});
  assert.match(String(await other.open('another-group')),/belongs to another original input/);
+});
+
+// Saved Goldberg pages that only lack Bach's repeat signs: engraving them again
+// can fail, and then the score opens on its saved pages instead of not at all.
+class SavedPagesLackRepeats extends Error{constructor(readonly sourceSha256:string){super('This saved engraving lacks the score\'s repeat signs.');}}
+function lacksRepeats(rebuild:()=>Promise<unknown>,refusal:Error=new SavedPagesLackRepeats('goldberg')){
+ let refused=false;const kept:string[]=[];
+ const f=reading({SavedPagesLackRepeats,keepSavedPagesWithoutRepeats:(sha:string)=>kept.push(sha),reengraveReadingArchive:async()=>undefined,
+  importReading:async()=>{if(!refused){refused=true;throw refusal;}return {manifest:{version:3},reading:{dual:{}}};},
+  prepareRebuiltEdition:rebuild});
+ return {...f,kept};
+}
+test('saved pages that lack their repeat signs open as saved, with a plain notice, when engraving them again fails',async()=>{
+ const f=lacksRepeats(async()=>{throw Error('The engine refused the edition');});
+ assert.equal(await f.open(),undefined);assert.deepEqual(f.kept,['goldberg']);
+ assert.deepEqual(f.calls.filter(c=>c==='complete'||c.includes('repeat signs')),['complete','This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.']);
+});
+test('any other refusal whose engraving again fails still keeps the score from opening',async()=>{
+ const f=lacksRepeats(async()=>{throw Error('The engine refused the edition');},Error('This saved engraving does not match the current shared engraving policy.'));
+ assert.match(String(await f.open()),/engine refused/);assert.deepEqual(f.kept,[]);assert.deepEqual(f.calls.slice(-1),['failed']);
 });
