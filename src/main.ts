@@ -628,14 +628,17 @@ function editorMemoryMarkup(){
  // The label, its tooltip and the line under it say one thing: where this finger comes from.
  const source=label&&memoryFingerSource(resolution,ownerId,label,{entryId:current.entry.id,writtenBar:selection.writtenBar},id=>{const m=entries.find(e=>e.id===id)?.metadata;return m?workReference(m):'another score';});
  // The finger and hand rows are named, so "Shared" can't be read as the hand's.
- return `<div class="editor-row" data-editor-row="finger"><span class="editor-row-name">Finger</span>${source?`<span class="personal-choice-kind" title="${esc(source.description)}" aria-label="${esc(label+'. '+source.description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${source?.promote?button('Use for matching bars','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}${source?`<span class="editor-said" aria-hidden="true">${esc(source.said)}</span>`:''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span></div>${editorHandMarkup()}`;
+ // Each row reads its fact first, then any further line, then its buttons: nothing follows a button.
+ return `<div class="editor-row" data-editor-row="finger"><span class="editor-row-name">Finger</span>${source?`<span class="personal-choice-kind" title="${esc(source.description)}" aria-label="${esc(label+'. '+source.description)}">${label}</span><span class="editor-said" aria-hidden="true">${esc(source.said)}</span>`:''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span>${editorActions(!!source,button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))+(source?.promote?button('Use for matching bars','memory-reference'):'')+(label==='Local'?button('Use shared','memory-inherit'):''))}</div>${editorHandMarkup()}`;
 }
+/** A row's buttons: on their own line under the row's fact when it has one. */
+const editorActions=(underFact:boolean,buttons:string)=>underFact?`<span class="editor-row-actions">${buttons}</span>`:buttons;
 /** Where the selected note's hand comes from, beside its finger's provenance.
  * The explanation is shown, not only hovered: nobody hovers on the TV. */
 function editorHandMarkup(){
  if(!current||!selection)return'';const view=handChoiceView(current.package,current.personal,selection.ownerIds[0]);if(!view)return'';
  const said=view.said.map(word=>typeof word==='string'?esc(word):`<kbd>${esc(word.key)}</kbd>`).join('');
- return `<div class="editor-row" data-editor-row="hand"><span class="editor-row-name">Hand</span>${view.label?`<span class="personal-choice-kind" title="${esc(view.description??'')}" aria-label="${esc(view.label+'. '+(view.description??''))}">${esc(view.label)}</span>`:''}${view.action?button(esc(view.action.label),view.action.id):''}<span class="editor-said"${view.label?' aria-hidden="true"':''}>${said}</span></div>`;
+ return `<div class="editor-row" data-editor-row="hand"><span class="editor-row-name">Hand</span><span class="personal-choice-kind editor-hand" title="${esc(view.description)}" aria-label="${esc(view.label+'. '+view.description)}">${esc(view.label)}</span>${said?`<span class="editor-said" aria-hidden="true">${said}</span>`:''}${view.action?editorActions(true,button(esc(view.action.label),view.action.id,view.action.key)):''}</div>`;
 }
 async function visitMemorySource(){
  if(!current||!selection||sourceNavigating)return;sourceNavigating=true;

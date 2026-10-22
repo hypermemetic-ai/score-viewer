@@ -54,8 +54,8 @@ test('No. 13: the owner’s bar 11 hand change reaches bar 21, the same music wr
  // Derived only: no record for bar 21, and the owner's records are unchanged.
  assert.deepEqual(personal.assignments,stored);assert.equal(personal.assignments!.choices[e4(21)],undefined);
  assert.equal(effectiveAssignments(input.p,personal,{carry:false}).find(a=>a.id===e4(21))!.hand,'LH');
- assert.deepEqual(handChoiceView(input.p,personal,e4(21)),{label:'Hand from bar 11',description:'Right hand, as you chose for the same music in bar 11. Press L to give this note its written left hand.',action:{id:'hand-not-here',label:'Keep this note’s written hand'},said:['RH. Press ',{key:'L'},' for its written LH.']});
- assert.deepEqual(handChoiceView(input.p,personal,e4(11)),{label:'Hand also in bar 21',description:'Right hand here and in bar 21: the same music.',action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:['RH.']});
+ assert.deepEqual(handChoiceView(input.p,personal,e4(21)),{label:'RH · from bar 11',description:'Right hand, as you chose for the same music in bar 11. Press L to give this note its written left hand.',action:{id:'hand-not-here',label:'Keep its written LH',key:'L'},said:[]});
+ assert.deepEqual(handChoiceView(input.p,personal,e4(11)),{label:'RH · also in bar 21',description:'Right hand here and in bar 21: the same music.',action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:[]});
  assert.equal(handCarryNotice(input.p,input.personal,personal),'RH also in bar 21: the same music.');
  // With bar 11's 4 still selected, its Hand row names bar 21; only bars the row doesn't name are said.
  assert.equal(handKeyNotice(input.p,input.personal,personal,e4(11),true),undefined);
@@ -81,7 +81,7 @@ test('only a hand chosen with recorded intent travels; a legacy hand or an only-
  const local=choose(input,e4(11),'RH',{local:true});
  assert.equal(local.assignments!.choices[e4(11)].handScope,'local');assert.equal(handFor(input.p,local,e4(21)),'LH');
  assert.deepEqual(handProvenance(input.p,local,e4(11)),{kind:'local',hand:'RH'});
- assert.deepEqual(handChoiceView(input.p,local,e4(11)),{label:'Hand for this note only',description:'Right hand for this note only.',said:['RH.'],action:{id:'hand-shared',label:'Share this note’s hand'}});
+ assert.deepEqual(handChoiceView(input.p,local,e4(11)),{label:'RH · this note only',description:'Right hand for this note only.',said:[],action:{id:'hand-shared',label:'Share this note’s hand'}});
  // A finger entered later keeps the scope; choosing a hand again without a scope keeps it too.
  const fingered=assigned(input.p,local,seat(input,e4(11)),{finger:2});assert.equal(fingered.assignments!.choices[e4(11)].handScope,'local');
  assert.equal(readPersonalAssignments(fingered.assignments,input.p)?.choices[e4(11)].handScope,'local');
@@ -246,7 +246,7 @@ test('a hand moved before hand changes were shared says so where it would reach,
  const input=no13(),legacy=assigned(input.p,input.personal,seat(input,e4(11)),{hand:'RH'});
  for(const c of Object.values(legacy.assignments!.choices))delete c.intent;
  assert.deepEqual(handProvenance(input.p,legacy,e4(11)),{kind:'unshared',hand:'RH',toBars:[21]});
- assert.deepEqual(handChoiceView(input.p,legacy,e4(11)),{said:['RH. Press ',{key:'R'},' to share it with bar 21.']});
+ assert.deepEqual(handChoiceView(input.p,legacy,e4(11)),{label:'RH',description:'Right hand. Press R to share it with bar 21: the same music.',said:['Press ',{key:'R'},' to share it with bar 21.']});
  assert.equal(handFor(input.p,legacy,e4(21)),'LH','nothing travels until it is chosen again');
  const store=storage(),s=session(store,{...input,personal:legacy});await s.initialize();
  let personal=await s.loadPersonalCurrent({id:'no13',importedAt:input.importedAt!},input.p,async()=>legacy);
@@ -337,4 +337,30 @@ test('a reopened score is never resolved with the hands from before a refused ca
  const reopened=fresh(),again={...reopened,personal:structuredClone(personal)};assert.equal(handFor(again.p,again.personal,e4(21)),'LH');
  const resolved=resolve(again);assert.notDeepEqual(resolved,before,'the refusal changes the resolution');
  assert.deepEqual(cache.resolve(again,0,resolve),resolved);
+});
+
+test('the Hand row reads its hand first, then any key line, then its button, and nothing after the button',()=>{
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),slice=(start:string,end:string)=>main.slice(main.indexOf(start),main.indexOf(end,main.indexOf(start)));
+ const code=stripTypeScriptTypes(`${slice('const button=(','\n')}\n${slice('const editorActions=','\n')}\n${slice('function editorHandMarkup(','async function visitMemorySource(')}`);
+ const input=no13(),personal=owners(input),local=structuredClone(personal);local.assignments!.choices[e4(11)].handScope='local';
+ const legacy=assigned(input.p,input.personal,seat(input,e4(11)),{hand:'RH'});for(const c of Object.values(legacy.assignments!.choices))delete c.intent;
+ const row=(state:PersonalState,ownerId:string)=>{const context:any={esc:(t:string)=>t,handChoiceView,current:{package:input.p,personal:state},selection:{ownerIds:[ownerId]}};runInNewContext(`${code};globalThis.markup=editorHandMarkup;`,context);return context.markup() as string;};
+ // Strip tags, keeping the order of what is read: the row name, the fact, any key line, the button.
+ const read=(html:string)=>html.replace(/<kbd>(.*?)<\/kbd>/g,'[$1]').replace(/<button[^>]*>(.*?)<\/button>/g,'{$1}').replace(/<[^>]+>/g,'|').split('|').filter(Boolean);
+ const cases:[string,string,string,string[]][]=[
+  // After R on bar 11's 4: the hand leads, the button sits under it.
+  ['shared',e4(11),'RH · also in bar 21',['{Don’t share this note’s hand}']],
+  // Bar 21's 4 takes bar 11's hand; L, which the button also does, is drawn on the button.
+  ['carried',e4(21),'RH · from bar 11',['{Keep its written LH[L]}']],
+  // After L where it stays to this note only.
+  ['local',e4(11),'RH · this note only',['{Share this note’s hand}']],
+  // The hint: a key line, and no button.
+  ['unshared',e4(11),'RH',['Press [R] to share it with bar 21.']],
+ ];
+ for(const [kind,ownerId,fact,rest] of cases){
+  const state=kind==='local'?local:kind==='unshared'?legacy:personal,html=row(state,ownerId);
+  assert.deepEqual(read(html),['Hand',fact,...rest],kind);
+  assert.ok(html.endsWith(rest[0].startsWith('{')?'</button></span></div>':'</span></div>'),`${kind}: nothing after the button`);
+  if(rest[0].startsWith('{'))assert.match(html,/<span class="editor-row-actions"><button/,`${kind}: the button starts its own line`);
+ }
 });
