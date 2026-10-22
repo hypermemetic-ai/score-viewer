@@ -8,7 +8,8 @@ function sandbox(){
  const made:string[]=[],prefetched:string[]=[];
  class PersonalPresentationSession{constructor(){made.push('written');}prefetch(){prefetched.push('written');}}
  class FoldedReader{constructor(readonly p:unknown){made.push('folded reader');}}
- const context:any={structuredClone,livePersonalEditors:new WeakMap(),PersonalPresentationSession,FoldedReader,PersonalEditQueue:class{},personalStorageName:(id:string)=>id,made,prefetched};
+ const context:any={structuredClone,livePersonalEditors:new WeakMap(),PersonalPresentationSession,FoldedReader,PersonalEditQueue:class{},personalStorageName:(id:string)=>id,made,prefetched,freed:[] as string[]};
+ context.retained={free(){context.freed.push('retained');}};
  runInNewContext(body('function personalEditor(','async function presentReader('),context);
  const target=(id:string,revision='r1')=>({entry:{id},package:{sourceRevision:revision,sourceSha256:'s',keyboardLayout:'janko'},personal:{}});
  return {context,made,prefetched,target};
@@ -37,6 +38,15 @@ test('reopening a score in the session reuses its folded reader; another revisio
  assert.notEqual(context.foldedReader(target('no13','r2')),first);
  for(const id of ['a','b','c','d'])context.foldedReader(target(id));
  assert.notEqual(context.foldedReader(target('no13')),first);
+});
+
+test('under memory pressure the folded readers kept for closed scores are let go, with the retained score', ()=>{
+ const {context,target}=sandbox(),no13=target('no13'),first=context.foldedReader(no13);
+ assert.equal(context.foldedReader(no13),first,'kept while there is room');
+ context.releaseUnderPressure();
+ assert.deepEqual(context.freed,['retained']);
+ assert.notEqual(context.foldedReader(no13),first,'reopened, its folded reader is made again');
+ assert.match(body('function retainScore(','\nasync function open('),/underMemoryPressure\(heapMemory\(\)\)\)releaseUnderPressure\(\)/,'the retention watch releases them');
 });
 
 test('a fold that can\'t be drawn opens written out and says so plainly, once a score; the reason goes to the console once', async()=>{

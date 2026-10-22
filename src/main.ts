@@ -335,6 +335,9 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
 /** Folded readers kept for the session, per score, revision and keyboard: reopening
  * a folded score reuses its folded pages and their engraving instead of drawing them again. */
 const foldedReaders=new Map<string,FoldedReader>(),KEPT_FOLDED_READERS=4;
+/** Under memory pressure: the score kept after Back and the folded readers kept for
+ * closed scores are let go. The open score's reader stays with its editor. */
+function releaseUnderPressure(){retained.free();foldedReaders.clear();}
 function foldedReader(target:NonNullable<typeof current>):FoldedReader{
  const p=target.package,key=JSON.stringify([target.entry?.id,p.sourceRevision??p.manifest?.revision,p.sourceSha256,p.keyboardLayout,p.renderingRecipe?.baseline]);
  const reader=foldedReaders.get(key)??new FoldedReader(p);foldedReaders.delete(key);foldedReaders.set(key,reader);
@@ -1177,11 +1180,12 @@ function retentionConditions(entry:Entry):RetentionConditions|undefined {
 function retainScore(target:NonNullable<typeof current>){
  const entry=entries.find(e=>e.id===target.entry.id);
  // A reading whose library entry moved on (a new edition, transposition) is opened afresh.
- if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error||underMemoryPressure(heapMemory()))return;
+ if(underMemoryPressure(heapMemory())){releaseUnderPressure();return;}
+ if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error)return;
  if(JSON.stringify(entry)!==JSON.stringify(target.entry))return;
  const conditions=retentionConditions(entry);if(!conditions)return;
  retained.keep(entry.id,conditions,target);
- retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))retained.free();},30000);
+ retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))releaseUnderPressure();},30000);
 }
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);
  // The score just closed, with nothing it rests on changed, is drawn again as it was left: no read, admission or projection.
