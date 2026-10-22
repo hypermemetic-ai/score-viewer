@@ -40,7 +40,7 @@ impl Default for State {
                     installed: false,
                     phase: "not-installed".into(),
                     progress: None,
-                    message: "Install the optional piano to play through the computer.".into(),
+                    message: "Hear your keyboard through this computer. One 1.7 GB download, then it works offline.".into(),
                     cancellable: false,
                 },
                 ready: None,
@@ -74,10 +74,10 @@ impl State {
         if let Ok(mut s) = self.inner.lock() {
             s.status.phase = phase.into();
             s.status.progress = Some(percent.min(100));
-            s.status.message = if phase == "checking" {
-                "Checking piano…"
-            } else {
-                "Installing piano…"
+            s.status.message = match phase {
+                "downloading" => "Downloading piano (1.7 GB)…",
+                "checking" => "Checking piano…",
+                _ => "Installing piano…",
             }
             .into();
         }
@@ -109,7 +109,7 @@ impl State {
                 s.status.message = if s.ready.is_some() {
                     "Piano installed. Works offline."
                 } else {
-                    "Install the optional piano to play through the computer."
+                    "Hear your keyboard through this computer. One 1.7 GB download, then it works offline."
                 }
                 .into();
             }
@@ -207,14 +207,14 @@ pub async fn piano_bank_install(
         s.status.cancellable = true;
         s.status.phase = "choosing".into();
         s.status.progress = None;
-        s.status.message = "Choose the original downloaded piano ZIP.".into();
+        s.status.message = "Choose the piano ZIP.".into();
         state.cancel.store(false, Ordering::Release);
     }
     let state = state.inner().clone();
     let worker = state.clone();
     match tauri::async_runtime::spawn_blocking(move || {
         let result = match crate::owned_dialog(&window)
-            .add_filter("Accurate-Salamander piano", &["zip"])
+            .add_filter("Accurate-Salamander piano V6.2a", &["zip"])
             .pick_file()
         {
             None => Ok(None),
@@ -239,7 +239,6 @@ pub fn piano_bank_cancel(state: tauri::State<'_, State>) -> Result<(), String> {
     Ok(())
 }
 
-pub const OFFICIAL_DOWNLOAD: &str = "https://www.ir.isas.jaxa.jp/~cyamauch/AccurateSalamander/";
 pub const WINDOWS_AUDIO_HELP: &str =
     "https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/low-latency-audio";
 fn open_fixed(url: &'static str) -> Result<(), String> {
@@ -276,7 +275,7 @@ fn open_fixed(url: &'static str) -> Result<(), String> {
             )
         };
         if result <= 32 {
-            return Err("The download/help page could not open in your browser.".into());
+            return Err("The help page could not open in your browser.".into());
         }
         Ok(())
     }
@@ -289,7 +288,7 @@ fn open_fixed(url: &'static str) -> Result<(), String> {
         if result.success() {
             Ok(())
         } else {
-            Err("The download/help page could not open in your browser.".into())
+            Err("The help page could not open in your browser.".into())
         }
     }
     #[cfg(not(any(windows, target_os = "macos")))]
@@ -298,12 +297,51 @@ fn open_fixed(url: &'static str) -> Result<(), String> {
         Err("Piano installation is available in the Windows and Mac desktop app.".into())
     }
 }
+/// One press: download, check and install the piano, off the UI thread.
+/// Closing Options does not stop it; Cancel does.
 #[tauri::command]
-pub async fn piano_bank_download() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| open_fixed(OFFICIAL_DOWNLOAD))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn piano_bank_download(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, State>,
+) -> Result<Status, String> {
+    let root = cache_root(&app)?;
+    {
+        let mut s = state
+            .inner
+            .lock()
+            .map_err(|_| "Piano bank state unavailable")?;
+        if s.busy {
+            return Err("Piano installation is already running.".into());
+        }
+        if s.ready.is_some() {
+            return Ok(s.status.clone());
+        }
+        s.busy = true;
+        s.status.cancellable = true;
+        s.status.phase = "downloading".into();
+        s.status.progress = Some(0);
+        s.status.message = "Downloading piano (1.7 GB)…".into();
+        state.cancel.store(false, Ordering::Release);
+    }
+    let state = state.inner().clone();
+    let worker = state.clone();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let cancel = worker.cancel.clone();
+        let result = core::download(
+            &root,
+            &worker.cancel,
+            |phase, pct| worker.progress(phase, pct),
+            |part, _have, grew| core::curl_fetch(part, &cancel, grew),
+        );
+        worker.finish(result.map(Some))
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(error) => state.finish(Err(format!("Piano download worker failed: {error}"))),
+    }
 }
+
 #[tauri::command]
 pub async fn piano_audio_help() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| open_fixed(WINDOWS_AUDIO_HELP))
