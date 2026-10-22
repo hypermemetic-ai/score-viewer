@@ -123,6 +123,36 @@ if(isTauri()&&!import.meta.env.DEV&&host.derived){
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});
 }
+const AHEAD_OF_TIME_KIND='ahead-of-time-v1';
+/** Library scores in the order the player is likeliest to open them. */
+const aheadOfTimeOrder=()=>[...entries.filter(e=>e.id===preferences.lastWorkedEntryId),...entries].map(e=>e.id);
+// Its own admission, so it never holds the reader's admission busy.
+const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:64*1024*1024});
+/** Make what opening a score reads from the derived-file cache: its pages for
+ * the player's saved hands, exactly as opening would project them. Read only:
+ * an edition that must be engraved again, a layout it lacks or memory not yet
+ * indexed is left for opening, which writes what it must. */
+async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution){
+ const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout;if(!entry||!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
+ const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
+ // What this score's archive and stored hand choices last needed, so a score
+ // already prepared costs a hash and two header reads, not an admission.
+ const stored=personalMemory.storedRefs(entryId),marker=stored&&await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
+ const done=(served:ProjectionEntry|null)=>{if(marker)void derived.put(AHEAD_OF_TIME_KIND,marker,true,JSON.stringify(served));};
+ const seen=marker&&await derived.peek(AHEAD_OF_TIME_KIND,marker);checkReadingExecution(execution);
+ if(seen){const served=JSON.parse(seen) as ProjectionEntry|null;if(!served||await projectionServed(derived,served))return;}
+ if(readingOnlyArchive(bytes))return done(null);
+ const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}).catch(()=>undefined);checkReadingExecution(execution);
+ if(!prior)return;if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return done(null);
+ const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(host,entry,selected);checkReadingExecution(execution);
+ const personal=personalMemory.personalFor({entryId,importedAt:entry.importedAt,p:selected,personal:journal});
+ const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);checkReadingExecution(execution);
+ // An edition that must be engraved again is made, and saved, by opening it.
+ if(!('package' in q))return done(null);
+ const session=new PersonalPresentationSession(q.package,undefined,{cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
+ if(served&&!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
+ done(served??null);
+}
 type ReadingJob=NonNullable<typeof job>;
 interface ReadingOperation {
  controller:AbortController;running:ReadingJob;dialog?:HTMLDialogElement;
@@ -496,36 +526,6 @@ async function savePdf(){
 }
 function renderToolbar(){if(practice)return;if(!current)return;syncControls();renderEditorNavigation();const {personal:s}=current,p=readerPackage(),v=s.view,capabilities=scoreCapabilities(p);const bar=app.querySelector<HTMLElement>('.toolbar')!,focused=bar.contains(document.activeElement)?document.activeElement as HTMLElement:undefined,focusSelector=focused?.dataset.action?`[data-action="${focused.dataset.action}"]`:focused?.dataset.optionsKey?`[data-options-key="${CSS.escape(focused.dataset.optionsKey)}"]`:focused?.dataset.option?`[data-options-key="${focused.dataset.option}"]`:undefined;toolbarNavigation?.dispose();bar.className=`toolbar${toolbarVisible?' visible':''}`;bar.innerHTML=`${button('Back','library','Esc')}${button('Previous','previous',actionControlLabel(controls.bindings,'previous'),v.page===0)}<small>${v.page+1} / ${p.pages.length}</small>${button('Next','next',actionControlLabel(controls.bindings,'next'),v.page===p.pages.length-1)}${capabilities.pianoPreparation?`${button(toggleLabel(),'toggle',actionControlLabel(controls.bindings,'toggle'),!fingerDisplayAvailable(p,s,currentFingerPresentation(p)))}<small data-label-mode>${labelMode()==='finger'?'Fingers':'Pitch'}</small>`:''}<select aria-label="Visible pages" data-option="count">${[1,2,3].map(n=>`<option value="${n}" ${v.count===n?'selected':''}>${n} page${n>1?'s':''}</option>`).join('')}</select>${v.count>1?`<select aria-label="Page advancement" data-option="advance"><option value="slide" ${v.advance==='slide'?'selected':''}>Slide pages</option><option value="group" ${v.advance==='group'?'selected':''}>Replace group</option></select>`:''}<select aria-label="Score scale" data-option="scale">${[1,.9,.75,.5].map(n=>`<option value="${n}" ${v.scale===n?'selected':''}>${Math.round(n*100)}%</option>`).join('')}</select>${capabilities.pianoPreparation?`${button(selection?'Done editing':'Edit hands / fingers',selection?'end-edit':'edit',selection?'Esc':actionControlLabel(controls.bindings,'edit'))}`:''}${button('Rotate','rotate',rotationHint())}${capabilities.pianoPractice||!!readingPresentation&&capabilities.manualPractice?button('Practice','practice','P'):''}${keyboardControl(p)}${readingNotationControl(p)}${button('Share score','share')}${button('Save as PDF','pdf')}${button('Options','practiceSettings',actionControlLabel(controls.bindings,'practiceSettings'))}${button('Hide','hide','H')}`;arrangeBottomNavigation(bar,bar.querySelector<HTMLButtonElement>('[data-action=library]'),bar.querySelector<HTMLButtonElement>('[data-action=practiceSettings]'));toolbarNavigation=new OptionsNavigation(bar,()=>{},()=>false,{horizontal:true,focusOnPrepare:false});if(focusSelector)bar.querySelector<HTMLElement>(focusSelector)?.focus();}
 function reveal(focus=false){const changed=!toolbarVisible;toolbarVisible=true;if(current&&changed)renderToolbar();clearTimeout(timer);timer=window.setTimeout(()=>{if(!dialog&&!app.querySelector('.toolbar')?.contains(document.activeElement)){toolbarVisible=false;if(current)renderToolbar();}},3500);if(focus)app.querySelector<HTMLElement>('.toolbar button')?.focus();}
-const AHEAD_OF_TIME_KIND='ahead-of-time-v1';
-/** Library scores in the order the player is likeliest to open them. */
-const aheadOfTimeOrder=()=>[...entries.filter(e=>e.id===preferences.lastWorkedEntryId),...entries].map(e=>e.id);
-// Its own admission, so it never holds the reader's admission busy.
-const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:64*1024*1024});
-/** Make what opening a score reads from the derived-file cache: its pages for
- * the player's saved hands, exactly as opening would project them. Read only:
- * an edition that must be engraved again, a layout it lacks or memory not yet
- * indexed is left for opening, which writes what it must. */
-async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution){
- const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout;if(!entry||!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
- const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
- // What this score's archive and stored hand choices last needed, so a score
- // already prepared costs a hash and two header reads, not an admission.
- const stored=personalMemory.storedRefs(entryId),marker=stored&&await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
- const done=(served:ProjectionEntry|null)=>{if(marker)void derived.put(AHEAD_OF_TIME_KIND,marker,true,JSON.stringify(served));};
- const seen=marker&&await derived.peek(AHEAD_OF_TIME_KIND,marker);checkReadingExecution(execution);
- if(seen){const served=JSON.parse(seen) as ProjectionEntry|null;if(!served||await projectionServed(derived,served))return;}
- if(readingOnlyArchive(bytes))return done(null);
- const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}).catch(()=>undefined);checkReadingExecution(execution);
- if(!prior)return;if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return done(null);
- const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(host,entry,selected);checkReadingExecution(execution);
- const personal=personalMemory.personalFor({entryId,importedAt:entry.importedAt,p:selected,personal:journal});
- const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);checkReadingExecution(execution);
- // An edition that must be engraved again is made, and saved, by opening it.
- if(!('package' in q))return done(null);
- const session=new PersonalPresentationSession(q.package,undefined,{cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
- if(served&&!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
- done(served??null);
-}
 async function loadPersonal(entry:Entry,p:ScorePackage){return scoreCapabilities(p).pianoPreparation?personalMemory.loadPersonalCurrent(entry,p,()=>loadPersonalJournal(host,entry,p)):loadPersonalJournal(host,entry,p);}
 function renderEditorNavigation(){
  const control=app.querySelector<HTMLElement>('.editor-navigation');if(!control)return;
