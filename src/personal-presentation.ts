@@ -12,6 +12,7 @@ import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} fr
 import type {ProjectionCoreInputs,ProjectionView} from './personal-projection-protocol';
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,projectionWorkerClient} from './personal-projection-client';
 import type {DerivedFileCache} from './derived-file-cache';
+import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
 
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
@@ -21,8 +22,9 @@ export interface PersonalProjectionCore {
   * not settle, else how: restored, engraved, or already settled before. */
  warm(execution?:ReadingExecution,offThreadOnly?:boolean,saved?:PersonalHandEngineState):Promise<false|'restored'|'engraved'|'already'>;
  project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>;
- /** The settled engine, for the disk cache; undefined when there is none. */
- save():Promise<PersonalHandEngineState|undefined>;
+ /** The settled engine, encoded for the disk cache on the thread that holds
+  * it; undefined when there is none. */
+ save():Promise<EncodedDerivedPayload|undefined>;
 }
 type Core=PersonalProjectionCore;
 type Capture=PreparationRequest<Core>&{digest:string};
@@ -40,7 +42,7 @@ function localCore(inputs:ProjectionCoreInputs):Core {
    if(e)await core.warmAsync(e);else core.warm();settled=true;return 'engraved';
   },
   async project(owners,digest,e){const view=e?await core.projectAsync(owners,digest,e):core.project(owners,digest);settled=true;return view;},
-  async save(){return core.exportState();}
+  async save(){const state=core.exportState();return state&&encodeDerivedPayload(state);}
  };
 }
 function freezeView<T>(value:T):T {
@@ -228,7 +230,10 @@ let prefetching:AbortController|undefined;
 let scoreWork:AbortController|undefined;
 export function cancelPersonalPrefetch(){prefetching?.abort();prefetching=undefined;scoreWork?.abort();scoreWork=undefined;}
 const whenIdle=(run:()=>void)=>{if(typeof requestIdleCallback==='function')requestIdleCallback(run,{timeout:30000});else run();};
-export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;cacheWriteDelayMs?:number}
+export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;
+ /** How long after a change its derived files are written in idle time;
+  * null when only the session's owner writes them, by flushing. */
+ cacheWriteDelayMs?:number|null}
 const CANNOT_DRAW="This score can't be displayed yet: the viewer can't draw its pages.";
 /** A refusal of the score's own engraving, rather than of a hand choice. A
  * mixed-hand key is drawn from the source's own pages and stays editable. */
@@ -249,12 +254,12 @@ export class PersonalPresentationSession {
  private readonly pool:PersonalPreparationPool<Core>;
  private readonly worker:ProjectionWorkerClient|null;
  private readonly cache:DerivedFileCache|null;
- private readonly cacheWriteDelayMs:number;
+ private readonly cacheWriteDelayMs:number|null;
  constructor(base:ScorePackage,pool=preparations,options:PersonalPresentationOptions={}){
   this.base=base;this.pool=pool;
   this.worker=options.worker===undefined?defaultProjectionWorker():options.worker;
   this.cache=options.cache===undefined?defaultCache??null:options.cache;
-  this.cacheWriteDelayMs=options.cacheWriteDelayMs??2000;
+  this.cacheWriteDelayMs=options.cacheWriteDelayMs===undefined?2000:options.cacheWriteDelayMs;
  }
  /** Without a projection worker the engraving settles cooperatively while the
   * score opens, as before, so a first hand choice never freezes the reader. */
@@ -371,9 +376,9 @@ export class PersonalPresentationSession {
    const core=this.lease?.valid?this.lease.core:undefined;if(!core||this.engineSaved)return;
    // An engine the cache refuses (too large, or the disk fails) is tried once more, not after every choice.
    this.engineAttempts++;
-   try{const state=await core.save();if(state&&await cache.put(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),state))this.engineSaved=true;}catch{}
+   try{const engine=await core.save();if(engine&&await cache.putEncoded(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey(),engine))this.engineSaved=true;}catch{}
   };
-  this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;whenIdle(()=>void this.runEngineJob());},this.cacheWriteDelayMs);
+  if(this.cacheWriteDelayMs!==null)this.engineWrite=setTimeout(()=>{this.engineWrite=undefined;whenIdle(()=>void this.runEngineJob());},this.cacheWriteDelayMs);
  }
  private async cacheKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_PROJECTION_CACHE_KIND,(await this.prepare()).digest,PERSONAL_ANNOTATION_INK_POLICY]));
@@ -387,19 +392,34 @@ export class PersonalPresentationSession {
   // Tagged with its hand choices' digest, so a peek tells whether it serves them.
   this.cacheJob=()=>this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).then(()=>{},()=>{});
   // Serializing pages is real work: it waits for the reader to be idle.
-  this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;whenIdle(()=>void this.runCacheJob());},this.cacheWriteDelayMs);
+  if(this.cacheWriteDelayMs!==null)this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;whenIdle(()=>void this.runCacheJob());},this.cacheWriteDelayMs);
  }
  private cacheJob?:()=>Promise<void>;private engineJob?:()=>Promise<void>;
  private runCacheJob(){const job=this.cacheJob;this.cacheJob=undefined;return job?.()??Promise.resolve();}
  private runEngineJob(){const job=this.engineJob;this.engineJob=undefined;return job?.()??Promise.resolve();}
- /** Write now what waits for idle time: the latest projection and the settled
-  * engine. Work that closes its worker afterwards does this first, or the
-  * engine is gone before it is saved. */
- async flushWrites():Promise<void>{
+ /** Write now what waits for idle time: the latest projection, which
+  * opening reads. */
+ async flushProjection():Promise<void>{
   if(this.cacheWrite!==undefined){clearTimeout(this.cacheWrite);this.cacheWrite=undefined;}
-  if(this.engineWrite!==undefined){clearTimeout(this.engineWrite);this.engineWrite=undefined;}
-  await Promise.all([this.runCacheJob(),this.runEngineJob()]);
+  await this.runCacheJob();
  }
+ /** Save now the settled engine waiting for idle time. Work that closes its
+  * worker afterwards does this first, or the engine is gone before it is
+  * saved. The worker encodes it: this thread only writes the file. */
+ async flushEngine():Promise<void>{
+  if(this.engineWrite!==undefined){clearTimeout(this.engineWrite);this.engineWrite=undefined;}
+  await this.runEngineJob();
+ }
+ async flushWrites():Promise<void>{await Promise.all([this.flushProjection(),this.flushEngine()]);}
+ /** Whether this score's settled engine is neither on disk nor waiting to be
+  * saved: background work that finds its pages made by an earlier reading
+  * then settles it, so hand editing never engraves it again. */
+ async engineMissing():Promise<boolean>{
+  const cache=this.cache;if(!cache||this.engineSaved||this.engineJob)return false;
+  if(await cache.has(PERSONAL_ENGINE_CACHE_KIND,await this.engineKey())){this.engineSaved=true;return false;}
+  return true;
+ }
+ get engineWaiting(){return this.engineJob!==undefined;}
  private owners(personal:PersonalState):PersonalOwnerHand[]|undefined{
   const owners:PersonalOwnerHand[]=effectiveAssignments(this.base,personal).map(({id,pitch,startTick,durationTicks,hand})=>({id,pitch,startTick,durationTicks,hand}));
   const hands=new Map(this.base.score.notes.map(n=>[n.id,n.hand??null]));

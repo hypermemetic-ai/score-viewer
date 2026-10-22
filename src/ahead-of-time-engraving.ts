@@ -12,8 +12,10 @@ import type {ProjectionEntry} from './personal-presentation';
  * again, until the next quiet moment, so a click never waits for it. Opening
  * a score stops it, except for the score being opened: that opening takes
  * over the work already under way, paused or not, instead of starting it
- * again. Every stop frees what the work held. Nothing here writes the
- * player's data; a failure or a stop costs nothing but the work. */
+ * again, and goes on as soon as its pages are written. Work made for anything
+ * else (another keyboard layout, edition or hand choices) is never taken
+ * over: it stops. Every stop frees what the work held. Nothing here writes
+ * the player's data; a failure or a stop costs nothing but the work. */
 /** Library scores in the order the player is likeliest to open them, the one
  * last worked on first. The score just closed is left out: its pages are in
  * memory, and the reader writes them to disk itself. */
@@ -22,9 +24,15 @@ export function aheadOfTimeOrder(entryIds:readonly string[],lastWorked?:string,c
 }
 /** Waits while the player is busy in the library; resolves at once otherwise. */
 export type AheadOfTimeQuiet=()=>Promise<void>;
+/** What one preparation is given besides its stop signal. */
+export interface AheadOfTimeWork {
+ quiet:AheadOfTimeQuiet;
+ /** What opening reads is written: an opening that took this work over goes on now. */
+ ready():void;
+}
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
- private running?:{entryId:string;done:Promise<void>};
+ private running?:{entryId:string;basis:string;done:Promise<void>;ready:Promise<void>};
  private queue:string[]=[];
  /** The next score, between its turn coming and idle time to start it. */
  private waiting?:string;
@@ -35,32 +43,55 @@ export class AheadOfTimeEngraving {
  private holding=false;
  /** Each start or stop ends the run before it, including a step still waiting for idle time. */
  private generation=0;
- constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,quiet:AheadOfTimeQuiet)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
+ constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,work:AheadOfTimeWork)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
   /** No work remains or the work stopped: free what it held (its own projection worker). */
-  release?:()=>void}={}){}
+  release?:()=>void;
+  /** Everything a preparation of this score is made for, as it stands now
+   * (the keyboard layout, the score's files and stored hand choices). Read
+   * when it starts; an opening takes it over only while it is unchanged. */
+  basis?:(entryId:string)=>string}={}){}
  get active(){return this.running?.entryId;}
  private get delay(){return this.options.delayMs??3000;}
  /** Prepare these scores in order, after a quiet moment. Replaces any earlier list. */
  start(entryIds:readonly string[]):void {
   this.end(true);this.queue=[...new Set(entryIds)];this.arm();
  }
+ /** Back in the library with these scores. Work still under way, such as the
+  * score whose opening was just cancelled while it took that work over,
+  * pauses as input pauses it and then goes on first, rather than starting
+  * again; otherwise the list starts afresh. */
+ resume(entryIds:readonly string[]):void {
+  const running=this.running;if(!running||!this.current(running)){this.start(entryIds);return;}
+  if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
+  this.waiting=undefined;this.queue=[...new Set(entryIds)].filter(id=>id!==running.entryId);this.hold();
+ }
+ private basis(entryId:string){return this.options.basis?.(entryId)??'';}
+ private current(running:{entryId:string;basis:string}){return this.basis(running.entryId)===running.basis;}
  /** The work under way for `entryId`, which an opening of that score awaits
-  * and then reads from disk instead of engraving it a second time. */
+  * until its pages are written, then reads them from disk instead of
+  * engraving them a second time. Work made for anything else stops at once. */
  joined(entryId:string,signal?:AbortSignal):Promise<void>{
   const running=this.running;if(running?.entryId!==entryId)return Promise.resolve();
+  if(!this.current(running)){this.end(true);return Promise.resolve();}
   return new Promise<void>(resolve=>{
    const stop=()=>resolve();signal?.addEventListener('abort',stop,{once:true});
-   void running.done.finally(()=>{signal?.removeEventListener('abort',stop);resolve();});
+   void Promise.race([running.ready,running.done]).finally(()=>{signal?.removeEventListener('abort',stop);resolve();});
   });
  }
+ /** The rest of the work an opening of `entryId` took over: saving the
+  * engine hand editing resumes from. The reader settles its own engine after
+  * it, and so restores that one rather than engraving it again. */
+ finishing(entryId:string):Promise<void>|undefined{
+  const running=this.running;return running?.entryId===entryId?running.done:undefined;
+ }
  /** Stop for a reading of `entryId`: work on that score continues at once,
-  * even if input held it, and the reading joins it; anything else stops now.
-  * It runs in its own projection worker, so stopping it never costs the
-  * reader's warm engines. */
+  * even if input held it, and the reading joins it, while it is still made
+  * for what the reading will show; anything else stops now. It runs in its
+  * own projection worker, so stopping it never costs the reader's warm engines. */
  yieldTo(entryId:string):void {
-  if(this.running?.entryId!==entryId){this.end(true);return;}
+  const running=this.running;if(running?.entryId!==entryId||!this.current(running)){this.end(true);return;}
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
-  this.queue=[];this.resume();
+  this.queue=[];this.waiting=undefined;this.unhold();
  }
  /** The player is doing something in the library: hold the work, and go on
   * with the same list, the score under way or waiting first, after another
@@ -76,16 +107,16 @@ export class AheadOfTimeEngraving {
  private arm(){this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.delay);}
  private hold(){
   if(!this.held){let resume!:()=>void;const until=new Promise<void>(done=>{resume=done;});this.held={resume,until};}
-  const held=this.held;if(held.timer!==undefined)clearTimeout(held.timer);held.timer=setTimeout(()=>this.resume(),this.delay);
+  const held=this.held;if(held.timer!==undefined)clearTimeout(held.timer);held.timer=setTimeout(()=>this.unhold(),this.delay);
  }
- private resume(){const held=this.held;this.held=undefined;if(!held)return;if(held.timer!==undefined)clearTimeout(held.timer);held.resume();}
+ private unhold(){const held=this.held;this.held=undefined;if(!held)return;if(held.timer!==undefined)clearTimeout(held.timer);held.resume();}
  private readonly quiet:AheadOfTimeQuiet=()=>this.held?.until??Promise.resolve();
  /** End the run: its list, the score waiting, the score under way. `release`
   * also frees the worker; a pause in the list keeps it for what follows. */
  private end(release:boolean){
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   this.queue=[];this.waiting=undefined;this.generation++;
-  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.resume();
+  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.unhold();
   if(release)this.free();
  }
  private free(){if(!this.holding)return;this.holding=false;this.options.release?.();}
@@ -96,11 +127,12 @@ export class AheadOfTimeEngraving {
   idle(()=>{
    if(generation!==this.generation||this.running)return;
    this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
-   const done=this.prepare(entryId,{signal:controller.signal},this.quiet).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
+   let ready!:()=>void;const written=new Promise<void>(resolve=>{ready=resolve;}),basis=this.basis(entryId);
+   const done=this.prepare(entryId,{signal:controller.signal},{quiet:this.quiet,ready}).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
     if(this.controller!==controller)return;
     this.controller=undefined;this.running=undefined;this.next();
    });
-   this.running={entryId,done};
+   this.running={entryId,basis,done,ready:written};
   });
  }
 }

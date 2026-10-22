@@ -7,6 +7,7 @@ import {strToU8,strFromU8} from 'fflate';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache';
+import {encodeDerivedPayload} from '../src/derived-payload';
 import {importPackage,archivePackage,hashBytes,usePianoPageCheckReceipts} from '../src/package';
 import {PersonalPresentationSession,projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
@@ -23,6 +24,22 @@ function memoryStore(){
  const store:DerivedFileStore={async read(name){reads.push(name);return files.get(name)??null;},async write(name,data){files.set(name,data);return true;}};
  return {files,reads,store};
 }
+
+test('an engine encoded in the worker that holds it is stored byte for byte as the reader would store it',async()=>{
+ const engine={systems:[{bars:[1,2,3],text:'é'}],digest:sha('d')};
+ const here=memoryStore(),there=memoryStore();
+ assert.equal(await new DerivedFileCache(here.store,'build-a').put('personal-engine-v1',sha('a'),engine),true);
+ const encoded=structuredClone(await encodeDerivedPayload(engine));
+ assert.equal(await new DerivedFileCache(there.store,'build-a').putEncoded('personal-engine-v1',sha('a'),encoded),true);
+ assert.deepEqual([...there.files.entries()],[...here.files.entries()]);
+ assert.deepEqual(await new DerivedFileCache(there.store,'build-a').get('personal-engine-v1',sha('a'),v=>v),engine);
+ assert.equal(await new DerivedFileCache(there.store,'build-a').has('personal-engine-v1',sha('a')),true);
+ assert.equal(await new DerivedFileCache(there.store,'build-b').has('personal-engine-v1',sha('a')),false);
+ assert.equal(await new DerivedFileCache(there.store,'build-a').putEncoded('personal-engine-v1',sha('b'),{...encoded,payloadSha256:'nope'}),false,'a malformed digest is never written');
+ // The reader settles its engine for editing only after work it took over has saved one, so it restores that engine.
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
+ assert.match(main,/settle=\(\)=>\{if\(current===next\)editor\.session\.prefetch\(\);\},saving=aheadOfTime\?\.finishing\(next\.entry\.id\);\s*if\(saving\)void saving\.then\(settle\);else settle\(\);/);
+});
 
 test('a derived entry\'s tag reads from its header alone, and only this build\'s entry has one',async()=>{
  const {files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
@@ -100,14 +117,16 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
 // yields the work to the reading (beginReading) and joins it (activateScore).
 function library(delayMs=30){
  const listeners=new Map<string,()=>void>(),window={addEventListener:(kind:string,listener:()=>void)=>{listeners.set(kind,listener);}};
- const steps:string[]=[],aborted:string[]=[],idles:Array<()=>void>=[];let released=0,engraved!:()=>void;
- const work=new AheadOfTimeEngraving(async(id,{signal},quiet)=>{
+ const steps:string[]=[],aborted:string[]=[],idles:Array<()=>void>=[];let released=0,engraved!:()=>void,engineDone!:()=>void;
+ const state={layout:'janko-four-row',reading:undefined as string|undefined};
+ const work=new AheadOfTimeEngraving(async(id,{signal},{quiet,ready})=>{
   const step=async(name:string)=>{await quiet();if(signal?.aborted){aborted.push(id);throw new DOMException('stop','AbortError');}steps.push(`${id} ${name}`);};
-  await step('admitted');await new Promise<void>(done=>{engraved=done;});await step('engraved');await step('saved');
- },{delayMs,idle:run=>idles.push(run),release:()=>{released++;}});
- let reading:string|undefined;holdAheadOfTimeOnInput(window,()=>work,()=>reading===undefined);
- const open=async(id:string)=>{reading=id;work.yieldTo(id);await work.joined(id);};
- return {work,listeners,steps,aborted,idles,released:()=>released,engrave:()=>engraved(),open,input:(kind:string)=>listeners.get(kind)!()};
+  await step('admitted');await new Promise<void>(done=>{engraved=done;});await step('engraved');await step('pages');ready();
+  await new Promise<void>(done=>{engineDone=done;});await step('engine');
+ },{delayMs,idle:run=>idles.push(run),release:()=>{released++;},basis:id=>`${state.layout} ${id}`});
+ holdAheadOfTimeOnInput(window,()=>work,()=>state.reading===undefined);
+ const open=async(id:string,signal?:AbortSignal)=>{state.reading=id;work.yieldTo(id);await work.joined(id,signal);};
+ return {work,state,listeners,steps,aborted,idles,released:()=>released,engrave:()=>engraved(),saveEngine:()=>engineDone(),open,input:(kind:string)=>listeners.get(kind)!()};
 }
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 test('the click or key that opens the score under way hands its work to the reading, never throwing it away',async()=>{
@@ -117,17 +136,66 @@ test('the click or key that opens the score under way hands its work to the read
   // The press reaches the viewer's listener before the opening it causes.
   l.input('pointermove');l.input(kind);l.engrave();await wait(5);
   assert.deepEqual(l.steps,['no13 admitted'],`${kind}: input holds the work at its next step`);
-  const opened=l.open('no13');await wait(5);
-  assert.deepEqual(l.steps,['no13 admitted','no13 engraved','no13 saved'],`${kind}: the opening takes the work over at once`);
-  await opened;assert.deepEqual(l.aborted,[],`${kind}: nothing was thrown away`);
+  let opened=false;const opening=l.open('no13').then(()=>{opened=true;});await wait(5);
+  assert.deepEqual(l.steps,['no13 admitted','no13 engraved','no13 pages'],`${kind}: the opening takes the work over at once`);
+  await opening;assert.deepEqual(l.aborted,[],`${kind}: nothing was thrown away`);
+  assert.ok(opened,`${kind}: the opening goes on once the pages are written, before the engine is saved`);
+  const finishing=l.work.finishing('no13')!;assert.ok(finishing,'the engine is still being saved');assert.equal(l.released(),0,'its worker holds the engine until it is saved');
+  l.saveEngine();await finishing;assert.deepEqual(l.steps.at(-1),'no13 engine');await wait(0);
   assert.equal(l.released(),1,'its worker is freed once the work is done');await wait(60);assert.equal(l.idles.length,0,'the rest waits for the library');
  }
  // Opening another score stops the paused work and frees its worker.
  const l=library();l.work.start(['no13']);await wait(40);l.idles.shift()!();await wait(0);l.input('pointerdown');l.engrave();
  await l.open('zelda');await wait(5);assert.deepEqual(l.aborted,['no13']);assert.equal(l.released(),1);
  // Left alone again, held work goes on by itself.
- const q=library(10);q.work.start(['no13']);await wait(20);q.idles.shift()!();await wait(0);q.input('wheel');q.engrave();await wait(30);
- assert.deepEqual(q.steps,['no13 admitted','no13 engraved','no13 saved']);
+ const q=library(10);q.work.start(['no13']);await wait(20);q.idles.shift()!();await wait(0);q.input('wheel');q.engrave();await wait(30);q.saveEngine();await wait(5);
+ assert.deepEqual(q.steps,['no13 admitted','no13 engraved','no13 pages','no13 engine']);
+});
+test('an opening never waits for work made for another layout: it stops, and the library prepares for the new one',async()=>{
+ // No. 13 is being prepared for the Jankó layout; the player switches to the conventional one, then opens No. 13.
+ const l=library();l.work.start(['no13','no14']);await wait(40);l.idles.shift()!();await wait(0);
+ l.state.layout='conventional';l.input('pointerdown');l.engrave();
+ let opened=false;const opening=l.open('no13').then(()=>{opened=true;});await wait(0);
+ assert.ok(opened,'the opening goes on at once and engraves for the conventional layout itself');await opening;
+ assert.deepEqual(l.aborted,['no13'],'the Jankó work stops');assert.equal(l.released(),1,'and frees its worker');
+ assert.ok(!l.steps.includes('no13 pages'));
+ // The same check holds where the opening waits: work changed under it is not waited for.
+ const j=library();j.work.start(['no13']);await wait(40);j.idles.shift()!();await wait(0);j.state.layout='conventional';
+ let joined=false;const joining=j.work.joined('no13').then(()=>{joined=true;});await wait(0);assert.ok(joined);await joining;
+ j.engrave();await wait(5);assert.deepEqual(j.aborted,['no13']);
+ // Work still made for what the opening shows is taken over, as before.
+ const k=library();k.work.start(['no13']);await wait(40);k.idles.shift()!();await wait(0);k.state.layout='conventional';k.state.layout='janko-four-row';
+ const taken=k.open('no13');k.engrave();await taken;assert.deepEqual(k.aborted,[]);assert.deepEqual(k.steps,['no13 admitted','no13 engraved','no13 pages']);
+ // The viewer's key holds every part of what a preparation reads before admission,
+ // and a layout chosen in the library starts the list again for it.
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
+ const basisSource=main.slice(main.indexOf('function aheadOfTimeBasis('),main.indexOf('\n}\n',main.indexOf('function aheadOfTimeBasis('))+2);
+ const refs=new Map<string,unknown>([['no13',[['state-no13','ref-1']]]]);
+ const context:any={JSON,preferences:{keyboardLayout:'janko-four-row'},entries:[{id:'no13',file:'package-a.tuna',importedAt:'t1',personalFiles:{'state-no13.json':'v1'}}],personalMemory:{storedRefs:(id:string)=>refs.get(id)}};
+ runInNewContext(stripTypeScriptTypes(basisSource),context);
+ const first=context.aheadOfTimeBasis('no13'),changed=(name:string,change:()=>void)=>{change();assert.notEqual(context.aheadOfTimeBasis('no13'),first,name);};
+ assert.equal(context.aheadOfTimeBasis('no13'),first);
+ changed('layout',()=>{context.preferences.keyboardLayout='conventional';});context.preferences.keyboardLayout='janko-four-row';
+ changed('archive',()=>{context.entries[0].file='package-b.tuna';});context.entries[0].file='package-a.tuna';
+ changed('import',()=>{context.entries[0].importedAt='t2';});context.entries[0].importedAt='t1';
+ changed('personal file',()=>{context.entries[0].personalFiles={'state-no13.json':'v2'};});context.entries[0].personalFiles={'state-no13.json':'v1'};
+ changed('stored hand choices',()=>{refs.set('no13',[['state-no13','ref-2']]);});
+ assert.match(main,/basis:aheadOfTimeBasis/);
+ assert.match(main,/\}else\{await enqueue\(async\(\)=>\{await writeJson\('preferences\.json',\{\.\.\.preferences,keyboardLayout:id\}\);[^]*?aheadOfTime\?\.start\(libraryOrder\(\)\);\}/);
+});
+test('Esc during an opening that took work over pauses that work; it is not thrown away',async()=>{
+ const l=library(10);l.work.start(['no13','no14']);await wait(20);l.idles.shift()!();await wait(0);l.input('pointerdown');
+ const esc=new AbortController(),opening=l.open('no13',esc.signal);esc.abort();await opening;
+ // Back in the library (finishReading): the work under way pauses, then goes on first.
+ l.state.reading=undefined;l.work.resume(['no13','no14']);l.engrave();await wait(2);
+ assert.deepEqual(l.steps,['no13 admitted'],'held, as input holds it');assert.deepEqual(l.aborted,[]);assert.equal(l.released(),0);
+ await wait(20);assert.deepEqual(l.steps,['no13 admitted','no13 engraved','no13 pages']);l.saveEngine();
+ for(let i=0;i<20&&!l.idles.length;i++)await wait(5);l.idles.shift()!();await wait(0);
+ assert.deepEqual(l.steps,['no13 admitted','no13 engraved','no13 pages','no13 engine','no14 admitted'],'then the rest of the list, without No. 13 again');
+ // With nothing under way, or work made for another layout, the list starts afresh.
+ const m=library(10);m.work.start(['no13']);await wait(20);m.idles.shift()!();await wait(0);m.state.layout='conventional';
+ m.work.resume(['no13','no14']);m.engrave();await wait(2);assert.deepEqual(m.aborted,['no13']);
+ assert.equal(m.released(),1);for(let i=0;i<20&&!m.idles.length;i++)await wait(5);m.idles.shift()!();await wait(0);assert.deepEqual(m.steps.at(-1),'no13 admitted');
 });
 test('between two scores: a stop frees the worker, and input keeps the waiting score and holds the last one',async()=>{
  const quick=()=>{const idles:Array<()=>void>=[],started:string[]=[];let released=0;
@@ -151,13 +219,57 @@ test('the viewer holds ahead-of-time work through its own listener and saves an 
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  assert.match(main,/holdAheadOfTimeOnInput\(window,\(\)=>aheadOfTime,\(\)=>!current&&!readingOperation\)/);
  assert.match(main,/function beginReading\([^]*?aheadOfTime\?\.yieldTo\(entryId\)/);
- assert.match(main,/await session\.project\(q\.personal\?\?personal,execution\);[^]*?await session\.flushWrites\(\);[^]*?return served\?\?null;/);
+ assert.match(main,/aheadOfTime=new AheadOfTimeEngraving\([^\n]*release:\(\)=>\{aheadWorker\?\.close\(\);aheadAdmission\.clear\(\);\}/,'freeing the worker frees its admission session too');
+});
+
+/** The viewer's own preparation of one score, against stubs that log each step. */
+function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean}={}){
+ const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
+ const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
+ const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a');
+ const stop=(step:string)=>{log.push(step);if(options.stopAt===step)controller.abort();};
+ class Session {
+  waiting=false;
+  async projectionEntry(){return {key:sha('e'),tag:'hands'};}
+  async project(){stop('project');this.waiting=!options.engineOnDisk;}
+  async flushProjection(){stop('pages written');}
+  async engineMissing(){return !options.engineOnDisk&&!this.waiting;}
+  async warm(){stop('engine settled');this.waiting=true;}
+  get engineWaiting(){return this.waiting;}
+  async flushEngine(){stop('engine saved');this.waiting=false;}
+ }
+ const context:any={
+  JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,
+  checkReadingExecution:(e:any)=>{if(e?.signal?.aborted)throw new DOMException('stop','AbortError');},
+  entries:[{id:'no13',file:'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
+  personalMemory:{adoptIndexed:async()=>true,storedRefs:()=>[],personalFor:()=>({})},host:{read:async()=>new Uint8Array([1,2,3])},
+  projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>({availablePresentations:['janko-four-row']})},
+  scoreCapabilities:()=>({pianoPreparation:true}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>undefined,
+  ensurePianoReady:async()=>({package:{}}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
+ };
+ runInNewContext(source,context);
+ const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},ready:()=>log.push('ready')});
+ const recorded=async()=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),'janko-four-row','no13','t1',null,[]]))))!==undefined;
+ return {log,run,recorded};
+}
+test('a preparation writes the pages before an opening goes on, then saves the engine, and records itself only after both',async()=>{
+ const whole=preparation();await whole.run();
+ assert.deepEqual(whole.log,['project','pages written','ready','engine saved']);assert.equal(await whole.recorded(),true);
+ // Pages an earlier reading made, without an engine: the engine is settled and saved.
+ const settle=preparation({projected:true});await settle.run();
+ assert.deepEqual(settle.log,['ready','engine settled','engine saved']);
+ const both=preparation({projected:true,engineOnDisk:true});await both.run();assert.deepEqual(both.log,['ready']);assert.equal(await both.recorded(),true);
+ // A stop while either is written is no outcome: the score is prepared again on the next visit.
+ for(const stopAt of ['pages written','engine saved','engine settled']){
+  const stopped=preparation({stopAt,projected:stopAt==='engine settled'});
+  await assert.rejects(stopped.run(),{name:'AbortError'},stopAt);assert.equal(await stopped.recorded(),false,stopAt);
+ }
 });
 
 test('an opening cancelled with Esc, or failed, returns to a library that prepares scores again',async()=>{
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),from=main.indexOf('function finishReading('),to=main.indexOf('\nconst readerPages=',from);
  const started:string[][]=[],context:any={readingOperation:undefined,current:undefined,shownFailures:new Set(),dialog:undefined,READING_CANCELLED:'cancelled',
-  closeDialog(){},options(){},button:()=>'',libraryOrder:()=>['no13','no14'],aheadOfTime:{start:(ids:string[])=>started.push(ids)}};
+  closeDialog(){},options(){},button:()=>'',libraryOrder:()=>['no13','no14'],aheadOfTime:{resume:(ids:string[])=>started.push(ids)}};
  runInNewContext(stripTypeScriptTypes(main.slice(from,to)),context);
  const op=()=>{const op={running:{state:'working'},loading:{stop(){},fail(){}},controller:new AbortController(),options:undefined,previous:undefined};context.readingOperation=op;return op;};
  const cancelled=op();cancelled.controller.abort();context.finishReading(cancelled,false,new DOMException('stop','AbortError'));
