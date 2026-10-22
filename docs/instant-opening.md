@@ -42,7 +42,7 @@ The work runs in its own projection worker and preparation pool, and frees them 
 
 | Situation | What happens |
 | --- | --- |
-| Reopen, nothing changed | Admission checks digests and seats; the pages' passive-ink check comes from its receipt. Personal memory and its resolution come from the memo, and the projection from disk. No engraving. |
+| Reopen, nothing changed | Admission checks digests and seats; the pages' passive-ink check comes from its receipt. Personal memory and its resolution come from the memo, whose key leaves out where the reader is looking (page, rotation, selected contact). The projection comes from memory when the score was last read or engraved in this window (the last two are kept), otherwise from disk. No engraving. |
 | First opening after an app update that leaves the engraving code unchanged | The same as a reopen: the derived identity has not changed. |
 | First opening after an engraver update | Usually prepared already in the library. Otherwise one engrave, as before. |
 | Hand edit | Re-engraves in the settled engine (ISO notation's incremental path). It is not cached ahead of time. |
