@@ -48,7 +48,7 @@ test('memory pressure is more than half the script heap in use, where the engine
 // The viewer's own retention and opening, run against a stub host.
 const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const slice=(from:string,to:string)=>{const start=main.indexOf(from),end=main.indexOf(to,start);assert.ok(start>=0&&end>start,from);return stripTypeScriptTypes(main.slice(start,end));};
-const retention=slice('const retainable=new WeakSet','function readerPackage(){'),opening=slice('async function open(','\nasync function chooseGuitarProTracks(');
+const retention=slice('const retainable=new WeakSet','\nasync function open('),opening=slice('async function open(','\nasync function chooseGuitarProTracks(');
 const libraryAction=main.slice(main.indexOf("if(action==='library'){"),main.indexOf("if(action==='restore-header')"));
 
 function viewer(){

@@ -291,24 +291,6 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{const projected=await editor.projections.get(sequence)?.catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});editor.projections.delete(sequence);},sequence=>{editor.projections.get(sequence)?.catch(()=>{});editor.projections.delete(sequence);});
  livePersonalEditors.set(target,editor);return editor;
 }
-/** The score last read, kept after Back so reopening it unchanged only draws
- * it again. Only scores opened from the library on their piano pages qualify. */
-const retainable=new WeakSet<NonNullable<typeof current>>();let retentionWatch:number|undefined;
-const retained=new RetainedScore<NonNullable<typeof current>>(()=>{window.clearInterval(retentionWatch);retentionWatch=undefined;});
-type HeapMemory={usedJSHeapSize:number;jsHeapSizeLimit:number};const heapMemory=()=>(performance as Performance&{memory?:HeapMemory}).memory;
-function retentionConditions(entry:Entry):RetentionConditions|undefined {
- const records=personalMemory.readingRefs(entry.id);if(!records)return;
- const {lastWorkedEntryId:_opened,...kept}=preferences;return {entry,records,preferences:kept,build:VIEWER_DERIVED_IDENTITY};
-}
-function retainScore(target:NonNullable<typeof current>){
- const entry=entries.find(e=>e.id===target.entry.id);
- // A reading whose library entry moved on (a new edition, transposition) is opened afresh.
- if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error||underMemoryPressure(heapMemory()))return;
- if(JSON.stringify(entry)!==JSON.stringify(target.entry))return;
- const conditions=retentionConditions(entry);if(!conditions)return;
- retained.keep(entry.id,conditions,target);
- retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))retained.free();},30000);
-}
 function readerPackage(){if(!current)throw Error('No open score.');return livePersonalEditors.get(current)?.view??current.package;}
 function visibleSourceSeat(p:ScorePackage,seat:Seat):Seat|undefined {
  const aliases=p.seats.filter(s=>s.ownerIds.some(id=>seat.ownerIds.includes(id)));
@@ -1037,6 +1019,24 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}
 }
 
+/** The score last read, kept after Back so reopening it unchanged only draws
+ * it again. Only scores opened from the library on their piano pages qualify. */
+const retainable=new WeakSet<NonNullable<typeof current>>();let retentionWatch:number|undefined;
+const retained=new RetainedScore<NonNullable<typeof current>>(()=>{window.clearInterval(retentionWatch);retentionWatch=undefined;});
+type HeapMemory={usedJSHeapSize:number;jsHeapSizeLimit:number};const heapMemory=()=>(performance as Performance&{memory?:HeapMemory}).memory;
+function retentionConditions(entry:Entry):RetentionConditions|undefined {
+ const records=personalMemory.readingRefs(entry.id);if(!records)return;
+ const {lastWorkedEntryId:_opened,...kept}=preferences;return {entry,records,preferences:kept,build:VIEWER_DERIVED_IDENTITY};
+}
+function retainScore(target:NonNullable<typeof current>){
+ const entry=entries.find(e=>e.id===target.entry.id);
+ // A reading whose library entry moved on (a new edition, transposition) is opened afresh.
+ if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error||underMemoryPressure(heapMemory()))return;
+ if(JSON.stringify(entry)!==JSON.stringify(target.entry))return;
+ const conditions=retentionConditions(entry);if(!conditions)return;
+ retained.keep(entry.id,conditions,target);
+ retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))retained.free();},30000);
+}
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);
  // The score just closed, with nothing it rests on changed, is drawn again as it was left: no read, admission or projection.
  const kept=retained.take(entry.id,()=>sourceGroup===undefined?retentionConditions(entry):undefined);
