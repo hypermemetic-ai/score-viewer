@@ -22,6 +22,7 @@ import {practiceTiming} from './practice-timing';
 import {practiceAttemptGrid,practiceCountInGrid} from './practice-attempt-grid';
 import {requireReferencePerformanceTempo,validateReferencePerformanceTempo,type ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 import {savedPlayerTempo} from './player-tempo';
+import type {PracticeFoldPart} from './practice-fold-journal';
 export interface PracticeAttack {id:string;tick:number;end:number;midi:number;bar:number;owners:string[];groups:string[]}
 /** `hand: null` groups notes the score leaves hand-less; only plans that are not
  * practised carry it (source identity, earlier editions, summaries). */
@@ -51,7 +52,7 @@ export const practiceSameKeyGrace=(plan:Pick<PracticePlan,'ornaments'>,a:Pick<Pr
 export interface PersonalPerformanceGoal {version:'personal-performance-goal-v1';bpm:number;beat:ReferencePerformanceTempo['beat']}
 export interface LegacyPracticeEnvelope {version:'legacy-practice-envelope-v1';partition:LegacyPracticePartition;revision:string;state:PracticeState;record?:unknown}
 export interface PracticeEditionEvidence {version:'practice-edition-evidence-v1';sourceIdentity:string;keyboardLayout:string;revision:string;rawState:unknown}
-export interface PracticeState {manualAttainment?:ManualAttainment;referenceBeat?:ReferencePerformanceTempo['beat'];partition?:PracticePartition;version:1;revision:string;target:number;personalGoal?:PersonalPerformanceGoal;working:number;step:number;tolerance:number;offset:number;keepTempo:boolean;start:number;connectionStart?:number;workingByPattern:Record<string,number>;best:Record<string,number>;usabilityRevision?:1;speedRevision?:2;countInBars?:number;resumeCooldownSeconds?:number;audioOutput?:string;groundwork?:Record<string,boolean>;composites?:Record<string,string[]>;policyFingerprint?:string;excluded?:Record<string,boolean>;legacy?:LegacyPracticeEnvelope;editionEvidence?:PracticeEditionEvidence}
+export interface PracticeState {manualAttainment?:ManualAttainment;referenceBeat?:ReferencePerformanceTempo['beat'];partition?:PracticePartition;version:1;revision:string;target:number;personalGoal?:PersonalPerformanceGoal;working:number;step:number;tolerance:number;offset:number;keepTempo:boolean;start:number;connectionStart?:number;workingByPattern:Record<string,number>;best:Record<string,number>;usabilityRevision?:1;speedRevision?:2;countInBars?:number;resumeCooldownSeconds?:number;audioOutput?:string;groundwork?:Record<string,boolean>;composites?:Record<string,string[]>;policyFingerprint?:string;excluded?:Record<string,boolean>;legacy?:LegacyPracticeEnvelope;editionEvidence?:PracticeEditionEvidence;folded?:Record<string,PracticeFoldPart>}
 /** A brushed wrong key is not a failure; an expected quiet key is still a real attack. */
 export const QUIET_STRAY_MAX_VELOCITY=8;
 export const isQuietStray=(velocity:number)=>velocity>0&&velocity<=QUIET_STRAY_MAX_VELOCITY;
@@ -243,6 +244,8 @@ export function transferPracticeEdition(from:ScorePackage,raw:unknown,to:ScorePa
   if(old.workingByPattern[match.pattern]!==undefined)next.workingByPattern[chunk.pattern]??=old.workingByPattern[match.pattern];
   if(old.excluded?.[match.id])next.excluded![chunk.id]=true;
  }
+ // A folded edition's own exercises stay with the fold; its music is shared with this journal.
+ if(old.folded)next.folded=structuredClone(old.folded);
  next.editionEvidence={version:'practice-edition-evidence-v1',sourceIdentity:plan.sourcePracticeIdentity!,keyboardLayout:plan.keyboardLayout!,revision:oldPlan.revision,rawState:structuredClone(raw??old)};
  return readPractice(next,plan);
 }

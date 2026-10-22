@@ -3,6 +3,7 @@ import type {PracticeMode,PracticePrimaryMode} from './practice-view';
 import type {PersonalState} from './state';
 import type {ScorePackage} from './package';
 import {savedPlayerTempo,playerTempo} from './player-tempo';
+import {FoldedPracticeJournal,foldedPracticeJournal,foldedPracticePreferences} from './practice-fold-journal';
 import type {ReferencePerformanceTempo} from '../vendor/iso-notation/src/model/reference-performance-tempo';
 
 export type PracticePreferences=Pick<PracticeState,'start'|'connectionStart'|'step'|'target'|'personalGoal'|'tolerance'|'offset'|'keepTempo'|'audioOutput'|'countInBars'|'resumeCooldownSeconds'>;
@@ -17,21 +18,30 @@ export function practiceStateForContext(plan:PracticePassagePlan,saved:unknown,c
 }
 /** Lays out measures for Fingers only; nothing is timed against it. */
 export const FINGERS_LAYOUT_TEMPO=80;
-export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean;rememberTempo?:true}
+export interface AdmittedPracticeContext {plan:PracticePlan;state:PracticeState;saved:boolean;rememberTempo?:true;
+ /** On a folded edition, the score's journal it reads and saves in written-out terms. */
+ journal?:FoldedPracticeJournal}
+/** The written-out edition behind a folded one, and the fold's own name in the journal. */
+export interface PracticeFoldSource {key:string;written:ScorePackage;personal:PersonalState}
 /** A score without a reference tempo uses the remembered player tempo, else
  * the newly chosen one; the journal keeps it as the personal goal. Fingers
  * alone needs no tempo: a stand-in lays out the measures, is never saved and
  * never asked for. */
-export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo,fingersOnly=!!context?.fingersOnly):AdmittedPracticeContext {
+export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:PracticeViewContext,personal?:PersonalState,chosenTempo?:ReferencePerformanceTempo,fingersOnly=!!context?.fingersOnly,fold?:PracticeFoldSource):AdmittedPracticeContext {
  requirePracticeHands(p,personal);
  const remembered=savedPlayerTempo(p.score,saved,context?.preferences),standIn=fingersOnly&&!remembered&&p.score.referencePerformanceTempo===undefined;
  const player=standIn?playerTempo(p.score,FINGERS_LAYOUT_TEMPO):remembered??(p.score.referencePerformanceTempo===undefined?chosenTempo:undefined);
  const plan=planPractice(p,'bounded-exercises-v1',personal,player);
- let state=practiceStateForContext(plan,saved,context);
+ // A folded edition reads the score's journal by music. Fingers alone saves
+ // nothing and reads only the player's settings.
+ let journal:FoldedPracticeJournal|undefined;
+ if(fold&&fingersOnly)saved=foldedPracticePreferences(saved,plan);
+ else if(fold){const written={key:fold.key,written:planPractice(fold.written,'bounded-exercises-v1',fold.personal,player)},raw=saved;saved=foldedPracticeJournal(raw,plan,written);journal=new FoldedPracticeJournal(written,raw);}
+ let state=practiceStateForContext(plan,saved,context);journal?.read(state);
  // The stand-in never becomes the player's goal, so no snapshot can carry it.
  const rememberTempo=!!plan.playerTempo&&!state.personalGoal&&!standIn;
  if(rememberTempo)state=setPracticeGoal(state,plan,plan.referencePerformanceTempo!.bpm);
- return {plan,state,saved:!!saved,...(rememberTempo?{rememberTempo:true as const}:{})};
+ return {plan,state,saved:!!saved,...(rememberTempo?{rememberTempo:true as const}:{}),...(journal?{journal}:{})};
 }
 
 /** Navigation/group structure only. No played evidence or completion claim. */
