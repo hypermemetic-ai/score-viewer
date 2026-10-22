@@ -186,6 +186,9 @@ export const ownsHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null)
  * score and keyboard layout. Never saved: such a bar keeps its written hands
  * until the score is read again, and no record of the owner's changes. */
 const droppedCarries=new Map<string,Set<number>>();let dropGeneration=0;
+/** Changes whenever a carried hand is dropped in this session: anything derived
+ * from carried hands and kept beyond one opening keys on it. */
+export const handCarryDropGeneration=()=>dropGeneration;
 const dropKey=(p:ScorePackage)=>`${sourceRevision(p)}\n${p.keyboardLayout??p.manifest.keyboardLayout??''}`;
 const barNumber=(p:ScorePackage,n:Note)=>(p.score.sourceBarTicks?.findLastIndex(t=>t<=n.startTick)??-1)+1;
 /** Stop carrying hands into the bar holding this note, because the engraver

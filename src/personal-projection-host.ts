@@ -1,5 +1,6 @@
 import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationExecution,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {withLayoutPeer,type StartLayoutPeer} from './layout-peer';
+import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse,ProjectionView,SerializedProjectionError} from './personal-projection-protocol';
 
 /** The calls the projection host makes on one ISO personal projection core. */
@@ -25,7 +26,7 @@ const taskTurn=()=>new Promise<void>(resolve=>{const channel=new MessageChannel(
  * cores as the reader's preparation pool keeps are retained; an evicted core is made again on request. A
  * refused hand choice leaves its core unchanged (ISO publishes a projection
  * only after it succeeds), so the core is kept; any other failure drops it. */
-export function createProjectionHost(post:(response:ProjectionResponse)=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore;
+export function createProjectionHost(post:(response:ProjectionResponse,transfer?:Transferable[])=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore;
  /** A second worker for a core's whole first engrave (layout-peer.ts). */
  startLayoutPeer?:StartLayoutPeer}={}){
  const cores=new Map<string,HostedProjectionCore>(),maxCores=options.maxCores??2,create=options.create??createHostedCore;
@@ -35,8 +36,8 @@ export function createProjectionHost(post:(response:ProjectionResponse)=>void,op
   let core=cores.get(request.key);
   // A forgotten core has no engine to save; saving never makes one.
   if(request.kind==='save'){
-   let state:PersonalHandEngineState|undefined;try{state=core?.exportState?.();}catch{/* nothing to save */}
-   post({id:request.id,kind:'done',...(state?{state}:{})});return;
+   let engine:EncodedDerivedPayload|undefined;try{const state=core?.exportState?.();if(state)engine=await encodeDerivedPayload(state);}catch{/* nothing to save */}
+   post({id:request.id,kind:'done',...(engine?{engine}:{})},engine?[engine.body.buffer]:[]);return;
   }
   try{
    if(!core){if(!request.create){post({id:request.id,kind:'missing'});return;}core=create(request.create);}

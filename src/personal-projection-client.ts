@@ -1,6 +1,7 @@
 import {HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand} from '../vendor/iso-notation/src/score-presentation';
 import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse,ProjectionView,SerializedProjectionError} from './personal-projection-protocol';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
+import type {EncodedDerivedPayload} from './derived-payload';
 
 export interface ProjectionWorkerLike {
  postMessage(message:ProjectionRequest):void;terminate():void;
@@ -41,6 +42,14 @@ export class ProjectionWorkerClient {
   // A message that cannot be read would leave its request waiting forever.
   worker.onmessageerror=()=>this.lose(worker,false);
   this.worker=worker;this.known.clear();return worker;
+ }
+ /** Stop the worker and everything it holds; the next request starts a fresh one. */
+ close():void {
+  const worker=this.worker;if(!worker)return;
+  try{worker.terminate();}catch{/* already gone */}
+  this.worker=undefined;this.known.clear();
+  const lost=[...this.pending.values()];this.pending.clear();
+  for(const p of lost){p.cleanup();p.reject(new DOMException('Reading preparation was cancelled.','AbortError'));}
  }
  /** A worker that never answered cannot run here; a crash later restarts it on the next request. */
  private lose(worker:ProjectionWorkerLike,permanent:boolean){
@@ -88,8 +97,8 @@ export class ProjectionWorkerClient {
  warm(key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution,saved?:PersonalHandEngineState):Promise<'restored'|'engraved'|'already'>{
   return this.request({kind:'warm',...(saved?{saved}:{})},key,inputs,execution).then(done=>done.settled??'engraved');
  }
- /** The core's settled engine, when the worker still holds a settled core. */
- save(key:string,inputs:ProjectionCoreInputs):Promise<PersonalHandEngineState|undefined>{return this.request({kind:'save'},key,inputs).then(done=>done.state);}
+ /** The core's settled engine, encoded for the disk cache, when the worker still holds a settled core. */
+ save(key:string,inputs:ProjectionCoreInputs):Promise<EncodedDerivedPayload|undefined>{return this.request({kind:'save'},key,inputs).then(done=>done.engine);}
  async project(key:string,inputs:ProjectionCoreInputs,owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>{
   const {view}=await this.request({kind:'project',owners:owners.map(o=>({...o})),digest},key,inputs,execution);
   if(!view)throw Error('The hand drawing worker returned no pages.');
