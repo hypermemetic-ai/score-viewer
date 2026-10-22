@@ -91,6 +91,18 @@ let defaultCache:DerivedFileCache|undefined;
  * the same hand choices reads its pages instead of engraving them again. */
 export function usePersonalProjectionCache(cache:DerivedFileCache|undefined){defaultCache=cache;}
 export const PERSONAL_PROJECTION_CACHE_KIND='personal-projection-v1';
+/** The projections each disk cache last served, by captured score and hand
+ * choices. Reopening a score in the same window draws them without reading,
+ * inflating and parsing its entry again; each is frozen, so every opening shares it. */
+const recentProjections=new WeakMap<DerivedFileCache,Map<string,ProjectionView>>();
+function recentProjection(cache:DerivedFileCache,key:string):ProjectionView|undefined{
+ const recent=recentProjections.get(cache),view=recent?.get(key);if(view){recent!.delete(key);recent!.set(key,view);}return view;
+}
+function keepRecentProjection(cache:DerivedFileCache,key:string,view:ProjectionView){
+ let recent=recentProjections.get(cache);if(!recent)recentProjections.set(cache,recent=new Map());
+ recent.delete(key);recent.set(key,view);
+ if(recent.size>2)recent.delete(recent.keys().next().value!);
+}
 export interface ProjectionEntry {key:string;tag:string}
 /** Whether the disk holds the projection for these hand choices, from its header alone. */
 export async function projectionServed(cache:DerivedFileCache,served:ProjectionEntry):Promise<boolean>{
@@ -404,8 +416,11 @@ export class PersonalPresentationSession {
   // Only a session's first projection, normally the one that opens the score, reads the disk.
   if(this.cache&&!this.cacheRead){
    this.cacheRead=true;
-   result=await this.cache.get(PERSONAL_PROJECTION_CACHE_KIND,await this.cacheKey(),cachedProjection(owners,digest));
+   const cacheKey=await this.cacheKey(),recent=`${cacheKey} ${digest}`;
+   // Reopened in the same window, the pages it last read are still in memory.
+   result=recentProjection(this.cache,recent)??await this.cache.get(PERSONAL_PROJECTION_CACHE_KIND,cacheKey,cachedProjection(owners,digest));
    checkReadingExecution(execution);
+   if(result)keepRecentProjection(this.cache,recent,result);
   }
   if(!result){
    // A saved engine settles the core first, so this choice only places what

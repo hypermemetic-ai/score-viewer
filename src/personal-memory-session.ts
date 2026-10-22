@@ -181,9 +181,11 @@ export class PersonalMemorySession {
    const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);registered=new Set(Object.values(memory.occurrences).map(actual=>canonicalJson(actual.occurrence)));
    if(ref!==undefined)this.registry={ref,registered};
   }
+  // Where the reader is looking does not change which bars are registered, so it does not key the memo.
+  const {view:_view,navigation:_navigation,editContactId:_editContactId,...authored}=candidate.personal;
   // Hands carried from matching bars are derived: the score is known with them or without them.
   return [{},{carry:false}].some(options=>{
-   const choice=JSON.stringify([memoryInputKey(candidate),candidate.p.transposition??null,candidate.importedAt??null,candidate.personal,options]);
+   const choice=JSON.stringify([memoryInputKey(candidate),candidate.p.transposition??null,candidate.importedAt??null,authored,options]);
    let wanted=this.projected.get(choice);
    if(!wanted){
     wanted=projectPersonalMemoryScore(candidate,options).map(w=>canonicalJson(w.occurrence));

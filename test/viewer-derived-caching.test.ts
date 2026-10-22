@@ -173,9 +173,13 @@ test('worker projection and the disk cache give the same view as the reader thre
  const cached=await second.project(again);
  assert.equal(log.length,requests,'a cached projection runs no engraving');
  assert.deepEqual(cached.pages,local.pages);assert.deepEqual(cached.score,local.score);assert.deepEqual(cached.annotationGeometry,local.annotationGeometry);
- // A corrupt entry is recomputed and written again.
+ // Reopened again in the same window, the pages come from memory: even a
+ // corrupt entry on disk is not read.
  for(const name of files.keys())files.set(name,new Uint8Array([9]));
- const third=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
+ const remembered=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache}).project(again);
+ assert.equal(log.length,requests,'a remembered projection runs no engraving');assert.deepEqual(remembered.pages,local.pages);
+ // Another window finds the corrupt entry, and recomputes and writes it again.
+ const third=await new PersonalPresentationSession(reopened,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(worker.spawn),cache:new DerivedFileCache(store,'build-a')}).project(again);
  assert.ok(log.length>requests);assert.deepEqual(third.pages,local.pages);
 });
 

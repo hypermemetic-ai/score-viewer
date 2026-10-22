@@ -250,3 +250,11 @@ test('reopening reads stored memory once per change and still registers what ano
  const other=session(store,[a,b]);await other.initialize();await other.deleteEntry('a');assert.equal(await registered(),0);
  await load(s,a);assert.equal(await registered(),indexed);assert.equal(finger(s,a,'b0n1'),2);
 });
+test('turning pages or rotating the view does not make opening project the score for memory again',async()=>{
+ const input=choose(fixture('a'),'b0n1',2),store=storage(),s=session(store,[input]);await s.initialize();
+ const snapshot=await store.read(),inner=s as unknown as {known(snapshot:unknown,candidate:MemoryScoreInput):boolean;projected:Map<string,unknown>};
+ const registered=inner.known(snapshot,input),projected=inner.projected.size;assert.ok(projected>0);
+ const looking=structuredClone(input);looking.personal.view={...looking.personal.view,page:3,rotation:90};looking.personal.editContactId='c1';
+ assert.equal(inner.known(snapshot,looking),registered);assert.equal(inner.projected.size,projected,'only where the reader looks changed');
+ inner.known(snapshot,choose(structuredClone(input),'b1n1',4,'2021-01-01'));assert.ok(inner.projected.size>projected,'a changed choice is projected');
+});
