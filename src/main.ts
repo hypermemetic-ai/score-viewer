@@ -96,7 +96,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage} from './repeat-fold';
+import {FoldedReader,editOwners,foldFailureText,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {noteMemoryActions,type NoteMemoryCommand} from './note-memory-actions';
@@ -112,7 +112,7 @@ import {readMidiMapping,readMidiBindings,type MidiBindings,type MidiMapping,type
 import {scoreCapabilities,requirePianoCapability} from './score-capabilities';
 const app=document.querySelector<HTMLElement>('#app')!;
 let startupReady=false,startupFailed=false;
-let entries:Entry[]=[],preferences:{version:1;libraryRotation:Rotation;displayRotation?:Rotation;bindings:Bindings;fingerBehavior:FingerBehavior;fingerPresentation:FingerPresentation;keyboardLayout:PhysicalKeyboardId;notationSystem?:'iso';midi?:MidiMapping;midiBindings?:MidiBindings;controlBindings?:ControlBindings;freeViewControls?:FreeViewControlOverrides;lastWorkedEntryId?:string;audioOutput?:string;piano?:PianoPreferences;fingeringAdvice?:FingeringAdviceSettings;scoreTempos?:Record<string,unknown>}={version:1,libraryRotation:0,bindings:defaultBindings(),...fingerPreferences(),keyboardLayout:'conventional-piano'},input=new InputController();
+let entries:Entry[]=[],preferences:{version:1;libraryRotation:Rotation;displayRotation?:Rotation;bindings:Bindings;fingerBehavior:FingerBehavior;fingerPresentation:FingerPresentation;keyboardLayout:PhysicalKeyboardId;notationSystem?:'iso';midi?:MidiMapping;midiBindings?:MidiBindings;controlBindings?:ControlBindings;freeViewControls?:FreeViewControlOverrides;lastWorkedEntryId?:string;audioOutput?:string;piano?:PianoPreferences;fingeringAdvice?:FingeringAdviceSettings;scoreTempos?:Record<string,unknown>;writtenOutRepeats?:string[]}={version:1,libraryRotation:0,bindings:defaultBindings(),...fingerPreferences(),keyboardLayout:'conventional-piano'},input=new InputController();
 let pianoSettings=defaultPianoPreferences(),pianoWarning='',pianoOptions:PianoOptionsPanel|undefined;
 let current:{entry:Entry;package:ScorePackage;personal:PersonalState}|undefined;let toolbarVisible=false,timer:number|undefined,dialog:HTMLDialogElement|undefined,focusReturn:HTMLElement|undefined;
 let readingPresentation:ReadingPresentationController|undefined,readingViewError:string|undefined;const readingParts=new ReadingPartCatalog();
@@ -350,7 +350,9 @@ function shownSession(target:NonNullable<typeof current>):PersonalPresentationSe
 async function presentReader(target:NonNullable<typeof current>,personal:PersonalState,written:()=>Promise<ScorePackage>,execution?:ReadingExecution):Promise<ScorePackage>{
  if(scoreCapabilities(target.package).pianoPreparation){const fold=personalEditor(target).fold;
   if(fold.folds(personal))try{const view=await fold.view(personal,target.package,execution);if(view)return view;}
-  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);
+   // Said once a score: the pages are right, only longer.
+   if(!foldFailureSaid.has(target.package)){foldFailureSaid.add(target.package);notify(foldFailureText(error));}}
  }
  return written();
 }
@@ -358,11 +360,20 @@ async function presentReader(target:NonNullable<typeof current>,personal:Persona
 function printedBar(entryId:string,bar:number):number{const fold=current?.entry.id===entryId?(readerPackage() as FoldedPackage).verbatimFold:undefined;return fold?fold.printedBar(bar):bar;}
 /** A score's stored bars as printed, for notices that name bars. */
 const printedBars=(target:{entry:{id:string}}):PrintedBar=>bar=>printedBar(target.entry.id,bar);
-/** Scores whose written-out repeat the player chose to keep this session. */
-const keptWrittenOut=new WeakSet<NonNullable<typeof current>>();
+/** Written-out repeats the player keeps (K), remembered with the settings for
+ * each score package: the notice returns only when its passes differ otherwise. */
+const KEPT_WRITTEN_OUT=200,repeatKept=(target:NonNullable<typeof current>,found:WrittenOutRepeat)=>`${personalStorageName(target.entry.id,target.package)}\n${found.text}`;
+const keepsWrittenOut=(target:NonNullable<typeof current>,found:WrittenOutRepeat)=>!!preferences.writtenOutRepeats?.includes(repeatKept(target,found));
+async function keepWrittenOut(target:NonNullable<typeof current>,found:WrittenOutRepeat){
+ const key=repeatKept(target,found),package_=personalStorageName(target.entry.id,target.package)+'\n';if(keepsWrittenOut(target,found))return;
+ // One kept repeat per score package: the one its notice last offered.
+ await enqueue(async()=>{const next={...preferences,writtenOutRepeats:[...(preferences.writtenOutRepeats??[]).filter(k=>!k.startsWith(package_)),key].slice(-KEPT_WRITTEN_OUT)};await writeJson('preferences.json',next);preferences=next;});
+}
+/** Scores told this session that their folded pages couldn't be drawn. */
+const foldFailureSaid=new WeakSet<ScorePackage>();
 /** Why a repeat the reader would fold is written out, and how to fold it again. */
 function paintRepeatNotice(){
- const target=current,found=target&&!practice&&!keptWrittenOut.has(target)&&scoreCapabilities(target.package).pianoPreparation?writtenOutRepeat(target.package,target.personal,bar=>printedBar(target.entry.id,bar)):undefined;
+ const target=current,shown=target&&!practice&&scoreCapabilities(target.package).pianoPreparation?writtenOutRepeat(target.package,target.personal,bar=>printedBar(target.entry.id,bar)):undefined,found=shown&&!keepsWrittenOut(target!,shown)?shown:undefined;
  let notice=app.querySelector<HTMLElement>('.repeat-written-out');
  if(!found){notice?.remove();return;}
  if(!notice){notice=document.createElement('aside');notice.className='repeat-written-out';notice.setAttribute('role','status');app.querySelector('.surface')?.append(notice);}
@@ -1525,7 +1536,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
 
 async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='pdf'){await savePdf();return;}if(action==='score-tempo'){if(current&&!practice){const target=current,tempos=await scoreTempoFor(target);if(current===target){await hearAndSetTempo(target,tempos,'Keep this tempo');if(current===target&&!dialog&&!practice){options('score');document.querySelector<HTMLElement>('dialog[data-kind=options] [data-action=score-tempo]')?.focus();}}}return;}if(action==='practice'){if(current&&!readingPresentation)practiceMenu();else await startPractice();return;}if(action==='practice-fingers'||action==='practice-sections'){closeDialog(false);await startPractice(undefined,undefined,action==='practice-fingers');return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
  if(['toggle','edit','feedback','restore-all','undo-restore','earlier-editions','restore-header'].includes(action))requirePianoCapability(p,'pianoPreparation');
- if(action==='library'){const closed=current?.entry.id,leaving=current;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();const abandoning=!!handWait;leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();if(leaving&&!abandoning)retainScore(leaving);aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-keep'){keptWrittenOut.add(current);paintRepeatNotice();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-use'){await useFirstPassChoices(current);renderPages();renderToolbar();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
+ if(action==='library'){const closed=current?.entry.id,leaving=current;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();const abandoning=!!handWait;leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();if(leaving&&!abandoning)retainScore(leaving);aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-keep'){const found=writtenOutRepeat(current.package,current.personal,printedBars(current));if(found)await keepWrittenOut(current,found);paintRepeatNotice();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-use'){await useFirstPassChoices(current);renderPages();renderToolbar();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
  if(selection&&!practice&&['editorNavigation','editorPrevious','editorNext'].includes(action)){
   if(action==='editorNavigation'){editNavigation=editNavigation==='notes'?'measures':'notes';renderEditorNavigation();}
   else if(editNavigation==='measures')selectFingerMeasure(action==='editorPrevious'?-1:1);else selectFinger(action==='editorPrevious'?-1:1);return;
@@ -1708,6 +1719,8 @@ async function boot(){
   if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');
   try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}
   preferences.fingeringAdvice=readFingeringAdviceSettings(preferences.fingeringAdvice);
+  // Kept written-out repeats only hide a notice: an unreadable list is forgotten, never fatal.
+  if(preferences.writtenOutRepeats!==undefined)preferences.writtenOutRepeats=Array.isArray(preferences.writtenOutRepeats)?preferences.writtenOutRepeats.filter((k:unknown):k is string=>typeof k==='string').slice(-KEPT_WRITTEN_OUT):undefined;
   orientation=new ViewerOrientation(preferences);input=new InputController(preferences.bindings);
   mainControls=readControlBindings(preferences.controlBindings,preferences);
   preferences.freeViewControls=readFreeViewControlOverrides(preferences.freeViewControls,mainControls);controls.configure(mainControls);

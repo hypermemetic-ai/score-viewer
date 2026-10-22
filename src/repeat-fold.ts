@@ -102,6 +102,12 @@ export function writtenOutRepeat(p:ScorePackage,s:PersonalState,printed:(bar:num
  return {text,use,restore};
 }
 
+/** Said once when a score's folded pages can't be drawn, so it opens with its repeats written out. */
+export function foldFailureText(error:unknown):string{
+ const reason=error instanceof Error?error.message.trim().replace(/[.!?]+$/,''):'';
+ return `This score’s repeats are written out: its folded pages couldn’t be drawn${reason?` (${reason})`:''}.`;
+}
+
 /** The player's state with what each note reads from its twin: every choice it leaves unset. */
 export function withRepeatInheritance(p:ScorePackage,s:PersonalState):PersonalState{
  const next=own(s),fold=verbatimRepeats(p,next)?.fold;

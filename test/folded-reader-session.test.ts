@@ -37,3 +37,32 @@ test('reopening a score in the session reuses its folded reader; another revisio
  for(const id of ['a','b','c','d'])context.foldedReader(target(id));
  assert.notEqual(context.foldedReader(target('no13')),first);
 });
+
+test('a fold that can\'t be drawn opens written out and says so, once a score', async()=>{
+ const said:string[]=[],warned:unknown[]=[];
+ const context:any={said,scoreCapabilities:()=>({pianoPreparation:true}),foldFailureSaid:new WeakSet(),notify:(text:string)=>said.push(text),
+  foldFailureText:(error:Error)=>`folded pages failed: ${error.message}`,console:{warn:(...args:unknown[])=>warned.push(args)},DOMException,
+  personalEditor:()=>({fold:{folds:()=>true,view:async()=>{throw Error('no room for bar 12');}}})};
+ runInNewContext(body('async function presentReader(','/** A stored bar as the reader prints it'),context);
+ const target={package:{}},written={pages:['written']};
+ assert.equal(await context.presentReader(target,{},async()=>written),written,'the written-out pages are shown');
+ assert.equal(await context.presentReader(target,{},async()=>written),written);
+ assert.deepEqual(said,['folded pages failed: no room for bar 12'],'said once, with the reason');
+ await context.presentReader({package:{}},{},async()=>written);assert.equal(said.length,2,'and once for another score');
+});
+
+test('Keep written out is remembered with the settings for the score package, until its passes differ otherwise', async()=>{
+ let disk:any;const context:any={preferences:{version:1},personalStorageName:(id:string,p:any)=>`state-${id}-${p.layout}`,enqueue:(run:()=>Promise<unknown>)=>run(),writeJson:async(name:string,value:unknown)=>{assert.equal(name,'preferences.json');disk=structuredClone(value);}};
+ runInNewContext(body('/** Written-out repeats the player keeps (K)','/** Why a repeat the reader would fold')+';globalThis.keepsWrittenOut=keepsWrittenOut;',context);
+ const no13={entry:{id:'no13'},package:{layout:'janko'}},found={text:'Bar 9 has a different finger than bar 1, so the repeat is written out.'};
+ assert.equal(context.keepsWrittenOut(no13,found),false);
+ await context.keepWrittenOut(no13,found);
+ // Reopened in a new session: the settings are read back from disk.
+ context.preferences=structuredClone(disk);
+ assert.equal(context.keepsWrittenOut(no13,found),true,'K holds across reopen');
+ assert.equal(context.keepsWrittenOut({...no13,package:{layout:'conventional'}},found),false,'per score package');
+ const other={text:'Bar 10 has a different hand than bar 2, so the repeat is written out.'};
+ assert.equal(context.keepsWrittenOut(no13,other),false,'a different difference is offered again');
+ await context.keepWrittenOut(no13,other);
+ assert.deepEqual(disk.writtenOutRepeats,['state-no13-janko\n'+other.text],'one kept repeat per package');
+});
