@@ -11,12 +11,15 @@ const escape=(text:string)=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').
 const button=(label:string,action:string,disabled=false)=>`<button type="button" data-action="${action}"${disabled?' disabled':''}>${label}</button>`;
 
 /** Shared reader/practice Score section. Only provenance is a disclosure. */
-export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string},instrumentControl='',pdf=false){
+/** The score's performance tempo; main fills the value once it is resolved. */
+const tempoRow=(shown:boolean)=>shown?`<div class="option-setting score-tempo-setting" data-options-row><span>Tempo</span><div class="score-tempo-fields"><span class="score-tempo-value" data-score-tempo-value>…</span>${button('Hear and set','score-tempo')}</div></div>`:'';
+export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,transpose:{steps:number;min:number;max:number;error?:string},job?:{state:string;progress:string},instrumentControl='',pdf=false,tempo=false){
  const pdfAction=pdf?button('Save as PDF','pdf'):'';
  if(!scoreCapabilities(p).pianoPreparation)return `<section class="score-options" aria-labelledby="score-options-heading">
   <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${workHeadingMarkup(entry.metadata)}</p></header>
   ${instrumentControl?`<label class="option-setting" data-options-row><span>Instrument</span>${instrumentControl}</label>`:''}
   ${p.reading?.dual?`<label class="option-setting" data-options-row><span>Notation</span>${readingNotationControl(p)}</label>`:'<p class="help">Read the score with its notes, rhythm and articulations.</p>'}
+  ${tempoRow(tempo)}
   <div class="dialog-actions score-primary-actions" data-options-row>${button('Share score','share')}${pdfAction}</div>
   <details class="score-source-review"><summary>Source & review</summary>
    ${p.manifest.metadata.provenance.map(text=>`<p class="help">${escape(text)}</p>`).join('')}
@@ -36,6 +39,7 @@ export function scoreOptionsMarkup(entry:Entry,p:ScorePackage,s:PersonalState,tr
   <header class="score-options-heading"><h3 id="score-options-heading">Score</h3><p>${workHeadingMarkup(entry.metadata)}</p></header>
   <label class="option-setting score-transpose-setting" data-options-row><span>Transpose</span>${field}</label>
   <p class="control-error score-setting-help" data-transpose-error role="alert">${escape(transpose.error??'')}</p>
+  ${tempoRow(tempo)}
   <div class="dialog-actions score-primary-actions" data-options-row>${primary}</div>
   ${!p.fingerEligibility.eligible&&p.fingerLayer?'<p class="help">Finger choices use annotations for this score.</p>':''}
   ${busy&&job?.progress?`<p class="job" role="status">${escape(job.progress)}</p>`:''}
