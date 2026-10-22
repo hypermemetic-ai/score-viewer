@@ -38,7 +38,7 @@ import {workHeadingMarkup,workReference} from './score-catalog';
 import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
 import {personalForTransposedEdition} from './transposed-personal';
 import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTransposition} from './score-transposition-selection';
-import {PitchInputEpoch,FINGERS_LAYOUT_TEMPO,type AdmittedPracticeContext,type PracticeViewContext} from './practice-context';
+import {PitchInputEpoch,FINGERS_LAYOUT_TEMPO,type AdmittedPracticeContext,type PracticeFoldSource,type PracticeViewContext} from './practice-context';
 import {PracticeView} from './practice-view';
 import {ManualPracticeView} from './manual-practice-view';
 import {ManualReadingContext} from './manual-reading-context';
@@ -301,9 +301,10 @@ async function useFirstPassChoices(target:NonNullable<typeof current>){
  await presentPersonalChange(target,personal,Promise.all(saved).then(()=>{}));
 }
 /** What practice and Fingers go through: the folded edition when the reader folds a repeat, as a score with composer repeats is; else the stored edition. */
-function practiceSource(target:NonNullable<typeof current>):{view:ScorePackage;base:ScorePackage;personal:PersonalState}{
+function practiceSource(target:NonNullable<typeof current>):{view:ScorePackage;base:ScorePackage;personal:PersonalState;fold?:PracticeFoldSource}{
  const shown=livePersonalEditors.get(target)?.view??target.package,fold=(shown as FoldedPackage).verbatimFold;
- return fold?{view:fold.practice,base:fold.edition,personal:fold.personal(target.personal)}:{view:shown,base:target.package,personal:target.personal};
+ // The folded edition practises in the score's one journal, read and saved in the stored edition's terms.
+ return fold?{view:fold.practice,base:fold.edition,personal:fold.personal(target.personal),fold:{key:fold.edition.sourceSha256!,written:target.package,personal:target.personal}}:{view:shown,base:target.package,personal:target.personal};
 }
 /** The score a performance plays: the one the reader prints. A folded repeat plays twice in performed order, numbered by printed bar and pass, as a composer repeat does. */
 function performedScore(target:NonNullable<typeof current>):ScorePackage['score']{return ((livePersonalEditors.get(target)?.view??target.package) as FoldedPackage).verbatimFold?.edition.score??target.package.score;}
@@ -484,7 +485,7 @@ async function refreshPersonalPractice(target:NonNullable<typeof current>,owner:
   // Restoring choices can leave notes hand-less again: return to reading and say why.
   const source=practiceSource(target);
   try{requirePracticeHands(source.base,source.personal);}catch(error){owner.close();practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;resetInput();render();notify((error as Error).message);return;}
-  const context=owner.contextSnapshot(),admitted=await PracticeView.prepareContext(source.base,target.entry.id,context,source.personal);
+  const context=owner.contextSnapshot(),admitted=await PracticeView.prepareContext(source.base,target.entry.id,context,source.personal,undefined,undefined,source.fold);
   if(!owns())return;
   // Options remain usable during admission. A later settings or navigation
   // choice must be admitted again rather than replaced by the earlier context.
@@ -1396,7 +1397,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
    const bpm=known?.confident?wholeTempoOnBeat(known.bpm,known.beat,beat):await hearAndSetTempo(target,{piece:known},'Practice at this tempo',true);
    if(bpm===undefined||!owns())return;tempo=playerTempo(target.package.score,Math.min(500,Math.max(5,bpm)));}
  }
- selection=undefined;editNavigation='notes';resetInput();const source=practiceSource(target),next=new PracticeView(app,{playerTempo:tempo,fingersOnly,work:target.entry.metadata,rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),modeKeys:()=>({reading:actionControlLabel(effectiveControls(),'practiceReading'),timed:actionControlLabel(effectiveControls(),'practiceTimed')}),...{navigationKeys:()=>{const bindings=effectiveControls();return {previous:actionControlLabel(bindings,'previous'),next:actionControlLabel(bindings,'next')};}},package:source.view,basePackage:source.base,personal:source.personal,presentation:()=>currentFingerPresentation(target.package),audioOutput:()=>preferences.audioOutput??'',sustain:()=>musicalSustain.snapshot(),entryId:target.entry.id,connected:()=>!!midiConnection,source:()=>midiConnection?.source??preferences.midi?.source??'',connect:connectMidi,disconnect:disconnectMidi,back:()=>{practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;resetInput();render();},saveFinger:(seat,finger)=>{if(!current)return Promise.reject(Error('No open score.'));
+ selection=undefined;editNavigation='notes';resetInput();const source=practiceSource(target),next=new PracticeView(app,{playerTempo:tempo,fingersOnly,work:target.entry.metadata,rotation:()=>orientation.rotation,doneKey:()=>actionControlLabel(effectiveControls(),'done'),settingsKey:()=>actionControlLabel(effectiveControls(),'practiceSettings'),workingEditKey:()=>controls.match({kind:'key',key:'KeyS'})?'':'S',freeViewKey:()=>actionControlLabel(effectiveControls(),'practiceFreeView'),modeKeys:()=>({reading:actionControlLabel(effectiveControls(),'practiceReading'),timed:actionControlLabel(effectiveControls(),'practiceTimed')}),...{navigationKeys:()=>{const bindings=effectiveControls();return {previous:actionControlLabel(bindings,'previous'),next:actionControlLabel(bindings,'next')};}},package:source.view,basePackage:source.base,personal:source.personal,...(source.fold?{fold:source.fold}:{}),presentation:()=>currentFingerPresentation(target.package),audioOutput:()=>preferences.audioOutput??'',sustain:()=>musicalSustain.snapshot(),entryId:target.entry.id,connected:()=>!!midiConnection,source:()=>midiConnection?.source??preferences.midi?.source??'',connect:connectMidi,disconnect:disconnectMidi,back:()=>{practice=undefined;selection=undefined;editNavigation='notes';selectionPitchToggle=false;resetInput();render();},saveFinger:(seat,finger)=>{if(!current)return Promise.reject(Error('No open score.'));
    // The editor reads the note before its first await; practice keeps no score selection.
    selection=seat;const saving=saveSelectedChoice({finger},false);selection=undefined;return saving.catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});},saveHand:(seat,hand)=>{if(!current)return Promise.reject(Error('No open score.'));selection=seat;const saving=saveHandChoice(hand);selection=undefined;return saving;},settings:()=>settings()});practice=next;await next.mount(context,admitted);}
 
