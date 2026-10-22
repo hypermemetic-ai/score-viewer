@@ -89,7 +89,7 @@ Hear-and-set SHALL play a metronome count-in and then a performance synthesised 
 - **THEN** the dialog says so and ← → and Enter still set the tempo
 
 ### Requirement: The preview plays on the owner's piano when it is on
-Hear-and-set SHALL play the count-in and performance on the native piano through the output selected in Piano settings when Piano is enabled and running, scheduled on the native MIDI clock, and SHALL otherwise use the built-in voice. The dialog SHALL say which voice plays. When Piano is installed but off it SHALL offer to turn it on, saying plainly that it stays on like Options › Piano.
+Hear-and-set SHALL play the count-in and performance on the native piano through the output selected in Piano settings when Piano is enabled and running, scheduled on the native MIDI clock, and SHALL otherwise use the built-in voice. The dialog SHALL say which voice plays. When Piano is installed but off it SHALL offer to turn it on, saying plainly that it stays on and is turned off in Options › Piano. Opening the dialog SHALL NOT wait for the piano bank's files to be checked.
 
 #### Scenario: Piano on
 - **WHEN** Piano is enabled and its output is running
@@ -97,7 +97,7 @@ Hear-and-set SHALL play the count-in and performance on the native piano through
 
 #### Scenario: Piano installed but off
 - **WHEN** the bank is installed and Piano is off
-- **THEN** the built-in voice plays and the dialog offers "Turn on your piano — stays on, like Options › Piano"; choosing it enables Piano as the Options switch does and continues on the piano
+- **THEN** the dialog opens and the built-in voice plays at once, and the dialog offers "[Turn on your piano] It stays on; turn it off in Options › Piano."; choosing it enables Piano as the Options switch does, saves it only once the piano sounds, and continues on the piano
 
 #### Scenario: Piano cannot start
 - **WHEN** the native piano refuses or stops

@@ -21,7 +21,7 @@ export interface TempoAuditionView {
  /** Why the piano is not playing. */
  voiceNote?:string;
 }
-const BUILT_IN='A simple built-in piano plays this preview.',PIANO='Your piano plays this preview.',STAYS_ON='stays on, like Options › Piano';
+const BUILT_IN='A simple built-in piano plays this preview.',PIANO='Your piano plays this preview.',STAYS_ON='It stays on; turn it off in Options › Piano.';
 const voiceText=(view:TempoAuditionView)=>view.voice==='piano'?PIANO:view.voiceNote?`${view.voiceNote} ${BUILT_IN}`:BUILT_IN;
 /** Proper English ordinals: 1st, 2nd, 3rd, 11th, 21st, 112th. */
 export const ordinal=(n:number)=>{const tens=n%100,ones=n%10;return `${n}${tens>=11&&tens<=13?'th':ones===1?'st':ones===2?'nd':ones===3?'rd':'th'}`;};
@@ -30,6 +30,8 @@ export function tempoKeepText(view:Pick<TempoAuditionView,'practiceGoal'|'setsPr
  if(view.practiceGoal!==undefined)return `Enter keeps the piece tempo. Practice keeps its goal of ${tempoRateNumber(view.practiceGoal)}; change that in practice Options.`;
  return view.setsPracticeGoal?'Enter keeps it as the piece tempo and your practice goal.':'Enter keeps it as the piece tempo.';
 }
+/** Installed but off: the offer is the Options › Piano switch, and says it stays on. */
+export const tempoOfferMarkup=()=>`<p class="help tempo-audition-offer" data-tempo-offer>Your piano is installed and turned off. <button type="button" data-tempo-action="piano">Turn on your piano</button> ${STAYS_ON}</p>`;
 export function tempoAuditionMarkup(view:TempoAuditionView):string {
  const origin=view.tempo?scoreTempoOriginText(view.tempo):'This score doesn’t say how fast it goes. Listen, and change it until it sounds right.';
  return `<h2 id="tempo-audition-title">Tempo</h2>
@@ -42,7 +44,7 @@ export function tempoAuditionMarkup(view:TempoAuditionView):string {
   <p class="tempo-audition-status" data-tempo-status role="status">${view.silent?'':'Starting…'}</p>
   <p class="tempo-audition-keys"><span><kbd>←</kbd><kbd>→</kbd> Slower / faster</span><span data-tempo-sound-key><kbd>Space</kbd> <span data-tempo-space>Pause</span></span><span data-tempo-sound-key><kbd>Home</kbd> From the start</span></p>
   <p class="help tempo-audition-sound">${escape(tempoKeepText(view))} <span data-tempo-voice>${escape(voiceText(view))}</span></p>
-  ${view.offerPiano?`<p class="help tempo-audition-offer" data-tempo-offer>Your piano is installed and turned off. <button type="button" data-tempo-action="piano">Turn on your piano</button> — ${STAYS_ON}.</p>`:''}
+  ${view.offerPiano?tempoOfferMarkup():''}
  </div>
  <footer class="options-footer tempo-audition-footer"><button type="button" data-tempo-action="back">Back <kbd class="escape-hint">Esc</kbd></button><button type="button" data-tempo-action="confirm">${escape(view.confirmLabel)} <kbd>Enter</kbd></button></footer>`;
 }
@@ -52,6 +54,9 @@ export interface TempoAuditionControl {
  confirm(bpm:number):void;cancel():void;
  /** Turn the installed piano on (as in Options › Piano: it stays on) and play on it. */
  usePiano?(bpm:number):Promise<Audition>;
+ /** Whether the piano is installed but off, known after the dialog opens: the
+  * preview starts at once and the offer joins it when the answer arrives. */
+ offerPiano?:Promise<boolean>;
  /** The built-in voice, when the piano cannot start. */
  fallback?(bpm:number):Audition;
  timers?:{set(fn:()=>void,ms:number):unknown;clear(id:unknown):void};repeat?:TempoRepeat;
@@ -115,7 +120,7 @@ export function mountTempoAudition(control:TempoAuditionControl):()=>void {
    if(disposed){void next.close();return;}
    const old=audition;audition=next;soundError='';void old.close();
    dialog.querySelector<HTMLElement>('[data-tempo-offer]')?.remove();root.focus();
-   q('voice').textContent=`Your piano is on and plays this preview — it ${STAYS_ON}.`;audition.play();paintStatus();
+   q('voice').textContent=`Your piano is on and plays this preview. ${STAYS_ON}`;audition.play();paintStatus();
   }catch(error){if(disposed)return;button.disabled=false;q('voice').textContent=`The piano could not start: ${message(error)}. ${BUILT_IN}`;}
  };
  const click=(e:Event)=>{const target=(e.target as HTMLElement).closest<HTMLElement>('[data-tempo-action]'),action=target?.dataset.tempoAction;if(action==='confirm')control.confirm(audition.bpm);else if(action==='back')control.cancel();else if(action==='piano')void usePiano(target as HTMLButtonElement);};
@@ -124,5 +129,9 @@ export function mountTempoAudition(control:TempoAuditionControl):()=>void {
  root.focus();paintRate();
  const ticker=timers.set(paintStatus,100);
  void begin(audition);
+ void control.offerPiano?.then(installed=>{
+  if(!installed||disposed||audition.voice==='piano'||dialog.querySelector('[data-tempo-offer]'))return;
+  q('voice').closest('p')!.insertAdjacentHTML('afterend',tempoOfferMarkup());
+ },()=>{});
  return ()=>{if(disposed)return;disposed=true;timers.clear(ticker);repeat.cancel();window.removeEventListener('blur',blur);follow(undefined);dialog.removeEventListener('keydown',keydown);dialog.removeEventListener('keyup',keyup);dialog.removeEventListener('click',click);void audition.close();};
 }

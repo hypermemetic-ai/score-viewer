@@ -56,8 +56,18 @@ worker, sampler, sample load or stream.
 A fixed 2048-entry lock-free queue carries events to the callback, which holds a
 single lookahead event and applies events at their sample offsets within each
 256-frame sampler chunk, at most 512 per chunk. Offsets never decrease within a
-chunk. Scheduled notes play on a seventeenth contact channel, so live MIDI keys
-and sustain are unaffected and the stream's own release lifts only its notes.
+chunk. Scheduled notes play on a seventeenth contact channel beside live MIDI's
+sixteen, and the stream's own release lifts only its notes. The piano is one
+sampler, so the two streams share a voice per pitch and one sustain pedal (the
+highest of all channels):
+
+- A live strike on a key only the stream holds sounds its own attack. The stream
+  never strikes over a key a live channel holds; it holds contact silently.
+- A key sounds until every channel holding it lets go.
+- Holding your own sustain pedal holds the stream's notes too. When the preview
+  stops, its notes lift, but under your held pedal they ring until you lift it.
+  The sampler cannot end only the stream's notes then: lifting and pressing the
+  pedal again in one instant re-catches every releasing note.
 Clicks use the practice metronome voice on the same clock, unscaled by piano
 volume. The callback publishes the frame it has rendered and its transfer size.
 From these the commands return `leadMicros`, the earliest instant a new event can
@@ -69,7 +79,11 @@ and its sounding notes and clicks stop at once. A replacement with `keepUntil`
 keeps the earlier epoch's events before that cut and drops them after it, so a
 tempo change keeps sounding notes. The ring remembers the last eight cuts. While
 the callback lags four epochs behind, a replacement waits briefly and then reports
-that the schedule is busy. A new output (`Mixer::at_rate`) restarts the stream.
+that the schedule is busy. Events kept before the cuts of those four replacements,
+releases among them, still play; the ring is twice the window, so their cuts are
+intact. A fresh stream whose first event the output has already passed is refused
+as too soon, like a cut that has, and the producer retries once with a new lead.
+A new output (`Mixer::at_rate`) restarts the stream.
 Practice cues, panic, live MIDI and the cue formulas are unchanged. The callback
 still takes no locks, emits no events, does no file work and does not allocate;
 the allocator test covers the scheduled path.

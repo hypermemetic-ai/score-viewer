@@ -75,9 +75,11 @@ When Piano is on and its output is running, your piano plays the preview: the Sa
 
 Otherwise a simple built-in WebAudio piano voice plays it, with the practice metronome click, through the system's default output:
 
-- **Installed but off.** The dialog shows "Your piano is installed and turned off. [Turn on your piano] — stays on, like Options › Piano." The button switches Piano on exactly as Options › Piano does, and Piano stays on afterwards. The preview then continues on your piano from the start.
+- **Installed but off.** The dialog opens and the built-in voice starts at once. A quick check reads only the installed bank's pointer and manifest, without hashing files, and then the dialog adds "Your piano is installed and turned off. [Turn on your piano] It stays on; turn it off in Options › Piano." The button switches Piano on exactly as Options › Piano does, including its full check of the bank's files, while the built-in voice keeps playing. Piano is saved on only once its output sounds; then it stays on, and the preview continues on your piano from the start.
 - **On but not sounding.** The dialog says why, and the built-in voice plays.
-- **Cannot start or stops.** If the piano cannot start, the built-in voice takes over and the dialog says why. If it stops while playing, the status says so, and Space plays it again.
+- **Cannot start or stops.** If the piano cannot start, the built-in voice takes over and the dialog says why. If it stops while playing, it silences the notes it had scheduled and the status says so, and Space plays it again. When the output fell behind, was replaced or restarted, the status says "The piano lost its place".
 - **Browser.** In the browser, which has no native piano, the built-in voice always plays.
 
 The tempo, ← →, Enter and Esc behave the same for both voices. A tempo change on your piano takes effect a few tens of milliseconds ahead, the queued output plus a call allowance. Notes already sounding keep sounding. Pause releases the piano's notes, and continuing has no second count-in. The pedal's effect is folded into each note's release; the native stream does not send pedal controllers yet.
+
+Playing along on a MIDI keyboard during the preview shares the one piano. Your strike on a key the preview holds sounds. But your own sustain pedal holds the preview's notes too: if you hold it when the preview stops, they ring until you lift it.

@@ -19,6 +19,9 @@ const BUDGET: usize = 512;
 /// Unobserved replacements the producer may publish ahead of the callback.
 const WINDOW: u64 = 4;
 const CUTS: usize = 8;
+// The callback reads the cuts of up to WINDOW observed epochs while the
+// producer writes up to WINDOW more; neither may wrap onto the other.
+const _: () = assert!(2 * WINDOW as usize <= CUTS);
 const MAX_AHEAD_MICROS: u64 = 60_000_000;
 /// An attack this late is skipped, so a stalled output does not burst.
 pub const LATE_MICROS: u64 = 50_000;
@@ -35,6 +38,8 @@ pub const CLICK: u8 = 4;
 pub const OFF: &str = "Piano sound is off.";
 pub const BUSY: &str = "Piano schedule is busy";
 pub const STALE: &str = "Piano schedule was replaced";
+/// The producer retries this once with a fresh lead.
+pub const TOO_SOON: &str = "Piano schedule starts too soon";
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub struct Event {
@@ -154,8 +159,10 @@ impl ScheduleBus {
         let floor = if keep_until.is_some() || !events.is_empty() {
             let earliest = now.saturating_add(self.lead(now)?);
             let floor = keep_until.unwrap_or(earliest);
-            if floor < earliest {
-                return Err("Piano schedule starts too soon".into());
+            // A fresh stream whose first event the output has already passed
+            // is as early as a cut that has: the producer takes a new lead.
+            if floor < earliest || (keep_until.is_none() && events[0].at < earliest) {
+                return Err(TOO_SOON.into());
             }
             floor
         } else {
@@ -263,7 +270,10 @@ impl Player {
         if age == 0 {
             return true;
         }
-        if age >= WINDOW {
+        // Events kept before the cuts of up to WINDOW replacements published
+        // during a stall still play, releases among them. The cuts they are
+        // checked against are intact up to that age (see CUTS).
+        if age > WINDOW {
             return false;
         }
         let mut e = s.epoch;
@@ -490,6 +500,30 @@ mod tests {
     }
 
     #[test]
+    fn kept_releases_survive_a_stall_of_queued_replacements() {
+        let bus = ScheduleBus::default();
+        bus.restart();
+        let mut player = Player::new(&bus, RATE);
+        let mut sub = Submitter::default();
+        let now = 4_500_000;
+        running(&bus, now);
+        let t0 = now + 100_000;
+        bus.replace(&mut sub, now, None, &[on(t0, 60), off(t0 + 200_000, 60)]).unwrap();
+        let mut out = vec![];
+        let t = render(&mut player, &bus, now, t0 + 20_000, &mut out);
+        // The output stalls while the tempo changes four times; every cut
+        // falls after C lifts, so its release belongs to the first stream.
+        for i in 0..WINDOW {
+            let cut = t0 + 300_000 + i * 1_000;
+            bus.replace(&mut sub, t, Some(cut), &[on(cut + 10_000, 62)]).unwrap();
+        }
+        assert_eq!(bus.replace(&mut sub, t, None, &[]), Err(BUSY.into()));
+        render(&mut player, &bus, t, t0 + 600_000, &mut out);
+        let heard: Vec<_> = out.iter().filter(|e| e.0 != CONTROL).map(|e| (e.0, e.1)).collect();
+        assert_eq!(heard, [(NOTE_ON, 60), (NOTE_OFF, 60), (NOTE_ON, 62)], "C lifts; only the last D sounds");
+    }
+
+    #[test]
     fn bounded_validation_ordering_capacity_and_resubmission() {
         let bus = ScheduleBus::default();
         bus.restart();
@@ -498,7 +532,11 @@ mod tests {
         assert!(bus.replace(&mut sub, now, None, &[on(now + 1_000_000, 60)]).is_err(), "not rendering");
         running(&bus, now);
         let lead = bus.lead(now).unwrap();
-        assert!(bus.replace(&mut sub, now, Some(now + lead - 1), &[]).is_err(), "too soon");
+        assert_eq!(bus.replace(&mut sub, now, Some(now + lead - 1), &[]), Err(TOO_SOON.into()));
+        // Play, Home and resume start a fresh stream: an event the output has
+        // already passed is too soon, so the producer retries with a new lead.
+        assert_eq!(bus.replace(&mut sub, now, None, &[on(now + lead - 1, 60)]), Err(TOO_SOON.into()));
+        assert!(bus.replace(&mut sub, now, None, &[on(now + lead, 60)]).is_ok());
         for bad in [
             Event { at: now + 100_000, kind: 9, key: 60, value: 1 },
             Event { at: now + 100_000, kind: NOTE_ON, key: 128, value: 1 },

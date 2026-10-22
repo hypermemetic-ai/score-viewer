@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {buildPerformanceSchedule} from '../src/score-performance';
 import {CLICK,NOTE_OFF,NOTE_ON,performanceEvents,type PianoScheduleHost,type ScheduledEvent} from '../src/piano-schedule';
-import {NativeTempoAudition} from '../src/native-tempo-audition';
+import {NativeTempoAudition,pianoStopped} from '../src/native-tempo-audition';
 import type {AuditionTimers} from '../src/tempo-audition';
 
 const quarter={numerator:1,denominator:4};
@@ -24,7 +24,7 @@ test('one tick-ordered stream: clicks, lifts before attacks, pedal-held keys lif
 
 /** A native schedule double: its clock runs `offset` µs ahead of local time. */
 function fakeNative(){
- const state={nowMs:1000,offset:7_000_000,lead:40_000,epoch:0,inflight:0,maxInflight:0,capacity:Infinity,tooSoon:0,off:false};
+ const state={nowMs:1000,offset:7_000_000,lead:40_000,epoch:0,inflight:0,maxInflight:0,capacity:Infinity,tooSoon:0,off:false,submitError:''};
  const calls:{call:'open'|'replace'|'submit';keepUntil?:number|null;epoch?:number;events:ScheduledEvent[];clock:number}[]=[];
  const clock=()=>Math.round(state.nowMs*1000+state.offset);
  const receipt=(accepted:number)=>({epoch:state.epoch,accepted,clock:clock(),leadMicros:state.lead,late:0});
@@ -39,6 +39,7 @@ function fakeNative(){
    state.epoch++;calls.push({call:'replace',keepUntil,events,clock:clock()});return receipt(Math.min(events.length,state.capacity));
   }),
   submit:(epoch,events)=>guard(()=>{
+   if(state.submitError)throw Error(state.submitError);
    if(epoch!==state.epoch)throw Error('Piano schedule was replaced');
    calls.push({call:'submit',epoch,events,clock:clock()});return receipt(Math.min(events.length,state.capacity));
   })
@@ -126,6 +127,23 @@ test('a late start retries once with a fresh lead; a stopped piano reports and s
  assert.equal(a.phase,'idle');
  const off=fakeNative();off.state.off=true;
  await assert.rejects(new NativeTempoAudition(notes(),60,off.host,off.timers).open(),/Piano sound is off/);
+});
+
+test('when the piano loses its place the preview says so plainly and silences what it scheduled',async()=>{
+ const native=fakeNative(),a=new NativeTempoAudition(notes(),60,native.host,native.timers);
+ await a.open();a.play();await flush();
+ native.state.submitError='Piano schedule is busy';await native.advance(1500);
+ assert.equal(a.failure,'The piano lost its place');
+ assert.equal(a.phase,'idle');
+ const last=native.calls.at(-1)!;
+ assert.deepEqual([last.call,last.keepUntil,last.events.length],['replace',null,0],'the scheduled notes are released');
+ // A release that itself fails is not reported over the first failure.
+ const off=fakeNative(),b=new NativeTempoAudition(notes(),60,off.host,off.timers);
+ await b.open();b.play();await flush();
+ off.state.off=true;await off.advance(1500);
+ assert.match(b.failure??'',/^The piano stopped: Piano sound is off$/);
+ for(const message of ['Piano schedule was replaced','Piano schedule is busy','Piano events must be in time order and ahead of the output','Piano schedule starts too soon'])
+  assert.equal(pianoStopped(Error(message)),'The piano lost its place',message);
 });
 
 test('later score tempos stretch the native clock as they do the built-in voice',async()=>{

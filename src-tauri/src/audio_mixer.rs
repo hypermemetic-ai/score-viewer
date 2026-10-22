@@ -109,7 +109,9 @@ impl Synth for crate::piano_engine::PianoEngine {
 /// A single piano timbre combines contacts across16channels. Same-pitch attacks
 /// retrigger within a channel; an overlapping second channel retains contact
 /// without creating a voice that channel-less sfizz note-off would also kill.
-/// Channel 17 holds the scheduled stream's contacts, beside live MIDI.
+/// Channel 17 holds the scheduled stream's contacts, beside live MIDI. A live
+/// strike on a key only the stream holds sounds its own attack, so a pianist
+/// playing along is always heard; the stream never strikes over a live key.
 struct Contacts {
     held: [[bool; 128]; 17],
     sustain: [u8; 17],
@@ -122,6 +124,7 @@ impl Default for Contacts {
         }
     }
 }
+const PREVIEW: usize = schedule::CHANNEL as usize - 1;
 impl Contacts {
     fn apply(&mut self, e: Midi, synth: &mut dyn Synth) {
         self.apply_at(e, 0, synth)
@@ -132,7 +135,9 @@ impl Contacts {
         let key = e.key as usize;
         match e.kind {
             1 if e.value > 0 => {
-                let others = (0..self.held.len()).any(|c| c != ch && self.held[c][key]);
+                let live = ch != PREVIEW;
+                let others = (0..self.held.len())
+                    .any(|c| c != ch && self.held[c][key] && !(live && c == PREVIEW));
                 self.held[ch][key] = true;
                 if !others {
                     synth.note_on(offset, e.key, e.value);
@@ -1664,6 +1669,23 @@ mod tests {
             c.apply(e, &mut s);
         }
         assert_eq!(&s.events[3..], &[(3, 64, 127), (3, 64, 127), (3, 64, 80)]);
+    }
+    #[test]
+    fn a_live_strike_on_a_key_the_preview_holds_is_heard() {
+        let mut c = Contacts::default();
+        let mut s = Fake::default();
+        let preview = schedule::CHANNEL;
+        c.apply(event(1, preview, 60, 70), &mut s);
+        c.apply(event(1, 1, 60, 100), &mut s);
+        assert_eq!(s.events, vec![(1, 60, 70), (1, 60, 100)], "your attack sounds");
+        c.apply(event(2, preview, 60, 0), &mut s);
+        assert_eq!(s.events.len(), 2, "the preview lifting does not silence your key");
+        c.apply(event(1, preview, 60, 70), &mut s);
+        assert_eq!(s.events.len(), 2, "the preview never strikes over your key");
+        c.apply(event(2, 1, 60, 0), &mut s);
+        assert_eq!(s.events.len(), 2, "the preview still holds it");
+        c.apply(event(2, preview, 60, 0), &mut s);
+        assert_eq!(s.events.last(), Some(&(2, 60, 0)));
     }
     #[test]
     fn overflow_invalidates_old_generation_independent_of_capacity() {

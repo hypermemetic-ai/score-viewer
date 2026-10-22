@@ -11,6 +11,13 @@ const HORIZON_US=1_500_000,PUMP_MS=100,IPC_US=30_000;
 const browserTimers:AuditionTimers={set:(fn,ms)=>setInterval(fn,ms),clear:id=>clearInterval(id as ReturnType<typeof setInterval>)};
 /** What the native stream plays: `tick` at native instant `time`, at `bpm`. */
 interface Mapping {time:number;tick:number;bpm:number}
+// The output stalled, restarted or was passed by the clock: the stream lost its place.
+const LOST_PLACE=/schedule was replaced|schedule is busy|in time order|too soon/i;
+/** Why the piano stopped, as the pianist hears it. */
+export function pianoStopped(error:unknown):string {
+ const message=String((error as Error)?.message??error).replace(/\.$/,'');
+ return LOST_PLACE.test(message)?'The piano lost its place':`The piano stopped: ${message}`;
+}
 
 export class NativeTempoAudition implements Audition {
  readonly voice='piano' as const;
@@ -79,8 +86,10 @@ export class NativeTempoAudition implements Audition {
  }
  private enqueue(action:()=>Promise<void>){
   this.chain=this.chain.then(action).catch(error=>{
-   this.failure=`The piano stopped: ${(error as Error)?.message??String(error)}`;
+   this.failure=pianoStopped(error);
    this.stopTimer();this.phaseValue='idle';
+   // Notes already scheduled would keep sounding: silence the stream.
+   return this.release().catch(()=>{});
   });
  }
  private run(){this.stopTimer();this.timer=this.timers.set(()=>{if(!this.pumping){this.pumping=true;this.enqueue(()=>this.pump().finally(()=>{this.pumping=false;}));}},PUMP_MS);}
