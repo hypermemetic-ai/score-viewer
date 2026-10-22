@@ -5,6 +5,7 @@ import {unzipSync} from 'fflate';
 import {importPackage,selectPresentation} from '../src/package';
 import {canShareKeyboardView,layoutNeutralPages,packageFile,prepareRebuiltEdition,shareKeyboardView} from '../src/edition-rebuild';
 import {ensurePianoReady} from '../src/piano-readiness';
+import {APPROVED_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 import {collectionId,corrected,fingerFor,initialPersonal,personalStorageName,type Entry} from '../src/state';
 
 // ISO notation draws the same pages for both keyboard layouts and the reader
@@ -19,7 +20,7 @@ test('an early-format score file opens on the conventional layout with its own e
  assert.equal(layoutNeutralPages(early),true,'its pages print pitch digits only; the operator fingers are drawn by the reader');
  assert.equal(canShareKeyboardView(early,'conventional-piano'),true);
  const entry:Entry={id:collectionId(early),file:await packageFile(bytes),metadata:early.manifest.metadata,importedAt:'2026-10-18T00:00:00.000Z'},
-  started=performance.now(),linked=await prepareRebuiltEdition(host(new Map()),entry,entry.file,bytes,'conventional-piano',{keepPages:true}),took=performance.now()-started;
+  linked=await prepareRebuiltEdition(host(new Map()),entry,entry.file,bytes,'conventional-piano',{keepPages:true});
  const next=await importPackage(linked.packageBytes,{allowLegacyTempo:true}),
   conventional=await selectPresentation(next,'conventional-piano'),janko=await selectPresentation(next,'janko-four-row');
  assert.equal(collectionId(next),entry.id);
@@ -33,7 +34,9 @@ test('an early-format score file opens on the conventional layout with its own e
  assert.deepEqual(janko.fingerEligibility,early.fingerEligibility);assert.equal(janko.fingerEligibility.eligible,true);
  assert.equal(conventional.fingerLayer,undefined);
  assert.equal(linked.fingers,'edition');assert.equal(linked.hands,'edition');
- assert.ok(took<5000,`no engraving (${Math.round(took)} ms)`);
+ // Nothing engraved: an engraving stamps the current engine on every view; these keep the early one.
+ for(const view of [next.manifest,conventional.manifest,janko.manifest])assert.equal(view.engineVersion,early.manifest.engineVersion,'no engraving');
+ assert.notEqual(early.manifest.engineVersion,APPROVED_SCORE_RENDERING_ENGINE);
  const ready=await ensurePianoReady({packageBytes:linked.packageBytes,layout:'conventional-piano',personal:linked.personal});
  assert.ok('package' in ready&&ready.package.pages.length===early.pages.length,`prepared as ${ready.status}`);
 });
