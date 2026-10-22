@@ -104,7 +104,7 @@ impl Host {
             } else {
                 None
             };
-            let mut render = mixer::Mixer::new(synth, bus.clone(), mailbox, volume);
+            let mut render = mixer::Mixer::new(synth, bus.clone(), mailbox, volume).at_rate(rate);
             #[cfg(test)]
             if std::env::var_os("VIEWER_AUDIO_DIAGNOSTIC_REPORT_DIR").is_some() {
                 if channels > 8 || rate > 96000 {
