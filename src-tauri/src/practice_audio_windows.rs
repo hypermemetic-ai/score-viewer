@@ -400,7 +400,7 @@ impl Host {
                 client: opened.client,
                 render,
                 event,
-                mixer: mixer::Mixer::new(synth, bus, mailbox, volume),
+                mixer: mixer::Mixer::new(synth, bus, mailbox, volume).at_rate(f.nSamplesPerSec),
                 format: opened.format,
                 encoding: enc,
                 int24,
