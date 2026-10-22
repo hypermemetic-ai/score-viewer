@@ -83,7 +83,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
-import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,type AheadOfTimeQuiet} from './ahead-of-time-engraving';
+import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,type AheadOfTimeWork} from './ahead-of-time-engraving';
 import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
@@ -126,7 +126,7 @@ let aheadOfTime:AheadOfTimeEngraving|undefined;
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
  // What opening each score reads from disk is made while the player is in the library.
- aheadOfTime=new AheadOfTimeEngraving((entryId,execution,quiet)=>prepareAheadOfTime(derived,entryId,execution,quiet),{release:()=>{aheadWorker?.close();}});
+ aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();}});
  usePersonalProjectionCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
@@ -135,6 +135,12 @@ if(isTauri()&&!import.meta.env.DEV&&host.derived){
 // Ahead-of-time work is for when the player leaves the library alone; any input there defers it.
 holdAheadOfTimeOnInput(window,()=>aheadOfTime,()=>!current&&!readingOperation);
 const libraryOrder=(closed?:string)=>aheadOfTimeOrder(entries.map(e=>e.id),preferences.lastWorkedEntryId,closed);
+/** What a preparation of a score is made for, as the library stands now: an
+ * opening takes over only work made for what it will show. */
+function aheadOfTimeBasis(entryId:string):string {
+ const entry=entries.find(e=>e.id===entryId);
+ return JSON.stringify([preferences.keyboardLayout,entry?.file??null,entry?.importedAt??null,entry?.personalFiles??null,personalMemory.storedRefs(entryId)??null]);
+}
 // Its own admission and projection worker, so it never holds the reader's
 // busy, and stopping it never costs the reader's warm engines.
 let aheadWorker:ProjectionWorkerClient|undefined;
@@ -143,7 +149,8 @@ const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:
  * the player's saved hands, exactly as opening would project them. Read only:
  * an edition that must be engraved again, a layout it lacks or memory not yet
  * indexed is left for opening, which writes what it must. */
-async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,quiet:AheadOfTimeQuiet){
+const idleTime=()=>new Promise<void>(resolve=>{if(typeof requestIdleCallback==='function')requestIdleCallback(()=>resolve(),{timeout:5000});else setTimeout(resolve,0);});
+async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,work:AheadOfTimeWork){
  const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout;if(!entry||!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
  const bytes=await host.read(entry.file),stored=personalMemory.storedRefs(entryId);checkReadingExecution(execution);if(!bytes||!stored)return;
  // Everything known before admission. A score already prepared, refused or
@@ -153,7 +160,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  if(await preparedBefore(derived,key,{served:served=>projectionServed(derived,served),digest}))return;checkReadingExecution(execution);
  // Between steps a click is answered at once, and input in the library holds
  // the work here until the next quiet moment: the player never waits for it.
- const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await quiet();checkReadingExecution(execution);};
+ const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
  await prepareRecorded(derived,key,async read=>{
   if(readingOnlyArchive(bytes))return null;
   await answerInput();const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});await answerInput();
@@ -165,11 +172,22 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   await answerInput();const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);await answerInput();
   // An edition that must be engraved again is made, and saved, by opening it.
   if(!('package' in q))return null;
-  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
-  if(served&&!await projectionServed(derived,served)){await session.project(q.personal??personal,execution);
-   // Its engine is saved before the worker holding it is freed.
-   await session.flushWrites();}
-  return served??null;
+  // Its files are written at the steps below, never on a timer of their own.
+  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null}),served=await session.projectionEntry(q.personal??personal);
+  if(!served)return null;
+  if(!await projectionServed(derived,served)){
+   await session.project(q.personal??personal,execution);
+   // The pages opening reads are written as soon as input allows; an opening
+   // that took this work over goes on from here.
+   await answerInput();await session.flushProjection();checkReadingExecution(execution);
+  }
+  work.ready();
+  // Then, in idle time, the engine hand editing resumes from: settled when an
+  // earlier reading made the pages but saved none, and saved before the
+  // worker holding it is freed. The worker encodes it; this thread writes a file.
+  if(await session.engineMissing()){await answerInput();await session.warm(execution);checkReadingExecution(execution);}
+  if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
+  return served;
  });
 }
 type ReadingJob=NonNullable<typeof job>;
@@ -267,8 +285,9 @@ function finishReading(op:ReadingOperation,success:boolean,error?:unknown){
  else{op.loading.stop();if(dialog===op.dialog)closeDialog(false);}
  readingOperation=undefined;
  if(!success&&op.options&&current===op.previous){options(op.options);if(op.optionsFocus)dialog?.querySelector<HTMLElement>(`[data-options-key="${CSS.escape(op.optionsFocus)}"]`)?.focus();}
- // An opening cancelled or failed from the library returns there: its quiet moments prepare scores again.
- if(!success&&!current)aheadOfTime?.start(libraryOrder());
+ // An opening cancelled or failed from the library returns there: work it
+ // took over goes on, and its quiet moments prepare scores again.
+ if(!success&&!current)aheadOfTime?.resume(libraryOrder());
 }
 const readerPages=new ReaderPageCache();let dialogBack:(()=>void)|undefined;let optionsSection:string|undefined;let toolbarNavigation:OptionsNavigation|undefined;let dialogNavigation:OptionsNavigation|undefined;
 let orientation=new ViewerOrientation(preferences);
@@ -921,7 +940,11 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
- if(!context&&scoreCapabilities(next.package).pianoPreparation)personalEditor(next).session.prefetch();
+ // Work taken over from the library saves its engine first, which this then restores.
+ if(!context&&scoreCapabilities(next.package).pianoPreparation){
+  const editor=personalEditor(next),settle=()=>{if(current===next)editor.session.prefetch();},saving=aheadOfTime?.finishing(next.entry.id);
+  if(saving)void saving.then(settle);else settle();
+ }
  if(ownsOperation)finishReading(op,true);return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
 }
@@ -1025,7 +1048,9 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
    await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext,op);
    finishReading(op,true);
    const said=gained&&gainedNotice(gained,q.package,false);if(said)notify(said);
- }else{await enqueue(async()=>{await writeJson('preferences.json',{...preferences,keyboardLayout:id});preferences.keyboardLayout=id;});repaintLibrary();}
+ }else{await enqueue(async()=>{await writeJson('preferences.json',{...preferences,keyboardLayout:id});preferences.keyboardLayout=id;});repaintLibrary();
+  // Pages prepared for the old layout are no use now: prepare the library for this one.
+  aheadOfTime?.start(libraryOrder());}
  return true;
  }catch(error){if(op)finishReading(op,false,error);reportFailure(error);if(current&&!practice)renderToolbar();return false;}
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}

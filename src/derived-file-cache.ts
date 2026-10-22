@@ -1,5 +1,6 @@
-import {deflateSync,inflateSync,strFromU8,strToU8} from 'fflate';
+import {inflateSync,strFromU8,strToU8} from 'fflate';
 import {hashBytes} from './package';
+import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
 
 /** The source identity of this viewer build: its own source and the pinned
  * notation dependency, hashed when the frontend is built. A different build
@@ -56,6 +57,10 @@ export class DerivedFileCache {
  async peek(kind:string,key:string):Promise<string|undefined>{
   try{return (await this.header(kind,key))?.header.tag;}catch{return;}
  }
+ /** Whether an entry with a sound header is stored; its payload is not read. */
+ async has(kind:string,key:string):Promise<boolean>{
+  try{return !!await this.header(kind,key);}catch{return false;}
+ }
  async get<T>(kind:string,key:string,validate:(value:unknown)=>T):Promise<T|undefined>{
   try{
    const found=await this.header(kind,key);if(!found)return;
@@ -67,11 +72,15 @@ export class DerivedFileCache {
  }
  /** Ordered and best effort: a refused or failed write keeps the old entry or
   * none, and resolves false. */
- put(kind:string,key:string,value:unknown,tag?:string):Promise<boolean>{
+ put(kind:string,key:string,value:unknown,tag?:string):Promise<boolean>{return this.putEncoded(kind,key,()=>encodeDerivedPayload(value),tag);}
+ /** The same entry, from a payload already encoded where its value lives
+  * (encodeDerivedPayload): this thread only writes a header line before it. */
+ putEncoded(kind:string,key:string,encoded:EncodedDerivedPayload|(()=>Promise<EncodedDerivedPayload>),tag?:string):Promise<boolean>{
   const write=async()=>{
-   const payload=strToU8(JSON.stringify(value));if(payload.byteLength>this.limits.payloadBytes)return false;
-   const header:Header={format:DERIVED_FILE_CACHE_FORMAT,identity:this.identity,kind,key,payloadSha256:await hashBytes(payload),payloadBytes:payload.byteLength,...(tag===undefined?{}:{tag})},
-    head=strToU8(JSON.stringify(header)+'\n'),body=deflateSync(payload,{level:1});
+   const {payloadSha256,payloadBytes,body}=typeof encoded==='function'?await encoded():encoded;
+   if(!sha256.test(payloadSha256)||!Number.isSafeInteger(payloadBytes)||payloadBytes<2||payloadBytes>this.limits.payloadBytes)return false;
+   const header:Header={format:DERIVED_FILE_CACHE_FORMAT,identity:this.identity,kind,key,payloadSha256,payloadBytes,...(tag===undefined?{}:{tag})},
+    head=strToU8(JSON.stringify(header)+'\n');
    if(head.byteLength>MAX_HEADER||head.byteLength+body.byteLength>this.limits.entryBytes)return false;
    const bytes=new Uint8Array(head.byteLength+body.byteLength);bytes.set(head);bytes.set(body,head.byteLength);
    return await this.store.write(await this.entryName(kind,key),bytes)===true;
