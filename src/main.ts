@@ -288,6 +288,12 @@ function practiceSource(target:NonNullable<typeof current>):{view:ScorePackage;b
  const shown=livePersonalEditors.get(target)?.view??target.package,fold=(shown as FoldedPackage).verbatimFold;
  return fold?{view:fold.practice,base:fold.edition,personal:fold.personal(target.personal)}:{view:shown,base:target.package,personal:target.personal};
 }
+/** Whether choices move a note to another hand than the one practice was planned with, in practice's own edition (folded or stored). */
+function practiceHandsDiffer(target:NonNullable<typeof current>,owner:PracticeView,next:PersonalState):boolean{
+ const base=owner.options.basePackage??owner.options.package,fold=((livePersonalEditors.get(target)?.view??target.package) as FoldedPackage).verbatimFold,
+  personal=fold&&base===fold.edition?fold.personal(next):next;
+ return base.score.notes.some(note=>handFor(base,owner.options.personal,note.id)!==handFor(base,personal,note.id));
+}
 function visibleSourceSeat(p:ScorePackage,seat:Seat):Seat|undefined {
  const aliases=p.seats.filter(s=>s.ownerIds.some(id=>seat.ownerIds.includes(id)));
  return aliases.find(s=>s.id===seat.id)??aliases.find(s=>s.page===seat.page&&!!s.continuation===!!seat.continuation)??aliases.find(s=>!s.continuation)??aliases[0];
@@ -330,7 +336,7 @@ async function retryPersonalEdits(target:NonNullable<typeof current>){
   if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
   app.querySelector('.personal-edit-status')?.remove();
   if(practice instanceof PracticeView){
-   const owner=practice,source=practiceSource(target),handsChanged=source.base!==owner.options.basePackage||source.base.score.notes.some(note=>handFor(source.base,owner.options.personal,note.id)!==handFor(source.base,source.personal,note.id));
+   const owner=practice,source=practiceSource(target),handsChanged=source.base!==(owner.options.basePackage??owner.options.package)||source.base.score.notes.some(note=>handFor(source.base,owner.options.personal,note.id)!==handFor(source.base,source.personal,note.id));
    if(handsChanged){owner.holdForPersonalChoices();await refreshPersonalPractice(target,owner,generation);}
    else{owner.options.personal=source.personal;owner.releasePersonalChoices();owner.refit();}
   }else if(!practice){renderPages();renderToolbar();}
@@ -372,7 +378,7 @@ async function savePersonal(){if(!current)return;const target=current,snapshot=s
 function savePersonalQuietly(){const target=current;void savePersonal().catch(error=>{if(target)paintPersonalSaveError(target,error);else notify(error.message);});}
 /** Painting follows accepted intent, never the completion order of host writes. */
 async function presentPersonalChange(target:NonNullable<typeof current>,personal:PersonalState,saved:Promise<void>,nextSeat?:Seat,previous=target.personal):Promise<{keptReason?:string}>{
- const editor=personalEditor(target),generation=++editor.generation,before=previous,prior=target.personal;let keptReason:string|undefined;
+ const editor=personalEditor(target),generation=++editor.generation,before=previous;let keptReason:string|undefined;
  target.personal=personal;target.personal=resolveMemory(target);if(nextSeat&&current===target)selection=nextSeat;
  let next=target.personal;
  capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!nextSeat||!!next.navigation?.followEdit);
@@ -384,7 +390,7 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const ownerPractice=target===current&&practice instanceof PracticeView?practice:undefined,
-  handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,prior,note.id)!==handFor(target.package,next,note.id));
+  handsChanged=!!ownerPractice&&practiceHandsDiffer(target,ownerPractice,next);
  if(handsChanged)ownerPractice!.holdForPersonalChoices();
  adviceKey='';adviceRunner.cancel();void saved.catch(error=>paintPersonalSaveError(target,error));
  const projected=await projection;
@@ -395,7 +401,7 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
   if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
   if(selection)target.personal.editContactId=selection.contactId;
   // Practice follows the reader: a repeat that folds or is written out again starts it afresh.
-  if(ownerPractice&&practice===ownerPractice){const source=practiceSource(target);if(handsChanged||source.base!==ownerPractice.options.basePackage)await refreshPersonalPractice(target,ownerPractice,generation);else{ownerPractice.options.personal=source.personal;ownerPractice.releasePersonalChoices();ownerPractice.refit();}}
+  if(ownerPractice&&practice===ownerPractice){const source=practiceSource(target);if(handsChanged||source.base!==(ownerPractice.options.basePackage??ownerPractice.options.package))await refreshPersonalPractice(target,ownerPractice,generation);else{ownerPractice.options.personal=source.personal;ownerPractice.releasePersonalChoices();ownerPractice.refit();}}
   else if(!practice){renderPages();renderToolbar();focusSelection();}
  }
  // Another process may have won a CAS race. Refresh only this still-current
@@ -1317,7 +1323,7 @@ function practiceMenu(){
 }
 async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPracticeContext,fingers=false){if(!current)return;const fingersOnly=fingers||!!context?.fingersOnly;adviceKey='';adviceRunner.cancel();if(!admitted){await personalMemory.flush();await livePersonalEditors.get(current)?.queue.flush();}if(readingPresentation){await startManualPractice(context);return;}requirePianoCapability(current.package,'pianoPractice');const target=current;
  // A context admitted on other bars (a repeat folded or written out since) is admitted again here.
- if(admitted&&admitted.plan.barTicks.length!==practiceSource(target).base.score.sourceBarTicks?.length)admitted=undefined;
+ const admittedBars=admitted?.plan.barTicks;if(admittedBars&&admittedBars.length!==practiceSource(target).base.score.sourceBarTicks?.length)admitted=undefined;
  // A score without a reference tempo practises toward the player's own tempo,
  // remembered in its practice journal; it is asked for only the first time.
  let tempo:ReferencePerformanceTempo|undefined;

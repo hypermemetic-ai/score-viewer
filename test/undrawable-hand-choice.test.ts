@@ -136,6 +136,7 @@ test('leaving saves the view even when the engraver refuses the current hands',a
  const body=stripTypeScriptTypes(source.slice(source.indexOf('async function savePersonal('),source.indexOf('function savePersonalQuietly(')));
  const views:unknown[]=[],target={package:p,personal:initialPersonal(p),entry:{id:'e'}};
  const context:any={structuredClone,engravingRefusal,current:target,selection:undefined,readingPresentation:undefined,livePersonalEditors:new WeakMap(),
+  presentReader:(_target:unknown,_personal:unknown,written:()=>Promise<unknown>)=>written(),
   sourceNavigationSeat:()=>undefined,capturePersonalNavigation(){},resolvePersonalNavigation(){},scoreCapabilities:()=>({pianoPreparation:true}),
   memoryInput:()=>({}),personalEditor:()=>({session:{project:async()=>{throw cueRefusal([owner]);}}}),
   personalMemory:{flush:async()=>{},saveView:async(input:any)=>{views.push(input.personal);}}};
