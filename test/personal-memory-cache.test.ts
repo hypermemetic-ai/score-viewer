@@ -13,9 +13,9 @@ test('resolution is reused for navigation and derived display changes, invalidat
  const revised=cache.resolve(input,2,load);assert.equal(calls,4);assert.equal(cache.resolve(input,2,load),revised);
  // A reopening reads its package afresh: the same score is the same resolution.
  assert.equal(cache.resolve({...input,p:structuredClone(input.p)},2,load),revised);
- assert.notEqual(cache.resolve({...input,p:{...input.p,manifest:{revision:'another source'}}},2,load),revised);
+ assert.notEqual(cache.resolve({...input,p:{...input.p,manifest:{revision:'another source'} as never}},2,load),revised);
  assert.notEqual(cache.resolve({...input,p:{...input.p,keyboardLayout:'conventional-piano'}},2,load),revised);
- assert.notEqual(cache.resolve({...input,p:{...input.p,transposition:{semitones:2}}},2,load),revised);
+ assert.notEqual(cache.resolve({...input,p:{...input.p,transposition:{semitones:2} as never}},2,load),revised);
  assert.notEqual(cache.resolve({...input,entryId:'other'},2,load),revised);
  assert.equal(calls,8);
 });
