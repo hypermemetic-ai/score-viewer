@@ -37,12 +37,15 @@ export function memoryChoiceLabel(resolution:MemoryResolution,ownerId:string):'S
 /** Where the selected note's finger comes from, said once: `said` on the
  * editor's Finger row, `description` in full for the label's tooltip. Both read
  * the bar matching bars follow from the resolution; when it is missing it is
- * unavailable, never assumed. `reference` says whether that bar is this one. */
-export function memoryFingerSource(resolution:MemoryResolution,ownerId:string,label:'Shared'|'Local',at:{entryId:string;writtenBar:number},work:(entryId:string)=>string):{said:string;description:string;reference:'here'|'elsewhere'|'unavailable';promote:boolean} {
- const ref=resolution.byOwner[ownerId]?.reference,reference=!ref?'unavailable':ref.entryId===at.entryId&&ref.writtenBar===at.writtenBar?'here':'elsewhere';
+ * unavailable, never assumed. `reference` says whether that bar is this one.
+ * `at` is the note's bar as printed; `bar` prints the reference's stored bar (a
+ * folded repeat prints fewer bars). */
+export function memoryFingerSource(resolution:MemoryResolution,ownerId:string,label:'Shared'|'Local',at:{entryId:string;writtenBar:number},work:(entryId:string)=>string,bar:(entryId:string,writtenBar:number)=>number=(_,b)=>b):{said:string;description:string;reference:'here'|'elsewhere'|'unavailable';promote:boolean} {
+ // On a folded score a reference in this printed bar's other pass is this bar.
+ const ref=resolution.byOwner[ownerId]?.reference,reference=!ref?'unavailable':ref.entryId===at.entryId&&bar(ref.entryId,ref.writtenBar)===at.writtenBar?'here':'elsewhere';
  // "Use for matching bars" is offered for an owner's finger, except where matching bars already follow it.
  const promote=!!resolution.byOwner[ownerId]?.personal&&!(label==='Shared'&&reference==='here');
- const where=ref?`bar ${ref.writtenBar}${ref.entryId===at.entryId?'':` of ${work(ref.entryId)}`}`:'';
+ const where=ref?`bar ${bar(ref.entryId,ref.writtenBar)}${ref.entryId===at.entryId?'':` of ${work(ref.entryId)}`}`:'';
  if(label==='Local')return{said:'For this note only.',description:`Your finger for this note only, instead of ${reference==='elsewhere'?`${where}’s`:'the shared one'}.`,reference,promote};
  if(reference==='unavailable')return{said:'Reference unavailable.',description:'Shared with matching bars, but the bar they follow is unavailable.',reference,promote};
  if(reference==='here')return{said:'Matching bars follow this bar.',description:'Matching bars follow this bar’s finger.',reference,promote};

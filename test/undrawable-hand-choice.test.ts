@@ -11,6 +11,7 @@ import {engravingRefusal,undrawableHandOwners,undrawableHandReason} from '../src
 import {keptHandsText} from '../src/hand-editing-wait';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
+import {writtenOutReader} from './helpers/written-out-reader';
 
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
@@ -110,7 +111,7 @@ test('only fit refusals pass the save queue; integrity failures still wait for r
 /** personalEditor from main.ts: its save queue, with the memory replaced. */
 function editorHarness(){
  const body=stripTypeScriptTypes(source.slice(source.indexOf('function personalEditor('),source.indexOf('function readerPackage(')));
- const views:unknown[]=[],context:any={structuredClone,handCarryNotice,PersonalEditQueue,engravingRefusal,livePersonalEditors:new WeakMap(),
+ const views:unknown[]=[],context:any={structuredClone,...writtenOutReader,handCarryNotice,PersonalEditQueue,engravingRefusal,livePersonalEditors:new WeakMap(),
   PersonalPresentationSession:class{},personalStorageName:()=>'state.json',resolvePersonalNavigation(){},memoryInput:()=>({}),
   personalMemory:{saveView:async(input:any)=>{views.push(input.personal);}}};
  runInNewContext(body,context);
@@ -136,6 +137,7 @@ test('leaving saves the view even when the engraver refuses the current hands',a
  const body=stripTypeScriptTypes(source.slice(source.indexOf('async function savePersonal('),source.indexOf('function savePersonalQuietly(')));
  const views:unknown[]=[],target={package:p,personal:initialPersonal(p),entry:{id:'e'}};
  const context:any={structuredClone,engravingRefusal,current:target,selection:undefined,readingPresentation:undefined,livePersonalEditors:new WeakMap(),
+  presentReader:(_target:unknown,_personal:unknown,written:()=>Promise<unknown>)=>written(),
   sourceNavigationSeat:()=>undefined,capturePersonalNavigation(){},resolvePersonalNavigation(){},scoreCapabilities:()=>({pianoPreparation:true}),
   memoryInput:()=>({}),personalEditor:()=>({session:{project:async()=>{throw cueRefusal([owner]);}}}),
   personalMemory:{flush:async()=>{},saveView:async(input:any)=>{views.push(input.personal);}}};

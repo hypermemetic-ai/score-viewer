@@ -8,6 +8,7 @@ import {runInNewContext} from 'node:vm';
 import {GENERIC_PERSONAL_COMMIT} from './helpers/generic-personal-commit';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {personalMemoryBoundary} from './helpers/personal-memory-boundary';
+import {writtenOutReader} from './helpers/written-out-reader';
 
 // Exercise the production handover and new-mount bodies. The independent
 // geometry, admission and durable storage boundaries can finish out of order.
@@ -38,7 +39,7 @@ function fixture(){
  }
  const old=new FakePracticeView({}, {package:p,personal:structuredClone(personal)});
  let persist=Promise.resolve(),disk=structuredClone(personal);
- context={structuredClone,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,practice:old,selection:undefined,PracticeView:FakePracticeView,handFor,handsDiffer:(p:any,a:any,b:any)=>p.score.notes.some((n:any)=>handFor(p,a,n.id)!==handFor(p,b,n.id)),dropHandCarry:()=>undefined,PersonalEditQueue,livePersonalEditors:new WeakMap(),
+ context={structuredClone,...writtenOutReader,undrawableHandOwners,undrawableHandReason,keptHandsText,engravingRefusal,current:target,practice:old,selection:undefined,PracticeView:FakePracticeView,handFor,handsDiffer:(p:any,a:any,b:any)=>p.score.notes.some((n:any)=>handFor(p,a,n.id)!==handFor(p,b,n.id)),dropHandCarry:()=>undefined,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   PersonalPresentationSession:class{project(s:any){return projection(structuredClone(s));}},personalStorageName:()=> 'bound-personal',
   readPersonal:(s:any)=>structuredClone(s),personalContext:async(t:any)=>({p:t.package,file:'bound-personal'}),
   enqueue(fn:()=>Promise<any>){const result=persist.then(fn);persist=result.catch(()=>{});return result;},writeJson:async(_file:string,s:any)=>save(s),paintPersonalSaveError:(_t:any,error:any)=>errors.push(error),

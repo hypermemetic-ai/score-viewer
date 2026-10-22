@@ -13,6 +13,8 @@ import {droppedCarryText} from '../src/hand-recurrence-text';
 import {undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {initialPersonal,type PersonalState} from '../src/state';
+import {withRepeatInheritance} from '../src/repeat-fold';
+import {scoreCapabilities} from '../src/score-capabilities';
 import type {ScorePackage} from '../src/package';
 
 // Schumann Op. 68 No. 13 in 2/4, 48 ticks a beat, as the owner's edition writes
@@ -165,7 +167,7 @@ test('a refused carried hand: bar 21 is resolved again with its written hands, a
  // The viewer's own resolution path and refusal handling, as main.ts writes them.
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),line=(start:string)=>{const i=main.indexOf(start);return main.slice(i,main.indexOf('\n',i));};
  const body=[line('const memoryInput='),line('const memoryResolutions='),line('const resolveMemoryInput='),line('function resolveMemory('),main.slice(main.indexOf('async function keepDrawableHands('),main.indexOf('async function acceptMemoryAction('))].map(s=>stripTypeScriptTypes(s)).join('\n');
- const context:any={structuredClone,crypto,handFor,dropHandCarry,undrawableHandOwners,undrawableHandReason,rawMemoryPersonal,withResolvedMemory,PersonalMemoryResolutionCache,
+ const context:any={structuredClone,crypto,handFor,dropHandCarry,undrawableHandOwners,undrawableHandReason,rawMemoryPersonal,withResolvedMemory,withRepeatInheritance,scoreCapabilities,PersonalMemoryResolutionCache,
   personalMemory:session,memoryLibrary:{remember(){}},paintPersonalSaveError(){},
   personalEditor:()=>({session:{project:async(s:PersonalState)=>{if(handFor(input.p,s,'m21:n5')==='RH')throw refusal();return input.p;}}})};
  const refusal=()=>Error("These hand choices can't be drawn on the page yet.",{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',['m21:n5'])});

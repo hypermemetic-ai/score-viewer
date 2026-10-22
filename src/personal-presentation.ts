@@ -107,10 +107,14 @@ function keepRecentProjection(cache:DerivedFileCache,key:string,view:ProjectionV
  recent.delete(key);recent.set(key,view);
  if(recent.size>2)recent.delete(recent.keys().next().value!);
 }
-export interface ProjectionEntry {key:string;tag:string}
-/** Whether the disk holds the projection for these hand choices, from its header alone. */
+/** A derived entry opening reads, and the tag it must carry: a projection
+ * unless `kind` says otherwise; `with` names the entries read together with it. */
+export interface ProjectionEntry {key:string;tag:string;kind?:string;with?:readonly ProjectionEntry[]}
+/** Whether the disk holds the projection for these hand choices, and what it is read with, from headers alone. */
 export async function projectionServed(cache:DerivedFileCache,served:ProjectionEntry):Promise<boolean>{
- return await cache.peek(PERSONAL_PROJECTION_CACHE_KIND,served.key)===served.tag;
+ if(await cache.peek(served.kind??PERSONAL_PROJECTION_CACHE_KIND,served.key)!==served.tag)return false;
+ for(const entry of served.with??[])if(!await projectionServed(cache,entry))return false;
+ return true;
 }
 /** The settled hand engine of one captured package, so hand editing resumes
  * on reopening instead of engraving the score again. ISO notation refuses a

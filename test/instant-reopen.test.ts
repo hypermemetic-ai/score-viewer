@@ -49,7 +49,7 @@ test('memory pressure is more than half the script heap in use, where the engine
 // The viewer's own retention and opening, run against a stub host.
 const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const slice=(from:string,to:string)=>{const start=main.indexOf(from),end=main.indexOf(to,start);assert.ok(start>=0&&end>start,from);return stripTypeScriptTypes(main.slice(start,end));};
-const retention=slice('const retainable=new WeakSet','\nasync function open('),opening=slice('async function open(','\nasync function chooseGuitarProTracks(');
+const pressure=slice('const foldedReaders=new Map','\nfunction foldedReader('),retention=slice('const retainable=new WeakSet','\nasync function open('),opening=slice('async function open(','\nasync function chooseGuitarProTracks(');
 const libraryAction=main.slice(main.indexOf("if(action==='library'){"),main.indexOf("if(action==='restore-header')"));
 
 function viewer(){
@@ -71,7 +71,7 @@ function viewer(){
   activateScore:async(next:any)=>{calls.push(`activate ${next.entry.id}`);context.opened=next;return next;},
   saveReadingPreferences:async()=>{calls.push('preferences');},finishReading:(_op:unknown,success:boolean)=>calls.push(success?'complete':'failed'),
  };
- runInNewContext(`${retention}\n${opening}\nglobalThis.retained=retained;`,context);
+ runInNewContext(`${pressure}\n${retention}\n${opening}\nglobalThis.retained=retained;globalThis.foldedReaders=foldedReaders;`,context);
  const open=async(id:string)=>{context.lastPackage=pkg(id);calls.length=0;await context.open(context.entries.find((e:any)=>e.id===id));return [...calls];};
  return {context,calls,refs,intervals,open,entryOf};
 }
@@ -118,7 +118,9 @@ test('unsaved records, dual and reading-only scores, readings not opened from th
  assert.equal(await kept(v=>{v.context.entries=[{...v.entryOf('no13'),file:'package-new-edition.tuna'},v.entryOf('no14')];}),false,'the library moved to a new edition while reading');
  const v=viewer();await v.open('no13');v.context.retainScore(v.context.opened);
  v.intervals[0]!();assert.equal(v.context.retained.holding,'no13');
+ v.context.foldedReaders.set('closed score',{});
  v.context.performance.memory.usedJSHeapSize=2.5e9;v.intervals[0]!();assert.equal(v.context.retained.holding,undefined,'freed under memory pressure');
+ assert.equal(v.context.foldedReaders.size,0,'and the folded readers kept for closed scores');
 });
 
 test('Back keeps the score after its view is saved, unless waiting hand choices were abandoned',()=>{

@@ -68,6 +68,12 @@ test('the Finger row, its tooltip and its button say one thing: the bar matching
  // Another score's bar is named by its catalogue, not its title.
  const elsewhere={...r,byOwner:{...r.byOwner,b2n1:{...r.byOwner.b2n1,reference:{...r.byOwner.b2n1.reference!,entryId:'no13',writtenBar:11}}}};
  assert.equal(memoryFingerSource(elsewhere,'b2n1','Shared',at(3),work).said,'Same as bar 11 of Robert Schumann › Op. 68 › No. 13.');
+ // On a folded score bars are named as printed: a reference in a repeat's second pass is its first pass's bar,
+ // and from the printed bar it shares it is this bar.
+ const folded=(entryId:string,bar:number)=>entryId==='piece'&&bar>=12&&bar<=21?bar-10:bar,second={...r,byOwner:{...r.byOwner,b2n1:{...r.byOwner.b2n1,reference:{...r.byOwner.b2n1.reference!,writtenBar:13}}}};
+ assert.equal(memoryFingerSource(second,'b2n1','Shared',at(5),work,folded).said,'Same as bar 3.');
+ assert.equal(memoryFingerSource(second,'b2n1','Shared',at(3),work,folded).reference,'here');
+ assert.equal(memoryFingerSource(elsewhere,'b2n1','Shared',at(3),work,folded).said,'Same as bar 11 of Robert Schumann › Op. 68 › No. 13.','another score keeps its own bars');
  // A missing reference is unavailable, never "shared with matching bars".
  const {reference:_,...missing}=r.byOwner.b2n1,unavailable={...r,byOwner:{...r.byOwner,b2n1:missing}};
  assert.deepEqual(memoryFingerSource(unavailable,'b2n1','Shared',at(3),work),{said:'Reference unavailable.',description:'Shared with matching bars, but the bar they follow is unavailable.',reference:'unavailable',promote:true});

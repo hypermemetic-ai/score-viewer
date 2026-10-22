@@ -11,6 +11,7 @@ import {browserAssistanceStore,type AssistanceStore} from '../src/durable-assist
 import {withResolvedMemory} from '../src/personal-assistance';
 import {dropHandCarry,handFor,handsDiffer} from '../src/personal-assignments';
 import {HandChoiceQueue,abandonedChoicesText,waitingOutcomeText} from '../src/hand-editing-wait';
+import {writtenOutReader} from './helpers/written-out-reader';
 const source=readFileSync(process.env.SCORE_VIEWER_PERSONAL_MAIN??new URL('../src/main.ts',import.meta.url),'utf8'),body=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const deferred=()=>{let resolve!:(value?:any)=>void;const promise=new Promise<any>(r=>resolve=r);return {promise,resolve};};
@@ -24,7 +25,7 @@ async function fixture(){
  }};
  const memoryInput=(owner:any)=>({entryId:owner.entry.id,importedAt:owner.entry.importedAt,p:owner.package,personal:rawMemoryPersonal(owner.personal)});
  const personalMemory=new PersonalMemorySession(store,{scanLibrary:async()=>[memoryInput(target)]});await personalMemory.initialize();active=true;
- const context:any={structuredClone,handCarryNotice,handKeyNotice,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
+ const context:any={structuredClone,...writtenOutReader,handCarryNotice,handKeyNotice,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}async project(personal:any){return {...p,projection:personal.assignments};}},personalStorageName,personalMemory,memoryInput,rawMemoryPersonal,
   resolveMemory:(owner:any)=>withResolvedMemory(memoryInput(owner),personalMemory.resolve(memoryInput(owner)),personalMemory.memory.revision),effectiveAssignmentKey,
   adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){},
@@ -112,4 +113,18 @@ test('leaving the score says at once that its waiting choices were not applied',
  await f.context.saveHandChoice('LH');f.context.leaveHandEditingWait();
  assert.equal(f.messages.length,1);assert.match(f.messages[0],/^LH for the note in bar \d+ was not applied/);
  f.disk.resolve();prep.ready();await new Promise(r=>setTimeout(r,20));assert.equal(f.messages.length,1,'said once');assert.equal(f.target.personal.assignments,undefined);
+});
+test('a hand choice waiting on a folded note applies to every pass, even a return with its own hand',async()=>{
+ const f=await fixture(),a=f.units[0],b=f.units.find((s:any)=>s.writtenBar===13)!,owners=[a.ownerIds[0],b.ownerIds[0]];
+ // Both passes are the player's right hand, so they fold; bar 13's is its own choice.
+ await f.context.saveHandChoice('RH');f.context.selection=b;await f.context.saveHandChoice('RH');
+ assert.deepEqual(owners.map(id=>handFor(p,f.target.personal,id)),['RH','RH']);
+ const prep=preparing(f);f.context.selection={...a,verbatimTwins:owners};
+ await f.context.saveHandChoice('LH');
+ assert.deepEqual(handWait(f).status.queued.map((c:any)=>[c.key,c.owners,c.hand]),[[a.ownerIds[0],owners,'LH']],'one choice waits, for both passes');
+ f.disk.resolve();prep.ready();await settle(f);
+ assert.deepEqual(owners.map(id=>handFor(p,f.target.personal,id)),['LH','LH'],'the left hand reaches bar 1 and bar 13');
+ assert.match(f.messages.at(-1)!,/^Hand editing is ready\. LH applied to the note in bar 1\.$/);
+ await f.flush();
+ assert.deepEqual(owners.map(id=>f.written.at(-1)!.assignments.choices[id].hand),['LH','LH'],'and both are saved');
 });

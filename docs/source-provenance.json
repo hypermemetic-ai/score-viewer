@@ -1424,19 +1424,29 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "7a4a6794be3abab1011385e55a68c49ac11ed2a6",
+  "dependencyRevision": "6729e50081aee870c80a03d95f8bbb3d7aa03664",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/427",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/428",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/429",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/435",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/433"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/430",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/442",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/439"
     ],
-    "previousRevision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
-    "scope": "Bach's repeats in Goldberg Var. 1, 2026-10-22. #433 (merged; this pin is its merge commit): Goldberg Var. 1 was encoded by hand with a double bar at m. 17 and a final bar, so no repeat signs were drawn. ISO now records Bach's repeats (each half twice, after the 1741 Clavier-Übung IV print) and the score carries them as a written presentation: notes written once, every performed visit mapped, `:||:` after m. 16 and `:||` at the end. withKnownComposerRepeats gives the same repeats to a stored Goldberg source saved before them, matched by identity and bar grid, without changing its bytes; the viewer applies it on admission, so the owner's entry keeps its id, hand identity and personal keys and is engraved again once with the signs. #427 (merged) lets a slur end beside its head on a joined chord and drops #426's stopgap. #428 (merged) slopes a beam by the heads beside it, not a chord's far head, and rests a concave group's beam on the heads nearest it: in Goldberg Var. 1 its concave sixteenth groups now lie flat; No. 13's beams change as #428 lists. #429 (merged) keeps a flag off every stem it does not own and lints for it (No. 13 m. 26/42: the RH eighth B's flag no longer cuts the sixteenth's stem on the same head). #435 (merged, stacked on #429) gives a flag and another note's stem separate columns, so hand edits once refused for flag-foreign-stem or solo-flag-rail-clearance are accepted; stem direction stays the hand."
+    "previousRevision": "7a4a6794be3abab1011385e55a68c49ac11ed2a6",
+    "scope": "Verbatim returns read as repeats, 2026-10-21. #430: the import no longer folds; ISO's foldVerbatimRepeats folds the stored written-out score as a derived presentation. One rule decides an inferred repeat: a passage of at least 8 full bars (a pickup is no bar) played exactly twice, identical or differing only in its final bar (engraved as 1st/2nd endings), never nested or overlapping, never three times; when in doubt it stays written out. Composer-written repeats are kept as written and never judged. verifyVerbatimFold proves the folded score, performed, equals the written-out one. The player's choices stay keyed to written-out notes: a note they have not touched reads its twin's hand and finger (derived, never saved); twins are compared choice by choice: a choice one twin leaves unset is read from the other, and twins that both set it differently keep their repeat written out. The viewer shows the fold and practises it as it practises composer repeats: practice sections and Fingers visit each printed bar once and every bar label is a printed bar; only the folded pages are drawn. A repeat kept written out names the twins that differ, so the reader can say why; a hand kept to its own bar is not read by its twin. No. 13 reads as two repeats (bars 1-11 and 12-28; 3 pages instead of 5); No. 14, Zelda's Lullaby and Add It Up keep their composer repeats; Goldberg Variation 1 keeps the composer repeats #433 gives it and has no verbatim return. The volta is drawn with class iso-volta. This pin is ISO main 6729e50, #430's merge commit (its tree is #430's reviewed head 8e00069, which merged ISO main a81c1e1). Since the previous pin 7a4a679 (which has #433) ISO main brings #430, #442 (engraving speed: one placed scene per system and memoised pure fits; pages, seats and lint byte-identical on all 10 benchmarks) and #439 (a beam never runs along a staff line: it crosses it or leaves white; this changes beam ink). #430 brings no other change."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "7a4a6794be3abab1011385e55a68c49ac11ed2a6",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/427",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/428",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/429",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/435",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/433"
+      ],
+      "previousRevision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
+      "scope": "Bach's repeats in Goldberg Var. 1, 2026-10-22. #433 (merged; this pin is its merge commit): Goldberg Var. 1 was encoded by hand with a double bar at m. 17 and a final bar, so no repeat signs were drawn. ISO now records Bach's repeats (each half twice, after the 1741 Clavier-Übung IV print) and the score carries them as a written presentation: notes written once, every performed visit mapped, `:||:` after m. 16 and `:||` at the end. withKnownComposerRepeats gives the same repeats to a stored Goldberg source saved before them, matched by identity and bar grid, without changing its bytes; the viewer applies it on admission, so the owner's entry keeps its id, hand identity and personal keys and is engraved again once with the signs. #427 (merged) lets a slur end beside its head on a joined chord and drops #426's stopgap. #428 (merged) slopes a beam by the heads beside it, not a chord's far head, and rests a concave group's beam on the heads nearest it: in Goldberg Var. 1 its concave sixteenth groups now lie flat; No. 13's beams change as #428 lists. #429 (merged) keeps a flag off every stem it does not own and lints for it (No. 13 m. 26/42: the RH eighth B's flag no longer cuts the sixteenth's stem on the same head). #435 (merged, stacked on #429) gives a flag and another note's stem separate columns, so hand edits once refused for flag-foreign-stem or solo-flag-rail-clearance are accepted; stem direction stays the hand."
+    },
     {
       "revision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319",
       "pullRequests": [

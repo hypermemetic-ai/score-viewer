@@ -23,6 +23,8 @@ const validFinger=(v:unknown)=>Number.isInteger(v)&&Number(v)>=1&&Number(v)<=5;
 const sourceRevision=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
 const pitch=(n:ScorePackage['score']['notes'][number])=>{if(!isPitchedEvent(n))throw Error('Personal assignments require a pitched piano owner.');return n.pitch.octave*12+n.pitch.pitchClass;};
 const guard=(n:ScorePackage['score']['notes'][number])=>({pitch:pitch(n),startTick:n.startTick,durationTicks:n.durationTicks});
+/** What an untouched note reads from its twin in a repeat the reader shows once. */
+const repeatChoice=(p:ScorePackage,s:PersonalState,id:string)=>s.repeatResolved?.sourceRevision===sourceRevision(p)?s.repeatResolved.choices[id]:undefined;
 const baseFinger=(p:ScorePackage,s:PersonalState,id:string)=>{const layer=s.layer??p.fingerLayer;return layer?.attacks.find(a=>a.id===layer.sourceOwnerToAttack[id])?.finger;};
 /** Only admitted shared contact owners establish aliases; coincident pitches do not. */
 const aliases=(p:ScorePackage,id:string)=>{if(!p.score.notes.some(n=>n.id===id))throw Error('Personal choice names an unknown source owner.');const ids=new Set([id]);let changed=true;while(changed){changed=false;for(const seat of p.seats)if(seat.ownerIds.some(owner=>ids.has(owner)))for(const owner of seat.ownerIds)if(!ids.has(owner)){ids.add(owner);changed=true;}}return [...ids];};
@@ -55,11 +57,16 @@ export function handlessMessage(count:number,purpose:string):string {
 /** Each package's notes by id, built once: hands are read for every seat on every paint. */
 const noteIndexes=new WeakMap<ScorePackage,ReadonlyMap<string,ScorePackage['score']['notes'][number]>>();
 const noteIndex=(p:ScorePackage)=>{let index=noteIndexes.get(p);if(!index)noteIndexes.set(p,index=new Map(p.score.notes.map(n=>[n.id,n])));return index;};
+/** A note's hand, in one order everywhere: the owner's own hand (`ownsHand`),
+ * else a hand carried from a matching bar, else its repeat twin's (derived,
+ * #173), else a stored record that is no hand choice, else the written hand. */
+const handInOrder=(c:PersonalOwnerChoice|undefined,written:PersonalHand|null,carried:PersonalHand|undefined,twin:PersonalHand|undefined):PersonalHand|null=>
+ (ownsHand(c,written)?c!.hand!:undefined)??carried??twin??c?.hand??written;
 /** The effective hand of any note under one state, through one carried-hand
  * read: for paints and comparisons over many notes. */
 export function effectiveHands(p:ScorePackage,s:PersonalState):(ownerId:string)=>PersonalHand|null {
- const notes=noteIndex(p),carried=handRecurrences(p,s).carried,choices=s.assignments?.choices;
- return ownerId=>{const n=notes.get(ownerId);if(!n||n.hand!==undefined&&!validHand(n.hand))throw Error('No piano owner at this source owner.');return carried.get(ownerId)?.hand??choices?.[ownerId]?.hand??n.hand??null;};
+ const notes=noteIndex(p),carried=handRecurrences(p,s).carried,choices=s.assignments?.choices,repeat=s.repeatResolved?.sourceRevision===sourceRevision(p)?s.repeatResolved.choices:undefined;
+ return ownerId=>{const n=notes.get(ownerId);if(!n||n.hand!==undefined&&!validHand(n.hand))throw Error('No piano owner at this source owner.');return handInOrder(choices?.[ownerId],(n.hand??null) as PersonalHand|null,carried.get(ownerId)?.hand,repeat?.[ownerId]?.hand);};
 }
 /** The owner's effective hand, or null when neither the source nor the player gives one. */
 export function handFor(p:ScorePackage,s:PersonalState,ownerId:string):PersonalHand|null {return effectiveHands(p,s)(ownerId);}
@@ -68,7 +75,7 @@ export function handFor(p:ScorePackage,s:PersonalState,ownerId:string):PersonalH
 export function handsDiffer(p:ScorePackage,a:PersonalState,b:PersonalState):boolean {
  if(a===b)return false;
  const x=effectiveHands(p,a),y=effectiveHands(p,b),notes=noteIndex(p);
- for(const id of new Set([...Object.keys(a.assignments?.choices??{}),...Object.keys(b.assignments?.choices??{}),...handRecurrences(p,a).carried.keys(),...handRecurrences(p,b).carried.keys()]))if(notes.has(id)&&x(id)!==y(id))return true;
+ for(const id of new Set([...Object.keys(a.assignments?.choices??{}),...Object.keys(b.assignments?.choices??{}),...Object.keys(a.repeatResolved?.choices??{}),...Object.keys(b.repeatResolved?.choices??{}),...handRecurrences(p,a).carried.keys(),...handRecurrences(p,b).carried.keys()]))if(notes.has(id)&&x(id)!==y(id))return true;
  return false;
 }
 /** `carry: false` reads the owner's records alone, without hands carried from matching bars. */
@@ -76,8 +83,8 @@ export function effectiveAssignments(p:ScorePackage,s:PersonalState,options:{car
  readPersonalAssignments(s.assignments,p);
  const carried=options.carry===false?undefined:handRecurrences(p,s).carried,legacyByOwner=new Map(Object.values(s.overrides).flatMap(c=>c.ownerIds.map(id=>[id,c] as const))),layer=s.layer??p.fingerLayer,fingers=new Map(layer?.attacks.flatMap(a=>a.owners.map(o=>[o.id,a.finger] as const)));
  return p.score.notes.filter(isPitchedEvent).map(n=>{
-  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??fingers.get(n.id);
-  return{id:n.id,...guard(n),hand:carried?.get(n.id)?.hand??c?.hand??n.hand??null,...(finger===undefined?{}:{finger})};
+  const c=s.assignments?.choices[n.id],legacy=legacyByOwner.get(n.id),shared=s.memoryResolved?.sourceRevision===sourceRevision(p)?s.memoryResolved.choices[n.id]:undefined,repeat=repeatChoice(p,s,n.id),finger=s.calculatedOwners?.[n.id]?fingers.get(n.id):shared?shared.finger??undefined:c?.finger??legacy?.replacement??repeat?.finger??fingers.get(n.id);
+  return{id:n.id,...guard(n),hand:handInOrder(c,(n.hand??null) as PersonalHand|null,carried?.get(n.id)?.hand,repeat?.hand),...(finger===undefined?{}:{finger})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 /** Canonical content key is synchronous; durable digests can be computed away from key handling. */

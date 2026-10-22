@@ -6,7 +6,7 @@ import {parseSync} from 'rolldown/experimental';
 /** The modules that make every derived file the viewer keeps on disk:
  * package admission and its replays (`src/package.ts`), and personal hand
  * projections with their engines, on the reader's thread or in the workers. */
-export const DERIVED_ENTRY_MODULES=Object.freeze(['src/package.ts','src/personal-presentation.ts','src/personal-projection-worker.ts','src/layout-peer-worker.ts']);
+export const DERIVED_ENTRY_MODULES=Object.freeze(['src/package.ts','src/personal-presentation.ts','src/personal-projection-worker.ts','src/layout-peer-worker.ts','src/repeat-fold.ts']);
 /** Build inputs outside the module graph that can still change what those
  * modules compute: locked packages and the build itself. */
 const BUILD_INPUTS=['package.json','package-lock.json','tsconfig.json','vite.config.ts','scripts/derived-identity.ts'];

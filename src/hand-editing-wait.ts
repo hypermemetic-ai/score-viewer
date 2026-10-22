@@ -6,6 +6,8 @@ import type {PersonalHand} from './personal-assignments';
 export interface WaitingHandChoice {
  /** The note it was made on; a later choice on the same note replaces it. */
  key:string;
+ /** Every note the choice changes: a folded note's passes, first pass first. */
+ owners?:readonly string[];
  hand:PersonalHand;
  /** The printed bar, for saying where the choice lands. */
  bar:number;

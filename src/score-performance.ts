@@ -106,10 +106,10 @@ function graceNotes(score:PerformanceScore,occurrences:Occurrence[]|undefined,le
  for(const group of score.graceGroups??[]){
   const members=group.members.filter(m=>m.pitch&&Number.isFinite(m.pitch.octave)&&Number.isFinite(m.pitch.pitchClass));if(!members.length)continue;
   for(const visit of group.occurrences){
-   const pass=occurrences?.find(o=>o.writtenBar===visit.sourceBar+1&&o.pass===visit.pass);
-   if(occurrences&&!pass)continue;
-   const host=pass?pass.performedTick+visit.tick-pass.writtenTick:visit.tick;
-   members.forEach((m,i)=>{const tick=host-(members.length-i)*length;out.push({tick,end:tick+length,midi:m.pitch!.octave*12+m.pitch!.pitchClass+12,velocity:level(host)-8});});
+   // A grace sounds on every pass through its bar, unless the score gives that pass a visit of its own.
+   const passes=occurrences?.filter(o=>o.writtenBar===visit.sourceBar+1&&(o.pass===visit.pass||!group.occurrences.some(v=>v.sourceBar===visit.sourceBar&&v.pass===o.pass)));
+   for(const host of passes?passes.map(o=>o.performedTick+visit.tick-o.writtenTick):[visit.tick])
+    members.forEach((m,i)=>{const tick=host-(members.length-i)*length;out.push({tick,end:tick+length,midi:m.pitch!.octave*12+m.pitch!.pitchClass+12,velocity:level(host)-8});});
   }
  }
  return out;
