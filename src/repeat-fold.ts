@@ -133,6 +133,8 @@ export interface FoldedReaderView {
  personal(personal:PersonalState):PersonalState;
  /** The printed bar (1-based) that shows a stored bar (1-based). */
  printedBar(storedBar:number):number;
+ /** The folded pages' own engraving session: hand editing on a folded score settles and waits on it alone. */
+ session:PersonalPresentationSession;
  /** The written-out seat of a folded seat. */
  writtenSeat(seat:Seat):Seat|undefined;
  /** The folded seat that shows a written-out seat. */
@@ -202,7 +204,7 @@ export class FoldedReader {
   return {...projected,score:{...projected.score,notes:[...projected.score.notes,...aliases]},seats,verbatimFold:{shownBy:fold.shownBy,written,edition:base,
    practice:{...projected,seats:practiceSeats},
    personal:next=>foldedPersonal(base,this.base,next),
-   printedBar:bar=>printed.get(bar-1)??bar,
+   printedBar:bar=>printed.get(bar-1)??bar,session,
    writtenSeat:seat=>writtenOf(seat.ownerIds[0],seat),
    foldedSeat:seat=>{const id=seat.ownerIds[0];return foldedOf(fold.shownBy.get(id)??id,seat);}}};
  }

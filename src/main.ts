@@ -241,7 +241,9 @@ interface LivePersonalEditor {view:ScorePackage;visiblePersonal:PersonalState;se
 const livePersonalEditors=new WeakMap<NonNullable<typeof current>,LivePersonalEditor>();
 function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  const existing=livePersonalEditors.get(target);if(existing)return existing;
- const editor:LivePersonalEditor={view:target.package,visiblePersonal:structuredClone(target.personal),session:new PersonalPresentationSession(target.package),fold:new FoldedReader(target.package),generation:0,queue:undefined!,projections:new Map()};
+ // The written-out pages' session is made only when they are drawn: a folded score never draws them.
+ let session:PersonalPresentationSession|undefined;
+ const editor:LivePersonalEditor={view:target.package,visiblePersonal:structuredClone(target.personal),get session(){return session??=new PersonalPresentationSession(target.package);},fold:foldedReader(target),generation:0,queue:undefined!,projections:new Map()};
  // The page drawn for a choice only places the saved view. A choice the
  // engraver refused is answered where it was made; it is not a failed save,
  // so it never holds the score open behind "Choices haven't been saved".
@@ -249,7 +251,18 @@ function personalEditor(target:NonNullable<typeof current>):LivePersonalEditor {
  editor.queue=new PersonalEditQueue(personalStorageName(target.entry.id,target.package),async(snapshot,sequence)=>{const projected=await editor.projections.get(sequence)?.catch(error=>{if(engravingRefusal(error))return undefined;throw error;});if(projected)resolvePersonalNavigation(snapshot,projected);await personalMemory.saveView({...memoryInput(target),personal:snapshot});editor.projections.delete(sequence);},sequence=>{editor.projections.get(sequence)?.catch(()=>{});editor.projections.delete(sequence);});
  livePersonalEditors.set(target,editor);return editor;
 }
+/** Folded readers kept for the session, per score, revision and keyboard: reopening
+ * a folded score reuses its folded pages and their engraving instead of drawing them again. */
+const foldedReaders=new Map<string,FoldedReader>(),KEPT_FOLDED_READERS=4;
+function foldedReader(target:NonNullable<typeof current>):FoldedReader{
+ const p=target.package,key=JSON.stringify([target.entry?.id,p.sourceRevision??p.manifest?.revision,p.sourceSha256,p.keyboardLayout,p.renderingRecipe?.baseline]);
+ const reader=foldedReaders.get(key)??new FoldedReader(p);foldedReaders.delete(key);foldedReaders.set(key,reader);
+ for(const old of foldedReaders.keys()){if(foldedReaders.size<=KEPT_FOLDED_READERS)break;foldedReaders.delete(old);}
+ return reader;
+}
 function readerPackage(){if(!current)throw Error('No open score.');return livePersonalEditors.get(current)?.view??current.package;}
+/** The engraving session behind the pages shown: the folded pages' own on a folded score, else the written-out pages'. */
+function shownSession(target:NonNullable<typeof current>):PersonalPresentationSession{const editor=personalEditor(target);return (editor.view as FoldedPackage).verbatimFold?.session??editor.session;}
 /** The reader's pages for these choices. Where a repeat folds, only the
  * folded pages are drawn; the written-out pages are drawn when nothing folds
  * or the fold can't be drawn. */
@@ -906,7 +919,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // hand choices' projection. With a projection worker the engraver settles
  // for editing in the worker after opening; without one it settles here, as before.
  // A score that shows a repeat folded draws only its folded pages.
- cancelPersonalPrefetch();const nextEditor=personalEditor(next),folds=scoreCapabilities(next.package).pianoPreparation&&nextEditor.fold.folds(next.personal);if(nextEditor.session.settlesOnOpen&&!folds){await nextEditor.session.warm(readingExecution(op));check();}
+ cancelPersonalPrefetch();const nextEditor=personalEditor(next),folds=scoreCapabilities(next.package).pianoPreparation&&nextEditor.fold.folds(next.personal);if(!folds&&nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}
  nextEditor.view=await presentReader(next,next.personal,()=>nextEditor.session.project(next.personal,readingExecution(op))
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;return kept.view;}),readingExecution(op));check();resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
@@ -921,7 +934,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
- if(!context&&scoreCapabilities(next.package).pianoPreparation)personalEditor(next).session.prefetch();
+ if(!context&&scoreCapabilities(next.package).pianoPreparation)shownSession(next).prefetch();
  if(ownsOperation)finishReading(op,true);return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
 }
@@ -1504,7 +1517,7 @@ function paintHandPreparation(){if(handWait?.showing&&current===handWait.target&
  * hand choice may be saved now. Throws when the score takes no hand choices. */
 function handEditingWait(target:NonNullable<typeof current>):HandEditingWait|undefined{
  if(handWait?.target===target)return handWait;
- const session=personalEditor(target).session,check=session.handChoiceCheck();if(!check)return;
+ const session=shownSession(target),check=session.handChoiceCheck();if(!check)return;
  const status=new HandPreparationStatus(session.preparationStage),unlisten=session.onPreparationStage(stage=>status.stage(stage));
  const wait:HandEditingWait={target,status,queue:new HandChoiceQueue(),ready:check.finally(()=>{unlisten();wait.showing=false;status.close();}),showing:true};
  handWait=wait;paintHandPreparation();
