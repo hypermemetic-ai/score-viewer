@@ -52,9 +52,9 @@ When a score has no confident tempo, starting practice opens Hear and set. Optio
    - dynamics and hairpins set loudness, and accents add weight;
    - staccato shortens a note;
    - the sustain pedal holds releases. A key released exactly as the pedal changes is not caught by the new pedal;
-   - grace notes sound briefly just before their note;
+   - grace notes sound briefly just before their note, on every pass through a repeat;
    - later metronome marks in the score change the speed in proportion. The tempo you set is the opening tempo, and "The whole piece takes about" includes the later tempos.
-3. The status shows the printed bar, numbered as the reader numbers it, and the pass through a repeat ("measure 12 of 32 · 2nd time").
+3. The status shows the printed bar, numbered as the reader numbers it, and the pass through a repeat ("measure 12 of 32 · 2nd time"). A passage the stored score writes out twice and the reader shows as a repeat (`docs/verbatim-repeats.md`) is heard and numbered as printed.
 4. The score behind the dialog follows the playing bar. It turns to the bar's page and marks the bar lightly, and the dialog moves to the other half of the screen. Closing returns to the page you were reading. The view you saved is never changed.
 
 | Key | Action |

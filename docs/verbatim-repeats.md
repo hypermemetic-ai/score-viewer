@@ -50,9 +50,11 @@ repeat is folded.
 Every bar number the player reads is the printed number of the pages shown:
 seats, practice sections, Fingers ("measure N of 28" for Op. 68 No. 13) and
 fingering-memory labels (`printedBar`). Op. 68 No. 13's stored bar 22 is
-printed bar 12. Playback in performed order and its "· 2nd time" label belong
-to the tempo preview (score-viewer #172, not merged yet); when it lands it reads
-the folded edition's performed order and labels printed bars.
+printed bar 12. Hearing the piece (Options → Tempo, from score-viewer #172)
+plays the folded edition in performed order: the status counts printed bars
+("measure 5 of 28 · 2nd time" for stored bar 15) and the playing bar is tinted
+on the printed bar of each pass. It sounds exactly the notes of the written-out
+score; a grace sounds on every pass through its bar.
 
 ## When passes disagree
 
