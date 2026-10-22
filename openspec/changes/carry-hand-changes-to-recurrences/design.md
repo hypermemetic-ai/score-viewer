@@ -17,8 +17,8 @@ The effective hand of a note is: the carried hand, then the note's own stored ha
 Every control applies to the selected note (and the other heads of its key), as L and R do, and its notice names that note before any bar it changed.
 
 - **L/R on a carried note.** This records an exception with `handScope: 'local'`. Pressing the hand it already has does nothing, so the editor names only the other key ("Press L to give this note its written left hand").
-- **"Keep this note's written hand"** (at a receiving note, bar 21). The same exception as L/R: "This note keeps its written left hand. The rest of bar 21 still follows bar 11."
-- **"Don't share this note's hand"** (at a donor, bar 11). This sets `handScope: 'local'` on that note; the notes it reached return to their written hands, and the bar's other moves still travel: "This note's right hand stays in bar 11 only. In bar 21, 4 is in its written hand again."
+- **"Keep its written LH"** (at a receiving note, bar 21, with <kbd>L</kbd> drawn on it). The same exception as L/R. The Hand row then reads "LH · this note only", and the notice adds only "The rest of bar 21 still follows bar 11."
+- **"Don't share this note's hand"** (at a donor, bar 11). This sets `handScope: 'local'` on that note; the notes it reached return to their written hands, and the bar's other moves still travel. The Hand row then reads "RH · this note only", and the notice adds "In bar 21, 4 is in its written hand again."
 - **"Use bar N's hand" / "Share this note's hand".** This clears the scope. At a receiver, the record is removed when the carry would give the same hand.
 - **Undo.** Choosing the written hand at the donor removes the carry as well.
 

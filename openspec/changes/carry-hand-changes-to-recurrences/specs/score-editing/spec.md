@@ -25,7 +25,7 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **AND** a bar with another bass under the same chords is not changed
 
 #### Scenario: Keep, don't share and reset, note by note
-- **WHEN** the player presses L or Keep this note's written hand at bar 21's carried E4, or Don't share this note's hand at bar 11's E4
+- **WHEN** the player presses L or Keep its written LH at bar 21's carried E4, or Don't share this note's hand at bar 11's E4
 - **THEN** that note keeps its own hand, the other bar's E4 keeps its own effective hand, and bar 21's D#4 still follows bar 11
 - **AND** the notice names the note and what happened to it before the bars it changed
 - **AND** Use bar 11's hand or Share this note's hand returns to the shared hand, and choosing the written hand at bar 11 undoes the change in both bars
