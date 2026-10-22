@@ -22,10 +22,12 @@ const digitOf=(p:ScorePackage,id:string)=>p.seats.find(s=>s.ownerIds.includes(id
 export type HandChoiceAction='hand-not-here'|'hand-only-here'|'hand-shared';
 /** Words said in the editor bar; a `key` is drawn as a key. */
 export type HandWords=readonly (string|{key:string})[];
-/** `said` is shown under the label, brief, with its keys as keys, and says
- * only what the label and button don't; `description` is the full sentence for
- * the label's tooltip and screen readers. */
-export interface HandChoiceView {label?:string;description?:string;action?:{id:HandChoiceAction;label:string};said:HandWords}
+/** The Hand row reads in order: `label`, its first line, leads with the hand
+ * (RH or LH) and says where it comes from; `said`, only when a key does what no
+ * button does, with its keys as keys; then the button, with its key when one
+ * does the same. Nothing follows the button. `description` is the full
+ * sentence for the label's tooltip and screen readers. */
+export interface HandChoiceView {label:string;description:string;action?:{id:HandChoiceAction;label:string;key?:string};said:HandWords}
 /** What the editor says about the selected note's hand: carried from another
  * bar, carried from here to matching bars, kept to this note alone, or not yet
  * shared with the matching bars it would reach (R shares it). Every action
@@ -38,11 +40,11 @@ export function handChoiceView(p:ScorePackage,s:PersonalState,ownerId:string,pri
   :found.kind==='local'?{...found,follows:found.follows===undefined||printed(found.follows)===own?undefined:printed(found.follows)}
   :{...found,toBars:otherBars(found.toBars,printed,own)};
  const name=handName(hand.hand);
- if(hand.kind==='carried'){const written=otherHand(hand.hand);return{label:`Hand from bar ${hand.fromBar}`,description:`${capital(name)}, as you chose for the same music in bar ${hand.fromBar}. Press ${handKey(written)} to give this note its written ${handName(written)}.`,action:{id:'hand-not-here',label:'Keep this note’s written hand'},said:[`${hand.hand}. Press `,{key:handKey(written)},` for its written ${written}.`]};}
- if(hand.kind==='shared')return hand.toBars.length?{label:`Hand also in ${barList(hand.toBars)}`,description:`${capital(name)} here and in ${barList(hand.toBars)}: the same music.`,action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:[`${hand.hand}.`]}:undefined;
- if(hand.kind==='unshared')return hand.toBars.length?{said:[`${hand.hand}. Press `,{key:handKey(hand.hand)},` to share it with ${barList(hand.toBars)}.`]}:undefined;
+ if(hand.kind==='carried'){const written=otherHand(hand.hand);return{label:`${hand.hand} · from bar ${hand.fromBar}`,description:`${capital(name)}, as you chose for the same music in bar ${hand.fromBar}. Press ${handKey(written)} to give this note its written ${handName(written)}.`,action:{id:'hand-not-here',label:`Keep its written ${written}`,key:handKey(written)},said:[]};}
+ if(hand.kind==='shared')return hand.toBars.length?{label:`${hand.hand} · also in ${barList(hand.toBars)}`,description:`${capital(name)} here and in ${barList(hand.toBars)}: the same music.`,action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:[]}:undefined;
+ if(hand.kind==='unshared')return hand.toBars.length?{label:hand.hand,description:`${capital(name)}. Press ${handKey(hand.hand)} to share it with ${barList(hand.toBars)}: the same music.`,said:['Press ',{key:handKey(hand.hand)},` to share it with ${barList(hand.toBars)}.`]}:undefined;
  const follows=hand.follows===undefined?'':` Bar ${hand.follows} has the same music.`;
- return{label:'Hand for this note only',description:`${capital(name)} for this note only.${follows}`,said:[`${hand.hand}.`],
+ return{label:`${hand.hand} · this note only`,description:`${capital(name)} for this note only.${follows}`,said:[],
   ...(hand.follows!==undefined?{action:{id:'hand-shared' as const,label:`Use bar ${hand.follows}’s hand`}}:p.score.notes.find(n=>n.id===ownerId)?.hand!==hand.hand?{action:{id:'hand-shared' as const,label:'Share this note’s hand'}}:{})};
 }
 
