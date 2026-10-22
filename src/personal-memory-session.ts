@@ -117,12 +117,12 @@ export class PersonalMemorySession {
  get revision(){return this.snapshot?.revision??0;}
  get error(){return this.failed;}
  get recovery(){return [...this.pending.values()].map(clone);}
- /** The stored objects holding this score's hand choices, by name, or none
-  * while unsaved edits stand in for them or nothing is stored for it. */
+ /** The stored objects holding this score's hand choices, by name (none when
+  * nothing is stored for it), or undefined while unsaved edits stand in for them. */
  storedRefs(entryId:string):Array<[string,string]>|undefined{
   if(!this.snapshot||this.pending.size)return;
   const refs=Object.entries(this.snapshot.refs).filter(([name])=>name.startsWith(`state-${entryId}`)).sort(([a],[b])=>a<b?-1:a>b?1:0);
-  return refs.length?refs:undefined;
+  return refs;
  }
  /** Adopt memory that is already indexed, writing nothing. False when it is
   * not indexed yet or saves wait for recovery: opening a score does those. */

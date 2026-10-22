@@ -82,7 +82,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
-import {AheadOfTimeEngraving} from './ahead-of-time-engraving';
+import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,preparedBefore,prepareRecorded} from './ahead-of-time-engraving';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
@@ -129,7 +129,6 @@ if(isTauri()&&!import.meta.env.DEV&&host.derived){
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});
 }
-const AHEAD_OF_TIME_KIND='ahead-of-time-v1';
 /** Library scores in the order the player is likeliest to open them. */
 const aheadOfTimeOrder=()=>[...entries.filter(e=>e.id===preferences.lastWorkedEntryId),...entries].map(e=>e.id);
 // Its own admission, so it never holds the reader's admission busy.
@@ -140,24 +139,27 @@ const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:
  * indexed is left for opening, which writes what it must. */
 async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution){
  const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout;if(!entry||!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
- const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
- // What this score's archive and stored hand choices last needed, so a score
- // already prepared costs a hash and two header reads, not an admission.
- const stored=personalMemory.storedRefs(entryId),marker=stored&&await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
- const done=(served:ProjectionEntry|null)=>{if(marker)void derived.put(AHEAD_OF_TIME_KIND,marker,true,JSON.stringify(served));};
- const seen=marker&&await derived.peek(AHEAD_OF_TIME_KIND,marker);checkReadingExecution(execution);
- if(seen){const served=JSON.parse(seen) as ProjectionEntry|null;if(!served||await projectionServed(derived,served))return;}
- if(readingOnlyArchive(bytes))return done(null);
- const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}).catch(()=>undefined);checkReadingExecution(execution);
- if(!prior)return;if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return done(null);
- const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(host,entry,selected);checkReadingExecution(execution);
- const personal=personalMemory.personalFor({entryId,importedAt:entry.importedAt,p:selected,personal:journal});
- const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);checkReadingExecution(execution);
- // An edition that must be engraved again is made, and saved, by opening it.
- if(!('package' in q))return done(null);
- const session=new PersonalPresentationSession(q.package,undefined,{cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
- if(served&&!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
- done(served??null);
+ const bytes=await host.read(entry.file),stored=personalMemory.storedRefs(entryId);checkReadingExecution(execution);if(!bytes||!stored)return;
+ // Everything known before admission. A score already prepared, refused or
+ // needing nothing costs a hash and a few header reads, not an admission.
+ const key=await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
+ const digest=async(name:string)=>{const b=await host.read(name);return b?hashBytes(b):null;};
+ if(await preparedBefore(derived,key,{served:served=>projectionServed(derived,served),digest}))return;checkReadingExecution(execution);
+ await prepareRecorded(derived,key,async read=>{
+  if(readingOnlyArchive(bytes))return null;
+  const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});checkReadingExecution(execution);
+  if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
+  // A journal kept outside the store is a file: its digest joins the record.
+  const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
+  const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(journals,entry,selected);checkReadingExecution(execution);
+  const personal=personalMemory.personalFor({entryId,importedAt:entry.importedAt,p:selected,personal:journal});
+  const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);checkReadingExecution(execution);
+  // An edition that must be engraved again is made, and saved, by opening it.
+  if(!('package' in q))return null;
+  const session=new PersonalPresentationSession(q.package,undefined,{cacheWriteDelayMs:0}),served=await session.projectionEntry(q.personal??personal);
+  if(served&&!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
+  return served??null;
+ });
 }
 type ReadingJob=NonNullable<typeof job>;
 interface ReadingOperation {

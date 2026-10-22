@@ -8,7 +8,7 @@ import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache'
 import {importPackage,archivePackage,hashBytes,usePianoPageCheckReceipts} from '../src/package';
 import {PersonalPresentationSession,projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
-import {AheadOfTimeEngraving} from '../src/ahead-of-time-engraving';
+import {AheadOfTimeEngraving,preparedBefore,prepareRecorded} from '../src/ahead-of-time-engraving';
 import {derivedModuleClosure,viewerDerivedIdentity} from '../scripts/derived-identity';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -74,6 +74,30 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
  const late=new AheadOfTimeEngraving(async id=>{started.push('late:'+id);},{delayMs:5});
  late.start(['x']);late.stop();await new Promise(r=>setTimeout(r,20));
  assert.ok(!started.includes('late:x'));
+});
+
+test('a refused or needless ahead-of-time preparation is recorded, and tried again only when what it read changes',async()=>{
+ const {store}=memoryStore(),cache=new DerivedFileCache(store,'build-a'),files=new Map<string,string|null>([['journal.json','d1']]),onDisk=new Set<string>();
+ const still={served:async(e:{key:string})=>onDisk.has(e.key),digest:async(name:string)=>files.get(name)??null};
+ let runs=0;
+ const refuse=async(read:(name:string,digest:string|null)=>void)=>{runs++;read('journal.json',files.get('journal.json')!);throw Error("This score can't be engraved yet");};
+ // A refusal (saved hands the engraver refuses, an edition admission rejects) is an outcome.
+ assert.equal(await preparedBefore(cache,sha('1'),still),false);
+ assert.equal(await prepareRecorded(cache,sha('1'),refuse),'refused');
+ for(let visit=0;visit<3;visit++)if(!await preparedBefore(cache,sha('1'),still))await prepareRecorded(cache,sha('1'),refuse);
+ assert.equal(runs,1,'later library visits do not engrave it again');
+ // A journal kept outside the store changed: prepare again.
+ files.set('journal.json','d2');assert.equal(await preparedBefore(cache,sha('1'),still),false);
+ // Nothing to prepare (a reading-only archive, a layout it lacks) is recorded the same way.
+ assert.equal(await prepareRecorded(cache,sha('2'),async()=>null),'nothing');assert.equal(await preparedBefore(cache,sha('2'),still),true);
+ // A served projection stands only while its entry is on disk.
+ onDisk.add('p1');assert.equal(await prepareRecorded(cache,sha('3'),async()=>({key:'p1',tag:'t'})),'served');
+ assert.equal(await preparedBefore(cache,sha('3'),still),true);onDisk.delete('p1');assert.equal(await preparedBefore(cache,sha('3'),still),false);
+ // A stop is no outcome.
+ await assert.rejects(prepareRecorded(cache,sha('4'),async()=>{throw new DOMException('stop','AbortError');}),/stop/);
+ assert.equal(await preparedBefore(cache,sha('4'),still),false);
+ // Another build reads no record.
+ assert.equal(await preparedBefore(new DerivedFileCache(store,'build-b'),sha('2'),still),false);
 });
 
 test('derived files are bound to the code that makes them, followed through every import and worker',()=>{

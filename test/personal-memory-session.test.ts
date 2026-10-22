@@ -245,7 +245,7 @@ test('reopening reads stored memory once per change and still registers what ano
  const first=await load(s,a),revision=(await store.read()).revision;
  // The same score again, as its own fresh package: nothing to write, the same hands.
  assert.deepEqual(await load(s,{...a,p:structuredClone(a.p)}),first);assert.equal((await store.read()).revision,revision);
- assert.ok(s.storedRefs('a')?.length);assert.equal(s.storedRefs('missing'),undefined);
+ assert.ok(s.storedRefs('a')?.length);assert.deepEqual(s.storedRefs('missing'),[]);
  // Another application session forgets the score; the next opening registers it again.
  const other=session(store,[a,b]);await other.initialize();await other.deleteEntry('a');assert.equal(await registered(),0);
  await load(s,a);assert.equal(await registered(),indexed);assert.equal(finger(s,a,'b0n1'),2);
