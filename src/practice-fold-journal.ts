@@ -14,9 +14,11 @@ import {claimIdentity,readManualAttainment} from './practice-attainment';
  * does leaving it out (X): it is left out wherever every exercise with its
  * music is. Only its own exercises, which no written-out exercise matches,
  * are kept under the fold, and read again whenever it folds alike; the
- * latest few folds are kept.
+ * latest few folds are kept. `added`: by folded exercise, the written-out
+ * exercises its X left out that weren't already, so taking it back in
+ * restores only those and a pass the player left out alone stays out.
  */
-export interface PracticeFoldPart {excluded:Record<string,boolean>;best:Record<string,number>;groundwork:Record<string,boolean>;workingByPattern:Record<string,number>;marks?:Record<string,number[]>}
+export interface PracticeFoldPart {excluded:Record<string,boolean>;best:Record<string,number>;groundwork:Record<string,boolean>;workingByPattern:Record<string,number>;marks?:Record<string,number[]>;added?:Record<string,string[]>}
 /** The written-out edition a folded edition's practice journal belongs to. */
 export interface PracticeFold {key:string;written:PracticePassagePlan}
 
@@ -31,7 +33,8 @@ function readPart(value:unknown):PracticeFoldPart|undefined{
  const v=value as PracticeFoldPart;
  if(!record(v)||!record(v.excluded)||!record(v.best)||!record(v.groundwork)||!record(v.workingByPattern)||
   Object.values(v.excluded).some(x=>typeof x!=='boolean')||Object.values(v.groundwork).some(x=>typeof x!=='boolean')||
-  Object.values(v.best).some(x=>!validTempo(x))||Object.values(v.workingByPattern).some(x=>!validTempo(x)))throw differs();
+  Object.values(v.best).some(x=>!validTempo(x))||Object.values(v.workingByPattern).some(x=>!validTempo(x))||
+  (v.added!==undefined&&(!record(v.added)||Object.values(v.added).some(ids=>!Array.isArray(ids)||ids.some(id=>typeof id!=='string')))))throw differs();
  if(v.marks!==undefined)readManualAttainment({version:1,marks:v.marks});
  return structuredClone(v);
 }
@@ -110,12 +113,17 @@ function writtenJournal(journal:PracticeState,folded:PracticePassagePlan,before:
  copyPreferences(after,journal);
  const writtenAll=passageHierarchy(fold.written,journal).all,written=byMusic(fold.written,writtenAll);
  const wasAll=passageHierarchy(folded,before).all,all=passageHierarchy(folded,after).all;
- const own:PracticeChunk[]=[];
+ const own:PracticeChunk[]=[],addedBefore=readPart(journal.folded?.[fold.key])?.added??{},leftOut:Record<string,string[]>={};
  for(const chunk of all.values()){
   const twins=matching(folded,chunk,written);if(!twins.length){own.push(chunk);continue;}
-  // Leaving an exercise out, or taking it back in, does the same to every exercise with its music.
-  const left=!!after.excluded?.[chunk.id];
-  if(left!==!!before.excluded?.[chunk.id])for(const twin of twins){if(left){journal.excluded??={};journal.excluded[twin.id]=true;}else if(journal.excluded)delete journal.excluded[twin.id];}
+  // Leaving an exercise out leaves out every exercise with its music. Taking it back in takes back
+  // what that X left out; a pass the player had left out alone stays out. Only an X that found some
+  // pass already out keeps a record: without one, taking it back takes every pass back in.
+  const left=!!after.excluded?.[chunk.id],was=addedBefore[chunk.id];
+  if(left!==!!before.excluded?.[chunk.id]){
+   if(left){const fresh=twins.map(t=>t.id).filter(id=>!journal.excluded?.[id]);journal.excluded??={};for(const id of fresh)journal.excluded[id]=true;const ids=[...new Set([...was??[],...fresh])];if(ids.length&&ids.length<twins.length)leftOut[chunk.id]=ids;}
+   else if(journal.excluded)for(const id of was??twins.map(t=>t.id))delete journal.excluded[id];
+  }else if(left&&was)leftOut[chunk.id]=was;
   const old=wasAll.get(chunk.id)?creditOf(folded,before,wasAll,chunk):{rate:0,groundwork:false,marks:[]},now=creditOf(folded,after,all,chunk);
   const removed=now.rate<old.rate||(old.groundwork&&!now.groundwork)||old.marks.some(rate=>!now.marks.includes(rate));
   const added=now.rate>old.rate||(now.groundwork&&!old.groundwork)||now.marks.some(rate=>!old.marks.includes(rate))||now.working!==old.working;
@@ -141,9 +149,10 @@ function writtenJournal(journal:PracticeState,folded:PracticePassagePlan,before:
   if(after.workingByPattern[chunk.pattern]!==undefined)part.workingByPattern[chunk.pattern]=after.workingByPattern[chunk.pattern];
  }
  if(Object.keys(marks).length)part.marks=marks;
+ if(Object.keys(leftOut).length)part.added=leftOut;
  // This fold's record moves to the end; only the latest few folds are kept, and a fold with nothing of its own keeps none.
  const folds=Object.entries(journal.folded??{}).filter(([key])=>key!==fold.key);
- if([part.excluded,part.best,part.groundwork,part.workingByPattern,marks].some(r=>Object.keys(r).length))folds.push([fold.key,part]);
+ if([part.excluded,part.best,part.groundwork,part.workingByPattern,marks,leftOut].some(r=>Object.keys(r).length))folds.push([fold.key,part]);
  if(folds.length)journal.folded=Object.fromEntries(folds.slice(-KEPT_FOLDS));else delete journal.folded;
  return readPractice(journal,fold.written);
 }

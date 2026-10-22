@@ -186,3 +186,25 @@ test('Fingers alone on the folded score reads the player\'s settings and nothing
  assert.equal(foldedPracticePreferences(undefined,foldedPlan),undefined);
  assert.deepEqual(json(readPractice(undefined,foldedPlan)),json(initialPractice(foldedPlan)));
 });
+
+test('X on the folded score, taken back, takes back only what it left out: a pass the player left out alone stays out', async()=>{
+ const {writtenPlan,foldedPlan}=await editions(),fold:PracticeFold={key:KEY,written:writtenPlan};
+ // Written out, the player left out the passage's second phrase on its first pass only.
+ const raw=json(practised(writtenPlan)),w=readPractice(raw,writtenPlan),wat=exercises(writtenPlan,w);
+ const s=foldedPracticeJournal(raw,foldedPlan,fold)!,at=exercises(foldedPlan,s),journal=new FoldedPracticeJournal(fold,raw);journal.read(s);
+ // Folded: X on the phrase leaves out both passes.
+ const out=structuredClone(s);out.excluded={...out.excluded,[at('section 9-12').id]:true};
+ const left=journal.written(foldedPlan,out);journal.saved(out,left);
+ assert.ok(left.excluded?.[wat('section 9-12').id]&&left.excluded?.[wat('section 17-20').id],'both passes left out');
+ // Read again in another session, X again takes it back in: the return plays, the first pass stays as the player left it.
+ const reread=foldedPracticeJournal(json(left),foldedPlan,fold)!,later=new FoldedPracticeJournal(fold,json(left));later.read(reread);
+ assert.ok(reread.excluded?.[at('section 9-12').id]);
+ const back=structuredClone(reread);delete back.excluded![at('section 9-12').id];
+ const again=readPractice(json(later.written(foldedPlan,back)),writtenPlan);
+ assert.ok(again.excluded?.[wat('section 9-12').id],'the pass left out alone stays out');
+ assert.ok(!again.excluded?.[wat('section 17-20').id],'the pass the X left out plays again');
+ assert.equal(again.folded?.[KEY]?.added?.[at('section 9-12').id],undefined,'nothing more to take back');
+ assert.ok(again.excluded?.[wat('section 21-24').id]&&again.excluded?.[wat('connection 9-16').id],'and nothing else changes');
+ // Folded again, the phrase plays: one pass of it still does.
+ assert.ok(!foldedPracticeJournal(json(again),foldedPlan,fold)!.excluded?.[at('section 9-12').id]);
+});
