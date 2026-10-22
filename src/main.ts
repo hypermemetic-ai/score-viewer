@@ -93,8 +93,9 @@ import {selectedAdviceExplanations} from './fingering-advice-markers';
 import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
-import {handFor,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
+import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
+import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,type HandChoiceAction} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
@@ -287,7 +288,7 @@ async function retryPersonalEdits(target:NonNullable<typeof current>){
   if(selection)selection=sourceNavigationSeat(projected,cursor)??visibleSourceSeat(projected,selection)??selection;
   app.querySelector('.personal-edit-status')?.remove();
   if(practice instanceof PracticeView){
-   const owner=practice,handsChanged=target.package.score.notes.some(note=>handFor(target.package,owner.options.personal,note.id)!==handFor(target.package,target.personal,note.id));
+   const owner=practice,handsChanged=handsDiffer(target.package,owner.options.personal,target.personal);
    if(handsChanged){owner.holdForPersonalChoices();await refreshPersonalPractice(target,owner,generation);}
    else{owner.options.personal=target.personal;owner.releasePersonalChoices();owner.refit();}
   }else if(!practice){renderPages();renderToolbar();}
@@ -336,12 +337,12 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
   attempted=next,projection=editor.session.project(next).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
    if(editor.generation===generation)next=target.personal;
-   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}
+   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}else if(kept.dropped.length)notify(droppedCarryText(kept.dropped));
    return kept.view;}),
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const ownerPractice=target===current&&practice instanceof PracticeView?practice:undefined,
-  handsChanged=!!ownerPractice&&target.package.score.notes.some(note=>handFor(target.package,ownerPractice.options.personal,note.id)!==handFor(target.package,next,note.id));
+  handsChanged=!!ownerPractice&&handsDiffer(target.package,ownerPractice.options.personal,next);
  if(handsChanged)ownerPractice!.holdForPersonalChoices();
  adviceKey='';adviceRunner.cancel();void saved.catch(error=>paintPersonalSaveError(target,error));
  const projected=await projection;
@@ -366,13 +367,14 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
 }
 /** A hand choice the engraver can't fit yet is not kept: its notes return to
  * the hand they had, as the player's own decision, so a saved choice can never
- * stop the score from opening. Other refusals, and a choice whose notes had no
+ * stop the score from opening. A hand carried from a matching bar is never
+ * written: that bar keeps its written hands for this session (`dropped`). Other refusals, and a choice whose notes had no
  * hand to return to, still reach the player unchanged. `attempted` is the
  * refused state; a note whose hand has changed since then is left as it is.
  * A refusal also names the notes the choice ran into, such as the other note
  * of a beam; one whose hand the choice did not change has nothing to return. */
-async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string}>{
- const returned=new Set<string>(),reason=undrawableHandReason(error);
+async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string;dropped:number[]}>{
+ const returned=new Set<string>(),dropped=new Set<number>(),reason=undrawableHandReason(error);
  for(let attempt=0;;attempt++){
   const refused=undrawableHandOwners(error),seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
   if(!refused||!seats.length||attempt>=3)throw error;
@@ -380,6 +382,7 @@ async function keepDrawableHands(target:NonNullable<typeof current>,attempted:Pe
   for(const seat of seats){
    const ownerId=seat.ownerIds.find(id=>refused.includes(id))!,refusedHand=handFor(target.package,attempted,ownerId);
    if(handFor(target.package,target.personal,ownerId)!==refusedHand){changed=true;continue;}
+   const bar=dropHandCarry(target.package,target.personal,ownerId);if(bar!==undefined){dropped.add(bar);changed=true;continue;}
    const hand=hadHand(ownerId);if(hand===refusedHand)continue;if(!hand)throw error;
    const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});
    target.personal=receipt.personal;target.personal=resolveMemory(target);returned.add(ownerId);changed=true;
@@ -387,16 +390,16 @@ async function keepDrawableHands(target:NonNullable<typeof current>,attempted:Pe
   }
   if(!changed)throw error;
   attempted=target.personal;
-  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{})};}catch(next){error=next;}
+  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{}),dropped:[...dropped]};}catch(next){error=next;}
  }
 }
-async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat){
+async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat):Promise<ReturnType<typeof personalMemory.accept>&{kept?:string}>{
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  // Actions that can give a note a personal hand are refused on a score whose own engraving is refused.
- if(['hand','reference','calculated','undoRestore'].includes(action.kind)&&scoreCapabilities(target.package).pianoPreparation){
+ if(['hand','handScope','reference','calculated','undoRestore'].includes(action.kind)&&scoreCapabilities(target.package).pianoPreparation){
   const wait=handEditingWait(target);if(wait&&(!await wait.ready||current!==target))throw cancelledReading();}
  const receipt=personalMemory.accept(memoryInput(target),action);
- await presentPersonalChange(target,receipt.personal,receipt.saved,nextSeat);return receipt;
+ const {keptReason}=await presentPersonalChange(target,receipt.personal,receipt.saved,nextSeat);return keptReason?{...receipt,kept:keptReason}:receipt;
 }
 /** Replace both notation and hand grouping together, retaining the exact saved
  * exercise evidence and UI context. No completion is invalidated by an edit. */
@@ -471,9 +474,9 @@ function renderPages(){
 }
 /** Reader and PDF pages share one finger/hand paint; only interaction differs. */
 function paintReaderSeats(page:ReaderPage,base:ScorePackage,p:ScorePackage,s:PersonalState,mode:'pitch'|'finger',positions:ReadonlyMap<string,AnnotationPosition>,interactive:boolean){
- page.element.dataset.fingers=String(mode==='finger');const presentation=currentFingerPresentation(p);
+ page.element.dataset.fingers=String(mode==='finger');const presentation=currentFingerPresentation(p),handOf=effectiveHands(base,s);
  for(const {seat,text} of page.seats){
-  const finger=fingerFor(base,s,seat),hand=handFor(base,s,seat.ownerIds[0]);
+  const finger=fingerFor(base,s,seat),hand=handOf(seat.ownerIds[0]);
   paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
   if(hand)text.dataset.performingHand=hand;else delete text.dataset.performingHand;
  }
@@ -502,7 +505,7 @@ function renderEditorNavigation(){
  const control=app.querySelector<HTMLElement>('.editor-navigation');if(!control)return;
  control.hidden=!selection;if(!selection)return;refreshEditorAdvice();
  const focused=control.contains(document.activeElement);
- control.innerHTML=`<button data-action="editorNavigation" aria-label="Edit navigation: ${editNavigation==='notes'?'Notes':'Measures'}" aria-pressed="${editNavigation==='measures'}">${editNavigation==='notes'?'Notes':'Measures'} <kbd>${esc(actionControlLabel(controls.bindings,'editorNavigation'))}</kbd></button>`;
+ control.innerHTML=`<button data-action="editorNavigation" aria-label="Edit navigation: ${editNavigation==='notes'?'Notes':'Bars'}" aria-pressed="${editNavigation==='measures'}">${editNavigation==='notes'?'Notes':'Bars'} <kbd>${esc(actionControlLabel(controls.bindings,'editorNavigation'))}</kbd></button>`;
  control.insertAdjacentHTML('beforeend',editorMemoryMarkup());
  if(focused)control.querySelector<HTMLElement>('button')?.focus();
 }
@@ -514,7 +517,7 @@ function paintAdviceOnly(){
  for(const page of app.querySelectorAll<HTMLElement>('.page-group .page'))paintEditorAdvice(page,p,Number(page.dataset.page),editorAdvice,!!selection);
  const explanation=app.querySelector<HTMLElement>('[data-advice-explanation]');if(explanation)explanation.textContent=selectedWarningText();
 }
-function selectedWarningText(){return current&&selection?selectedAdviceExplanations(editorAdvice,'edit',selection.ownerIds,ids=>{const seat=readerPackage().seats.find(s=>s.ownerIds.some(id=>ids.includes(id)));return seat?`measure ${seat.writtenBar}`:'previous contact';}).join(' '):'';}
+function selectedWarningText(){return current&&selection?selectedAdviceExplanations(editorAdvice,'edit',selection.ownerIds,ids=>{const seat=readerPackage().seats.find(s=>s.ownerIds.some(id=>ids.includes(id)));return seat?`bar ${seat.writtenBar}`:'previous contact';}).join(' '):'';}
 function refreshEditorAdvice(){
  if(!current||!selection||practice)return;
  const target=current,settings=readFingeringAdviceSettings(preferences.fingeringAdvice),key=JSON.stringify([personalMemoryResolutionKey({entryId:target.entry.id,p:target.package,personal:target.personal},personalMemory.memoryGeneration),settings]);
@@ -547,7 +550,12 @@ function editorMemoryMarkup(){
  if(!current||!selection)return'';
  const input=memoryInput(current),resolution=resolveMemoryInput(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId),description=memorySourceLabel(memoryDocument(),resolution,ownerId,id=>entries.find(e=>e.id===id)?.metadata.title??'Score');
  const self=reference?.entryId===current.entry.id&&reference.ownerId===ownerId;
- return `${label?`<span class="personal-choice-kind" title="${esc(description)}" aria-label="${esc(label+'. '+description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${resolution.byOwner[ownerId]?.personal?button('Use for matching measures','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span>`;
+ return `${label?`<span class="personal-choice-kind" title="${esc(description)}" aria-label="${esc(label+'. '+description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${resolution.byOwner[ownerId]?.personal?button('Use for matching bars','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}${editorHandMarkup()}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span>`;
+}
+/** Where the selected note's hand comes from, beside its finger's provenance. */
+function editorHandMarkup(){
+ if(!current||!selection)return'';const view=handChoiceView(current.package,current.personal,selection.ownerIds[0]);if(!view)return'';
+ return `${view.label?`<span class="personal-choice-kind" title="${esc(view.description??'')}" aria-label="${esc(view.label+'. '+(view.description??''))}">${esc(view.label)}</span>`:''}${view.action?button(esc(view.action.label),view.action.id):''}${view.hint?`<span class="hand-choice-hint">${esc(view.hint.lead)} <kbd>${esc(view.hint.key)}</kbd> ${esc(view.hint.rest)}</span>`:''}`;
 }
 async function visitMemorySource(){
  if(!current||!selection||sourceNavigating)return;sourceNavigating=true;
@@ -830,12 +838,12 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingProgress(op,scoreCapabilities(next.package).pianoPreparation?'hands':'parts');await paintCheckpoint(op.controller.signal);check();
  if(scoreCapabilities(next.package).pianoPreparation){next.personal=await personalMemory.loadPersonalCurrent(next.entry,next.package,async()=>rawMemoryPersonal(next.personal));check();next.personal=resolveMemory(next);}
  // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
- let keptHands=0;
+ let keptHands=0,droppedCarries:number[]=[];
  // Opening draws only what this score shows: its own pages, or the saved
  // hand choices' projection. With a projection worker the engraver settles
  // for editing in the worker after opening; without one it settles here, as before.
  cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
-  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
  op.running.state='installing';readingProgress(op,'open');op.loading.saving('Almost ready. This part can’t be cancelled.');
@@ -844,7 +852,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingPresentation=nextPresentation;readingViewError=nextViewError;
  if(rememberOpened){toolbarVisible=false;libraryMenu.selection.update(entries,next.entry.id);libraryMenu.selection.select(`score:${next.entry.id}`);preferences.lastWorkedEntryId=next.entry.id;}
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
- if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
+ if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(droppedCarries.length)notify(droppedCarryText(droppedCarries));if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
@@ -1308,6 +1316,13 @@ async function act(action:string){try{if(!startupReady&&action!=='exit')return;i
   else if(editNavigation==='measures')selectFingerMeasure(action==='editorPrevious'?-1:1);else selectFinger(action==='editorPrevious'?-1:1);return;
  }
  if(selection&&!practice&&action==='editorSource'){await visitMemorySource();return;}
+ if(selection&&!practice&&['hand-not-here','hand-only-here','hand-shared'].includes(action)){
+  const target=current,before=target.personal,ownerId=selection.ownerIds[0],decisionId=crypto.randomUUID(),authoredAt=new Date().toISOString(),written=target.package.score.notes.find(n=>n.id===ownerId)?.hand;
+  // Keep this note’s written hand: an exception to the bar it would follow, for this note only.
+  if(action==='hand-not-here'&&!written)return;
+  const kept=(await acceptMemoryAction(target,action==='hand-not-here'?{kind:'hand',ownerId,hand:written!,local:true,decisionId,authoredAt}:{kind:'handScope',ownerId,scope:action==='hand-only-here'?'local':'shared',decisionId,authoredAt})).kept;
+  if(!kept)notify(handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction));return;
+ }
  if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,{kind:action==='memory-reference'?'reference':'reset',ownerId:selection.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});return;}
  if(action==='restore-all'||action==='undo-restore'){if(action==='restore-all'||s.undo||s.undoAssignments||s.undoCalculatedOwners){const target=current,ownerDialog=dialog,ownerSection=optionsSection;await acceptMemoryAction(target,{kind:action==='restore-all'?'restoreAll':'undoRestore',ownerId:p.seats[0].ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(current===target){if(dialog===ownerDialog)options(ownerSection);if(practice)practice.refit();else{renderPages();renderToolbar();}}}return;}
  if((selection||practice)&&['next','previous','count','scale'].includes(action))return;
@@ -1392,12 +1407,14 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');
  const action:PersonalMemoryAction=choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
- const receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
- if(waitedOwner||!nextSeat)return presentPersonalChange(target,next,receipt.saved);
+ const before=target.personal,receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
+ // A hand change reaching matching bars, or stopping there, is said; a refused one says why instead.
+ const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handCarryNotice(target.package,before,target.personal,ownerId):undefined;if(notice)notify(notice);return result;});
+ if(waitedOwner||!nextSeat)return said(presentPersonalChange(target,next,receipt.saved));
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
  capturePersonalNavigation(next,readerPackage(),nextSeat,true);
- return presentPersonalChange(target,next,receipt.saved,nextSeat);
+ return said(presentPersonalChange(target,next,receipt.saved,nextSeat));
 }
 function saveFingerDigit(replacement:number){return saveSelectedChoice({finger:replacement},true).catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});}
 function saveHandChoice(hand:PersonalHand){return saveSelectedChoice({hand},false).catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});}

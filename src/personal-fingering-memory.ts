@@ -45,12 +45,14 @@ const unknownAge=Number.MAX_SAFE_INTEGER;
 function fail(s:string):never{throw Error(`Personal fingering memory: ${s}`);}
 export const createPersonalFingeringMemory=(playerId='personal-library'):PersonalFingeringMemory=>({version:'personal-fingering-memory-v1',revision:0,playerId,indexed:false,keyboards:{},occurrences:{},receipts:{}});
 
-/** Complete written measures, not just notes with calculated or personal digits. */
-export function projectPersonalMemoryScore(input:MemoryScoreInput):PersonalMemoryOccurrence[] {
+/** Complete written measures, not just notes with calculated or personal digits.
+ * Hands carried from matching bars partition their bars like the owner's own;
+ * `carry: false` gives the partition of the owner's records alone. */
+export function projectPersonalMemoryScore(input:MemoryScoreInput,options:{carry?:boolean}={}):PersonalMemoryOccurrence[] {
  const {p,personal,entryId}=input,bars=p.score.sourceBarTicks,tpq=p.score.ticksPerBeat;
  if(!entryId||!bars||bars.length<2||bars[0]!==0||bars.at(-1)!==p.score.totalTicks||bars.some((n,i)=>!Number.isSafeInteger(n)||i>0&&n<=bars[i-1])||!Number.isSafeInteger(tpq)||tpq<=0)fail('complete exact written-measure map required');
  const keyboardId=p.keyboardLayout??p.manifest.keyboardLayout??'janko-four-row',profileId=p.profileSha256??p.manifest.profileSha256??p.profileId??p.manifest.profileId??`legacy:${source(p)}`;
- const effective=new Map(effectiveAssignments(p,personal).map(a=>[a.id,a])),notes=p.score.notes.filter(isPitchedEvent);
+ const effective=new Map(effectiveAssignments(p,personal,options).map(a=>[a.id,a])),notes=p.score.notes.filter(isPitchedEvent);
  const parent=new Map(notes.map(n=>[n.id,n.id]));
  const find=(id:string):string=>{const q=parent.get(id);if(q===undefined)return fail('unknown admitted alias owner');if(q!==id)parent.set(id,find(q));return parent.get(id)!;};
  for(const seat of p.seats){const ids=seat.ownerIds.filter(id=>parent.has(id));for(const id of ids.slice(1))parent.set(find(id),find(ids[0]));}
@@ -240,11 +242,14 @@ export function editPersonalFingeringMemory(document:PersonalFingeringMemory,inp
 }
 
 /** A hand edit does not author fingers. Preserve prior personal field lineage
- * when repartitioning would otherwise change any finger in the affected bar. */
+ * when repartitioning would otherwise change any finger in an affected bar:
+ * the edited bar and every bar whose carried hands changed with it. */
 export function preservePersonalMemoryHandChange(document:PersonalFingeringMemory,before:MemoryScoreInput,after:MemoryScoreInput,ownerId:string):PersonalFingeringMemory {
  if(before.entryId!==after.entryId||source(before.p)!==source(after.p)||(before.p.keyboardLayout??before.p.manifest.keyboardLayout)!==(after.p.keyboardLayout??after.p.manifest.keyboardLayout))fail('hand change source differs');
  const prior=resolvePersonalFingeringMemory(document,before.entryId,before.p,before.personal),oldRecords=projectPersonalMemoryScore(before),bar=oldRecords.find(r=>!r.occurrence.scope&&r.ownerIds.includes(ownerId));if(!bar)fail('unknown hand change owner');
- const next=registerMemoryScore(document,after),current=resolvePersonalFingeringMemory(next,after.entryId,after.p,after.personal),records=projectPersonalMemoryScore(after).filter(r=>r.writtenBar===bar.writtenBar);
+ const hands=new Map(effectiveAssignments(after.p,after.personal).map(a=>[a.id,a.hand])),moved=new Set(effectiveAssignments(before.p,before.personal).filter(a=>hands.get(a.id)!==a.hand).map(a=>a.id));
+ const bars=new Set([bar.writtenBar,...oldRecords.filter(r=>!r.occurrence.scope&&r.ownerIds.some(id=>moved.has(id))).map(r=>r.writtenBar)]);
+ const next=registerMemoryScore(document,after),current=resolvePersonalFingeringMemory(next,after.entryId,after.p,after.personal),records=projectPersonalMemoryScore(after).filter(r=>bars.has(r.writtenBar));
  for(const r of records){const edits:MeasureOwnerEdit[]=r.ownerIds.flatMap(id=>{
    const old=prior.byOwner[id]?.finger,now=current.byOwner[id]?.finger;
    if(prior.byOwner[id]?.calculated||!old||old.value===now?.value&&old.decision?.decisionId===now?.decision?.decisionId)return[];
@@ -307,7 +312,7 @@ export async function consolidatePersonalFingeringMemory(document:PersonalFinger
  if(document.receipts[receiptId])return{document,receipt:document.receipts[receiptId],personalByEntry:{},personalByKey:{}};
  const targets=[...new Set(targetEntryIds)].sort();if(!receiptId||!targets.length||targets.some(id=>!inputs.some(i=>i.entryId===id)))fail('complete authorized target snapshot required');
  if(targets.some(id=>inputs.filter(i=>i.entryId===id).length!==1))fail('one explicit presentation per consolidation target required');
- const selected=inputs.filter(i=>targets.includes(i.entryId)).sort((a,b)=>a.entryId.localeCompare(b.entryId)),frozen=structuredClone(selected),records=selected.flatMap(projectPersonalMemoryScore),parent=new Map<string,string>();
+ const selected=inputs.filter(i=>targets.includes(i.entryId)).sort((a,b)=>a.entryId.localeCompare(b.entryId)),frozen=structuredClone(selected),records=selected.flatMap(input=>projectPersonalMemoryScore(input)),parent=new Map<string,string>();
  const field=(r:PersonalMemoryOccurrence,id:string)=>JSON.stringify([r.entryId,r.occurrence.sourceRevision,id]);
  const find=(id:string):string=>{if(!parent.has(id))parent.set(id,id);const q=parent.get(id)!;if(q!==id)parent.set(id,find(q));return parent.get(id)!;};
  const join=(a:string,b:string)=>{const x=find(a),y=find(b);if(x!==y)parent.set(x<y?y:x,x<y?x:y);};
