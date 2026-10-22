@@ -24,15 +24,29 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **AND** no record is written for bar 21, and the bass notes and every other note keep their hands
 - **AND** a bar with another bass under the same chords is not changed
 
-#### Scenario: Local choice, only here and reset
-- **WHEN** the player presses L at bar 21's carried E4, or chooses Only here at bar 11
-- **THEN** that note or bar keeps its own hand, while the other bar keeps its own effective hand
-- **AND** Use bar 11's hand or Use for matching bars returns to the shared hand, and choosing the written hand at bar 11 undoes the change in both bars
+#### Scenario: Keep, don't share and reset, note by note
+- **WHEN** the player presses L or Keep this note's written hand at bar 21's carried E4, or Don't share this note's hand at bar 11's E4
+- **THEN** that note keeps its own hand, the other bar's E4 keeps its own effective hand, and bar 21's D#4 still follows bar 11
+- **AND** the notice names the note and what happened to it before the bars it changed
+- **AND** Use bar 11's hand or Share this note's hand returns to the shared hand, and choosing the written hand at bar 11 undoes the change in both bars
+
+#### Scenario: A move in bar 11's pickup
+- **WHEN** the player also moves bar 11's pickup B4, after the stretch bar 21 plays
+- **THEN** bar 11's E4 and D#4 still reach bar 21, and the pickup's hand stays in bar 11
+
+#### Scenario: Pickup bars
+- **WHEN** a hand is moved in a pickup bar, or in a full bar that starts with the same notes
+- **THEN** it reaches only pickup bars of the same length, never a full bar's downbeat
+
+#### Scenario: Older hand records
+- **WHEN** a note's hand was moved before hand choices recorded their intent, and a matching bar exists
+- **THEN** the editor shows at that note that pressing its hand key shares it, naming the bars, and nothing travels or is migrated until then
 
 #### Scenario: Practice follows the page
 - **WHEN** bar 21 takes bar 11's right hand
 - **THEN** practice, Fingers and calculator requests use the right hand for bar 21's E4 and D#4, and an exception made there wins
 
 #### Scenario: Undrawable recurrence
-- **WHEN** a matching bar would be left with a key that is half without a hand
-- **THEN** that bar keeps its hands, the player is told which bar and why, and the change itself is saved
+- **WHEN** a matching bar would be left with a key that is half without a hand, or the engraver refuses the carried hand there on opening or after an edit
+- **THEN** that bar keeps its written hands, the player is told which bar and why, and the change itself is saved
+- **AND** nothing is written for the receiving bar: no record and no "hand here only" choice, and opening the score saves nothing

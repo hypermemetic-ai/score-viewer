@@ -6,7 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {importPackage} from '../src/package';
 import {initialPersonal,type PersonalState} from '../src/state';
-import {assigned,handFor} from '../src/personal-assignments';
+import {assigned,dropHandCarry,handFor} from '../src/personal-assignments';
 import {engravingRefusal,undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
 import {keptHandsText} from '../src/hand-editing-wait';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
@@ -24,7 +24,7 @@ const flipped=(s:PersonalState)=>assigned(p,s,seat,{hand:'RH'});
 /** keepDrawableHands from main.ts, with the memory and the engraver replaced. */
 function harness(personal:PersonalState,project:(s:PersonalState)=>Promise<unknown>){
  const accepted:any[]=[],target={package:p,personal,entry:{id:'e',importedAt:'now'}};
- const context:any={structuredClone,crypto,handFor,undrawableHandOwners,undrawableHandReason,accepted,
+ const context:any={structuredClone,crypto,handFor,dropHandCarry,undrawableHandOwners,undrawableHandReason,accepted,
   personalMemory:{accept(input:any,action:any){accepted.push(action);const s=p.seats.find(s=>s.ownerIds.includes(action.ownerId))!;
    return {personal:assigned(p,input.personal,s,{hand:action.hand}),saved:Promise.resolve()};}},
   memoryInput:(t:any)=>({personal:t.personal}),resolveMemory:(t:any)=>t.personal,paintPersonalSaveError(){},
