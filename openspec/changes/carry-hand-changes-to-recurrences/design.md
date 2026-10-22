@@ -44,11 +44,19 @@ Practice (`personalPracticePackage`), the Fingers view (the projected package) a
 
 Hand records saved before recorded intent existed (No. 14 has seven) are not migrated and do not travel. Where such a note would reach matching bars, the editor says so at the note: "Moved before hand changes were shared. Press <kbd>R</kbd> to share it with bar 30." Pressing that key once records the choice with intent, and from then on it reaches matching bars (bar 14 → bar 30 in No. 14).
 
+## The owner's own hand: one rule
+
+A stored hand is the owner's own when it was chosen with recorded intent, kept to its note, or differs from the written hand. Before 2026-10-14 (f00f698) a finger edit also saved the note's hand as it then was. No. 14's 44 records that hold the written hand without intent are all of that kind: each was first saved with a finger, between 01:28 and 05:40 UTC that day, and none ever held another hand. They are no hand choice, so a carried hand replaces them, and they are not migrated. `ownsHand` is exported and asked by the carry (pages, practice), by `pianoRequestAuthority` and, when it rebases, by the repeat fold, so the page and the calculator cannot disagree about a note. On the owner's data no such record is carried over today: No. 14 has no hand change with intent that reaches another bar.
+
+## Following a matching bar again by L or R
+
+L or R at a note with its own hand, choosing the hand its matching bar would carry there (read without the key's own records), removes that note's own hand, as "Use bar N's hand" does: it follows that bar again, keeps its finger, and the notice says "In bar 21, 4 takes bar 11's right hand again." Any other choice is recorded as before.
+
 ## Composition with the repeat fold (viewer #173, ISO #430)
 
 #173 shows a verbatim repeat once. A note the player has not touched reads its twin's hand and finger on read (`repeatResolved`), and touched twins that disagree keep the repeat written out. Both mechanisms are derived and never stored. Together they give one answer per note, taking the first that exists:
 
-1. **The note's own stored hand**, including an exception at a receiving note.
+1. **The note's own stored hand** (`ownsHand`), including an exception at a receiving note.
 2. **A hand carried from a matching bar** (this change): only deliberate hands, not marked "Don't share this note's hand" (`handScope: 'local'`).
 3. **The repeat twin's stored hand** (#173), when the note is untouched.
 4. **The written hand.**

@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {handCarryNotice} from '../src/hand-recurrence-text';
+import {handCarryNotice,handKeyNotice} from '../src/hand-recurrence-text';
 import {undrawableHandOwners} from '../src/personal-presentation';
 import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {runInNewContext,runInContext} from 'node:vm';
 import {scoreCapabilities} from '../src/score-capabilities';
@@ -24,7 +24,7 @@ async function fixture(){
  }};
  const memoryInput=(owner:any)=>({entryId:owner.entry.id,importedAt:owner.entry.importedAt,p:owner.package,personal:rawMemoryPersonal(owner.personal)});
  const personalMemory=new PersonalMemorySession(store,{scanLibrary:async()=>[memoryInput(target)]});await personalMemory.initialize();active=true;
- const context:any={structuredClone,handCarryNotice,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
+ const context:any={structuredClone,handCarryNotice,handKeyNotice,crypto,undrawableHandOwners,current:target,selection:units[0],assigned,readPersonal,editUnits,nextInHand,viewportFit,innerWidth:1280,innerHeight:720,PersonalEditQueue,livePersonalEditors:new WeakMap(),
   scoreCapabilities,PersonalPresentationSession:class{handChoiceCheck(){return undefined;}async project(personal:any){return {...p,projection:personal.assignments};}},personalStorageName,personalMemory,memoryInput,rawMemoryPersonal,
   resolveMemory:(owner:any)=>withResolvedMemory(memoryInput(owner),personalMemory.resolve(memoryInput(owner)),personalMemory.memory.revision),effectiveAssignmentKey,
   adviceRunner:{cancel(){}},adviceKey:'',practice:undefined,PracticeView:class{},effectiveView:(v:any)=>v,renderPages(){frames.push(context.readerPackage());},renderToolbar(){},focusSelection(){},notify:(message:string)=>messages.push(message),paintPersonalSaveError(){},
@@ -104,12 +104,12 @@ test('waiting hand choices are said to be not applied when the score closes firs
  const f=await fixture(),prep=preparing(f);
  await f.context.saveHandChoice('RH');const status=handWait(f).status;f.context.current={package:p,personal:initialPersonal(p)};
  f.disk.resolve();prep.ready();await settle(f);
- assert.match(f.messages.at(-1)!,/^Right hand for the note in bar \d+ was not applied: the score was closed or changed before hand editing was ready\. Nothing was saved for it\.$/);
+ assert.match(f.messages.at(-1)!,/^RH for the note in bar \d+ was not applied: the score was closed or changed before hand editing was ready\. Nothing was saved for it\.$/);
  assert.equal(f.target.personal.assignments,undefined);assert.equal(status.closed,true);
 });
 test('leaving the score says at once that its waiting choices were not applied',async()=>{
  const f=await fixture(),prep=preparing(f);
  await f.context.saveHandChoice('LH');f.context.leaveHandEditingWait();
- assert.equal(f.messages.length,1);assert.match(f.messages[0],/^Left hand for the note in bar \d+ was not applied/);
+ assert.equal(f.messages.length,1);assert.match(f.messages[0],/^LH for the note in bar \d+ was not applied/);
  f.disk.resolve();prep.ready();await new Promise(r=>setTimeout(r,20));assert.equal(f.messages.length,1,'said once');assert.equal(f.target.personal.assignments,undefined);
 });
