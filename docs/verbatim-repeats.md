@@ -76,9 +76,11 @@ onto the other.
 
 ## Cost
 
-The first open of a score that folds engraves the folded pages once and draws
-the player's hands on them; both are then kept on disk. Op. 68 No. 13 on the
-owner data (headless Chromium on a shared, loaded machine, with a derived
-cache): first open 35.8 s against 19.4 s before; reopen 11.3 s against 13.3 s.
-A finger that splits or rejoins the passes switches between already-drawn
-pages.
+A score that folds engraves only its folded pages and draws the player's hands
+on them; both are then kept on disk. The written-out pages are not engraved as
+well. A score that does not fold pays the fold check alone (about 10 ms cold).
+Op. 68 No. 13 on the owner data, headless Chromium on a shared machine under
+load 25–50, first open without a derived cache: 29.4 CPU seconds against 34.7
+before (three folded pages instead of five written-out ones); wall times were
+no slower than main in paired runs. A finger that splits or rejoins the passes
+switches between already-drawn pages.
