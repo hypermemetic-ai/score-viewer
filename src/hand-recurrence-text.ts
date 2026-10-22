@@ -13,18 +13,22 @@ const barOf=(p:ScorePackage,id:string)=>{const n=p.score.notes.find(n=>n.id===id
 const digitOf=(p:ScorePackage,id:string)=>p.seats.find(s=>s.ownerIds.includes(id))?.pitchDigit??'one note';
 
 export type HandChoiceAction='hand-not-here'|'hand-only-here'|'hand-shared';
-/** `hint` is said beside the note with its key shown as a key: lead, key, rest. */
-export interface HandChoiceView {label?:string;description?:string;action?:{id:HandChoiceAction;label:string};hint?:{lead:string;key:string;rest:string}}
+/** Words said in the editor bar; a `key` is drawn as a key. */
+export type HandWords=readonly (string|{key:string})[];
+/** `said` is shown under the label, brief, with its keys as keys; `description`
+ * is the full sentence for the label's tooltip and screen readers. */
+export interface HandChoiceView {label?:string;description?:string;action?:{id:HandChoiceAction;label:string};said:HandWords}
 /** What the editor says about the selected note's hand: carried from another
  * bar, carried from here to matching bars, kept to this note alone, or moved
  * before hand changes were shared. Every action applies to this note. */
 export function handChoiceView(p:ScorePackage,s:PersonalState,ownerId:string):HandChoiceView|undefined {
  const hand=handProvenance(p,s,ownerId);if(!hand)return;
  const name=handName(hand.hand);
- if(hand.kind==='carried'){const written=otherHand(hand.hand);return{label:`Hand from bar ${hand.fromBar}`,description:`${capital(name)}, as you chose for the same music in bar ${hand.fromBar}. Press ${handKey(written)} to give this note its written ${handName(written)}.`,action:{id:'hand-not-here',label:'Keep this note’s written hand'}};}
- if(hand.kind==='shared')return hand.toBars.length?{label:`Hand also in ${barList(hand.toBars)}`,description:`${capital(name)} here and in ${barList(hand.toBars)}: the same music.`,action:{id:'hand-only-here',label:'Don’t share this note’s hand'}}:undefined;
- if(hand.kind==='unshared')return{hint:{lead:'Moved before hand changes were shared. Press',key:handKey(hand.hand),rest:`to share it with ${barList(hand.toBars)}.`}};
- return{label:'Hand for this note only',description:`${capital(name)} for this note only.${hand.follows===undefined?'':` Bar ${hand.follows} has the same music.`}`,
+ if(hand.kind==='carried'){const written=otherHand(hand.hand);return{label:`Hand from bar ${hand.fromBar}`,description:`${capital(name)}, as you chose for the same music in bar ${hand.fromBar}. Press ${handKey(written)} to give this note its written ${handName(written)}.`,action:{id:'hand-not-here',label:'Keep this note’s written hand'},said:[`${capital(name)}. Press `,{key:handKey(written)},` for its written ${handName(written)}.`]};}
+ if(hand.kind==='shared')return hand.toBars.length?{label:`Hand also in ${barList(hand.toBars)}`,description:`${capital(name)} here and in ${barList(hand.toBars)}: the same music.`,action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:[`${capital(name)}: the same music.`]}:undefined;
+ if(hand.kind==='unshared')return{said:['Moved before hand changes were shared. Press ',{key:handKey(hand.hand)},` to share it with ${barList(hand.toBars)}.`]};
+ const follows=hand.follows===undefined?'':` Bar ${hand.follows} has the same music.`;
+ return{label:'Hand for this note only',description:`${capital(name)} for this note only.${follows}`,said:[`${capital(name)}.${follows}`],
   ...(hand.follows!==undefined?{action:{id:'hand-shared' as const,label:`Use bar ${hand.follows}’s hand`}}:p.score.notes.find(n=>n.id===ownerId)?.hand!==hand.hand?{action:{id:'hand-shared' as const,label:'Share this note’s hand'}}:{})};
 }
 

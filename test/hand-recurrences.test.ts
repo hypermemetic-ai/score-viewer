@@ -53,8 +53,8 @@ test('No. 13: the owner’s bar 11 hand change reaches bar 21, the same music wr
  // Derived only: no record for bar 21, and the owner's records are unchanged.
  assert.deepEqual(personal.assignments,stored);assert.equal(personal.assignments!.choices[e4(21)],undefined);
  assert.equal(effectiveAssignments(input.p,personal,{carry:false}).find(a=>a.id===e4(21))!.hand,'LH');
- assert.deepEqual(handChoiceView(input.p,personal,e4(21)),{label:'Hand from bar 11',description:'Right hand, as you chose for the same music in bar 11. Press L to give this note its written left hand.',action:{id:'hand-not-here',label:'Keep this note’s written hand'}});
- assert.deepEqual(handChoiceView(input.p,personal,e4(11)),{label:'Hand also in bar 21',description:'Right hand here and in bar 21: the same music.',action:{id:'hand-only-here',label:'Don’t share this note’s hand'}});
+ assert.deepEqual(handChoiceView(input.p,personal,e4(21)),{label:'Hand from bar 11',description:'Right hand, as you chose for the same music in bar 11. Press L to give this note its written left hand.',action:{id:'hand-not-here',label:'Keep this note’s written hand'},said:['Right hand. Press ',{key:'L'},' for its written left hand.']});
+ assert.deepEqual(handChoiceView(input.p,personal,e4(11)),{label:'Hand also in bar 21',description:'Right hand here and in bar 21: the same music.',action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:['Right hand: the same music.']});
  assert.equal(handCarryNotice(input.p,input.personal,personal),'Right hand also in bar 21: the same music.');
 });
 
@@ -77,7 +77,7 @@ test('only a hand chosen with recorded intent travels; a legacy hand or an only-
  const local=choose(input,e4(11),'RH',{local:true});
  assert.equal(local.assignments!.choices[e4(11)].handScope,'local');assert.equal(handFor(input.p,local,e4(21)),'LH');
  assert.deepEqual(handProvenance(input.p,local,e4(11)),{kind:'local',hand:'RH'});
- assert.deepEqual(handChoiceView(input.p,local,e4(11)),{label:'Hand for this note only',description:'Right hand for this note only.',action:{id:'hand-shared',label:'Share this note’s hand'}});
+ assert.deepEqual(handChoiceView(input.p,local,e4(11)),{label:'Hand for this note only',description:'Right hand for this note only.',said:['Right hand.'],action:{id:'hand-shared',label:'Share this note’s hand'}});
  // A finger entered later keeps the scope; choosing a hand again without a scope keeps it too.
  const fingered=assigned(input.p,local,seat(input,e4(11)),{finger:2});assert.equal(fingered.assignments!.choices[e4(11)].handScope,'local');
  assert.equal(readPersonalAssignments(fingered.assignments,input.p)?.choices[e4(11)].handScope,'local');
@@ -223,7 +223,7 @@ test('a hand moved before hand changes were shared says so where it would reach,
  const input=no13(),legacy=assigned(input.p,input.personal,seat(input,e4(11)),{hand:'RH'});
  for(const c of Object.values(legacy.assignments!.choices))delete c.intent;
  assert.deepEqual(handProvenance(input.p,legacy,e4(11)),{kind:'unshared',hand:'RH',toBars:[21]});
- assert.deepEqual(handChoiceView(input.p,legacy,e4(11)),{hint:{lead:'Moved before hand changes were shared. Press',key:'R',rest:'to share it with bar 21.'}});
+ assert.deepEqual(handChoiceView(input.p,legacy,e4(11)),{said:['Moved before hand changes were shared. Press ',{key:'R'},' to share it with bar 21.']});
  assert.equal(handFor(input.p,legacy,e4(21)),'LH','nothing travels until it is chosen again');
  const store=storage(),s=session(store,{...input,personal:legacy});await s.initialize();
  let personal=await s.loadPersonalCurrent({id:'no13',importedAt:input.importedAt!},input.p,async()=>legacy);
