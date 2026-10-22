@@ -105,9 +105,9 @@ test('the owner’s own hand in the receiving bar wins, note by note',()=>{
  assert.equal(handActionNotice(input.p,owners(input),personal,e4(21),'hand-not-here'),'The rest of bar 21 still follows bar 11.');
  const unshared=structuredClone(owners(input));unshared.assignments!.choices[e4(11)].handScope='local';
  assert.equal(handActionNotice(input.p,owners(input),unshared,e4(11),'hand-only-here'),'In bar 21, 4 is in its written hand again.');
- // The Hand row now names bar 21 ("Hand also in bar 21"), so the notice doesn't say it again.
+ // The Hand row now names bar 21 ("RH · also in bar 21"), so the notice doesn't say it again.
  assert.equal(handActionNotice(input.p,unshared,owners(input),e4(11),'hand-shared'),undefined);
- // Its Hand row now reads "Hand from bar 11", so nothing else is said.
+ // Its Hand row now reads "RH · from bar 11", so nothing else is said.
  assert.equal(handActionNotice(input.p,personal,owners(input),e4(21),'hand-shared'),undefined);
 });
 
@@ -304,7 +304,7 @@ test('L, then R, on a carried note: it follows bar 11 again, not the right hand 
  assert.equal(personal.assignments!.choices[e4(21)].hand,undefined);assert.equal(personal.assignments!.choices[e4(21)].handScope,undefined);
  assert.equal(effectiveAssignments(input.p,personal).find(a=>a.id===e4(21))!.finger,3);
  assert.equal(handKeyNotice(input.p,before,personal,e4(21)),'In bar 21, 4 takes bar 11’s RH again.');
- // While the 4 stays selected its Hand row reads "Hand from bar 11", so the notice doesn't repeat it.
+ // While the 4 stays selected its Hand row reads "RH · from bar 11", so the notice doesn't repeat it.
  assert.equal(handKeyNotice(input.p,before,personal,e4(21),true),undefined);
  // So a later change at bar 11 reaches it: the written hand there takes bar 21 back with it.
  await step(handAction(e4(11),'LH','undo'));assert.equal(handFor(input.p,personal,e4(21)),'LH');
@@ -344,6 +344,7 @@ test('the Hand row reads its hand first, then any key line, then its button, and
  const code=stripTypeScriptTypes(`${slice('const button=(','\n')}\n${slice('const editorActions=','\n')}\n${slice('function editorHandMarkup(','async function visitMemorySource(')}`);
  const input=no13(),personal=owners(input),local=structuredClone(personal);local.assignments!.choices[e4(11)].handScope='local';
  const legacy=assigned(input.p,input.personal,seat(input,e4(11)),{hand:'RH'});for(const c of Object.values(legacy.assignments!.choices))delete c.intent;
+ const follows=choose({...input,personal},e4(21),'LH',{local:true,at:'2026-10-22T00:00:00.000Z'});
  const row=(state:PersonalState,ownerId:string)=>{const context:any={esc:(t:string)=>t,handChoiceView,current:{package:input.p,personal:state},selection:{ownerIds:[ownerId]}};runInNewContext(`${code};globalThis.markup=editorHandMarkup;`,context);return context.markup() as string;};
  // Strip tags, keeping the order of what is read: the row name, the fact, any key line, the button.
  const read=(html:string)=>html.replace(/<kbd>(.*?)<\/kbd>/g,'[$1]').replace(/<button[^>]*>(.*?)<\/button>/g,'{$1}').replace(/<[^>]+>/g,'|').split('|').filter(Boolean);
@@ -354,13 +355,18 @@ test('the Hand row reads its hand first, then any key line, then its button, and
   ['carried',e4(21),'RH · from bar 11',['{Keep its written LH[L]}']],
   // After L where it stays to this note only.
   ['local',e4(11),'RH · this note only',['{Share this note’s hand}']],
+  // After L at bar 21's 4, kept to that note while bar 11 still has the same music.
+  ['follows',e4(21),'LH · this note only',['{Use bar 11’s hand}']],
   // The hint: a key line, and no button.
   ['unshared',e4(11),'RH',['Press [R] to share it with bar 21.']],
  ];
  for(const [kind,ownerId,fact,rest] of cases){
-  const state=kind==='local'?local:kind==='unshared'?legacy:personal,html=row(state,ownerId);
+  const state=kind==='local'?local:kind==='unshared'?legacy:kind==='follows'?follows:personal,html=row(state,ownerId);
   assert.deepEqual(read(html),['Hand',fact,...rest],kind);
   assert.ok(html.endsWith(rest[0].startsWith('{')?'</button></span></div>':'</span></div>'),`${kind}: nothing after the button`);
   if(rest[0].startsWith('{'))assert.match(html,/<span class="editor-row-actions"><button/,`${kind}: the button starts its own line`);
  }
+ // No state has both a key line and a button yet; when one does, the key line comes first and the button ends the row.
+ const both=(()=>{const context:any={esc:(t:string)=>t,handChoiceView:()=>({label:'RH',description:'Right hand.',said:['Press ',{key:'R'},' to share it.'],action:{id:'hand-shared',label:'Use bar 11’s hand'}}),current:{package:input.p,personal},selection:{ownerIds:[e4(11)]}};runInNewContext(`${code};globalThis.markup=editorHandMarkup;`,context);return context.markup() as string;})();
+ assert.deepEqual(read(both),['Hand','RH','Press [R] to share it.','{Use bar 11’s hand}']);assert.ok(both.endsWith('</button></span></div>'));
 });
