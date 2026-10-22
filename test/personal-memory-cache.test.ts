@@ -11,8 +11,13 @@ test('resolution is reused for navigation and derived display changes, invalidat
  input.personal.calculatedOwners={n:true};assert.notEqual(cache.resolve(input,1,load),first);
  const masked=cache.resolve(input,1,load);input.personal.calculatedOwners.n=false as never;assert.notEqual(cache.resolve(input,1,load),masked);
  const revised=cache.resolve(input,2,load);assert.equal(calls,4);assert.equal(cache.resolve(input,2,load),revised);
- assert.notEqual(cache.resolve({...input,p:{...input.p}},2,load),revised);assert.notEqual(cache.resolve({...input,entryId:'other'},2,load),revised);
- assert.equal(calls,6);
+ // A reopening reads its package afresh: the same score is the same resolution.
+ assert.equal(cache.resolve({...input,p:structuredClone(input.p)},2,load),revised);
+ assert.notEqual(cache.resolve({...input,p:{...input.p,manifest:{revision:'another source'}}},2,load),revised);
+ assert.notEqual(cache.resolve({...input,p:{...input.p,keyboardLayout:'conventional-piano'}},2,load),revised);
+ assert.notEqual(cache.resolve({...input,p:{...input.p,transposition:{semitones:2}}},2,load),revised);
+ assert.notEqual(cache.resolve({...input,entryId:'other'},2,load),revised);
+ assert.equal(calls,8);
 });
 function queues(){let id=0;const frames=new Map<number,()=>void>(),tasks=new Map<number,()=>void>();return{frames,tasks,work:new AfterPaintWork({request:fn=>{frames.set(++id,fn);return id;},cancel:n=>{frames.delete(n);}},{request:fn=>{tasks.set(++id,fn);return id as unknown as ReturnType<typeof setTimeout>;},cancel:n=>{tasks.delete(Number(n));}}),frame(){const next=frames.entries().next().value!;frames.delete(next[0]);next[1]();},task(){const next=tasks.entries().next().value!;tasks.delete(next[0]);next[1]();}};}
 test('derived work waits beyond animation frame, replaces queued work, and cancels on owner exit',()=>{

@@ -1,15 +1,20 @@
-import type {MemoryScoreInput,MemoryResolution} from './personal-fingering-memory';
+import {memoryInputKey,type MemoryScoreInput,type MemoryResolution} from './personal-fingering-memory';
 /** Only musical authority participates. Cursor/page changes and the derived
  * display projection cannot invalidate the same accepted source resolution. */
 export function personalMemoryResolutionKey(input:MemoryScoreInput,generation:number):string {
  const s=input.personal;return JSON.stringify([input.entryId,generation,s.assignments,s.overrides,s.calculatedOwners,s.layer]);
 }
+/** Each opening reads its package afresh, so resolutions are kept by the
+ * score's memory identity rather than by package object: reopening a score
+ * whose memory and hands are unchanged resolves nothing again. */
 export class PersonalMemoryResolutionCache {
- private values=new WeakMap<MemoryScoreInput['p'],Map<string,{key:string;value:MemoryResolution}>>();
+ private values=new Map<string,{key:string;value:MemoryResolution}>();
  resolve(input:MemoryScoreInput,generation:number,load:(input:MemoryScoreInput)=>MemoryResolution):MemoryResolution{
-  const key=personalMemoryResolutionKey(input,generation),entries=this.values.get(input.p)??new Map(),saved=entries.get(input.entryId);
+  const score=JSON.stringify([memoryInputKey(input),input.p.transposition??null]),key=personalMemoryResolutionKey(input,generation),saved=this.values.get(score);
   if(saved?.key===key)return saved.value;
-  const value=load(input);entries.set(input.entryId,{key,value});this.values.set(input.p,entries);return value;
+  const value=load(input);this.values.delete(score);this.values.set(score,{key,value});
+  if(this.values.size>16)this.values.delete(this.values.keys().next().value!);
+  return value;
  }
 }
 /** Start derived work only after the next opportunity to paint. A newer request

@@ -238,3 +238,15 @@ test('cache generation changes when equal-revision optimistic authority is repla
  await accepted.saved;assert.equal(s.memoryRevision,optimisticRevision);assert.ok(s.memoryGeneration>optimisticGeneration);
  const durableGeneration=s.memoryGeneration;input.personal.view.page=1;await s.saveView(input);assert.equal(s.memoryGeneration,durableGeneration);
 });
+test('reopening reads stored memory once per change and still registers what another session removed',async()=>{
+ const a=choose(fixture('a'),'b0n1',2),b=fixture('b'),store=storage(),s=session(store,[a,b]);await s.initialize();
+ const registered=async()=>Object.values(((await store.read()).documents[personalMemoryDocument] as any).occurrences).filter((o:any)=>o.entryId==='a').length;
+ const indexed=await registered();assert.ok(indexed);
+ const first=await load(s,a),revision=(await store.read()).revision;
+ // The same score again, as its own fresh package: nothing to write, the same hands.
+ assert.deepEqual(await load(s,{...a,p:structuredClone(a.p)}),first);assert.equal((await store.read()).revision,revision);
+ assert.ok(s.storedRefs('a')?.length);assert.equal(s.storedRefs('missing'),undefined);
+ // Another application session forgets the score; the next opening registers it again.
+ const other=session(store,[a,b]);await other.initialize();await other.deleteEntry('a');assert.equal(await registered(),0);
+ await load(s,a);assert.equal(await registered(),indexed);assert.equal(finger(s,a,'b0n1'),2);
+});
