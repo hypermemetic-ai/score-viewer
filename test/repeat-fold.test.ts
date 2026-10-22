@@ -366,6 +366,14 @@ test('a folded score is prepared ahead of time as it opens: served only while it
  assert.equal((await Promise.all([...files.keys()].map(async name=>{const kept=new Map(files);kept.delete(name);return !await projectionServed(new DerivedFileCache({read:async n=>kept.get(n)??null,write:async()=>true},'build-a'),served);}))).filter(Boolean).length,2,'the folded pages and their projection');
  assert.equal(await projectionServed(new DerivedFileCache(store,'build-b'),served),false,'another build draws them again');
  // Choices that keep every folded note's written hand need only the folded pages.
+ // Opening it in a fresh process: a fresh package, a fresh reader, the same disk. Nothing is engraved or written again.
+ const writes:string[]=[],disk:DerivedFileStore={read:name=>store.read(name),async write(name,data){writes.push(name);return store.write(name,data);}},again=new DerivedFileCache(disk,'build-a');
+ const fresh={...p,score:structuredClone(p.score),...(p.sourceScore?{sourceScore:structuredClone(p.sourceScore)}:{})},opened=new FoldedReader(fresh,again,{options:{worker:null,cache:again}});
+ const shown=(await opened.view(s,fresh))!;await again.flush();
+ assert.deepEqual(writes,[],'the folded pages and their projection are read from disk');
+ assert.equal(shown.pages.length,(await reader.view(s))!.pages.length);
+ assert.deepEqual((await opened.served(s))?.key,served.key,'and it serves what was prepared');
+ assert.equal((await opened.view(structuredClone(s),fresh))!.verbatimFold!.session,shown.verbatimFold!.session,'the same fold reuses its edition');
  const own=initialPersonal(p),plain=new FoldedReader(p,cache,{pool:new PersonalPreparationPool<any>(),options:{worker:null,cache,cacheWriteDelayMs:0}});
  if(verbatimRepeats(p,own)?.fold){await plain.view(own);assert.deepEqual((await plain.served(own))?.with,[]);}
 });
