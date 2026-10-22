@@ -26,13 +26,15 @@ Before this change, two problems meant a reopen was rarely instant:
 
 A score that is already prepared costs a hash and two header reads, not an admission. A small `ahead-of-time-v1` entry, keyed by the archive bytes, the keyboard layout and the stored objects holding the score's hand choices, records which projection entry serves it. If that projection was evicted or never written, the header check fails and the score is prepared again.
 
-**Personal memory is read once per change.** Stored assistance objects are named by their content. The session therefore reads and validates the memory document again only when its stored object changes. It keeps each recent score's registered occurrences by memory identity and hand choices. Another session's change gives the memory document a new name, which forces a fresh read.
+**Page checks leave receipts.** Admission checks every piano page as passive ink for its seats, which means parsing each page's SVG. A page this build already checked leaves a `piano-page-checks-v1` receipt keyed by the digests of the exact page bytes and seats, so a later start skips the parse. A changed page has a different key and is checked as before.
+
+**Personal memory is read once per change.** Stored assistance objects are named by their content. The session therefore reads and validates the memory document again only when its stored object changes. It keeps each recent score's registered occurrences, and its fingering resolution, by memory identity and hand choices, because every opening reads its package afresh. Another session's change gives the memory document a new name, which forces a fresh read.
 
 ## Opening steps after this change
 
 | Situation | What happens |
 | --- | --- |
-| Reopen, nothing changed | Admission from its receipt, personal memory from the memo, projection from disk. No engraving. |
+| Reopen, nothing changed | Admission checks digests and seats; the pages' passive-ink check comes from its receipt. Personal memory and its resolution come from the memo, and the projection from disk. No engraving. |
 | First opening after an app update that leaves the engraving code unchanged | The same as a reopen: the derived identity has not changed. |
 | First opening after an engraver update | Usually prepared already in the library. Otherwise one engrave, as before. |
 | Hand edit | Re-engraves in the settled engine (ISO notation's incremental path). It is not cached ahead of time. |
