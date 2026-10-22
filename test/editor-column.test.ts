@@ -66,3 +66,17 @@ test('while a note is edited, notices sit in the editor column instead of over t
  assert.equal(column.children.length,0);assert.equal(body.children[0].textContent,'Saved.');
  assert.equal(all().length,1,'one notice at a time');
 });
+
+test('the Finger row reads its source first, then its buttons, and nothing after them',()=>{
+ const code=`${production('const button=(','\n')}\n${production('const editorActions=','\n')}\n${production('function editorMemoryMarkup(','/** A row')}`;
+ const row=(said:string|undefined,promote:boolean)=>{
+  const context:any={esc:(t:string)=>t,current:{entry:{id:'piece'}},selection:{ownerIds:['n1'],writtenBar:1},entries:[],sourceReturn:undefined,controls:{bindings:{}},
+   memoryInput:()=>({personal:{}}),resolveMemoryInput:()=>({}),memoryChoiceLabel:()=>said?'Shared':undefined,memoryReferenceTarget:()=>undefined,
+   memoryFingerSource:()=>({said,description:'Matching bars follow this bar’s finger.',reference:'here',promote}),workReference:()=>'',actionControlLabel:()=>'G',selectedWarningText:()=>'',editorHandMarkup:()=>'',printedBar:(_id:string,bar:number)=>bar};
+  runInNewContext(`${stripTypeScriptTypes(code)};globalThis.markup=editorMemoryMarkup;`,context);return context.markup() as string;};
+ const shared=row('Matching bars follow this bar.',true);
+ assert.ok(shared.indexOf('Matching bars follow this bar.')<shared.indexOf('<span class="editor-row-actions">'),'the line comes before the buttons');
+ assert.match(shared,/<span class="editor-row-actions"><button[^>]*>Source<kbd>G<\/kbd><\/button><button[^>]*>Use for matching bars<\/button><\/span><\/div>$/);
+ // With no finger yet the row is its name and Source alone, on one line.
+ assert.match(row(undefined,false),/^<div class="editor-row" data-editor-row="finger"><span class="editor-row-name">Finger<\/span><span class="fingering-advice-explanation"[^>]*><\/span><button[^>]*disabled>Source<kbd>G<\/kbd><\/button><\/div>$/);
+});
