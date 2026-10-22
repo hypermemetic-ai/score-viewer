@@ -600,19 +600,24 @@ async function chooseReference(actionLabel:'Practice'):Promise<ReferencePerforma
 }
 type OpenScore=NonNullable<typeof current>;
 interface ScoreTempos {piece?:ScoreTempo;goal?:{bpm:number;beat:ScoreTempo['beat']}}
-/** Practice's goal, read only: the journal's personal goal (or the edition's reference
- * it otherwise practises toward), or reading practice's saved tempo. */
+/** Two tempos are the same when they match to the metronome's whole number on one beat. */
+const sameTempo=(a?:{bpm:number;beat:ScoreTempo['beat']},b?:{bpm:number;beat:ScoreTempo['beat']})=>!!a&&!!b&&Math.abs(tempoOnBeat(a.bpm,a.beat,b.beat)-b.bpm)<.5;
+/** Practice's goal when you have set one, read only: the journal's personal goal, or
+ * reading practice's saved tempo. The edition's reference is the piece tempo, not a goal,
+ * and a personal goal that is the reference says nothing more. */
 async function practiceGoalFor(target:OpenScore):Promise<unknown>{
  const score=target.package.score;
  try{
-  if(scoreCapabilities(target.package).pianoPreparation)return ((await PracticeView.savedJournal(target.package,target.entry.id)) as {personalGoal?:unknown}|undefined)?.personalGoal??score.referencePerformanceTempo;
+  if(scoreCapabilities(target.package).pianoPreparation){
+   const goal=((await PracticeView.savedJournal(target.package,target.entry.id)) as {personalGoal?:unknown}|undefined)?.personalGoal;
+   return sameTempo(readPracticeGoal(goal),readPracticeGoal(score.referencePerformanceTempo))?undefined:goal;
+  }
   const controller=readingPresentation;
   if(target===current&&controller&&target.package.reading?.dual&&score.referencePerformanceTempo===undefined){
    const identity={partId:target.package.reading.dual.sourcePartId,musicalRevision:controller.revision};
    return readManualReference(await readJson(await manualReferenceStorageName(identity)),identity);
   }
  }catch{/* An unreadable journal is practice's to report. */}
- return score.referencePerformanceTempo;
 }
 /** The piece tempo (yours, then what the score says) and practice's own goal, kept distinct. */
 async function scoreTempoFor(target:OpenScore):Promise<ScoreTempos>{
@@ -665,7 +670,7 @@ function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string
    preferences.scoreTempos=withOwnerScoreTempo(preferences,target.entry.id,ownerScoreTempo(chosen,beat)).scoreTempos;
    void savePreferences().catch(error=>notify(`Tempo was not saved: ${(error as Error).message}`));
    finish(chosen);if(dialog===d)closeDialog();
-   if(goal!==undefined)notify(`Piece tempo ${tempoRateNumber(chosen)} kept. Practice keeps its goal of ${tempoRateNumber(goal)}; change that in practice Options.`);}});
+   if(goal!==undefined&&goal!==chosen)notify(`Piece tempo ${tempoRateNumber(chosen)} kept. Practice keeps its goal of ${tempoRateNumber(goal)}; change that in practice Options.`);}});
   d.addEventListener('close',()=>finish(undefined),{once:true});
  });
 }
@@ -677,8 +682,8 @@ async function paintScoreTempo(d:HTMLDialogElement,target:OpenScore){
   const {piece,goal}=await scoreTempoFor(target);if(dialog!==d||current!==target)return;
   const beat=meterBeat(target.package.score),hear=d.querySelector<HTMLButtonElement>('[data-action=score-tempo]');
   if(!beat&&hear){hear.disabled=true;hear.title='Hearing needs a meter; this score has none.';}
-  const practiceLine=goal&&piece?.origin!=='practice'?`<small data-score-practice-goal>Practice goal ${tempoMark(goal.bpm,goal.beat)}</small>`:'';
-  if(!piece||!piece.confident){slot.innerHTML=`<span>Not set</span><small>${esc(scoreTempoOriginText(undefined))}</small>${practiceLine}`;return;}
+  const practiceLine=goal&&piece?.origin!=='practice'&&!(piece?.confident&&sameTempo(goal,piece))?`<small data-score-practice-goal>Practice goal ${tempoMark(goal.bpm,goal.beat)}</small>`:'';
+  if(!piece||!piece.confident){slot.innerHTML=`<span>Not set</span><small>${esc(scoreTempoOriginText(piece))}</small>${practiceLine}`;return;}
   const counted=beat??piece.beat,seconds=performanceSeconds(buildPerformanceSchedule(target.package.score,counted),tempoOnBeat(piece.bpm,piece.beat,counted));
   slot.innerHTML=`<span>${tempoMark(piece.bpm,piece.beat)}</span><small>${esc(scoreTempoOriginText(piece))} · about ${playingTimeLabel(seconds)}</small>${practiceLine}`;
  }catch(error){if(dialog===d)slot.textContent=(error as Error).message;}

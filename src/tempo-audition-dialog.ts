@@ -16,7 +16,8 @@ export interface TempoAuditionView {
  /** Practice opened the flow and has no goal yet: Enter sets both. */
  setsPracticeGoal?:boolean;
 }
-const ordinal=(n:number)=>n===2?'2nd':n===3?'3rd':`${n}th`;
+/** Proper English ordinals: 1st, 2nd, 3rd, 11th, 21st, 112th. */
+export const ordinal=(n:number)=>{const tens=n%100,ones=n%10;return `${n}${tens>=11&&tens<=13?'th':ones===1?'st':ones===2?'nd':ones===3?'rd':'th'}`;};
 /** What Enter keeps, said plainly: the piece tempo, and what happens to practice's goal. */
 export function tempoKeepText(view:Pick<TempoAuditionView,'practiceGoal'|'setsPracticeGoal'>):string {
  if(view.practiceGoal!==undefined)return `Enter keeps the piece tempo. Practice keeps its goal of ${tempoRateNumber(view.practiceGoal)}; change that in practice Options.`;

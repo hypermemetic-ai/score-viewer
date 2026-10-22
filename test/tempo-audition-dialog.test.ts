@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {tempoAuditionMarkup,tempoKeepText} from '../src/tempo-audition-dialog';
+import {ordinal,tempoAuditionMarkup,tempoKeepText} from '../src/tempo-audition-dialog';
 
 const quarter={numerator:1,denominator:4};
 test('Enter says what it keeps: the piece tempo, and practice keeps its own goal',()=>{
@@ -12,4 +12,7 @@ test('Enter says what it keeps: the piece tempo, and practice keeps its own goal
  assert.doesNotMatch(first,/data-tempo-compare/);assert.match(first,/Practice at this tempo <kbd>Enter<\/kbd>/);
  // Key hints are <kbd>.
  for(const key of ['←','→','Space','Home','Esc','Enter'])assert.match(withGoal,new RegExp(`<kbd[^>]*>${key}</kbd>`));
+});
+test('passes are counted with proper ordinals',()=>{
+ assert.deepEqual([1,2,3,4,11,12,13,21,22,23,101,111,112,113].map(ordinal),['1st','2nd','3rd','4th','11th','12th','13th','21st','22nd','23rd','101st','111th','112th','113th']);
 });

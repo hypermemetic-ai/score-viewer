@@ -44,6 +44,46 @@ test('the first tempo word governs; later words qualify it',()=>{
  ];
  for(const [text,bpm] of cases)assert.equal(interpretTempoMarking(text,quarter)?.bpm,bpm,text);
 });
+test('a negation, modifier or restraint belongs to the word it stands beside',()=>{
+ const read=(text:string)=>{const r=interpretTempoMarking(text,quarter)!;return r.confident?r.bpm:`${r.bpm}?`;};
+ const cases:[string,number|string][]=[
+  // A negation or restraint just before a word names a pace of its own, the same for every word that says "fast" or "slow".
+  ['Sehr innig und nicht zu rasch',112],['Nicht zu rasch',112],['Nicht rasch',76],['Nicht zu lebhaft',112],['Nicht allzu rasch',112],['Nicht zu geschwind',112],
+  ['Nicht schnell',76],['Nicht zu schnell',112],['Nicht langsam',100],['Nicht zu langsam',76],
+  ['Not fast',76],['Not too fast',112],['Not too slow',76],['Pas trop lent',76],['Pas trop vite',112],['Pas vite',76],['Non troppo allegro',112],
+  // A moderating first word: between the two.
+  ['Moderately slow',77],['Mässig langsam',76],['Mäßig schnell',124],['Moderately fast',126],['Mässig bewegt',104],
+  // A restraint belongs to the word it follows, and holds back what it names.
+  ['Adagio ma non troppo',71],['Lento ma non troppo',56],['Vivace ma non troppo',144],['Lent, pas trop',60],['Langsam, ma non troppo',65],
+  ['Lebhaft, doch nicht zu schnell',133],['Lebhaft, doch nicht schnell',133],['Allegro, but not too fast',122],
+  // A compound marking: the first section is the opening's.
+  ['Adagio – Allegro ma non troppo',66],['Grave – Allegro di molto e con brio',40],['Andante – Allegro',80],
+  // What cannot be placed is not confident: hear it and set it.
+  ['Adagio, Allegro ma non troppo','66?'],['Nicht zu bewegt','120?'],['Andante, quasi allegretto, ma non troppo','96?'],['Nicht mässig langsam','60?'],
+ ];
+ for(const [text,bpm] of cases)assert.equal(read(text),bpm,text);
+});
+test('a sweep of common markings in four languages, including the built-in and owner scores',()=>{
+ const read=(text:string)=>{const r=interpretTempoMarking(text,quarter);return !r?undefined:r.confident?r.bpm:`${r.bpm}?`;};
+ const cases:[string,number|undefined][]=[
+  // Owner and built-in scores: No. 13 says "Nicht schnell"; No. 14 says only how to play.
+  ['Nicht schnell',76],['Leise und sehr egal zu spielen.',undefined],
+  // Italian
+  ['Largo',46],['Lento',52],['Larghetto',60],['Adagio',66],['Adagio sostenuto',66],['Adagio molto',60],['Andante',80],['Andante con moto',80],['Andante cantabile',80],
+  ['Andante maestoso',80],['Andantino',88],['Moderato',108],['Moderato cantabile',108],['Allegretto',112],['Allegretto grazioso',112],['Tempo di Menuetto',112],
+  ['Allegro moderato',116],['Allegro',132],['Allegro con brio',132],['Allegro vivace',132],['Allegro assai',145],['Molto allegro',145],['Vivace',156],
+  ['Presto',180],['Presto agitato',180],['Prestissimo',200],['Maestoso',72],['Tempo giusto',108],['Alla marcia',112],['Introduzione. Adagio',66],
+  // German
+  ['Langsam',60],['Sehr langsam',55],['Ziemlich langsam',63],['Langsam und mit Ausdruck',60],['Ruhig',72],['Gehend',84],['Mäßig',96],['Mäßig, durchaus energisch',96],
+  ['Bewegt',120],['Etwas bewegt',114],['Frisch',132],['Munter',138],['Lebhaft',144],['Etwas lebhaft',137],['Rasch',160],['Schnell',160],
+  ['Innig',undefined],['Im Legendenton',undefined],['Mit Humor',undefined],['Kräftig und sehr markiert',undefined],
+  // French
+  ['Lent',56],['Très lent',46],['Lent et grave',56],['Modéré',100],['Sans lenteur',96],['Animé',132],['Un peu animé',126],['Vif',150],['Assez vif',143],['Cédez',undefined],
+  // English
+  ['Slowly',60],['Slow and steady',60],['Moderately',100],['Moderate',100],['With motion',112],['Walking pace',84],['Lively',144],['Quickly',152],['Fast',160],
+ ];
+ for(const [text,bpm] of cases)assert.equal(read(text),bpm,text);
+});
 test('words that are not tempo words give nothing',()=>{
  // Character words say how to play, not how fast.
  for(const text of ['Simile','dolce','Leise und sehr egal zu spielen.','Léger et très égal','espressivo','rit.','Fine','dolce e tranquillo','sempre sostenuto','cantabile'])assert.equal(interpretTempoMarking(text,quarter),undefined,text);
@@ -63,6 +103,11 @@ test('the score itself: reference, printed mark, encoded rate, opening word',()=
  // A printed metronome mark at the opening wins over a word at the same place.
  assert.deepEqual(sourceScoreTempo(score({tempos:[{tick:0,bpm:132,description:'Allegro'},{tick:0,bpm:100,sourceUnit:{type:'quarter',dots:0,perMinute:100}}]})),{bpm:100,beat:quarter,origin:'metronome',confident:true,marking:'Allegro'});
  assert.deepEqual(sourceScoreTempo(score({tempos:[{tick:0,bpm:100,sourceUnit:{type:'quarter',dots:0,perMinute:100}}],sourceTexts:[{id:'a',tick:0,text:'Allegro',origin:{}}]})),{bpm:100,beat:quarter,origin:'metronome',confident:true});
+ // A reading that cannot be placed only starts hearing: practice's goal, else the reading, not confident.
+ const unsure=score({sourceTexts:[{id:'a',tick:0,text:'Adagio, Allegro ma non troppo',origin:{}}]});
+ assert.deepEqual(sourceScoreTempo(unsure),{bpm:66,beat:quarter,origin:'marking',confident:false,marking:'Adagio, Allegro ma non troppo'});
+ assert.equal(resolveScoreTempo(unsure,{practiceGoal:{version:'personal-performance-goal-v1',bpm:80,beat:quarter}})!.origin,'practice');
+ assert.equal(resolveScoreTempo(unsure)!.confident,false);
  // Character words alone do not make a confident tempo.
  assert.equal(sourceScoreTempo(score({sourceTexts:[{id:'a',tick:0,text:'dolce e tranquillo',origin:{}}]})),undefined);
  // The Schumann fixture without its reference says only how to play, not how fast.
@@ -111,6 +156,7 @@ test('the metronome scale steps and beat conversion',()=>{
 test('origins and playing time read as facts',()=>{
  assert.equal(scoreTempoOriginText({bpm:76,beat:quarter,origin:'marking',confident:true,marking:'Nicht schnell'}),'From “Nicht schnell”');
  assert.equal(scoreTempoOriginText({bpm:72,beat:quarter,origin:'yours',confident:true}),'Set by you');
+ assert.equal(scoreTempoOriginText({bpm:120,beat:quarter,origin:'marking',confident:false,marking:'Nicht zu bewegt'}),'The score says “Nicht zu bewegt”, which doesn’t settle how fast it goes.');
  assert.equal(scoreTempoOriginText({bpm:80,beat:quarter,origin:'practice',confident:true}),'From your practice goal');
  assert.equal(scoreTempoOriginText(undefined),'This score doesn’t say how fast it goes.');
  assert.equal(playingTimeLabel(70.9),'1:11');assert.equal(playingTimeLabel(3599.6),'60:00');assert.equal(playingTimeLabel(5),'0:05');
