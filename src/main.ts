@@ -59,7 +59,7 @@ import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-
 import {requirePracticeHands} from './practice';
 import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
 import type {ReadingExecution} from './reading-execution';
-import {editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
+import {SavedPagesLackRepeats,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
@@ -297,6 +297,8 @@ async function retryPersonalEdits(target:NonNullable<typeof current>){
 const personalFile=(entry:Entry,p:ScorePackage)=>entry.personalFiles?.[personalStorageName(entry.id,p)]??personalStorageName(entry.id,p);
 let persist=Promise.resolve();const enqueue=<T>(op:()=>Promise<T>):Promise<T>=>{const result=persist.then(op);persist=result.then(()=>{},error=>notify(error.message));return result;};
 const esc=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+/** A notice belongs to the opening that said it; the next opening starts without one. */
+function clearNotice(){const t=document.querySelector<HTMLElement>('.toast');if(t)t.textContent='';}
 function notify(text:string){let t=document.querySelector<HTMLElement>('.toast');if(!t){t=document.createElement('div');t.className='toast';t.setAttribute('role','status');document.body.append(t);}t.textContent=text;window.setTimeout(()=>{if(t?.textContent===text)t.textContent='';},6500);}
 const button=(label:string,id:string,shortcut='',disabled=false)=>`<button type="button" data-action="${id}" ${disabled?'disabled':''}>${label}${shortcut?`<kbd>${esc(shortcut)}</kbd>`:''}</button>`;
 async function savePreferences(){await enqueue(()=>writeJson('preferences.json',preferences));}
@@ -955,8 +957,10 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}
 }
 
-async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
- let prior:ScorePackage;try{prior=await importReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}await openRebuiltEdition(entry,data,error,op,sourceGroup);return;}
+async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
+ let prior:ScorePackage,withoutRepeats=false;try{prior=await importReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
+  // Pages that only lack their repeat signs open as saved when they can't be engraved again.
+  keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);prior=await importReading(data,op);withoutRepeats=true;}
  await admitReadingSource(prior,op);
  if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);
  // Every piano score opens on the player's keyboard layout, gaining it when its edition lacks it.
@@ -970,7 +974,7 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
-  const said=gained&&gainedNotice(gained,q.package,false);if(said)notify(said);
+  const said=[withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
 }
 
@@ -1013,18 +1017,21 @@ function gainedNotice(g:GainedLayout,shown:ScorePackage,imported:boolean):string
 }
 /** A saved edition whose pages the current engraving no longer reproduces is
  * engraved again from its own content and installed like an Earlier edition:
- * the earlier archive and its journals stay saved. */
-async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string){
+ * the earlier archive and its journals stay saved. False when pages that only
+ * lack their repeat signs couldn't be engraved again: they open as saved. */
+async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string):Promise<boolean>{
  readingProgress(op,'engrave-again');
  const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
- if(reading){await openReengravedReading(entry,reading,op,sourceGroup);return;}
- const rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
- await readingCheckpoint(op);
- const {q,running}=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op),
+ if(reading){await openReengravedReading(entry,reading,op,sourceGroup);return true;}
+ let rebuilt:RebuiltInstall,prepared:Awaited<ReturnType<typeof preparePiano>>;
+ try{rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
+  await readingCheckpoint(op);prepared=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op);}
+ catch(error){if(!(admission instanceof SavedPagesLackRepeats)||(error as Error).name==='AbortError')throw error;checkReading(op);return false;}
+ const {q,running}=prepared,
   installed=await installPreparedScore(entry,q,running,q.personal??rebuilt.personal,false,undefined,undefined,rebuilt);await readingCheckpoint(op);
  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
  finishReading(op,true);
- notify(rebuiltNotice(rebuilt)+unsaved);
+ notify(rebuiltNotice(rebuilt)+unsaved);return true;
 }
 
 /** A musical reading engraved again is installed like any new edition of
