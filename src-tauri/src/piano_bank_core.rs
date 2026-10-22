@@ -45,6 +45,8 @@ struct Pointer {
 
 #[derive(Clone)]
 struct Profile<'a> {
+    /// Cache directory prefix naming this archive's identity.
+    prefix: &'a str,
     bytes: u64,
     archive_sha256: &'a str,
     live: &'a str,
@@ -55,6 +57,7 @@ struct Profile<'a> {
     samples: usize,
 }
 const ORIGINAL: Profile<'static> = Profile {
+    prefix: CACHE_PREFIX,
     bytes: ARCHIVE_BYTES,
     archive_sha256: ARCHIVE_SHA256,
     live: LIVE_PATH,
@@ -64,6 +67,24 @@ const ORIGINAL: Profile<'static> = Profile {
     files: 716,
     samples: 641,
 };
+/// The author replaced V6.2 with V6.2a; the official mirrors now serve only
+/// V6.2a. Both are admitted, so an installed V6.2 bank stays installed.
+const CURRENT_RELEASE: Profile<'static> = Profile {
+    prefix: "v6.2a-3bc8623b598d7d854-",
+    bytes: 1_663_231_006,
+    archive_sha256: "3bc8623b598d7d854a14228c2f7c0e4a7970b118e8b056e39e221b8334678350",
+    live: LIVE_PATH,
+    live_sha256: "aeeaac5b68a83f1c52af5dcd2d198f300ce8a5a251957909b42d286c846c57b1",
+    manifest_sha256: "0251a6d5237d4588fa371e040bfe7a0209fe7d2c38884d1567f3fe37a8ab80e2",
+    raw: 1_969_543_216,
+    files: 716,
+    samples: 641,
+};
+const PROFILES: [&Profile<'static>; 2] = [&CURRENT_RELEASE, &ORIGINAL];
+/// The author's own archive.org copy of V6.2a, linked from
+/// https://www.ir.isas.jaxa.jp/~cyamauch/AccurateSalamander/ (CC BY 3.0).
+pub const DOWNLOAD_URL: &str = "https://archive.org/download/httpswww.ir.isas.jaxa.jpcyamauchaccuratesalamander/AccurateSalamanderGrandPianoV6.2a_48khz24bit.zip";
+pub const DOWNLOAD_BYTES: u64 = CURRENT_RELEASE.bytes;
 
 fn err(e: impl std::fmt::Display) -> String {
     format!("Piano installation could not finish: {e}")
@@ -388,6 +409,7 @@ mod tests {
         }
         fn profile(&self) -> Profile<'_> {
             Profile {
+                prefix: CACHE_PREFIX,
                 bytes: self.bytes,
                 archive_sha256: &self.archive_hash,
                 live: "sfz_live/test.sfz",
@@ -435,7 +457,7 @@ mod tests {
             "<region> sample=..\\48khz24bit\\tone.wav"
         );
         assert_eq!(
-            verify_impl(&f.root(), &f.profile(), &stop, &mut quiet).unwrap(),
+            verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).unwrap(),
             Some(sfz)
         );
         assert_eq!(stage_count(&f.root()), 0);
@@ -574,7 +596,7 @@ mod tests {
             .unwrap()
             .join("48khz24bit/tone.wav");
         fs::write(sample, b"modified audio fixture").unwrap();
-        assert!(verify_impl(&f.root(), &f.profile(), &stop, &mut quiet).is_err());
+        assert!(verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).is_err());
     }
     #[test]
     fn marker_cannot_reauthorize_modified_hashes() {
@@ -585,25 +607,233 @@ mod tests {
         let mut m: Manifest = json(&marker, 4_000_000).unwrap();
         m.files[0].sha256 = "0".repeat(64);
         fs::write(marker, serde_json::to_vec(&m).unwrap()).unwrap();
-        assert!(verify_impl(&f.root(), &f.profile(), &stop, &mut quiet).is_err());
+        assert!(verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).is_err());
+    }
+    fn get(
+        f: &Fixture,
+        cancel: &AtomicBool,
+        fetch: impl FnMut(&Path, u64, &mut dyn FnMut(u64)) -> Fetch,
+    ) -> Result<PathBuf, String> {
+        download_impl(&f.root(), &f.profile(), cancel, &mut quiet, fetch, None)
+    }
+    fn part(f: &Fixture) -> PathBuf {
+        f.root().join(format!("{CACHE_PREFIX}download.part"))
+    }
+    /// Appends `bytes[from..to]` the way curl --continue-at does.
+    fn append(path: &Path, bytes: &[u8], have: u64, to: usize) {
+        let mut out = OpenOptions::new().create(true).append(true).open(path).unwrap();
+        out.write_all(&bytes[have as usize..to]).unwrap();
+    }
+    #[test]
+    fn one_press_downloads_checks_and_publishes_without_a_second_archive() {
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let stop = AtomicBool::new(false);
+        let mut phases = Vec::new();
+        let sfz = download_impl(
+            &f.root(),
+            &f.profile(),
+            &stop,
+            &mut |phase: &str, _| {
+                if phases.last().map(String::as_str) != Some(phase) {
+                    phases.push(phase.to_string());
+                }
+            },
+            |path, have, grew| {
+                assert_eq!(have, 0);
+                append(path, &source, have, source.len());
+                grew(source.len() as u64);
+                Fetch::Ended
+            },
+            None,
+        )
+        .unwrap();
+        assert_eq!(phases, ["downloading", "checking", "installing"]);
+        assert_eq!(
+            verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).unwrap(),
+            Some(sfz)
+        );
+        assert!(!part(&f).exists(), "the archive is not kept after admission");
+        assert_eq!(stage_count(&f.root()), 0);
+    }
+    #[test]
+    fn an_interrupted_download_continues_where_it_stopped() {
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let half = source.len() / 2;
+        let mut calls = Vec::new();
+        let sfz = get(&f, &AtomicBool::new(false), |path, have, _| {
+            calls.push(have);
+            if have == 0 {
+                append(path, &source, have, half);
+                Fetch::Interrupted("The piano download was interrupted.".into())
+            } else {
+                append(path, &source, have, source.len());
+                Fetch::Ended
+            }
+        })
+        .unwrap();
+        assert_eq!(calls, [0, half as u64]);
+        assert!(sfz.exists());
+    }
+    #[test]
+    fn network_failure_keeps_the_unfinished_download_for_the_next_press() {
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let stop = AtomicBool::new(false);
+        let mut attempts = 0;
+        let error = get(&f, &stop, |path, have, _| {
+            attempts += 1;
+            append(path, &source, have, have as usize + 3);
+            Fetch::Interrupted("Can't reach the piano download.".into())
+        })
+        .unwrap_err();
+        assert_eq!(error, "Can't reach the piano download.");
+        assert_eq!(attempts, DOWNLOAD_ATTEMPTS);
+        assert_eq!(fs::metadata(part(&f)).unwrap().len(), 3 * DOWNLOAD_ATTEMPTS as u64);
+        assert!(!f.root().join(CURRENT).exists());
+        // The next press starts from what is already there.
+        let sfz = get(&f, &stop, |path, have, _| {
+            assert_eq!(have, 3 * DOWNLOAD_ATTEMPTS as u64);
+            append(path, &source, have, source.len());
+            Fetch::Ended
+        })
+        .unwrap();
+        assert!(sfz.exists());
+    }
+    #[test]
+    fn cancel_discards_the_download_and_keeps_the_installed_bank() {
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let stop = AtomicBool::new(false);
+        let sfz = f.install(&stop, &mut quiet, None).unwrap();
+        let pointer = fs::read(f.root().join(CURRENT)).unwrap();
+        let error = get(&f, &stop, |path, have, _| {
+            append(path, &source, have, 5);
+            stop.store(true, Ordering::Release);
+            Fetch::Interrupted("Piano installation cancelled.".into())
+        })
+        .unwrap_err();
+        assert!(error.contains("cancelled"));
+        assert!(!part(&f).exists());
+        assert_eq!(fs::read(f.root().join(CURRENT)).unwrap(), pointer);
+        assert!(sfz.exists());
+        // Cancelling while checking also leaves nothing behind.
+        stop.store(false, Ordering::Release);
+        let error = download_impl(
+            &f.root(),
+            &f.profile(),
+            &stop,
+            &mut |phase: &str, _| {
+                if phase == "checking" {
+                    stop.store(true, Ordering::Release);
+                }
+            },
+            |path, have, _| {
+                append(path, &source, have, source.len());
+                Fetch::Ended
+            },
+            None,
+        )
+        .unwrap_err();
+        assert!(error.contains("cancelled"));
+        assert!(!part(&f).exists());
+        assert_eq!(stage_count(&f.root()), 0);
+        assert_eq!(fs::read(f.root().join(CURRENT)).unwrap(), pointer);
+    }
+    #[test]
+    fn a_changed_download_is_refused_and_not_kept() {
+        let f = Fixture::valid();
+        let mut source = fs::read(&f.source).unwrap();
+        let last = source.len() - 1;
+        source[last] ^= 1;
+        let error = get(&f, &AtomicBool::new(false), |path, have, _| {
+            append(path, &source, have, source.len());
+            Fetch::Ended
+        })
+        .unwrap_err();
+        assert!(error.contains("differs"), "{error}");
+        assert!(!part(&f).exists());
+        assert!(!f.root().join(CURRENT).exists());
+        assert_eq!(stage_count(&f.root()), 0);
+    }
+    #[test]
+    fn server_refusal_stops_at_once_and_oversized_leftovers_restart() {
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let mut attempts = 0;
+        let error = get(&f, &AtomicBool::new(false), |_, _, _| {
+            attempts += 1;
+            Fetch::Failed("The piano download isn't available right now.".into())
+        })
+        .unwrap_err();
+        assert_eq!((attempts, error.as_str()), (1, "The piano download isn't available right now."));
+        fs::create_dir_all(f.root()).unwrap();
+        fs::write(part(&f), vec![0; source.len() + 1]).unwrap();
+        let sfz = get(&f, &AtomicBool::new(false), |path, have, _| {
+            assert_eq!(have, 0, "a leftover larger than the archive starts again");
+            append(path, &source, have, source.len());
+            Fetch::Ended
+        })
+        .unwrap();
+        assert!(sfz.exists());
+        // Not enough room for the rest of the download and the bank.
+        let other = Fixture::valid();
+        let error = download_impl(&other.root(), &other.profile(), &AtomicBool::new(false), &mut quiet, |_, _, _| unreachable!(), Some(0)).unwrap_err();
+        assert!(error.contains("free space"), "{error}");
+    }
+    #[test]
+    fn an_installed_earlier_release_stays_installed_beside_the_new_one() {
+        let f = Fixture::valid();
+        let stop = AtomicBool::new(false);
+        let sfz = f.install(&stop, &mut quiet, None).unwrap();
+        let mut newer = f.profile();
+        newer.prefix = "v6.2a-fixture-";
+        newer.archive_sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(
+            verify_impl(&f.root(), &[&newer, &f.profile()], &stop, &mut quiet).unwrap(),
+            Some(sfz)
+        );
+        assert!(present_impl(&f.root(), &[&newer, &f.profile()]).unwrap());
+        assert!(verify_impl(&f.root(), &[&newer], &stop, &mut quiet).is_err());
+    }
+    #[test]
+    fn curl_exits_read_as_plain_reasons() {
+        assert!(matches!(curl_outcome(Some(0), ""), Fetch::Ended));
+        for code in [Some(6), Some(7), Some(18), Some(28), Some(56), None] {
+            assert!(matches!(curl_outcome(code, ""), Fetch::Interrupted(m) if m.contains("continue where it stopped")));
+        }
+        assert!(matches!(curl_outcome(Some(22), "curl: (22) The requested URL returned error: 503"), Fetch::Failed(m) if m.contains("(server: 503)")));
+        assert!(matches!(curl_outcome(Some(23), ""), Fetch::Failed(m) if m.contains("4 GB")));
+        assert!(matches!(curl_outcome(Some(60), ""), Fetch::Failed(_)));
+    }
+    #[test]
+    fn admitted_archives_are_distinct_and_the_download_is_the_current_release() {
+        assert_eq!(DOWNLOAD_BYTES, CURRENT_RELEASE.bytes);
+        assert!(DOWNLOAD_URL.starts_with("https://") && DOWNLOAD_URL.ends_with("V6.2a_48khz24bit.zip"));
+        assert_ne!(CURRENT_RELEASE.bytes, ORIGINAL.bytes, "a chosen ZIP's size selects its identity");
+        assert!(!CURRENT_RELEASE.prefix.starts_with(ORIGINAL.prefix) && !ORIGINAL.prefix.starts_with(CURRENT_RELEASE.prefix));
+        for p in PROFILES {
+            assert!(digest_text(p.archive_sha256) && digest_text(p.live_sha256) && digest_text(p.manifest_sha256));
+        }
     }
     #[test]
     fn presence_reads_pointer_and_marker_without_hashing() {
         let f = Fixture::valid();
-        assert!(!present_impl(&f.root(), &f.profile()).unwrap());
+        assert!(!present_impl(&f.root(), &[&f.profile()]).unwrap());
         assert!(!f.root().exists(), "asking does not create the cache");
         let stop = AtomicBool::new(false);
         let sfz = f.install(&stop, &mut quiet, None).unwrap();
-        assert!(present_impl(&f.root(), &f.profile()).unwrap());
+        assert!(present_impl(&f.root(), &[&f.profile()]).unwrap());
         // Changed sample bytes are only found by the full check.
         let sample = sfz.parent().unwrap().parent().unwrap().join("48khz24bit/tone.wav");
         fs::write(sample, b"modified audio fixture").unwrap();
-        assert!(present_impl(&f.root(), &f.profile()).unwrap());
-        assert!(verify_impl(&f.root(), &f.profile(), &stop, &mut quiet).is_err());
+        assert!(present_impl(&f.root(), &[&f.profile()]).unwrap());
+        assert!(verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).is_err());
         fs::remove_file(&sfz).unwrap();
-        assert!(present_impl(&f.root(), &f.profile()).is_err());
+        assert!(present_impl(&f.root(), &[&f.profile()]).is_err());
         fs::remove_file(f.root().join(CURRENT)).unwrap();
-        assert!(!present_impl(&f.root(), &f.profile()).unwrap());
+        assert!(!present_impl(&f.root(), &[&f.profile()]).unwrap());
     }
 }
 fn closure(root: &Path, m: &Manifest, p: &Profile) -> Result<(), String> {
@@ -642,16 +872,16 @@ pub fn verify_installed(
     cancel: &AtomicBool,
     mut progress: impl FnMut(&str, u8),
 ) -> Result<Option<PathBuf>, String> {
-    verify_impl(root, &ORIGINAL, cancel, &mut progress)
+    verify_impl(root, &PROFILES, cancel, &mut progress)
 }
 fn verify_impl(
     root: &Path,
-    p: &Profile,
+    profiles: &[&Profile],
     cancel: &AtomicBool,
     progress: &mut impl FnMut(&str, u8),
 ) -> Result<Option<PathBuf>, String> {
     let root = prepare_root(root)?;
-    let Some((bank, manifest)) = admitted_manifest(&root, p)? else {
+    let Some((bank, manifest, p)) = admitted_manifest(&root, profiles)? else {
         return Ok(None);
     };
     for (i, member) in manifest.files.iter().enumerate() {
@@ -669,41 +899,48 @@ fn verify_impl(
 
 /// The installed bank directory and its admitted manifest, read from the
 /// pointer and marker alone; `None` when nothing is installed.
-fn admitted_manifest(root: &Path, p: &Profile) -> Result<Option<(PathBuf, Manifest)>, String> {
+fn admitted_manifest<'p>(
+    root: &Path,
+    profiles: &[&'p Profile<'p>],
+) -> Result<Option<(PathBuf, Manifest, &'p Profile<'p>)>, String> {
     let pointer = root.join(CURRENT);
     if !pointer.exists() {
         return Ok(None);
     }
     let pointer: Pointer = json(&pointer, 4096)?;
-    if pointer.version != 1
-        || !pointer.directory.starts_with(CACHE_PREFIX)
-        || !pointer.directory[CACHE_PREFIX.len()..]
-            .bytes()
-            .all(|x| x.is_ascii_digit() || x == b'-')
-        || pointer.directory.len() > 100
-    {
+    let p = profiles
+        .iter()
+        .copied()
+        .find(|p| pointer.directory.starts_with(p.prefix));
+    let Some(p) = p.filter(|p| {
+        pointer.version == 1
+            && pointer.directory[p.prefix.len()..]
+                .bytes()
+                .all(|x| x.is_ascii_digit() || x == b'-')
+            && pointer.directory.len() <= 100
+    }) else {
         return Err("Piano cache pointer differs.".into());
-    }
+    };
     safe_member(&pointer.directory)?;
     let bank = root.join(pointer.directory);
     ordinary(&bank, true)?;
     let manifest: Manifest = json(&bank.join(MARKER), 4_000_000)?;
     manifest_valid(&manifest, p)?;
-    Ok(Some((bank, manifest)))
+    Ok(Some((bank, manifest, p)))
 }
 /// Whether a bank is installed, from its pointer, marker and live SFZ alone.
 /// Nothing is hashed, so this answers at once; the full check runs when the
 /// piano is turned on.
 pub fn installed_present(root: &Path) -> bool {
-    present_impl(root, &ORIGINAL).unwrap_or(false)
+    present_impl(root, &PROFILES).unwrap_or(false)
 }
-fn present_impl(root: &Path, p: &Profile) -> Result<bool, String> {
+fn present_impl(root: &Path, profiles: &[&Profile]) -> Result<bool, String> {
     if fs::symlink_metadata(root).is_err() {
         return Ok(false);
     }
     ordinary(root, true)?;
     let root = fs::canonicalize(root).map_err(err)?;
-    let Some((bank, _)) = admitted_manifest(&root, p)? else {
+    let Some((bank, _, p)) = admitted_manifest(&root, profiles)? else {
         return Ok(false);
     };
     checked_path(&bank, p.live)?;
@@ -767,13 +1004,20 @@ fn replace_file(source: &Path, target: &Path) -> Result<(), String> {
     }
 }
 
+/// Install from a ZIP the player already has. Its size selects which admitted
+/// archive it must be; its bytes are then checked against that archive.
 pub fn install(
     source: &Path,
     root: &Path,
     cancel: &AtomicBool,
     mut progress: impl FnMut(&str, u8),
 ) -> Result<PathBuf, String> {
-    install_impl(source, root, &ORIGINAL, cancel, &mut progress, None)
+    let size = fs::metadata(source).map_err(err)?.len();
+    let p = PROFILES
+        .iter()
+        .find(|p| p.bytes == size)
+        .ok_or("Choose the Accurate-Salamander V6.2a 48 kHz/24-bit ZIP (the WAV one, not FLAC).")?;
+    install_impl(source, root, p, cancel, &mut progress, None)
 }
 fn install_impl(
     source: &Path,
@@ -786,7 +1030,7 @@ fn install_impl(
     cancelled(cancel)?;
     ordinary(source, false)?;
     if fs::metadata(source).map_err(err)?.len() != p.bytes {
-        return Err("Choose the original Accurate-Salamander V6.2 48 kHz/24-bit ZIP.".into());
+        return Err("Choose the Accurate-Salamander V6.2a 48 kHz/24-bit ZIP (the WAV one, not FLAC).".into());
     }
     let root = prepare_root(root)?;
     enough_space(
@@ -825,9 +1069,271 @@ fn install_impl(
     drop(output);
     drop(input);
     if bytes != p.bytes || hex(hash.finalize()) != p.archive_sha256 {
-        return Err("This piano download differs from the original V6.2 bank.".into());
+        return Err("This ZIP differs from the author's original piano, so it was not installed.".into());
     }
-    let mut zip = ZipArchive::new(File::open(&snapshot).map_err(err)?).map_err(err)?;
+    admit(&root, &stage, &snapshot, &id, p, cancel, progress, test_free)
+}
+
+/// What one download attempt reports.
+pub enum Fetch {
+    /// The transfer ended without an error; the file's length says how far.
+    Ended,
+    /// A transient failure: the next attempt continues the same file.
+    Interrupted(String),
+    /// A failure another attempt would repeat.
+    Failed(String),
+}
+const DOWNLOAD_ATTEMPTS: usize = 4;
+/// The system's own curl appends to the unfinished file: /usr/bin/curl on
+/// macOS, System32 curl.exe on Windows 10 1803 and later. No new network
+/// stack is bundled. HTTPS only, including redirects.
+fn curl() -> PathBuf {
+    #[cfg(windows)]
+    {
+        PathBuf::from(std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into()))
+            .join("System32")
+            .join("curl.exe")
+    }
+    #[cfg(not(windows))]
+    {
+        PathBuf::from("/usr/bin/curl")
+    }
+}
+pub fn curl_fetch(part: &Path, cancel: &AtomicBool, grew: &mut dyn FnMut(u64)) -> Fetch {
+    use std::process::{Command, Stdio};
+    let mut command = Command::new(curl());
+    command
+        .args([
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--proto",
+            "=https",
+            "--proto-redir",
+            "=https",
+            "--connect-timeout",
+            "30",
+            "--speed-limit",
+            "4096",
+            "--speed-time",
+            "60",
+            "--continue-at",
+            "-",
+            "--output",
+        ])
+        .arg(part)
+        .arg(DOWNLOAD_URL)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(_) => {
+            return Fetch::Failed(
+                "This computer can't download the piano by itself. Use Install from a file… with the Accurate-Salamander V6.2a ZIP.".into(),
+            )
+        }
+    };
+    let status = loop {
+        if cancel.load(Ordering::Acquire) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Fetch::Interrupted("Piano installation cancelled.".into());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if let Ok(m) = std::fs::metadata(part) {
+                    grew(m.len());
+                }
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
+            Err(error) => return Fetch::Failed(format!("Piano download failed: {error}")),
+        }
+    };
+    let mut detail = String::new();
+    if let Some(stderr) = child.stderr.take() {
+        use std::io::Read;
+        let _ = stderr.take(4096).read_to_string(&mut detail);
+    }
+    let outcome = curl_outcome(status.code(), detail.trim());
+    if matches!(outcome, Fetch::Interrupted(_)) {
+        // A moment before the next attempt continues the file.
+        for _ in 0..8 {
+            if cancel.load(Ordering::Acquire) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+    }
+    outcome
+}
+/// Pianist-facing meaning of a curl exit. Network trouble keeps the
+/// unfinished file so the next attempt or press continues it.
+pub fn curl_outcome(code: Option<i32>, detail: &str) -> Fetch {
+    const AGAIN: &str = "Press Download piano to continue where it stopped.";
+    match code {
+        Some(0) => Fetch::Ended,
+        Some(6 | 7) => Fetch::Interrupted(format!(
+            "Can't reach the piano download. Check the internet connection. {AGAIN}"
+        )),
+        Some(16 | 18 | 28 | 35 | 52 | 55 | 56 | 92) | None => {
+            Fetch::Interrupted(format!("The piano download was interrupted. {AGAIN}"))
+        }
+        Some(22) => Fetch::Failed(format!(
+            "The piano download isn't available right now{}. Try again later.",
+            detail
+                .rsplit("error: ")
+                .next()
+                .filter(|x| x.len() < 80 && x.chars().any(|c| c.is_ascii_digit()))
+                .map(|x| format!(" (server: {x})"))
+                .unwrap_or_default()
+        )),
+        Some(23) => Fetch::Failed(
+            "The piano download could not be saved. Free about 4 GB and try again.".into(),
+        ),
+        Some(51 | 58 | 60 | 77 | 83 | 90 | 91) => Fetch::Failed(
+            "The download server's identity could not be checked, so the piano was not downloaded.".into(),
+        ),
+        Some(code) => Fetch::Interrupted(format!(
+            "The piano download stopped (curl {code}). {AGAIN}"
+        )),
+    }
+}
+/// One press: download the author's archive into the viewer's own piano
+/// folder, continuing a download an earlier press left unfinished, then
+/// admit it exactly as a chosen ZIP would be. `fetch` appends to the file
+/// from its current length and reports the length as it grows. Cancel
+/// discards the unfinished download; an interruption keeps it.
+pub fn download(
+    root: &Path,
+    cancel: &AtomicBool,
+    mut progress: impl FnMut(&str, u8),
+    fetch: impl FnMut(&Path, u64, &mut dyn FnMut(u64)) -> Fetch,
+) -> Result<PathBuf, String> {
+    download_impl(root, &CURRENT_RELEASE, cancel, &mut progress, fetch, None)
+}
+fn length(path: &Path) -> Result<u64, String> {
+    match fs::symlink_metadata(path) {
+        Ok(m) if m.is_file() => Ok(m.len()),
+        Ok(_) => Err("Piano download path is not an ordinary file.".into()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(0),
+        Err(e) => Err(err(e)),
+    }
+}
+fn download_impl(
+    root: &Path,
+    p: &Profile,
+    cancel: &AtomicBool,
+    progress: &mut impl FnMut(&str, u8),
+    mut fetch: impl FnMut(&Path, u64, &mut dyn FnMut(u64)) -> Fetch,
+    test_free: Option<u64>,
+) -> Result<PathBuf, String> {
+    cancelled(cancel)?;
+    let root = prepare_root(root)?;
+    let part = root.join(format!("{}download.part", p.prefix));
+    let discard = |message: String| {
+        let _ = fs::remove_file(&part);
+        message
+    };
+    if length(&part)? > p.bytes {
+        fs::remove_file(&part).map_err(err)?;
+    }
+    let have = length(&part)?;
+    enough_space(
+        test_free.unwrap_or(fs2::available_space(&root).map_err(err)?),
+        (p.bytes - have).checked_add(p.raw).ok_or("Piano size overflow")?,
+    )?;
+    let mut reason = String::new();
+    for _ in 0..DOWNLOAD_ATTEMPTS {
+        let have = length(&part)?;
+        if have >= p.bytes {
+            break;
+        }
+        progress("downloading", (have.saturating_mul(100) / p.bytes) as u8);
+        let outcome = fetch(&part, have, &mut |now| {
+            progress("downloading", (now.min(p.bytes).saturating_mul(100) / p.bytes) as u8)
+        });
+        cancelled(cancel).map_err(discard)?;
+        match outcome {
+            Fetch::Ended => reason.clear(),
+            Fetch::Interrupted(why) => reason = why,
+            Fetch::Failed(why) => return Err(why),
+        }
+        if length(&part)? > p.bytes {
+            return Err(discard("The piano download is larger than expected. Press Download piano to start again.".into()));
+        }
+    }
+    if length(&part)? != p.bytes {
+        return Err(if reason.is_empty() {
+            "The piano download stopped early. Press Download piano to continue where it stopped.".into()
+        } else {
+            reason
+        });
+    }
+    install_owned(&part, &root, p, cancel, progress, test_free)
+}
+/// Admit a complete download the viewer itself made. It is moved, not
+/// copied, into the staging directory, so the disk holds one archive.
+fn install_owned(
+    part: &Path,
+    root: &Path,
+    p: &Profile,
+    cancel: &AtomicBool,
+    progress: &mut impl FnMut(&str, u8),
+    test_free: Option<u64>,
+) -> Result<PathBuf, String> {
+    cancelled(cancel)?;
+    ordinary(part, false)?;
+    let id = nonce();
+    let stage = root.join(format!("pending-{id}"));
+    fs::create_dir(&stage).map_err(err)?;
+    let _guard = OwnedDirectory(Some(stage.clone()));
+    let snapshot = stage.join("source.zip");
+    fs::rename(part, &snapshot).map_err(err)?;
+    let mut input = File::open(&snapshot).map_err(err)?;
+    let mut hash = Sha256::new();
+    let mut bytes = 0u64;
+    let mut buffer = vec![0; BUFFER];
+    loop {
+        cancelled(cancel)?;
+        let n = input.read(&mut buffer).map_err(err)?;
+        if n == 0 {
+            break;
+        }
+        bytes = bytes.checked_add(n as u64).ok_or("Piano size overflow")?;
+        if bytes > p.bytes {
+            return Err("Piano download size differs.".into());
+        }
+        hash.update(&buffer[..n]);
+        progress("checking", (bytes.saturating_mul(100) / p.bytes) as u8);
+    }
+    drop(input);
+    if bytes != p.bytes || hex(hash.finalize()) != p.archive_sha256 {
+        return Err("The downloaded piano differs from the one this viewer knows, so it was not installed. Press Download piano to try again.".into());
+    }
+    admit(root, &stage, &snapshot, &id, p, cancel, progress, test_free)
+}
+#[allow(clippy::too_many_arguments)]
+fn admit(
+    root: &Path,
+    stage: &Path,
+    snapshot: &Path,
+    id: &str,
+    p: &Profile,
+    cancel: &AtomicBool,
+    progress: &mut impl FnMut(&str, u8),
+    test_free: Option<u64>,
+) -> Result<PathBuf, String> {
+    let mut buffer = vec![0; BUFFER];
+    let mut zip = ZipArchive::new(File::open(snapshot).map_err(err)?).map_err(err)?;
     if zip.len() > 10_000 {
         return Err("Too many piano ZIP entries.".into());
     }
@@ -938,7 +1444,7 @@ fn install_impl(
     closure(&payload, &manifest, p)?;
     write_json(&payload.join(MARKER), &manifest)?;
     cancelled(cancel)?;
-    let directory = format!("{CACHE_PREFIX}{id}");
+    let directory = format!("{}{id}", p.prefix);
     let final_dir = root.join(&directory);
     fs::rename(&payload, &final_dir).map_err(err)?;
     let mut publication = OwnedDirectory(Some(final_dir.clone()));
