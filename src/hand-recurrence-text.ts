@@ -78,7 +78,11 @@ export function handActionNotice(p:ScorePackage,before:PersonalState,after:Perso
  return parts.length?parts.join(' '):undefined;
 }
 
-/** Said when bars keep their written hands because the carried hand can't be drawn there. */
-export function droppedCarryText(bars:readonly number[]):string {
- return `${capital(barList(bars))} ${new Set(bars).size===1?'keeps its written hands: the carried hand':'keep their written hands: the carried hands'} can’t be drawn there.`;
+/** Said when bars keep their written hands because the carried hand can't be
+ * drawn there; `unshared` are those bars that lost the shared fingers with it. */
+export function droppedCarryText(bars:readonly number[],unshared:readonly number[]=[]):string {
+ const all=new Set(bars),lost=new Set(unshared.filter(bar=>all.has(bar)));
+ if(all.size===1)return `${capital(barList(bars))} keeps its written hands${lost.size?', and its fingers stay unshared':''}: the carried hand can’t be drawn there.`;
+ const fingers=!lost.size?'':lost.size===all.size?' Their fingers stay unshared.':` Fingers stay unshared in ${barList([...lost])}.`;
+ return `${capital(barList(bars))} keep their written hands: the carried hands can’t be drawn there.${fingers}`;
 }

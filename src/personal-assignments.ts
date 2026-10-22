@@ -207,14 +207,20 @@ function recurrenceIndex(p:ScorePackage,bars:readonly number[]):RecurrenceIndex 
  const known=recurrenceIndexes.get(p);if(known?.bars===bars)return known;
  const pitched=p.score.notes.filter(isPitchedEvent).sort((a,b)=>a.startTick-b.startTick),keys=new Map<string,Note[]>();
  for(const n of pitched){const k=`${n.startTick}:${pitch(n)}`,list=keys.get(k);if(list)list.push(n);else keys.set(k,[n]);}
- const extents=bars.slice(1).map((t,i)=>t-bars[i]),counts=new Map<number,number>();for(const e of extents)counts.set(e,(counts.get(e)??0)+1);
- const usual=[...counts].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0][0],meters=[...p.score.timeSignatures??[]].sort((a,b)=>a.tick-b.tick);
- // A bar's full length is its meter's, or the usual bar length when the source gives none.
- const full=(tick:number)=>{const m=meters.filter(m=>m.tick<=tick).at(-1),length=m?m.numerator*p.score.ticksPerBeat*4/m.denominator:usual;return Number.isSafeInteger(length)&&length>0?length:usual;};
- // A pickup is a short bar that opens the piece or follows another short bar (the end of a bar written short).
- const pickup=extents.map((e,t)=>e<full(bars[t])&&(t===0||extents[t-1]<full(bars[t-1])));
- const index={bars,pitched,longest:Math.max(0,...pitched.map(n=>n.durationTicks)),keys,pickup,stretches:new Map(),results:new Map()};
+ const index={bars,pitched,longest:Math.max(0,...pitched.map(n=>n.durationTicks)),keys,pickup:pickupBars(p,bars),stretches:new Map(),results:new Map()};
  recurrenceIndexes.set(p,index);return index;
+}
+/** Bars that don't start on a downbeat. A pickup is a short bar that opens the
+ * piece or follows another short bar (the end of a bar written short, as No. 13
+ * bar 22 after bar 21). A bar's full length is its meter's, or the usual bar
+ * length when the source gives none; meter decides nothing else. Hands and
+ * fingers carried to bars of another length compare the same bars by this rule. */
+export function pickupBars(p:ScorePackage,bars:readonly number[]):boolean[] {
+ const extents=bars.slice(1).map((t,i)=>t-bars[i]),counts=new Map<number,number>();for(const e of extents)counts.set(e,(counts.get(e)??0)+1);
+ if(!extents.length)return [];
+ const usual=[...counts].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0][0],meters=[...p.score.timeSignatures??[]].sort((a,b)=>a.tick-b.tick);
+ const full=(tick:number)=>{const m=meters.filter(m=>m.tick<=tick).at(-1),length=m?m.numerator*p.score.ticksPerBeat*4/m.denominator:usual;return Number.isSafeInteger(length)&&length>0?length:usual;};
+ return extents.map((e,t)=>e<full(bars[t])&&(t===0||extents[t-1]<full(bars[t-1])));
 }
 const tuple=(n:Note,start:number)=>`${n.hand??'-'}:${pitch(n)}:${n.startTick-start}:${n.durationTicks}`;
 /** Every note sounding in the first `length` ticks of bar `t`, held notes included, and their signature from its downbeat. */
