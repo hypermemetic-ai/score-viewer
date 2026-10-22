@@ -133,8 +133,8 @@ middle C at 70% peaks at −53.8, −45.7, −33.7, −26.1 and −20.9 dBFS for
 adds 3.1 dB. The metronome click peaks at −16.1 dBFS at both volumes.
 
 The loopback has no converters, so a real interface or built-in speakers add their
-own device latency and safety offset (often 1–5 ms more on a Mac), and the
-keyboard's USB MIDI and the room are not counted. CI has no speakers.
+own reported device latency and safety offset, which this run cannot measure, and
+the keyboard's USB MIDI and the room are not counted. CI has no speakers.
 
 These checks establish source/stream behavior. Final package launch, physical
 MIDI, audible quality, pedal response, sound-to-ear latency and the timing of
