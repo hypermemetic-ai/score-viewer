@@ -360,8 +360,14 @@ export class PersonalPresentationSession {
   const state=importedEngines.get(this.base);
   if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
-  return this.savedEngine=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+  // The engine is read once per session, so not before a save under way has finished.
+  return this.savedEngine=(this.engineArriving??Promise.resolve()).then(()=>this.engineKey()).then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
  }
+ private engineArriving?:Promise<unknown>;
+ /** This package's engine is being saved elsewhere (work an opening took
+  * over from the library): every settle, a prefetch or a hand choice's
+  * check, restores it once that ends rather than engraving again. */
+ engineSavedBy(saving:Promise<unknown>){this.engineArriving=saving.catch(()=>undefined);}
  private async engineKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,(await this.prepare()).digest]));
  }

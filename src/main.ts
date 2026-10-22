@@ -17,7 +17,7 @@ import {defaultPianoPreferences,readPianoPreferences,type PianoPreferences} from
 import {OptionsBindingsPanel,optionsBindingRows} from './options-bindings';
 import {OptionsNavigation} from './options-navigation';
 import {workingSpeedArrow} from './practice-shortcuts';
-import {PackageAdmissionSession} from './package-admission-session';
+import {PackageAdmissionSession,admissionRejection} from './package-admission-session';
 import {optionsSectionsMarkup,type OptionsSection} from './options-sections';
 import {ReaderPageCache,createReaderPage,mountReaderPages,type ReaderPage} from './reader-page-cache';
 import {mountScorePrint,pdfSaveMessage,scorePageSize,scorePdfFilename} from './score-pdf';
@@ -83,7 +83,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
-import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,type AheadOfTimeWork} from './ahead-of-time-engraving';
+import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
 import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
@@ -164,7 +164,8 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
  await prepareRecorded(derived,key,async read=>{
   if(readingOnlyArchive(bytes))return null;
-  await answerInput();const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});await answerInput();
+  // Only admission rejecting the archive, or the engraver refusing its pages, is a refusal.
+  await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}),admissionRejection);await answerInput();
   if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
@@ -177,7 +178,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null}),served=await session.projectionEntry(q.personal??personal);
   if(!served)return null;
   if(!await projectionServed(derived,served)){
-   await session.project(q.personal??personal,execution);
+   await refusedWhen(session.project(q.personal??personal,execution),engravingRefusal);
    // The pages opening reads are written as soon as input allows; an opening
    // that took this work over goes on from here.
    await answerInput();await session.flushProjection();checkReadingExecution(execution);
@@ -186,7 +187,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   // Then, in idle time, the engine hand editing resumes from: settled when an
   // earlier reading made the pages but saved none, and saved before the
   // worker holding it is freed. The worker encodes it; this thread writes a file.
-  if(await session.engineMissing()){await answerInput();await session.warm(execution);checkReadingExecution(execution);}
+  if(await session.engineMissing()){await answerInput();await refusedWhen(session.warm(execution),engravingRefusal);checkReadingExecution(execution);}
   if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
   return served;
  });
@@ -947,7 +948,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Work taken over from the library saves its engine first, which this then restores.
  if(!context&&scoreCapabilities(next.package).pianoPreparation){
   const editor=personalEditor(next),settle=()=>{if(current===next)editor.session.prefetch();},saving=aheadOfTime?.finishing(next.entry.id);
-  if(saving)void saving.then(settle);else settle();
+  if(saving){editor.session.engineSavedBy(saving);void saving.then(settle);}else settle();
  }
  if(ownsOperation)finishReading(op,true);return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
