@@ -10,7 +10,6 @@ export interface WaitingHandChoice {
  /** The printed bar, for saying where the choice lands. */
  bar:number;
 }
-const handName=(hand:PersonalHand)=>hand==='LH'?'Left hand':'Right hand';
 const bars=(choices:readonly WaitingHandChoice[])=>{
  const unique=[...new Set(choices.map(c=>c.bar))].sort((a,b)=>a-b);
  return unique.length===1?`bar ${unique[0]}`:`bars ${unique.slice(0,-1).join(', ')} and ${unique.at(-1)}`;
@@ -33,12 +32,12 @@ export class HandChoiceQueue {
 /** What a waiting choice will do, in one line. */
 export function waitingChoicesText(choices:readonly WaitingHandChoice[]):string {
  if(!choices.length)return '';
- if(choices.length===1)return `${handName(choices[0].hand)} for the note in ${bars(choices)} applies once this is ready.`;
+ if(choices.length===1)return `${choices[0].hand} for the note in ${bars(choices)} applies once this is ready.`;
  return `${choices.length} hand choices (${bars(choices)}) apply once this is ready.`;
 }
 /** A reason sentence read as the clause after a colon. */
 const clause=(reason:string)=>reason.trim().replace(/[.!?]$/,'').replace(/^[A-Z](?=[a-z])/,c=>c.toLowerCase());
-const notes=(choices:readonly WaitingHandChoice[])=>choices.length===1?`${handName(choices[0].hand)} for the note in ${bars(choices)}`:`${choices.length} hand choices (${bars(choices)})`;
+const notes=(choices:readonly WaitingHandChoice[])=>choices.length===1?`${choices[0].hand} for the note in ${bars(choices)}`:`${choices.length} hand choices (${bars(choices)})`;
 /** The engraver's reason, a clause about one refused note, as a sentence. */
 const keptReasonSentence=(notes:number,reason?:string)=>reason?`${notes===1?'It':'One of them'} ${clause(reason)}.`:'';
 /** Said when a hand choice is refused because the engraver can't draw it:
@@ -53,7 +52,7 @@ export function keptHandsText(keys:number,reason?:string):string {
  * applied with the reason. */
 export function waitingOutcomeText(outcome:{applied:readonly WaitingHandChoice[];kept?:readonly WaitingHandChoice[];keptReason?:string;unapplied?:readonly WaitingHandChoice[];reason?:string}):string {
  const {applied,kept=[],unapplied=[]}=outcome,parts=['Hand editing is ready.'];
- if(applied.length)parts.push(applied.length===1?`${handName(applied[0].hand)} applied to the note in ${bars(applied)}.`:`${applied.length} hand choices applied in ${bars(applied)}.`);
+ if(applied.length)parts.push(applied.length===1?`${applied[0].hand} applied to the note in ${bars(applied)}.`:`${applied.length} hand choices applied in ${bars(applied)}.`);
  if(kept.length)parts.push(kept.length===1?`The note in ${bars(kept)} keeps the hand it had: that hand can’t be drawn on the page yet.`:`The notes in ${bars(kept)} keep the hands they had: those hands can’t be drawn on the page yet.`);
  if(kept.length&&outcome.keptReason)parts.push(keptReasonSentence(kept.length,outcome.keptReason));
  if(unapplied.length)parts.push(`${notes(unapplied)} ${unapplied.length===1?'was':'were'} not applied${outcome.reason?`: ${clause(outcome.reason)}`:''}.`);

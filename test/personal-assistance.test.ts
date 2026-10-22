@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {assigned,effectiveAssignments} from '../src/personal-assignments';
 import {initialPersonal,fingerFor,readPersonal,type Entry} from '../src/state';
 import {bootstrapPersonalFingeringMemory,editPersonalFingeringMemory,resolvePersonalFingeringMemory,type MemoryScoreInput} from '../src/personal-fingering-memory';
-import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from '../src/personal-assistance';
+import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from '../src/personal-assistance';
 import {PersonalMemoryLibrary} from '../src/personal-memory-library';
 import type {ScorePackage} from '../src/package';
 function fixture(entryId='piece'):MemoryScoreInput{
@@ -23,7 +23,7 @@ test('source navigation maps exact written source owners and evidence counts the
  const local=resolvePersonalFingeringMemory(next,input.entryId,input.p,input.personal);
  assert.equal(memoryChoiceLabel(local,'b2n1'),'Local');
  assert.deepEqual(memoryReferenceTarget(input,local,'b2n1'),{entryId:'piece',sourceRevision:'revision',writtenBar:1,ownerId:'b0n1'});
- assert.equal(memorySourceLabel(next,local,'b2n1',()=> 'Fixture'),'Reference: Fixture, bar 1. Choice from Fixture, bar 3.');
+ assert.deepEqual(memoryFingerSource(local,'b2n1','Local',{entryId:'piece',writtenBar:3},()=> 'Fixture'),{said:'For this note only.',description:'Your finger for this note only, instead of bar 1’s.',reference:'elsewhere',promote:true});
  assert.equal(memoryAdviceEvidence(input,local).get('b2n1')?.evidence,'personal');
 });
 test('a local hand-match exception and suppression keep navigation to their underlying shared source',()=>{
@@ -56,4 +56,26 @@ test('library additions during election invalidate the donor snapshot',async()=>
  const input=fixture(),entries=[{id:'piece',file:'active.tuna',metadata:{title:'Fixture'},importedAt:'2020-01-01'} as Entry];
  const library=new PersonalMemoryLibrary({read:async name=>name==='active.tuna'?new Uint8Array([1]):null},()=>entries,async()=>input.p);
  await library.scan();entries.push({...entries[0],id:'other'});assert.equal(await library.validate(),false);
+});
+
+test('the Finger row, its tooltip and its button say one thing: the bar matching bars follow, or that it is unavailable',()=>{
+ const input=fixture();input.personal=assigned(input.p,input.personal,input.p.seats[1],{finger:2});const memory=bootstrapPersonalFingeringMemory([input]),r=resolvePersonalFingeringMemory(memory,input.entryId,input.p,input.personal);
+ const work=(id:string)=>id==='no13'?'Robert Schumann › Op. 68 › No. 13':'Fixture',at=(writtenBar:number,entryId='piece')=>({entryId,writtenBar});
+ // Just typed: this bar is the one matching bars follow, so "Use for matching bars" is not offered again;
+ // a bar that follows another may become the one they follow.
+ assert.deepEqual(memoryFingerSource(r,'b0n1','Shared',at(1),work),{said:'Matching bars follow this bar.',description:'Matching bars follow this bar’s finger.',reference:'here',promote:false});
+ assert.deepEqual(memoryFingerSource(r,'b2n1','Shared',at(3),work),{said:'Same as bar 1.',description:'Same as bar 1, which matching bars follow.',reference:'elsewhere',promote:true});
+ // Another score's bar is named by its catalogue, not its title.
+ const elsewhere={...r,byOwner:{...r.byOwner,b2n1:{...r.byOwner.b2n1,reference:{...r.byOwner.b2n1.reference!,entryId:'no13',writtenBar:11}}}};
+ assert.equal(memoryFingerSource(elsewhere,'b2n1','Shared',at(3),work).said,'Same as bar 11 of Robert Schumann › Op. 68 › No. 13.');
+ // On a folded score bars are named as printed: a reference in a repeat's second pass is its first pass's bar,
+ // and from the printed bar it shares it is this bar.
+ const folded=(entryId:string,bar:number)=>entryId==='piece'&&bar>=12&&bar<=21?bar-10:bar,second={...r,byOwner:{...r.byOwner,b2n1:{...r.byOwner.b2n1,reference:{...r.byOwner.b2n1.reference!,writtenBar:13}}}};
+ assert.equal(memoryFingerSource(second,'b2n1','Shared',at(5),work,folded).said,'Same as bar 3.');
+ assert.equal(memoryFingerSource(second,'b2n1','Shared',at(3),work,folded).reference,'here');
+ assert.equal(memoryFingerSource(elsewhere,'b2n1','Shared',at(3),work,folded).said,'Same as bar 11 of Robert Schumann › Op. 68 › No. 13.','another score keeps its own bars');
+ // A missing reference is unavailable, never "shared with matching bars".
+ const {reference:_,...missing}=r.byOwner.b2n1,unavailable={...r,byOwner:{...r.byOwner,b2n1:missing}};
+ assert.deepEqual(memoryFingerSource(unavailable,'b2n1','Shared',at(3),work),{said:'Reference unavailable.',description:'Shared with matching bars, but the bar they follow is unavailable.',reference:'unavailable',promote:true});
+ assert.equal(memoryFingerSource(unavailable,'b2n1','Local',at(3),work).description,'Your finger for this note only, instead of the shared one.');
 });
