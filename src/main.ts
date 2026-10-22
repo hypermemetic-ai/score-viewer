@@ -34,7 +34,7 @@ import {buildPerformanceSchedule,performanceSeconds} from './score-performance';
 import {TempoAudition,type Audition} from './tempo-audition';
 import {NativeTempoAudition} from './native-tempo-audition';
 import {mountTempoAudition,tempoAuditionMarkup} from './tempo-audition-dialog';
-import {workHeadingMarkup} from './score-catalog';
+import {workHeadingMarkup,workReference} from './score-catalog';
 import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
 import {personalForTransposedEdition} from './transposed-personal';
 import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTransposition} from './score-transposition-selection';
@@ -83,7 +83,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary} from './personal-memory-library';
-import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from './personal-assistance';
+import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
 import {EditorAdviceRunner,scoreAdviceContacts,analyzeEditorAdviceAsync,createAdviceCorpusState,replaceAdviceCorpusScore,type EditorAdviceResult} from './fingering-advice';
@@ -554,18 +554,12 @@ interface SourceReturn {entryId:string;file:string;sourceRevision:string;view:Pe
 let sourceReturn:SourceReturn|undefined,sourceNavigating=false;
 function editorMemoryMarkup(){
  if(!current||!selection)return'';
- const input=memoryInput(current),resolution=resolveMemoryInput(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId),description=memorySourceLabel(memoryDocument(),resolution,ownerId,id=>entries.find(e=>e.id===id)?.metadata.title??'Score');
+ const input=memoryInput(current),resolution=resolveMemoryInput(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId);
  const self=reference?.entryId===current.entry.id&&reference.ownerId===ownerId;
+ // The label, its tooltip and the line under it say one thing: where this finger comes from.
+ const source=label&&memoryFingerSource(resolution,ownerId,label,{entryId:current.entry.id,writtenBar:selection.writtenBar},id=>{const m=entries.find(e=>e.id===id)?.metadata;return m?workReference(m):'another score';});
  // The finger and hand rows are named, so "Shared" can't be read as the hand's.
- return `<div class="editor-row" data-editor-row="finger"><span class="editor-row-name">Finger</span>${label?`<span class="personal-choice-kind" title="${esc(description)}" aria-label="${esc(label+'. '+description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${resolution.byOwner[ownerId]?.personal?button('Use for matching bars','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}${label?`<span class="editor-said" aria-hidden="true">${esc(fingerSaid(label,self?undefined:reference))}</span>`:''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span></div>${editorHandMarkup()}`;
-}
-/** What Shared or Local means for the selected finger, briefly; the label's
- * tooltip keeps the full reference and donor. */
-function fingerSaid(label:'Shared'|'Local',reference?:{entryId:string;writtenBar:number}){
- if(label==='Local')return 'For this note only.';
- if(!reference)return 'Shared with matching bars.';
- const elsewhere=reference.entryId!==current?.entry.id?entries.find(e=>e.id===reference.entryId)?.metadata.title:undefined;
- return `Same as bar ${reference.writtenBar}${elsewhere?` of ${elsewhere}`:''}.`;
+ return `<div class="editor-row" data-editor-row="finger"><span class="editor-row-name">Finger</span>${source?`<span class="personal-choice-kind" title="${esc(source.description)}" aria-label="${esc(label+'. '+source.description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${source?.promote?button('Use for matching bars','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}${source?`<span class="editor-said" aria-hidden="true">${esc(source.said)}</span>`:''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span></div>${editorHandMarkup()}`;
 }
 /** Where the selected note's hand comes from, beside its finger's provenance.
  * The explanation is shown, not only hovered: nobody hovers on the TV. */
@@ -1346,7 +1340,7 @@ async function act(action:string){try{if(!startupReady&&action!=='exit')return;i
   // Keep this note’s written hand: an exception to the bar it would follow, for this note only.
   if(action==='hand-not-here'&&!written)return;
   const kept=(await acceptMemoryAction(target,action==='hand-not-here'?{kind:'hand',ownerId,hand:written!,local:true,decisionId,authoredAt}:{kind:'handScope',ownerId,scope:action==='hand-only-here'?'local':'shared',decisionId,authoredAt})).kept;
-  if(!kept)notify(handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction));return;
+  const notice=kept?undefined:handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction);if(notice)notify(notice);return;
  }
  if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,{kind:action==='memory-reference'?'reference':'reset',ownerId:selection.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});return;}
  if(action==='restore-all'||action==='undo-restore'){if(action==='restore-all'||s.undo||s.undoAssignments||s.undoCalculatedOwners){const target=current,ownerDialog=dialog,ownerSection=optionsSection;await acceptMemoryAction(target,{kind:action==='restore-all'?'restoreAll':'undoRestore',ownerId:p.seats[0].ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(current===target){if(dialog===ownerDialog)options(ownerSection);if(practice)practice.refit();else{renderPages();renderToolbar();}}}return;}
@@ -1434,7 +1428,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  const before=target.personal,receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
  // A hand change reaching matching bars, or stopping there, is said; a refused one says why instead.
- const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handKeyNotice(target.package,before,target.personal,ownerId):undefined;if(notice)notify(notice);return result;});
+ const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handKeyNotice(target.package,before,target.personal,ownerId,!!selection?.ownerIds.includes(ownerId)):undefined;if(notice)notify(notice);return result;});
  if(waitedOwner||!nextSeat)return said(presentPersonalChange(target,next,receipt.saved));
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;

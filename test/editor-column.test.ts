@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
-import {defaultView,EDITOR_COLUMN,readerFit,viewportFit,type ViewState} from '../src/state';
+import {defaultView,EDITOR_COLUMN,EDITOR_GUTTER,readerFit,viewportFit,type ViewState} from '../src/state';
 
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const production=(start:string,end:string)=>stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))));
@@ -23,15 +23,18 @@ test('one page on the TV or a laptop keeps its size and place; the editor column
  }
 });
 
-test('pages that crowd the column move left, then shrink only as much as the column needs',()=>{
+test('pages that crowd the column are centred in the room left of it, and shrink only as much as that room needs',()=>{
  const tv=edges(1920,1080,view({count:2}));
  assert.equal(tv.fit.scale,viewportFit(1920,1080,view({count:2}),3).scale,'two pages on the TV only move');
- assert.ok(Math.abs(tv.right-EDITOR_COLUMN)<1e-6);assert.ok(tv.left>0);
- for(const [w,h,count] of [[1280,720,2],[1920,1080,3],[1080,1920,1]] as const){
+ for(const [w,h,count] of [[1920,1080,2],[1280,720,2],[1280,720,3],[1920,1080,3],[1366,768,2],[1080,1920,1]] as const){
   const {fit,left,right}=edges(w,h,view({count}));
-  assert.ok(Math.abs(right-EDITOR_COLUMN)<1e-6,`${w}x${h}x${count} column`);assert.ok(left>=-1e-6,`${w}x${h}x${count} stays on screen`);
+  assert.ok(right>=EDITOR_COLUMN-1e-6,`${w}x${h}x${count} column`);assert.ok(Math.abs(fit.column-right)<1e-6,`${w}x${h}x${count} the column is the room right of the pages`);
+  // Centred in the space beside the column, not against the screen's left edge.
+  assert.ok(Math.abs(left-(right-EDITOR_COLUMN))<1e-6,`${w}x${h}x${count} centred`);assert.ok(left>=EDITOR_GUTTER-1e-6,`${w}x${h}x${count} clear of the edge`);
   assert.ok(fit.scale<=viewportFit(w,h,view({count}),3).scale);
  }
+ // The TV at 150% with two pages: the pages stand off the left edge by the gutter, as the column does from the right.
+ const tv150=edges(1280,720,view({count:2}));assert.ok(Math.abs(tv150.left-EDITOR_GUTTER)<1e-6);
  const turned=edges(1920,1080,view({rotation:90})),upright=edges(1080,1920,view());
  assert.deepEqual(turned.fit,{...upright.fit,width:upright.fit.width,height:upright.fit.height});
 });

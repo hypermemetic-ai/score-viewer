@@ -24,18 +24,18 @@ test('hand choices made while hand editing is prepared wait in order, one per no
 test('the waiting status and its outcome say what happens to each choice',()=>{
  assert.equal(LOADING_STEPS['hand-editing'],'Engraving the score for hand choices');
  assert.equal(waitingChoicesText([]),'');
- assert.equal(waitingChoicesText([{key:'a',hand:'RH',bar:12}]),'Right hand for the note in bar 12 applies once this is ready.');
- assert.equal(appliedChoicesText([{key:'a',hand:'LH',bar:12}]),'Hand editing is ready. Left hand applied to the note in bar 12.');
+ assert.equal(waitingChoicesText([{key:'a',hand:'RH',bar:12}]),'RH for the note in bar 12 applies once this is ready.');
+ assert.equal(appliedChoicesText([{key:'a',hand:'LH',bar:12}]),'Hand editing is ready. LH applied to the note in bar 12.');
  assert.equal(appliedChoicesText([{key:'a',hand:'LH',bar:12},{key:'b',hand:'RH',bar:4},{key:'c',hand:'RH',bar:4}]),'Hand editing is ready. 3 hand choices applied in bars 4 and 12.');
- assert.equal(abandonedChoicesText([{key:'a',hand:'LH',bar:7}]),'Left hand for the note in bar 7 was not applied: the score was closed or changed before hand editing was ready. Nothing was saved for it.');
+ assert.equal(abandonedChoicesText([{key:'a',hand:'LH',bar:7}]),'LH for the note in bar 7 was not applied: the score was closed or changed before hand editing was ready. Nothing was saved for it.');
  // A note whose new hand cannot be drawn keeps its hand, and the outcome says so rather than claiming it applied.
- assert.equal(waitingOutcomeText({applied:[{key:'a',hand:'RH',bar:2}],kept:[{key:'b',hand:'LH',bar:3}]}),'Hand editing is ready. Right hand applied to the note in bar 2. The note in bar 3 keeps the hand it had: that hand can’t be drawn on the page yet.');
+ assert.equal(waitingOutcomeText({applied:[{key:'a',hand:'RH',bar:2}],kept:[{key:'b',hand:'LH',bar:3}]}),'Hand editing is ready. RH applied to the note in bar 2. The note in bar 3 keeps the hand it had: that hand can’t be drawn on the page yet.');
  // A refused waiting choice says why, in the engraver's diagnosis put plainly.
  assert.equal(waitingOutcomeText({applied:[],kept:[{key:'b',hand:'LH',bar:1}],keptReason:'shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation'}),
   'Hand editing is ready. The note in bar 1 keeps the hand it had: that hand can’t be drawn on the page yet. It shares a beam with a note in the other hand, and the line that marks the change of hand would run into other notation.');
  assert.equal(waitingOutcomeText({applied:[],kept:[{key:'a',hand:'LH',bar:1},{key:'b',hand:'LH',bar:1}],keptReason:'shares a beam with a note in the other hand, and there is no room to draw the line that marks the change of hand'}),
   'Hand editing is ready. The notes in bar 1 keep the hands they had: those hands can’t be drawn on the page yet. One of them shares a beam with a note in the other hand, and there is no room to draw the line that marks the change of hand.');
- assert.equal(waitingOutcomeText({applied:[{key:'a',hand:'RH',bar:2}],keptReason:'Unused.'}),'Hand editing is ready. Right hand applied to the note in bar 2.');
+ assert.equal(waitingOutcomeText({applied:[{key:'a',hand:'RH',bar:2}],keptReason:'Unused.'}),'Hand editing is ready. RH applied to the note in bar 2.');
  assert.equal(waitingOutcomeText({applied:[],unapplied:[{key:'a',hand:'RH',bar:2},{key:'b',hand:'RH',bar:9}],reason:'Saving is paused.'}),'Hand editing is ready. 2 hand choices (bars 2 and 9) were not applied: saving is paused.');
 });
 

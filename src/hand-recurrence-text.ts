@@ -2,6 +2,7 @@ import {handProvenance,handRecurrences,type PersonalHand} from './personal-assig
 import type {ScorePackage} from './package';
 import type {PersonalState} from './state';
 
+/** Tooltips spell the hand out; every line that stays on screen says RH or LH, as the pianist reads it. */
 const handName=(hand:PersonalHand)=>hand==='LH'?'left hand':'right hand';
 const capital=(text:string)=>text[0].toUpperCase()+text.slice(1);
 const otherHand=(hand:PersonalHand):PersonalHand=>hand==='LH'?'RH':'LH';
@@ -15,34 +16,38 @@ const digitOf=(p:ScorePackage,id:string)=>p.seats.find(s=>s.ownerIds.includes(id
 export type HandChoiceAction='hand-not-here'|'hand-only-here'|'hand-shared';
 /** Words said in the editor bar; a `key` is drawn as a key. */
 export type HandWords=readonly (string|{key:string})[];
-/** `said` is shown under the label, brief, with its keys as keys; `description`
- * is the full sentence for the label's tooltip and screen readers. */
+/** `said` is shown under the label, brief, with its keys as keys, and says
+ * only what the label and button don't; `description` is the full sentence for
+ * the label's tooltip and screen readers. */
 export interface HandChoiceView {label?:string;description?:string;action?:{id:HandChoiceAction;label:string};said:HandWords}
 /** What the editor says about the selected note's hand: carried from another
- * bar, carried from here to matching bars, kept to this note alone, or moved
- * before hand changes were shared. Every action applies to this note. */
+ * bar, carried from here to matching bars, kept to this note alone, or not yet
+ * shared with the matching bars it would reach (R shares it). Every action
+ * applies to this note. */
 export function handChoiceView(p:ScorePackage,s:PersonalState,ownerId:string):HandChoiceView|undefined {
  const hand=handProvenance(p,s,ownerId);if(!hand)return;
  const name=handName(hand.hand);
- if(hand.kind==='carried'){const written=otherHand(hand.hand);return{label:`Hand from bar ${hand.fromBar}`,description:`${capital(name)}, as you chose for the same music in bar ${hand.fromBar}. Press ${handKey(written)} to give this note its written ${handName(written)}.`,action:{id:'hand-not-here',label:'Keep this note’s written hand'},said:[`${capital(name)}. Press `,{key:handKey(written)},` for its written ${handName(written)}.`]};}
- if(hand.kind==='shared')return hand.toBars.length?{label:`Hand also in ${barList(hand.toBars)}`,description:`${capital(name)} here and in ${barList(hand.toBars)}: the same music.`,action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:[`${capital(name)}: the same music.`]}:undefined;
- if(hand.kind==='unshared')return{said:['Moved before hand changes were shared. Press ',{key:handKey(hand.hand)},` to share it with ${barList(hand.toBars)}.`]};
+ if(hand.kind==='carried'){const written=otherHand(hand.hand);return{label:`Hand from bar ${hand.fromBar}`,description:`${capital(name)}, as you chose for the same music in bar ${hand.fromBar}. Press ${handKey(written)} to give this note its written ${handName(written)}.`,action:{id:'hand-not-here',label:'Keep this note’s written hand'},said:[`${hand.hand}. Press `,{key:handKey(written)},` for its written ${written}.`]};}
+ if(hand.kind==='shared')return hand.toBars.length?{label:`Hand also in ${barList(hand.toBars)}`,description:`${capital(name)} here and in ${barList(hand.toBars)}: the same music.`,action:{id:'hand-only-here',label:'Don’t share this note’s hand'},said:[`${hand.hand}.`]}:undefined;
+ if(hand.kind==='unshared')return{said:[`${hand.hand}. Press `,{key:handKey(hand.hand)},` to share it with ${barList(hand.toBars)}.`]};
  const follows=hand.follows===undefined?'':` Bar ${hand.follows} has the same music.`;
- return{label:'Hand for this note only',description:`${capital(name)} for this note only.${follows}`,said:[`${capital(name)}.${follows}`],
+ return{label:'Hand for this note only',description:`${capital(name)} for this note only.${follows}`,said:[`${hand.hand}.`],
   ...(hand.follows!==undefined?{action:{id:'hand-shared' as const,label:`Use bar ${hand.follows}’s hand`}}:p.score.notes.find(n=>n.id===ownerId)?.hand!==hand.hand?{action:{id:'hand-shared' as const,label:'Share this note’s hand'}}:{})};
 }
 
 /** Said after a hand decision: which matching bars now take it, which stopped,
  * and which it could not reach. The edited note says its own hand in the editor,
- * so it is left out. Undefined when no other bar changed. */
-export function handCarryNotice(p:ScorePackage,before:PersonalState,after:PersonalState,edited?:string):string|undefined {
+ * so it is left out; while it stays selected (`shown`), so are the bars its Hand
+ * row names. Undefined when nothing else changed. */
+export function handCarryNotice(p:ScorePackage,before:PersonalState,after:PersonalState,edited?:string,shown=false):string|undefined {
  const a=handRecurrences(p,before),b=handRecurrences(p,after);if(a===b)return;
  const gained=new Map<number,PersonalHand>(),lost=new Map<number,string[]>(),still=new Set([...b.carried.keys()].map(id=>barOf(p,id)));
  for(const [id,c] of b.carried)if(id!==edited&&a.carried.get(id)?.hand!==c.hand)gained.set(barOf(p,id),c.hand);
  for(const [id] of a.carried)if(id!==edited&&!b.carried.has(id))lost.set(barOf(p,id),[...lost.get(barOf(p,id))??[],id]);
  const known=new Set(a.skipped.map(s=>JSON.stringify(s))),skipped=b.skipped.filter(s=>!known.has(JSON.stringify(s)));
+ const named=new Set(shown&&edited?(()=>{const now=handProvenance(p,after,edited);return now?.kind==='shared'?now.toBars:[];})():[]);
  const parts:string[]=[];
- for(const hand of ['RH','LH'] as const){const bars=[...gained].filter(([,h])=>h===hand).map(([bar])=>bar);if(bars.length)parts.push(`${capital(handName(hand))} also in ${barList(bars)}: the same music.`);}
+ for(const hand of ['RH','LH'] as const){const bars=[...gained].filter(([bar,h])=>h===hand&&!named.has(bar)).map(([bar])=>bar);if(bars.length)parts.push(`${hand} also in ${barList(bars)}: the same music.`);}
  // A bar whose every note stopped following has its written hands again; otherwise name the notes that did.
  const whole=[...lost.keys()].filter(bar=>!gained.has(bar)&&!still.has(bar));if(whole.length)parts.push(`${capital(barList(whole))} ${whole.length===1?'keeps its':'keep their'} written hands again.`);
  for(const [bar,ids] of lost)if(!gained.has(bar)&&still.has(bar))parts.push(`In bar ${bar}, ${list(ids.map(id=>digitOf(p,id)))} ${ids.length===1?'is in its written hand':'are in their written hands'} again.`);
@@ -52,27 +57,23 @@ export function handCarryNotice(p:ScorePackage,before:PersonalState,after:Person
 }
 
 /** Said after L or R: when the note now follows a matching bar again, it is
- * named first, since the selection moves on; then the other bars it changed. */
-export function handKeyNotice(p:ScorePackage,before:PersonalState,after:PersonalState,ownerId:string):string|undefined {
- const now=handRecurrences(p,after).carried.get(ownerId),rest=handCarryNotice(p,before,after,ownerId);
- if(!now||handRecurrences(p,before).carried.has(ownerId))return rest;
- const lead=`In bar ${barOf(p,ownerId)}, ${digitOf(p,ownerId)} takes bar ${now.fromBar}’s ${handName(now.hand)} again.`;
+ * named first, since the selection moves on; then the other bars it changed.
+ * When the note stays selected (`shown`), its Hand row says its own part. */
+export function handKeyNotice(p:ScorePackage,before:PersonalState,after:PersonalState,ownerId:string,shown=false):string|undefined {
+ const now=handRecurrences(p,after).carried.get(ownerId),rest=handCarryNotice(p,before,after,ownerId,shown);
+ if(shown||!now||handRecurrences(p,before).carried.has(ownerId))return rest;
+ const lead=`In bar ${barOf(p,ownerId)}, ${digitOf(p,ownerId)} takes bar ${now.fromBar}’s ${now.hand} again.`;
  return rest?`${lead} ${rest}`:lead;
 }
 
-/** Said after an editor hand button, naming the note it applied to before the
- * bars it changed. */
-export function handActionNotice(p:ScorePackage,before:PersonalState,after:PersonalState,ownerId:string,action:HandChoiceAction):string {
- const now=handProvenance(p,after,ownerId),was=handProvenance(p,before,ownerId),bar=barOf(p,ownerId),rest=handCarryNotice(p,before,after,ownerId);
- const with_=(lead:string)=>rest?`${lead} ${rest}`:lead;
- if(action==='hand-not-here'){
-  const from=was?.kind==='carried'?was.fromBar:undefined,following=[...handRecurrences(p,after).carried.keys()].some(id=>barOf(p,id)===bar);
-  const hand=p.score.notes.find(n=>n.id===ownerId)?.hand;
-  return with_(`This note keeps its written ${hand?handName(hand as PersonalHand):'hand'}.${following&&from!==undefined?` The rest of bar ${bar} still follows bar ${from}.`:''}`);
- }
- if(action==='hand-only-here')return with_(`This note’s ${now?handName(now.hand):'hand'} stays in bar ${bar} only.`);
- if(now?.kind==='carried')return with_(`This note takes bar ${now.fromBar}’s ${handName(now.hand)} again.`);
- return with_(`This note’s ${now?handName(now.hand):'hand'} is shared with matching bars again.`);
+/** Said after an editor hand button. The note stays selected and its Hand row
+ * shows what it now has, so only the bars it changed are said, and the rest of
+ * its bar when that still follows another. Undefined when nothing else changed. */
+export function handActionNotice(p:ScorePackage,before:PersonalState,after:PersonalState,ownerId:string,action:HandChoiceAction):string|undefined {
+ const was=handProvenance(p,before,ownerId),bar=barOf(p,ownerId),rest=handCarryNotice(p,before,after,ownerId,true);
+ const from=action==='hand-not-here'&&was?.kind==='carried'?was.fromBar:undefined,following=from!==undefined&&[...handRecurrences(p,after).carried.keys()].some(id=>barOf(p,id)===bar);
+ const parts=[...following?[`The rest of bar ${bar} still follows bar ${from}.`]:[],...rest?[rest]:[]];
+ return parts.length?parts.join(' '):undefined;
 }
 
 /** Said when bars keep their written hands because the carried hand can't be drawn there. */

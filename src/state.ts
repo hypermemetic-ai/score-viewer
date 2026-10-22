@@ -111,16 +111,21 @@ export function viewportFit(w:number,h:number,v:ViewState,total:number,pageWidth
 }
 /** Room beside the pages for the editor bar and its notices, in CSS pixels. */
 export const EDITOR_COLUMN=280;
+/** Margin kept between the screen's left edge and pages that fill the room
+ * beside the editor column; the column keeps the same margin on its right. */
+export const EDITOR_GUTTER=16;
 /** The reader's fit when its score can be edited: the editor bar gets a column
  * of at least `column` pixels to the right of the pages, so it never covers the
  * title or the music. The column is kept whether or not the bar is showing, so
  * nothing moves when editing starts. Pages that already leave that much room are
- * untouched; otherwise they move left (`shift`) and shrink only as needed. */
+ * untouched; otherwise they are centred in the space left of the column, at least
+ * `EDITOR_GUTTER` from the screen's edge, and shrink only as needed. The column
+ * is all the room right of the pages. */
 export function readerFit(w:number,h:number,v:ViewState,total:number,column=0,pageWidth=595.276,pageHeight=841.89):Fit&{shift:number;column:number}{
  const fit=viewportFit(w,h,v,total,pageWidth,pageHeight),natural=fit.pages.length*pageWidth+Math.max(0,fit.pages.length-1)*12;
  const room=(fit.width-natural*fit.scale)/2;if(room>=column)return {...fit,shift:0,column:room};
- const scale=Math.max(.01,Math.min(fit.scale,(fit.width-column)/natural));
- return {...fit,scale,shift:column-(fit.width-natural*scale)/2,column};
+ const scale=Math.max(.01,Math.min(fit.scale,(fit.width-column-2*EDITOR_GUTTER)/natural)),left=(fit.width-column-natural*scale)/2;
+ return {...fit,scale,shift:column/2,column:column+left};
 }
 export function turnPage(v:ViewState,dir:1|-1,total:number,effectiveCount:number):ViewState{return {...v,page:Math.max(0,Math.min(total-1,v.page+dir*(v.advance==='group'?effectiveCount:1)))};}
 export const rotate=(r:Rotation)=>(r+90)%360 as Rotation;
