@@ -50,8 +50,8 @@ export function handCarryNotice(p:ScorePackage,before:PersonalState,after:Person
 /** Said after L or R: when the note now follows a matching bar again, it is
  * named first, since the selection moves on; then the other bars it changed. */
 export function handKeyNotice(p:ScorePackage,before:PersonalState,after:PersonalState,ownerId:string):string|undefined {
- const now=handProvenance(p,after,ownerId),rest=handCarryNotice(p,before,after,ownerId);
- if(now?.kind!=='carried'||handProvenance(p,before,ownerId)?.kind==='carried')return rest;
+ const now=handRecurrences(p,after).carried.get(ownerId),rest=handCarryNotice(p,before,after,ownerId);
+ if(!now||handRecurrences(p,before).carried.has(ownerId))return rest;
  const lead=`In bar ${barOf(p,ownerId)}, ${digitOf(p,ownerId)} takes bar ${now.fromBar}’s ${handName(now.hand)} again.`;
  return rest?`${lead} ${rest}`:lead;
 }
