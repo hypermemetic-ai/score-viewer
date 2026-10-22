@@ -202,6 +202,32 @@ impl HalDevice {
     pub fn uid(&self) -> &str {
         &self.uid
     }
+    /// Test-only playability probe: device latency and safety offset, in frames.
+    #[cfg(test)]
+    pub fn path_frames(&self, input: bool) -> Result<(u32, u32), String> {
+        let scope = four(if input { b"inpt" } else { b"outp" });
+        let get = |selector: u32| -> Result<u32, String> {
+            let a = Address {
+                selector,
+                scope,
+                element: 0,
+            };
+            let mut value = 0u32;
+            let mut size = 4u32;
+            unsafe {
+                check(AudioObjectGetPropertyData(
+                    self.id,
+                    &a,
+                    0,
+                    ptr::null(),
+                    &mut size,
+                    (&mut value as *mut u32).cast(),
+                ))?;
+            }
+            Ok(value)
+        };
+        Ok((get(four(b"ltnc"))?, get(four(b"saft"))?))
+    }
     pub fn current(&self) -> Result<u32, String> {
         self.read()
     }

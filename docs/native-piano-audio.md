@@ -106,6 +106,36 @@ available output fail the test. Host close/drop is distinct from observing the
 normal Tauri exit hook, which acknowledges shutdown and preserves restoration
 errors in a small native audit file.
 
+The separate, manually started workflow `piano-playability-probe.yml` (not the
+native build) runs the ignored test
+`practice_audio::playability_macos::loopback_delay_and_loudness` on a GitHub
+macOS 15 runner. It installs the BlackHole 2ch loopback, downloads and checks the
+V6.2a archive, plays through the real CoreAudio host at each latency setting and
+records the loopback input. It reports, per setting, note-on handed to the engine
+to the first non-zero input sample, timed in CoreAudio host time, and the peak and
+300 ms RMS (left channel) per velocity, chord and metronome click. It saves no
+cache and publishes only a JSON report; the whole run takes about 5.5 minutes.
+
+Run 39871601774 (48 kHz, BlackHole reports zero device latency and safety offset;
+16 notes per setting):
+
+| Latency setting | Buffer | Note-on to loopback input |
+| --- | --- | --- |
+| Lowest | 15 frames (0.31 ms) | 0.26–0.54 ms, median 0.44 |
+| Low | 256 frames (5.33 ms) | 3.78–9.08 ms, median 6.23 |
+| Medium | 512 frames (10.67 ms) | 7.10–19.21 ms, median 14.60 |
+| High | 512 frames (10.67 ms) | 7.20–21.26 ms, median 14.52 |
+
+High equals Medium here because the device default is 512 frames. Loudness at
+the device matches the offline rendering within about 4 dB (left channel only):
+middle C at 70% peaks at −53.8, −45.7, −33.7, −26.1 and −20.9 dBFS for velocities
+16, 32, 64, 96 and 127; a five-note chord at velocity 100 peaks at −14.9; 100%
+adds 3.1 dB. The metronome click peaks at −16.1 dBFS at both volumes.
+
+The loopback has no converters, so a real interface or built-in speakers add their
+own reported device latency and safety offset, which this run cannot measure, and
+the keyboard's USB MIDI and the room are not counted. CI has no speakers.
+
 These checks establish source/stream behavior. Final package launch, physical
 MIDI, audible quality, pedal response, sound-to-ear latency and the timing of
 scheduled notes on a real output need their separate native and human acceptance
