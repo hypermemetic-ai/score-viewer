@@ -58,6 +58,22 @@ test('No. 13: the owner’s bar 11 hand change reaches bar 21, the same music wr
  assert.equal(handCarryNotice(input.p,input.personal,personal),'Right hand also in bar 21: the same music.');
 });
 
+// The owner's No. 13 folds its repeat: stored bars 12–21 are printed bars 2–11 played again, and bar 22 on prints ten bars earlier.
+const foldedNo13=(bar:number)=>bar<=11?bar:bar-10;
+test('No. 13 folded: bar 21 is bar 11 played again, so the hand notices name no bar that is not on the page', ()=>{
+ const input=no13(),personal=owners(input);
+ assert.equal(handCarryNotice(input.p,input.personal,personal,e4(11)),'Right hand also in bar 21: the same music.','written out, bar 21 is its own bar');
+ assert.equal(handCarryNotice(input.p,input.personal,personal,e4(11),foldedNo13),undefined,'folded, its second pass is the bar just edited');
+ assert.equal(handChoiceView(input.p,personal,e4(11),foldedNo13),undefined);
+ assert.equal(handChoiceView(input.p,personal,e4(21),foldedNo13),undefined,'the second pass shows bar 11’s own hand');
+ // Keeping one second-pass note's written hand: said without the bar the page doesn't print.
+ const kept=assigned(input.p,personal,seat(input,e4(21)),{hand:'LH',local:true});
+ assert.equal(handActionNotice(input.p,personal,kept,e4(21),'hand-not-here',foldedNo13),'This note keeps its written left hand.');
+ assert.equal(handActionNotice(input.p,personal,kept,e4(21),'hand-not-here'),'This note keeps its written left hand. The rest of bar 21 still follows bar 11.');
+ assert.equal(droppedCarryText([21,22],foldedNo13),'Bars 11 and 12 keep their written hands: the carried hands can’t be drawn there.');
+ assert.equal(droppedCarryText([21],foldedNo13),'Bar 11 keeps its written hands: the carried hand can’t be drawn there.');
+});
+
 test('a bar matches only when both hands play the same from the downbeat to the end of the shorter bar',()=>{
  // Another bass at the downbeat: the moved notes sound with the same notes, but the bar is other music.
  const otherBass=no13({10:bar10,11:[...chords,['RH',59,72,12],['RH',61,84,12]],21:chords.map(([h,p,o,d],i)=>i===0?[h,p+1,o,d] as Row:[h,p,o,d] as Row)});

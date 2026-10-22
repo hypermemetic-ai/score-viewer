@@ -96,7 +96,7 @@ import './personal-assistance.css';
 import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage} from './repeat-fold';
 import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
-import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,type HandChoiceAction} from './hand-recurrence-text';
+import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
@@ -262,6 +262,8 @@ async function presentReader(target:NonNullable<typeof current>,personal:Persona
 }
 /** A stored bar as the reader prints it: a folded repeat prints fewer bars. */
 function printedBar(entryId:string,bar:number):number{const fold=current?.entry.id===entryId?(readerPackage() as FoldedPackage).verbatimFold:undefined;return fold?fold.printedBar(bar):bar;}
+/** A score's stored bars as printed, for notices that name bars. */
+const printedBars=(target:{entry:{id:string}}):PrintedBar=>bar=>printedBar(target.entry.id,bar);
 /** Scores whose written-out repeat the player chose to keep this session. */
 const keptWrittenOut=new WeakSet<NonNullable<typeof current>>();
 /** Why a repeat the reader would fold is written out, and how to fold it again. */
@@ -393,7 +395,7 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
   attempted=next,projection=presentReader(target,next,()=>editor.session.project(attempted).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
    if(editor.generation===generation)next=target.personal;
-   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}else if(kept.dropped.length)notify(droppedCarryText(kept.dropped));
+   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}else if(kept.dropped.length)notify(droppedCarryText(kept.dropped,printedBars(target)));
    return kept.view;})),
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
@@ -612,7 +614,7 @@ function editorMemoryMarkup(){
 }
 /** Where the selected note's hand comes from, beside its finger's provenance. */
 function editorHandMarkup(){
- if(!current||!selection)return'';const view=handChoiceView(current.package,current.personal,selection.ownerIds[0]);if(!view)return'';
+ if(!current||!selection)return'';const view=handChoiceView(current.package,current.personal,selection.ownerIds[0],printedBars(current));if(!view)return'';
  return `${view.label?`<span class="personal-choice-kind" title="${esc(view.description??'')}" aria-label="${esc(view.label+'. '+(view.description??''))}">${esc(view.label)}</span>`:''}${view.action?button(esc(view.action.label),view.action.id):''}${view.hint?`<span class="hand-choice-hint">${esc(view.hint.lead)} <kbd>${esc(view.hint.key)}</kbd> ${esc(view.hint.rest)}</span>`:''}`;
 }
 async function visitMemorySource(){
@@ -915,7 +917,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingPresentation=nextPresentation;readingViewError=nextViewError;
  if(rememberOpened){toolbarVisible=false;libraryMenu.selection.update(entries,next.entry.id);libraryMenu.selection.select(`score:${next.entry.id}`);preferences.lastWorkedEntryId=next.entry.id;}
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
- if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(droppedCarries.length)notify(droppedCarryText(droppedCarries));if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
+ if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(droppedCarries.length)notify(droppedCarryText(droppedCarries,printedBars(next)));if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
@@ -1391,7 +1393,7 @@ async function act(action:string){try{if(!startupReady&&action!=='exit')return;i
   // Keep this note’s written hand: an exception to the bar it would follow, for this note only.
   if(action==='hand-not-here'&&!written)return;
   const kept=(await acceptMemoryAction(target,action==='hand-not-here'?{kind:'hand',ownerId,hand:written!,local:true,decisionId,authoredAt}:{kind:'handScope',ownerId,scope:action==='hand-only-here'?'local':'shared',decisionId,authoredAt})).kept;
-  if(!kept)notify(handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction));return;
+  if(!kept)notify(handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction,printedBars(target)));return;
  }
  if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,{kind:action==='memory-reference'?'reference':'reset',ownerId:selection.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});return;}
  if(action==='restore-all'||action==='undo-restore'){if(action==='restore-all'||s.undo||s.undoAssignments||s.undoCalculatedOwners){const target=current,ownerDialog=dialog,ownerSection=optionsSection;await acceptMemoryAction(target,{kind:action==='restore-all'?'restoreAll':'undoRestore',ownerId:p.seats[0].ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(current===target){if(dialog===ownerDialog)options(ownerSection);if(practice)practice.refit();else{renderPages();renderToolbar();}}}return;}
@@ -1483,7 +1485,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  for(const ownerId of ownerIds.slice(1)){receipt=personalMemory.accept({...memoryInput(target),personal:receipt.personal},action(ownerId));saved.push(receipt.saved);}
  receipt={...receipt,saved:Promise.all(saved).then(()=>{})};const next=receipt.personal;
  // A hand change reaching matching bars, or stopping there, is said; a refused one says why instead.
- const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handCarryNotice(target.package,before,target.personal,ownerIds[0]):undefined;if(notice)notify(notice);return result;});
+ const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handCarryNotice(target.package,before,target.personal,ownerIds[0],printedBars(target)):undefined;if(notice)notify(notice);return result;});
  if(waitedOwner||!nextSeat)return said(presentPersonalChange(target,next,receipt.saved));
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
