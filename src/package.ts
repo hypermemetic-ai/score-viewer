@@ -512,7 +512,12 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
   return clone.original;
  }};
 }
-export function archivePackage(manifest:Manifest,files:Record<string,Uint8Array>):Uint8Array{return zipSync({...files,'manifest.json':strToU8(JSON.stringify(manifest,null,2)+'\n')},{level:6});}
+/** A package's bytes follow from its manifest and files alone: zip entries
+ * carry one fixed time, not the clock, so archiving the same package twice
+ * gives the same archive and the same archiveSha256. The manifest's createdAt
+ * says when it was made. */
+const ARCHIVE_ENTRY_TIME=new Date(1980,0,1);
+export function archivePackage(manifest:Manifest,files:Record<string,Uint8Array>):Uint8Array{return zipSync({...files,'manifest.json':strToU8(JSON.stringify(manifest,null,2)+'\n')},{level:6,mtime:ARCHIVE_ENTRY_TIME});}
 export const libraryOrder=(a:Metadata,b:Metadata)=>a.composer.localeCompare(b.composer)||((a.opus??Infinity)-(b.opus??Infinity)||0)||((a.piece??Infinity)-(b.piece??Infinity)||0)||a.title.localeCompare(b.title);
 
 /** Explicit import may refresh metadata only; source/vector/font/assignments stay byte-identical. */

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {conservativeMaterialBytes,PACKAGE_MATERIAL_BUDGET_BYTES} from '../src/package-material';
 import {assertGuitarProStagedMaterial,GUITAR_PRO_SELECTION_TOO_LARGE} from '../src/guitar-pro-material';
+import {strToU8} from 'fflate';
+import {archivePackage,type Manifest} from '../src/package';
 
 test('shared material helper preserves the literal ordinary admission formula',()=>{
  const counted=new Set<object>();
@@ -31,4 +33,14 @@ test('finite material traversal stops after exceeding its bound without visiting
  let visited=0;const tail={};Object.defineProperty(tail,'never',{enumerable:true,get(){visited++;throw Error('unrelated tail');}});
  assert.ok(conservativeMaterialBytes({first:new Uint8Array(100),tail},80)>80);
  assert.equal(visited,0);
+});
+
+// The transposition and readiness fixtures archive one package twice and
+// expect one archiveSha256; zip entry times from the clock made that fail
+// whenever the two calls fell in different 2-second zip time slots.
+test('archiving the same package twice gives the same bytes, whatever the clock says',()=>{
+ const manifest={format:'iso-score',version:2,scoreId:'clock'} as unknown as Manifest,files={'source-score.json':strToU8('{}')};
+ const realNow=Date.now;let step=0;
+ Date.now=()=>realNow()+2000*step++;
+ try{assert.deepEqual(archivePackage(manifest,files),archivePackage(manifest,files));}finally{Date.now=realNow;}
 });
