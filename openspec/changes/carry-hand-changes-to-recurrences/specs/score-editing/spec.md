@@ -38,6 +38,16 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **WHEN** a hand is moved in a pickup bar, or in a full bar that starts with the same notes
 - **THEN** it reaches only pickup bars of the same length, never a full bar's downbeat
 
+#### Scenario: L, then R, at a carried note
+- **WHEN** the player presses L at bar 21's carried E4, then R
+- **THEN** bar 21's E4 follows bar 11 again, with no hand of its own, and keeps any finger given to it
+- **AND** a later change at bar 11 reaches it
+
+#### Scenario: A hand saved with a finger
+- **WHEN** a note's record holds its written hand without recorded intent, as finger edits saved before 2026-10-14 did, and a matching bar carries another hand to it
+- **THEN** the page, practice and calculator requests all take the carried hand, and the record's finger stays
+- **AND** opening the score rewrites nothing
+
 #### Scenario: Older hand records
 - **WHEN** a note's hand was moved before hand choices recorded their intent, and a matching bar exists
 - **THEN** the editor shows at that note that pressing its hand key shares it, naming the bars, and nothing travels or is migrated until then

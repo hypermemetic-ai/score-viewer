@@ -18,3 +18,7 @@
 - [x] 2.6 The editor's hint at older hand records, without migration.
 - [x] 2.7 A test pins own → carried → written; #173 adds the repeat twin when it rebases.
 
+## Review round 2
+
+- [x] 3.1 One rule for the owner's own hand (`ownsHand`), asked by the carry and by `pianoRequestAuthority`; a hand saved with a finger before recorded intent is no choice, by the owner's No. 14 records. Nothing is rewritten on open.
+- [x] 3.2 L, then R, at a carried note follows the matching bar again instead of keeping the hand for that note only.

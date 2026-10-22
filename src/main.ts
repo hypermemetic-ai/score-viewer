@@ -96,7 +96,7 @@ import './personal-assistance.css';
 import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage} from './repeat-fold';
 import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
-import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
+import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
@@ -1498,7 +1498,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  for(const ownerId of ownerIds.slice(1)){receipt=personalMemory.accept({...memoryInput(target),personal:receipt.personal},action(ownerId));saved.push(receipt.saved);}
  receipt={...receipt,saved:Promise.all(saved).then(()=>{})};const next=receipt.personal;
  // A hand change reaching matching bars, or stopping there, is said; a refused one says why instead.
- const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handCarryNotice(target.package,before,target.personal,ownerIds[0],printedBars(target)):undefined;if(notice)notify(notice);return result;});
+ const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handKeyNotice(target.package,before,target.personal,ownerIds[0],printedBars(target)):undefined;if(notice)notify(notice);return result;});
  if(waitedOwner||!nextSeat)return said(presentPersonalChange(target,next,receipt.saved));
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
