@@ -6,6 +6,8 @@ const browserBank=():PianoBankStatus=>({supported:false,installed:false,phase:'n
 const browserAudio=():PianoAudioStatus=>({enabled:false,ready:false,running:false,device:'',sampleRate:0,periodFrames:0,bufferFrames:0,raw:false,mode:'browser',fallback:null,error:null,latencyTier:0});
 export const nativePiano={
  bankStatus:():Promise<PianoBankStatus>=>isTauri()?invoke('piano_bank_status'):Promise.resolve(browserBank()),
+ /** Installed, without hashing the bank: answers at once. */
+ bankPresent:():Promise<boolean>=>isTauri()?invoke('piano_bank_present'):Promise.resolve(false),
  install:():Promise<PianoBankStatus>=>invoke('piano_bank_install'),
  cancelInstall:():Promise<void>=>invoke('piano_bank_cancel'),
  download:():Promise<void>=>invoke('piano_bank_download'),

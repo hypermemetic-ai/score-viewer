@@ -166,6 +166,28 @@ pub async fn piano_bank_status(
         Err(error) => state.finish(Err(format!("Piano verification worker failed: {error}"))),
     }
 }
+/// Whether the piano is installed, without the full file check: the verified
+/// answer when this session has one, otherwise the pointer and marker alone.
+/// A dialog can ask this as it opens; nothing waits for hashing.
+#[tauri::command]
+pub async fn piano_bank_present(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, State>,
+) -> Result<bool, String> {
+    {
+        let s = state
+            .inner
+            .lock()
+            .map_err(|_| "Piano bank state unavailable")?;
+        if s.initialized && !s.busy {
+            return Ok(s.status.installed);
+        }
+    }
+    let root = cache_root(&app)?;
+    tauri::async_runtime::spawn_blocking(move || core::installed_present(&root))
+        .await
+        .map_err(|error| error.to_string())
+}
 #[tauri::command]
 pub async fn piano_bank_install(
     app: tauri::AppHandle,

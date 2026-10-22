@@ -1,6 +1,6 @@
 ## Context
 
-`.tuna` scores already carry `tempos` (source metronome marks with `sourceUnit`, or an encoded quarter-note rate and description), `sourceTexts` and `performingInstruction` (source words), and an optional `referencePerformanceTempo`. Practice on a score without a reference stores the player's tempo as the journal's `personalGoal`. The optional native piano (Accurate-Salamander V6.2) renders only native MIDI input; the frontend has no command to send it notes, and browser builds have no native audio at all.
+`.tuna` scores already carry `tempos` (source metronome marks with `sourceUnit`, or an encoded quarter-note rate and description), `sourceTexts` and `performingInstruction` (source words), and an optional `referencePerformanceTempo`. Practice on a score without a reference stores the player's tempo as the journal's `personalGoal`. The optional native piano (Accurate-Salamander V6.2) rendered only native MIDI input; this change adds commands that schedule notes into it from the frontend. Browser builds have no native audio at all.
 
 ## Decisions
 
@@ -38,7 +38,11 @@ Built from the score's notes in performed order: written-presentation occurrence
 
 ### Sound
 
-The native Salamander cannot be driven from the frontend, so the flow uses a light WebAudio voice (two periodic-wave oscillators per note with register-dependent decay, damped on release) and the practice metronome's click in the same AudioContext, so the count-in and the music share one clock. It works in the browser and in the desktop WebView, through the system default output rather than the native selected output. A lookahead scheduler (350 ms window, 40 ms pump) keeps node counts small; a tempo change re-anchors at the current position, drops not-yet-started sounds and moves sounding notes' releases.
+When Piano is enabled and its output is running, the preview plays on the native Salamander through the selected output (`NativeTempoAudition`). The performance and count-in become one tick-ordered event stream: lifts before attacks and clicks between them at one tick, and a pedal-held re-strike lifts once at the later release. Ticks are mapped to native MIDI-clock instants and sent in chunks of at most 512 events, 1.5 s ahead, with a 100 ms pump. Native calls run one at a time. Each receipt gives the native clock and the lead, the earliest on-time instant. A start or resume replaces and releases the stream from lead + 30 ms. A tempo change replaces it with `keepUntil` at that cut: sounding notes keep sounding, the old stream's later events are dropped, and the new events follow from the tick the old stream reaches at the cut. Pause releases. Status and the followed bar use the mapping in force at the clock, so the place is kept. "Too soon" (a cut, or a fresh stream's first event, the output has passed) retries once with a fresh lead. Any other failure stops the preview, releases what it scheduled, and the status says why; a stall, replacement or late stream reads "The piano lost its place". Native constraints and the queue/epoch design are in `docs/native-piano-audio.md`.
+
+The dialog names the voice. It opens at once: with Piano on, the voice comes from the audio status, which is only read. With Piano off, `piano_bank_present` reads the bank pointer and manifest without hashing (the session's verified answer when it has one), and the offer "[Turn on your piano] It stays on; turn it off in Options › Piano." joins the open dialog when it answers. The button is that switch: it is persistent and saved in Piano settings, but only once the output sounds; otherwise the piano returns to how it was. If the piano cannot start, the built-in voice takes over and the dialog says why.
+
+Otherwise the flow uses a light WebAudio voice (two periodic-wave oscillators per note with register-dependent decay, damped on release) and the practice metronome's click in the same AudioContext, so the count-in and the music share one clock. It works in the browser and in the desktop WebView, through the system default output rather than the native selected output. A lookahead scheduler (350 ms window, 40 ms pump) keeps node counts small; a tempo change re-anchors at the current position, drops not-yet-started sounds and moves sounding notes' releases.
 
 ### Keys
 
@@ -54,7 +58,11 @@ They have no counted beat: Options disables Hear and set, and reading practice k
 
 ## Risks / Trade-offs
 
-- The built-in voice is a recognisable piano-like tone, not the Salamander. Native playback through the installed bank is separate work (a native command scheduling notes into the existing MIDI/sampler path, Windows/Mac build and ear acceptance).
+- The built-in voice is a recognisable piano-like tone, not the Salamander; it plays when Piano is off, not sounding, or in the browser.
+- Native scheduled instants are when frames leave the mixer; output latency is not included, so on a high-latency output the piano sounds later than its clock. This is consistent across the count-in and the music.
+- If the output stalls for more than half a second around a tempo change, the boundary note can sound twice or not at all; late attacks (> 50 ms) are dropped rather than played out of time.
+- The pedal is folded into note releases; the native stream accepts controllers, but the preview does not send pedal yet.
+- The native path is compiled and tested on the portable core only here; Windows/macOS host builds, audible timing and ear acceptance need the paired native build.
 - Marking values are conventions; a confident marking is used silently but shown in Options with its source word.
 - WebAudio uses the default output; on a machine where the native output differs, the preview may come from another device.
 - Audible quality, physical output and human tempo acceptance are not verifiable in this environment.

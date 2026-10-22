@@ -119,6 +119,8 @@ pub struct State {
     status: Arc<Mutex<AudioStatus>>,
     volume: Arc<AtomicU64>,
     initial: Mutex<Config>,
+    /// Command-side scheduled-note stream; never locked by the callback.
+    schedule: Arc<Mutex<mixer::schedule::Submitter>>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -129,6 +131,7 @@ impl Default for State {
             status: Arc::new(Mutex::new(AudioStatus::default())),
             volume: Arc::new(AtomicU64::new(0.7f64.to_bits())),
             initial: Mutex::new(Config::default()),
+            schedule: Arc::new(Mutex::new(Default::default())),
         }
     }
 }
@@ -933,6 +936,94 @@ pub async fn practice_audio_cancel_repeat(
     .map_err(|e| e.to_string())?
 }
 
+/// Scheduled notes need the enabled piano's running output. A disabled piano
+/// starts no worker, stream or sampler for them.
+fn schedule_ready(state: &State) -> bool {
+    let s = state.status();
+    state.worker.get().is_some() && s.enabled && s.running && s.error.is_none()
+}
+fn scheduled_events(events: Vec<(u64, u8, u8, u8)>) -> Result<Vec<mixer::schedule::Event>, String> {
+    if events.len() > mixer::schedule::MAX_SUBMIT {
+        return Err("Too many piano events in one submission".into());
+    }
+    Ok(events
+        .into_iter()
+        .map(|(at, kind, key, value)| mixer::schedule::Event {
+            at,
+            kind,
+            key,
+            value,
+        })
+        .collect())
+}
+/// The MIDI clock and the earliest cut a replacement may name.
+#[tauri::command]
+pub fn piano_schedule_open(state: tauri::State<'_, State>) -> Result<mixer::schedule::Receipt, String> {
+    if !schedule_ready(&state) {
+        return Err(mixer::schedule::OFF.into());
+    }
+    let now = crate::midi_input::midi_clock();
+    state.bus.schedule.lead(now)?;
+    let epoch = state.schedule.lock().map_err(|_| "Piano schedule unavailable")?.epoch();
+    Ok(state.bus.schedule.receipt(epoch, 0, now))
+}
+/// Start a new epoch of `[atMicros, kind, key, value]` events. `keep_until`
+/// keeps earlier events before that cut; without it the stream is released.
+#[tauri::command]
+pub async fn piano_schedule_replace(
+    state: tauri::State<'_, State>,
+    keep_until: Option<u64>,
+    events: Vec<(u64, u8, u8, u8)>,
+) -> Result<mixer::schedule::Receipt, String> {
+    let events = scheduled_events(events)?;
+    let release_only = keep_until.is_none() && events.is_empty();
+    if !schedule_ready(&state) {
+        // Nothing renders, so nothing scheduled can sound.
+        return if release_only {
+            Ok(state.bus.schedule.receipt(0, 0, crate::midi_input::midi_clock()))
+        } else {
+            Err(mixer::schedule::OFF.into())
+        };
+    }
+    let (bus, submitter) = (state.bus.clone(), state.schedule.clone());
+    tauri::async_runtime::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+        loop {
+            let result = {
+                let mut sub = submitter.lock().map_err(|_| "Piano schedule unavailable")?;
+                bus.schedule
+                    .replace(&mut sub, crate::midi_input::midi_clock(), keep_until, &events)
+            };
+            match result {
+                // The callback observes replacements every sampler quantum.
+                Err(e) if e == mixer::schedule::BUSY && start.elapsed() < Duration::from_millis(250) => {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                other => return other,
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+/// Continue the current epoch; `accepted` may be short when the queue is full.
+#[tauri::command]
+pub fn piano_schedule_submit(
+    state: tauri::State<'_, State>,
+    epoch: u64,
+    events: Vec<(u64, u8, u8, u8)>,
+) -> Result<mixer::schedule::Receipt, String> {
+    let events = scheduled_events(events)?;
+    if !schedule_ready(&state) {
+        return Err(mixer::schedule::OFF.into());
+    }
+    let mut sub = state.schedule.lock().map_err(|_| "Piano schedule unavailable")?;
+    state
+        .bus
+        .schedule
+        .submit(&mut sub, crate::midi_input::midi_clock(), epoch, &events)
+}
+
 #[cfg(test)]
 #[path = "audio_capture_validation.rs"]
 mod capture_validation;
@@ -957,6 +1048,7 @@ mod tests {
         assert!(state.worker.get().is_none());
         assert!(!state.status().enabled);
         assert!(!state.status().running);
+        assert!(!schedule_ready(&state), "scheduled notes never start a disabled piano");
         state.shutdown().unwrap();
         assert!(state.worker.get().is_none());
     }
