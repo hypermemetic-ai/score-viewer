@@ -7,8 +7,9 @@ import {HandPresentationError} from '../vendor/iso-notation/src/score-presentati
 import {importPackage,selectPresentation,validateLayerAsync,type ScorePackage,type FingerLayer} from './package';
 import {readPersonal,type PersonalState} from './state';
 import {scoreCapabilities} from './score-capabilities';
-import {replayProvidedRRLayer} from './operator-finger-update';
+import {replayProvidedRRLayer,replayProvidedRRLayerSteps} from './operator-finger-update';
 import type {PackageAdmissionSession} from './package-admission-session';
+import {drainReadingChecks,readingTurn} from './reading-execution';
 
 /** Open one saved keyboard view of a score. The viewer never calculates hands
  * or fingers: it reads the edition's own pages, its saved finger layer, if any,
@@ -18,6 +19,12 @@ export interface PianoReadinessRequest {
   layout:PhysicalKeyboardId;
   personal?:PersonalState;
   signal?:AbortSignal;
+  /** These bytes as the caller has just admitted them, in a copy only this
+   * request holds: it is read as admitted rather than admitted again. */
+  admitted?:ScorePackage;
+  /** No one waits on this request (background work): it takes turns between
+   * its long steps, so input is answered between them. */
+  stepwise?:boolean;
 }
 export interface PianoReady {
   status:'ready'|'editable';packageBytes:Uint8Array;package:ScorePackage;layer:FingerLayer;
@@ -44,9 +51,11 @@ export async function ensurePianoReady(request:PianoReadinessRequest,admission?:
   const failure=(status:PianoNotReady['status'],code:string,message:string):PianoNotReady=>
     ({status,code,message,retainedPackageBytes:original,...(prior?{retainedPackage:prior}:{})});
   const interrupted=()=>{if(request.signal?.aborted)throw new Cancelled(CANCELLED);};
+  // A turn fails only when the request is stopped, which reads as a cancellation.
+  const turn=async()=>{if(request.stepwise)await readingTurn({signal:request.signal}).catch(()=>{});interrupted();};
   try{
     interrupted();
-    try{prior=await (admission?admission.import(original,{allowLegacyTempo:true}):importPackage(original,{allowLegacyTempo:true}));}catch(error){
+    try{prior=request.admitted??await (admission?admission.import(original,{allowLegacyTempo:true}):importPackage(original,{allowLegacyTempo:true}));}catch(error){
       const message=(error as Error).message;
       return /authority|operator|source guard|source instruction/i.test(message)?failure('conflict','operator-authority',message):
         failure('unsupported','package-admission',message);
@@ -59,19 +68,23 @@ export async function ensurePianoReady(request:PianoReadinessRequest,admission?:
       return failure('unsupported','keyboard-presentation',`This edition has no pages for the ${keyboardName(request.layout)} layout yet. The current score is retained.`);
     const p=await selectPresentation(prior,request.layout);
     let personal:PersonalState|undefined;
+    await turn();
     if(request.personal)try{personal=readPersonal(request.personal,p);}catch(error){return failure('conflict','personal-binding',(error as Error).message);}
+    await turn();
     if(personal)try{
       if(personal.layer)await validateLayerAsync(personal.layer,p);
-      for(const layer of personal.history)await validateLayerAsync(layer,p,{history:true});
-    }catch(error){return failure('conflict','personal-layer',(error as Error).message);}
+      for(const layer of personal.history){await turn();await validateLayerAsync(layer,p,{history:true});}
+    }catch(error){if(error instanceof Cancelled)throw error;return failure('conflict','personal-layer',(error as Error).message);}
     interrupted();
     const active=personal?.layer??p.fingerLayer;
     if(!active)return{status:'reading',packageBytes:original,package:p,availableFingerPresentations:[],...(personal?{personal}:{})};
+    await turn();
     const layer=await validateLayerAsync(active,p,{requireCurrent:false});
+    await turn();
     // A provided RR layer gets its fixed-route replay; nothing is recalculated.
     if(!currentLayer(layer)&&layer.version==='physical-attack-finger-layer-v1'&&layer.physicalRowOrder==='rr-even-far-last-v1'&&
       layer.profileId===RR_PERFORMANCE_POSE_PROFILE.id&&['released-owner-actions-v1','released-owner-actions-v1/viewer-bounded-performance-v2'].includes(layer.plannerVersion))
-      replayProvidedRRLayer(p,layer);
+      if(request.stepwise)await drainReadingChecks(replayProvidedRRLayerSteps(p,layer),{signal:request.signal});else replayProvidedRRLayer(p,layer);
     interrupted();
     const edited=!!personal&&Object.keys(personal.overrides).length>0;
     return{status:layer.version===PIANO_ASSIGNMENT_VERSION||edited?'editable':'ready',packageBytes:original,package:p,layer,

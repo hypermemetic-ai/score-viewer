@@ -6,9 +6,10 @@ import {PERSONAL_ANNOTATION_INK_POLICY,ensureAnnotationInkPolicyReady} from './a
 import {effectiveAssignments} from './personal-assignments';
 import {hashBytes,type ScorePackage} from './package';
 import type {PersonalState} from './state';
-import {conservativeMaterialBytes} from './package-material';
+import {conservativeMaterialBytes,conservativeMaterialBytesSteps} from './package-material';
+import {cloneSteps,literalJsonSteps} from './stepwise-data';
 import {PersonalPreparationPool,type PreparationLease,type PreparationRequest} from './personal-preparation-pool';
-import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
+import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
 import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionView} from './personal-projection-protocol';
 import {ProjectionWorkerClient,ProjectionWorkerUnavailable,encodedProjections,projectionWorkerClient} from './personal-projection-client';
 import type {DerivedFileCache} from './derived-file-cache';
@@ -150,12 +151,15 @@ function literal(value:unknown):unknown {
  throw Error('Personal preparation requires captured literal package data.');
 }
 /** Each facade captures once before yielding. File bytes, rather than a mutable
- * archiveSha claim, bind the exact current archive members to the source graph. */
-async function capture(base:ScorePackage,worker:ProjectionWorkerClient|null):Promise<Capture> {
- const snapshot=structuredClone(base),files=snapshot.files;
+ * archiveSha claim, bind the exact current archive members to the source graph.
+ * A stepwise capture, for a session whose package no one else holds
+ * (background work), makes the same capture in steps that let input through. */
+async function capture(base:ScorePackage,worker:ProjectionWorkerClient|null,stepwise:boolean):Promise<Capture> {
+ const steps=<T,>(work:Generator<PreparationStage,T,void>)=>drainReadingChecks(work,{});
+ const snapshot=stepwise?await steps(cloneSteps(base)):structuredClone(base),files=snapshot.files;
  const {files:ignored,...meaning}=snapshot;
- const identity=JSON.stringify(literal(meaning));
- const materialBytes=conservativeMaterialBytes(snapshot)+identity.length*2;
+ const identity=stepwise?await steps(literalJsonSteps(meaning)):JSON.stringify(literal(meaning));
+ const materialBytes=(stepwise?await steps(conservativeMaterialBytesSteps(snapshot)):conservativeMaterialBytes(snapshot))+identity.length*2;
  const members=await Promise.all(Object.entries(files).map(async([name,bytes])=>[name,await hashBytes(bytes)]));
  const key=JSON.stringify([identity,members]),digest=await hashBytes(key);
  return {key,digest,materialBytes,async produce(execution){
@@ -234,7 +238,10 @@ const whenIdle=(run:()=>void)=>{if(typeof requestIdleCallback==='function')reque
 export interface PersonalPresentationOptions {cache?:DerivedFileCache|null;worker?:ProjectionWorkerClient|null;
  /** How long after a change its derived files are written in idle time;
   * null when only the session's owner writes them, by flushing. */
- cacheWriteDelayMs?:number|null}
+ cacheWriteDelayMs?:number|null;
+ /** No one waits on this session (background work): it captures its
+  * package in steps that let input through. */
+ stepwise?:boolean}
 const CANNOT_DRAW="This score can't be displayed yet: the viewer can't draw its pages.";
 /** A refusal of the score's own engraving, rather than of a hand choice. A
  * mixed-hand key is drawn from the source's own pages and stays editable. */
@@ -256,11 +263,13 @@ export class PersonalPresentationSession {
  private readonly worker:ProjectionWorkerClient|null;
  private readonly cache:DerivedFileCache|null;
  private readonly cacheWriteDelayMs:number|null;
+ private readonly stepwise:boolean;
  constructor(base:ScorePackage,pool=preparations,options:PersonalPresentationOptions={}){
   this.base=base;this.pool=pool;
   this.worker=options.worker===undefined?defaultProjectionWorker():options.worker;
   this.cache=options.cache===undefined?defaultCache??null:options.cache;
   this.cacheWriteDelayMs=options.cacheWriteDelayMs===undefined?2000:options.cacheWriteDelayMs;
+  this.stepwise=!!options.stepwise;
  }
  /** A session that writes its pages as soon as they are made (background
   * work) has the worker encode them. The reader's own sessions do not: an
@@ -275,7 +284,7 @@ export class PersonalPresentationSession {
  private stageListeners=new Set<(stage:PreparationStage)=>void>();
  onPreparationStage(listener:(stage:PreparationStage)=>void):()=>void{this.stageListeners.add(listener);return ()=>{this.stageListeners.delete(listener);};}
  private readonly noteStage=(stage:PreparationStage)=>{this.preparationStage=stage;for(const listener of this.stageListeners)try{listener(stage);}catch{/* a listener never stops the engraving */}};
- private prepare(){return this.preparation??=capture(this.base,this.worker).catch(error=>{this.preparation=undefined;throw error;});}
+ private prepare(){return this.preparation??=capture(this.base,this.worker,this.stepwise).catch(error=>{this.preparation=undefined;throw error;});}
  private async use<V>(action:(core:Core,execution?:ReadingExecution)=>V|Promise<V>,execution?:ReadingExecution):Promise<V>{
   const request=await this.prepare();checkReadingExecution(execution);
   const result=await this.pool.use({...request,lease:this.lease},action,execution);this.lease=result.lease;return result.value;

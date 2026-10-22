@@ -1,12 +1,13 @@
 import {admitReadingContent,type ReadingDescriptor,type ReadingContent,type ReadingAdmissionReceipt} from './reading-package';
 import {selectReadingNotation,admitDualReadingContentAsync,dualReadingContentAsync} from './dual-reading-package';
-import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,type ReadingExecution} from './reading-execution';
+import {capturedReadingExecution,checkReadingExecution,drainReadingChecks,readingTurn,type ReadingExecution} from './reading-execution';
 import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
-import {conservativeMaterialBytes} from './package-material';
+import {conservativeMaterialBytes,conservativeMaterialBytesSteps} from './package-material';
+import {cloneSteps} from './stepwise-data';
 import {annotationInkPolicyFor,ensureAnnotationInkPolicyReady,assertAnnotationInkPolicyReady,type PersonalAnnotationInkPolicy} from './annotation-ink-policy';
 import {normalizeLegacyScoreEvents,requirePitchedEvent,isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {requirePianoEvent} from './piano-event';
-import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
+import {unzipSync,strFromU8,strToU8,zipSync,type UnzipFileInfo} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
 import {validateOperatorFingerJournal} from './operator-finger-authority';
 import type {QuantizedGridScore,Hand} from '../vendor/iso-notation/src/model/types';
@@ -86,16 +87,19 @@ function passiveSvg(svg:string,seats:Seat[],page:number){
 /** Bounds from the pinned engine outline, not character advance or the current finger. */
 export const digitMetrics:Record<string,[number,number,number,number]>={'1':[153,0,379,739],'2':[34,0,520,752],'3':[15,-13,518,752],'4':[0,0,530,739],'5':[12,-13,520,739]};
 const geometryFont='5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae';
-async function fingerEligibility(m:Manifest,seats:Seat[],pages:string[]):Promise<ScorePackage['fingerEligibility']>{
+async function fingerEligibility(m:Manifest,seats:Seat[],pages:string[],execution?:ReadingExecution):Promise<ScorePackage['fingerEligibility']>{
  const certificate=m.fingerGeometry;
  if(certificate?.version!=='frozen-slot-all-five-v1')return {eligible:false,reason:'This package has no supported all-five frozen-seat geometry certificate; pitch reading remains available.'};
  if(certificate.fontSha256!==geometryFont||m.files[m.font]!==geometryFont)return {eligible:false,reason:'The digit font has no supported outline measurements; pitch reading remains available.'};
  for(let page=0;page<pages.length;page++){
+  await readingTurn(execution);checkReadingExecution(execution);
   const doc=new DOMParser().parseFromString(pages[page],'image/svg+xml');
   const styles=Array.from(doc.getElementsByTagName('style'));
   if(styles.length!==1||await hashBytes(styles[0].textContent??'')!=='2c0f0fa8086d7bd7c46f6469a647d3512800ac82b885dc50b0e1ad2a8cc6dd5a')return {eligible:false,reason:'The vector typography is outside the measured presentation contract; pitch reading remains available.'};
+  // Each seat's first text in document order, found once per page rather than once per seat.
+  const texts=new Map<string,Element>();for(const el of Array.from(doc.getElementsByTagName('text'))){const id=el.getAttribute('data-viewer-seat');if(id!==null&&!texts.has(id))texts.set(id,el as unknown as Element);}
   for(const seat of seats.filter(s=>s.page===page)){
-   const text=Array.from(doc.getElementsByTagName('text')).find(el=>el.getAttribute('data-viewer-seat')===seat.id)!;
+   const text=texts.get(seat.id)!;
    const group=text.parentNode as unknown as Element;
    const masks=Array.from(group.childNodes).filter((n:any)=>n.nodeType===1&&n.localName==='rect'&&n.getAttribute('class')==='janko-knockout') as unknown as Element[];
    if(group.getAttribute('class')!=='janko-reading-head'||masks.length!==1||text.getAttribute('class')!=='janko-digit'||text.hasAttribute('transform')||text.hasAttribute('style')||text.getAttribute('font-weight')!=='700')return {eligible:false,reason:`Seat ${seat.id} has an unsupported frozen presentation; pitch reading remains available.`};
@@ -314,10 +318,22 @@ export function usePianoPageCheckReceipts(receipts:PianoPageCheckReceipts|undefi
 let calculatedEvidence:CalculatedAdmissionEvidenceStore|undefined;
 /** Evidence for calculated editions this build already replayed; see {@link CalculatedAdmissionEvidence}. */
 export function useCalculatedAdmissionEvidence(store:CalculatedAdmissionEvidenceStore|undefined){calculatedEvidence=store;}
+/** unzipSync's members, in its order, one member per step. */
+async function unzipInSteps(bytes:Uint8Array,member:(f:UnzipFileInfo)=>boolean,execution:ReadingExecution):Promise<Record<string,Uint8Array>>{
+ const names:string[]=[];unzipSync(bytes,{filter:f=>{member(f);names.push(f.name);return false;}});
+ const files:Record<string,Uint8Array>={};
+ await drainReadingChecks((function*():Generator<PreparationStage,void,void>{for(const name of names){files[name]=unzipSync(bytes,{filter:f=>f.name===name})[name];yield 'commit';}})(),execution);
+ return files;
+}
 async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentOnly:boolean):Promise<ScorePackage>{
  options={...options};const execution=options.execution?capturedReadingExecution(options.execution):undefined;checkReadingExecution(execution);
  if(bytes.length>50_000_000)fail('Package exceeds 50 MB');let total=0;const members=new Set<string>();
- const files=unzipSync(bytes,{filter:f=>{total+=f.originalSize;if(members.has(f.name)||members.size>=10000)fail('Duplicate or excessive archive members');members.add(f.name);if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;}});
+ const member=(f:UnzipFileInfo)=>{total+=f.originalSize;if(members.has(f.name)||members.size>=10000)fail('Duplicate or excessive archive members');members.add(f.name);if(f.originalSize>20_000_000||total>100_000_000||!/^[A-Za-z0-9_./-]+$/.test(f.name)||f.name.includes('..')||f.name.startsWith('/'))fail('Unsafe/oversized archive');return true;};
+ // With an execution the members are inflated one at a time, with turns
+ // between them, from bytes this admission owns: a caller's later change to
+ // its own array reaches neither the members nor any digest below.
+ if(execution)bytes=new Uint8Array(bytes);
+ const files=execution?await unzipInSteps(bytes,member,execution):unzipSync(bytes,{filter:member});
  const parse=(name:string)=>{if(!files[name])fail(`Missing ${name}`);try{return JSON.parse(strFromU8(files[name]));}catch{return fail(`Invalid JSON: ${name}`);}};
  let m=parse('manifest.json') as Manifest;
  if(m.format!=='iso-score'||![1,2,3].includes(m.version)||!isObject(m.files)||!Array.isArray(m.pages)||!m.pages.length||!isObject(m.metadata)||typeof m.metadata.title!=='string'||typeof m.metadata.composer!=='string'||!Array.isArray(m.metadata.provenance)||m.metadata.provenance.some(v=>typeof v!=='string')||m.metadata.variant!==undefined&&typeof m.metadata.variant!=='string'||!Array.isArray(m.notices)||!m.files[m.font])fail('Unsupported/incomplete ISO package');
@@ -357,6 +373,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  let pagesLackRepeats=false;
  async function presentation(viewManifest:Manifest,scoreName:string,seatsName:string,fingersName?:string,context:Partial<ScorePackage>={}):Promise<ScorePackage>{
   const m=viewManifest;
+ await readingTurn(execution);checkReadingExecution(execution);
  const stored=normalizeLegacyScoreEvents(parse(scoreName) as QuantizedGridScore),seats=parse(seatsName) as Seat[];
  // A linked score saved before its composer's repeats were encoded shows
  // them; its stored bytes, identity and hands stay as saved.
@@ -384,8 +401,8 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  // Pages engraved before those repeats were known carry no repeat sign.
  if(score!==stored&&!pages.some(svg=>svg.includes('data-repeat="repeat-end"')))pagesLackRepeats=true;
 
-  const p:ScorePackage={manifest:m,score,seats,pages,files,archiveSha256:await hashBytes(bytes),...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages)};
-  if(fingersName&&files[fingersName])p.fingerLayer=await validateLayerAsync(parse(fingersName),p);
+  const p:ScorePackage={manifest:m,score,seats,pages,files,archiveSha256:await hashBytes(bytes),...(referenceMidi?{referenceMidi}:{}),...context,fingerEligibility:await fingerEligibility(m,seats,pages,execution)};
+  if(fingersName&&files[fingersName]){await readingTurn(execution);checkReadingExecution(execution);p.fingerLayer=await validateLayerAsync(parse(fingersName),p);}
   return p;
  }
  if(m.version===1){if(m.transposition!==undefined)fail('Transposition requires its linked effective source and retained original.');const p=await presentation(m,'score.json','seats.json','fingers.json');
@@ -415,7 +432,9 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(d.fingers&&!options.allowLegacyTempo)requireReferencePerformanceTempo(planningSource);
   const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe,preparationIdentity:d.preparationIdentity,calculatedHandReceipt:d.calculatedHandReceipt};
   if(viewContext)viewManifest.calculationContext=viewContext;else delete viewManifest.calculationContext;
+  await readingTurn(execution);checkReadingExecution(execution);
   const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(transposition?{transposition:transposition.envelope,transpositionOriginal:transposition.original}:{}),...(viewContext?{calculationContext:viewContext}:{})});
+  await readingTurn(execution);checkReadingExecution(execution);
   // Context is an explicit known field, never a blanket exclusion of source tempo.
   if(viewContext&&JSON.stringify(p.score.referencePerformanceTempo)!==JSON.stringify(viewContext.referencePerformanceTempo))
    fail('Linked presentation differs from its piano calculation reference');
@@ -423,9 +442,12 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   // A transposed edition shows exactly the hands its envelope names: the
   // score's own, or the hands an earlier edition carried when engraved again.
   if(transposition){const map=transposition.envelope.handMaps[key];if(!map||map.some(o=>p.score.notes.find(n=>n.id===o.id)?.hand!==o.hand))fail('Transposed presentation differs from its selected owner-hand authority.');}
-  if(derived){if(JSON.stringify(sourceFactsProjection(planningSource))!==JSON.stringify(sourceFactsProjection(p.score)))fail('Linked calculated presentation changes immutable musical source facts');}
-  else if(JSON.stringify(musicalSourceProjection(planningSource))!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');
+  // Each side is drawn in its own step.
+  if(derived){const facts=JSON.stringify(sourceFactsProjection(planningSource));await readingTurn(execution);checkReadingExecution(execution);if(facts!==JSON.stringify(sourceFactsProjection(p.score)))fail('Linked calculated presentation changes immutable musical source facts');}
+  else{const facts=JSON.stringify(musicalSourceProjection(planningSource));await readingTurn(execution);checkReadingExecution(execution);if(facts!==JSON.stringify(musicalSourceProjection(p.score)))fail('Linked presentation changes immutable musical source facts');}
+  await readingTurn(execution);checkReadingExecution(execution);
   if(await handDigest(source,p.score)!==d.effectiveHandSha256)fail('Linked effective-hand identity differs');
+  await readingTurn(execution);checkReadingExecution(execution);
   if(d.renderingRecipe){p.renderingRecipe=validatePassiveScoreRenderingRecipe(parse(d.renderingRecipe),{sourceSha256:m.sourceSha256!});
    // An approved recipe made before the current shared policy refuses on
    // opening, so the reader engraves the edition again from its content.
@@ -433,6 +455,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
   if(d.preparationIdentity!==undefined)p.preparationIdentity=await validatePianoPreparationIdentity(d.preparationIdentity,p);
   if(derived&&!d.calculatedHandReceipt)fail('Calculated edition lacks actual source/paint replay evidence.');
   if(derived&&!contentOnly){
+   await readingTurn(execution);checkReadingExecution(execution);
    const evidenceKey=evidence?await calculatedAdmissionKey(await (evidenceArchiveSha256??=hashBytes(evidenceBytes!)),key):undefined;
    p.calculatedHandReceipt=await admitCalculatedHandEdition(p,parse(d.calculatedHandReceipt!),files[d.seats],heads=>actualHeads.set(p,heads),execution,
     evidence&&evidenceKey?{found:()=>evidence.get(evidenceKey),made:made=>madeEvidence.push([evidenceKey,made])}:undefined);p.annotationGeometry=p.calculatedHandReceipt.annotationGeometry;}
@@ -464,7 +487,10 @@ export const importPackageForReading=(bytes:Uint8Array,execution?:ReadingExecuti
  * Every copy preserves this realm's companion registry; another realm must
  * independently import its own archive. This is not a serialized certificate. */
 export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyTempo?:boolean;execution?:ReadingExecution}={}):Promise<{
- retainedBytes:number;copy(keyboardLayout?:PhysicalKeyboardId):Promise<ScorePackage>
+ retainedBytes:number;
+ /** A copy for the caller. With `stepwise` it is made in steps that let
+  * input through, for a caller no one waits on; otherwise in one call. */
+ copy(keyboardLayout?:PhysicalKeyboardId,stepwise?:ReadingExecution):Promise<ScorePackage>
 }> {
  const original=await importPackage(new Uint8Array(bytes),{allowLegacyTempo:!!options.allowLegacyTempo,...(options.execution?{execution:options.execution}:{})});
  const packages:ScorePackage[]=[],groups:Array<[ScorePackage,Array<[PhysicalKeyboardId,ScorePackage]>]>=[],seen=new Set<ScorePackage>();
@@ -478,8 +504,10 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
  // Count each shared object/buffer once, without serializing duplicate paths
  // through the companion graph. This is a conservative material budget, not
  // a claim about the VM's object headers or string interning.
- const retainedBytes=conservativeMaterialBytes(graph)+packages.reduce((n,p)=>{const record=writtenHeadEvidence.get(p);return n+(record?record.signature.length*2+JSON.stringify([...record.heads]).length*2+record.pages.length*16+record.count*32:0);},0);
- return {retainedBytes,async copy(keyboardLayout){
+ const execution=options.execution?capturedReadingExecution(options.execution):undefined;
+ if(execution){await readingTurn(execution);checkReadingExecution(execution);}
+ const retainedBytes=(execution?await drainReadingChecks(conservativeMaterialBytesSteps(graph),execution):conservativeMaterialBytes(graph))+packages.reduce((n,p)=>{const record=writtenHeadEvidence.get(p);return n+(record?record.signature.length*2+JSON.stringify([...record.heads]).length*2+record.pages.length*16+record.count*32:0);},0);
+ return {retainedBytes,async copy(keyboardLayout,stepwise){
   // A cached package cannot grant a stale or ambiguous font family authority.
   // In Node this also rereads and hashes the actual font file on every use.
   for(const p of packages){const policy=annotationInkPolicyFor(p);if(policy)await ensureAnnotationInkPolicyReady(policy);}
@@ -489,8 +517,9 @@ export async function ownPackageAdmission(bytes:Uint8Array,options:{allowLegacyT
   // mutable wrappers and archive member buffers still cross structuredClone.
   const copyInputs=new Map(packages.map(p=>[p,p.reading?.dual?{...p,manifest:undefined,score:undefined,
    sourceScore:undefined,reading:undefined,pages:undefined}:p] as const)),
-   clone=structuredClone({original:copyInputs.get(original)!,packages:packages.map(p=>copyInputs.get(p)!),
-    groups:groups.map(([p,views])=>[copyInputs.get(p)!,views.map(([keyboard,view])=>[keyboard,copyInputs.get(view)!])])}) as typeof graph;
+   inputs={original:copyInputs.get(original)!,packages:packages.map(p=>copyInputs.get(p)!),
+    groups:groups.map(([p,views])=>[copyInputs.get(p)!,views.map(([keyboard,view])=>[keyboard,copyInputs.get(view)!])])},
+   clone=(stepwise?await drainReadingChecks(cloneSteps(inputs),stepwise):structuredClone(inputs)) as typeof graph;
   // Dual scenes retain this realm's immutable actual preparation. A plain
   // clone cannot carry their source-owned projector registration. Only this
   // private cold-admission graph supplies that shared frozen source/context;

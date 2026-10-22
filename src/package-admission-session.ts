@@ -3,7 +3,10 @@ import {PACKAGE_MATERIAL_BUDGET_BYTES} from './package-material';
 import {capturedReadingExecution,checkReadingExecution,waitForReading,type ReadingExecution} from './reading-execution';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 
-interface Options {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution}
+interface Options {allowLegacyTempo?:boolean;keyboardLayout?:PhysicalKeyboardId;execution?:ReadingExecution;
+ /** No one waits on this import (background work): its copy is made in
+  * steps that let input through, rather than in one call. */
+ stepwise?:boolean}
 type OwnedAdmission=Awaited<ReturnType<typeof ownPackageAdmission>>;
 interface Entry {bytes:Uint8Array;allowLegacyTempo:boolean;admission:OwnedAdmission;retainedBytes:number}
 interface Pending {bytes:Uint8Array;allowLegacyTempo:boolean;generation:number;owner?:AbortSignal|ReadingExecution;promise:Promise<OwnedAdmission>}
@@ -47,13 +50,13 @@ export class PackageAdmissionSession {
   const inputExecution=options.execution,execution=inputExecution?capturedReadingExecution(inputExecution):undefined,owner=execution?.signal??inputExecution;checkReadingExecution(execution);
   if(bytes.byteLength>50_000_000)throw Error('Package exceeds 50 MB');
   // Capture bytes AND effective options before the first asynchronous boundary.
-  const snapshot=new Uint8Array(bytes),allowLegacyTempo=!!options.allowLegacyTempo,keyboardLayout=options.keyboardLayout,
+  const snapshot=new Uint8Array(bytes),allowLegacyTempo=!!options.allowLegacyTempo,keyboardLayout=options.keyboardLayout,stepwise=options.stepwise?execution??{}:undefined,
    matches=(e:{bytes:Uint8Array;allowLegacyTempo:boolean})=>e.allowLegacyTempo===allowLegacyTempo&&sameBytes(e.bytes,snapshot),
    hit=this.#entries.find(matches);
   if(this.#pending.size&&[...this.#pending].some(p=>p.owner!==owner))throw new PackageAdmissionBusy();
   if(hit){
    this.#entries=this.#entries.filter(e=>e!==hit);this.#entries.push(hit);
-   let result:ScorePackage;try{result=await hit.admission.copy(keyboardLayout);}catch(error){this.#entries=this.#entries.filter(e=>e!==hit);throw error;}checkReadingExecution(execution);return result;
+   let result:ScorePackage;try{result=await hit.admission.copy(keyboardLayout,stepwise);}catch(error){this.#entries=this.#entries.filter(e=>e!==hit);throw error;}checkReadingExecution(execution);return result;
   }
   let pending=[...this.#pending].find(e=>e.generation===this.#generation&&e.owner===owner&&matches(e));
   if(!pending){
@@ -70,6 +73,6 @@ export class PackageAdmissionSession {
    }).finally(()=>this.#pending.delete(request));
    this.#pending.add(request);pending=request;
   }
-  const admission=await pending.promise;checkReadingExecution(execution);const result=await admission.copy(keyboardLayout);checkReadingExecution(execution);return result;
+  const admission=await pending.promise;checkReadingExecution(execution);const result=await admission.copy(keyboardLayout,stepwise);checkReadingExecution(execution);return result;
  }
 }

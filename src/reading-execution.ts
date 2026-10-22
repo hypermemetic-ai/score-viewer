@@ -31,3 +31,6 @@ export async function drainReadingChecks<T>(steps:Generator<PreparationStage,T,v
   execution.onCheckpoint?.(next.value);checkReadingExecution(execution);if(performance.now()-start>=budget)await yieldTask(next.value);
  }}finally{steps.return(undefined as T);}
 }
+/** A task turn between two long receiver steps, so input is answered between
+ * them: none without an execution, which then runs as one task as before. */
+export async function readingTurn(execution?:ReadingExecution):Promise<void>{if(execution)await drainReadingChecks((function*():Generator<PreparationStage,void,void>{})(),execution);}

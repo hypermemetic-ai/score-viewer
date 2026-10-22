@@ -1,3 +1,4 @@
+import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 /** The ordinary admission material budget. This is a conservative count of
  * retained bytes and UTF-16 plain-data content, not an exact VM heap ceiling. */
 export const PACKAGE_MATERIAL_BUDGET_BYTES=64*1024*1024;
@@ -20,4 +21,24 @@ export function conservativeMaterialBytes(value:unknown,maximum=Infinity):number
   }
  };
  visit(value);return bytes;
+}
+/** {@link conservativeMaterialBytes} without a bound, in steps: the same
+ * count, so a large graph never holds the thread while it is counted. */
+export function* conservativeMaterialBytesSteps(value:unknown):Generator<PreparationStage,number,void>{
+ const counted=new Set<object>(),pending:Array<{entries:Array<[string,unknown]>;next:number}>=[];let bytes=0,visits=0;
+ const visit=(item:unknown):void=>{
+  if(typeof item==='string'){bytes+=item.length*2;return;}
+  if(!item||typeof item!=='object'){bytes+=16;return;}
+  if(counted.has(item))return;counted.add(item);
+  if(item instanceof Uint8Array){bytes+=item.byteLength+64;return;}
+  bytes+=64;pending.push({entries:Object.entries(item),next:0});
+ };
+ visit(value);
+ while(pending.length){
+  const frame=pending[pending.length-1];
+  if(frame.next>=frame.entries.length){pending.pop();continue;}
+  const [key,child]=frame.entries[frame.next++];bytes+=32+key.length*2;visit(child);
+  if(++visits%1024===0)yield 'commit';
+ }
+ return bytes;
 }

@@ -166,17 +166,20 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  await prepareRecorded(derived,key,async read=>{
   if(readingOnlyArchive(bytes))return null;
   // Only admission rejecting the archive, or the engraver refusing its pages, is a refusal.
-  await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}),admissionRejection);await answerInput();
+  // Every step below that is long on the reader's thread takes turns, so no
+  // task of this work stands long in front of a key or click.
+  await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution,stepwise:true}),admissionRejection);await answerInput();
   if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
   const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(journals,entry,selected);checkReadingExecution(execution);
   const personal=personalMemory.personalFor({entryId,importedAt:entry.importedAt,p:selected,personal:journal});
-  await answerInput();const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);await answerInput();
+  // Readiness reads this copy as admitted, rather than admitting and copying the archive again.
+  await answerInput();const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal,admitted:prior,stepwise:true},aheadAdmission);await answerInput();
   // An edition that must be engraved again is made, and saved, by opening it.
   if(!('package' in q))return null;
   // Its files are written at the steps below, never on a timer of their own.
-  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null}),served=await session.projectionEntry(q.personal??personal);
+  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null,stepwise:true}),served=await session.projectionEntry(q.personal??personal);
   if(!served)return null;
   if(!await projectionServed(derived,served)){
    await answerInput();await refusedWhen(session.project(q.personal??personal,execution),engravingRefusal);

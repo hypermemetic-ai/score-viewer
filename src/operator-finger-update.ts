@@ -1,4 +1,5 @@
 import {strToU8} from 'fflate';
+import type {PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {normalizeHandPlanningInput} from '../vendor/iso-notation/src/model/hand-planning-input';
 import {completeFingerGrip} from '../vendor/iso-notation/src/model/isomorphic-fingering-profile';
 import {RR_PERFORMANCE_POSE_PROFILE as profile} from '../vendor/iso-notation/src/model/isomorphic-rr-personal-pose';
@@ -11,14 +12,24 @@ import {readOperatorFingerReview} from './operator-finger-authority';
 /** Reconstruct the admitted contacts, including held owners. This path fixes
  * only reviewed fingers; it does not propose other hands, rows or routes. */
 export function replayProvidedRRLayer(p:ScorePackage,layer:FingerLayer){
+ const steps=replayProvidedRRLayerSteps(p,layer);for(;;){const next=steps.next();if(next.done)return next.value;}
+}
+/** {@link replayProvidedRRLayer} in steps, a few gestures' grips at a time,
+ * for work that lets input through between them. */
+export function* replayProvidedRRLayerSteps(p:ScorePackage,layer:FingerLayer):Generator<PreparationStage,ReturnType<typeof replayResult>,void>{
  const input=normalizeHandPlanningInput(p.score),owners=new Map(layer.attacks.flatMap(a=>a.owners.map(o=>[o.id,a] as const)));
- const selected:JointFingerGrip[]=input.gestures.map(g=>{
+ const selected:JointFingerGrip[]=[];
+ for(const g of input.gestures){
   const all=[...g.attacks,...g.carried],roles:NonNullable<JointFingerGrip['attackRoles']>={};
   for(const a of all)for(const o of a.owners){const q=owners.get(o.id);if(!q||q.row===undefined)throw Error('Fixed route contact missing');roles[o.id]={hand:q.hand,key:{pitch:q.pitch,finger:q.finger,row:q.row}};}
   const forHand=(hand:'LH'|'RH')=>{const keys=[...new Map(all.map(a=>roles[a.owners[0].id]).filter(r=>r.hand===hand).map(r=>[r.key.pitch,r.key])).values()];return keys.length?completeFingerGrip(hand,keys,profile):undefined;};
   const LH=forHand('LH'),RH=forHand('RH');
-  return {id:'operator-fixed:'+g.id,pattern:g.attacks.map(a=>roles[a.owners[0].id].hand==='LH'?'L':'R').join(''),LH,RH,attackRoles:roles,nominalCost:(LH?.strain??0)+(RH?.strain??0)};
- });
+  selected.push({id:'operator-fixed:'+g.id,pattern:g.attacks.map(a=>roles[a.owners[0].id].hand==='LH'?'L':'R').join(''),LH,RH,attackRoles:roles,nominalCost:(LH?.strain??0)+(RH?.strain??0)});
+  yield 'geometry';
+ }
+ return replayResult(input,selected);
+}
+function replayResult(input:ReturnType<typeof normalizeHandPlanningInput>,selected:JointFingerGrip[]){
  const result=evaluateFingerRoute(input,selected,profile);
  if(result.failure)throw Error('Operator choices cannot replay the complete contact route: '+result.failure);
  return {input,result,plan:fingerActionPlan(input,selected,profile,result)};
