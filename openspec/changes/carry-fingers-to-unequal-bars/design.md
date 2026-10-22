@@ -8,7 +8,11 @@ This is the hand-change carry's stretch (`carry-hand-changes-to-recurrences`), a
 
 ## Downbeats
 
-A pickup bar's first note is not on a downbeat, so comparing it from the start would match a pickup against the start of an unrelated bar. A bar is compared from its start when it is complete or longer for its meter; when it is short and the next bar completes it (bar 21 with its pickup, bar 22); or when it is a short last bar that completes nothing. The first bar when short, the second bar of a completing pair (bar 22) and a short bar on its own are never compared. A score without meters compares nothing. The practice clock's pickup phase rule is not used: it does not identify bar 22 as a pickup.
+A pickup bar's first note is not on a downbeat, so comparing it from the start would match a pickup against the start of an unrelated bar. Hands and fingers use one rule, `pickupBars` in `personal-assignments.ts`, the hand-change carry's: a pickup is a short bar that opens the piece or follows another short bar (bar 22 after bar 21). Every other bar starts on a downbeat and is compared from its start, a lone short bar mid-score included. A bar's full length is its meter's, or the usual bar length when the source gives no meters, so a score without meters compares the same bars for hands and for fingers. A pickup matches only a pickup of its length, which the exact key already covers. The practice clock's pickup phase rule is not used: it does not identify bar 22 as a pickup.
+
+## Meter
+
+Meter is otherwise ignored. The rule is the same hand in the same bar: a 3/8 bar and a 2/4 bar match when the hand plays the same notes from the downbeat to the end of the shorter bar. Meter, or the usual bar length, only decides which bars are pickups.
 
 ## Resolution
 
@@ -23,7 +27,11 @@ Donor-only bars outside a single-bar resolution are resolved in the same batch.
 
 ## Speed
 
-The pairs depend on the bars and the hand partition only. They are cached per package and keyed by the hand projection identities. On the owner's No. 13 the matching takes about 2.7 ms against about 90 ms for a whole resolution, and nothing after the first resolution of a partition.
+The pairs depend on the bars and the hand partition only. They are cached per package and keyed by the hand projection identities, and built with appends rather than copies. On every resolve, each donor bar's shared fingers are read once, into a map by note, and a donor bar with none is skipped, so a score where many bars share a hand's opening and nothing is fingered costs about what it costs without the carry. On a synthetic 120-bar score in 2/4, 3/4 and 4/4 whose bars share the left hand's opening, a resolve took about 350 ms of CPU before this and about 65 ms after, against about 65 ms on main. A test compares the CPU of that score with the same score whose hands match nowhere. On the owner's No. 13 the matching takes about 2.7 ms against about 90 ms for a whole resolution, and nothing after the first resolution of a partition.
+
+## Refused carried hands
+
+When the engraver refuses a carried hand (#175), its bar keeps its written hands for the session, which changes the bar's hand partition without changing any record. The resolution cache key includes the session's refusals (`handCarryGeneration`), and the refusal path resolves memory again before drawing, so the bar never keeps fingers resolved for the hands it no longer has. Bar 21 then plays bar 11's music in neither hand, and its fingers stay unshared; the notice that it keeps its written hands says so. Nothing is written.
 
 ## Composition
 

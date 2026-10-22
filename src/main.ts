@@ -331,7 +331,7 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
   attempted=next,projection=editor.session.project(next).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
    if(editor.generation===generation)next=target.personal;
-   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}else if(kept.dropped.length)notify(droppedCarryText(kept.dropped));
+   if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}else if(kept.dropped.length)notify(droppedCarryText(kept.dropped,kept.unshared));
    return kept.view;}),
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
@@ -366,25 +366,29 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  * hand to return to, still reach the player unchanged. `attempted` is the
  * refused state; a note whose hand has changed since then is left as it is.
  * A refusal also names the notes the choice ran into, such as the other note
- * of a beam; one whose hand the choice did not change has nothing to return. */
-async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string;dropped:number[]}>{
- const returned=new Set<string>(),dropped=new Set<number>(),reason=undrawableHandReason(error);
+ * of a beam; one whose hand the choice did not change has nothing to return.
+ * A dropped carry repartitions its bar's hands, so fingers are resolved again;
+ * `unshared` is the dropped bars whose shared fingers no longer reach them. */
+async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string;dropped:number[];unshared:number[]}>{
+ const returned=new Set<string>(),dropped=new Set<number>(),reason=undrawableHandReason(error),fingered=target.personal.memoryResolved?.choices??{};
  for(let attempt=0;;attempt++){
   const refused=undrawableHandOwners(error),seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
   if(!refused||!seats.length||attempt>=3)throw error;
-  let changed=false;
+  let changed=false,repartitioned=false;
   for(const seat of seats){
    const ownerId=seat.ownerIds.find(id=>refused.includes(id))!,refusedHand=handFor(target.package,attempted,ownerId);
    if(handFor(target.package,target.personal,ownerId)!==refusedHand){changed=true;continue;}
-   const bar=dropHandCarry(target.package,target.personal,ownerId);if(bar!==undefined){dropped.add(bar);changed=true;continue;}
+   const bar=dropHandCarry(target.package,target.personal,ownerId);if(bar!==undefined){dropped.add(bar);changed=repartitioned=true;continue;}
    const hand=hadHand(ownerId);if(hand===refusedHand)continue;if(!hand)throw error;
    const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});
    target.personal=receipt.personal;target.personal=resolveMemory(target);returned.add(ownerId);changed=true;
    void receipt.saved.catch(saveError=>paintPersonalSaveError(target,saveError));
   }
   if(!changed)throw error;
+  if(repartitioned)target.personal=resolveMemory(target);
   attempted=target.personal;
-  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{}),dropped:[...dropped]};}catch(next){error=next;}
+  const now=target.personal.memoryResolved?.choices??{},unshared=[...dropped].filter(bar=>target.package.seats.some(seat=>seat.writtenBar===bar&&seat.ownerIds.some(id=>fingered[id]&&!now[id])));
+  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{}),dropped:[...dropped],unshared};}catch(next){error=next;}
  }
 }
 async function acceptMemoryAction(target:NonNullable<typeof current>,action:PersonalMemoryAction,nextSeat?:Seat):Promise<ReturnType<typeof personalMemory.accept>&{kept?:string}>{
@@ -731,12 +735,12 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingProgress(op,scoreCapabilities(next.package).pianoPreparation?'hands':'parts');await paintCheckpoint(op.controller.signal);check();
  if(scoreCapabilities(next.package).pianoPreparation){next.personal=await personalMemory.loadPersonalCurrent(next.entry,next.package,async()=>rawMemoryPersonal(next.personal));check();next.personal=resolveMemory(next);}
  // A saved hand the engraver can't fit returns to the score's own hand, with a notice, rather than locking the score.
- let keptHands=0,droppedCarries:number[]=[];
+ let keptHands=0,droppedCarries:number[]=[],unsharedFingers:number[]=[];
  // Opening draws only what this score shows: its own pages, or the saved
  // hand choices' projection. With a projection worker the engraver settles
  // for editing in the worker after opening; without one it settles here, as before.
  cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
-  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+  .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;unsharedFingers=kept.unshared;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
  op.running.state='installing';readingProgress(op,'open');op.loading.saving('Almost ready. This part can’t be cancelled.');
@@ -745,7 +749,7 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  readingPresentation=nextPresentation;readingViewError=nextViewError;
  if(rememberOpened){toolbarVisible=false;libraryMenu.selection.update(entries,next.entry.id);libraryMenu.selection.select(`score:${next.entry.id}`);preferences.lastWorkedEntryId=next.entry.id;}
  current=next;orientation.admitReader(next.personal.view.rotation);editSequence.reset();musicalSustain.clear();resetInput();
- if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(droppedCarries.length)notify(droppedCarryText(droppedCarries));if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
+ if(clock!==undefined)pitchInput.reset(clock);if(clockError)notify((clockError as Error).message);if(nextViewError)notify(nextViewError);if(droppedCarries.length)notify(droppedCarryText(droppedCarries,unsharedFingers));if(keptHands)notify(keptHands===1?'A saved hand choice can’t be drawn on the page yet, so its note keeps the score’s hand.':'Some saved hand choices can’t be drawn on the page yet, so those notes keep the score’s hands.');
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.

@@ -1,8 +1,11 @@
 import type {MemoryScoreInput,MemoryResolution} from './personal-fingering-memory';
+import {handCarryGeneration} from './personal-assignments';
 /** Only musical authority participates. Cursor/page changes and the derived
- * display projection cannot invalidate the same accepted source resolution. */
+ * display projection cannot invalidate the same accepted source resolution. A
+ * carried hand the engraver refused repartitions its bar without changing any
+ * record, so the session's refusals take part too. */
 export function personalMemoryResolutionKey(input:MemoryScoreInput,generation:number):string {
- const s=input.personal;return JSON.stringify([input.entryId,generation,s.assignments,s.overrides,s.calculatedOwners,s.layer]);
+ const s=input.personal;return JSON.stringify([input.entryId,generation,handCarryGeneration(),s.assignments,s.overrides,s.calculatedOwners,s.layer]);
 }
 export class PersonalMemoryResolutionCache {
  private values=new WeakMap<MemoryScoreInput['p'],Map<string,{key:string;value:MemoryResolution}>>();
