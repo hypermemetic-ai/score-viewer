@@ -11,7 +11,7 @@ import {browserAssistanceStore,type AssistanceBrowserLocks} from '../src/durable
 import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache';
 import {projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
-import {VERBATIM_FOLD_CACHE_KIND,FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
+import {VERBATIM_FOLD_CACHE_KIND,FoldFailure,FoldedReader,forgetFoldFailures,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
 import {requirePracticeHands} from '../src/practice';
 import {noteMemoryActions} from '../src/note-memory-actions';
 import type {PersonalMemoryAction} from '../src/personal-memory-session';
@@ -288,6 +288,23 @@ test('one hand order: a carried left hand against the player\'s own right hand i
   assert.deepEqual([first,second].map(id=>handFor(p,inherited,id)),[first_,first_],`${where}: both passes play bar 1's hand`);
   assert.equal(handFor(view!.verbatimFold!.edition,folded,first),first_,`${where}: the printed bar shows it`);
  }
+});
+
+test('a fold that can\'t be drawn is remembered for the session: opening it again, or a fresh package of it, does not draw it again', async()=>{
+ forgetFoldFailures();
+ const p=await closingReturn(),broken={...p,renderingRecipe:{...p.renderingRecipe!,engineId:'no-such-engine'}} as ScorePackage,s=initialPersonal(p);
+ const warned:unknown[][]=[],warn=console.warn;console.warn=(...args:unknown[])=>{warned.push(args);};
+ const failing=async(reader:FoldedReader)=>{try{await reader.view(s);}catch(error){return error;}assert.fail('the fold draws');};
+ const first=await failing(new FoldedReader(broken,null));
+ assert.ok(first instanceof FoldFailure&&!first.remembered,'drawn once, and it fails');
+ assert.ok(first.detail instanceof Error&&first.detail.message,'the reason is kept');
+ assert.deepEqual(warned,[['Repeats stay written out:',first.detail]],'and logged to the console');
+ const again=await failing(new FoldedReader({...broken,score:structuredClone(broken.score)},null));
+ assert.ok(again instanceof FoldFailure&&again.remembered&&again.key===first.key,'a fresh package of the score is not drawn again');
+ forgetFoldFailures();
+ assert.equal(warned.length,1,'logged once');
+ const retried=await failing(new FoldedReader(broken,null));assert.ok(retried instanceof FoldFailure&&!retried.remembered,'a new session draws it again');
+ console.warn=warn;forgetFoldFailures();
 });
 
 test('U after a hand kept "this note only" in one pass keeps it to the repeat: the closing bar, matching music outside it, keeps its hand', async()=>{

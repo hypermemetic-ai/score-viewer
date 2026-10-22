@@ -104,11 +104,8 @@ export function writtenOutRepeat(p:ScorePackage,s:PersonalState,printed:(bar:num
  return {text,use,restore};
 }
 
-/** Said once when a score's folded pages can't be drawn, so it opens with its repeats written out. */
-export function foldFailureText(error:unknown):string{
- const reason=error instanceof Error?error.message.trim().replace(/[.!?]+$/,''):'';
- return `This score’s repeats are written out: its folded pages couldn’t be drawn${reason?` (${reason})`:''}.`;
-}
+/** Said once when a score's folded pages can't be drawn, so it opens with its repeats written out. The reason goes to the console, not to the pianist. */
+export const FOLD_FAILURE_TEXT='This score’s repeats are written out: its folded pages couldn’t be drawn.';
 
 /** The player's state with what each note reads from its twin: every choice it leaves unset. */
 export function withRepeatInheritance(p:ScorePackage,s:PersonalState):PersonalState{
@@ -179,7 +176,28 @@ function cachedPages(value:unknown):FoldedPages{
  * written-out notes: the twin that carries a choice, or the first pass, so an
  * edit lands where the choice already is and never splits agreeing passes.
  */
-const KEPT_FOLDED_EDITIONS=4;
+const KEPT_FOLDED_EDITIONS=4,KEPT_FOLD_FAILURES=64;
+/** Folds that couldn't be drawn this session, by edition key (and, for the
+ * player's choices on them, the choices' digest): opening, an edit or a save
+ * shows the repeats written out without drawing the fold again. */
+const foldFailures=new Map<string,unknown>();
+/** A fold that couldn't be drawn. `key` names the edition (and choices) it
+ * failed on; `remembered` when it failed earlier this session and was not drawn again. */
+export class FoldFailure extends Error {
+ constructor(readonly key:string,readonly detail:unknown,readonly remembered:boolean){super('The folded pages couldn’t be drawn.');this.name='FoldFailure';}
+}
+const aborted=(error:unknown)=>error instanceof DOMException&&error.name==='AbortError';
+async function remembering<T>(key:string,draw:()=>Promise<T>):Promise<T>{
+ if(foldFailures.has(key))throw new FoldFailure(key,foldFailures.get(key),true);
+ try{return await draw();}
+ catch(error){if(aborted(error))throw error;
+  // The reason is for the console, once, wherever the fold first failed (opening or preparing ahead of time).
+  console.warn('Repeats stay written out:',error);
+  foldFailures.delete(key);foldFailures.set(key,error);for(const old of foldFailures.keys()){if(foldFailures.size<=KEPT_FOLD_FAILURES)break;foldFailures.delete(old);}
+  throw new FoldFailure(key,error,false);}
+}
+/** For tests: forget the folds that couldn't be drawn. */
+export function forgetFoldFailures(){foldFailures.clear();}
 interface FoldedEdition {base:ScorePackage;session:PersonalPresentationSession;pages:ProjectionEntry;saved?:Promise<unknown>}
 export class FoldedReader {
  /** Folded editions by their folded score's digest, as many as opening keeps scores (#178): a fresh package of the same score finds its edition. */
@@ -196,8 +214,9 @@ export class FoldedReader {
  async view(personal:PersonalState,written:ScorePackage=this.base,input?:ReadingExecution):Promise<FoldedPackage|undefined>{
   const execution=input?capturedReadingExecution(input):undefined;
   const fold=verbatimRepeats(this.base,personal)?.fold;if(!fold)return;
-  const {base,session}=await this.editionOf(fold.score,execution);checkReadingExecution(execution);
-  const projected=await session.project(foldedChoices(base,this.base,withRepeatInheritance(this.base,personal)),execution);checkReadingExecution(execution);
+  const {base,session,pages}=await this.editionOf(fold.score,execution);checkReadingExecution(execution);
+  const choices=foldedChoices(base,this.base,withRepeatInheritance(this.base,personal));
+  const projected=await remembering(`${pages.key}|${await hashBytes(JSON.stringify(choices))}`,()=>session.project(choices,execution));checkReadingExecution(execution);
   const facts=repeatOwnerFacts(this.base,personal),writtenOf=seatIndex(written.seats,seat=>seat.ownerIds.slice(0,1));
   // A folded note is named by its twins that carry a choice, else by itself.
   const named=new Map<string,string[]>(),notes=new Map(projected.score.notes.map(n=>[n.id,n]));
@@ -247,6 +266,10 @@ export class FoldedReader {
  private async edition(bytes:string,sourceSha256:string,execution?:ReadingExecution):Promise<FoldedEdition>{
   const base=this.base,recipe=base.renderingRecipe!;
   const key=await hashBytes(JSON.stringify([VERBATIM_FOLD_CACHE_KIND,sourceSha256,recipe.options,recipe.tokens,recipe.engineId,recipe.version]));
+  return remembering(key,()=>this.draw(base,key,bytes,sourceSha256,execution));
+ }
+ private async draw(base:ScorePackage,key:string,bytes:string,sourceSha256:string,execution?:ReadingExecution):Promise<FoldedEdition>{
+  const recipe=base.renderingRecipe!;
   let pages=await this.cache?.get(VERBATIM_FOLD_CACHE_KIND,key,cachedPages);checkReadingExecution(execution);
   let reading,saved:Promise<unknown>|undefined;
   const baseline=(rendered:{rawPages:readonly string[];seats:readonly Seat[]})=>Promise.all([Promise.all(rendered.rawPages.map(hashBytes)),hashBytes(JSON.stringify(rendered.seats))]);

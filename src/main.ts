@@ -96,7 +96,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {FoldedReader,editOwners,foldFailureText,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
+import {FOLD_FAILURE_TEXT,FoldFailure,FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {noteMemoryActions,type NoteMemoryCommand} from './note-memory-actions';
@@ -350,9 +350,11 @@ function shownSession(target:NonNullable<typeof current>):PersonalPresentationSe
 async function presentReader(target:NonNullable<typeof current>,personal:PersonalState,written:()=>Promise<ScorePackage>,execution?:ReadingExecution):Promise<ScorePackage>{
  if(scoreCapabilities(target.package).pianoPreparation){const fold=personalEditor(target).fold;
   if(fold.folds(personal))try{const view=await fold.view(personal,target.package,execution);if(view)return view;}
-  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;console.warn('Repeats stay written out:',error);
-   // Said once a score: the pages are right, only longer.
-   if(!foldFailureSaid.has(target.package)){foldFailureSaid.add(target.package);notify(foldFailureText(error));}}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;
+   // A fold that failed is remembered for the session and not drawn again; its reason was logged when it failed.
+   const failure=error instanceof FoldFailure?error:undefined;if(!failure)console.warn('Repeats stay written out:',error);
+   // Said once a score and fold: the pages are right, only longer.
+   const said=`${target.entry.id}\n${failure?.key??''}`;if(!foldFailureSaid.has(said)){foldFailureSaid.add(said);notify(FOLD_FAILURE_TEXT);}}
  }
  return written();
 }
@@ -369,8 +371,8 @@ async function keepWrittenOut(target:NonNullable<typeof current>,found:WrittenOu
  // One kept repeat per score package: the one its notice last offered.
  await enqueue(async()=>{const next={...preferences,writtenOutRepeats:[...(preferences.writtenOutRepeats??[]).filter(k=>!k.startsWith(package_)),key].slice(-KEPT_WRITTEN_OUT)};await writeJson('preferences.json',next);preferences=next;});
 }
-/** Scores told this session that their folded pages couldn't be drawn. */
-const foldFailureSaid=new WeakSet<ScorePackage>();
+/** Scores (and their folds) told this session that their folded pages couldn't be drawn. */
+const foldFailureSaid=new Set<string>();
 /** Why a repeat the reader would fold is written out, and how to fold it again. */
 function paintRepeatNotice(){
  const target=current,shown=target&&!practice&&scoreCapabilities(target.package).pianoPreparation?writtenOutRepeat(target.package,target.personal,bar=>printedBar(target.entry.id,bar)):undefined,found=shown&&!keepsWrittenOut(target!,shown)?shown:undefined;
