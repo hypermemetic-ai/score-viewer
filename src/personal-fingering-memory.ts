@@ -76,7 +76,15 @@ export function projectPersonalMemoryScore(input:MemoryScoreInput,options:{carry
  return result;
 }
 
-interface SpanDonor {donor:PersonalMemoryOccurrence;owners:ReadonlyMap<string,string>}
+/** A donor bar for one receiving hand, which plays the same as the donor for its first `span` ticks. */
+interface SpanDonor {donor:PersonalMemoryOccurrence;span:number}
+const stretchNote=(n:MeasureMemoryOccurrence['notes'][number])=>`${n.midiPitch}:${n.onset.numerator}:${n.duration.numerator}`;
+/** Each receiving note in the stretch with the donor's note of the same pitch, onset and length.
+ * Built only for a donor with fingers to give. */
+function spanOwners(to:PersonalMemoryOccurrence,{donor,span}:SpanDonor):Map<string,string> {
+ const donors=new Map<string,string>();for(const n of donor.occurrence.notes)if(n.onset.numerator<span&&!donors.has(stretchNote(n)))donors.set(stretchNote(n),n.ownerId);
+ const owners=new Map<string,string>();for(const n of to.occurrence.notes)if(n.onset.numerator<span)owners.set(n.ownerId,donors.get(stretchNote(n))!);return owners;
+}
 const spanCache=new WeakMap<ScorePackage,{key:string;value:Map<string,SpanDonor[]>}>();
 /** Bars of unequal length whose notes in one hand are the same from the
  * downbeat to the end of the shorter bar: pitch, place in the bar and length,
@@ -91,14 +99,12 @@ function spanDonors(p:ScorePackage,all:readonly PersonalMemoryOccurrence[]):Map<
 }
 function findSpanDonors(p:ScorePackage,all:readonly PersonalMemoryOccurrence[]):Map<string,SpanDonor[]> {
  // A pickup is never compared from its start; it matches only a pickup of its length, through the exact key.
- const result=new Map<string,SpanDonor[]>(),pickup=pickupBars(p,p.score.sourceBarTicks!),hands=all.filter(r=>r.occurrence.scope&&!pickup[r.writtenBar-1]);
- const within=(r:PersonalMemoryOccurrence,span:number)=>r.occurrence.notes.filter(n=>n.onset.numerator<span);
- const key=(r:PersonalMemoryOccurrence,span:number)=>measureMemoryKey({scope:r.occurrence.scope,extent:{numerator:span,denominator:r.occurrence.extent.denominator},notes:within(r,span)});
- const note=(n:MeasureMemoryOccurrence['notes'][number])=>`${n.midiPitch}:${n.onset.numerator}:${n.duration.numerator}`;
+ const result=new Map<string,SpanDonor[]>(),pickup=pickupBars(p,p.score.sourceBarTicks!),hands=all.filter(r=>r.occurrence.scope&&!pickup[r.writtenBar-1]),ids=new Map(hands.map(r=>[r,identity(r.occurrence)]));
+ // The library's measure key over the stretch: the score's projections share one tick denominator, so
+ // comparing tick counts is comparing its reduced ratios, and the projection already validated each note.
+ const key=(r:PersonalMemoryOccurrence,span:number)=>`${r.occurrence.scope}|${r.occurrence.extent.denominator}|${r.occurrence.notes.filter(n=>n.onset.numerator<span).map(stretchNote).sort().join(',')}`;
  const link=(to:PersonalMemoryOccurrence,from:PersonalMemoryOccurrence,span:number)=>{
-  const donors=new Map<string,string>();for(const n of within(from,span))if(!donors.has(note(n)))donors.set(note(n),n.ownerId);
-  const owners=new Map(within(to,span).map(n=>[n.ownerId,donors.get(note(n))!]));if(!owners.size)return;
-  const id=identity(to.occurrence),list=result.get(id),donor={donor:from,owners};if(list)list.push(donor);else result.set(id,[donor]);
+  const id=ids.get(to)!,list=result.get(id),donor={donor:from,span};if(list)list.push(donor);else result.set(id,[donor]);
  };
  const extents=[...new Set(hands.map(r=>r.occurrence.extent.numerator))].sort((a,b)=>a-b);
  for(const [i,short] of extents.entries())for(const long of extents.slice(i+1)){
@@ -228,9 +234,9 @@ function resolveMemoryRecords(document:PersonalFingeringMemory,input:MemoryScore
   }
   sharedByBar.set(bar,fields);return fields;
  };
- for(const r of records.filter(r=>r.occurrence.scope))for(const {donor,owners} of donors.get(identity(r.occurrence))??[]){
-  const there=sharedIn(donor.writtenBar);if(!there.size)continue;
-  const fields:Array<readonly [string,ResolvedMeasureField<1|2|3|4|5>]>=[];for(const [id,from] of owners){const f=there.get(from);if(f)fields.push([id,f]);}
+ for(const r of records.filter(r=>r.occurrence.scope))for(const span of donors.get(identity(r.occurrence))??[]){
+  const there=sharedIn(span.donor.writtenBar);if(!there.size)continue;
+  const fields:Array<readonly [string,ResolvedMeasureField<1|2|3|4|5>]>=[];for(const [id,from] of spanOwners(r,span)){const f=there.get(from);if(f)fields.push([id,f]);}
   if(!fields.length)continue;
   for(const [id,f] of fields){
    const own=byOwner[id].finger,reference=f.origin?references.get(JSON.stringify([identity({...f.origin,keyboardId:r.occurrence.keyboardId}),f.origin.sourceRevision])):undefined;

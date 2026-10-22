@@ -212,11 +212,15 @@ function mixedMeters(matching:boolean):MemoryScoreInput {
 test('speed: bars of other lengths sharing a hand’s opening cost a resolve about what the same score costs without them',()=>{
  // CPU time of the same process, compared with a score of the same bars and notes whose hands match nowhere, so machine load cancels out.
  const scores=[mixedMeters(true),mixedMeters(false)].map(input=>({input,document:bootstrapPersonalFingeringMemory([input])}));
- const cpu=({input,document}:typeof scores[number])=>{const start=process.cpuUsage();resolvePersonalFingeringMemory(document,input.entryId,input.p,input.personal);const used=process.cpuUsage(start);return used.user+used.system;};
- for(const score of scores)cpu(score);
- const times:number[][]=[[],[]];for(let k=0;k<7;k++)scores.forEach((score,i)=>times[i].push(cpu(score)));
- const median=(xs:number[])=>[...xs].sort((a,b)=>a-b)[xs.length>>1],ratio=median(times[0])/median(times[1]);
- // Each bar's LH has dozens of matching bars of another length; carrying from them used to cost about five times as much.
- assert.ok(scores[0].input.p.score.notes.length===scores[1].input.p.score.notes.length);
- assert.ok(ratio<2,`a resolve with matching bars took ${ratio.toFixed(2)}× the CPU of one without (${(median(times[0])/1000).toFixed(0)} ms against ${(median(times[1])/1000).toFixed(0)} ms)`);
+ // A fresh package is a score read again: nothing derived from it is cached yet, the matching bars included.
+ const cpu=({input,document}:typeof scores[number],fresh:boolean)=>{const p=fresh?{...input.p}:input.p,start=process.cpuUsage();resolvePersonalFingeringMemory(document,input.entryId,p,input.personal);const used=process.cpuUsage(start);return used.user+used.system;};
+ assert.equal(scores[0].input.p.score.notes.length,scores[1].input.p.score.notes.length);
+ const median=(xs:number[])=>[...xs].sort((a,b)=>a-b)[xs.length>>1];
+ for(const fresh of [false,true]){
+  for(const score of scores)cpu(score,fresh);
+  const times:number[][]=[[],[]];for(let k=0;k<7;k++)scores.forEach((score,i)=>times[i].push(cpu(score,fresh)));
+  // Each bar's LH has dozens of matching bars of another length; carrying from them used to cost five to six times as much.
+  const ratio=median(times[0])/median(times[1]);
+  assert.ok(ratio<2,`${fresh?'a first':'a later'} resolve with matching bars took ${ratio.toFixed(2)}× the CPU of one without (${(median(times[0])/1000).toFixed(0)} ms against ${(median(times[1])/1000).toFixed(0)} ms)`);
+ }
 });

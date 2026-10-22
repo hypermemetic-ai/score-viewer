@@ -2,9 +2,9 @@
 
 ## Matching rule
 
-The memory's hand projections of one score are compared in pairs of downbeat bars of unequal length. For extents `a < b`, the longer bar's projection is cut to its notes starting before `a`, with extent `a`, and its exact measure key is compared with the shorter bar's key. Equal keys mean the hand plays the same notes, by pitch, onset in the bar and length, from the downbeat to the end of the shorter bar. Each note in that stretch is paired with the note of the same pitch, onset and length in the other bar. Notes after the stretch are not paired.
+The memory's hand projections of one score are compared in pairs of bars of unequal length that are not pickups. For extents `a < b`, both bars' projections are cut to their notes starting before `a`, and the cuts are compared by the library's measure key taken over that stretch: sorted pitch, onset and length. Within one score every projection shares the tick denominator, so the key compares tick counts directly rather than reducing ratios again. Equal keys mean the hand plays the same notes, by pitch, onset in the bar and length, from the downbeat to the end of the shorter bar. Each note in that stretch is paired with the note of the same pitch, onset and length in the other bar. Notes after the stretch are not paired.
 
-This is the hand-change carry's stretch (`carry-hand-changes-to-recurrences`), applied per hand, which is how the memory already matches a hand. It uses the memory's own projections (notes starting in the bar), the hands the player has, and the library's canonical key, so rational onsets and the owner multiplicity are compared exactly as for exact matches.
+This is the hand-change carry's stretch (`carry-hand-changes-to-recurrences`), applied per hand, which is how the memory already matches a hand. It uses the memory's own projections (notes starting in the bar), the hands the player has, and the canonical key's content, so onsets and the owner multiplicity are compared exactly as for exact matches.
 
 ## Downbeats
 
@@ -27,7 +27,7 @@ Donor-only bars outside a single-bar resolution are resolved in the same batch.
 
 ## Speed
 
-The pairs depend on the bars and the hand partition only. They are cached per package and keyed by the hand projection identities, and built with appends rather than copies. On every resolve, each donor bar's shared fingers are read once, into a map by note, and a donor bar with none is skipped, so a score where many bars share a hand's opening and nothing is fingered costs about what it costs without the carry. On a synthetic 120-bar score in 2/4, 3/4 and 4/4 whose bars share the left hand's opening, a resolve took about 350 ms of CPU before this and about 65 ms after, against about 65 ms on main. A test compares the CPU of that score with the same score whose hands match nowhere. On the owner's No. 13 the matching takes about 2.7 ms against about 90 ms for a whole resolution, and nothing after the first resolution of a partition.
+The pairs depend on the bars and the hand partition only. They are cached per package and keyed by the hand projection identities, built with appends rather than copies, and each note's partner in the donor is found only for a donor that has fingers to give. On every resolve, each donor bar's shared fingers are read once, into a map by note, and a donor bar with none is skipped, so a score where many bars share a hand's opening and nothing is fingered costs about what it costs without the carry. On a synthetic 120-bar score in 2/4, 3/4 and 4/4 whose bars share the left hand's opening, a resolve took about 350 ms of CPU before this and about 65 ms after, against about 65 ms on main; reading the score again (pairs not yet cached) took about 390 ms before, and 55–90 ms after, against 35–85 ms on main. A test compares the CPU of that score with the same score whose hands match nowhere. On the owner's No. 13 the matching takes about 2.7 ms against about 90 ms for a whole resolution, and nothing after the first resolution of a partition.
 
 ## Refused carried hands
 
