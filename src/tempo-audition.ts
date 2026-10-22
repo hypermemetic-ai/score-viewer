@@ -20,13 +20,22 @@ const browserTimers:AuditionTimers={set:(fn,ms)=>setInterval(fn,ms),clear:id=>cl
 export type AuditionPhase='idle'|'count-in'|'playing'|'paused'|'finished';
 /** `measure` is the written bar as the reader numbers it, `pass` its visit through a repeat, `measures` the written bars. */
 export interface AuditionPosition {phase:AuditionPhase;tick:number;measure:number;pass:number;measures:number;countBeat?:number}
+/** Who plays the preview: this built-in voice or the installed native piano. */
+export type AuditionVoice='built-in'|'piano';
+export interface Audition {
+ readonly schedule:PerformanceSchedule;readonly voice:AuditionVoice;readonly bpm:number;readonly phase:AuditionPhase;readonly seconds:number;
+ /** Why sound stopped after it had started. */
+ readonly failure?:string;
+ open():Promise<void>;play():void;pause():void;resume():void;setBpm(bpm:number):void;position():AuditionPosition;close():Promise<void>;
+}
 /** A scheduled sound, kept so a tempo change can move it. */
 interface Voice {tick:number;release:number;start:number;nodes:AuditionOscillator[];gains:AuditionGain[];click:boolean;entry?:object}
 
 const LOOKAHEAD_S=.35,INTERVAL_MS=40,LEAD_S=.12,RELEASE_TAU=.07;
 const frequency=(midi:number)=>440*Math.pow(2,(midi-69)/12);
 
-export class TempoAudition {
+export class TempoAudition implements Audition {
+ readonly voice='built-in' as const;
  private context?:AuditionContext;private master?:AuditionGain;private waves=new Map<string,unknown>();
  private timer?:unknown;private voices:Voice[]=[];private nextNote=0;private nextClick=0;
  private anchor={time:0,tick:0};private pausedTick=0;private phaseValue:AuditionPhase='idle';private readonly endTick:number;

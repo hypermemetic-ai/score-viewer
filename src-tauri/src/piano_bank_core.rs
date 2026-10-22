@@ -587,6 +587,24 @@ mod tests {
         fs::write(marker, serde_json::to_vec(&m).unwrap()).unwrap();
         assert!(verify_impl(&f.root(), &f.profile(), &stop, &mut quiet).is_err());
     }
+    #[test]
+    fn presence_reads_pointer_and_marker_without_hashing() {
+        let f = Fixture::valid();
+        assert!(!present_impl(&f.root(), &f.profile()).unwrap());
+        assert!(!f.root().exists(), "asking does not create the cache");
+        let stop = AtomicBool::new(false);
+        let sfz = f.install(&stop, &mut quiet, None).unwrap();
+        assert!(present_impl(&f.root(), &f.profile()).unwrap());
+        // Changed sample bytes are only found by the full check.
+        let sample = sfz.parent().unwrap().parent().unwrap().join("48khz24bit/tone.wav");
+        fs::write(sample, b"modified audio fixture").unwrap();
+        assert!(present_impl(&f.root(), &f.profile()).unwrap());
+        assert!(verify_impl(&f.root(), &f.profile(), &stop, &mut quiet).is_err());
+        fs::remove_file(&sfz).unwrap();
+        assert!(present_impl(&f.root(), &f.profile()).is_err());
+        fs::remove_file(f.root().join(CURRENT)).unwrap();
+        assert!(!present_impl(&f.root(), &f.profile()).unwrap());
+    }
 }
 fn closure(root: &Path, m: &Manifest, p: &Profile) -> Result<(), String> {
     let members: HashSet<_> = m.files.iter().map(|x| x.path.clone()).collect();
@@ -633,6 +651,25 @@ fn verify_impl(
     progress: &mut impl FnMut(&str, u8),
 ) -> Result<Option<PathBuf>, String> {
     let root = prepare_root(root)?;
+    let Some((bank, manifest)) = admitted_manifest(&root, p)? else {
+        return Ok(None);
+    };
+    for (i, member) in manifest.files.iter().enumerate() {
+        cancelled(cancel)?;
+        let path = checked_path(&bank, &member.path)?;
+        let (size, hash) = hash_file(&path, member.bytes, cancel)?;
+        if size != member.bytes || hash != member.sha256 {
+            return Err("Installed piano files differ. Install the original bank again.".into());
+        }
+        progress("checking", ((i + 1) * 100 / manifest.files.len()) as u8);
+    }
+    closure(&bank, &manifest, p)?;
+    Ok(Some(checked_path(&bank, p.live)?))
+}
+
+/// The installed bank directory and its admitted manifest, read from the
+/// pointer and marker alone; `None` when nothing is installed.
+fn admitted_manifest(root: &Path, p: &Profile) -> Result<Option<(PathBuf, Manifest)>, String> {
     let pointer = root.join(CURRENT);
     if !pointer.exists() {
         return Ok(None);
@@ -652,17 +689,25 @@ fn verify_impl(
     ordinary(&bank, true)?;
     let manifest: Manifest = json(&bank.join(MARKER), 4_000_000)?;
     manifest_valid(&manifest, p)?;
-    for (i, member) in manifest.files.iter().enumerate() {
-        cancelled(cancel)?;
-        let path = checked_path(&bank, &member.path)?;
-        let (size, hash) = hash_file(&path, member.bytes, cancel)?;
-        if size != member.bytes || hash != member.sha256 {
-            return Err("Installed piano files differ. Install the original bank again.".into());
-        }
-        progress("checking", ((i + 1) * 100 / manifest.files.len()) as u8);
+    Ok(Some((bank, manifest)))
+}
+/// Whether a bank is installed, from its pointer, marker and live SFZ alone.
+/// Nothing is hashed, so this answers at once; the full check runs when the
+/// piano is turned on.
+pub fn installed_present(root: &Path) -> bool {
+    present_impl(root, &ORIGINAL).unwrap_or(false)
+}
+fn present_impl(root: &Path, p: &Profile) -> Result<bool, String> {
+    if fs::symlink_metadata(root).is_err() {
+        return Ok(false);
     }
-    closure(&bank, &manifest, p)?;
-    Ok(Some(checked_path(&bank, p.live)?))
+    ordinary(root, true)?;
+    let root = fs::canonicalize(root).map_err(err)?;
+    let Some((bank, _)) = admitted_manifest(&root, p)? else {
+        return Ok(false);
+    };
+    checked_path(&bank, p.live)?;
+    Ok(true)
 }
 
 struct OwnedDirectory(Option<PathBuf>);
