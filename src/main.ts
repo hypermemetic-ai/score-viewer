@@ -17,7 +17,7 @@ import {defaultPianoPreferences,readPianoPreferences,type PianoPreferences} from
 import {OptionsBindingsPanel,optionsBindingRows} from './options-bindings';
 import {OptionsNavigation} from './options-navigation';
 import {workingSpeedArrow} from './practice-shortcuts';
-import {PackageAdmissionSession} from './package-admission-session';
+import {PackageAdmissionSession,admissionRejection} from './package-admission-session';
 import {optionsSectionsMarkup,type OptionsSection} from './options-sections';
 import {ReaderPageCache,createReaderPage,mountReaderPages,type ReaderPage} from './reader-page-cache';
 import {mountScorePrint,pdfSaveMessage,scorePageSize,scorePdfFilename} from './score-pdf';
@@ -83,7 +83,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
-import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,type AheadOfTimeWork} from './ahead-of-time-engraving';
+import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
 import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
@@ -95,12 +95,13 @@ import {selectedAdviceExplanations} from './fingering-advice-markers';
 import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
-import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
+import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {FoldedReader,editOwners,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage} from './repeat-fold';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
-import {DerivedFileCache} from './derived-file-cache';
+import {DerivedFileCache,VIEWER_DERIVED_IDENTITY} from './derived-file-cache';
+import {RetainedScore,underMemoryPressure,type RetentionConditions} from './retained-score';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
 import {calculatedAdmissionEvidence} from './calculated-hand-edition';
 import {isTauri} from '@tauri-apps/api/core';
@@ -165,7 +166,8 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
  await prepareRecorded(derived,key,async read=>{
   if(readingOnlyArchive(bytes))return null;
-  await answerInput();const prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});await answerInput();
+  // Only admission rejecting the archive, or the engraver refusing its pages, is a refusal.
+  await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}),admissionRejection);await answerInput();
   if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
@@ -182,12 +184,12 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
    fold=new FoldedReader(q.package,derived,{pool:separatePreparations(),options});
   let session:PersonalPresentationSession|undefined,served:ProjectionEntry|undefined,drawn=false;
   // A fold that can't be drawn opens written out, so that is what is prepared.
-  if(fold.folds(shown))try{const view=await fold.view(shown,q.package,execution);if(view?.verbatimFold){session=view.verbatimFold.session;served=await fold.served(shown);drawn=true;}}
-  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;}
+  if(fold.folds(shown)){await answerInput();try{const view=await fold.view(shown,q.package,execution);if(view?.verbatimFold){session=view.verbatimFold.session;served=await fold.served(shown);drawn=true;}}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;}}
   if(!session||!served){
    session=new PersonalPresentationSession(q.package,separatePreparations(),options);served=await session.projectionEntry(q.personal??personal);
    if(!served)return null;
-   if(drawn=!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
+   if(drawn=!await projectionServed(derived,served)){await answerInput();await refusedWhen(session.project(q.personal??personal,execution),engravingRefusal);}
   }
   // The pages opening reads are written as soon as input allows; an opening
   // that took this work over goes on from here.
@@ -196,7 +198,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   // Then, in idle time, the engine hand editing resumes from: settled when an
   // earlier reading made the pages but saved none, and saved before the
   // worker holding it is freed. The worker encodes it; this thread writes a file.
-  if(await session.engineMissing()){await answerInput();await session.warm(execution);checkReadingExecution(execution);}
+  if(await session.engineMissing()){await answerInput();await refusedWhen(session.warm(execution),engravingRefusal);checkReadingExecution(execution);}
   if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
   return served;
  });
@@ -987,7 +989,7 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,per
 }
 let scoreActivation=0;
 async function activateScore(next:NonNullable<typeof current>,context?:PracticeViewContext,admitted?:AdmittedPracticeContext,op?:ReadingOperation,rememberOpened=false){
- const ownsOperation=!op;op??=beginReading(next.entry.id);
+ const ownsOperation=!op;op??=beginReading(next.entry.id);retained.free();
  try{
  if(op){checkReadingOwner(op);if(current!==op.previous)throw cancelledReading();}
  const activation=++scoreActivation,previous=current,keyboard=preferences.keyboardLayout;
@@ -1026,8 +1028,9 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
  // Work taken over from the library saves its engine first, which this then restores.
  if(!context&&scoreCapabilities(next.package).pianoPreparation){
+  // On a folded score that is the folded pages' session: the one work taken over from the library prepared.
   const settle=()=>{if(current===next)shownSession(next).prefetch();},saving=aheadOfTime?.finishing(next.entry.id);
-  if(saving)void saving.then(settle);else settle();
+  if(saving){shownSession(next).engineSavedBy(saving);void saving.then(settle);}else settle();
  }
  if(ownsOperation)finishReading(op,true);return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
@@ -1140,7 +1143,29 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}
 }
 
-async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
+/** The score last read, kept after Back so reopening it unchanged only draws
+ * it again. Only scores opened from the library on their piano pages qualify. */
+const retainable=new WeakSet<NonNullable<typeof current>>();let retentionWatch:number|undefined;
+const retained=new RetainedScore<NonNullable<typeof current>>(()=>{window.clearInterval(retentionWatch);retentionWatch=undefined;});
+type HeapMemory={usedJSHeapSize:number;jsHeapSizeLimit:number};const heapMemory=()=>(performance as Performance&{memory?:HeapMemory}).memory;
+function retentionConditions(entry:Entry):RetentionConditions|undefined {
+ const records=personalMemory.readingRefs(entry.id);if(!records)return;
+ const {lastWorkedEntryId:_opened,...kept}=preferences;return {entry,records,preferences:kept,carries:handCarryDropGeneration(),build:VIEWER_DERIVED_IDENTITY};
+}
+function retainScore(target:NonNullable<typeof current>){
+ const entry=entries.find(e=>e.id===target.entry.id);
+ // A reading whose library entry moved on (a new edition, transposition) is opened afresh.
+ if(!entry||!retainable.has(target)||target.package.reading?.dual||!scoreCapabilities(target.package).pianoPreparation||personalMemory.error||underMemoryPressure(heapMemory()))return;
+ if(JSON.stringify(entry)!==JSON.stringify(target.entry))return;
+ const conditions=retentionConditions(entry);if(!conditions)return;
+ retained.keep(entry.id,conditions,target);
+ retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))retained.free();},30000);
+}
+async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);
+ // The score just closed, with nothing it rests on changed, is drawn again as it was left: no read, admission or projection.
+ const kept=retained.take(entry.id,()=>sourceGroup===undefined?retentionConditions(entry):undefined);
+ if(kept){await host.fullscreen(true);checkReading(op);const activated=await activateScore(kept,undefined,undefined,op,true);retainable.add(activated);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});finishReading(op,true);return;}
+ const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  let prior:ScorePackage,withoutRepeats=false;try{prior=await importReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
   // Pages that only lack their repeat signs open as saved when they can't be engraved again.
   keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);prior=await importReading(data,op);withoutRepeats=true;}
@@ -1155,7 +1180,7 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   // Byte equality also covers retained ready/editable finger layers.
   unchangedArchive=collectionId(q.package)===entry.id&&q.packageBytes.byteLength===data.byteLength&&q.packageBytes.every((value,index)=>value===data[index]),
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
-  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
+  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
   const said=[withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
@@ -1491,7 +1516,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
 
 async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='pdf'){await savePdf();return;}if(action==='score-tempo'){if(current&&!practice){const target=current,tempos=await scoreTempoFor(target);if(current===target){await hearAndSetTempo(target,tempos,'Keep this tempo');if(current===target&&!dialog&&!practice){options('score');document.querySelector<HTMLElement>('dialog[data-kind=options] [data-action=score-tempo]')?.focus();}}}return;}if(action==='practice'){if(current&&!readingPresentation)practiceMenu();else await startPractice();return;}if(action==='practice-fingers'||action==='practice-sections'){closeDialog(false);await startPractice(undefined,undefined,action==='practice-fingers');return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
  if(['toggle','edit','feedback','restore-all','undo-restore','earlier-editions','restore-header'].includes(action))requirePianoCapability(p,'pianoPreparation');
- if(action==='library'){const closed=current?.entry.id;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-keep'){keptWrittenOut.add(current);paintRepeatNotice();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-use'){await useFirstPassChoices(current);renderPages();renderToolbar();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
+ if(action==='library'){const closed=current?.entry.id,leaving=current;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();const abandoning=!!handWait;leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();if(leaving&&!abandoning)retainScore(leaving);aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-keep'){keptWrittenOut.add(current);paintRepeatNotice();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='repeat-use'){await useFirstPassChoices(current);renderPages();renderToolbar();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
  if(selection&&!practice&&['editorNavigation','editorPrevious','editorNext'].includes(action)){
   if(action==='editorNavigation'){editNavigation=editNavigation==='notes'?'measures':'notes';renderEditorNavigation();}
   else if(editNavigation==='measures')selectFingerMeasure(action==='editorPrevious'?-1:1);else selectFinger(action==='editorPrevious'?-1:1);return;

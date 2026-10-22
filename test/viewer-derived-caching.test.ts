@@ -244,6 +244,40 @@ test('work that frees its worker after projecting saves the engine first',async(
  assert.deepEqual(await run(true),[true],'saved first: the reader resumes from it');
 });
 
+test('background work has the worker encode the pages it writes, byte for byte as the reader writes them; the reader does not ask',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const projection=async(cacheWriteDelayMs:number|null)=>{
+  const log:ProjectionRequest[]=[],{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+  const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore,log).spawn),cache,cacheWriteDelayMs});
+  await session.project(choice);await session.flushProjection();await cache.flush();
+  const name=[...files.keys()].find(n=>!n.includes('engine'))!;
+  return {encode:log.filter(m=>m.kind==='project').map(m=>!!(m as {encode?:boolean}).encode),bytes:files.get(name)!,name};
+ };
+ const background=await projection(null),reader=await projection(0);
+ assert.deepEqual(background.encode,[true]);assert.deepEqual(reader.encode,[false],'an edit never waits for an encoding');
+ assert.equal(background.name,reader.name);assert.deepEqual(background.bytes,reader.bytes);
+});
+
+test('a hand choice right after an opening that took library work over restores the engine that work is saving',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const run=async(told:boolean)=>{
+  const {store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+  // The library's work: pages written, its engine still to be saved in idle time.
+  const background=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore).spawn),cache,cacheWriteDelayMs:null});
+  await background.project(choice);await background.flushProjection();assert.equal(background.engineWaiting,true);
+  let saved!:()=>void;const saving=new Promise<void>(resolve=>{saved=resolve;});
+  const restores:boolean[]=[],later=fakeWorker(inputs=>{const core=createHostedCore(inputs),restore=core.restoreAsync!;return Object.assign(core,{restoreAsync:async(...a:Parameters<typeof restore>)=>{const r=await restore(...a);restores.push(r);return r;}});});
+  const reader=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(later.spawn),cache,cacheWriteDelayMs:0});
+  if(told)reader.engineSavedBy(saving);
+  // The player's first hand choice checks the engraving before the save has run.
+  const check=reader.ensureHandChoicesDrawable();await new Promise(r=>setTimeout(r,20));
+  await background.flushEngine();await cache.flush();saved();await check;
+  return {restores,warms:later.log.filter(m=>m.kind==='warm').map(m=>!!(m as {saved?:unknown}).saved)};
+ };
+ assert.deepEqual(await run(false),{restores:[],warms:[false]},'read too early: the reader engraves the whole score again');
+ assert.deepEqual(await run(true),{restores:[true],warms:[true]},'it waits for the save, then restores the engine');
+});
+
 const musicXml=readFileSync(new URL('./fixtures/musicxml/two-staff-piano.musicxml',import.meta.url));
 const musicXmlAssets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
  notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>['licenses/'+name,readFileSync(new URL('../licenses/'+name,import.meta.url))]))};

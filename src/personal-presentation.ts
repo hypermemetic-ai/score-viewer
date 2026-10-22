@@ -9,8 +9,8 @@ import type {PersonalState} from './state';
 import {conservativeMaterialBytes} from './package-material';
 import {PersonalPreparationPool,type PreparationLease,type PreparationRequest} from './personal-preparation-pool';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
-import type {ProjectionCoreInputs,ProjectionView} from './personal-projection-protocol';
-import {ProjectionWorkerClient,ProjectionWorkerUnavailable,projectionWorkerClient} from './personal-projection-client';
+import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionView} from './personal-projection-protocol';
+import {ProjectionWorkerClient,ProjectionWorkerUnavailable,encodedProjections,projectionWorkerClient} from './personal-projection-client';
 import type {DerivedFileCache} from './derived-file-cache';
 import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
 
@@ -21,7 +21,8 @@ export interface PersonalProjectionCore {
   * resume from instead of engraving. Resolves false when the engraving did
   * not settle, else how: restored, engraved, or already settled before. */
  warm(execution?:ReadingExecution,offThreadOnly?:boolean,saved?:PersonalHandEngineState):Promise<false|'restored'|'engraved'|'already'>;
- project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>;
+ /** `encode`: the worker also encodes the view for the disk cache. */
+ project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution,encode?:boolean):Promise<ProjectionView>;
  /** The settled engine, encoded for the disk cache on the thread that holds
   * it; undefined when there is none. */
  save():Promise<EncodedDerivedPayload|undefined>;
@@ -76,8 +77,8 @@ function workerCore(client:ProjectionWorkerClient,key:string,inputs:ProjectionCo
    if(local)return local.save();
    try{return await client.save(key,inputs);}catch{return undefined;}
   },
-  async project(owners,digest,e){
-   if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e));if(view)return freezeView(view);}
+  async project(owners,digest,e,encode){
+   if(!local){const view=await remote(()=>client.project(key,inputs,owners,digest,e,encode));if(view)return freezeView(view);}
    return local!.project(owners,digest,e??{});
   }
  };
@@ -265,6 +266,10 @@ export class PersonalPresentationSession {
   this.cache=options.cache===undefined?defaultCache??null:options.cache;
   this.cacheWriteDelayMs=options.cacheWriteDelayMs===undefined?2000:options.cacheWriteDelayMs;
  }
+ /** A session that writes its pages as soon as they are made (background
+  * work) has the worker encode them. The reader's own sessions do not: an
+  * edit's pages would wait for an encoding only its last edit needs. */
+ private get encodesInWorker(){return !!this.cache&&this.cacheWriteDelayMs===null;}
  /** Without a projection worker the engraving settles cooperatively while the
   * score opens, as before, so a first hand choice never freezes the reader. */
  get settlesOnOpen(){return !this.worker?.available;}
@@ -364,8 +369,14 @@ export class PersonalPresentationSession {
   const state=importedEngines.get(this.base);
   if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
-  return this.savedEngine=this.engineKey().then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+  // The engine is read once per session, so not before a save under way has finished.
+  return this.savedEngine=(this.engineArriving??Promise.resolve()).then(()=>this.engineKey()).then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
  }
+ private engineArriving?:Promise<unknown>;
+ /** This package's engine is being saved elsewhere (work an opening took
+  * over from the library): every settle, a prefetch or a hand choice's
+  * check, restores it once that ends rather than engraving again. */
+ engineSavedBy(saving:Promise<unknown>){this.engineArriving=saving.catch(()=>undefined);}
  private async engineKey():Promise<string>{
   return hashBytes(JSON.stringify([PERSONAL_ENGINE_CACHE_KIND,(await this.prepare()).digest]));
  }
@@ -392,9 +403,9 @@ export class PersonalPresentationSession {
  private remember(view:ProjectionView){
   const cache=this.cache;if(!cache)return;
   if(this.cacheWrite!==undefined)clearTimeout(this.cacheWrite);
-  const value={score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry};
+  const value=cachedProjectionValue(view),encoded=encodedProjections.get(view);encodedProjections.delete(view);
   // Tagged with its hand choices' digest, so a peek tells whether it serves them.
-  this.cacheJob=()=>this.cacheKey().then(key=>cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).then(()=>{},()=>{});
+  this.cacheJob=()=>this.cacheKey().then(key=>encoded?cache.putEncoded(PERSONAL_PROJECTION_CACHE_KIND,key,encoded,view.annotationGeometry?.presentationIdentity):cache.put(PERSONAL_PROJECTION_CACHE_KIND,key,value,view.annotationGeometry?.presentationIdentity)).then(()=>{},()=>{});
   // Serializing pages is real work: it waits for the reader to be idle.
   if(this.cacheWriteDelayMs!==null)this.cacheWrite=setTimeout(()=>{this.cacheWrite=undefined;whenIdle(()=>void this.runCacheJob());},this.cacheWriteDelayMs);
  }
@@ -462,7 +473,7 @@ export class PersonalPresentationSession {
   if(!result){
    // A saved engine settles the core first, so this choice only places what
    // changed, even when its projection is no longer on disk.
-   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState())await this.settle(core,e);return core.project(owners,digest,e);},execution).catch(error=>this.refusal(error,execution)),
+   result=await playerFacing(this.use(async(core,e)=>{if(await this.savedState())await this.settle(core,e);return core.project(owners,digest,e,this.encodesInWorker);},execution).catch(error=>this.refusal(error,execution)),
     UNDRAWABLE_HAND_CHOICES,
     "One key is written as two notes, and only one of them has a hand. Choose a hand for that key (L or R) to give it to both notes.");
    this.baseline??=true;this.remember(result);this.rememberEngine();
