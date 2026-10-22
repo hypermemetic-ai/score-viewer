@@ -38,7 +38,7 @@ test('an engine encoded in the worker that holds it is stored byte for byte as t
  assert.equal(await new DerivedFileCache(there.store,'build-a').putEncoded('personal-engine-v1',sha('b'),{...encoded,payloadSha256:'nope'}),false,'a malformed digest is never written');
  // The reader settles its engine for editing only after work it took over has saved one, so it restores that engine.
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
- assert.match(main,/settle=\(\)=>\{if\(current===next\)editor\.session\.prefetch\(\);\},saving=aheadOfTime\?\.finishing\(next\.entry\.id\);\s*if\(saving\)void saving\.then\(settle\);else settle\(\);/);
+ assert.match(main,/settle=\(\)=>\{if\(current===next\)shownSession\(next\)\.prefetch\(\);\},saving=aheadOfTime\?\.finishing\(next\.entry\.id\);\s*if\(saving\)void saving\.then\(settle\);else settle\(\);/);
 });
 
 test('a derived entry\'s tag reads from its header alone, and only this build\'s entry has one',async()=>{
@@ -238,7 +238,7 @@ test('the viewer holds ahead-of-time work through its own listener and saves an 
 });
 
 /** The viewer's own preparation of one score, against stubs that log each step. */
-function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean}={}){
+function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean;folds?:boolean}={}){
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
  const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a');
@@ -253,12 +253,19 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
   get engineWaiting(){return this.waiting;}
   async flushEngine(){stop('engine saved');this.waiting=false;}
  }
+ // A score that shows a repeat folded is prepared on its folded pages' own session.
+ class FoldedReader {
+  readonly session=new Session();
+  folds(){return !!options.folds;}
+  async view(){stop('folded project');this.session.waiting=!options.engineOnDisk;return {verbatimFold:{session:this.session}};}
+  async served(){return {kind:'verbatim-fold-v1',key:sha('f'),tag:'folded',with:[]};}
+ }
  const memory={adoptIndexed:async()=>{log.push('indexed');return true;},storedRefs:()=>{log.push('hand choices read');return [];},personalFor:()=>({})};
  const context:any={
   JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,
   checkReadingExecution:(e:any)=>{if(e?.signal?.aborted)throw new DOMException('stop','AbortError');},
   entries:[{id:'no13',file:'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
-  personalMemory:memory,host:{read:async()=>new Uint8Array([1,2,3])},
+  personalMemory:{...memory,memoryRevision:0},FoldedReader,withRepeatInheritance:(_p:unknown,s:unknown)=>s,withResolvedMemory:()=>({}),resolveMemoryInput:()=>({}),host:{read:async()=>new Uint8Array([1,2,3])},
   projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>({availablePresentations:['janko-four-row']})},
   scoreCapabilities:()=>({pianoPreparation:true}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>undefined,
   ensurePianoReady:async()=>({package:{}}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
@@ -277,6 +284,9 @@ test('a preparation writes the pages before an opening goes on, then saves the e
  const settle=preparation({projected:true});await settle.run();settle.log.splice(0,3);
  assert.deepEqual(settle.log,['ready','engine settled','engine saved']);
  const both=preparation({projected:true,engineOnDisk:true});await both.run();assert.deepEqual(both.log.slice(3),['ready']);assert.equal(await both.recorded(),true);
+ // A score that folds is prepared on its folded pages in the same order.
+ const folded=preparation({folds:true});await folded.run();folded.log.splice(0,3);
+ assert.deepEqual(folded.log,['folded project','pages written','ready','engine saved']);assert.equal(await folded.recorded(),true);
  // A stop while either is written is no outcome: the score is prepared again on the next visit.
  for(const stopAt of ['pages written','engine saved','engine settled']){
   const stopped=preparation({stopAt,projected:stopAt==='engine settled'});

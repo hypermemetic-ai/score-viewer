@@ -174,15 +174,24 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   await answerInput();const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);await answerInput();
   // An edition that must be engraved again is made, and saved, by opening it.
   if(!('package' in q))return null;
+  // A score that shows a repeat folded opens on its folded pages, from its choices
+  // as opening resolves them: shared memory first, then the repeat's twins.
   // Its files are written at the steps below, never on a timer of their own.
-  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null}),served=await session.projectionEntry(q.personal??personal);
-  if(!served)return null;
-  if(!await projectionServed(derived,served)){
-   await session.project(q.personal??personal,execution);
-   // The pages opening reads are written as soon as input allows; an opening
-   // that took this work over goes on from here.
-   await answerInput();await session.flushProjection();checkReadingExecution(execution);
+  const options={worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null},input={entryId,importedAt:entry.importedAt,p:q.package,personal:q.personal??personal},
+   shown=withRepeatInheritance(q.package,withResolvedMemory(input,resolveMemoryInput(input),personalMemory.memoryRevision)),
+   fold=new FoldedReader(q.package,derived,{pool:separatePreparations(),options});
+  let session:PersonalPresentationSession|undefined,served:ProjectionEntry|undefined,drawn=false;
+  // A fold that can't be drawn opens written out, so that is what is prepared.
+  if(fold.folds(shown))try{const view=await fold.view(shown,q.package,execution);if(view?.verbatimFold){session=view.verbatimFold.session;served=await fold.served(shown);drawn=true;}}
+  catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;}
+  if(!session||!served){
+   session=new PersonalPresentationSession(q.package,separatePreparations(),options);served=await session.projectionEntry(q.personal??personal);
+   if(!served)return null;
+   if(drawn=!await projectionServed(derived,served))await session.project(q.personal??personal,execution);
   }
+  // The pages opening reads are written as soon as input allows; an opening
+  // that took this work over goes on from here.
+  if(drawn){await answerInput();await session.flushProjection();checkReadingExecution(execution);}
   work.ready();
   // Then, in idle time, the engine hand editing resumes from: settled when an
   // earlier reading made the pages but saved none, and saved before the

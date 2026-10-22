@@ -6,7 +6,7 @@ import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,type ScorePackage,type Seat} from './package';
 import {activeLayer,type PersonalRepeatResolution,type PersonalState} from './state';
 import {effectiveHands,handRecurrences,ownsHand,type PersonalAssignments,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,adoptImportedReading} from './personal-presentation';
+import {PersonalPresentationSession,adoptImportedReading,type PersonalPresentationOptions,type ProjectionEntry} from './personal-presentation';
 import {withLayoutPeer} from './layout-peer';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 import type {DerivedFileCache} from './derived-file-cache';
@@ -172,9 +172,10 @@ function cachedPages(value:unknown):FoldedPages{
  * edit lands where the choice already is and never splits agreeing passes.
  */
 export class FoldedReader {
- private readonly editions=new Map<QuantizedGridScore,Promise<{base:ScorePackage;session:PersonalPresentationSession}>>();
+ private readonly editions=new Map<QuantizedGridScore,Promise<{base:ScorePackage;session:PersonalPresentationSession;pages:ProjectionEntry}>>();
  private readonly cache:DerivedFileCache|null;
- constructor(private readonly base:ScorePackage,cache?:DerivedFileCache|null){this.cache=cache===undefined?defaultCache??null:cache;}
+ /** `sessions` engraves the folded pages' hand choices elsewhere than the reader's own engines, as preparing ahead of time does. */
+ constructor(private readonly base:ScorePackage,cache?:DerivedFileCache|null,private readonly sessions:{pool?:ConstructorParameters<typeof PersonalPresentationSession>[1];options?:PersonalPresentationOptions}={}){this.cache=cache===undefined?defaultCache??null:cache;}
  /** Whether these choices show a repeat folded: then the written-out pages need not be drawn at all. */
  folds(personal:PersonalState):boolean{return !!verbatimRepeats(this.base,personal)?.fold;}
  /** The folded view for these choices, or undefined when nothing folds. Its
@@ -208,6 +209,15 @@ export class FoldedReader {
    writtenSeat:seat=>writtenOf(seat.ownerIds[0],seat),
    foldedSeat:seat=>{const id=seat.ownerIds[0];return foldedOf(fold.shownBy.get(id)??id,seat);}}};
  }
+ /** What opening reads from the derived-file cache for these choices once
+  * this reader has drawn them folded: the folded pages, with their projection
+  * unless every folded note keeps its written hand. Undefined when nothing folds
+  * or the folded pages were not drawn here. */
+ async served(personal:PersonalState):Promise<ProjectionEntry|undefined>{
+  const fold=verbatimRepeats(this.base,personal)?.fold,edition=fold&&this.editions.get(fold.score);if(!edition)return;
+  const {base,session,pages}=await edition,projection=await session.projectionEntry(foldedChoices(base,this.base,withRepeatInheritance(this.base,personal)));
+  return {...pages,with:projection?[projection]:[]};
+ }
  private async edition(score:QuantizedGridScore,execution?:ReadingExecution){
   const base=this.base,recipe=base.renderingRecipe!,bytes=JSON.stringify(score),sourceSha256=await hashBytes(bytes);
   const key=await hashBytes(JSON.stringify([VERBATIM_FOLD_CACHE_KIND,sourceSha256,recipe.options,recipe.tokens,recipe.engineId,recipe.version]));
@@ -220,14 +230,14 @@ export class FoldedReader {
    checkReadingExecution(execution);
    pages={pages:rendered.pages,rawPages:rendered.rawPages,seats:rendered.seats as Seat[],sourceSha256};
    reading={score:rendered.score,layouts:rendered.layouts,rawPages:rendered.rawPages};
-   void this.cache?.put(VERBATIM_FOLD_CACHE_KIND,key,pages);
+   void this.cache?.put(VERBATIM_FOLD_CACHE_KIND,key,pages,sourceSha256);
   }
   const [pageSha256,seatSha256]=await baseline(pages);
   const edition:ScorePackage={...base,score:JSON.parse(bytes),sourceScore:JSON.parse(bytes),sourceSha256,pages:pages.pages,seats:pages.seats,
    renderingRecipe:validateScoreRenderingRecipe({...folded,baseline:{pageSha256,seatSha256}},{sourceSha256}),annotationGeometry:undefined};
   // A fresh engrave is the hand engine's own first preparation; it is adopted rather than engraved again.
   if(reading)await adoptImportedReading(edition,reading,execution).catch(error=>{if(error instanceof DOMException&&error.name==='AbortError')throw error;});
-  return {base:edition,session:new PersonalPresentationSession(edition)};
+  return {base:edition,session:new PersonalPresentationSession(edition,this.sessions.pool,this.sessions.options),pages:{kind:VERBATIM_FOLD_CACHE_KIND,key,tag:sourceSha256}};
  }
 }
 
