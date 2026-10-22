@@ -4,6 +4,8 @@
 - [x] 1.2 Store owner tempos additively in preferences; never write packages or journals.
 - [x] 1.3 Keep the piece tempo and the practice goal distinct; show both and say what Enter keeps.
 - [x] 1.4 Read the first opening tempo word with following modifiers, quasi and restraint; ignore character words; include a pickup's first full downbeat; a metronome mark wins at its tick.
+- [x] 1.5 Place a negation, restraint or moderating word on the word it stands beside; read a compound marking from its first section; make a reading that cannot be placed not confident (review round 2).
+- [x] 1.6 Show a practice goal only when the owner has set one that differs from the reference and the piece tempo; match the Enter notice; proper ordinals (review round 2).
 
 ## 2. Performance
 

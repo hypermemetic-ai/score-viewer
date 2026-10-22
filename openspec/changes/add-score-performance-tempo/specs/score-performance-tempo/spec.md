@@ -1,11 +1,19 @@
 ## ADDED Requirements
 
 ### Requirement: Every score has a resolvable performance tempo
-The viewer SHALL resolve a score's piece tempo, in order, from the tempo the owner set, the edition's reference performance tempo, a printed source metronome mark, an encoded source rate beside a tempo word, an opening tempo word interpreted from the marking table, and, when the score says nothing confident, the practice goal. The first tempo word at the opening SHALL govern; character words SHALL NOT make a tempo. It SHALL NOT write a derived tempo into the score package.
+The viewer SHALL resolve a score's piece tempo, in order, from the tempo the owner set, the edition's reference performance tempo, a printed source metronome mark, an encoded source rate beside a tempo word, an opening tempo word interpreted from the marking table, and, when the score says nothing confident, the practice goal. The first tempo word at the opening SHALL govern; character words SHALL NOT make a tempo. A negation, restraint or moderating word SHALL apply to the word it stands beside, a compound marking SHALL be read from its first section, and a reading whose negation, modifier or restraint cannot be placed SHALL NOT be confident. It SHALL NOT write a derived tempo into the score package.
 
 #### Scenario: Exact metronome mark
 - **WHEN** a score's opening source tempo has a printed beat unit and rate
 - **THEN** that mark is the score's tempo and is used without asking
+
+#### Scenario: Negated and moderated words
+- **WHEN** a score opens with "Sehr innig und nicht zu rasch", "Nicht rasch", "Mässig langsam" or "Adagio – Allegro ma non troppo"
+- **THEN** its tempo is read as not too fast (112), not fast (76), between moderate and slow (76) and adagio (66), never as the fast or later word alone
+
+#### Scenario: A negation that cannot be placed
+- **WHEN** a score opens with "Adagio, Allegro ma non troppo" or "Nicht zu bewegt"
+- **THEN** the reading is not confident, and features that need a tempo open hear-and-set starting from it
 
 #### Scenario: Confident tempo word
 - **WHEN** a score has no numeric tempo and an opening word such as "Nicht schnell", "Andante" or "Lebhaft"
@@ -32,11 +40,15 @@ The viewer SHALL resolve a score's piece tempo, in order, from the tempo the own
 - **THEN** it has no confident tempo, and features that need one open hear-and-set
 
 ### Requirement: Piece tempo and practice goal stay distinct
-The piece tempo and the practice goal SHALL be shown as two plainly labelled values whenever practice has a goal. Keeping a piece tempo SHALL NOT change the practice goal, and the viewer SHALL say so when it keeps one.
+The piece tempo and the practice goal SHALL be shown as two plainly labelled values whenever the owner has set a practice goal that differs from the piece tempo; the edition's reference tempo, or a personal goal equal to it, SHALL NOT be shown as a practice goal. Keeping a piece tempo SHALL NOT change the practice goal, and the viewer SHALL say so when it keeps one.
 
 #### Scenario: Practice already has a goal
 - **WHEN** a score with practice goal 80 is heard and set to 88 from Options
 - **THEN** the dialog shows "Piece tempo 88 · practice goal 80", Enter saves 88 as the piece tempo, a notice says practice keeps its goal of 80 and where to change it, and Options shows both
+
+#### Scenario: No goal of your own
+- **WHEN** a score with an edition reference of 180 and no personal goal (or a personal goal of 180) is heard and set to 168
+- **THEN** Options shows only the piece tempo, the dialog says Enter keeps it as the piece tempo, and no notice mentions a practice goal
 
 #### Scenario: Practice has no goal yet
 - **WHEN** practice opens hear-and-set because it has no goal
