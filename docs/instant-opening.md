@@ -43,6 +43,7 @@ The work runs in its own projection worker and preparation pool, and frees them 
 - the library entry, whose archive and personal files are named by their content;
 - the score's stored hand choices and the fingering memory, also named by content;
 - the preferences, apart from which score was opened last;
+- any carried hand the engraver refused in this session, which is not stored but changes the pages;
 - the build, which carries the ISO notation pin.
 
 Comparing these needs no reads. Any difference opens the score afresh. Personal state is still loaded from the memory session on reopen, so practice progress and records are exactly what was saved. The MIDI clock is acquired again, and the selection starts empty, as on any opening. One score is held. Opening any score frees it, and so does memory pressure (more than half the script heap in use, checked at Back and every 30 s). It is not kept when hand choices were still waiting on Back, when edits are unsaved, for dual readings and reading-only scores, or for readings not opened from the library.

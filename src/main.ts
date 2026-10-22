@@ -95,7 +95,7 @@ import {selectedAdviceExplanations} from './fingering-advice-markers';
 import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
-import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
+import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
@@ -1038,7 +1038,7 @@ const retained=new RetainedScore<NonNullable<typeof current>>(()=>{window.clearI
 type HeapMemory={usedJSHeapSize:number;jsHeapSizeLimit:number};const heapMemory=()=>(performance as Performance&{memory?:HeapMemory}).memory;
 function retentionConditions(entry:Entry):RetentionConditions|undefined {
  const records=personalMemory.readingRefs(entry.id);if(!records)return;
- const {lastWorkedEntryId:_opened,...kept}=preferences;return {entry,records,preferences:kept,build:VIEWER_DERIVED_IDENTITY};
+ const {lastWorkedEntryId:_opened,...kept}=preferences;return {entry,records,preferences:kept,carries:handCarryDropGeneration(),build:VIEWER_DERIVED_IDENTITY};
 }
 function retainScore(target:NonNullable<typeof current>){
  const entry=entries.find(e=>e.id===target.entry.id);

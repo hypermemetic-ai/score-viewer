@@ -7,7 +7,7 @@ import {RetainedScore,underMemoryPressure,type RetentionConditions} from '../src
 
 const conditions=(change:Partial<RetentionConditions>={}):RetentionConditions=>({
  entry:{id:'no13',file:'package-aaa.tuna',personalFiles:{'state-no13.json':'state-version-111.json'}},
- records:{state:[['state-no13','ref-1']],memory:'memory-1'},preferences:{keyboardLayout:'janko-four-row',scoreTempos:{no13:60}},build:'build-a',...change});
+ records:{state:[['state-no13','ref-1']],memory:'memory-1'},preferences:{keyboardLayout:'janko-four-row',scoreTempos:{no13:60}},carries:0,build:'build-a',...change});
 
 test('one score is held, and taking any score, or keeping another, frees it',()=>{
  let freed=0;const kept=new RetainedScore<string>(()=>freed++);
@@ -27,6 +27,7 @@ test('a change to the score, its records, the preferences or the build reopens i
   ['the fingering memory',{records:{state:[['state-no13','ref-1']],memory:'memory-2'}}],
   ['the keyboard layout',{preferences:{keyboardLayout:'conventional',scoreTempos:{no13:60}}}],
   ['a practice tempo',{preferences:{keyboardLayout:'janko-four-row',scoreTempos:{no13:72}}}],
+  ['a carried hand the engraver refused',{carries:1}],
   ['the engraver pin',{build:'build-b'}],
   ['edits not saved yet',undefined],
  ];
@@ -56,7 +57,7 @@ function viewer(){
  const calls:string[]=[],intervals:Array<()=>void>=[],refs=new Map<string,unknown>([['no13',{state:[['state-no13','ref-1']],memory:'memory-1'}],['no14',{state:[],memory:'memory-1'}]]);
  const pkg=(id:string)=>({availablePresentations:['janko-four-row'],manifest:{version:3},collection:id});
  const context:any={
-  RetainedScore,underMemoryPressure,VIEWER_DERIVED_IDENTITY:'build-a',JSON,Object,
+  RetainedScore,underMemoryPressure,VIEWER_DERIVED_IDENTITY:'build-a',JSON,Object,drops:0,handCarryDropGeneration:()=>context.drops,
   window:{setInterval:(f:()=>void)=>intervals.push(f),clearInterval(){}},performance:{memory:{usedJSHeapSize:300e6,jsHeapSizeLimit:4e9}},
   entries:[entryOf('no13'),entryOf('no14')],preferences:{keyboardLayout:'janko-four-row',lastWorkedEntryId:'no13',scoreTempos:{}},
   personalMemory:{readingRefs:(id:string)=>refs.get(id),error:undefined},scoreCapabilities:(p:any)=>({pianoPreparation:!p.readingOnly}),
@@ -95,6 +96,7 @@ test('the order a score was last opened in does not invalidate it; its records, 
  assert.equal(await reopened(v=>{v.context.preferences.scoreTempos={no13:72};}),false,'a practice tempo');
  assert.equal(await reopened(v=>{v.context.preferences.keyboardLayout='conventional';}),false,'the keyboard layout');
  assert.equal(await reopened(v=>{v.context.VIEWER_DERIVED_IDENTITY='build-b';}),false,'the ISO pin');
+ assert.equal(await reopened(v=>{v.context.drops++;}),false,'a carried hand the engraver refused');
  assert.equal(await reopened(v=>{v.context.entries=[{...v.entryOf('no13'),file:'package-other.tuna'},v.entryOf('no14')];}),false,'a new archive');
 });
 

@@ -10,6 +10,9 @@ export interface RetentionConditions {
  records:unknown;
  /** Every preference except which score was opened last, which each opening writes. */
  preferences:unknown;
+ /** Hands carried from matching bars that the engraver refused in this
+  * session: not stored anywhere, yet they change what the pages show. */
+ carries:number;
  /** The build that made the pages: the engraver pin and all derived-file code. */
  build:string;
 }
