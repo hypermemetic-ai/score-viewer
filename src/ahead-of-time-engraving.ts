@@ -171,14 +171,24 @@ export async function preparedBefore(records:AheadOfTimeRecords,key:string,still
  return record.outcome!=='served'||!!record.served&&await still.served(record.served);
 }
 
+/** A score this build cannot prepare however often it tries: admission
+ * rejects its archive, or the engraver refuses its pages. Only this is
+ * recorded as a refusal. */
+export class AheadOfTimeRefusal extends Error {constructor(cause:unknown){super(cause instanceof Error?cause.message:String(cause),{cause});this.name='AheadOfTimeRefusal';}}
+/** One step of a preparation, whose failure is a refusal when `refusal` says so. */
+export async function refusedWhen<T>(step:Promise<T>,refusal:(error:unknown)=>boolean):Promise<T>{
+ try{return await step;}catch(error){throw refusal(error)?new AheadOfTimeRefusal(error):error;}
+}
 /** Prepare once and record the outcome. A refusal is recorded like a success,
- * so the library does not repeat a whole engrave on every visit; a stop is
- * not an outcome and records nothing. */
+ * so the library does not repeat a whole engrave on every visit. A stop, or
+ * any other failure (a busy admission, a worker lost or out of memory, a file
+ * that could not be read), is not an outcome: it records nothing, and a later
+ * visit tries again. */
 export async function prepareRecorded(records:AheadOfTimeRecords,key:string,prepare:(read:(name:string,digest:string|null)=>void)=>Promise<ProjectionEntry|null>):Promise<AheadOfTimeRecord['outcome']>{
  const inputs:AheadOfTimeRecord['inputs']=[],read=(name:string,digest:string|null)=>{inputs.push([name,digest]);};
  let record:AheadOfTimeRecord;
  try{const served=await prepare(read);record=served?{outcome:'served',served,inputs}:{outcome:'nothing',inputs};}
- catch(error){if((error as Error)?.name==='AbortError')throw error;record={outcome:'refused',inputs};}
+ catch(error){if(!(error instanceof AheadOfTimeRefusal))throw error;record={outcome:'refused',inputs};}
  await records.put(AHEAD_OF_TIME_KIND,key,true,JSON.stringify(record));
  return record.outcome;
 }

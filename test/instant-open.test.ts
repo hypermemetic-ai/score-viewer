@@ -9,10 +9,12 @@ import {join} from 'node:path';
 import {DerivedFileCache,type DerivedFileStore} from '../src/derived-file-cache';
 import {encodeDerivedPayload} from '../src/derived-payload';
 import {importPackage,archivePackage,hashBytes,usePianoPageCheckReceipts} from '../src/package';
-import {PersonalPresentationSession,projectionServed} from '../src/personal-presentation';
+import {PersonalPresentationSession,projectionServed,engravingRefusal} from '../src/personal-presentation';
+import {PackageAdmissionBusy,admissionRejection} from '../src/package-admission-session';
+import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
-import {ProjectionWorkerClient} from '../src/personal-projection-client';
-import {AheadOfTimeEngraving,preparedBefore,prepareRecorded,aheadOfTimeOrder,holdAheadOfTimeOnInput} from '../src/ahead-of-time-engraving';
+import {ProjectionWorkerClient,ProjectionWorkerUnavailable} from '../src/personal-projection-client';
+import {AheadOfTimeEngraving,AheadOfTimeRefusal,preparedBefore,prepareRecorded,refusedWhen,aheadOfTimeOrder,holdAheadOfTimeOnInput} from '../src/ahead-of-time-engraving';
 import {derivedModuleClosure,viewerDerivedIdentity} from '../scripts/derived-identity';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -38,7 +40,7 @@ test('an engine encoded in the worker that holds it is stored byte for byte as t
  assert.equal(await new DerivedFileCache(there.store,'build-a').putEncoded('personal-engine-v1',sha('b'),{...encoded,payloadSha256:'nope'}),false,'a malformed digest is never written');
  // The reader settles its engine for editing only after work it took over has saved one, so it restores that engine.
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
- assert.match(main,/settle=\(\)=>\{if\(current===next\)editor\.session\.prefetch\(\);\},saving=aheadOfTime\?\.finishing\(next\.entry\.id\);\s*if\(saving\)void saving\.then\(settle\);else settle\(\);/);
+ assert.match(main,/saving=aheadOfTime\?\.finishing\(next\.entry\.id\);\s*if\(saving\)\{editor\.session\.engineSavedBy\(saving\);void saving\.then\(settle\);\}else settle\(\);/,'and every settle of its session, a hand choice\'s check too, waits for that save');
 });
 
 test('a derived entry\'s tag reads from its header alone, and only this build\'s entry has one',async()=>{
@@ -238,7 +240,7 @@ test('the viewer holds ahead-of-time work through its own listener and saves an 
 });
 
 /** The viewer's own preparation of one score, against stubs that log each step. */
-function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean}={}){
+function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean;admission?:unknown;projection?:unknown}={}){
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
  const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a');
@@ -246,7 +248,7 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  class Session {
   waiting=false;
   async projectionEntry(){return {key:sha('e'),tag:'hands'};}
-  async project(){stop('project');this.waiting=!options.engineOnDisk;}
+  async project(){stop('project');if(options.projection)throw options.projection;this.waiting=!options.engineOnDisk;}
   async flushProjection(){stop('pages written');}
   async engineMissing(){return !options.engineOnDisk&&!this.waiting;}
   async warm(){stop('engine settled');this.waiting=true;}
@@ -255,11 +257,11 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  }
  const memory={adoptIndexed:async()=>{log.push('indexed');return true;},storedRefs:()=>{log.push('hand choices read');return [];},personalFor:()=>({})};
  const context:any={
-  JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,
+  JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,refusedWhen,admissionRejection,engravingRefusal,
   checkReadingExecution:(e:any)=>{if(e?.signal?.aborted)throw new DOMException('stop','AbortError');},
   entries:[{id:'no13',file:'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
   personalMemory:memory,host:{read:async()=>new Uint8Array([1,2,3])},
-  projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>({availablePresentations:['janko-four-row']})},
+  projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>{if(options.admission)throw options.admission;return {availablePresentations:['janko-four-row']};}},
   scoreCapabilities:()=>({pianoPreparation:true}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>undefined,
   ensurePianoReady:async()=>({package:{}}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
  };
@@ -282,6 +284,27 @@ test('a preparation writes the pages before an opening goes on, then saves the e
   const stopped=preparation({stopAt,projected:stopAt==='engine settled'});
   await assert.rejects(stopped.run(),{name:'AbortError'},stopAt);assert.equal(await stopped.recorded(),false,stopAt);
  }
+});
+
+test('only admission rejecting a score, or the engraver refusing its pages, is recorded as a refusal; anything else is tried again',async()=>{
+ const unfit=new HandPresentationError('unsupported-fit','Hands cannot be fitted in bar 11.');
+ const refusals:[string,{admission?:unknown;projection?:unknown}][]=[
+  ['admission rejects the archive',{admission:Error('Package manifest is invalid')}],
+  ['the engraver cannot fit the saved hands',{projection:unfit}],
+  ['the same refusal in the player\'s words',{projection:Error("These hand choices can't be drawn on the page yet.",{cause:unfit})}],
+ ];
+ for(const [what,failure] of refusals){const p=preparation(failure);await p.run();assert.equal(await p.recorded(),true,what);}
+ const passing:[string,{admission?:unknown;projection?:unknown}][]=[
+  ['another import holds admission',{admission:new PackageAdmissionBusy()}],
+  ['admission runs out of memory',{admission:new RangeError('Array buffer allocation failed')}],
+  ['the projection worker is lost',{projection:new ProjectionWorkerUnavailable()}],
+  ['the worker fails for a reason of its own',{projection:new TypeError('Cannot read properties of undefined')}],
+  ['an authority failure, which waits for recovery',{projection:new HandPresentationError('authority','Operator hand requirement has a stale owner guard.')}],
+ ];
+ for(const [what,failure] of passing){const p=preparation(failure);await assert.rejects(p.run(),e=>e===(failure.admission??failure.projection),what);assert.equal(await p.recorded(),false,what);}
+ // The wrapper keeps what failed, and passes everything else on unchanged.
+ const busy=new PackageAdmissionBusy();await assert.rejects(refusedWhen(Promise.reject(busy),admissionRejection),e=>e===busy);
+ await assert.rejects(refusedWhen(Promise.reject(unfit),engravingRefusal),e=>e instanceof AheadOfTimeRefusal&&e.cause===unfit);
 });
 
 test('an opening cancelled with Esc, or failed, returns to a library that prepares scores again',async()=>{
@@ -312,7 +335,7 @@ test('a refused or needless ahead-of-time preparation is recorded, and tried aga
  const {store}=memoryStore(),cache=new DerivedFileCache(store,'build-a'),files=new Map<string,string|null>([['journal.json','d1']]),onDisk=new Set<string>();
  const still={served:async(e:{key:string})=>onDisk.has(e.key),digest:async(name:string)=>files.get(name)??null};
  let runs=0;
- const refuse=async(read:(name:string,digest:string|null)=>void)=>{runs++;read('journal.json',files.get('journal.json')!);throw Error("This score can't be engraved yet");};
+ const refuse=async(read:(name:string,digest:string|null)=>void)=>{runs++;read('journal.json',files.get('journal.json')!);throw new AheadOfTimeRefusal(Error("This score can't be engraved yet"));};
  // A refusal (saved hands the engraver refuses, an edition admission rejects) is an outcome.
  assert.equal(await preparedBefore(cache,sha('1'),still),false);
  assert.equal(await prepareRecorded(cache,sha('1'),refuse),'refused');

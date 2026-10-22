@@ -10,6 +10,13 @@ interface Pending {bytes:Uint8Array;allowLegacyTempo:boolean;generation:number;o
 const sameBytes=(a:Uint8Array,b:Uint8Array)=>a.byteLength===b.byteLength&&a.every((v,i)=>v===b[i]);
 const bounded=(value:number|undefined,maximum:number)=>value===undefined?maximum:Number.isFinite(value)?Math.min(maximum,Math.max(0,Math.floor(value))):0;
 
+/** Another import holds the session: nothing is wrong with the archive. */
+export class PackageAdmissionBusy extends Error {constructor(){super('Package admission is busy; retry after the active import finishes.');this.name='PackageAdmissionBusy';}}
+/** Admission's answer that it rejects these bytes: its validation throws a
+ * plain error. A busy session, a stop, or the runtime failing (memory, a
+ * type error) says nothing about the archive. */
+export function admissionRejection(error:unknown):boolean {return error instanceof Error&&Object.getPrototypeOf(error)===Error.prototype;}
+
 /** Bounded reuse of actual admission within this compiled realm. Exact bytes
  * resolve even same-size index collisions. Canonical graphs stay behind private
  * fields and copy closures; callers receive independent wrappers/member bytes.
@@ -43,14 +50,14 @@ export class PackageAdmissionSession {
   const snapshot=new Uint8Array(bytes),allowLegacyTempo=!!options.allowLegacyTempo,keyboardLayout=options.keyboardLayout,
    matches=(e:{bytes:Uint8Array;allowLegacyTempo:boolean})=>e.allowLegacyTempo===allowLegacyTempo&&sameBytes(e.bytes,snapshot),
    hit=this.#entries.find(matches);
-  if(this.#pending.size&&[...this.#pending].some(p=>p.owner!==owner))throw Error('Package admission is busy; retry after the active import finishes.');
+  if(this.#pending.size&&[...this.#pending].some(p=>p.owner!==owner))throw new PackageAdmissionBusy();
   if(hit){
    this.#entries=this.#entries.filter(e=>e!==hit);this.#entries.push(hit);
    let result:ScorePackage;try{result=await hit.admission.copy(keyboardLayout);}catch(error){this.#entries=this.#entries.filter(e=>e!==hit);throw error;}checkReadingExecution(execution);return result;
   }
   let pending=[...this.#pending].find(e=>e.generation===this.#generation&&e.owner===owner&&matches(e));
   if(!pending){
-   if(this.#pending.size)throw Error('Package admission is busy; retry after the active import finishes.');
+   if(this.#pending.size)throw new PackageAdmissionBusy();
    const generation=this.#generation,request:Pending={bytes:snapshot,allowLegacyTempo,generation,owner,promise:undefined!};
    request.promise=ownPackageAdmission(snapshot,{allowLegacyTempo,execution}).then(admission=>{
     checkReadingExecution(execution);
