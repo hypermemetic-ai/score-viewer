@@ -2,7 +2,7 @@ import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-stor
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {canonicalJson} from './piano-preparation-identity';
-import {assigned,handChoiceOwners,handRecurrences,type PersonalHand} from './personal-assignments';
+import {assigned,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
  bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
@@ -260,6 +260,9 @@ export class PersonalMemorySession {
    const owners=handChoiceOwners(input.p,seat),without=clone(personal);for(const id of owners)if(without.assignments)delete without.assignments.choices[id];
    const carried=handRecurrences(input.p,without).carried;
    if(owners.some(id=>personal.assignments?.choices[id]?.hand!==undefined)&&owners.every(id=>carried.get(id)?.hand===action.hand)){
+    // Only when the press changes the hand (L, then R): the hand the note already
+    // shows by the owner's own choice is kept, with the bars that follow it.
+    if(handFor(input.p,personal,intent.ownerId)===action.hand)return{document,personal:readPersonal(personal,input.p)};
     // A fresh copy: carried hands are kept with the records they were read from.
     personal=clone(personal);for(const id of owners){const c=personal.assignments?.choices[id];if(!c)continue;delete c.hand;delete c.handScope;if(c.intent)delete c.intent.hand;if(c.finger===undefined)delete personal.assignments!.choices[id];}
     if(personal.assignments&&!Object.keys(personal.assignments.choices).length)delete personal.assignments;

@@ -303,3 +303,17 @@ test('L, then R, on a carried note: it follows bar 11 again, not the right hand 
  // R on a note that does not follow another bar is still that note's own hand.
  await step(handAction(m21bass,'RH','bass'));assert.equal(personal.assignments!.choices[m21bass].hand,'RH');
 });
+
+test('R on a note already in the owner’s right hand changes nothing, even where a matching bar would carry it',async()=>{
+ // Bar 12 plays bar 21's music. The owner moved the 4 (E4) to the right hand in bar 11 and in bar 21, each with intent.
+ const input=no13({11:[...chords,['RH',59,72,12],['RH',61,84,12]],12:chords,21:chords,22:bar22}),own=choose({...input,personal:choose(input,e4(21),'RH')},e4(11),'RH');
+ const store=storage(),s=session(store,{...input,personal:own});await s.initialize();
+ let personal=await s.loadPersonalCurrent({id:'no13',importedAt:input.importedAt!},input.p,async()=>own);
+ assert.ok(ownsHand(personal.assignments!.choices[e4(11)],'LH')&&ownsHand(personal.assignments!.choices[e4(21)],'LH'));
+ assert.deepEqual(handRecurrences(input.p,personal).carried.get(e4(12)),{hand:'RH',fromBar:21,fromOwnerId:e4(21)});
+ // R at bar 21's 4, already the owner's right hand: its record and intent stay, and bar 12 keeps following it.
+ const before=personal,record=structuredClone(personal.assignments!.choices[e4(21)]),receipt=s.accept({...input,personal},handAction(e4(21),'RH','again'));await receipt.saved;personal=receipt.personal;
+ assert.deepEqual(personal.assignments!.choices[e4(21)],record);
+ assert.equal(handFor(input.p,personal,e4(12)),'RH');
+ assert.equal(handKeyNotice(input.p,before,personal,e4(21)),undefined);
+});
