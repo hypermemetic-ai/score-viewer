@@ -1,5 +1,5 @@
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
-import {projectPersonalMemoryScore,type MemoryScoreInput,type MemoryResolution,type PersonalFingeringMemory} from './personal-fingering-memory';
+import {projectPersonalMemoryScore,type MemoryScoreInput,type MemoryResolution} from './personal-fingering-memory';
 import {rawMemoryPersonal} from './personal-memory-session';
 import type {PersonalState} from './state';
 import type {AdviceEvidence} from './fingering-advice';
@@ -34,8 +34,18 @@ export function memoryReferenceTarget(input:MemoryScoreInput,resolution:MemoryRe
 export function memoryChoiceLabel(resolution:MemoryResolution,ownerId:string):'Shared'|'Local'|undefined {
  const finger=resolution.byOwner[ownerId]?.finger;return finger?finger.provenance==='local'?'Local':'Shared':undefined;
 }
-export function memorySourceLabel(document:PersonalFingeringMemory,resolution:MemoryResolution,ownerId:string,title:(entryId:string)=>string):string {
- const r=resolution.byOwner[ownerId],decision=r?.finger?.decision;
- const ref=r?.reference,donor=decision&&Object.values(document.occurrences).find(q=>q.occurrence.occurrenceId===decision.donor.occurrenceId&&q.occurrence.sourceRevision===decision.donor.sourceRevision&&q.occurrence.scope===decision.donor.scope);
- return [ref?`Reference: ${title(ref.entryId)}, bar ${ref.writtenBar}.`:r?.finger?'Reference unavailable.':'',donor?`Choice from ${title(donor.entryId)}, bar ${donor.writtenBar}.`:''].filter(Boolean).join(' ');
+/** Where the selected note's finger comes from, said once: `said` on the
+ * editor's Finger row, `description` in full for the label's tooltip. Both read
+ * the bar matching bars follow from the resolution; when it is missing it is
+ * unavailable, never assumed. `reference` says whether that bar is this one. */
+export function memoryFingerSource(resolution:MemoryResolution,ownerId:string,label:'Shared'|'Local',at:{entryId:string;writtenBar:number},work:(entryId:string)=>string):{said:string;description:string;reference:'here'|'elsewhere'|'unavailable';promote:boolean} {
+ const ref=resolution.byOwner[ownerId]?.reference,reference=!ref?'unavailable':ref.entryId===at.entryId&&ref.writtenBar===at.writtenBar?'here':'elsewhere';
+ // "Use for matching bars" is offered for an owner's finger, except where matching bars already follow it.
+ const promote=!!resolution.byOwner[ownerId]?.personal&&!(label==='Shared'&&reference==='here');
+ const where=ref?`bar ${ref.writtenBar}${ref.entryId===at.entryId?'':` of ${work(ref.entryId)}`}`:'';
+ if(label==='Local')return{said:'For this note only.',description:`Your finger for this note only, instead of ${reference==='elsewhere'?`${where}’s`:'the shared one'}.`,reference,promote};
+ if(reference==='unavailable')return{said:'Reference unavailable.',description:'Shared with matching bars, but the bar they follow is unavailable.',reference,promote};
+ if(reference==='here')return{said:'Matching bars follow this bar.',description:'Matching bars follow this bar’s finger.',reference,promote};
+ return{said:`Same as ${where}.`,description:`Same as ${where}, which matching bars follow.`,reference,promote};
 }
+

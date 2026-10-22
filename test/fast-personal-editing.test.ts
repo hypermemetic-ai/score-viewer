@@ -104,12 +104,12 @@ test('waiting hand choices are said to be not applied when the score closes firs
  const f=await fixture(),prep=preparing(f);
  await f.context.saveHandChoice('RH');const status=handWait(f).status;f.context.current={package:p,personal:initialPersonal(p)};
  f.disk.resolve();prep.ready();await settle(f);
- assert.match(f.messages.at(-1)!,/^Right hand for the note in bar \d+ was not applied: the score was closed or changed before hand editing was ready\. Nothing was saved for it\.$/);
+ assert.match(f.messages.at(-1)!,/^RH for the note in bar \d+ was not applied: the score was closed or changed before hand editing was ready\. Nothing was saved for it\.$/);
  assert.equal(f.target.personal.assignments,undefined);assert.equal(status.closed,true);
 });
 test('leaving the score says at once that its waiting choices were not applied',async()=>{
  const f=await fixture(),prep=preparing(f);
  await f.context.saveHandChoice('LH');f.context.leaveHandEditingWait();
- assert.equal(f.messages.length,1);assert.match(f.messages[0],/^Left hand for the note in bar \d+ was not applied/);
+ assert.equal(f.messages.length,1);assert.match(f.messages[0],/^LH for the note in bar \d+ was not applied/);
  f.disk.resolve();prep.ready();await new Promise(r=>setTimeout(r,20));assert.equal(f.messages.length,1,'said once');assert.equal(f.target.personal.assignments,undefined);
 });

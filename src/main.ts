@@ -34,7 +34,7 @@ import {buildPerformanceSchedule,performanceSeconds} from './score-performance';
 import {TempoAudition,type Audition} from './tempo-audition';
 import {NativeTempoAudition} from './native-tempo-audition';
 import {mountTempoAudition,tempoAuditionMarkup} from './tempo-audition-dialog';
-import {workHeadingMarkup} from './score-catalog';
+import {workHeadingMarkup,workReference} from './score-catalog';
 import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
 import {personalForTransposedEdition} from './transposed-personal';
 import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTransposition} from './score-transposition-selection';
@@ -61,7 +61,7 @@ import {requirePracticeHands} from './practice';
 import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
 import {SavedPagesLackRepeats,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,usePianoPageCheckReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
-import {activeLayer,corrected,defaultView,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
+import {activeLayer,corrected,defaultView,EDITOR_COLUMN,readerFit,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
 import {host,readJson,writeJson} from './host';
@@ -85,7 +85,7 @@ import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
 import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,type AheadOfTimeQuiet} from './ahead-of-time-engraving';
 import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
-import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memorySourceLabel} from './personal-assistance';
+import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
 import {EditorAdviceRunner,scoreAdviceContacts,analyzeEditorAdviceAsync,createAdviceCorpusState,replaceAdviceCorpusScore,type EditorAdviceResult} from './fingering-advice';
@@ -348,7 +348,9 @@ let persist=Promise.resolve();const enqueue=<T>(op:()=>Promise<T>):Promise<T>=>{
 const esc=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 /** A notice belongs to the opening that said it; the next opening starts without one. */
 function clearNotice(){const t=document.querySelector<HTMLElement>('.toast');if(t)t.textContent='';}
-function notify(text:string){let t=document.querySelector<HTMLElement>('.toast');if(!t){t=document.createElement('div');t.className='toast';t.setAttribute('role','status');document.body.append(t);}t.textContent=text;window.setTimeout(()=>{if(t?.textContent===text)t.textContent='';},6500);}
+/** While a note is being edited, notices join the editor bar beside the pages
+ * instead of covering the music. */
+function notify(text:string){let t=document.querySelector<HTMLElement>('.toast');if(!t){t=document.createElement('div');t.className='toast';t.setAttribute('role','status');}const home=selection&&!practice&&app.querySelector('.editor-column')||document.body;if(t.parentElement!==home)home.append(t);t.textContent=text;window.setTimeout(()=>{if(t?.textContent===text)t.textContent='';},6500);}
 const button=(label:string,id:string,shortcut='',disabled=false)=>`<button type="button" data-action="${id}" ${disabled?'disabled':''}>${label}${shortcut?`<kbd>${esc(shortcut)}</kbd>`:''}</button>`;
 async function savePreferences(){await enqueue(()=>writeJson('preferences.json',preferences));}
 async function saveNotationSystem(choice:'iso'|'traditional'){
@@ -508,11 +510,11 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
  libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>esc(readingParts.summary(entry)),preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
  const restore=libraryFocusElement(app,focusKey);if(restore&&!restore.hidden)restore.focus();else if(entries.length)libraryMenu.focus();else app.querySelector<HTMLElement>('[data-action=import]')?.focus();
 }
-function render(){if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><div class="editor-navigation" hidden></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;renderPages();renderToolbar();paintHandPreparation();app.querySelector<HTMLElement>('.reader')?.focus();}
+function render(){if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><div class="editor-column"><div class="editor-navigation" hidden></div></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;renderPages();renderToolbar();paintHandPreparation();app.querySelector<HTMLElement>('.reader')?.focus();}
 function renderPages(){
  if(practice||!current)return;
  const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(followedPage===undefined?s.view:{...s.view,page:followedPage}),mode=labelMode(),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
- transformSurface(surface,v.rotation);const fit=viewportFit(innerWidth,innerHeight,v,p.pages.length),positions=annotationPositions(p,fit.pages),pages:HTMLElement[]=[];
+ transformSurface(surface,v.rotation);const fit=readerFit(innerWidth,innerHeight,v,p.pages.length,scoreCapabilities(p).pianoPreparation?EDITOR_COLUMN:0),positions=annotationPositions(p,fit.pages),pages:HTMLElement[]=[];
  for(const index of fit.pages){
   const cached=readerPages.get(p,index),page=cached.element;paintReaderSeats(cached,current.package,p,s,mode,positions,true);
   for(const {seat,text} of cached.seats){
@@ -521,7 +523,7 @@ function renderPages(){
   }
   paintEditorAdvice(page,p,index,editorAdvice,!!selection);pages.push(page);
  }
- mountReaderPages(group,pages);group.style.transform=`scale(${fit.scale})`;app.dataset.notation=p.reading?.dual?.notation??'iso';app.dataset.mode=mode;app.dataset.fingerSet=v.fingerSet;app.dataset.page=String(v.page);app.dataset.rotation=String(v.rotation);app.dataset.selecting=String(!!selection);
+ mountReaderPages(group,pages);group.style.transform=`translateX(${-fit.shift}px) scale(${fit.scale})`;surface.style.setProperty('--editor-column',`${fit.column}px`);app.dataset.notation=p.reading?.dual?.notation??'iso';app.dataset.mode=mode;app.dataset.fingerSet=v.fingerSet;app.dataset.page=String(v.page);app.dataset.rotation=String(v.rotation);app.dataset.selecting=String(!!selection);
  if(selection&&!dialog&&!app.querySelector('.toolbar')?.contains(document.activeElement))focusSelection();
 }
 /** Reader and PDF pages share one finger/hand paint; only interaction differs. */
@@ -529,7 +531,7 @@ function paintReaderSeats(page:ReaderPage,base:ScorePackage,p:ScorePackage,s:Per
  page.element.dataset.fingers=String(mode==='finger');const presentation=currentFingerPresentation(p),handOf=effectiveHands(base,s);
  for(const {seat,text} of page.seats){
   const finger=fingerFor(base,s,seat),hand=handOf(seat.ownerIds[0]);
-  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, finger ${finger}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
+  paintFinger(text,seat,{visible:mode==='finger'&&finger!==undefined,presentation,finger,position:positions.get(seat.id)!,interactive,label:mode==='finger'?`Pitch ${seat.pitchDigit}, ${finger===undefined?'no finger':`finger ${finger}`}, ${hand??'no hand'}, bar ${seat.writtenBar}`:`Pitch ${seat.pitchDigit}, bar ${seat.writtenBar}`});
   if(hand)text.dataset.performingHand=hand;else delete text.dataset.performingHand;
  }
 }
@@ -600,14 +602,19 @@ interface SourceReturn {entryId:string;file:string;sourceRevision:string;view:Pe
 let sourceReturn:SourceReturn|undefined,sourceNavigating=false;
 function editorMemoryMarkup(){
  if(!current||!selection)return'';
- const input=memoryInput(current),resolution=resolveMemoryInput(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId),description=memorySourceLabel(memoryDocument(),resolution,ownerId,id=>entries.find(e=>e.id===id)?.metadata.title??'Score');
+ const input=memoryInput(current),resolution=resolveMemoryInput(input),ownerId=selection.ownerIds[0],label=input.personal.calculatedOwners?.[ownerId]?'Local':memoryChoiceLabel(resolution,ownerId),reference=memoryReferenceTarget(input,resolution,ownerId);
  const self=reference?.entryId===current.entry.id&&reference.ownerId===ownerId;
- return `${label?`<span class="personal-choice-kind" title="${esc(description)}" aria-label="${esc(label+'. '+description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${resolution.byOwner[ownerId]?.personal?button('Use for matching bars','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}${editorHandMarkup()}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span>`;
+ // The label, its tooltip and the line under it say one thing: where this finger comes from.
+ const source=label&&memoryFingerSource(resolution,ownerId,label,{entryId:current.entry.id,writtenBar:selection.writtenBar},id=>{const m=entries.find(e=>e.id===id)?.metadata;return m?workReference(m):'another score';});
+ // The finger and hand rows are named, so "Shared" can't be read as the hand's.
+ return `<div class="editor-row" data-editor-row="finger"><span class="editor-row-name">Finger</span>${source?`<span class="personal-choice-kind" title="${esc(source.description)}" aria-label="${esc(label+'. '+source.description)}">${label}</span>`:''}${button(sourceReturn?'Return':'Source','editorSource',actionControlLabel(controls.bindings,'editorSource'),!sourceReturn&&(!reference||self))}${source?.promote?button('Use for matching bars','memory-reference'):''}${label==='Local'?button('Use shared','memory-inherit'):''}${source?`<span class="editor-said" aria-hidden="true">${esc(source.said)}</span>`:''}<span class="fingering-advice-explanation" data-advice-explanation>${esc(selectedWarningText())}</span></div>${editorHandMarkup()}`;
 }
-/** Where the selected note's hand comes from, beside its finger's provenance. */
+/** Where the selected note's hand comes from, beside its finger's provenance.
+ * The explanation is shown, not only hovered: nobody hovers on the TV. */
 function editorHandMarkup(){
  if(!current||!selection)return'';const view=handChoiceView(current.package,current.personal,selection.ownerIds[0]);if(!view)return'';
- return `${view.label?`<span class="personal-choice-kind" title="${esc(view.description??'')}" aria-label="${esc(view.label+'. '+(view.description??''))}">${esc(view.label)}</span>`:''}${view.action?button(esc(view.action.label),view.action.id):''}${view.hint?`<span class="hand-choice-hint">${esc(view.hint.lead)} <kbd>${esc(view.hint.key)}</kbd> ${esc(view.hint.rest)}</span>`:''}`;
+ const said=view.said.map(word=>typeof word==='string'?esc(word):`<kbd>${esc(word.key)}</kbd>`).join('');
+ return `<div class="editor-row" data-editor-row="hand"><span class="editor-row-name">Hand</span>${view.label?`<span class="personal-choice-kind" title="${esc(view.description??'')}" aria-label="${esc(view.label+'. '+(view.description??''))}">${esc(view.label)}</span>`:''}${view.action?button(esc(view.action.label),view.action.id):''}<span class="editor-said"${view.label?' aria-hidden="true"':''}>${said}</span></div>`;
 }
 async function visitMemorySource(){
  if(!current||!selection||sourceNavigating)return;sourceNavigating=true;
@@ -1383,7 +1390,7 @@ async function act(action:string){try{if(!startupReady&&action!=='exit')return;i
   // Keep this note’s written hand: an exception to the bar it would follow, for this note only.
   if(action==='hand-not-here'&&!written)return;
   const kept=(await acceptMemoryAction(target,action==='hand-not-here'?{kind:'hand',ownerId,hand:written!,local:true,decisionId,authoredAt}:{kind:'handScope',ownerId,scope:action==='hand-only-here'?'local':'shared',decisionId,authoredAt})).kept;
-  if(!kept)notify(handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction));return;
+  const notice=kept?undefined:handActionNotice(target.package,before,target.personal,ownerId,action as HandChoiceAction);if(notice)notify(notice);return;
  }
  if(selection&&!practice&&['memory-reference','memory-inherit'].includes(action)){const target=current;await acceptMemoryAction(target,{kind:action==='memory-reference'?'reference':'reset',ownerId:selection.ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});return;}
  if(action==='restore-all'||action==='undo-restore'){if(action==='restore-all'||s.undo||s.undoAssignments||s.undoCalculatedOwners){const target=current,ownerDialog=dialog,ownerSection=optionsSection;await acceptMemoryAction(target,{kind:action==='restore-all'?'restoreAll':'undoRestore',ownerId:p.seats[0].ownerIds[0],decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});if(current===target){if(dialog===ownerDialog)options(ownerSection);if(practice)practice.refit();else{renderPages();renderToolbar();}}}return;}
@@ -1471,7 +1478,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  const before=target.personal,receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
  // A hand change reaching matching bars, or stopping there, is said; a refused one says why instead.
- const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handKeyNotice(target.package,before,target.personal,ownerId):undefined;if(notice)notify(notice);return result;});
+ const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handKeyNotice(target.package,before,target.personal,ownerId,!!selection?.ownerIds.includes(ownerId)):undefined;if(notice)notify(notice);return result;});
  if(waitedOwner||!nextSeat)return said(presentPersonalChange(target,next,receipt.saved));
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
