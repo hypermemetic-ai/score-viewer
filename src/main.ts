@@ -31,7 +31,8 @@ import {ManualTempoControls,manualTempoField} from './manual-tempo-control';
 import {scoreOptionsMarkup,transposeDraft} from './score-options';
 import {auditionStartTempo,countedBeat,ownerScoreTempo,playingTimeLabel,readPracticeGoal,resolveScoreTempo,scoreTempoOriginText,tempoOnBeat,wholeTempoOnBeat,withOwnerScoreTempo,type ScoreTempo} from './score-tempo';
 import {buildPerformanceSchedule,performanceSeconds} from './score-performance';
-import {TempoAudition} from './tempo-audition';
+import {TempoAudition,type Audition} from './tempo-audition';
+import {NativeTempoAudition} from './native-tempo-audition';
 import {mountTempoAudition,tempoAuditionMarkup} from './tempo-audition-dialog';
 import {workHeadingMarkup} from './score-catalog';
 import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
@@ -94,7 +95,7 @@ import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
 import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
-import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,type HandChoiceAction} from './hand-recurrence-text';
+import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
 import {readingAdmissionReceipt,reengraveReadingArchive} from './reading-package';
@@ -312,7 +313,9 @@ async function saveReadingPreferences(op:ReadingOperation,target:NonNullable<typ
  await enqueue(()=>{checkReadingOwner(op);if(current!==target)throw cancelledReading();return writeJson('preferences.json',preferences);});
 }
 async function configurePiano(){if(!pianoSettings.enabled)return nativePiano.configure(pianoSettings,preferences.audioOutput??'',false);const bank=await nativePiano.bankStatus();if(!bank.installed)pianoSettings={...pianoSettings,enabled:false};return nativePiano.configure(pianoSettings,preferences.audioOutput??'',bank.installed);}
-function savePiano(next:PianoPreferences):Promise<PianoAudioStatus>{return enqueue(async()=>{const admitted=readPianoPreferences(next),bank=await nativePiano.bankStatus();if(admitted.enabled&&!bank.installed)throw Error('Install piano before enabling sound.');const previous={...pianoSettings},status=await nativePiano.configure(admitted,preferences.audioOutput??'',bank.installed);if(admitted.enabled&&(status.error||!status.enabled))throw Error(status.error||'Piano sound could not start.');try{await writeJson('preferences.json',{...preferences,piano:admitted});}catch(error){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw error;}preferences.piano=admitted;pianoSettings=admitted;pianoWarning='';return status;});}
+/** `sounding`: enabling counts only once the output runs; otherwise nothing is
+ * saved and the piano returns to how it was. */
+function savePiano(next:PianoPreferences,sounding=false):Promise<PianoAudioStatus>{return enqueue(async()=>{const admitted=readPianoPreferences(next),bank=await nativePiano.bankStatus();if(admitted.enabled&&!bank.installed)throw Error('Install piano before enabling sound.');const previous={...pianoSettings},status=await nativePiano.configure(admitted,preferences.audioOutput??'',bank.installed);if(sounding&&admitted.enabled&&(status.error||!status.enabled||!status.running)){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw Error(status.error||'Its sound output did not start.');}if(admitted.enabled&&(status.error||!status.enabled))throw Error(status.error||'Piano sound could not start.');try{await writeJson('preferences.json',{...preferences,piano:admitted});}catch(error){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw error;}preferences.piano=admitted;pianoSettings=admitted;pianoWarning='';return status;});}
 async function personalContext(target:NonNullable<typeof current>){
  const entry=entries.find(e=>e.id===target.entry.id)??target.entry,active=matchingCurrent(target);let p=active?.package??target.package;
  if(!active&&entry.file!==target.entry.file)throw Error('The score edition changed; the pending choice stays with its previous edition.');
@@ -677,18 +680,31 @@ function placeTempoDialog(place?:'high'|'low'){
  if(dialog?.dataset.kind!=='score-tempo')return;
  if(place)dialog.dataset.place=place;else delete dialog.dataset.place;fitDialog(dialog,orientation.rotation);
 }
+/** The installed piano plays the preview when it is on and sounding (its status
+ * is read, not checked again). Installed but off, the built-in voice plays at
+ * once and the dialog offers to turn it on when the quick installed check
+ * answers; the full bank check waits until the pianist turns it on. */
+async function auditionVoice():Promise<{voice:'piano'|'built-in';voiceNote?:string}>{
+ if(!pianoSettings.enabled)return {voice:'built-in'};
+ try{const audio=await nativePiano.audioStatus();if(audio.mode==='browser')return {voice:'built-in'};return audio.enabled&&audio.running&&!audio.error?{voice:'piano'}:{voice:'built-in',voiceNote:`Your piano is not sounding${audio.error?`: ${audio.error.replace(/\.$/,'')}`:''}.`};}
+ catch{return {voice:'built-in'};}
+}
 /** Hear the piece after a count-in and set its tempo by ear. Resolves with the
  * chosen rate on the counted beat, saved as yours, or undefined when left. When
  * practice already has a goal, it keeps it, and the dialog says so. */
-function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string,setsPracticeGoal=false):Promise<number|undefined>{
- const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,tempos.piece);
+async function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string,setsPracticeGoal=false):Promise<number|undefined>{
+ const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,tempos.piece),schedule=buildPerformanceSchedule(score,beat),voice=await auditionVoice();
  const goal=!setsPracticeGoal&&tempos.goal?wholeTempoOnBeat(tempos.goal.bpm,tempos.goal.beat,beat):undefined;
- const view={heading:workHeadingMarkup(target.entry.metadata),tempo:tempos.piece,beat,bpm,confirmLabel,setsPracticeGoal,...(goal!==undefined?{practiceGoal:goal}:{})};
- const audition=new TempoAudition(buildPerformanceSchedule(score,beat),bpm),follow=followPlayingBar(target);
+ const view={heading:workHeadingMarkup(target.entry.metadata),tempo:tempos.piece,beat,bpm,confirmLabel,setsPracticeGoal,...(goal!==undefined?{practiceGoal:goal}:{}),...voice};
+ const audition:Audition=voice.voice==='piano'?new NativeTempoAudition(schedule,bpm):new TempoAudition(schedule,bpm),follow=followPlayingBar(target);
+ // Turning the piano on here is the Options › Piano switch: it stays on, and
+ // is saved only once the piano sounds.
+ const usePiano=async(chosen:number)=>{await savePiano({...pianoSettings,enabled:true},true);return new NativeTempoAudition(schedule,chosen);};
+ const offerPiano=pianoSettings.enabled?undefined:nativePiano.bankPresent().catch(()=>false);
  return new Promise(resolve=>{
   const d=showDialog(tempoAuditionMarkup(view),'score-tempo');d.setAttribute('aria-labelledby','tempo-audition-title');
   let settled=false;const finish=(value:number|undefined)=>{if(settled)return;settled=true;dispose();if(followedPage!==undefined&&current===target){followedPage=undefined;renderPages();}followedPage=undefined;resolve(value);};
-  const dispose=mountTempoAudition({dialog:d,audition,view,follow,cancel:()=>{finish(undefined);if(dialog===d)closeDialog();},confirm:chosen=>{
+  const dispose=mountTempoAudition({dialog:d,audition,view,follow,usePiano,offerPiano,fallback:chosen=>new TempoAudition(schedule,chosen),cancel:()=>{finish(undefined);if(dialog===d)closeDialog();},confirm:chosen=>{
    // Shown at once; written after. Every other preference stays as it is.
    preferences.scoreTempos=withOwnerScoreTempo(preferences,target.entry.id,ownerScoreTempo(chosen,beat)).scoreTempos;
    void savePreferences().catch(error=>notify(`Tempo was not saved: ${(error as Error).message}`));
@@ -1418,7 +1434,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  const before=target.personal,receipt=personalMemory.accept(memoryInput(target),action),next=receipt.personal;
  // A hand change reaching matching bars, or stopping there, is said; a refused one says why instead.
- const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handCarryNotice(target.package,before,target.personal,ownerId):undefined;if(notice)notify(notice);return result;});
+ const said=(shown:Promise<{keptReason?:string}>)=>shown.then(result=>{const notice=choice.hand&&!result.keptReason?handKeyNotice(target.package,before,target.personal,ownerId):undefined;if(notice)notify(notice);return result;});
  if(waitedOwner||!nextSeat)return said(presentPersonalChange(target,next,receipt.saved));
  next.editContactId=nextSeat.contactId;
  if(!viewportFit(innerWidth,innerHeight,effectiveView(next.view),readerPackage().pages.length).pages.includes(nextSeat.page))next.view.page=nextSeat.page;
