@@ -166,8 +166,14 @@ const noRecurrences:HandRecurrences={carried:new Map(),targets:new Map(),skipped
 const carriesHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null):c is PersonalOwnerChoice&{hand:PersonalHand}=>!!c&&c.hand!==undefined&&!!c.intent?.hand&&c.handScope===undefined&&source!==null&&c.hand!==source;
 /** A hand moved before choices recorded their intent: it stays where it is until chosen again. */
 const unsharedHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null):c is PersonalOwnerChoice&{hand:PersonalHand}=>!!c&&c.hand!==undefined&&!c.intent?.hand&&c.handScope===undefined&&source!==null&&c.hand!==source;
-/** The owner's own hand for this note, which a carried hand never replaces. */
-const ownsHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null)=>!!c&&c.hand!==undefined&&(!!c.intent?.hand||c.handScope!==undefined||c.hand!==source);
+/** Whether a note's record holds the owner's own hand, which a hand carried
+ * from a matching bar never replaces: a hand chosen with recorded intent, kept
+ * to this note, or moved away from the written hand. Before 2026-10-14 a finger
+ * edit also saved the note's hand as it then was (No. 14 has 44 such records,
+ * each first saved with a finger and none ever a different hand), so a hand
+ * without intent that only repeats the written hand is no choice. The pages,
+ * the calculator and the repeat fold all ask this one question. */
+export const ownsHand=(c:PersonalOwnerChoice|undefined,source:PersonalHand|null)=>!!c&&c.hand!==undefined&&(!!c.intent?.hand||c.handScope!==undefined||c.hand!==source);
 
 /** Receiving bars whose carried hands the engraver refused in this session, per
  * score and keyboard layout. Never saved: such a bar keeps its written hands

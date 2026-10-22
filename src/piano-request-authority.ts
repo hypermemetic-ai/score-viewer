@@ -1,4 +1,4 @@
-import {handRecurrences,readPersonalAssignments} from './personal-assignments';
+import {handRecurrences,ownsHand,readPersonalAssignments} from './personal-assignments';
 import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
@@ -32,7 +32,8 @@ export function pianoRequestAuthority(p:ScorePackage,source:QuantizedGridScore,l
   const shared=personal?.memoryResolved?.sourceRevision===(p.sourceRevision??p.manifest.revision)?personal.memoryResolved.choices:{};
   for(const id of Object.keys(personal?.calculatedOwners??{}))if(choices[id])delete choices[id].finger;
   // A hand carried from a matching bar is the player's hand there, as the page shows it.
-  if(personal)for(const [id,c] of handRecurrences(p,personal).carried){if(choices[id]?.hand!==undefined)continue;const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('A carried hand names a stale owner.',[id]);
+  // It replaces a stored hand that is no choice of the owner's (`ownsHand`), as on the page.
+  if(personal)for(const [id,c] of handRecurrences(p,personal).carried){const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('A carried hand names a stale owner.',[id]);if(ownsHand(choices[id],(n.hand as 'LH'|'RH'|undefined)??null))continue;
    const donor=choices[c.fromOwnerId];choices[id]={...(choices[id]??{ownerId:id,guard:{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand as 'LH'|'RH'},createdAt:`hand from bar ${c.fromBar}, ${donor?.createdAt??'carried'}`}),hand:c.hand};}
   for(const [id,field] of Object.entries(shared)){if(personal?.calculatedOwners?.[id])continue;edited.add(id);const n=owners.get(id);if(!n)throw new PianoAuthorityConflict('Shared knowledge names a stale owner.',[id]);const prior=choices[id];choices[id]={...(prior??{ownerId:id,guard:{pitch:requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,startTick:n.startTick,durationTicks:n.durationTicks},original:{hand:n.hand as 'LH'|'RH'},createdAt:'Shared memory revision '+personal!.memoryResolved!.revision}),finger:field.finger??undefined};}
   const guard=(id:string)=>{
