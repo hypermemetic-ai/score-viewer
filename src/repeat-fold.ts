@@ -52,12 +52,14 @@ export function repeatOwnerFacts(p:ScorePackage,s:PersonalState):Map<string,Verb
  const shared=personal.memoryResolved?.sourceRevision===revision(p)?personal.memoryResolved.choices:{};
  for(const n of source.notes){
   if(!isPitchedEvent(n))continue;
-  // A hand carried from matching music is the note's own answer, ahead of its twin's.
-  const choice=personal.assignments?.choices[n.id],chosen=carried.get(n.id)?.hand??choice?.hand,hand=chosen!==undefined&&chosen!==(n.hand??null)?chosen:undefined;
+  const choice=personal.assignments?.choices[n.id];
   // A hand kept to its own bar ("only here", or "hand here only"; hand-change carries) is a choice even where it is the written hand.
   const local=(choice as {handScope?:string}|undefined)?.handScope==='local'&&choice?.hand!==undefined;
   const restored=!!personal.calculatedOwners?.[n.id],remembered=!restored&&Object.hasOwn(shared,n.id);
   const finger=restored?layer?.attacks.find(a=>a.id===layer.sourceOwnerToAttack[n.id])?.finger:remembered?shared[n.id].finger??undefined:choice?.finger??legacy.get(n.id);
+  // A hand carried from matching music reaches every pass alike, so alone it touches nothing: it is
+  // read ahead of the twin's (effectiveHands). Beside the note's own finger it is that note's hand.
+  const chosen=choice?.hand??(finger!==undefined||restored||remembered?carried.get(n.id)?.hand:undefined),hand=chosen!==undefined&&chosen!==(n.hand??null)?chosen:undefined;
   if(hand!==undefined||finger!==undefined||restored||remembered||local)facts.set(n.id,{...(hand?{hand}:{}),...(finger!==undefined?{finger:String(finger)}:{}),...(local?{local}:{})});
  }
  return facts;

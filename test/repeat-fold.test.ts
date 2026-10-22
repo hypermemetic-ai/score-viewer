@@ -156,6 +156,22 @@ test('a hand carried from matching music reaches both passes, so they still fold
  }
 });
 
+test('a hand change with its finger in one pass carries its hand to the twin, which still reads the finger, so the passes fold', async()=>{
+ // Op. 68 No. 13 as the owner left it: bar 11's 4 and 3 moved and fingered, bar 21 reached only by the carried hand.
+ const p=await returning(),first=ownerAt(p,1),second=ownerAt(p,9),at='2026-10-22T00:00:00.000Z';
+ const moved=assigned(p,fingered(p,initialPersonal(p),{[first]:2}),seatOf(p,first),{hand:'LH'});
+ for(const c of Object.values(moved.assignments!.choices))if(c.hand!==undefined)c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};
+ assert.equal(handRecurrences(p,moved).carried.get(second)?.hand,'LH','the hand reaches the return');
+ assert.ok(verbatimRepeats(p,moved)?.fold,'a carried hand alone touches nothing, so the passes still agree');
+ assert.equal(writtenOutRepeat(p,moved),undefined);
+ const personal=withRepeatInheritance(p,moved);
+ assert.deepEqual([handFor(p,personal,second),fingerFor(p,personal,seatOf(p,second))],['LH',2],'the return reads the hand and finger of its twin');
+ // The same finger given on the return as well: both passes are the player's, and they agree.
+ const also=(finger:number)=>assigned(p,moved,seatOf(p,second),{finger});
+ assert.ok(verbatimRepeats(p,also(2))?.fold);
+ assert.match(writtenOutRepeat(p,also(3))!.text,/^Bar 9 has a different finger than bar 1/);
+});
+
 test('practice and Fingers visit each printed bar once, reading every pass\'s choices, and edit the stored notes', async()=>{
  const p=await returning(),first=ownerAt(p,1),second=ownerAt(p,9),late=ownerAt(p,10);
  const personal=withRepeatInheritance(p,fingered(p,initialPersonal(p),{[first]:4,[late]:3}));
