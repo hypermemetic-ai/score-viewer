@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync,readFileSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,readFileSync,readdirSync} from 'node:fs';
 import {strToU8,strFromU8} from 'fflate';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -150,6 +150,24 @@ test('derived files are bound to the code that makes them, followed through ever
   write('src/lazy.ts',"export {x} from './missing';");
   assert.throws(()=>derivedModuleClosure(root,entries),/does not exist/);
  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('every module that fills the derived-file cache lies inside the derived identity',()=>{
+ const closure=new Set(derivedModuleClosure(process.cwd())),read=(file:string)=>readFileSync(file,'utf8');
+ // Modules that hold the cache without making what goes in it.
+ const holders:Record<string,string>={'src/derived-file-cache.ts':'the cache itself','src/host.ts':'gives the cache its store','src/main.ts':'hands the cache to the modules that fill it',
+  'src/ahead-of-time-engraving.ts':'records only which projection serves a score; every read checks that entry and the files it read again'};
+ const sources=readdirSync('src',{recursive:true}).map(String).filter(f=>/\.ts$/.test(f)).map(f=>'src/'+f.split('\\').join('/'));
+ for(const file of sources)if(/\bDerivedFileCache\b|derived-file-cache['"]/.test(read(file))&&!holders[file])
+  assert.ok(closure.has(file),`${file} uses the derived-file cache: add it to DERIVED_ENTRY_MODULES (scripts/derived-identity.ts)`);
+ // Whatever main.ts hands the cache to must be inside the identity too.
+ const main=read('src/main.ts'),from=new Map<string,string>();
+ for(const m of main.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'\.\/([^']+)'/g))
+  for(const name of m[1].split(','))from.set(name.trim().replace(/^type\s+/,'').split(/\s+as\s+/).pop()!,`src/${m[2]}.ts`);
+ const handed=new Set<string>();
+ for(const line of main.split('\n'))if(/\bderived\b/.test(line))for(const call of line.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)){const module=from.get(call[1]);if(module)handed.add(module);}
+ assert.ok(handed.has('src/personal-presentation.ts')&&handed.has('src/package.ts'),'the wiring is found');
+ for(const module of handed)assert.ok(closure.has(module)||holders[module],`main.ts hands the derived-file cache to ${module}: add it to DERIVED_ENTRY_MODULES (scripts/derived-identity.ts)`);
 });
 
 test('piano pages checked once as passive ink are not parsed again; changed pages are checked as before',async()=>{
