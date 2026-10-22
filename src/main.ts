@@ -178,7 +178,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null}),served=await session.projectionEntry(q.personal??personal);
   if(!served)return null;
   if(!await projectionServed(derived,served)){
-   await refusedWhen(session.project(q.personal??personal,execution),engravingRefusal);
+   await answerInput();await refusedWhen(session.project(q.personal??personal,execution),engravingRefusal);
    // The pages opening reads are written as soon as input allows; an opening
    // that took this work over goes on from here.
    await answerInput();await session.flushProjection();checkReadingExecution(execution);

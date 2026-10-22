@@ -1,7 +1,7 @@
 import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationExecution,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {withLayoutPeer,type StartLayoutPeer} from './layout-peer';
 import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
-import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse,ProjectionView,SerializedProjectionError} from './personal-projection-protocol';
+import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionRequest,type ProjectionResponse,type ProjectionView,type SerializedProjectionError} from './personal-projection-protocol';
 
 /** The calls the projection host makes on one ISO personal projection core. */
 export interface HostedProjectionCore {
@@ -59,7 +59,9 @@ export function createProjectionHost(post:(response:ProjectionResponse,transfer?
    }
    const view=settled.has(core)?await core.projectAsync(request.owners,request.digest,execution):
     await engraving(execution=>hostCore.projectAsync(request.owners,request.digest,execution));settled.add(core);
-   post({id:request.id,kind:'done',view:{score:view.score,pages:[...view.pages],seats:[...view.seats],annotationGeometry:view.annotationGeometry}});
+   const shown:ProjectionView={score:view.score,pages:[...view.pages],seats:[...view.seats],annotationGeometry:view.annotationGeometry};
+   let encoded:EncodedDerivedPayload|undefined;if(request.encode)try{encoded=await encodeDerivedPayload(cachedProjectionValue(shown));}catch{/* the reader encodes it */}
+   post({id:request.id,kind:'done',view:shown,...(encoded?{encoded}:{})},encoded?[encoded.body.buffer]:[]);
   }catch(error){
    if(!(error instanceof HandPresentationError)&&cores.get(request.key)===core)cores.delete(request.key);
    post({id:request.id,kind:'error',error:serializeProjectionError(error)});

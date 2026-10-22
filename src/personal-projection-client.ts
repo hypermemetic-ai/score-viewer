@@ -73,7 +73,7 @@ export class ProjectionWorkerClient {
   this.pending.delete(response.id);p.cleanup();
   if(response.kind==='done')p.resolve(response);else{if(response.error.name!=='HandPresentationError')this.known.delete(p.request.key);p.reject(deserializeProjectionError(response.error));}
  }
- private request(base:{kind:'warm';saved?:PersonalHandEngineState}|{kind:'project';owners:PersonalOwnerHand[];digest:string}|{kind:'save'},key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<Done>{
+ private request(base:{kind:'warm';saved?:PersonalHandEngineState}|{kind:'project';owners:PersonalOwnerHand[];digest:string;encode?:boolean}|{kind:'save'},key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<Done>{
   checkReadingExecution(execution);
   return new Promise((resolve,reject)=>{
    const id=++this.sequence,signal=execution?.signal;
@@ -99,12 +99,15 @@ export class ProjectionWorkerClient {
  }
  /** The core's settled engine, encoded for the disk cache, when the worker still holds a settled core. */
  save(key:string,inputs:ProjectionCoreInputs):Promise<EncodedDerivedPayload|undefined>{return this.request({kind:'save'},key,inputs).then(done=>done.engine);}
- async project(key:string,inputs:ProjectionCoreInputs,owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution):Promise<ProjectionView>{
-  const {view}=await this.request({kind:'project',owners:owners.map(o=>({...o})),digest},key,inputs,execution);
+ async project(key:string,inputs:ProjectionCoreInputs,owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution,encode=false):Promise<ProjectionView>{
+  const {view,encoded}=await this.request({kind:'project',owners:owners.map(o=>({...o})),digest,...(encode?{encode}:{})},key,inputs,execution);
   if(!view)throw Error('The hand drawing worker returned no pages.');
+  if(encoded)encodedProjections.set(view,encoded);
   return view;
  }
 }
+/** Views the worker also encoded for the disk cache, as asked. */
+export const encodedProjections=new WeakMap<ProjectionView,EncodedDerivedPayload>();
 /** The reader's projection worker, built as its own module chunk. */
 export const projectionWorkerClient=()=>new ProjectionWorkerClient(()=>
  new Worker(new URL('./personal-projection-worker.ts',import.meta.url),{type:'module'}) as unknown as ProjectionWorkerLike);

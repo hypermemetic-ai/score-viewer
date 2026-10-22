@@ -244,6 +244,20 @@ test('work that frees its worker after projecting saves the engine first',async(
  assert.deepEqual(await run(true),[true],'saved first: the reader resumes from it');
 });
 
+test('background work has the worker encode the pages it writes, byte for byte as the reader writes them; the reader does not ask',async()=>{
+ const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
+ const projection=async(cacheWriteDelayMs:number|null)=>{
+  const log:ProjectionRequest[]=[],{files,store}=memoryStore(),cache=new DerivedFileCache(store,'build-a');
+  const session=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(fakeWorker(createHostedCore,log).spawn),cache,cacheWriteDelayMs});
+  await session.project(choice);await session.flushProjection();await cache.flush();
+  const name=[...files.keys()].find(n=>!n.includes('engine'))!;
+  return {encode:log.filter(m=>m.kind==='project').map(m=>!!(m as {encode?:boolean}).encode),bytes:files.get(name)!,name};
+ };
+ const background=await projection(null),reader=await projection(0);
+ assert.deepEqual(background.encode,[true]);assert.deepEqual(reader.encode,[false],'an edit never waits for an encoding');
+ assert.equal(background.name,reader.name);assert.deepEqual(background.bytes,reader.bytes);
+});
+
 test('a hand choice right after an opening that took library work over restores the engine that work is saving',async()=>{
  const {p}=await sourcePackage(transferStudy()),seat=p.seats.find(s=>s.ownerIds.includes('gesture-1'))!,choice=assigned(p,initialPersonal(p),seat,{hand:'RH'});
  const run=async(told:boolean)=>{
