@@ -10,14 +10,18 @@ import {claimIdentity,readManualAttainment} from './practice-attainment';
  * written out again reads it as it always did. The folded edition reads that
  * journal by music: an exercise whose music the written-out edition also has
  * shows that music's credit, marks and working tempo. What it practises goes
- * back the same way to every written-out exercise with that music. Its own
- * exercises (what it leaves out, and exercises no written-out exercise
- * matches) are kept under the fold, and read again whenever it folds alike.
+ * back the same way to every written-out exercise with that music, and so
+ * does leaving it out (X): it is left out wherever every exercise with its
+ * music is. Only its own exercises, which no written-out exercise matches,
+ * are kept under the fold, and read again whenever it folds alike; the
+ * latest few folds are kept.
  */
 export interface PracticeFoldPart {excluded:Record<string,boolean>;best:Record<string,number>;groundwork:Record<string,boolean>;workingByPattern:Record<string,number>;marks?:Record<string,number[]>}
 /** The written-out edition a folded edition's practice journal belongs to. */
 export interface PracticeFold {key:string;written:PracticePassagePlan}
 
+/** Folds whose own exercises a journal keeps: the latest saved. */
+const KEPT_FOLDS=4;
 const PREFERENCES=['referenceBeat','target','personalGoal','working','step','tolerance','offset','keepTempo','start','connectionStart','usabilityRevision','speedRevision','countInBars','resumeCooldownSeconds','audioOutput'] as const;
 const validTempo=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>=5&&n<=500;
 const record=(v:unknown)=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -83,11 +87,11 @@ export function foldedPracticeJournal(raw:unknown,folded:PracticePassagePlan,fol
  next.excluded=part?structuredClone(part.excluded):{};
  const shared=[...all.values()].flatMap(chunk=>{const twins=matching(folded,chunk,written);return twins.length?[{chunk,twins}]:[];});
  // The written-out journal speaks for music both editions have: it is what the written-out edition shows.
- for(const {chunk} of shared)clear(folded,next,all,chunk);
+ for(const {chunk} of shared){clear(folded,next,all,chunk);delete next.excluded![chunk.id];}
  for(const {chunk,twins} of shared){
   give(next,chunk,mergeCredit(twins.map(twin=>creditOf(fold.written,journal,writtenAll,twin))));
-  // A fold read for the first time leaves out what the written-out edition leaves out wherever it has this music.
-  if(!part&&twins.every(twin=>journal.excluded?.[twin.id]))next.excluded![chunk.id]=true;
+  // Left out wherever the written-out edition leaves out every exercise with this music.
+  if(twins.every(twin=>journal.excluded?.[twin.id]))next.excluded![chunk.id]=true;
  }
  return readPractice(next,folded);
 }
@@ -106,8 +110,12 @@ function writtenJournal(journal:PracticeState,folded:PracticePassagePlan,before:
  copyPreferences(after,journal);
  const writtenAll=passageHierarchy(fold.written,journal).all,written=byMusic(fold.written,writtenAll);
  const wasAll=passageHierarchy(folded,before).all,all=passageHierarchy(folded,after).all;
+ const own:PracticeChunk[]=[];
  for(const chunk of all.values()){
-  const twins=matching(folded,chunk,written);if(!twins.length)continue;
+  const twins=matching(folded,chunk,written);if(!twins.length){own.push(chunk);continue;}
+  // Leaving an exercise out, or taking it back in, does the same to every exercise with its music.
+  const left=!!after.excluded?.[chunk.id];
+  if(left!==!!before.excluded?.[chunk.id])for(const twin of twins){if(left){journal.excluded??={};journal.excluded[twin.id]=true;}else if(journal.excluded)delete journal.excluded[twin.id];}
   const old=wasAll.get(chunk.id)?creditOf(folded,before,wasAll,chunk):{rate:0,groundwork:false,marks:[]},now=creditOf(folded,after,all,chunk);
   const removed=now.rate<old.rate||(old.groundwork&&!now.groundwork)||old.marks.some(rate=>!now.marks.includes(rate));
   const added=now.rate>old.rate||(now.groundwork&&!old.groundwork)||now.marks.some(rate=>!old.marks.includes(rate))||now.working!==old.working;
@@ -121,8 +129,22 @@ function writtenJournal(journal:PracticeState,folded:PracticePassagePlan,before:
    give(journal,twin,{rate:now.rate>old.rate?now.rate:0,groundwork:now.groundwork&&!old.groundwork,marks:now.marks.filter(rate=>!old.marks.includes(rate)),...(now.working!==old.working&&now.working!==undefined?{working:now.working}:{})});
   }
  }
- const marks=after.manualAttainment?.marks;
- journal.folded={...journal.folded,[fold.key]:{excluded:structuredClone(after.excluded??{}),best:structuredClone(after.best),groundwork:structuredClone(after.groundwork??{}),workingByPattern:structuredClone(after.workingByPattern),...(marks&&Object.keys(marks).length?{marks:structuredClone(marks)}:{})}};
+ // The fold keeps only what the written-out journal can't say: its own exercises.
+ const part:PracticeFoldPart={excluded:{},best:{},groundwork:{},workingByPattern:{}},marks:Record<string,number[]>={};
+ for(const chunk of own){
+  if(after.excluded?.[chunk.id])part.excluded[chunk.id]=true;
+  for(const c of claims(folded,after,all,chunk)){
+   if(after.best[c.pattern]!==undefined)part.best[c.pattern]=after.best[c.pattern];
+   if(after.groundwork?.[c.pattern])part.groundwork[c.pattern]=true;
+   const key=JSON.stringify([c.passage,c.pattern]),kept=after.manualAttainment?.marks[key];if(kept?.length)marks[key]=[...kept];
+  }
+  if(after.workingByPattern[chunk.pattern]!==undefined)part.workingByPattern[chunk.pattern]=after.workingByPattern[chunk.pattern];
+ }
+ if(Object.keys(marks).length)part.marks=marks;
+ // This fold's record moves to the end; only the latest few folds are kept, and a fold with nothing of its own keeps none.
+ const folds=Object.entries(journal.folded??{}).filter(([key])=>key!==fold.key);
+ if([part.excluded,part.best,part.groundwork,part.workingByPattern,marks].some(r=>Object.keys(r).length))folds.push([fold.key,part]);
+ if(folds.length)journal.folded=Object.fromEntries(folds.slice(-KEPT_FOLDS));else delete journal.folded;
  return readPractice(journal,fold.written);
 }
 

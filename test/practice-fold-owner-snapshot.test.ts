@@ -29,14 +29,19 @@ test('the owner\'s No. 13 practice shows on the folded score as on the written-o
  assert.equal(sections(written).length,15);assert.equal(sections(folded).length,8);
  // The owner has practised no passage to credit yet; the folded score claims none either.
  for(const a of [written,folded])for(const c of passageHierarchy(a.plan,a.state).all.values())assert.equal(attainedRate(a.state,c.pattern,c.id),0);
- // Saving there leaves the written-out journal as it was, adding the fold's own record.
+ // Saving there leaves the written-out journal as it was, and adds nothing while the fold has nothing of its own.
  const saved=readPractice(json(folded.journal!.written(folded.plan,structuredClone(folded.state))),written.plan);
  assert.deepEqual(json(without(saved)),json(without(readPractice(raw,written.plan))));
- assert.deepEqual(Object.keys(saved.folded!),['no13-fold']);
+ assert.equal(saved.folded,undefined);
  // A folded section no written-out section matches (printed bars 12–14) keeps its credit with the fold.
  const own=structuredClone(folded.state),plan=folded.plan,c=sections(folded).find(c=>c.firstBar===11)!;own.working=40;passed(c,own);
  const back=json(folded.journal!.written(plan,own)),fresh=planPractice(edition,'bounded-exercises-v1',personal,savedPlayerTempo(p.score,back));
  readPractice(back,written.plan);
+ assert.deepEqual(Object.keys(back.folded),['no13-fold']);
+ // The journal grows by that section's record (its credit and working tempo, each under the section's music), not by a copy of the folded state.
+ const growth=JSON.stringify(back).length-JSON.stringify(raw).length,record=JSON.stringify(back.folded['no13-fold']).length;
+ assert.ok(growth<=record+100&&record<3*JSON.stringify(c.pattern).length,`grew by ${growth} characters`);
+ if(process.env.SCORE_VIEWER_REPORT)console.log(JSON.stringify({rawBytes:JSON.stringify(raw).length,savedBytes:JSON.stringify(back).length,growth,keys:Object.fromEntries(Object.entries(back.folded['no13-fold']).map(([k,v])=>[k,Object.keys(v as object).length]))}));
  const again=foldedPracticeJournal(back,fresh,{key:'no13-fold',written:written.plan})!,same=passageHierarchy(fresh,again).all.get(c.id)!;
  assert.equal(attainedRate(again,same.pattern,same.id),40);
 });

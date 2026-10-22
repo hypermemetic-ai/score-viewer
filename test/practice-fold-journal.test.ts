@@ -78,7 +78,7 @@ test('the folded score reads the written-out journal by music: settings, credit,
  assert.equal(rate(admitted.plan,admitted.state,'section 5-8'),60);assert.ok(admitted.journal);
 });
 
-test('practice on the folded score reaches every pass of its music; what it leaves out stays with the fold, and it reads back alike', async()=>{
+test('practice on the folded score reaches every pass of its music, and so does what it leaves out; it reads back alike', async()=>{
  const {p,personal,writtenPlan,foldedPlan}=await editions(),fold:PracticeFold={key:KEY,written:writtenPlan};
  const raw=json(practised(writtenPlan)),journal=new FoldedPracticeJournal(fold,raw),s=foldedPracticeJournal(raw,foldedPlan,fold)!;journal.read(s);
  const at=exercises(foldedPlan,s);
@@ -91,11 +91,12 @@ test('practice on the folded score reaches every pass of its music; what it leav
  assert.equal(rate(writtenPlan,w,'connection 17-24'),44,'the return into the closing');
  assert.equal(rate(writtenPlan,w,'connection 9-16'),70,'across the repeat, as it was');
  assert.equal(rate(writtenPlan,w,'section 13-16'),60);
- assert.deepEqual(w.excluded,practised(writtenPlan).excluded,'the written-out score leaves out what it did');
- assert.deepEqual(w.folded?.[KEY].excluded,{[at('section 13-16').id]:true,[at('connection 1-8').id]:true});
+ const wat=exercises(writtenPlan,w);
+ assert.deepEqual(w.excluded,{...practised(writtenPlan).excluded,[wat('connection 1-8').id]:true},'what it did, and the opening into the passage, left out on the folded score');
+ // Every folded exercise here has its music written out: the fold keeps nothing of its own, and the journal grows by nothing else.
+ assert.equal(w.folded,undefined);
  assert.equal(w.working,36);
- // Engraved again, the edition's journal keeps the fold's own record.
- assert.deepEqual(transferPracticeEdition(p,saved,p,personal).folded,w.folded);
+ assert.equal(transferPracticeEdition(p,saved,p,personal).folded,undefined);
  // Folded again from the saved journal: as it was left.
  const again=foldedPracticeJournal(saved,foldedPlan,fold)!;
  for(const name of ['section 1-4','section 5-8','section 9-12','section 13-16','connection 1-8','connection 5-12','connection 9-16'])assert.equal(rate(foldedPlan,again,name),rate(foldedPlan,s,name),name);
@@ -129,6 +130,53 @@ test('written out again, the score reads its journal as before; folding again sh
  assert.ok(!again.groundwork?.[exercises(foldedPlan,again)('section 9-12').pattern],'taken back, not kept by the fold');
  assert.deepEqual(again.excluded,s.excluded,'what the fold left out');
  assert.equal(again.working,55);
+});
+
+test('leaving music out, or taking it back in, carries between the folded and the written-out score both ways', async()=>{
+ const {writtenPlan,foldedPlan}=await editions(),fold:PracticeFold={key:KEY,written:writtenPlan};
+ const raw=json(practised(writtenPlan)),s=foldedPracticeJournal(raw,foldedPlan,fold)!,at=exercises(foldedPlan,s);
+ assert.ok(!s.excluded?.[at('section 9-12').id],'left out on one pass only: the folded score plays it');
+ // Written out: X on the return as well. Folded again, the phrase is left out.
+ const w=readPractice(raw,writtenPlan),wat=exercises(writtenPlan,w);w.excluded={...w.excluded,[wat('section 17-20').id]:true};
+ const folded=foldedPracticeJournal(json(w),foldedPlan,fold)!;
+ assert.ok(folded.excluded?.[at('section 9-12').id],'both passes left out: so is the folded phrase');
+ // Folded: taken back in. Written out again, both passes play it; the closing stays out.
+ const journal=new FoldedPracticeJournal(fold,json(w));journal.read(folded);
+ const back=structuredClone(folded);delete back.excluded![at('section 9-12').id];
+ const again=readPractice(json(journal.written(foldedPlan,back)),writtenPlan);
+ assert.ok(!again.excluded?.[wat('section 9-12').id]&&!again.excluded?.[wat('section 17-20').id],'taken back on both passes');
+ assert.ok(again.excluded?.[wat('section 21-24').id]&&again.excluded?.[wat('connection 9-16').id],'and nothing else changes');
+ // Written-out exercises the folded score has no music for (across the repeat) keep their credit and stay as they were.
+ assert.equal(rate(writtenPlan,again,'connection 9-16'),70);
+});
+
+test('a fold keeps only its own exercises, and only the latest few folds are kept', async()=>{
+ const {writtenPlan,foldedPlan}=await editions(),raw=json(practised(writtenPlan));
+ // Older folds' records, as a journal saved after other folds would hold them.
+ const stale=(n:number)=>[`old-${n}`,{excluded:{},best:{[`pattern-${n}`]:40},groundwork:{},workingByPattern:{}}] as const;
+ raw.folded=Object.fromEntries([1,2,3,4,5].map(stale));
+ const fold:PracticeFold={key:KEY,written:writtenPlan},s=foldedPracticeJournal(raw,foldedPlan,fold)!,journal=new FoldedPracticeJournal(fold,raw);journal.read(s);
+ passed(exercises(foldedPlan,s)('section 5-8'),s);
+ const saved=json(journal.written(foldedPlan,s));
+ assert.deepEqual(Object.keys(saved.folded),['old-2','old-3','old-4','old-5'],'the latest four; this fold has nothing of its own');
+ assert.deepEqual(saved.folded['old-5'],stale(5)[1],'kept as saved');
+ assert.ok(JSON.stringify(saved).length<JSON.stringify(raw).length+2000,'the journal grows by what changed, not by a copy of the folded state');
+});
+
+test('the fold\'s own exercises, music no written-out exercise has, are kept under the fold and read back', async()=>{
+ const {p,foldedPlan}=await editions(),tempo=playerTempo(p.score,96);
+ // A written-out edition without the closing: the folded closing, and the passage into it, are the fold's own.
+ const shorter=await prepareMusicXmlScore(strToU8(musicXml([...opening,...passage,...passage])),assets).then(r=>importPackage(r.bytes,{allowLegacyTempo:true}));
+ const writtenPlan=planPractice(shorter,'bounded-exercises-v1',initialPersonal(shorter),tempo),fold:PracticeFold={key:KEY,written:writtenPlan},raw=json(initialPractice(writtenPlan));
+ const s=foldedPracticeJournal(raw,foldedPlan,fold)!,journal=new FoldedPracticeJournal(fold,raw),at=exercises(foldedPlan,s);journal.read(s);
+ s.working=42;passed(at('section 13-16'),s);passed(at('section 5-8'),s);s.excluded={[at('connection 9-16').id]:true};
+ const saved=json(journal.written(foldedPlan,s)),part=saved.folded[KEY];
+ assert.deepEqual(Object.keys(part.best),[at('section 13-16').pattern],'the closing\'s credit, and not the passage\'s: its music is written out');
+ assert.deepEqual(part.excluded,{[at('connection 9-16').id]:true});
+ assert.equal(rate(writtenPlan,readPractice(saved,writtenPlan),'section 5-8'),rate(foldedPlan,s,'section 5-8'),'the passage\'s credit is in written-out terms');
+ const again=foldedPracticeJournal(saved,foldedPlan,fold)!;
+ for(const name of ['section 13-16','section 5-8'])assert.ok(rate(foldedPlan,again,name)>0&&rate(foldedPlan,again,name)===rate(foldedPlan,s,name),name);
+ assert.deepEqual(again.excluded,s.excluded);
 });
 
 test('Fingers alone on the folded score reads the player\'s settings and nothing it would refuse', async()=>{
