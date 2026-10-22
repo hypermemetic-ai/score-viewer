@@ -12,10 +12,10 @@ The viewer SHALL bundle the reviewed native SFZ engine without the sample bank a
 - **THEN** the native host renders the original live bank through the selected shared output without frontend synthesis or a forced device/driver/MIDI change
 
 ### Requirement: Original offline bank admission
-The installer SHALL admit only the exact approved V6.2 archive identity into a private native app-data cache. It SHALL stream all copying/hashing/extraction, validate paths, symlinks, bounds, CRCs, per-file hashes and local SFZ/sample closure, retain original content/licenses, and atomically publish only a complete bank.
+The installer SHALL admit only an exact approved archive identity into a private native app-data cache: the original V6.2 archive or the author's current V6.2a 48 kHz/24-bit replacement, each pinned by size, SHA256, canonical file fingerprint and live SFZ hash, and installed under its own profile prefix. An already admitted bank of either identity SHALL remain valid. It SHALL stream all copying/hashing/extraction, validate paths, symlinks, bounds, CRCs, per-file hashes and local SFZ/sample closure, retain original content/licenses, and atomically publish only a complete bank.
 
 #### Scenario: Valid original archive
-- **WHEN** Install downloaded piano… selects the unchanged archive matching the approved size/SHA256
+- **WHEN** Download piano finishes, or Install from a file… selects an unchanged archive matching an approved size/SHA256
 - **THEN** a native worker verifies and installs all original files with the verified live SFZ and local samples, and the bank subsequently works offline
 
 #### Scenario: Failure or cancellation
@@ -26,19 +26,27 @@ The installer SHALL admit only the exact approved V6.2 archive identity into a p
 - **WHEN** a ZIP has a different identity, unsafe/duplicate paths, symlinks, unsupported member type or excessive entry/size bounds
 - **THEN** it is rejected before publication and no arbitrary filesystem path is written
 
-### Requirement: Fixed external download affordance
-Options SHALL offer Download piano before installation using a native command that opens only the fixed official author page externally. Install downloaded piano… SHALL use a native ZIP picker without passing bank bytes or arbitrary filesystem paths to the frontend.
+### Requirement: One-press piano download
+Options SHALL offer one Download piano button before installation. One press SHALL download the fixed current archive over HTTPS with the system curl, show progress for downloading, checking and installing, and admit it through the same installer, with no browser, file picker or second button. Cancel SHALL stop the download and discard it. An interrupted download SHALL be kept and continued by the next press; a refused server answer, a changed archive or a full disk SHALL be reported in plain words. The finished download SHALL be moved, not copied, into staging so only one archive occupies the disk. After a successful install the piano sound SHALL be switched on; MIDI SHALL NOT be connected automatically. Install from a file… SHALL remain a secondary offline path using a native ZIP picker without passing bank bytes or arbitrary filesystem paths to the frontend.
+
+#### Scenario: One press
+- **WHEN** the player presses Download piano with no bank installed
+- **THEN** the archive is downloaded, checked and installed with visible progress, the piano is switched on, and it works offline afterwards
+
+#### Scenario: Interrupted, cancelled or changed download
+- **WHEN** the network drops, the player cancels, or the download differs from the pinned archive
+- **THEN** a network drop keeps the partial download for the next press, cancel discards it, a changed archive is discarded and refused, and any installed bank and the preferences are unchanged
 
 #### Scenario: Already acquired original download
-- **WHEN** the operator has an existing local original ZIP
-- **THEN** it enters the same installer path without another Internet download or adopting an unvalidated extracted directory
+- **WHEN** the operator has an existing local approved ZIP
+- **THEN** Install from a file… enters the same installer path without another Internet download or adopting an unvalidated extracted directory
 
 ### Requirement: Clear additive piano settings
-Options SHALL show Piano in its own section below Audio/MIDI and above Keys and pedals with installation/status, an optional toggle, a compact centered percentage volume spinbox and a compact four-choice Latency setting requesting monotonically increasing host tiers. Actual device periods MAY coincide. Browsing arrows SHALL navigate Options without adjusting sound; entered control editing SHALL own adjustments. Volume SHALL reuse the shared centered percentage spinbox with entered typing/arrow editing and stacked mouse chevrons. Latency SHALL offer four discrete choices through one browse stop and entered arrow editing. Preferences SHALL be additive, disabled by default, and preserve existing records and settings. Installation SHALL NOT enable piano or connect MIDI automatically.
+Options SHALL show Piano in its own section below Audio/MIDI and above Keys and pedals with installation/status, an optional toggle, a compact centered percentage volume spinbox with a pointer-only drag track and a compact four-choice Latency setting requesting monotonically increasing host tiers. Actual device periods MAY coincide. Browsing arrows SHALL navigate Options without adjusting sound; entered control editing SHALL own adjustments. Volume SHALL reuse the shared centered percentage spinbox with entered typing/arrow editing and stacked mouse chevrons. Latency SHALL offer four discrete choices through one browse stop and entered arrow editing. Preferences SHALL be additive, disabled by default, and preserve existing records and settings. Installation SHALL NOT connect MIDI automatically; only the one-press download switches the piano on after it succeeds. Volume SHALL be available before installation and while the piano downloads.
 
 #### Scenario: Controls before installation
 - **WHEN** no native bank has been admitted
-- **THEN** only Download/Install and necessary installation status/cancel appear in the piano section, shared Audio/MIDI stay available, and piano controls/help and sampler loading remain absent
+- **THEN** only Download piano, Install from a file…, Volume and necessary installation status/cancel appear in the piano section, shared Audio/MIDI stay available, and piano controls/help and sampler loading remain absent
 
 #### Scenario: Saving and reopening Options
 - **WHEN** the player changes Piano, volume or latency and reopens Options/restarts the app

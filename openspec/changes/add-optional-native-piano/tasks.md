@@ -31,3 +31,11 @@
 - [x] 5.1 Implement and prove bounded Windows queue targets, shared packet bounds, per-sampler-quantum MIDI/panic intake and retained actual prepared-cue horizons without Mac/vendor/config changes.
 - [x] 5.2 Observe root-controlled same-endpoint admitted-bank baseline/repaired submission, independently admitted coarse loopback intervals, actual stream latency and exact three-attack service headroom; preserve fine-timing refusals, sustained-heavy-load limits and separate physical acceptance.
 - [ ] 5.3 Independently review, merge and include the source repair in the ordinary paired native delivery with exact source and preservation receipts.
+
+## 6. One-press download
+
+- [x] 6.1 Admit the author's current V6.2a archive beside V6.2 by exact identity, keeping installed V6.2 banks valid.
+- [x] 6.2 Replace the page-opening Download piano with one native press: resumable HTTPS download, progress, cancel, plain failures, move-not-copy into the admitted installer, then switch the piano on.
+- [x] 6.3 Add a pointer drag track beside the Volume field, shown before installation and during the download, with keyboard editing unchanged.
+- [x] 6.4 Test success, cancel, network failure, integrity failure and already installed in the core and the frontend; observe the real download through the production core on Linux.
+- [ ] 6.5 Observe one press in the native Windows and Mac packages, and the pianist's own judgement of delay and volume.
