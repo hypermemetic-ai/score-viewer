@@ -1424,7 +1424,7 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "2bac48661ce0a900a21e9020df5f9bcd9a3a33cb",
+  "dependencyRevision": "3fc561efa48ccc23ab525474cc516f2040f64234",
   "dependencyReview": {
     "pullRequests": [
       "https://github.com/hypermemetic-ai/iso-notation/pull/430"

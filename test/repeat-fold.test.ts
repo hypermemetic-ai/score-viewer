@@ -9,6 +9,7 @@ import {effectiveAssignments,handFor} from '../src/personal-assignments';
 import {rawMemoryPersonal} from '../src/personal-memory-session';
 import {FoldedReader,editOwners,verbatimRepeats,withRepeatInheritance,writtenOutRepeat,writtenView} from '../src/repeat-fold';
 import {requirePracticeHands} from '../src/practice';
+import {buildPerformanceSchedule,writtenBarAt} from '../src/score-performance';
 
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('../src/URWGothic-Demi.otf',import.meta.url))},
  notices:Object.fromEntries(['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'].map(name=>
@@ -154,4 +155,18 @@ test('practice and Fingers visit each printed bar once, reading every pass\'s ch
  assert.deepEqual(editOwners(at(ownerAt(p,2))),[late],'and an edit there reaches the note that carries it');
  assert.equal(folded.assignments?.choices[second],undefined,'no second-pass note is in the folded score');
  assert.deepEqual([view.verbatimFold!.printedBar(10),view.verbatimFold!.printedBar(17),view.verbatimFold!.printedBar(3)],[2,9,3],'stored bars name their printed bars');
+});
+
+test('hearing a folded score plays it in performed order, numbered by printed bar and pass, and follows the printed seats', async()=>{
+ const p=await returning(),view=await new FoldedReader(p,null).view(initialPersonal(p));
+ const edition=view!.verbatimFold!.edition,beat={numerator:1,denominator:4};
+ const folded=buildPerformanceSchedule(edition.score,beat),stored=buildPerformanceSchedule(p.score,beat);
+ assert.deepEqual(folded.notes,stored.notes,'the same notes at the same times as the written-out score');
+ assert.equal(folded.totalTicks,stored.totalTicks);
+ assert.equal(folded.writtenBars,9,'measures counted as printed');
+ assert.deepEqual(folded.barLabels.map(l=>`${l.bar}.${l.pass}`),['1.1','2.1','3.1','4.1','5.1','6.1','7.1','8.1','1.2','2.2','3.2','4.2','5.2','6.2','7.2','8.2','9.1'],'stored bars 9–16 are printed bars 1–8, the second time');
+ for(const [i,tick] of folded.bars.slice(0,-1).entries()){
+  const at=writtenBarAt(folded,tick);
+  assert.ok(view!.seats.some(seat=>seat.writtenBar===at.bar),`performed bar ${i+1} has printed seats to follow`);
+ }
 });

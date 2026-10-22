@@ -288,6 +288,8 @@ function practiceSource(target:NonNullable<typeof current>):{view:ScorePackage;b
  const shown=livePersonalEditors.get(target)?.view??target.package,fold=(shown as FoldedPackage).verbatimFold;
  return fold?{view:fold.practice,base:fold.edition,personal:fold.personal(target.personal)}:{view:shown,base:target.package,personal:target.personal};
 }
+/** The score a performance plays: the one the reader prints. A folded repeat plays twice in performed order, numbered by printed bar and pass, as a composer repeat does. */
+function performedScore(target:NonNullable<typeof current>):ScorePackage['score']{return ((livePersonalEditors.get(target)?.view??target.package) as FoldedPackage).verbatimFold?.edition.score??target.package.score;}
 /** Whether choices move a note to another hand than the one practice was planned with, in practice's own edition (folded or stored). */
 function practiceHandsDiffer(target:NonNullable<typeof current>,owner:PracticeView,next:PersonalState):boolean{
  const base=owner.options.basePackage??owner.options.package,fold=((livePersonalEditors.get(target)?.view??target.package) as FoldedPackage).verbatimFold,
@@ -713,7 +715,7 @@ function hearAndSetTempo(target:OpenScore,tempos:ScoreTempos,confirmLabel:string
  const score=target.package.score,beat=countedBeat(score),bpm=auditionStartTempo(score,tempos.piece);
  const goal=!setsPracticeGoal&&tempos.goal?wholeTempoOnBeat(tempos.goal.bpm,tempos.goal.beat,beat):undefined;
  const view={heading:workHeadingMarkup(target.entry.metadata),tempo:tempos.piece,beat,bpm,confirmLabel,setsPracticeGoal,...(goal!==undefined?{practiceGoal:goal}:{})};
- const audition=new TempoAudition(buildPerformanceSchedule(score,beat),bpm),follow=followPlayingBar(target);
+ const audition=new TempoAudition(buildPerformanceSchedule(performedScore(target),beat),bpm),follow=followPlayingBar(target);
  return new Promise(resolve=>{
   const d=showDialog(tempoAuditionMarkup(view),'score-tempo');d.setAttribute('aria-labelledby','tempo-audition-title');
   let settled=false;const finish=(value:number|undefined)=>{if(settled)return;settled=true;dispose();if(followedPage!==undefined&&current===target){followedPage=undefined;renderPages();}followedPage=undefined;resolve(value);};
@@ -736,7 +738,7 @@ async function paintScoreTempo(d:HTMLDialogElement,target:OpenScore){
   if(!beat&&hear){hear.disabled=true;hear.title='Hearing needs a meter; this score has none.';}
   const practiceLine=goal&&piece?.origin!=='practice'&&!(piece?.confident&&sameTempo(goal,piece))?`<small data-score-practice-goal>Practice goal ${tempoMark(goal.bpm,goal.beat)}</small>`:'';
   if(!piece||!piece.confident){slot.innerHTML=`<span>Not set</span><small>${esc(scoreTempoOriginText(piece))}</small>${practiceLine}`;return;}
-  const counted=beat??piece.beat,seconds=performanceSeconds(buildPerformanceSchedule(target.package.score,counted),tempoOnBeat(piece.bpm,piece.beat,counted));
+  const counted=beat??piece.beat,seconds=performanceSeconds(buildPerformanceSchedule(performedScore(target),counted),tempoOnBeat(piece.bpm,piece.beat,counted));
   slot.innerHTML=`<span>${tempoMark(piece.bpm,piece.beat)}</span><small>${esc(scoreTempoOriginText(piece))} · about ${playingTimeLabel(seconds)}</small>${practiceLine}`;
  }catch(error){if(dialog===d)slot.textContent=(error as Error).message;}
 }

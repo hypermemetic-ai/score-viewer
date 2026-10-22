@@ -46,6 +46,15 @@ test('grace notes sound just before their host, a little softer; ties of the sam
   graceGroups:[{id:'g',members:[{id:'m1',pitch:{pitchClass:1,octave:4},duration:'1/16'},{id:'m2',pitch:{pitchClass:6,octave:4},duration:'1/16'}],occurrences:[{id:'o',sourceBar:2,pass:1,tick:120,hostNoteIds:['h']}]}]}),quarter);
  assert.deepEqual(s.notes.map(n=>[n.tick,n.end,n.midi,n.velocity]),[[108,114,61,70],[114,120,66,70],[120,216,71,78]]);
 });
+test('a grace in a repeated bar sounds on each pass through it',()=>{
+ const repeat={performedTotalTicks:312,writtenBars:3,occurrences:[{performedBar:1,writtenBar:1,pass:1,performedTick:0,writtenTick:0},{performedBar:2,writtenBar:2,pass:1,performedTick:24,writtenTick:24},{performedBar:3,writtenBar:2,pass:2,performedTick:120,writtenTick:24},{performedBar:4,writtenBar:3,pass:1,performedTick:216,writtenTick:120}],events:{}};
+ const grace={id:'g',members:[{id:'m1',pitch:{pitchClass:1,octave:4},duration:'1/16'}],occurrences:[{id:'o',sourceBar:1,pass:1,tick:72,hostNoteIds:['h']}]};
+ const s=buildPerformanceSchedule(base({totalTicks:216,notes:[note('h',72,24,71)],graceGroups:[grace],writtenPresentation:repeat}),quarter);
+ assert.deepEqual(s.notes.filter(n=>n.midi===61).map(n=>n.tick),[66,162],'once before each pass\'s host');
+ // A pass with a visit of its own plays that one.
+ const own=buildPerformanceSchedule(base({totalTicks:216,notes:[note('h',72,24,71)],graceGroups:[{...grace,occurrences:[...grace.occurrences,{id:'o2',sourceBar:1,pass:2,tick:96,hostNoteIds:['h']}]}],writtenPresentation:repeat}),quarter);
+ assert.deepEqual(own.notes.filter(n=>n.midi===61).map(n=>n.tick),[66,186]);
+});
 test('later tempos stretch the clock and the playing time; repeats return to the tempo in force',()=>{
  // Opening ♩=60, ♩=120 from the third bar: that bar takes half as long.
  const s=buildPerformanceSchedule(base({notes:[note('a',0,24,60)],tempos:[{tick:0,bpm:60,description:'Andante'},{tick:120,bpm:120}]}),quarter);
