@@ -124,6 +124,11 @@ export class PersonalMemorySession {
   const refs=Object.entries(this.snapshot.refs).filter(([name])=>name.startsWith(`state-${entryId}`)).sort(([a],[b])=>a<b?-1:a>b?1:0);
   return refs;
  }
+ /** What reading a score rests on in the store, by content name: its hand
+  * choices and the fingering memory; undefined while unsaved edits stand in for them. */
+ readingRefs(entryId:string):{state:Array<[string,string]>;memory:string|null}|undefined{
+  const state=this.storedRefs(entryId);return state&&{state,memory:this.snapshot?.refs[personalMemoryDocument]??null};
+ }
  /** Adopt memory that is already indexed, writing nothing. False when it is
   * not indexed yet or saves wait for recovery: opening a score does those. */
  async adoptIndexed():Promise<boolean>{

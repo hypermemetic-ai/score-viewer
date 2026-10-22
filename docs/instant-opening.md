@@ -40,11 +40,21 @@ A preparation writes its files at its own steps, never on a timer, and lets inpu
 
 **Personal memory is read once per change.** Stored assistance objects are named by their content. The session therefore reads and validates the memory document again only when its stored object changes. It keeps each recent score's registered occurrences, and its fingering resolution, by memory identity and hand choices, because every opening reads its package afresh. Another session's change gives the memory document a new name, which forces a fresh read.
 
-## Opening steps after this change
+**The score just closed stays in memory.** Back keeps the reading of the score being left: its package, its pages and the projection of its hand choices. Reopening that score draws it again, with no read, admission, archive copy, identity hash or projection, when nothing it rests on has changed:
+
+- the library entry, whose archive and personal files are named by their content;
+- the score's stored hand choices and the fingering memory, also named by content;
+- the preferences, apart from which score was opened last;
+- any carried hand the engraver refused in this session, which is not stored but changes the pages;
+- the build, which carries the ISO notation pin.
+
+Comparing these needs no reads. Any difference opens the score afresh. Personal state is still loaded from the memory session on reopen, so practice progress and records are exactly what was saved. The MIDI clock is acquired again, and the selection starts empty, as on any opening. One score is held. Opening any score frees it, and so does memory pressure (more than half the script heap in use, checked at Back and every 30 s). It is not kept when hand choices were still waiting on Back, when edits are unsaved, for dual readings and reading-only scores, or for readings not opened from the library.
+
 
 | Situation | What happens |
 | --- | --- |
-| Reopen, nothing changed | Admission checks digests and seats; the pages' passive-ink check comes from its receipt. Personal memory and its resolution come from the memo, whose key leaves out where the reader is looking (page, rotation, selected contact). The projection comes from memory when the score was last read or engraved in this window (the last two are kept), otherwise from disk. No engraving. |
+| Reopen of the score just closed, nothing changed | Drawn from the kept reading: no read, admission or projection. |
+| Reopen, nothing changed, after another score or in a new session | Admission checks digests and seats; the pages' passive-ink check comes from its receipt. Personal memory and its resolution come from the memo, whose key leaves out where the reader is looking (page, rotation, selected contact). The projection comes from memory when the score was last read or engraved in this window (the last two are kept), otherwise from disk. No engraving. |
 | First opening after an app update that leaves the engraving code unchanged | The same as a reopen: the derived identity has not changed. |
 | First opening after an engraver update | Usually prepared already in the library. Otherwise one engrave, as before. |
 | Hand edit | Re-engraves in the settled engine (ISO notation's incremental path). It is not cached ahead of time. |
