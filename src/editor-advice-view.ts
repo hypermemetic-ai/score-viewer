@@ -7,7 +7,7 @@ import type {EditorAdviceResult,EditorAdviceWarning} from './fingering-advice';
 export function editorAdviceMarkerLabel(p:Pick<ScorePackage,'seats'>,warning:EditorAdviceWarning):string {
  return adviceExplanation(warning,ids=>{
   const bars=[...new Set(p.seats.filter(seat=>!seat.continuation&&seat.ownerIds.some(id=>ids.includes(id))).map(seat=>seat.writtenBar))].sort((a,b)=>a-b);
-  return bars.length?`${bars.length===1?'measure':'measures'} ${bars.join(', ')}`:'contact';
+  return bars.length?`${bars.length===1?'bar':'bars'} ${bars.join(', ')}`:'contact';
  });
 }
 const rect=(box:readonly number[]):AdviceRect=>({x:box[0],y:box[1],width:box[2]-box[0],height:box[3]-box[1]});
