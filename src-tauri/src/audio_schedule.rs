@@ -536,7 +536,11 @@ mod tests {
         // Play, Home and resume start a fresh stream: an event the output has
         // already passed is too soon, so the producer retries with a new lead.
         assert_eq!(bus.replace(&mut sub, now, None, &[on(now + lead - 1, 60)]), Err(TOO_SOON.into()));
-        assert!(bus.replace(&mut sub, now, None, &[on(now + lead, 60)]).is_ok());
+        // On time is accepted (on its own bus: this one's queue is filled below).
+        let fresh = ScheduleBus::default();
+        fresh.restart();
+        running(&fresh, now);
+        assert!(fresh.replace(&mut Submitter::default(), now, None, &[on(now + lead, 60)]).is_ok());
         for bad in [
             Event { at: now + 100_000, kind: 9, key: 60, value: 1 },
             Event { at: now + 100_000, kind: NOTE_ON, key: 128, value: 1 },
