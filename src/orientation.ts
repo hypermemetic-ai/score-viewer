@@ -17,5 +17,8 @@ export function fitSurface(el:HTMLElement,rotation:Rotation,width=innerWidth,hei
  const logical=logicalViewport(width,height,rotation);el.style.width=`${logical.width}px`;el.style.height=`${logical.height}px`;el.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)`;el.dataset.rotation=String(rotation);return logical;
 }
 export function fitDialog(el:HTMLDialogElement,rotation:Rotation,width=innerWidth,height=innerHeight){
- const logical=logicalViewport(width,height,rotation);el.style.position='fixed';el.style.inset='auto';el.style.left='50%';el.style.top='50%';el.style.margin='0';el.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)`;el.style.setProperty('--viewer-logical-width',`${logical.width}px`);el.style.setProperty('--viewer-logical-height',`${logical.height}px`);el.style.maxWidth=`min(${Math.max(1,logical.width-32)}px, var(--viewer-dialog-max, 640px))`;el.style.maxHeight=`${Math.max(1,logical.height-32)}px`;el.dataset.rotation=String(rotation);
+ const logical=logicalViewport(width,height,rotation);el.style.position='fixed';el.style.inset='auto';el.style.left='50%';el.style.top='50%';el.style.margin='0';
+ // A dialog placed high or low keeps to that edge of the logical screen in any rotation.
+ const edge=`${Math.max(0,logical.height/2-16)}px`,place=el.dataset.place==='low'?` translate(0,calc(${edge} - 50%))`:el.dataset.place==='high'?` translate(0,calc(50% - ${edge}))`:'';
+ el.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)${place}`;el.style.setProperty('--viewer-logical-width',`${logical.width}px`);el.style.setProperty('--viewer-logical-height',`${logical.height}px`);el.style.maxWidth=`min(${Math.max(1,logical.width-32)}px, var(--viewer-dialog-max, 640px))`;el.style.maxHeight=`${Math.max(1,logical.height-32)}px`;el.dataset.rotation=String(rotation);
 }
