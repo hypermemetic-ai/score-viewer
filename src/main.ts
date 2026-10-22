@@ -17,7 +17,7 @@ import {defaultPianoPreferences,readPianoPreferences,type PianoPreferences} from
 import {OptionsBindingsPanel,optionsBindingRows} from './options-bindings';
 import {OptionsNavigation} from './options-navigation';
 import {workingSpeedArrow} from './practice-shortcuts';
-import {PackageAdmissionSession} from './package-admission-session';
+import {PackageAdmissionSession,admissionRejection} from './package-admission-session';
 import {optionsSectionsMarkup,type OptionsSection} from './options-sections';
 import {ReaderPageCache,createReaderPage,mountReaderPages,type ReaderPage} from './reader-page-cache';
 import {mountScorePrint,pdfSaveMessage,scorePageSize,scorePdfFilename} from './score-pdf';
@@ -59,8 +59,8 @@ import {scoreImportKind,MUSESCORE_IMPORT_ENABLED} from './score-import-kind';
 import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-parts-install';
 import {requirePracticeHands} from './practice';
 import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
-import type {ReadingExecution} from './reading-execution';
-import {SavedPagesLackRepeats,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
+import {checkReadingExecution,type ReadingExecution} from './reading-execution';
+import {SavedPagesLackRepeats,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,usePianoPageCheckReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,EDITOR_COLUMN,readerFit,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
@@ -82,7 +82,9 @@ import {PersonalEditQueue} from './personal-edit-queue';
 import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type PersonalMemoryAction} from './personal-memory-session';
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
-import {PersonalMemoryLibrary} from './personal-memory-library';
+import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
+import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
+import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
 import {effectiveAssignmentKey} from './personal-assignments';
@@ -94,7 +96,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
+import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction} from './hand-recurrence-text';
 import {HandChoiceQueue,HandPreparationStatus,abandonedChoicesText,keptHandsText,waitingOutcomeText,type WaitingHandChoice} from './hand-editing-wait';
 import {DerivedFileCache} from './derived-file-cache';
@@ -119,11 +121,76 @@ const readerAdmission=new PackageAdmissionSession({maxEntries:2,maxRetainedBytes
 // Derived results this build already made are kept on disk within a size
 // budget: native builds only. The browser's local storage is too small for
 // pages, and a development server's source can change under one identity.
+let aheadOfTime:AheadOfTimeEngraving|undefined;
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
+ // What opening each score reads from disk is made while the player is in the library.
+ aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();}});
  usePersonalProjectionCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
+ usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});
+}
+// Ahead-of-time work is for when the player leaves the library alone; any input there defers it.
+holdAheadOfTimeOnInput(window,()=>aheadOfTime,()=>!current&&!readingOperation);
+const libraryOrder=(closed?:string)=>aheadOfTimeOrder(entries.map(e=>e.id),preferences.lastWorkedEntryId,closed);
+/** What a preparation of a score is made for, as the library stands now: an
+ * opening takes over only work made for what it will show. */
+function aheadOfTimeBasis(entryId:string):string {
+ const entry=entries.find(e=>e.id===entryId);
+ return JSON.stringify([preferences.keyboardLayout,entry?.file??null,entry?.importedAt??null,entry?.personalFiles??null,personalMemory.storedRefs(entryId)??null]);
+}
+// Its own admission and projection worker, so it never holds the reader's
+// busy, and stopping it never costs the reader's warm engines.
+let aheadWorker:ProjectionWorkerClient|undefined;
+const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:64*1024*1024});
+/** Make what opening a score reads from the derived-file cache: its pages for
+ * the player's saved hands, exactly as opening would project them. Read only:
+ * an edition that must be engraved again, a layout it lacks or memory not yet
+ * indexed is left for opening, which writes what it must. */
+const idleTime=()=>new Promise<void>(resolve=>{if(typeof requestIdleCallback==='function')requestIdleCallback(()=>resolve(),{timeout:5000});else setTimeout(resolve,0);});
+async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,work:AheadOfTimeWork){
+ if(!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
+ // What this preparation is made for is read here, at once; an opening takes it over only while that stands.
+ const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout,stored=personalMemory.storedRefs(entryId);if(!entry||!stored)return;work.started();
+ const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
+ // Everything known before admission. A score already prepared, refused or
+ // needing nothing costs a hash and a few header reads, not an admission.
+ const key=await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
+ const digest=async(name:string)=>{const b=await host.read(name);return b?hashBytes(b):null;};
+ if(await preparedBefore(derived,key,{served:served=>projectionServed(derived,served),digest}))return;checkReadingExecution(execution);
+ // Between steps a click is answered at once, and input in the library holds
+ // the work here until the next quiet moment: the player never waits for it.
+ const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
+ await prepareRecorded(derived,key,async read=>{
+  if(readingOnlyArchive(bytes))return null;
+  // Only admission rejecting the archive, or the engraver refusing its pages, is a refusal.
+  await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}),admissionRejection);await answerInput();
+  if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
+  // A journal kept outside the store is a file: its digest joins the record.
+  const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
+  const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(journals,entry,selected);checkReadingExecution(execution);
+  const personal=personalMemory.personalFor({entryId,importedAt:entry.importedAt,p:selected,personal:journal});
+  await answerInput();const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);await answerInput();
+  // An edition that must be engraved again is made, and saved, by opening it.
+  if(!('package' in q))return null;
+  // Its files are written at the steps below, never on a timer of their own.
+  const session=new PersonalPresentationSession(q.package,separatePreparations(),{worker:aheadWorker??=projectionWorkerClient(),cacheWriteDelayMs:null}),served=await session.projectionEntry(q.personal??personal);
+  if(!served)return null;
+  if(!await projectionServed(derived,served)){
+   await answerInput();await refusedWhen(session.project(q.personal??personal,execution),engravingRefusal);
+   // The pages opening reads are written as soon as input allows; an opening
+   // that took this work over goes on from here.
+   await answerInput();await session.flushProjection();checkReadingExecution(execution);
+  }
+  work.ready();
+  // Then, in idle time, the engine hand editing resumes from: settled when an
+  // earlier reading made the pages but saved none, and saved before the
+  // worker holding it is freed. The worker encodes it; this thread writes a file.
+  if(await session.engineMissing()){await answerInput();await refusedWhen(session.warm(execution),engravingRefusal);checkReadingExecution(execution);}
+  if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
+  return served;
+ });
 }
 type ReadingJob=NonNullable<typeof job>;
 interface ReadingOperation {
@@ -169,7 +236,7 @@ function openingLoading(entryId:string){return new LoadingProgress(scoreTitle(en
 function beginReading(entryId:string,loading?:LoadingProgress){
  const carried=carriedLoading;carriedLoading=undefined;
  if(job?.state==='installing')throw Error('A score is being saved. Try again in a moment.');
- job?.cancel();cancelPersonalPrefetch();
+ job?.cancel();cancelPersonalPrefetch();aheadOfTime?.yieldTo(entryId);
  loading??=carried??openingLoading(entryId);
  // A surface carried past its save stays uncancellable: the new edition is
  // already in the library, so Esc must not leave the reader on the old one.
@@ -220,6 +287,9 @@ function finishReading(op:ReadingOperation,success:boolean,error?:unknown){
  else{op.loading.stop();if(dialog===op.dialog)closeDialog(false);}
  readingOperation=undefined;
  if(!success&&op.options&&current===op.previous){options(op.options);if(op.optionsFocus)dialog?.querySelector<HTMLElement>(`[data-options-key="${CSS.escape(op.optionsFocus)}"]`)?.focus();}
+ // An opening cancelled or failed from the library returns there: work it
+ // took over goes on, and its quiet moments prepare scores again.
+ if(!success&&!current)aheadOfTime?.resume(libraryOrder());
 }
 const readerPages=new ReaderPageCache();let dialogBack:(()=>void)|undefined;let optionsSection:string|undefined;let toolbarNavigation:OptionsNavigation|undefined;let dialogNavigation:OptionsNavigation|undefined;
 let orientation=new ViewerOrientation(preferences);
@@ -859,6 +929,8 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  // Opening draws only what this score shows: its own pages, or the saved
  // hand choices' projection. With a projection worker the engraver settles
  // for editing in the worker after opening; without one it settles here, as before.
+ // Opening the score being prepared ahead of time waits for it, then reads its pages from disk.
+ await aheadOfTime?.joined(next.entry.id,op.controller.signal);check();
  cancelPersonalPrefetch();const nextEditor=personalEditor(next);if(nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}nextEditor.view=await nextEditor.session.project(next.personal,readingExecution(op))
   .catch(async error=>{const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;return kept.view;});resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
@@ -873,7 +945,11 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  if(context){await startPractice(context,admitted);if(op)checkReadingOwner(op);if(activation!==scoreActivation||current!==next)throw cancelledReading();}else render();
  if(personalMemory.error)paintPersonalSaveError(next,personalMemory.error);
  // The projection worker settles the engraving for hand editing while the score is read; practice never shares it.
- if(!context&&scoreCapabilities(next.package).pianoPreparation)personalEditor(next).session.prefetch();
+ // Work taken over from the library saves its engine first, which this then restores.
+ if(!context&&scoreCapabilities(next.package).pianoPreparation){
+  const editor=personalEditor(next),settle=()=>{if(current===next)editor.session.prefetch();},saving=aheadOfTime?.finishing(next.entry.id);
+  if(saving){editor.session.engineSavedBy(saving);void saving.then(settle);}else settle();
+ }
  if(ownsOperation)finishReading(op,true);return next;
  }catch(error){if(ownsOperation)finishReading(op,false,error);throw error;}
 }
@@ -977,7 +1053,9 @@ async function switchKeyboard(value:unknown){const source=document.activeElement
    await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext,op);
    finishReading(op,true);
    const said=gained&&gainedNotice(gained,q.package,false);if(said)notify(said);
- }else{await enqueue(async()=>{await writeJson('preferences.json',{...preferences,keyboardLayout:id});preferences.keyboardLayout=id;});repaintLibrary();}
+ }else{await enqueue(async()=>{await writeJson('preferences.json',{...preferences,keyboardLayout:id});preferences.keyboardLayout=id;});repaintLibrary();
+  // Pages prepared for the old layout are no use now: prepare the library for this one.
+  aheadOfTime?.start(libraryOrder());}
  return true;
  }catch(error){if(op)finishReading(op,false,error);reportFailure(error);if(current&&!practice)renderToolbar();return false;}
  finally{keyboardChanging=false;if(optionsSurface?.isConnected&&dialog===optionsSurface){optionsSurface.querySelectorAll<HTMLSelectElement>('[data-keyboard]').forEach(field=>field.value=current?.package.keyboardLayout??preferences.keyboardLayout);if(document.activeElement===source||!source?.isConnected)optionsSurface.querySelector<HTMLElement>('[data-keyboard]')?.focus();}}
@@ -1332,7 +1410,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
 
 async function act(action:string){try{if(!startupReady&&action!=='exit')return;if(action==='practiceSettings'){options();return;}if(action==='cancel-job'){if(job?.state==='working')job.cancel();return;}if(action==='instrument'&&!current){libraryMenu.beginInstrument();return;}if(action==='share'){if(current)notify(scoreSaveMessage(await shareInstalledScore(current.package,host)));return;}if(action==='pdf'){await savePdf();return;}if(action==='score-tempo'){if(current&&!practice){const target=current,tempos=await scoreTempoFor(target);if(current===target){await hearAndSetTempo(target,tempos,'Keep this tempo');if(current===target&&!dialog&&!practice){options('score');document.querySelector<HTMLElement>('dialog[data-kind=options] [data-action=score-tempo]')?.focus();}}}return;}if(action==='practice'){if(current&&!readingPresentation)practiceMenu();else await startPractice();return;}if(action==='practice-fingers'||action==='practice-sections'){closeDialog(false);await startPractice(undefined,undefined,action==='practice-fingers');return;}if(practice&&['library','edit'].includes(action)){if(practice instanceof ManualPracticeView){await practice.flush();await savePersonal();}practice.close();practice=undefined;resetInput();render();}if(action==='settings')practice?.pause();if(action==='import'){await importScore();return;}if(action==='settings'){settings();return;}if(action==='close'){closeDialog();return;}if(action==='exit'){await savePersonal();await practice?.flush();await host.close();return;}if(action==='rotate'){preferences.displayRotation=orientation.turn();await savePreferences();if(practice)practice.refit();else if(current)renderPages();else fitSurface(app.querySelector<HTMLElement>('.surface')!,orientation.rotation);if(dialog)fitDialog(dialog,orientation.rotation);return;}if(practice&&['practiceReading','practiceTimed','practiceFreeView'].includes(action)){if(practice instanceof PracticeView)await practice.action(action==='practiceReading'?'reading':action==='practiceTimed'?'timed':'free-view');else if(action==='practiceFreeView')await practice.action('pause');return;}if(practice&&(action==='next'||action==='previous'||action==='done')){await practice.action(action);return;}if(action==='options'){options();return;}if(!current)return;const {package:p,personal:s}=current,v=s.view;
  if(['toggle','edit','feedback','restore-all','undo-restore','earlier-editions','restore-header'].includes(action))requirePianoCapability(p,'pianoPreparation');
- if(action==='library'){adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
+ if(action==='library'){const closed=current?.entry.id;adviceKey='';adviceRunner.cancel();sourceReturn=undefined;selection=undefined;editNavigation='notes';await savePersonal();closeDialog();leaveHandEditingWait();current=undefined;readingPresentation=undefined;readingViewError=undefined;resetInput();render();aheadOfTime?.start(libraryOrder(closed));return;}if(action==='restore-header'){await restoreHeader();return;}if(action==='earlier-editions'){await earlierEditions();return;}if(action==='edit'){selectFinger();return;}if(action==='end-edit'){exitSelection();return;}if(action==='hide'){toolbarVisible=false;renderToolbar();app.querySelector<HTMLElement>('.reader')?.focus();return;}if(action==='feedback'){await host.exportFeedback(JSON.stringify(feedback(p,s),null,2));return;}
  if(selection&&!practice&&['editorNavigation','editorPrevious','editorNext'].includes(action)){
   if(action==='editorNavigation'){editNavigation=editNavigation==='notes'?'measures':'notes';renderEditorNavigation();}
   else if(editNavigation==='measures')selectFingerMeasure(action==='editorPrevious'?-1:1);else selectFinger(action==='editorPrevious'?-1:1);return;
@@ -1528,7 +1606,7 @@ async function boot(){
   if(pianoSettings.enabled)loading.step('sound');await paintCheckpoint();
   const requestedPiano=pianoSettings.enabled;
   try{const audio=await configurePiano();if(requestedPiano&&(!audio?.enabled||!audio.ready||audio.error))pianoWarning=`Piano sound is off: ${audio?.error??'The saved sound configuration is unavailable. Review Piano sound in Options.'}`;}catch(error){pianoWarning=`Piano sound is off: ${(error as Error).message}`;}
-  startupReady=true;loading.stop();startupLoading=undefined;resetInput();app.classList.remove('viewer-startup');render();
+  startupReady=true;loading.stop();startupLoading=undefined;resetInput();app.classList.remove('viewer-startup');render();aheadOfTime?.start(libraryOrder());
   if(pianoWarning||startupNotice)notify([pianoWarning,startupNotice].filter(Boolean).join(' '));
  }catch(error){
   startupFailed=true;app.classList.add('viewer-startup');

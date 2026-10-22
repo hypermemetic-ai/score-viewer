@@ -1,6 +1,7 @@
 import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationExecution,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {withLayoutPeer,type StartLayoutPeer} from './layout-peer';
-import type {ProjectionCoreInputs,ProjectionRequest,ProjectionResponse,ProjectionView,SerializedProjectionError} from './personal-projection-protocol';
+import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
+import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionRequest,type ProjectionResponse,type ProjectionView,type SerializedProjectionError} from './personal-projection-protocol';
 
 /** The calls the projection host makes on one ISO personal projection core. */
 export interface HostedProjectionCore {
@@ -25,7 +26,7 @@ const taskTurn=()=>new Promise<void>(resolve=>{const channel=new MessageChannel(
  * cores as the reader's preparation pool keeps are retained; an evicted core is made again on request. A
  * refused hand choice leaves its core unchanged (ISO publishes a projection
  * only after it succeeds), so the core is kept; any other failure drops it. */
-export function createProjectionHost(post:(response:ProjectionResponse)=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore;
+export function createProjectionHost(post:(response:ProjectionResponse,transfer?:Transferable[])=>void,options:{maxCores?:number;create?:(inputs:ProjectionCoreInputs)=>HostedProjectionCore;
  /** A second worker for a core's whole first engrave (layout-peer.ts). */
  startLayoutPeer?:StartLayoutPeer}={}){
  const cores=new Map<string,HostedProjectionCore>(),maxCores=options.maxCores??2,create=options.create??createHostedCore;
@@ -35,8 +36,8 @@ export function createProjectionHost(post:(response:ProjectionResponse)=>void,op
   let core=cores.get(request.key);
   // A forgotten core has no engine to save; saving never makes one.
   if(request.kind==='save'){
-   let state:PersonalHandEngineState|undefined;try{state=core?.exportState?.();}catch{/* nothing to save */}
-   post({id:request.id,kind:'done',...(state?{state}:{})});return;
+   let engine:EncodedDerivedPayload|undefined;try{const state=core?.exportState?.();if(state)engine=await encodeDerivedPayload(state);}catch{/* nothing to save */}
+   post({id:request.id,kind:'done',...(engine?{engine}:{})},engine?[engine.body.buffer]:[]);return;
   }
   try{
    if(!core){if(!request.create){post({id:request.id,kind:'missing'});return;}core=create(request.create);}
@@ -58,7 +59,9 @@ export function createProjectionHost(post:(response:ProjectionResponse)=>void,op
    }
    const view=settled.has(core)?await core.projectAsync(request.owners,request.digest,execution):
     await engraving(execution=>hostCore.projectAsync(request.owners,request.digest,execution));settled.add(core);
-   post({id:request.id,kind:'done',view:{score:view.score,pages:[...view.pages],seats:[...view.seats],annotationGeometry:view.annotationGeometry}});
+   const shown:ProjectionView={score:view.score,pages:[...view.pages],seats:[...view.seats],annotationGeometry:view.annotationGeometry};
+   let encoded:EncodedDerivedPayload|undefined;if(request.encode)try{encoded=await encodeDerivedPayload(cachedProjectionValue(shown));}catch{/* the reader encodes it */}
+   post({id:request.id,kind:'done',view:shown,...(encoded?{encoded}:{})},encoded?[encoded.body.buffer]:[]);
   }catch(error){
    if(!(error instanceof HandPresentationError)&&cores.get(request.key)===core)cores.delete(request.key);
    post({id:request.id,kind:'error',error:serializeProjectionError(error)});

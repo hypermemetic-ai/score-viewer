@@ -39,6 +39,8 @@ const identity=(o:Pick<MeasureMemoryOccurrence,'keyboardId'|'occurrenceId'|'scop
 const source=(p:ScorePackage)=>p.sourceRevision??p.manifest.revision;
 const presentationId=(i:MemoryScoreInput)=>JSON.stringify([i.entryId,i.p.keyboardLayout??i.p.manifest.keyboardLayout??'janko-four-row',i.p.profileSha256??i.p.manifest.profileSha256??i.p.profileId??i.p.manifest.profileId??`legacy:${source(i.p)}`,i.p.effectiveHandSha256??i.p.manifest.effectiveHandSha256??null,i.p.preparationIdentity?i.p.manifest.revision:null]);
 const inputKey=(i:MemoryScoreInput)=>JSON.stringify([presentationId(i),source(i.p),i.p.preparationIdentity?i.p.manifest.revision:null]);
+/** The identity memory registers a score's occurrences under. */
+export const memoryInputKey=inputKey;
 const date=(s:string|undefined)=>{const n=s===undefined?NaN:Date.parse(s);return Number.isSafeInteger(n)&&n>=0?n:undefined;};
 // Unknown dates deliberately sort last and remain explicitly unknown in metadata.
 const unknownAge=Number.MAX_SAFE_INTEGER;

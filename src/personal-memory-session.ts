@@ -2,10 +2,10 @@ import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-stor
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {canonicalJson} from './piano-preparation-identity';
-import {assigned,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
+import {assigned,handCarryDropGeneration,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
- bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
+ bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,memoryInputKey,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
  resolvePersonalFingeringMemory,captureMemoryFingerEdit,editPersonalFingeringMemory,promotePersonalFingeringReference,
  deletePersonalFingeringEntry,consolidatePersonalFingeringMemory,preservePersonalMemoryHandChange,
  type PersonalFingeringMemory,type MemoryScoreInput,type MemoryFingerEdit,type ConsolidationReceipt,
@@ -100,6 +100,14 @@ export class PersonalMemorySession {
  private inputs=new Map<string,MemoryScoreInput>();
  private pending=new Map<string,CapturedPersonalMemoryIntent>();
  constructor(private readonly store:AssistanceStore,private readonly options:PersonalMemorySessionOptions){}
+ /** The stored memory object `optimistic` was read from, while no edit has
+  * changed it since; stored objects are named by their content. */
+ private adoptedRef?:string;
+ /** The canonical occurrences one stored memory object registers. */
+ private registry?:{ref:string;registered:Set<string>};
+ /** The canonical occurrences recent scores register, by their memory
+  * identity and hand choices: each opening reads its package afresh. */
+ private projected=new Map<string,string[]>();
  private observedMemory?:PersonalFingeringMemory|string;private observedGeneration=0;
  /** A rebase may replace optimistic content with a different document bearing
   * the same revision. Cache authority by identity as well as revision. */
@@ -109,6 +117,21 @@ export class PersonalMemorySession {
  get revision(){return this.snapshot?.revision??0;}
  get error(){return this.failed;}
  get recovery(){return [...this.pending.values()].map(clone);}
+ /** The stored objects holding this score's hand choices, by name (none when
+  * nothing is stored for it), or undefined while unsaved edits stand in for them. */
+ storedRefs(entryId:string):Array<[string,string]>|undefined{
+  if(!this.snapshot||this.pending.size)return;
+  const refs=Object.entries(this.snapshot.refs).filter(([name])=>name.startsWith(`state-${entryId}`)).sort(([a],[b])=>a<b?-1:a>b?1:0);
+  return refs;
+ }
+ /** Adopt memory that is already indexed, writing nothing. False when it is
+  * not indexed yet or saves wait for recovery: opening a score does those. */
+ async adoptIndexed():Promise<boolean>{
+  if(this.snapshot)return true;if(this.initializing){await this.initializing;return !!this.snapshot;}
+  const current=await this.store.read();
+  if(current.documents[personalMemoryDocument]===undefined||Object.keys(record(current.documents[pendingDocument])).length)return false;
+  await this.initialize();return !!this.snapshot;
+ }
  initialize():Promise<void>{return this.initializing??=this.initializeOnce().catch(error=>{this.initializing=undefined;throw error;});}
  private async initializeOnce(){
   for(let attempt=0;attempt<maxAttempts;attempt++){
@@ -144,9 +167,32 @@ export class PersonalMemorySession {
  }
  currentInputs():MemoryScoreInput[]{return [...this.inputs.values()].map(input=>({...input,personal:this.personalFor(input)}));}
  private adopt(snapshot:AssistanceSnapshot){
+  // The same stored memory, unchanged here since it was read, need not be read again.
+  const ref=snapshot.refs[personalMemoryDocument];if(ref!==undefined&&ref===this.adoptedRef&&this.optimistic){this.snapshot=snapshot;return;}
   const document=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);
   if(!document.indexed)throw Error('Personal fingering library index is incomplete.');
-  this.snapshot=snapshot;this.optimistic=document;
+  this.snapshot=snapshot;this.optimistic=document;this.adoptedRef=ref;
+ }
+ /** Whether stored memory already registers every occurrence of this score. */
+ private known(snapshot:AssistanceSnapshot,candidate:MemoryScoreInput):boolean {
+  const ref=snapshot.refs[personalMemoryDocument];let registered=ref!==undefined&&this.registry?.ref===ref?this.registry.registered:undefined;
+  if(!registered){
+   // One canonical form per registered occurrence, not one per comparison.
+   const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);registered=new Set(Object.values(memory.occurrences).map(actual=>canonicalJson(actual.occurrence)));
+   if(ref!==undefined)this.registry={ref,registered};
+  }
+  // Where the reader is looking does not change which bars are registered, so it does not key the memo.
+  const {view:_view,navigation:_navigation,editContactId:_editContactId,...authored}=candidate.personal;
+  // Hands carried from matching bars are derived: the score is known with them or without them.
+  return [{},{carry:false}].some(options=>{
+   const choice=JSON.stringify([memoryInputKey(candidate),candidate.p.transposition??null,candidate.importedAt??null,handCarryDropGeneration(),authored,options]);
+   let wanted=this.projected.get(choice);
+   if(!wanted){
+    wanted=projectPersonalMemoryScore(candidate,options).map(w=>canonicalJson(w.occurrence));
+    this.projected.set(choice,wanted);if(this.projected.size>8)this.projected.delete(this.projected.keys().next().value!);
+   }
+   return wanted.every(w=>registered.has(w));
+  });
  }
  private personalAt(snapshot:AssistanceSnapshot,input:MemoryScoreInput):PersonalState {
   const key=inputKey(input);return readPersonal(snapshot.documents[key]??rawMemoryPersonal(input.personal),input.p);
@@ -173,15 +219,11 @@ export class PersonalMemorySession {
   const input={entryId:entry.id,importedAt:entry.importedAt,p,personal};this.remember([input]);
   // A score whose own records are registered is known: hands carried from matching
   // bars are derived, so merely opening it registers nothing new. The next edit does.
-  const known=(snapshot:AssistanceSnapshot,candidate:MemoryScoreInput)=>{
-   const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]),registered=new Set(Object.values(memory.occurrences).map(actual=>canonicalJson(actual.occurrence)));
-   return [{},{carry:false}].some(options=>projectPersonalMemoryScore(candidate,options).every(wanted=>registered.has(canonicalJson(wanted.occurrence))));
-  };
-  if(!known(current,input)){
+  if(!this.known(current,input)){
    await this.schedule(async()=>{
     for(let attempt=0;attempt<maxAttempts;attempt++){
      const snapshot=await this.store.read(),latest={...input,personal:this.personalAt(snapshot,input)};
-     if(known(snapshot,latest)){this.rebase(snapshot);return;}
+     if(this.known(snapshot,latest)){this.rebase(snapshot);return;}
      const memory=importPersonalMemoryScore(readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]),latest);
      const result=await this.store.commit({expectedRevision:snapshot.revision,changes:json({[personalMemoryDocument]:memory,[key]:latest.personal})});
      if(result.status==='committed'){this.rebase(result.snapshot);return;}
@@ -229,7 +271,7 @@ export class PersonalMemorySession {
  * order. Promise rejection pauses entry and retains all pending recovery data. */
  accept(input:MemoryScoreInput,action:PersonalMemoryAction):PersonalMemoryAccepted {
   const intent=this.capture(input,action),result=this.apply(this.memory,{...input,personal:rawMemoryPersonal(input.personal)},intent);
-  this.optimistic=result.document;this.inputs.set(intent.personalKey,{...input,personal:result.personal});this.pending.set(intent.id,intent);
+  this.optimistic=result.document;this.adoptedRef=undefined;this.inputs.set(intent.personalKey,{...input,personal:result.personal});this.pending.set(intent.id,intent);
   const work=()=>this.persist(intent);this.persisting.set(work,intent.id);
   const saved=this.schedule(work);
   return{intent,personal:clone(result.personal),memory:clone(result.document),saved};
@@ -344,7 +386,7 @@ export class PersonalMemorySession {
   this.adopt(snapshot);const raw=new Map<string,PersonalState>();
   for(const intent of this.pending.values()){
    const target=this.target(intent),input={...target,personal:raw.get(intent.personalKey)??this.personalAt(snapshot,target)},result=this.apply(this.optimistic!,input,intent);
-   this.optimistic=result.document;raw.set(intent.personalKey,result.personal);
+   this.optimistic=result.document;this.adoptedRef=undefined;raw.set(intent.personalKey,result.personal);
   }
   for(const [key,input]of this.inputs)this.inputs.set(key,{...input,personal:raw.get(key)??this.personalAt(snapshot,input)});
  }
