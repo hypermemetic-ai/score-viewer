@@ -9,7 +9,7 @@ import {importPackage,archivePackage,hashBytes,usePianoPageCheckReceipts} from '
 import {PersonalPresentationSession,projectionServed} from '../src/personal-presentation';
 import {PersonalPreparationPool} from '../src/personal-preparation-pool';
 import {ProjectionWorkerClient} from '../src/personal-projection-client';
-import {AheadOfTimeEngraving,preparedBefore,prepareRecorded} from '../src/ahead-of-time-engraving';
+import {AheadOfTimeEngraving,preparedBefore,prepareRecorded,aheadOfTimeOrder} from '../src/ahead-of-time-engraving';
 import {derivedModuleClosure,viewerDerivedIdentity} from '../scripts/derived-identity';
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
@@ -184,4 +184,11 @@ test('piano pages checked once as passive ink are not parsed again; changed page
   for(const [name,bytes] of Object.entries(q.files))q.manifest.files[name]=await hashBytes(bytes);
   await assert.rejects(admit(archivePackage(q.manifest,q.files)),/active|external|unsupported/i);assert.equal(receipts.size,1);
  }finally{usePianoPageCheckReceipts(undefined);}
+});
+
+test('the library prepares the score last worked on first, and never the score just closed',()=>{
+ assert.deepEqual(aheadOfTimeOrder(['a','b','c'],'b'),['b','a','b','c']);
+ // Its pages are in memory, and the reader writes them itself: preparing it would race that write.
+ assert.deepEqual(aheadOfTimeOrder(['a','b','c'],'b','b'),['a','c']);
+ assert.deepEqual(aheadOfTimeOrder(['a','b','c'],undefined,'c'),['a','b']);
 });

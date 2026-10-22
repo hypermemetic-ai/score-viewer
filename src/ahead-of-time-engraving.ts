@@ -11,6 +11,12 @@ import type {ProjectionEntry} from './personal-presentation';
  * under way instead of starting it again (the shared preparation pool and
  * projection worker serve both). Nothing here writes the player's data; a
  * failure or a stop costs nothing but the work. */
+/** Library scores in the order the player is likeliest to open them, the one
+ * last worked on first. The score just closed is left out: its pages are in
+ * memory, and the reader writes them to disk itself. */
+export function aheadOfTimeOrder(entryIds:readonly string[],lastWorked?:string,closed?:string):string[]{
+ return [...entryIds.filter(id=>id===lastWorked),...entryIds].filter(id=>id!==closed);
+}
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
  private running?:{entryId:string;done:Promise<void>};
