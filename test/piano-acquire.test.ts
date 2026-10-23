@@ -16,7 +16,7 @@ test('one press installs the piano and turns its sound on, keeping volume and la
  const p=player(async()=>ready);
  assert.deepEqual(await getPiano(p.api),ready);
  assert.equal(p.downloads,1);
- assert.deepEqual(p.saved,[{version:1,enabled:true,volume:.42,latencyTier:2}]);
+ assert.deepEqual(p.saved,[{version:1,enabled:true,volume:.42,latencyTier:2,levels:2}]);
 });
 
 test('a cancelled, interrupted or refused download leaves sound and saved choices alone',async()=>{

@@ -14,7 +14,7 @@ import {PianoOptionsPanel} from './piano-options';
 import {getPiano as getPianoSound} from './piano-acquire';
 import './piano-options.css';
 import {nativePiano,type PianoAudioStatus} from './piano-host';
-import {builtInClicks,cueGain,cueVolume,defaultPianoPreferences,readPianoPreferences,type PianoPreferences} from './piano-preferences';
+import {builtInClicks,cueGain,cueVolume,defaultPianoPreferences,loadPianoPreferences,PIANO_LEVELS,readPianoPreferences,type PianoPreferences} from './piano-preferences';
 import {OptionsBindingsPanel,optionsBindingRows} from './options-bindings';
 import {OptionsNavigation} from './options-navigation';
 import {workingSpeedArrow} from './practice-shortcuts';
@@ -484,7 +484,7 @@ async function configurePiano(){if(!pianoSettings.enabled)return nativePiano.con
 /** One press: the piano downloads, installs and then sounds, even if Options
  * closed meanwhile. A file install leaves sound as it was. */
 const getPiano=()=>getPianoSound({download:nativePiano.download,preferences:()=>pianoSettings,save:savePiano},message=>{pianoWarning=message;});
-function savePiano(next:PianoPreferences,sounding=false):Promise<PianoAudioStatus>{return enqueue(async()=>{const admitted=readPianoPreferences(next),bank=await nativePiano.bankStatus();if(admitted.enabled&&!bank.installed)throw Error('Install piano before enabling sound.');const previous={...pianoSettings},status=await nativePiano.configure(admitted,preferences.audioOutput??'',bank.installed);if(sounding&&admitted.enabled&&(status.error||!status.enabled||!status.running)){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw Error(status.error||'Its sound output did not start.');}if(admitted.enabled&&(status.error||!status.enabled))throw Error(status.error||'Piano sound could not start.');try{await writeJson('preferences.json',{...preferences,piano:admitted});}catch(error){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw error;}preferences.piano=admitted;pianoSettings=admitted;builtInClicks.gain=cueGain(cueVolume(admitted));pianoWarning='';return status;});}
+function savePiano(next:PianoPreferences,sounding=false):Promise<PianoAudioStatus>{return enqueue(async()=>{const admitted={...readPianoPreferences(next),levels:PIANO_LEVELS},bank=await nativePiano.bankStatus();if(admitted.enabled&&!bank.installed)throw Error('Install piano before enabling sound.');const previous={...pianoSettings},status=await nativePiano.configure(admitted,preferences.audioOutput??'',bank.installed);if(sounding&&admitted.enabled&&(status.error||!status.enabled||!status.running)){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw Error(status.error||'Its sound output did not start.');}if(admitted.enabled&&(status.error||!status.enabled))throw Error(status.error||'Piano sound could not start.');try{await writeJson('preferences.json',{...preferences,piano:admitted});}catch(error){await nativePiano.configure(previous,preferences.audioOutput??'',bank.installed).catch(()=>{});throw error;}preferences.piano=admitted;pianoSettings=admitted;builtInClicks.gain=cueGain(cueVolume(admitted));pianoWarning='';return status;});}
 async function personalContext(target:NonNullable<typeof current>){
  const entry=entries.find(e=>e.id===target.entry.id)??target.entry,active=matchingCurrent(target);let p=active?.package??target.package;
  if(!active&&entry.file!==target.entry.file)throw Error('The score edition changed; the pending choice stays with its previous edition.');
@@ -1728,7 +1728,10 @@ async function boot(){
   }
   if(preferences.lastWorkedEntryId!==undefined&&(typeof preferences.lastWorkedEntryId!=='string'||!/^[a-f0-9]{64}$/.test(preferences.lastWorkedEntryId)))throw Error('Saved score selection differs; data retained');
   if(preferences.audioOutput!==undefined&&typeof preferences.audioOutput!=='string')throw Error('Saved audio output differs; data retained');
-  try{pianoSettings=readPianoPreferences(preferences.piano);}catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}builtInClicks.gain=cueGain(cueVolume(pianoSettings));
+  try{const loaded=loadPianoPreferences(preferences.piano);pianoSettings=loaded.preferences;
+   // PIANO VOLUME MIGRATION: written back once, over the file as read, so no other setting changes.
+   if(loaded.migrated&&saved){preferences.piano=pianoSettings;await enqueue(()=>writeJson('preferences.json',{...saved,piano:pianoSettings})).catch(()=>{});}
+  }catch(error){pianoSettings=defaultPianoPreferences();pianoWarning=(error as Error).message;}builtInClicks.gain=cueGain(cueVolume(pianoSettings));
   preferences.fingeringAdvice=readFingeringAdviceSettings(preferences.fingeringAdvice);
   // Kept written-out repeats only hide a notice: an unreadable list is forgotten, never fatal.
   if(preferences.writtenOutRepeats!==undefined)preferences.writtenOutRepeats=Array.isArray(preferences.writtenOutRepeats)?preferences.writtenOutRepeats.filter((k:unknown):k is string=>typeof k==='string').slice(-KEPT_WRITTEN_OUT):undefined;
