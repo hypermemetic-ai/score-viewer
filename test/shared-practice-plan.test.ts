@@ -26,3 +26,10 @@ test('a changed hand, edition fingers or score gets its own plan',()=>{
  assert.notEqual(sharedPracticePlan(relayered,'bounded-exercises-v1',personal),first,'edition fingers are part of what is planned from');
  assert.equal(sharedPracticePlan(p,'bounded-exercises-v1',personal),first,'the first plan is still kept');
 });
+
+test('the same music on the other keyboard gets its own plan: a plan names its keyboard',()=>{
+ const personal=initialPersonal(p),first=sharedPracticePlan(p,'bounded-exercises-v1',personal);
+ const other=structuredClone(p);other.keyboardLayout=p.keyboardLayout==='conventional-piano'?'janko-four-row':'conventional-piano';
+ const plan=sharedPracticePlan(other,'bounded-exercises-v1',personal);
+ assert.notEqual(plan,first);assert.equal(plan.keyboardLayout,other.keyboardLayout);
+});

@@ -99,12 +99,12 @@ export function sharedPracticePlan(p:ScorePackage,partition:PracticePartition='b
 /** Plans kept by what they were planned from, newest last. */
 const plannedPractice=new Map<string,PracticePlan>(),KEPT_PLANS=4;
 /** What a plan is planned from, by content: the score (and the source it is
- * cut by), its revision and edition fingers (hands resolve against them),
+ * cut by), its keyboard (the plan names it), its revision and edition fingers (hands resolve against them),
  * whether it may be practised, the partition, the player's choices and tempo.
  * Where the reader is looking plans nothing. */
 function practicePlanKey(p:ScorePackage,partition:PracticePartition,personal:PersonalState|undefined,player:ReferencePerformanceTempo|undefined):string{
  const {view:_view,navigation:_navigation,editContactId:_edit,...choices}=personal??{} as Partial<PersonalState>;
- const text=JSON.stringify([partition,personal?choices:null,player??null,scoreCapabilities(p).pianoPractice,p.sourceRevision??null,p.manifest,p.fingerLayer??null,p.score,p.sourceScore&&p.sourceScore!==p.score?p.sourceScore:null]);
+ const text=JSON.stringify([partition,personal?choices:null,player??null,scoreCapabilities(p).pianoPractice,p.keyboardLayout??null,p.sourceRevision??null,p.manifest,p.fingerLayer??null,p.score,p.sourceScore&&p.sourceScore!==p.score?p.sourceScore:null]);
  // Two independent 32-bit FNV-1a passes, with the length: a content name, not a security claim.
  let a=0x811c9dc5,b=0x01000193^text.length;
  for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);a=Math.imul(a^c,0x01000193);b=Math.imul(b^c,0x5bd1e995);b^=b>>>15;}
