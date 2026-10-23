@@ -5,7 +5,8 @@
 The moves are grouped by written bar and by the hand the source writes them in. For each moved note `n` in bar `b`, the candidates are the notes alike in hand, pitch, length and articulation marks (indexed once per score). A candidate `q` in another bar `t` counts when:
 
 1. **Same beat.** It stands at the same place in its bar, counted from the downbeat. A pickup bar starts `full − extent` ticks before its downbeat, so No. 13's opening B4 (bar 1) stands at the same beat as the pickup B4 at the end of bar 11.
-2. **Same neighbours in that hand.** The notes the source writes in that hand at three onsets match, each with the same pitch, offset from the moved note, length and marks: the onset just before the note, the note's own onset (the notes struck with it), and the onset just after it. The neighbouring onsets may lie across the barline. A side with no note (the opening pickup has nothing before it) matches only a side with none. Notes further away and the other hand are not compared. The signature is cached per note.
+2. **Struck with the same notes.** The notes the source writes in that hand at the note's own onset match, each with the same pitch, length and marks.
+3. **The same neighbour on at least one side in that hand.** The notes at the onset just before the note, or those at the onset just after it, match, each with the same pitch, offset from the moved note, length and marks. The neighbouring onsets may lie across the barline. A side with no note never matches, so the opening pickup, with nothing before it, is decided by the note after it alone. The other side, notes further away and the other hand are not compared. The three signatures are cached per note.
 
 Then the move's hand is carried to `q`, unless `q` has the owner's own hand (`ownsHand`) or the result can't be drawn. The moves of one hand in one bar that reach the same bar `t` are carried there together, so the drawability check sees all the copies that hand brings; moves of the other hand in the same bar are matched, and checked, on their own.
 
@@ -24,15 +25,20 @@ A slur in the other hand is not part of the moved note's hand, so it does not bl
 
 - **Whole-bar comparison in both hands** (the previous rule, and ISO's twin bars). It blocks returns where only the other hand differs, which the rule says must still match. It also ignores slurs.
 - **The hand over the part of the bar both places share** (this change's first round). It refused a return over any difference anywhere in the bar, so one changed note blocked every identical note of the bar. Decided 2026-10-23: compare the note's neighbours only.
+- **Both neighbours** (the second round). It refused a note whose hand goes on differently after it, such as No. 13 bar 11's left-hand D#4 at bar 21, and every opening pickup, since a return always has a note before it. Decided 2026-10-23: one matching side is enough.
 - **Leaving out the notes struck with the moved note.** Then No. 13 bar 8's B3 would reach bar 10, where the same key is also struck as a held B3 in another voice; the copy would split one struck key between the hands.
 
 ## Effect on the public fixtures
 
-Bar-window rule (round 1) against the local window, moving the first note each hand plays in each bar:
+Moving the first note each hand plays in each bar, against round 1 (the hand over the shared part of the bar) and round 2 (both neighbours):
 
-- **No. 13 (MusicXML form), 107 → 102 rows.** Gains: RH between bars 6/16/31/47 and 7/17/32/48 (the grace before bar 6's last eighth lies outside the first note's window). Losses: the opening pickup ↔ bar 11's pickup (nothing comes before the opening); LH 2 ↔ 12 (bar 2's left hand enters with nothing before it); 22 ↔ 38 in both hands (other notes lead into them); LH between 6/16/31/47 and 7/17/32/48 (the notes just before them differ).
-- **No. 13 (written-out draft), 110 → 102 rows.** The same gains and losses, at its bar numbers (1 ↔ 12, 2 ↔ 13 LH, 23 ↔ 40, 6/17/32/49 against 7/18/33/50).
-- **No. 30, 88 → 90 rows.** Gains: bars that open alike and part later (2/6/10/14/26/42 with 3/7/11/15/27/43; 4/12/28/44 with 8/16; 9 ↔ 17), and LH 32 ↔ 48 (the slur into the first ending lies away from the first note). Losses: the opening pickup's returns; LH 18 ↔ 34 (other notes before them); LH 2/6/10/14 ↔ 26/42 (the chord before bars 26 and 42 also ends a slur).
+- **No. 13 (MusicXML form): 107 rows (round 1: 107, round 2: 102).**
+  - Against round 1, nothing is lost. The right hand's first notes of bars 6/7/8/16/17/18/23/31/32/33/39/47/48/49 reach one another. Each is a B4 sixteenth after a B4, so the note before it matches wherever that repetition stands on the same beat.
+  - Against round 2, every loss comes back: the opening pickup ↔ bar 11's pickup, LH 2 ↔ 12, 22 ↔ 38 in both hands, and LH between 6/16/31/47 and 7/17/32/48.
+- **No. 13 (written-out draft): 110 rows (round 1: 110, round 2: 102).** The same at its bar numbers: 1 ↔ 12, LH 2 ↔ 13, 23 ↔ 40, LH 6/17/32/49 ↔ 7/18/33/50. Right-hand first notes of 6/7/17/18/32/33/34/49/50/51 reach one another.
+- **No. 30: 94 rows (round 1: 88, round 2: 90).**
+  - Against round 1, nothing is lost. Gained: bars that open alike and part later (2/6/10/14/26/42 with 3/7/11/15/27/43; 4/12/28/44 with 8/16; 9 ↔ 17) and LH 32 ↔ 48.
+  - Against round 2, it gains back the opening pickup's returns, LH 18 ↔ 34 and LH 2/6/10/14 ↔ 26/42, and adds LH 26/42 with 3/7/11/15/27/43.
 
 The tests pin the full tables (`test/hand-returns.test.ts`).
 

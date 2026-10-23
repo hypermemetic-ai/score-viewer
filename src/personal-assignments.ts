@@ -211,7 +211,7 @@ interface RecurrenceIndex {
  bars:readonly number[];pitched:Note[];keys:ReadonlyMap<string,Note[]>;downbeats:readonly number[];
  marks:ReadonlyMap<string,string>;alike:ReadonlyMap<string,Note[]>;
  onsets:ReadonlyMap<PersonalHand,readonly number[]>;struck:ReadonlyMap<string,Note[]>;
- neighbours:Map<string,string>;
+ neighbours:Map<string,Neighbours>;
  /** The latest results by the hand records they were derived from, newest last. */
  results:Map<string,HandRecurrences>;
 }
@@ -273,15 +273,22 @@ function downbeatOffsets(p:ScorePackage,bars:readonly number[]):number[] {
 /** Notes alike apart from where they stand: hand, pitch, length and articulation. */
 const alikeKey=(marks:ReadonlyMap<string,string>,n:Note)=>`${n.hand}:${pitch(n)}:${n.durationTicks}:${marks.get(n.id)}`;
 /** The notes the source writes in a note's hand at the onset just before it,
- * with it and just after it, across barlines too, as one signature from the
- * note: pitch, place, length and articulation of each. Nothing on one side (a
- * pickup's missing predecessor) reads as nothing, which only nothing matches. */
-function neighbours(index:RecurrenceIndex,n:Note):string {
- const known=index.neighbours.get(n.id);if(known!==undefined)return known;
+ * with it and just after it, across barlines too, each as a signature from the
+ * note: pitch, place, length and articulation. A side with nothing on it (a
+ * pickup's missing predecessor) is undefined. */
+interface Neighbours {before?:string;at:string;after?:string}
+function neighbours(index:RecurrenceIndex,n:Note):Neighbours {
+ const known=index.neighbours.get(n.id);if(known)return known;
  const hand=n.hand as PersonalHand,onsets=index.onsets.get(hand)!;
  let lo=0,hi=onsets.length;while(lo<hi){const mid=(lo+hi)>>1;if(onsets[mid]<n.startTick)lo=mid+1;else hi=mid;}
- const side=(at:number|undefined)=>at===undefined?'':index.struck.get(`${hand}:${at}`)!.map(q=>`${pitch(q)}:${q.startTick-n.startTick}:${q.durationTicks}:${index.marks.get(q.id)}`).sort().join('|');
- const value=`${side(onsets[lo-1])}/${side(n.startTick)}/${side(onsets[lo+1])}`;index.neighbours.set(n.id,value);return value;
+ const side=(at:number|undefined)=>at===undefined?undefined:index.struck.get(`${hand}:${at}`)!.map(q=>`${pitch(q)}:${q.startTick-n.startTick}:${q.durationTicks}:${index.marks.get(q.id)}`).sort().join('|');
+ const value={before:side(onsets[lo-1]),at:side(n.startTick)!,after:side(onsets[lo+1])};index.neighbours.set(n.id,value);return value;
+}
+/** The same note struck with the same notes, with the same note on at least one
+ * side. A missing side never matches, so a note with nothing before it (an
+ * opening pickup) is decided by the note after it alone. */
+function sameSurroundings(a:Neighbours,b:Neighbours):boolean {
+ return a.at===b.at&&((a.before!==undefined&&a.before===b.before)||(a.after!==undefined&&a.after===b.after));
 }
 
 const byAssignments=new WeakMap<PersonalAssignments,{p:ScorePackage;generation:number;value:HandRecurrences}>();
@@ -307,14 +314,14 @@ function deriveHandRecurrences(p:ScorePackage,a:PersonalAssignments):HandRecurre
 }
 /** A changed note travels to every other place where its hand plays the same
  * passage: the same note (pitch, length, written value, ties, articulation,
- * slurs and graces) on the same beat of its bar, struck with the same notes
- * and between the same neighbours in that hand. Its neighbours are the notes
- * the source writes in that hand at the onset just before and just after it,
- * across the barline if need be, alike in pitch, place, length and marks;
- * notes further away and the other hand may differ. So a pickup into a return (No. 13 bar 11's last eighth)
- * matches the opening pickup it repeats, but never a downbeat, and a return
- * that changes elsewhere in the bar still takes the moves of the notes it
- * plays alike. The changes of one hand in one bar that reach the same bar
+ * slurs and graces) on the same beat of its bar, struck with the same notes,
+ * with the same neighbour on at least one side in that hand. Its neighbours
+ * are the notes the source writes in that hand at the onset just before and
+ * just after it, across the barline if need be, alike in pitch, place, length
+ * and marks; notes further away and the other hand may differ. So a pickup
+ * into a return (No. 13 bar 11's last eighth) matches the opening pickup it
+ * repeats, but never a downbeat, and a return that changes elsewhere in the
+ * bar still takes the moves of the notes it plays alike. The changes of one hand in one bar that reach the same bar
  * travel together. A note with the owner's own hand keeps it, and a bar where
  * the result could not be drawn is skipped. */
 function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note>,choices:PersonalAssignments['choices'],moves:Array<PersonalOwnerChoice&{hand:PersonalHand}>,older:Array<PersonalOwnerChoice&{hand:PersonalHand}>,dropped:ReadonlySet<number>|undefined):HandRecurrences {
@@ -331,7 +338,7 @@ function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note
    const n=notes.get(c.ownerId)!,beat=n.startTick-bars[b]+downbeats[b];
    for(const q of index.alike.get(alikeKey(index.marks,n))??[]){
     const t=barOf(q.startTick);if(t===b||q.startTick-bars[t]+downbeats[t]!==beat)continue;
-    if(neighbours(index,q)!==neighbours(index,n))continue;
+    if(!sameSurroundings(neighbours(index,q),neighbours(index,n)))continue;
     const found=places.get(t);if(found)found.push({n:q,hand:c.hand,ownerId:c.ownerId});else places.set(t,[{n:q,hand:c.hand,ownerId:c.ownerId}]);
    }
   }

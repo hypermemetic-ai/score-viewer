@@ -9,10 +9,10 @@ import {buildSchumannNo30Draft} from '../vendor/iso-notation/src/scores/schumann
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 
 // A hand change reaches every return of the moved note's hand: the same note,
-// on the same beat, struck with the same notes and between the same neighbours
-// in that hand, each with the same pitch, written duration and articulation
-// (slur and tie membership, staccato, accent and the like). Notes further away
-// in that hand, and the other hand, may differ.
+// on the same beat, struck with the same notes, with the same note before it or
+// after it in that hand, each with the same pitch, written duration and
+// articulation (slur and tie membership, staccato, accent and the like). The
+// other side, notes further away in that hand, and the other hand may differ.
 
 /** 2/4 at 48 ticks a beat: bars of 96 ticks. */
 const BAR=96;
@@ -67,15 +67,18 @@ test('a return of the moved note’s hand takes the move, even where the other h
  assert.deepEqual(reached(rh,g3(1),'RH'),[],'the left hand plays an octave lower in bar 3');
 });
 
-test('a return that differs at the moved note or its neighbours, in pitch or written duration, does not take the move; one that differs further away does',()=>{
+test('a return that differs at the moved note, or on both sides of it, in pitch or written duration, does not take the move; one that differs on one side or further away does',()=>{
  // Bar 1's G3 (the second note) moves; the C3 before it and the E3 after it are its neighbours, the last G3 is further away.
  const changed=(edit:(row:Row,i:number)=>Row)=>piece({1:[...left,...melody],3:[...left.map(edit),...melody]});
  assert.deepEqual(reached(changed(r=>r),g3(1),'RH'),['m3:n1'],'the same left hand matches');
  assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,i===1?p+1:p,o,d]),g3(1),'RH'),[],'the moved note itself differs in pitch');
- assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,i===2?p+1:p,o,d]),g3(1),'RH'),[],'the note after it differs in pitch');
+ assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,i===2?p+1:p,o,d]),g3(1),'RH'),['m3:n1'],'the note after it differs in pitch, the note before it is the same');
+ assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,i===0?p+1:p,o,d]),g3(1),'RH'),['m3:n1'],'the note before it differs in pitch, the note after it is the same');
+ assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,i===0||i===2?p+1:p,o,d]),g3(1),'RH'),[],'the notes before and after it both differ in pitch');
  assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,i===3?p+1:p,o,d]),g3(1),'RH'),['m3:n1'],'a note further away differs in pitch: the move still reaches bar 3');
  assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,p,o,i===1?12:d]),g3(1),'RH'),[],'the moved note is shorter there');
- assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,p,o,i===0?12:d]),g3(1),'RH'),[],'the note before it is shorter there');
+ assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,p,o,i===0?12:d]),g3(1),'RH'),['m3:n1'],'the note before it is shorter there, the note after it the same');
+ assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,p,o,i===0||i===2?12:d]),g3(1),'RH'),[],'the notes before and after it are both shorter there');
  assert.deepEqual(reached(changed(([h,p,o,d],i)=>[h,p,o,i===3?12:d]),g3(1),'RH'),['m3:n1'],'a note further away is shorter there');
  // A chord tone struck with the moved note counts as part of it.
  assert.deepEqual(reached(piece({1:[...left,...melody],3:[...left,['LH',59,24,24],...melody]}),g3(1),'RH'),[],'bar 3 strikes a B3 with the G3');
@@ -88,12 +91,14 @@ test('a return that differs at the moved note or its neighbours, in pitch or wri
  assert.deepEqual(reached(tied,'m2:n0','RH'),[],'a dotted quarter is not a tied quarter and eighth');
 });
 
-test('a return with other articulation in the moved note’s hand does not take the move',()=>{
+test('a return with other articulation at the moved note, or on both sides of it, does not take the move',()=>{
  const marked=(bar3:Row[])=>piece({1:[...left,...melody],3:[...bar3,...other]});
  const staccato=left.map(([h,p,o,d],i):Row=>[h,p,o,d,i===1?{articulation:'staccato'}:{}]);
  assert.deepEqual(reached(marked(staccato),g3(1),'RH'),[],'the moved note is staccato in bar 3');
  const accent=(at:number)=>left.map(([h,p,o,d],i):Row=>[h,p,o,d,i===at?{articulation:'accent'}:{}]);
- assert.deepEqual(reached(marked(accent(2)),g3(1),'RH'),[],'the note after it is accented in bar 3');
+ assert.deepEqual(reached(marked(accent(2)),g3(1),'RH'),['m3:n1'],'the note after it is accented in bar 3, the note before it is the same');
+ const accents=(...at:number[])=>left.map(([h,p,o,d],i):Row=>[h,p,o,d,at.includes(i)?{articulation:'accent'}:{}]);
+ assert.deepEqual(reached(marked(accents(0,2)),g3(1),'RH'),[],'the notes before and after it are both accented in bar 3');
  assert.deepEqual(reached(marked(accent(3)),g3(1),'RH'),['m3:n1'],'a note further away is accented in bar 3');
  // Slurred alike in both bars, it matches; slurred in one bar only, it does not.
  const slurred=left.map(([h,p,o,d],i):Row=>[h,p,o,d,i===0?{slur:'from'}:i===2?{slur:'to'}:{}]);
@@ -141,48 +146,50 @@ const firstNoteReturns=(score:QuantizedGridScore)=>{
 test('No. 13 as the MusicXML edition writes it out: every written-out return takes the move',()=>{
  const returns=firstNoteReturns(buildSchumannNo13MusicXmlImport().score);
  assert.deepEqual(returns,[
-  '2 RH → 12','3 RH → 13 28 44','3 LH → 13 28 44','4 RH → 14 29 45','4 LH → 14 29 45','5 RH → 15 30 46','5 LH → 15 30 46','6 RH → 7 16 17 31 32 47 48',
-  '6 LH → 16 31 47','7 RH → 6 16 17 31 32 47 48','7 LH → 17 32 48','8 RH → 18','8 LH → 18','9 RH → 19','9 LH → 19','10 RH → 20',
-  '10 LH → 20','11 RH → 21','11 LH → 21','12 RH → 2','13 RH → 3 28 44','13 LH → 3 28 44','14 RH → 4 29 45','14 LH → 4 29 45',
-  '15 RH → 5 30 46','15 LH → 5 30 46','16 RH → 6 7 17 31 32 47 48','16 LH → 6 31 47','17 RH → 6 7 16 31 32 47 48','17 LH → 7 32 48','18 RH → 8','18 LH → 8',
-  '19 RH → 9','19 LH → 9','20 RH → 10','20 LH → 10','21 RH → 11','21 LH → 11','23 RH → 39','23 LH → 39',
-  '24 RH → 40','24 LH → 40','25 RH → 41','25 LH → 41','26 RH → 42','26 LH → 42','27 RH → 43','27 LH → 43',
-  '28 RH → 3 13 44','28 LH → 3 13 44','29 RH → 4 14 45','29 LH → 4 14 45','30 RH → 5 15 46','30 LH → 5 15 46','31 RH → 6 7 16 17 32 47 48','31 LH → 6 16 47',
-  '32 RH → 6 7 16 17 31 47 48','32 LH → 7 17 48','33 RH → 49','33 LH → 49','34 RH → 50','34 LH → 50','35 RH → 51','35 LH → 51',
-  '36 RH → 52','36 LH → 52','37 RH → 53','37 LH → 53','38 RH → 54','38 LH → 54','39 RH → 23','39 LH → 23',
-  '40 RH → 24','40 LH → 24','41 RH → 25','41 LH → 25','42 RH → 26','42 LH → 26','43 RH → 27','43 LH → 27',
-  '44 RH → 3 13 28','44 LH → 3 13 28','45 RH → 4 14 29','45 LH → 4 14 29','46 RH → 5 15 30','46 LH → 5 15 30','47 RH → 6 7 16 17 31 32 48','47 LH → 6 16 31',
-  '48 RH → 6 7 16 17 31 32 47','48 LH → 7 17 32','49 RH → 33','49 LH → 33','50 RH → 34','50 LH → 34','51 RH → 35','51 LH → 35',
-  '52 RH → 36','52 LH → 36','53 RH → 37','53 LH → 37','54 RH → 38','54 LH → 38']);
- // Bar 1's opening B4 stands on bar 11's last eighth, but nothing comes before it: bar 11's pickup does not reach it.
+  '1 RH → 11','2 RH → 12','2 LH → 12','3 RH → 13 28 44','3 LH → 13 28 44','4 RH → 14 29 45','4 LH → 14 29 45','5 RH → 15 30 46',
+  '5 LH → 15 30 46','6 RH → 7 8 16 17 18 23 31 32 33 39 47 48 49','6 LH → 7 16 17 31 32 47 48','7 RH → 6 8 16 17 18 23 31 32 33 39 47 48 49','7 LH → 6 16 17 31 32 47 48','8 RH → 6 7 16 17 18 23 31 32 33 39 47 48 49','8 LH → 18','9 RH → 19',
+  '9 LH → 19','10 RH → 20','10 LH → 20','11 RH → 21','11 LH → 21','12 RH → 2','12 LH → 2','13 RH → 3 28 44',
+  '13 LH → 3 28 44','14 RH → 4 29 45','14 LH → 4 29 45','15 RH → 5 30 46','15 LH → 5 30 46','16 RH → 6 7 8 17 18 23 31 32 33 39 47 48 49','16 LH → 6 7 17 31 32 47 48','17 RH → 6 7 8 16 18 23 31 32 33 39 47 48 49',
+  '17 LH → 6 7 16 31 32 47 48','18 RH → 6 7 8 16 17 23 31 32 33 39 47 48 49','18 LH → 8','19 RH → 9','19 LH → 9','20 RH → 10','20 LH → 10','21 RH → 11',
+  '21 LH → 11','22 RH → 38','22 LH → 38','23 RH → 6 7 8 16 17 18 31 32 33 39 47 48 49','23 LH → 39','24 RH → 40','24 LH → 40','25 RH → 41',
+  '25 LH → 41','26 RH → 42','26 LH → 42','27 RH → 43','27 LH → 43','28 RH → 3 13 44','28 LH → 3 13 44','29 RH → 4 14 45',
+  '29 LH → 4 14 45','30 RH → 5 15 46','30 LH → 5 15 46','31 RH → 6 7 8 16 17 18 23 32 33 39 47 48 49','31 LH → 6 7 16 17 32 47 48','32 RH → 6 7 8 16 17 18 23 31 33 39 47 48 49','32 LH → 6 7 16 17 31 47 48','33 RH → 6 7 8 16 17 18 23 31 32 39 47 48 49',
+  '33 LH → 49','34 RH → 50','34 LH → 50','35 RH → 51','35 LH → 51','36 RH → 52','36 LH → 52','37 RH → 53',
+  '37 LH → 53','38 RH → 54','38 LH → 54','39 RH → 6 7 8 16 17 18 23 31 32 33 47 48 49','39 LH → 23','40 RH → 24','40 LH → 24','41 RH → 25',
+  '41 LH → 25','42 RH → 26','42 LH → 26','43 RH → 27','43 LH → 27','44 RH → 3 13 28','44 LH → 3 13 28','45 RH → 4 14 29',
+  '45 LH → 4 14 29','46 RH → 5 15 30','46 LH → 5 15 30','47 RH → 6 7 8 16 17 18 23 31 32 33 39 48 49','47 LH → 6 7 16 17 31 32 48','48 RH → 6 7 8 16 17 18 23 31 32 33 39 47 49','48 LH → 6 7 16 17 31 32 47','49 RH → 6 7 8 16 17 18 23 31 32 33 39 47 48',
+  '49 LH → 33','50 RH → 34','50 LH → 34','51 RH → 35','51 LH → 35','52 RH → 36','52 LH → 36','53 RH → 37',
+  '53 LH → 37','54 RH → 38','54 LH → 38']);
+ // Bar 1's opening B4 stands on bar 11's last eighth. Nothing comes before it, and the same note follows it, so bar 11's pickup reaches it.
  const input=packaged(buildSchumannNo13MusicXmlImport().score),bars=input.p.score.sourceBarTicks!;
  const at=(bar:number,onset:number,hand:PersonalHand)=>input.p.score.notes.filter(n=>n.hand===hand&&n.startTick===bars[bar-1]+onset).map(n=>n.id).sort();
  const pickup=move(input,at(11,72,'RH')[0],'LH');
- assert.equal(handFor(input.p,pickup,at(1,0,'RH')[0]),'RH');
- assert.deepEqual(handProvenance(input.p,pickup,at(11,72,'RH')[0]),{kind:'shared',hand:'LH',toBars:[]});
- // Bar 6 has a grace before its last eighth that bar 7 lacks. Its first note lies away from it, so bars 6 and 7 share it;
- // the graced eighth itself reaches bar 6's own returns only.
- assert.ok(returns.includes('6 RH → 7 16 17 31 32 47 48'));
+ assert.equal(handFor(input.p,pickup,at(1,0,'RH')[0]),'LH');
+ assert.deepEqual(handProvenance(input.p,pickup,at(11,72,'RH')[0]),{kind:'shared',hand:'LH',toBars:[1]});
+ // Bar 11's left-hand D#4 is preceded in bar 21 by the same chord, so it reaches bar 21, though different notes follow it there.
+ const dSharp4=at(11,48,'LH').find(id=>(input.p.score.notes.find(n=>n.id===id) as {pitch?:{pitchClass:number}}).pitch?.pitchClass===3)!;
+ assert.deepEqual(handProvenance(input.p,move(input,dSharp4,'RH'),dSharp4),{kind:'shared',hand:'RH',toBars:[21]});
+ // Bar 6 has a grace before its last eighth that bar 7 lacks. Its first note, a B4 after a B4, lies away from it, so it reaches
+ // every bar that opens with that B4 after a B4; the graced eighth itself reaches bar 6's own returns only.
+ assert.ok(returns.includes('6 RH → 7 8 16 17 18 23 31 32 33 39 47 48 49'));
  const graced=move(input,at(6,72,'RH').find(id=>(input.p.score.notes.find(n=>n.id===id) as {pitch?:{pitchClass:number}}).pitch?.pitchClass===1)!,'LH');
  assert.deepEqual([...handRecurrences(input.p,graced).targets.get(6)!].sort((x,y)=>x-y),[16,31,47]);
 });
 test('No. 13 unfolded from its repeats: each pass and each written-out return takes the move',()=>{
  const returns=firstNoteReturns(buildSchumannNo13Draft());
- for(const line of ['3 RH → 14 29 46','3 LH → 14 29 46','11 LH → 22','24 LH → 41','6 RH → 7 17 18 32 33 49 50','6 LH → 17 32 49'])assert.ok(returns.includes(line),line);
- // The opening pickup has nothing before it, and bar 23's pickup into the second part follows other notes than bar 40's.
- assert.ok(!returns.some(line=>/^(1|12|23|40) /.test(line)));
- assert.equal(returns.length,102);
+ for(const line of ['1 RH → 12','12 RH → 1','3 RH → 14 29 46','3 LH → 14 29 46','11 LH → 22','23 RH → 40','24 LH → 41','6 RH → 7 17 18 32 33 34 49 50 51','6 LH → 7 17 18 32 33 49 50'])assert.ok(returns.includes(line),line);
+ assert.equal(returns.length,110);
 });
-test('No. 30: a figure reaches the same figure between the same notes, whatever comes later in the bar',()=>{
+test('No. 30: a figure reaches the same figure with the same note on one side, whatever comes later in the bar',()=>{
  const returns=firstNoteReturns(buildSchumannNo30Draft());
  // Bar 32's left hand ends by slurring into the first ending, bar 48's goes on unslurred; their first notes are alike.
  assert.ok(returns.includes('32 LH → 48')&&returns.includes('48 LH → 32'));
  // Bars 9 and 17 open alike and part after their second beat.
  assert.ok(returns.includes('9 RH → 17')&&returns.includes('17 RH → 9'));
- // Bar 18's left hand follows another chord than bar 34's.
- assert.ok(!returns.some(line=>line.startsWith('18 LH')||line.startsWith('34 LH')));
- // The opening pickup has nothing before it, so it reaches no later pickup.
- assert.ok(!returns.some(line=>line.startsWith('1 ')));
- assert.equal(returns.length,90);
+ // Bar 18's left hand follows another chord than bar 34's, but goes on to the same.
+ assert.ok(returns.includes('18 LH → 34')&&returns.includes('34 LH → 18'));
+ // The opening pickup has nothing before it; the note after it decides, and it is the note after each later pickup.
+ assert.ok(returns.includes('1 RH → 2 5 6 9 10 13 14 25 26 41 42')&&returns.includes('1 LH → 2 5 6 9 10 13 14 26 42'));
+ assert.equal(returns.length,94);
 });
 
