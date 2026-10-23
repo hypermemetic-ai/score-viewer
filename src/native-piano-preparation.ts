@@ -8,6 +8,7 @@ import {archivePackage,hashBytes,importPackage,type Metadata} from './package';
 import {publishPackage,publishPreparedNative} from './publication';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
 import {withLayoutPeer} from './layout-peer';
+import {engraveClearOfTitleArea} from './title-area-clearance';
 
 export interface NativePianoAssets {font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>}
 export interface NativePianoPreparation {
@@ -25,7 +26,8 @@ export interface NativePianoPreparation {
 
 /** The shared tail of native piano preparation. The score's own hands are
  * kept exactly; nothing is calculated or inferred. Pages use the approved
- * production engraving with zero lint violations, both keyboards get the
+ * production engraving with zero lint violations and page one clear of its
+ * title area, both keyboards get the
  * same pages, and the recipe that reproduces them is retained, as calculated
  * editions and personal hand editing require. The package passes ordinary
  * admission. The reading engrave is returned too, so hand editing can start
@@ -38,7 +40,9 @@ export async function publishNativePianoScore(score:QuantizedGridScore,input:Nat
  // The score as the package stores it: hand editing reads it from there, and
  // takes this engrave as its own only for that very score.
  let rendered;
- try{rendered=await withLayoutPeer(layoutPeer=>renderScorePresentationAsync(JSON.parse(strFromU8(source)),recipe,{...execution,layoutPeer}));}
+ try{rendered=await engraveClearOfTitleArea(recipe.options,async options=>{
+  recipe=validateScoreRenderingRecipe({...recipe,options},{sourceSha256});
+  return withLayoutPeer(layoutPeer=>renderScorePresentationAsync(JSON.parse(strFromU8(source)),recipe,{...execution,layoutPeer}));});}
  catch(error){if((error as Error).name==='AbortError')throw error;throw new Refusal(`This score can't be engraved yet: ${(error as Error).message}`);}
  checkReadingExecution(execution);
  if(rendered.lint.violations.length)throw new Refusal("This score can't be engraved cleanly yet: some of its notation doesn't fit the page layout.");

@@ -60,8 +60,14 @@ const withRepeats=(score:QuantizedGridScore,sourceSha256:string)=>savedWithoutRe
 /** Saved piano pages an earlier engine drew. The edition is engraved again
  * when it is opened for display; see {@link savedPagesBehindPolicy}. */
 export class SavedPagesBehindPolicy extends Error{
- constructor(){super('This saved engraving was drawn before the current shared engraving policy. Open the score again to engrave it afresh.');this.name='SavedPagesBehindPolicy';}
+ constructor(readonly archiveSha256?:string){super('This saved engraving was drawn before the current shared engraving policy. Open the score again to engrave it afresh.');this.name='SavedPagesBehindPolicy';}
 }
+// Editions whose pages an earlier engine drew, and which could not be
+// engraved again this session: they read as saved, without another try.
+const savedBehindPolicy=new Set<string>();
+/** An edition whose pages an earlier engine drew, and which could not be
+ * engraved again, opens on those pages as saved for the rest of the session. */
+export function keepSavedPagesBehindPolicy(archiveSha256:string|undefined){if(archiveSha256)savedBehindPolicy.add(archiveSha256);}
 /** Whether any keyboard view of an admitted piano edition shows pages an
  * earlier engine drew. Only an approved or calculated-hand recipe is drawn
  * under the current shared policy: admission checks it against that policy
@@ -74,8 +80,10 @@ export function savedPagesBehindPolicy(p:ScorePackage):boolean{
  const current=(view:ScorePackage)=>view.renderingRecipe?.engineId===APPROVED_SCORE_RENDERING_ENGINE||view.renderingRecipe?.engineId===CALCULATED_HAND_SCORE_RENDERING_ENGINE;
  return [...(linkedViews.get(p)?.values()??[p])].some(view=>!current(view));
 }
-/** Refuses an edition whose saved pages predate the current shared policy. */
-export function requireCurrentEngraving<T extends ScorePackage>(p:T):T{if(savedPagesBehindPolicy(p))throw new SavedPagesBehindPolicy();return p;}
+/** Refuses an edition whose saved pages predate the current shared policy,
+ * unless it already failed to engrave again this session. */
+export function requireCurrentEngraving<T extends ScorePackage>(p:T):T{
+ if(savedPagesBehindPolicy(p)&&!(p.archiveSha256&&savedBehindPolicy.has(p.archiveSha256)))throw new SavedPagesBehindPolicy(p.archiveSha256);return p;}
 /** The profile of a view whose fingers, if any, are the edition's own fixed ones. */
 export const FIXED_PAGES_PROFILE='publisher-fixed-pages-v1';
 const isObject=(x:unknown):x is Record<string,any>=>!!x&&typeof x==='object'&&!Array.isArray(x);

@@ -61,7 +61,7 @@ import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-
 import {requirePracticeHands} from './practice';
 import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
-import {SavedPagesLackRepeats,SavedPagesBehindPolicy,requireCurrentEngraving,savedPagesBehindPolicy,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,usePianoPageCheckReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
+import {SavedPagesLackRepeats,SavedPagesBehindPolicy,requireCurrentEngraving,keepSavedPagesBehindPolicy,savedPagesBehindPolicy,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,usePianoPageCheckReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,EDITOR_COLUMN,readerFit,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
@@ -1115,7 +1115,7 @@ async function changeTransposition(steps:number){
       {signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')loading.stage(stage);}});}
      catch(rebuildError){if((rebuildError as Error).name==='AbortError')throw rebuildError;
       // Pages an earlier engine drew still open as saved.
-      if(refusal instanceof SavedPagesBehindPolicy){console.warn('The saved pitch could not be engraved again; it opens on its saved pages.',rebuildError);return await prepareRetainedEdition(host,target.entry,file,layout,false);}
+      if(refusal instanceof SavedPagesBehindPolicy){console.warn('The saved pitch could not be engraved again; it opens on its saved pages.',rebuildError);keepSavedPagesBehindPolicy(refusal.archiveSha256);return await prepareRetainedEdition(host,target.entry,file,layout,false);}
       if(steps===0)throw rebuildError;}
      return rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:undefined;
     };
@@ -1203,8 +1203,8 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
  const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  // Pages an earlier engine drew are engraved again with the current shared policy, once: the new edition is saved.
  let prior:ScorePackage,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
-  // Pages drawn before the current policy, or that only lack their repeat signs, open as saved when they can't be engraved again.
-  if(error instanceof SavedPagesBehindPolicy)keptSaved=true;else{keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);withoutRepeats=true;}prior=await importReading(data,op);}
+  // Pages drawn before the current policy, or that only lack their repeat signs, open as saved, for the rest of the session, when they can’t be engraved again.
+  if(error instanceof SavedPagesBehindPolicy){keepSavedPagesBehindPolicy(error.archiveSha256);keptSaved=true;}else{keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);withoutRepeats=true;}prior=await importReading(data,op);}
  await admitReadingSource(prior,op);
  if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);
  // Every piano score opens on the player's keyboard layout, gaining it when its edition lacks it.
@@ -1411,7 +1411,7 @@ async function earlierEditions(){
      catch(rebuildError){
       // Pages an earlier engine drew still open as saved.
       if(!(error instanceof SavedPagesBehindPolicy)||(rebuildError as Error).name==='AbortError')throw rebuildError;
-      console.warn('The earlier edition could not be engraved again; it opens on its saved pages.',rebuildError);}
+      console.warn('The earlier edition could not be engraved again; it opens on its saved pages.',rebuildError);keepSavedPagesBehindPolicy(error.archiveSha256);}
      finally{d.removeEventListener('close',stop);}
      retained=rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:await prepareRetainedEdition(host,target.entry,file,layout,false);
     }

@@ -16,6 +16,7 @@ import {serializeCompatibleScore} from './score-serialization';
 import {requirePianoEvent} from './piano-event';
 import {requirePianoCapability} from './score-capabilities';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
+import {editionPrintedNotices,engraveClearOfTitleArea} from './title-area-clearance';
 
 export const SCORE_TRANSPOSITION_VERSION='viewer-score-transposition-v1' as const;
 export interface TranspositionOwner {id:string;pitch:number;startTick:number;durationTicks:number;hand:Hand}
@@ -161,14 +162,15 @@ function ownerMap(original:QuantizedGridScore,score:QuantizedGridScore):Transpos
 /** Engrave an edition afresh with the current engine and the shared
  * production rules. Each keyboard view shows the hands it is given, as plain
  * content; views with the same hands share one set of pages, engraved with
- * `approvedProductionIsoOptions()` and default tokens. The base edition's
- * font, notices and reference recording carry over; its old pages and their
+ * `approvedProductionIsoOptions()` and default tokens, page one clear of its
+ * title area. The base edition's printed page-one notices, font, notice
+ * files and reference recording carry over; its old pages and their
  * recipe need not reproduce. A finger layer stays edition
  * content, bound to its new pages. With `keep`, that admitted edition's own
  * views stay byte-identical and `views` add the keyboards it lacks. Nothing
  * is calculated. */
 export async function engraveEdition(request:{
- /** Supplies metadata, font, notices and reference recording. */
+ /** Supplies metadata, printed notices, font, notice files and reference recording. */
  base:ScorePackage;source:QuantizedGridScore;sourceBytes:Uint8Array;context?:PianoCalculationContext;views:readonly EditionView[];
  transposition?:{original:ScorePackage;originalBytes:Uint8Array;selectedBytes:Uint8Array;steps:number};
  keep?:ScorePackage;
@@ -182,7 +184,8 @@ export async function engraveEdition(request:{
   throw Error('An edition needs exactly one view for each keyboard it serves.');
  // Fresh pages follow the shared rules alone, exactly as a new import does;
  // the base edition's own recipe belongs to its old pages.
- const options=approvedProductionIsoOptions(),tokens=resolveIsoTokens({}),
+ // Page one keeps printing the notices the base edition printed.
+ const notices=editionPrintedNotices(base),options=approvedProductionIsoOptions(notices?{printedNotices:notices}:{}),tokens=resolveIsoTokens({}),
   shared:Record<string,Uint8Array>={[baseManifest.font]:base.files[baseManifest.font],...Object.fromEntries(baseManifest.notices.map(name=>[name,base.files[name]]))},
   engraved=new Map<string,{score:string;seats:string;recipe:string;pages:string[]}>(),chosen:EditionView[]=[],fellBack:PhysicalKeyboardId[]=[];
  if(kept)for(const [name,bytes]of Object.entries(keep!.files))if(name!=='manifest.json')shared[name]=bytes;
@@ -194,7 +197,9 @@ export async function engraveEdition(request:{
   const prefix=engraved.size||kept?`${layout}/`:'';
   let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,options,tokens,
    baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256}),rendered;
-  try{rendered=await withLayoutPeer(layoutPeer=>renderScorePresentationAsync(structuredClone(score),recipe,{...execution,layoutPeer}));}
+  try{rendered=await engraveClearOfTitleArea(options,async options=>{
+   recipe=validateScoreRenderingRecipe({...recipe,options},{sourceSha256});
+   return withLayoutPeer(layoutPeer=>renderScorePresentationAsync(structuredClone(score),recipe,{...execution,layoutPeer}));});}
   catch(error){if((error as Error).name==='AbortError')throw error;throw Error(request.refusal,{cause:error});}
   checkReadingExecution(execution);
   recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
