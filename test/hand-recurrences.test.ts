@@ -81,8 +81,8 @@ test('No. 13 folded: bar 21 is bar 11 played again, so the hand notices name no 
  assert.equal(droppedCarryText([21],[],foldedNo13),'Bar 11 keeps its written hands: the carried hand can’t be drawn there.');
 });
 
-test('a bar matches only when both hands play the same from the downbeat to the end of the shorter bar',()=>{
- // Another bass at the downbeat: the moved notes sound with the same notes, but the bar is other music.
+test('a return matches only when the moved notes’ hand plays the same in the bar, up to the end of the shorter bar',()=>{
+ // Another bass at the downbeat, in the moved notes’ own hand: the bar is other music for that hand.
  const otherBass=no13({10:bar10,11:[...chords,['RH',59,72,12],['RH',61,84,12]],21:chords.map(([h,p,o,d],i)=>i===0?[h,p+1,o,d] as Row:[h,p,o,d] as Row)});
  assert.equal(handRecurrences(otherBass.p,owners(otherBass)).carried.size,0);
  // The same notes later in a longer bar do not take part: the place in the bar differs.

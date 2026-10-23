@@ -158,6 +158,8 @@ export interface HandRecurrences {
  carried:ReadonlyMap<string,CarriedHand>;
  /** Each bar whose hand changes are carried → the bars receiving them. */
  targets:ReadonlyMap<number,readonly number[]>;
+ /** Each carried change → the bars its hand's changes in its bar reach. */
+ reach:ReadonlyMap<string,readonly number[]>;
  /** Matching bars the change does not reach, because it could not be drawn there. */
  skipped:readonly SkippedHandCarry[];
  /** A note whose own hand stands where a hand would be carried to it → the bar it would follow without its own hand. */
@@ -165,7 +167,7 @@ export interface HandRecurrences {
  /** A hand moved before hand choices recorded their intent → the bars it would reach if chosen again. */
  unshared:ReadonlyMap<string,readonly number[]>;
 }
-const noRecurrences:HandRecurrences={carried:new Map(),targets:new Map(),skipped:[],following:new Map(),unshared:new Map()};
+const noRecurrences:HandRecurrences={carried:new Map(),targets:new Map(),reach:new Map(),skipped:[],following:new Map(),unshared:new Map()};
 /** A hand change the owner made and that follows the same music: an explicitly
  * authored hand away from the source's hand, not marked "only here". A legacy
  * hand without recorded intent stays where it is: its value alone does not
@@ -202,10 +204,13 @@ export function dropHandCarry(p:ScorePackage,s:PersonalState,ownerId:string):num
 }
 
 /** What matching needs from one score, built once: pitched notes in onset
- * order, struck keys, pickups and each compared stretch's notes. */
+ * order, struck keys, where each bar's downbeat stands, each note's
+ * articulation, the notes alike in hand, pitch, length and articulation, and
+ * each compared stretch of one hand. */
 interface RecurrenceIndex {
- bars:readonly number[];pitched:Note[];longest:number;keys:ReadonlyMap<string,Note[]>;pickup:readonly boolean[];
- stretches:Map<string,{notes:Note[];signature:string}>;
+ bars:readonly number[];pitched:Note[];longest:number;keys:ReadonlyMap<string,Note[]>;downbeats:readonly number[];
+ marks:ReadonlyMap<string,string>;alike:ReadonlyMap<string,Note[]>;
+ stretches:Map<string,string>;
  /** The latest results by the hand records they were derived from, newest last. */
  results:Map<string,HandRecurrences>;
 }
@@ -214,29 +219,64 @@ function recurrenceIndex(p:ScorePackage,bars:readonly number[]):RecurrenceIndex 
  const known=recurrenceIndexes.get(p);if(known?.bars===bars)return known;
  const pitched=p.score.notes.filter(isPitchedEvent).sort((a,b)=>a.startTick-b.startTick),keys=new Map<string,Note[]>();
  for(const n of pitched){const k=`${n.startTick}:${pitch(n)}`,list=keys.get(k);if(list)list.push(n);else keys.set(k,[n]);}
- const index={bars,pitched,longest:Math.max(0,...pitched.map(n=>n.durationTicks)),keys,pickup:pickupBars(p,bars),stretches:new Map(),results:new Map()};
+ const marks=articulationMarks(p.score,pitched),alike=new Map<string,Note[]>();
+ for(const n of pitched)if(n.hand==='LH'||n.hand==='RH'){const k=alikeKey(marks,n),list=alike.get(k);if(list)list.push(n);else alike.set(k,[n]);}
+ const index={bars,pitched,longest:Math.max(0,...pitched.map(n=>n.durationTicks)),keys,downbeats:downbeatOffsets(p,bars),marks,alike,stretches:new Map(),results:new Map()};
  recurrenceIndexes.set(p,index);return index;
+}
+/** How the source writes each note beyond its pitch, onset and length: its
+ * written value and tied components, its articulation (staccato, accent and
+ * the like), the slurs it starts, ends or lies under in its own voice, and the
+ * graces written before it. Read for what it writes, never by id, tick or bar,
+ * so the same material reads the same wherever it stands. */
+function articulationMarks(score:ScorePackage['score'],pitched:readonly Note[]):ReadonlyMap<string,string> {
+ const marks=new Map<string,unknown[]>(),add=(id:string,mark:unknown)=>{const list=marks.get(id);if(list)list.push(mark);};
+ for(const n of pitched){const v=n.sourceWrittenValue;marks.set(n.id,[v?[v.type,v.dots??0]:null,n.articulation??null,!!n.tieStart,!!n.tieEnd]);}
+ const starts=new Map(pitched.map(n=>[n.id,n.startTick]));
+ for(const c of score.tieChains??[]){const at=starts.get(c.noteId);if(at!==undefined)add(c.noteId,['tie',c.components.map(q=>[q.startTick-at,q.durationTicks,q.tieForward])]);}
+ const notes=new Map(pitched.map(n=>[n.id,n])),voices=(n:Note)=>n.sourceProvenance?.voices;
+ for(const q of score.phrases??[]){
+  const ends=new Set([...q.fromNoteIds,...q.toNoteIds]),first=notes.get(q.fromNoteIds[0]);
+  const inVoice=(n:Note)=>voices(n)?voices(n)!.includes(q.voice):!!first&&n.hand===first.hand&&n.voice===first.voice;
+  let lo=0,hi=pitched.length;while(lo<hi){const mid=(lo+hi)>>1;if(pitched[mid].startTick<q.startTick)lo=mid+1;else hi=mid;}
+  for(let i=lo;i<pitched.length&&pitched[i].startTick<=q.endTick;i++){const n=pitched[i];if(!ends.has(n.id)&&inVoice(n))add(n.id,[q.kind,'under']);}
+  for(const id of q.fromNoteIds)add(id,[q.kind,'from']);for(const id of q.toNoteIds)add(id,[q.kind,'to']);
+ }
+ for(const g of score.graceGroups??[])for(const o of g.occurrences)for(const id of o.hostNoteIds)
+  add(id,['grace',g.kind,g.members.map(m=>[m.pitch?12*m.pitch.octave+m.pitch.pitchClass:null,m.duration,'slash' in m?m.slash??false:null])]);
+ return new Map([...marks].map(([id,list])=>[id,JSON.stringify([...list.slice(0,4),...list.slice(4).map(x=>JSON.stringify(x)).sort()])]));
 }
 /** Bars that don't start on a downbeat. A pickup is a short bar that opens the
  * piece or follows another short bar (the end of a bar written short, as No. 13
  * bar 22 after bar 21). A bar's full length is its meter's, or the usual bar
  * length when the source gives none; meter decides nothing else. Hands and
  * fingers carried to bars of another length compare the same bars by this rule. */
-export function pickupBars(p:ScorePackage,bars:readonly number[]):boolean[] {
+export function pickupBars(p:ScorePackage,bars:readonly number[]):boolean[] {return barMeters(p,bars).pickup;}
+function barMeters(p:ScorePackage,bars:readonly number[]):{pickup:boolean[];full:number[]} {
  const extents=bars.slice(1).map((t,i)=>t-bars[i]),counts=new Map<number,number>();for(const e of extents)counts.set(e,(counts.get(e)??0)+1);
- if(!extents.length)return [];
+ if(!extents.length)return {pickup:[],full:[]};
  const usual=[...counts].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0][0],meters=[...p.score.timeSignatures??[]].sort((a,b)=>a.tick-b.tick);
- const full=(tick:number)=>{const m=meters.filter(m=>m.tick<=tick).at(-1),length=m?m.numerator*p.score.ticksPerBeat*4/m.denominator:usual;return Number.isSafeInteger(length)&&length>0?length:usual;};
- return extents.map((e,t)=>e<full(bars[t])&&(t===0||extents[t-1]<full(bars[t-1])));
+ const length=(tick:number)=>{const m=meters.filter(m=>m.tick<=tick).at(-1),length=m?m.numerator*p.score.ticksPerBeat*4/m.denominator:usual;return Number.isSafeInteger(length)&&length>0?length:usual;};
+ const full=extents.map((_,t)=>length(bars[t]));
+ return {pickup:extents.map((e,t)=>e<full[t]&&(t===0||extents[t-1]<full[t-1])),full};
 }
-const tuple=(n:Note,start:number)=>`${n.hand??'-'}:${pitch(n)}:${n.startTick-start}:${n.durationTicks}`;
-/** Every note sounding in the first `length` ticks of bar `t`, held notes included, and their signature from its downbeat. */
-function stretch(index:RecurrenceIndex,t:number,length:number){
- const key=`${t}:${length}`,known=index.stretches.get(key);if(known)return known;
- const {pitched}=index,at=index.bars[t],to=at+length,notes:Note[]=[];
- let lo=0,hi=pitched.length;while(lo<hi){const mid=(lo+hi)>>1;if(pitched[mid].startTick<at-index.longest)lo=mid+1;else hi=mid;}
- for(let i=lo;i<pitched.length&&pitched[i].startTick<to;i++){const n=pitched[i];if(n.startTick+n.durationTicks>at)notes.push(n);}
- const value={notes,signature:notes.map(n=>tuple(n,at)).sort().join('|')};index.stretches.set(key,value);return value;
+/** How far into its meter's bar each written bar starts: a pickup starts that
+ * far before its downbeat (No. 13's opening B4 at the last eighth, as bar 11's
+ * own pickup), every other bar on its downbeat. */
+function downbeatOffsets(p:ScorePackage,bars:readonly number[]):number[] {
+ const {pickup,full}=barMeters(p,bars);return pickup.map((short,t)=>short?full[t]-(bars[t+1]-bars[t]):0);
+}
+/** Notes alike apart from where they stand: hand, pitch, length and articulation. */
+const alikeKey=(marks:ReadonlyMap<string,string>,n:Note)=>`${n.hand}:${pitch(n)}:${n.durationTicks}:${marks.get(n.id)}`;
+/** The notes the source writes in `hand` that sound from tick `from` to `to`,
+ * held notes included, as one signature from `from`: pitch, place, length and
+ * articulation of each. */
+function stretch(index:RecurrenceIndex,hand:PersonalHand,from:number,to:number):string {
+ const key=`${hand}:${from}:${to}`,known=index.stretches.get(key);if(known!==undefined)return known;
+ const {pitched}=index,notes:string[]=[];
+ let lo=0,hi=pitched.length;while(lo<hi){const mid=(lo+hi)>>1;if(pitched[mid].startTick<from-index.longest)lo=mid+1;else hi=mid;}
+ for(let i=lo;i<pitched.length&&pitched[i].startTick<to;i++){const n=pitched[i];if(n.hand===hand&&n.startTick+n.durationTicks>from)notes.push(`${pitch(n)}:${n.startTick-from}:${n.durationTicks}:${index.marks.get(n.id)}`);}
+ const value=notes.sort().join('|');index.stretches.set(key,value);return value;
 }
 
 const byAssignments=new WeakMap<PersonalAssignments,{p:ScorePackage;generation:number;value:HandRecurrences}>();
@@ -260,35 +300,46 @@ function deriveHandRecurrences(p:ScorePackage,a:PersonalAssignments):HandRecurre
  index.results.set(key,value);if(index.results.size>8)index.results.delete(index.results.keys().next().value!);
  return value;
 }
-/** The changes made in one written bar travel together. Another bar matches
- * when, from the downbeat to the end of the shorter of the two bars, every
- * sounding note — both hands, held notes included, with the hands the source
- * writes — has the same pitch, hand, duration and place in the bar. A bar
- * written shorter, as a return whose pickup moves to the next bar, still
- * matches over what both bars play; the same notes among other notes do not.
- * A pickup matches only a pickup of its length. The changed notes inside that
- * stretch travel, and one after it (bar 11's pickup) stays in its bar. A note
- * with the owner's own hand keeps it, and a bar where the result could not be
- * drawn is skipped. */
+/** A changed note travels to every other place where its hand plays the same
+ * passage: the same note (pitch, length, written value, ties, articulation,
+ * slurs and graces) on the same beat of its bar, among the same notes of that
+ * hand. The hand's notes are compared over as much of the changed note's bar
+ * as the other note's bar shares with it, aligned on the two notes: every note
+ * the source writes in that hand and that sounds there, held notes included,
+ * is alike and stands alike. The other hand may differ. So a bar written
+ * shorter, as a return whose pickup moves to the next bar, still matches over
+ * what both bars play, and a pickup into a return (No. 13 bar 11's last
+ * eighth) matches the opening pickup it repeats, but never a downbeat; the
+ * same notes among other notes of that hand do not match. The changes of one
+ * hand in one bar that reach the same bar travel together. A note with the
+ * owner's own hand keeps it, and a bar where the result could not be drawn is
+ * skipped. */
 function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note>,choices:PersonalAssignments['choices'],moves:Array<PersonalOwnerChoice&{hand:PersonalHand}>,older:Array<PersonalOwnerChoice&{hand:PersonalHand}>,dropped:ReadonlySet<number>|undefined):HandRecurrences {
- const {bars,pickup,keys}=index;
+ const {bars,downbeats,keys}=index;
  const barOf=(tick:number)=>{let lo=0,hi=bars.length-2;while(lo<hi){const mid=(lo+hi+1)>>1;if(bars[mid]<=tick)lo=mid;else hi=mid-1;}return lo;};
- const byBar=(list:typeof moves)=>{const groups=new Map<number,typeof moves>();for(const c of list){const b=barOf(notes.get(c.ownerId)!.startTick);groups.set(b,[...groups.get(b)??[],c]);}return [...groups].sort((x,y)=>x[0]-y[0]);};
- /** Each other bar playing bar `b`'s music over the stretch both play, with that stretch's notes and the moves found in it. */
- const matching=function*(b:number,group:typeof moves){
-  const start=bars[b],extent=bars[b+1]-start,changed=new Map(group.map(c=>{const n=notes.get(c.ownerId)!;return [tuple(n,start),{hand:c.hand,ownerId:c.ownerId,onset:n.startTick-start}] as const;}));
-  for(let t=0;t<bars.length-1;t++){
-   const other=bars[t+1]-bars[t],shared=Math.min(extent,other);
-   if(t===b||pickup[t]!==pickup[b]||pickup[b]&&other!==extent||!group.some(c=>notes.get(c.ownerId)!.startTick-start<shared))continue;
-   const there=stretch(index,t,shared);if(there.signature!==stretch(index,b,shared).signature)continue;
-   const found:Array<{n:Note;hand:PersonalHand;ownerId:string}>=[];
-   for(const n of there.notes){const move=changed.get(tuple(n,bars[t]));if(move&&move.onset<shared)found.push({n,hand:move.hand,ownerId:move.ownerId});}
-   yield {t,found};
+ /** Moves by bar and by the hand the source writes them in, in bar order. */
+ const byBar=(list:typeof moves)=>{const groups=new Map<string,{b:number;written:PersonalHand;group:typeof moves}>();
+  for(const c of list){const n=notes.get(c.ownerId)!,b=barOf(n.startTick),written=n.hand as PersonalHand,key=`${b}:${written}`,known=groups.get(key);if(known)known.group.push(c);else groups.set(key,{b,written,group:[c]});}
+  return [...groups.values()].sort((x,y)=>x.b-y.b||x.written.localeCompare(y.written));};
+ /** Each other bar where the hand that writes bar `b`'s moves plays the same passage, with the moves' counterparts found there. */
+ const matching=function*({b,written,group}:{b:number;written:PersonalHand;group:typeof moves}){
+  const places=new Map<number,Array<{n:Note;hand:PersonalHand;ownerId:string}>>();
+  for(const c of group){
+   const n=notes.get(c.ownerId)!,beat=n.startTick-bars[b]+downbeats[b];
+   for(const q of index.alike.get(alikeKey(index.marks,n))??[]){
+    const t=barOf(q.startTick);if(t===b||q.startTick-bars[t]+downbeats[t]!==beat)continue;
+    // The part of the two bars both share, as seen from each note.
+    const from=Math.max(bars[b]-n.startTick,bars[t]-q.startTick),to=Math.min(bars[b+1]-n.startTick,bars[t+1]-q.startTick);
+    if(stretch(index,written,q.startTick+from,q.startTick+to)!==stretch(index,written,n.startTick+from,n.startTick+to))continue;
+    const found=places.get(t);if(found)found.push({n:q,hand:c.hand,ownerId:c.ownerId});else places.set(t,[{n:q,hand:c.hand,ownerId:c.ownerId}]);
+   }
   }
+  for(const t of [...places.keys()].sort((x,y)=>x-y))yield {t,found:places.get(t)!};
  };
- const carried=new Map<string,CarriedHand>(),targets=new Map<number,number[]>(),skipped:SkippedHandCarry[]=[],following=new Map<string,number>(),unshared=new Map<string,number[]>();
+ const carried=new Map<string,CarriedHand>(),targets=new Map<number,number[]>(),reach=new Map<string,number[]>(),skipped:SkippedHandCarry[]=[],following=new Map<string,number>(),unshared=new Map<string,number[]>();
  const handOf=(n:Note,adding:ReadonlyMap<string,PersonalHand>)=>adding.get(n.id)??carried.get(n.id)?.hand??choices[n.id]?.hand??n.hand??null;
- for(const [b,group] of byBar(moves))for(const {t,found} of matching(b,group)){
+ for(const moved of byBar(moves))for(const {t,found} of matching(moved)){
+  const {b}=moved;
   const adding=new Map<string,PersonalHand>(),sources=new Map<string,string>();
   for(const {n,hand,ownerId} of found){
    if(ownsHand(choices[n.id],n.hand??null)){if(!following.has(n.id))following.set(n.id,b+1);continue;}
@@ -300,11 +351,12 @@ function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note
   const mixed=[...adding.keys()].some(id=>{const n=notes.get(id)!,key=keys.get(`${n.startTick}:${pitch(n)}`)!;return key.some(q=>handOf(q,adding)===null)&&key.some(q=>handOf(q,adding)!==null);});
   if(mixed){skipped.push({fromBar:b+1,toBar:t+1,reason:'a key there is written as two notes, and only one of them would have a hand'});continue;}
   for(const [id,hand] of adding)carried.set(id,{hand,fromBar:b+1,fromOwnerId:sources.get(id)!});
-  targets.set(b+1,[...targets.get(b+1)??[],t+1]);
+  const to=targets.get(b+1)??[];if(!to.includes(t+1))targets.set(b+1,[...to,t+1]);
+  for(const ownerId of new Set(found.map(f=>f.ownerId))){const bars=reach.get(ownerId)??[];if(!bars.includes(t+1))reach.set(ownerId,[...bars,t+1]);}
  }
- for(const [b,group] of byBar(older))for(const {t,found} of matching(b,group))for(const {n,ownerId} of found)
+ for(const moved of byBar(older))for(const {t,found} of matching(moved))for(const {n,ownerId} of found)
   if(!ownsHand(choices[n.id],n.hand??null)){const reach=unshared.get(ownerId)??[];if(!reach.includes(t+1))unshared.set(ownerId,[...reach,t+1]);}
- return{carried,targets,skipped,following,unshared};
+ return{carried,targets,reach,skipped,following,unshared};
 }
 /** Where the selected note's hand comes from, for the editor to say. `follows`
  * is the bar a local hand would follow again if it stopped being local;
@@ -319,7 +371,7 @@ export function handProvenance(p:ScorePackage,s:PersonalState,ownerId:string):Ha
  const recurrences=handRecurrences(p,s),carried=recurrences.carried.get(ownerId);
  if(carried)return{kind:'carried',hand:carried.hand,fromBar:carried.fromBar};
  if(!c||c.hand===undefined)return;
- if(carriesHand(c,n.hand??null))return{kind:'shared',hand:c.hand,toBars:recurrences.targets.get(barNumber(p,n))??[]};
+ if(carriesHand(c,n.hand??null))return{kind:'shared',hand:c.hand,toBars:recurrences.reach.get(ownerId)??[]};
  const reach=recurrences.unshared.get(ownerId);if(reach)return{kind:'unshared',hand:c.hand,toBars:reach};
  if(c.handScope!=='local')return;
  const follows=recurrences.following.get(ownerId);
