@@ -764,6 +764,16 @@ pub async fn piano_audio_configure(
     .await
     .map_err(|e| e.to_string())?
 }
+/// While the Volume track is dragged the pianist hears each new volume at
+/// once; nothing is saved until the drag ends (piano_audio_configure).
+#[tauri::command]
+pub fn piano_audio_volume(state: tauri::State<'_, State>, volume: f64) -> Result<(), String> {
+    if !volume.is_finite() || !(0.0..=1.0).contains(&volume) {
+        return Err("Invalid piano volume".into());
+    }
+    state.volume.store(volume.to_bits(), Ordering::Release);
+    Ok(())
+}
 #[tauri::command]
 pub fn practice_audio_outputs() -> Result<Outputs, String> {
     #[cfg(any(windows, target_os = "macos"))]

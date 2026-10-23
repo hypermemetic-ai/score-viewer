@@ -88,6 +88,105 @@ Practice cues, panic, live MIDI and the cue formulas are unchanged. The callback
 still takes no locks, emits no events, does no file work and does not allocate;
 the allocator test covers the scheduled path.
 
+## Getting the piano
+
+Download piano is one press. The native side downloads the author's current
+Accurate-Salamander V6.2a 48 kHz/24-bit ZIP (1.66 GB) from archive.org with the
+system curl, HTTPS only, and shows Downloading, Checking and Installing with a
+percentage and Cancel. The finished `.part` file is checked where it lies and
+admitted exactly like a chosen ZIP (size, SHA256, file fingerprint, live SFZ hash,
+SFZ closure); it is deleted only once the bank is published. A dropped connection
+keeps the partial file and the next press continues from it; Cancel, a refused
+server answer or a changed archive discard it, and Cancel says so ("Download
+cancelled. The partial download was removed."). After a successful install the
+piano is switched on; MIDI stays the player's choice. Install from a file… stays
+for offline use and accepts V6.2 or V6.2a. Any successful install, either way,
+deletes every unfinished download and its records, for both admitted archives,
+and removes the bank it replaced; nothing reads them again once a piano is
+installed.
+
+Focus follows the press: Download piano moves focus to Cancel, which is its own
+Options row (arrows go Download piano, Cancel, Volume); a cancel or failure
+returns focus to the button that started it, and success to Enable piano sound.
+Dragging the Volume track is heard at once (`piano_audio_volume` sets the gain
+only) and saved once on release; the number box and track move together.
+
+Before downloading, a HEAD request reads the server's size and ETag (or
+Last-Modified). A size other than the pinned 1.66 GB stops at once with "The
+piano file online has changed. This viewer needs an update before it can
+download the piano." (a chosen copy of that file would be refused too); curl
+also gets `--max-filesize`. archive.org re-uploaded the item on 2026-10-13 and
+2026-10-15, so the pinned SHA256 can stop matching without the size changing;
+the ETag is stored beside the partial and a different one discards the partial
+before resuming rather than splicing two uploads. A download of the right size
+with the wrong SHA256 may be a resume gone wrong, so the first one is discarded
+with "The downloaded piano was damaged… Press Download piano to download it
+again."; the same ETag failing again is refused as changed online, and that ETag
+is remembered so a repeat press is refused after the HEAD request alone, not
+after another 1.7 GB. A resume the server
+refuses (curl 33/36, HTTP 416) discards the partial and starts again once. Messages
+never show curl or HTTP numbers.
+
+Quitting the viewer mid-download stops curl and keeps the partial for the next
+press; quitting while Checking or Installing keeps the `.part` too, and any
+`pending-*` stage left by a quit is removed (a complete ZIP in it is moved back)
+on the next download or install; only a download moves a complete ZIP back, so
+a chosen ZIP never becomes a download. A bank folder that `current.json` does
+not name (a kill between moving it in and writing the pointer) is removed on the
+next start or press, with the lock held. Only one viewer works on the piano
+folder at a time: it holds `piano.lock` (the lock alone decides; a virus scanner
+holding the `.part` open is not mistaken for another viewer), and curl inherits
+that lock, so a curl that outlives
+its viewer still keeps every other press out instead of having its file appended
+to. curl cannot outlive the viewer for long: on macOS it runs under a small shell
+watcher in its own process group that kills it within a second of the viewer
+disappearing (Cancel kills the group), and on Windows it runs in a Job Object
+that kills it when the viewer's handle closes, however the viewer ends. The
+Windows curl (`%SystemRoot%\System32\curl.exe`) gets only ASCII arguments: the
+piano folder, which may contain a non-ASCII user name, is its working directory
+and the output is a relative name, and `--disable` ignores personal curl
+settings.
+
+Earlier the button opened the author's page in a browser. On a Mac that meant a
+Japanese academic page whose hosts are share sites, a 1.66 GB browser download,
+Safari possibly unzipping it, then a second button and a file picker. Since the
+author replaced V6.2 with V6.2a (2026-09-28) every reachable archive was refused,
+so a new install could not succeed at all.
+
+On this Linux host the production core with real curl against archive.org took
+314 s to download (about 4.9 MB/s, including a forced interruption that resumed
+from 225 MB), 4.9 s to check and about 30 s to extract and hash: 348 s in all.
+Offline verification of the installed bank took 1.6 s at 15 MB peak memory. App
+start and score open do no piano work.
+
+## Delay and loudness
+
+Live notes are applied at the start of each 256-frame sampler chunk inside the
+output callback; the engine sounds a note in the block it arrives (the live SFZ
+has no note-on delay; the recorded attack reaches half its peak 2–10 ms later).
+The software delay is the wait for the next callback (0 to one buffer) plus the
+buffer itself, before driver and device latency:
+
+| Latency setting | macOS buffer at 48 kHz | macOS software delay | Windows queue |
+| --- | --- | --- | --- |
+| Lowest | device minimum (e.g. 15 frames) | under 1 ms | 1 period |
+| Low | 256 frames | 5.3–10.7 ms | 2 periods |
+| Medium | 512 frames | 10.7–21.3 ms | 3 periods |
+| High | larger of default and 10 ms | from 10.7–21.3 ms | 4 periods |
+
+Windows adds a wait of up to one period; with a 10 ms shared period the lowest
+choice is roughly 10–20 ms of software delay. An earlier coarse loopback on a MOTU
+interface at 44.1 kHz/512 frames measured 18.9–30.5 ms end to end.
+
+Rendered offline with the pinned engine and the V6.2a bank at the default volume
+(70%), a single middle C peaks at −47.9 dBFS at velocity 16, −39.9 at 32, −29.0 at
+64, −22.1 at 96 and −17.2 at 127 (300 ms RMS about 12 dB lower); C2 and C6 are
+similar. A five-note chord at velocity 100 peaks at −13.3 dBFS. 100% adds only
+3 dB. The metronome click is fixed at −15.9 dBFS (accent) and −18.4 dBFS, unscaled
+by piano volume, so it is louder than a forte single note; there is no separate
+metronome volume. The piano is quiet: louder playing needs either a range above
+100% with a limiter or the computer's own volume.
+
 `node scripts/check-piano-audio-core.mjs` (inside qq-job) compiles the portable
 core and its tests without Tauri, GUI or outputs. Stand-in `tauri` crates
 type-check the commands. The paired native build compiles the Windows and macOS

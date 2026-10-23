@@ -30,6 +30,8 @@ struct Inner {
 pub struct State {
     inner: Arc<Mutex<Inner>>,
     cancel: Arc<AtomicBool>,
+    /// The viewer is quitting: work stops, and a download keeps what arrived.
+    quitting: Arc<AtomicBool>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -40,7 +42,7 @@ impl Default for State {
                     installed: false,
                     phase: "not-installed".into(),
                     progress: None,
-                    message: "Install the optional piano to play through the computer.".into(),
+                    message: "Hear your keyboard through this computer. One 1.7 GB download, then it works offline.".into(),
                     cancellable: false,
                 },
                 ready: None,
@@ -48,10 +50,24 @@ impl Default for State {
                 busy: false,
             })),
             cancel: Arc::new(AtomicBool::new(false)),
+            quitting: Arc::new(AtomicBool::new(false)),
         }
     }
 }
 impl State {
+    /// On exit: stop any download, check or install and wait briefly for it,
+    /// so curl is gone before the viewer is. An unfinished download is kept
+    /// for the next press.
+    pub fn shutdown(&self) {
+        self.quitting.store(true, Ordering::Release);
+        self.cancel.store(true, Ordering::Release);
+        let start = std::time::Instant::now();
+        while self.inner.lock().map(|s| s.busy).unwrap_or(false)
+            && start.elapsed() < std::time::Duration::from_secs(5)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+    }
     pub fn ready_sfz(&self) -> Result<Option<PathBuf>, String> {
         let state = self
             .inner
@@ -74,10 +90,10 @@ impl State {
         if let Ok(mut s) = self.inner.lock() {
             s.status.phase = phase.into();
             s.status.progress = Some(percent.min(100));
-            s.status.message = if phase == "checking" {
-                "Checking piano…"
-            } else {
-                "Installing piano…"
+            s.status.message = match phase {
+                "downloading" => "Downloading piano (1.7 GB)…",
+                "checking" => "Checking piano…",
+                _ => "Installing piano…",
             }
             .into();
         }
@@ -109,7 +125,7 @@ impl State {
                 s.status.message = if s.ready.is_some() {
                     "Piano installed. Works offline."
                 } else {
-                    "Install the optional piano to play through the computer."
+                    "Hear your keyboard through this computer. One 1.7 GB download, then it works offline."
                 }
                 .into();
             }
@@ -207,14 +223,14 @@ pub async fn piano_bank_install(
         s.status.cancellable = true;
         s.status.phase = "choosing".into();
         s.status.progress = None;
-        s.status.message = "Choose the original downloaded piano ZIP.".into();
+        s.status.message = "Choose the piano ZIP.".into();
         state.cancel.store(false, Ordering::Release);
     }
     let state = state.inner().clone();
     let worker = state.clone();
     match tauri::async_runtime::spawn_blocking(move || {
         let result = match crate::owned_dialog(&window)
-            .add_filter("Accurate-Salamander piano", &["zip"])
+            .add_filter("Accurate-Salamander piano V6.2a", &["zip"])
             .pick_file()
         {
             None => Ok(None),
@@ -239,7 +255,6 @@ pub fn piano_bank_cancel(state: tauri::State<'_, State>) -> Result<(), String> {
     Ok(())
 }
 
-pub const OFFICIAL_DOWNLOAD: &str = "https://www.ir.isas.jaxa.jp/~cyamauch/AccurateSalamander/";
 pub const WINDOWS_AUDIO_HELP: &str =
     "https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/low-latency-audio";
 fn open_fixed(url: &'static str) -> Result<(), String> {
@@ -276,7 +291,7 @@ fn open_fixed(url: &'static str) -> Result<(), String> {
             )
         };
         if result <= 32 {
-            return Err("The download/help page could not open in your browser.".into());
+            return Err("The help page could not open in your browser.".into());
         }
         Ok(())
     }
@@ -289,7 +304,7 @@ fn open_fixed(url: &'static str) -> Result<(), String> {
         if result.success() {
             Ok(())
         } else {
-            Err("The download/help page could not open in your browser.".into())
+            Err("The help page could not open in your browser.".into())
         }
     }
     #[cfg(not(any(windows, target_os = "macos")))]
@@ -298,12 +313,53 @@ fn open_fixed(url: &'static str) -> Result<(), String> {
         Err("Piano installation is available in the Windows and Mac desktop app.".into())
     }
 }
+/// One press: download, check and install the piano, off the UI thread.
+/// Closing Options does not stop it; Cancel does.
 #[tauri::command]
-pub async fn piano_bank_download() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| open_fixed(OFFICIAL_DOWNLOAD))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn piano_bank_download(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, State>,
+) -> Result<Status, String> {
+    let root = cache_root(&app)?;
+    {
+        let mut s = state
+            .inner
+            .lock()
+            .map_err(|_| "Piano bank state unavailable")?;
+        if s.busy || state.quitting.load(Ordering::Acquire) {
+            return Err("Piano installation is already running.".into());
+        }
+        if s.ready.is_some() {
+            return Ok(s.status.clone());
+        }
+        s.busy = true;
+        s.status.cancellable = true;
+        s.status.phase = "downloading".into();
+        s.status.progress = Some(0);
+        s.status.message = "Downloading piano (1.7 GB)…".into();
+        state.cancel.store(false, Ordering::Release);
+    }
+    let state = state.inner().clone();
+    let worker = state.clone();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let directory = root.clone();
+        let result = core::download(
+            &root,
+            &worker.cancel,
+            &worker.quitting,
+            |phase, pct| worker.progress(phase, pct),
+            || core::curl_probe(&directory, &worker.cancel),
+            |attempt, grew| core::curl_fetch(attempt, &worker.cancel, grew),
+        );
+        worker.finish(result.map(Some))
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(error) => state.finish(Err(format!("Piano download worker failed: {error}"))),
+    }
 }
+
 #[tauri::command]
 pub async fn piano_audio_help() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| open_fixed(WINDOWS_AUDIO_HELP))
