@@ -1,0 +1,99 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+import {runInNewContext} from 'node:vm';
+import {importPackage,requireCurrentEngraving,savedPagesBehindPolicy,selectPresentation,SavedPagesBehindPolicy,type ScorePackage} from '../src/package';
+import {packageFile,prepareRebuiltEdition,shareKeyboardView} from '../src/edition-rebuild';
+import {collectionId,fingerFor,initialPersonal,personalStorageName,type Entry,type PersonalState} from '../src/state';
+import {assigned,handFor} from '../src/personal-assignments';
+import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
+
+// The owner's conventional No. 14 opened on pages the no14-recovery engine drew
+// (augmentation dots and all), because only approved recipes were checked
+// against the current shared policy. This edition is the same kind: a Jankó
+// view and a conventional view showing those very pages.
+const janko=new Uint8Array(readFileSync(new URL('../fixtures/authored-preparation-v1.tuna',import.meta.url))),
+ jankoOnly=await importPackage(janko,{allowLegacyTempo:true}),
+ stale=await shareKeyboardView(jankoOnly,'conventional-piano'),
+ saved=await importPackage(stale,{allowLegacyTempo:true}),id=collectionId(saved),file=await packageFile(stale),
+ earlier={'conventional-piano':await selectPresentation(saved,'conventional-piano'),'janko-four-row':await selectPresentation(saved,'janko-four-row')},
+ conventional=earlier['conventional-piano'],encode=(value:unknown)=>new TextEncoder().encode(JSON.stringify(value)),
+ journal=`state-version-${'c'.repeat(64)}.json`,
+ seatOf=(p:ScorePackage,owner:string)=>p.seats.find(s=>s.ownerIds.includes(owner))!,
+ printed=(p:ScorePackage,owner:string)=>p.fingerLayer?.attacks.find(a=>a.id===p.fingerLayer!.sourceOwnerToAttack[owner])?.finger;
+
+// The player's own hand and finger choices on the conventional layout: three notes moved to the other hand, with fingers.
+const chosenSeats=conventional.seats.filter(s=>s.ownerIds.length===1&&!s.continuation).slice(0,3);
+let prior:PersonalState=initialPersonal(conventional);const chosen=new Map<string,{hand:'LH'|'RH';finger:number}>();
+for(const [i,seat] of chosenSeats.entries()){const owner=seat.ownerIds[0],hand=handFor(conventional,initialPersonal(conventional),owner)==='LH'?'RH':'LH',finger=i+2;
+ prior=assigned(conventional,prior,seat,{hand,finger});chosen.set(owner,{hand,finger});}
+const entry:Entry={id,file,metadata:saved.manifest.metadata,importedAt:'2026-10-23T00:00:00.000Z',personalFiles:{[personalStorageName(id,conventional)]:journal}};
+const host=(stored:Map<string,Uint8Array>)=>({read:async(name:string)=>stored.get(name)??null});
+
+test('saved conventional pages an earlier engine drew are behind the current shared policy; admission still reads them',()=>{
+ assert.equal(conventional.renderingRecipe?.engineId,SCORE_RENDERING_ENGINE,'the conventional view shows the no14-recovery pages');
+ assert.deepEqual(conventional.pages,earlier['janko-four-row'].pages,'the same pages serve both layouts');
+ assert.equal(savedPagesBehindPolicy(saved),true);
+ assert.equal(savedPagesBehindPolicy(conventional),true,'either view names the edition');
+ assert.throws(()=>requireCurrentEngraving(conventional),(error:Error)=>error instanceof SavedPagesBehindPolicy&&/current shared engraving policy/.test(error.message));
+});
+
+test('a stale saved conventional edition is engraved again once, with every edition hand and finger and the player\'s own choices',async()=>{
+ const copy=stale.slice(),stored=new Map([[journal,encode(prior)]]),
+  rebuilt=await prepareRebuiltEdition(host(stored),entry,file,stale,'conventional-piano',{refusal:new SavedPagesBehindPolicy()}),
+  next=await importPackage(rebuilt.packageBytes,{allowLegacyTempo:true});
+ assert.deepEqual(stale,copy,'the earlier archive is not changed');
+ // Reopening admits the new edition as it is: nothing is engraved a second time.
+ assert.equal(savedPagesBehindPolicy(next),false);assert.equal(requireCurrentEngraving(next),next);
+ assert.deepEqual([...next.availablePresentations!].sort(),['conventional-piano','janko-four-row']);
+ const personal:Record<string,PersonalState>={[personalStorageName(id,rebuilt.package)]:rebuilt.personal,...Object.fromEntries(rebuilt.additionalPersonal.map(p=>[p.key,p.personal]))};
+ for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const before=earlier[layout],after=await selectPresentation(next,layout),s=personal[personalStorageName(id,after)];
+  assert.equal(after.renderingRecipe?.engineId,APPROVED_SCORE_RENDERING_ENGINE,`${layout} is drawn under the current shared policy`);
+  assert.ok(s,`${layout} has its journal`);
+  const beforeState=layout==='conventional-piano'?prior:initialPersonal(before);
+  for(const n of before.score.notes){
+   const own=layout==='conventional-piano'?chosen.get(n.id):undefined;
+   assert.equal(handFor(after,s,n.id),handFor(before,beforeState,n.id),`${layout} ${n.id} hand`);
+   if(own)assert.equal(handFor(after,s,n.id),own.hand,`${layout} ${n.id} keeps the player's hand`);
+   const finger=own?.finger??printed(before,n.id);
+   if(finger!==undefined)assert.equal(fingerFor(after,s,seatOf(after,n.id)),finger,`${layout} ${n.id} finger`);
+  }
+ }
+ assert.equal(rebuilt.carried,chosen.size,'every choice came along');assert.equal(rebuilt.left,0,'no choice stays behind');
+ assert.equal(rebuilt.replaced[file],await packageFile(rebuilt.packageBytes));
+});
+
+// Opening wiring, run on the actual open() source as retained-open.test.ts does.
+const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
+const open=stripTypeScriptTypes(source.slice(source.indexOf('async function open('),source.indexOf('\nasync function chooseGuitarProTracks(')));
+async function opening(rebuilds:boolean){
+ const entry={id:'source',file:'saved.tuna',personalFiles:{}},data=new Uint8Array([1,2,3]),personal={overrides:{},history:[]},
+  p={availablePresentations:['janko-four-row'],manifest:{version:2},collection:'source'},q={status:'reading',package:p,personal,packageBytes:new Uint8Array(data)};
+ const calls:string[]=[],notices:string[]=[],op={keyboard:'janko-four-row'},context:any={
+  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),getScoreTransposition:()=>0,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
+  host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>{calls.push('admit');return p;},admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
+  requireCurrentEngraving:()=>{throw new SavedPagesBehindPolicy();},SavedPagesBehindPolicy,SavedPagesLackRepeats:class extends Error{},
+  keepSavedPagesWithoutRepeats:()=>calls.push('without-repeats'),
+  readingProgress:()=>calls.push('engrave-again'),reengraveReadingArchive:async()=>undefined,readingExecution:()=>({}),
+  prepareRebuiltEdition:async(_h:unknown,_e:unknown,_f:unknown,_b:unknown,_l:unknown,options:{refusal:unknown})=>{assert.ok(options.refusal instanceof SavedPagesBehindPolicy);calls.push('rebuild');if(!rebuilds)throw Error('cannot engrave');return {packageBytes:new Uint8Array([9]),personal,left:0,carried:0,practice:[],additionalPersonal:[],replaced:{}};},
+  preparePiano:async()=>({q,running:{}}),
+  loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>'source',
+  installPreparedScore:async()=>{calls.push('install');return {entry,personal};},
+  activateScore:async(next:any)=>{calls.push('activate');return next;},saveReadingPreferences:async()=>{},checkReadingOwner(){},notify:(text:string)=>notices.push(text),clearNotice(){},finishReading(_op:any,success:boolean){calls.push(success?'complete':'failed');},
+  console:{warn(){}},
+ };
+ runInNewContext(open,context);let error:unknown;try{await context.open(entry);}catch(e){error=e;}
+ return {calls,notices,error};
+}
+test('opening saved pages an earlier engine drew engraves the edition again and installs it',async()=>{
+ const f=await opening(true);assert.equal(f.error,undefined);
+ assert.deepEqual(f.calls,['admit','engrave-again','rebuild','install','activate','complete']);
+ assert.deepEqual(f.notices,['This score was engraved again with the current engraving. Your hands, fingers and choices came along.']);
+});
+test('when they can\'t be engraved again, the score still opens on its saved pages and says so',async()=>{
+ const f=await opening(false);assert.equal(f.error,undefined);
+ assert.deepEqual(f.calls,['admit','engrave-again','rebuild','admit','activate','complete']);
+ assert.equal(f.calls.includes('without-repeats'),false);
+ assert.match(f.notices.join(' '),/couldn’t be engraved again with the current engraving, so it opened on its saved pages/);
+});

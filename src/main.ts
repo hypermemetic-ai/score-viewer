@@ -61,7 +61,7 @@ import {stageReadingPartsInstall,ReadingPartsCommitUnconfirmed} from './reading-
 import {requirePracticeHands} from './practice';
 import {LoadingProgress,LOADING_STEPS,type LoadingStepId} from './viewer-loading';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
-import {SavedPagesLackRepeats,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,usePianoPageCheckReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
+import {SavedPagesLackRepeats,SavedPagesBehindPolicy,requireCurrentEngraving,savedPagesBehindPolicy,keepSavedPagesWithoutRepeats,editionNeedsEngravingAgain,useCalculatedAdmissionEvidence,useReadingAdmissionReceipts,usePianoPageCheckReceipts,hashBytes,selectPresentation,sameFrozenPayload,headerOnlyRefresh,referenceMidiDiffers,type ScorePackage,type FingerLayer,type Seat} from './package';
 import {activeLayer,corrected,defaultView,EDITOR_COLUMN,readerFit,effectiveLabelMode,fingerDisplayAvailable,feedback,fingerFor,initialPersonal,readPersonal,collectionId,personalStorageName,practiceStorageName,legacyPracticeStorageName,validEntryStorage,rotate,turnPage,viewportFit,type Entry,type PersonalState,type PersonalSourceAnchor,type Rotation} from './state';
 import {loadPersonalJournal} from './personal-journal';
 import {rotationKey,rotationShortcut,InputController,defaultBindings,readBindings,readingActionAllowed,fingerBehavior,fingerPresentation,fingerPreferences,readableChord,actionCode,inputCode,chord,directFingerKey,type Bindings,type ReadingAction,type FingerBehavior,type FingerPresentation} from './input';
@@ -170,7 +170,8 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   if(readingOnlyArchive(bytes))return null;
   // Only admission rejecting the archive, or the engraver refusing its pages, is a refusal.
   await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}),admissionRejection);await answerInput();
-  if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
+  // Pages an earlier engine drew are engraved again, and saved, by opening them.
+  if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout)||savedPagesBehindPolicy(prior))return null;
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
   const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(journals,entry,selected);checkReadingExecution(execution);
@@ -1112,7 +1113,10 @@ async function changeTransposition(steps:number){
      const original={package:target.package.transpositionOriginal??target.package,bytes:getOriginalScorePackageBytes(target.package)??currentBytes};
      try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,bytes,layout,{refusal,...(steps?{original}:{}),admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},
       {signal:controller.signal,onCheckpoint:stage=>{if(job===running&&running.state==='working')loading.stage(stage);}});}
-     catch(rebuildError){if(steps===0||(rebuildError as Error).name==='AbortError')throw rebuildError;}
+     catch(rebuildError){if((rebuildError as Error).name==='AbortError')throw rebuildError;
+      // Pages an earlier engine drew still open as saved.
+      if(refusal instanceof SavedPagesBehindPolicy){console.warn('The saved pitch could not be engraved again; it opens on its saved pages.',rebuildError);return await prepareRetainedEdition(host,target.entry,file,layout,false);}
+      if(steps===0)throw rebuildError;}
      return rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:undefined;
     };
     try{retained=await prepareRetainedEdition(host,target.entry,file,layout);}
@@ -1197,9 +1201,10 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
  const kept=retained.take(entry.id,()=>sourceGroup===undefined?retentionConditions(entry):undefined);
  if(kept){await host.fullscreen(true);checkReading(op);const activated=await activateScore(kept,undefined,undefined,op,true);retainable.add(activated);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});finishReading(op,true);return;}
  const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
- let prior:ScorePackage,withoutRepeats=false;try{prior=await importReading(data,op);}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
-  // Pages that only lack their repeat signs open as saved when they can't be engraved again.
-  keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);prior=await importReading(data,op);withoutRepeats=true;}
+ // Pages an earlier engine drew are engraved again with the current shared policy, once: the new edition is saved.
+ let prior:ScorePackage,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
+  // Pages drawn before the current policy, or that only lack their repeat signs, open as saved when they can't be engraved again.
+  if(error instanceof SavedPagesBehindPolicy)keptSaved=true;else{keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);withoutRepeats=true;}prior=await importReading(data,op);}
  await admitReadingSource(prior,op);
  if(sourceGroup&&guitarProContext(prior)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');assertSelectedTransposition(entry,prior);
  // Every piano score opens on the player's keyboard layout, gaining it when its edition lacks it.
@@ -1213,7 +1218,7 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
   finishReading(op,true);
-  const said=[withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
+  const said=[withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',keptSaved?SAVED_PAGES_KEPT:'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
 }
 
@@ -1254,10 +1259,13 @@ function gainedNotice(g:GainedLayout,shown:ScorePackage,imported:boolean):string
  // A fresh import has nothing of the player's to carry yet.
  return [imported?lead:rebuiltNotice(g.rebuilt,lead),imported?'':'The earlier edition stays saved.',fingers].filter(Boolean).join(' ');
 }
+/** Said when saved pages an earlier engine drew couldn't be engraved again. */
+const SAVED_PAGES_KEPT='This score couldn’t be engraved again with the current engraving, so it opened on its saved pages.';
 /** A saved edition whose pages the current engraving no longer reproduces is
  * engraved again from its own content and installed like an Earlier edition:
  * the earlier archive and its journals stay saved. False when pages that only
- * lack their repeat signs couldn't be engraved again: they open as saved. */
+ * lack their repeat signs, or that an earlier engine drew, couldn't be
+ * engraved again: they open as saved. */
 async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string):Promise<boolean>{
  readingProgress(op,'engrave-again');
  const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
@@ -1265,7 +1273,7 @@ async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown
  let rebuilt:RebuiltInstall,prepared:Awaited<ReturnType<typeof preparePiano>>;
  try{rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
   await readingCheckpoint(op);prepared=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op);}
- catch(error){if(!(admission instanceof SavedPagesLackRepeats)||(error as Error).name==='AbortError')throw error;checkReading(op);return false;}
+ catch(error){if(!(admission instanceof SavedPagesLackRepeats||admission instanceof SavedPagesBehindPolicy)||(error as Error).name==='AbortError')throw error;checkReading(op);console.warn('The saved edition could not be engraved again; it opens on its saved pages.',error);return false;}
  const {q,running}=prepared,
   installed=await installPreparedScore(entry,q,running,q.personal??rebuilt.personal,false,undefined,undefined,rebuilt);await readingCheckpoint(op);
  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
@@ -1400,8 +1408,12 @@ async function earlierEditions(){
      const controller=new AbortController(),stop=()=>controller.abort();
      d.querySelector('.error')!.textContent='';progress.innerHTML=loading.markup();loading.attach(progress);loading.step('engrave-again');d.addEventListener('close',stop,{once:true});
      try{rebuilt=await prepareRebuiltEdition(host,target.entry,file,await readRetainedEdition(host,target.entry,file),layout,{refusal:error,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},{signal:controller.signal,onCheckpoint:stage=>loading.stage(stage)});}
+     catch(rebuildError){
+      // Pages an earlier engine drew still open as saved.
+      if(!(error instanceof SavedPagesBehindPolicy)||(rebuildError as Error).name==='AbortError')throw rebuildError;
+      console.warn('The earlier edition could not be engraved again; it opens on its saved pages.',rebuildError);}
      finally{d.removeEventListener('close',stop);}
-     retained={packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}};
+     retained=rebuilt?{packageBytes:rebuilt.packageBytes,package:rebuilt.package,personal:rebuilt.personal,personalFiles:{...(target.entry.editionPersonalFiles?.[file]??{})}}:await prepareRetainedEdition(host,target.entry,file,layout,false);
     }
     // A re-engraved edition's practice arrives during the install, so its
     // context is read after the transfer (as installPreparedScore does).
