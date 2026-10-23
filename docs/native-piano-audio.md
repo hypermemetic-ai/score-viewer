@@ -302,6 +302,36 @@ default the metronome click sits near a mezzo-forte note, under a forte one.
 The delays match run 39871601774 within the runner's scatter; the limiter cannot
 move the first sound, since it only scales samples.
 
+Run 39895851435 (application faac45f, piano gain 2.25, knee at −3 dBFS, report
+version 3; peaks over both channels in dBFS at the device; "Before" is the old
+linear 70% through the new limiter):
+
+| Sound | Before (old 70%) | Default 70% | 100% |
+| --- | --- | --- | --- |
+| Middle C, velocity 127 | −17.2 | −7.1 (not limited) | −2.0 (limited 0.9 dB, 0.14 s) |
+| Middle C, velocity 96 | −22.1 | −11.9 | −5.9 |
+| Middle C, velocity 64 | −29.0 | −18.8 | −12.8 |
+| Middle C, velocity 32 | −39.9 | −29.8 | −23.8 |
+| Middle C, velocity 16 | −47.9 | −37.7 | −31.7 |
+| Five-note chord, velocity 100 | −13.3 | −3.1 (not limited) | −1.4 (limited 4.3 dB, 0.27 s) |
+| Pedalled two-hand chord, ten notes at 120 then 127 | −6.1 | −1.3 (limited 6.4 dB, 0.80 s of 1.6 s) | −1.1 (limited 11.7 dB) |
+| Metronome click | −16.1 | −16.1 | −10.1 |
+| Click under a pedalled ten-note chord at 127 | +0.1 dB | +0.2 dB | +0.5 dB |
+
+The last row is the click's level under the chord relative to the same click
+alone (0 dB: its own level), found by least squares against the lone recording;
+the piano alone leaks −28 dB into that estimate, so the figures agree with 0 dB
+within it. C2 and C6 at velocity 127 peak at −7.9 and −8.6 dBFS at the default.
+
+| Latency setting | Note-on to loopback input |
+| --- | --- |
+| Lowest | 0.30–8.07 ms, median 0.45 (one note at 8.07, one at 1.34; the rest at most 0.59) |
+| Low | 3.41–9.96 ms, median 6.66 |
+| Medium | 8.48–18.76 ms, median 13.77 |
+| High | 7.07–18.01 ms, median 13.82 |
+
+The delays match the earlier runs within the runner's scatter.
+
 The loopback has no converters, so a real interface or built-in speakers add their
 own reported device latency and safety offset, which this run cannot measure, and
 the keyboard's USB MIDI and the room are not counted. CI has no speakers.
