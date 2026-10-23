@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc, Arc, Mutex, OnceLock,
     },
     time::Duration,
@@ -198,7 +198,7 @@ fn run(
     struct Active {
         app: tauri::AppHandle,
         session: lifecycle::Session,
-        onset: Arc<AtomicU64>,
+        onset: Arc<std::sync::atomic::AtomicU64>,
         finished: Arc<std::sync::atomic::AtomicBool>,
         invalid: Arc<std::sync::atomic::AtomicBool>,
         announced: bool,
@@ -716,11 +716,7 @@ pub async fn piano_audio_configure(
     device: String,
     latency_tier: u8,
 ) -> Result<AudioStatus, String> {
-    if !setting(volume)
-        || !setting(cue_volume)
-        || latency_tier > 3
-        || device.len() > 4096
-    {
+    if !setting(volume) || !setting(cue_volume) || latency_tier > 3 || device.len() > 4096 {
         return Err("Invalid piano audio settings".into());
     }
     let sfz = if enabled {

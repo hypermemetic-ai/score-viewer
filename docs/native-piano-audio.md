@@ -68,10 +68,11 @@ highest of all channels):
   stops, its notes lift, but under your held pedal they ring until you lift it.
   The sampler cannot end only the stream's notes then: lifting and pressing the
   pedal again in one instant re-catches every releasing note.
-Clicks use the practice metronome voice on the same clock, unscaled by piano
-volume. The callback publishes the frame it has rendered and its transfer size.
-From these the commands return `leadMicros`, the earliest instant a new event can
-be sounded on time. A note-on or click more than 50 ms late is dropped and counted.
+Clicks use the practice metronome voice on the same clock, scaled by the
+Metronome volume rather than the piano volume. The callback publishes the frame
+it has rendered and its transfer size. From these the commands return
+`leadMicros`, the earliest instant a new event can be sounded on time. A note-on
+or click more than 50 ms late is dropped and counted.
 
 Each replacement starts a new epoch, and late submits to an old epoch are
 rejected. A plain replacement releases the stream: earlier events are discarded
@@ -106,10 +107,15 @@ and removes the bank it replaced; nothing reads them again once a piano is
 installed.
 
 Focus follows the press: Download piano moves focus to Cancel, which is its own
-Options row (arrows go Download piano, Cancel, Volume); a cancel or failure
-returns focus to the button that started it, and success to Enable piano sound.
-Dragging the Volume track is heard at once (`piano_audio_volume` sets the gain
-only) and saved once on release; the number box and track move together.
+Options row (arrows go Download piano, Cancel, Piano volume, Metronome volume);
+a cancel or failure returns focus to the button that started it, and success to
+Enable piano sound. Dragging the Piano volume track is heard at once
+(`piano_audio_volume` sets the gain only) and saved once on release; the number
+box and track move together. The Metronome volume row below it works the same
+way (`cue_audio_volume`) for the metronome and practice cues, and is shown
+whether or not the piano is installed; the built-in browser clicks follow it too.
+It is saved as the optional `cueVolume` in the piano preferences; a missing value
+means the default 70%.
 
 Before downloading, a HEAD request reads the server's size and ETag (or
 Last-Modified). A size other than the pinned 1.66 GB stops at once with "The
@@ -178,14 +184,31 @@ Windows adds a wait of up to one period; with a 10 ms shared period the lowest
 choice is roughly 10–20 ms of software delay. An earlier coarse loopback on a MOTU
 interface at 44.1 kHz/512 frames measured 18.9–30.5 ms end to end.
 
-Rendered offline with the pinned engine and the V6.2a bank at the default volume
-(70%), a single middle C peaks at −47.9 dBFS at velocity 16, −39.9 at 32, −29.0 at
-64, −22.1 at 96 and −17.2 at 127 (300 ms RMS about 12 dB lower); C2 and C6 are
-similar. A five-note chord at velocity 100 peaks at −13.3 dBFS. 100% adds only
-3 dB. The metronome click is fixed at −15.9 dBFS (accent) and −18.4 dBFS, unscaled
-by piano volume, so it is louder than a forte single note; there is no separate
-metronome volume. The piano is quiet: louder playing needs either a range above
-100% with a limiter or the computer's own volume.
+Earlier the bank sounded at unity and the piano volume was a plain linear factor,
+so at the default 70% a hard middle C peaked at only −17.2 dBFS and 100% added
+3 dB. The piano gain is now applied where the sampler's float output is summed
+with the cues, just before a peak limiter, inside the output callback:
+
+- The engine renders float, so a gain there has no rounding and no clipping
+  before the limiter. Changing the bank (an SFZ `volume`) or the engine's own
+  volume would need a reload or a re-render for each change, and could not see
+  the cues; a drag must be heard at once.
+- It is the one place where everything that reaches the device is summed, so the
+  limiter there sees the true final peak.
+- It costs one multiply per sample. The limiter adds about 1–2 ns per stereo
+  frame (0.4 µs per 256-frame chunk, under 0.01% of real time, measured on a
+  Ryzen 7 250); it has no lookahead and adds no delay.
+
+The piano gain is 2.7 × (setting / 70%)^1.94: 70% stays the default and is
++11.7 dB over the old default, 100% is +6 dB over 70%, 50% is −5.7 dB and 35% is
+−11.7 dB. A saved setting is never quieter than before (the gain is at least the
+old linear one), and 0% is silent. The Metronome volume uses the same curve
+without the piano's 2.7, so its default leaves the click as before.
+
+The limiter is stereo-linked with a −1 dBFS ceiling, an instant attack, a 30 ms
+hold and a 150 ms release. Below the ceiling it passes the signal untouched; a
+peak above it is brought down in the same frame, so nothing clips at the device.
+The status reports how many frames it reduced and its deepest reduction.
 
 `node scripts/check-piano-audio-core.mjs` (inside qq-job) compiles the portable
 core and its tests without Tauri, GUI or outputs. Stand-in `tauri` crates
@@ -212,8 +235,11 @@ macOS 15 runner. It installs the BlackHole 2ch loopback, downloads and checks th
 V6.2a archive, plays through the real CoreAudio host at each latency setting and
 records the loopback input. It reports, per setting, note-on handed to the engine
 to the first non-zero input sample, timed in CoreAudio host time, and the peak and
-300 ms RMS (left channel) per velocity, chord and metronome click. It saves no
-cache and publishes only a JSON report; the whole run takes about 5.5 minutes.
+300 ms RMS per velocity, chord, pedalled chord and metronome click, with the
+limiter's frames and deepest reduction. Since report version 2 the peak covers
+both channels (the left-only peak is kept beside it), and loudness runs three
+times: the old linear 70% (`before`), the default 70% and 100%. It saves no cache
+and publishes only a JSON report; the whole run takes about 7 minutes.
 
 Run 39871601774 (48 kHz, BlackHole reports zero device latency and safety offset;
 16 notes per setting):
@@ -230,6 +256,33 @@ the device matches the offline rendering within about 4 dB (left channel only):
 middle C at 70% peaks at −53.8, −45.7, −33.7, −26.1 and −20.9 dBFS for velocities
 16, 32, 64, 96 and 127; a five-note chord at velocity 100 peaks at −14.9; 100%
 adds 3.1 dB. The metronome click peaks at −16.1 dBFS at both volumes.
+
+Run 39888612133 (application 654570a, piano gain 2.7, report version 2; peaks
+over both channels in dBFS at the device):
+
+| Sound | Before (old 70%) | Now, default 70% | Now, 100% |
+| --- | --- | --- | --- |
+| Middle C, velocity 127 | −17.2 | −5.5 | −1.0 (limited 1.5 dB) |
+| Middle C, velocity 96 | −22.1 | −10.3 | −4.3 |
+| Middle C, velocity 64 | −29.0 | −17.3 | −11.4 |
+| Middle C, velocity 32 | −39.9 | −28.2 | −22.2 |
+| Middle C, velocity 16 | −47.9 | −36.2 | −30.1 |
+| Five-note chord, velocity 100 | −13.3 | −1.6 (not limited) | −1.0 (limited 5.5 dB) |
+| Pedalled two-hand chord, ten notes at 120 then 127 | −5.8 | −1.0 (limited 7.8 dB, 0.74 s) | −1.0 (limited 13.5 dB) |
+| Metronome click | −16.1 | −16.1 | −10.1 |
+
+C2 and C6 at velocity 127 peak at −6.3 and −7.0 dBFS at the default. At the
+default the metronome click sits near a mezzo-forte note, under a forte one.
+
+| Latency setting | Note-on to loopback input |
+| --- | --- |
+| Lowest | 0.21–0.58 ms, median 0.44 |
+| Low | 3.47–17.71 ms, median 6.20 (one note at 17.71; the rest at most 9.63) |
+| Medium | 6.97–18.44 ms, median 11.76 |
+| High | 8.47–20.80 ms, median 13.48 |
+
+The delays match run 39871601774 within the runner's scatter; the limiter cannot
+move the first sound, since it only scales samples.
 
 The loopback has no converters, so a real interface or built-in speakers add their
 own reported device latency and safety offset, which this run cannot measure, and
