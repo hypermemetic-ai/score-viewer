@@ -736,7 +736,7 @@ mod tests {
             Fetch::Interrupted("Piano installation cancelled.".into())
         })
         .unwrap_err();
-        assert!(error.contains("cancelled"));
+        assert_eq!(error, CANCELLED, "the pianist is told the partial download is gone");
         assert!(!part(&f).exists());
         assert_eq!(fs::read(f.root().join(CURRENT)).unwrap(), pointer);
         assert!(sfz.exists());
@@ -861,18 +861,148 @@ mod tests {
         drop(held);
         assert!(get(&f, &AtomicBool::new(false), whole(&source)).unwrap().exists());
     }
+    fn marker(f: &Fixture, what: &str) -> PathBuf {
+        f.root().join(format!("{CACHE_PREFIX}{what}"))
+    }
+    fn banks(root: &Path) -> usize {
+        fs::read_dir(root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|x| x.path().is_dir() && x.file_name().to_string_lossy().starts_with(CACHE_PREFIX))
+            .count()
+    }
+    fn plain(message: &str) {
+        assert!(!message.contains("curl") && !message.chars().any(|c| c.is_ascii_digit()), "{message}");
+        assert!(!message.contains("Install from a file"), "{message}");
+    }
     #[test]
-    fn a_changed_download_is_refused_and_not_kept() {
+    fn a_damaged_download_is_fetched_whole_once_then_refused_without_fetching() {
+        // Review 2, finding 2: the right size with the wrong bytes.
         let f = Fixture::valid();
-        let mut source = fs::read(&f.source).unwrap();
+        let good = fs::read(&f.source).unwrap();
+        let mut source = good.clone();
         let last = source.len() - 1;
         source[last] ^= 1;
-        let error = get(&f, &AtomicBool::new(false), whole(&source)).unwrap_err();
-        assert!(error.contains("online has changed") && error.contains("Install from a file"), "{error}");
-        assert!(!error.contains("try again"));
-        assert!(!part(&f).exists());
-        assert!(!f.root().join(CURRENT).exists());
+        let stop = AtomicBool::new(false);
+        let error = get(&f, &stop, whole(&source)).unwrap_err();
+        assert_eq!(error, DAMAGED);
+        plain(&error);
+        assert!(!part(&f).exists() && !f.root().join(CURRENT).exists());
         assert_eq!(stage_count(&f.root()), 0);
+        // Pressing again fetches it whole; the same file failing again has changed online.
+        let mut fetched = Vec::new();
+        let error = get(&f, &stop, |a, g| {
+            fetched.push(a.have);
+            whole(&source)(a, g)
+        })
+        .unwrap_err();
+        assert_eq!((fetched.as_slice(), error.as_str()), (&[0][..], CHANGED));
+        plain(&error);
+        assert!(error.contains("needs an update"));
+        assert!(!part(&f).exists());
+        // A repeat press costs no download.
+        assert_eq!(get(&f, &stop, never).unwrap_err(), CHANGED);
+        // The file uploaded again (a new validator) is downloaded and installed;
+        // nothing about the refused one is kept.
+        let sfz = download_impl(
+            &f.root(), &f.profile(), &stop, &AtomicBool::new(false), &mut quiet,
+            || Ok(Remote { bytes: Some(f.bytes), validator: Some("etag \"second\"".into()) }),
+            whole(&good), None,
+        )
+        .unwrap();
+        assert!(sfz.exists());
+        for what in ["download.part", "download.json", "damaged.json", "refused.json"] {
+            assert!(!marker(&f, what).exists(), "{what}");
+        }
+    }
+    #[test]
+    fn one_damaged_resume_then_a_good_download_installs() {
+        let f = Fixture::valid();
+        let good = fs::read(&f.source).unwrap();
+        let mut source = good.clone();
+        source[good.len() / 2] ^= 1;
+        let stop = AtomicBool::new(false);
+        assert_eq!(get(&f, &stop, whole(&source)).unwrap_err(), DAMAGED);
+        assert!(get(&f, &stop, whole(&good)).unwrap().exists());
+        assert!(!marker(&f, "damaged.json").exists());
+    }
+    #[test]
+    fn a_file_install_leaves_no_unfinished_download_behind() {
+        // Review 2, finding 1, first case: quit mid-download, then Install from a file.
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let (stop, keep) = (AtomicBool::new(false), AtomicBool::new(false));
+        download_impl(&f.root(), &f.profile(), &stop, &keep, &mut quiet, || same(&f), |a, _| {
+            append(&out(a), &source, a.have, 7);
+            keep.store(true, Ordering::Release);
+            stop.store(true, Ordering::Release);
+            Fetch::Interrupted("Piano installation cancelled.".into())
+        }, None)
+        .unwrap_err();
+        assert!(part(&f).exists() && marker(&f, "download.json").exists());
+        // Another admitted archive's leftovers go too.
+        let other = f.root().join(format!("{}download.part", CURRENT_RELEASE.prefix));
+        fs::write(&other, b"partial").unwrap();
+        let refused = f.root().join(format!("{}refused.json", CURRENT_RELEASE.prefix));
+        fs::write(&refused, b"etag \"old\"").unwrap();
+        stop.store(false, Ordering::Release);
+        f.install(&stop, &mut quiet, None).unwrap();
+        for what in ["download.part", "download.json"] {
+            assert!(!marker(&f, what).exists(), "{what}");
+        }
+        assert!(!other.exists() && !refused.exists());
+    }
+    #[test]
+    fn a_file_install_never_turns_a_chosen_zip_into_a_download() {
+        // Review 2, finding 1, second and third cases: an interrupted file
+        // install left its copy of the chosen ZIP in a stage.
+        let f = Fixture::valid();
+        let source = fs::read(&f.source).unwrap();
+        let stop = AtomicBool::new(false);
+        let leave = |name: &str| {
+            let stage = f.root().join(name);
+            fs::create_dir_all(stage.join("payload")).unwrap();
+            fs::write(stage.join("source.zip"), &source).unwrap();
+        };
+        leave("pending-1-2-3");
+        // A file install that stops early (no room) removes the stage and makes no download.
+        assert!(f.install(&stop, &mut quiet, Some(0)).unwrap_err().contains("free space"));
+        assert_eq!(stage_count(&f.root()), 0);
+        assert!(!part(&f).exists(), "a chosen ZIP is not kept as a download");
+        leave("pending-4-5-6");
+        f.install(&stop, &mut quiet, None).unwrap();
+        assert_eq!(stage_count(&f.root()), 0);
+        assert!(!part(&f).exists());
+    }
+    #[test]
+    fn a_replaced_bank_and_a_bank_without_a_pointer_are_removed() {
+        // Review 2, item 4. Only bank folders go; the piano folder holds nothing else of the owner's.
+        let f = Fixture::valid();
+        let stop = AtomicBool::new(false);
+        f.install(&stop, &mut quiet, None).unwrap();
+        let sfz = f.install(&stop, &mut quiet, None).unwrap();
+        assert_eq!(banks(&f.root()), 1, "the replaced bank is removed");
+        // A kill between moving a bank in and writing current.json.
+        let orphan = f.root().join(format!("{CACHE_PREFIX}1-2-3"));
+        fs::create_dir_all(orphan.join("sfz_live")).unwrap();
+        let unrelated = f.root().join("notes");
+        fs::create_dir_all(&unrelated).unwrap();
+        // Next start: the check removes it when nothing else holds the lock.
+        let held = exclusive(&prepare_root(&f.root()).unwrap()).unwrap();
+        assert_eq!(verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).unwrap(), Some(sfz.clone()));
+        assert!(orphan.exists(), "not while another copy of the viewer works");
+        drop(held);
+        assert_eq!(verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).unwrap(), Some(sfz.clone()));
+        assert!(!orphan.exists() && unrelated.exists() && sfz.exists());
+        // Next press: the same, before anything is fetched.
+        fs::create_dir_all(&orphan).unwrap();
+        assert!(get(&f, &stop, |_, _| Fetch::Failed("offline".into())).is_err());
+        assert!(!orphan.exists() && sfz.exists());
+        // An unreadable pointer removes nothing.
+        fs::create_dir_all(&orphan).unwrap();
+        fs::write(f.root().join(CURRENT), b"{").unwrap();
+        assert!(verify_impl(&f.root(), &[&f.profile()], &stop, &mut quiet).is_err());
+        assert!(orphan.exists() && sfz.exists());
     }
     #[test]
     fn a_changed_file_online_is_found_before_downloading() {
@@ -897,7 +1027,7 @@ mod tests {
             None,
         )
         .unwrap_err();
-        assert_eq!(error, changed("downloaded"));
+        assert_eq!(error, CHANGED);
         assert!(!part(&f).exists(), "the unusable part is not kept");
         // A file uploaded again with the same size: the old part is not spliced onto it.
         fs::write(part(&f), &source[..4]).unwrap();
@@ -917,7 +1047,7 @@ mod tests {
             Fetch::Ended
         })
         .unwrap_err();
-        assert_eq!(error, changed("downloaded"));
+        assert_eq!(error, CHANGED);
         assert!(!part(&other).exists());
     }
     #[test]
@@ -1025,7 +1155,7 @@ mod tests {
         ] {
             assert!(matches!(curl_outcome(Some(code), detail), Fetch::Restart), "{detail}");
         }
-        assert!(matches!(curl_outcome(Some(22), "curl: (22) The requested URL returned error: 404"), Fetch::Failed(m) if m.contains("Install from a file")));
+        assert!(matches!(curl_outcome(Some(22), "curl: (22) The requested URL returned error: 404"), Fetch::Failed(m) if m.contains("needs an update")));
         assert!(matches!(curl_outcome(Some(63), "curl: (63) Maximum file size exceeded"), Fetch::Failed(m) if m.contains("online has changed")));
         assert!(matches!(curl_outcome(Some(23), ""), Fetch::Failed(m) if m.contains("4 GB")));
         assert!(matches!(curl_outcome(Some(60), ""), Fetch::Failed(_)));
@@ -1218,6 +1348,9 @@ fn verify_impl(
     progress: &mut impl FnMut(&str, u8),
 ) -> Result<Option<PathBuf>, String> {
     let root = prepare_root(root)?;
+    if let Some(_lock) = try_exclusive(&root) {
+        tidy_banks(&root, profiles);
+    }
     let Some((bank, manifest, p)) = admitted_manifest(&root, profiles)? else {
         return Ok(None);
     };
@@ -1226,7 +1359,7 @@ fn verify_impl(
         let path = checked_path(&bank, &member.path)?;
         let (size, hash) = hash_file(&path, member.bytes, cancel)?;
         if size != member.bytes || hash != member.sha256 {
-            return Err("Installed piano files differ. Install the original bank again.".into());
+            return Err("Installed piano files differ. Press Download piano to install it again.".into());
         }
         progress("checking", ((i + 1) * 100 / manifest.files.len()) as u8);
     }
@@ -1371,7 +1504,8 @@ fn install_impl(
     }
     let root = prepare_root(root)?;
     let _lock = exclusive(&root)?;
-    sweep(&root, p);
+    sweep(&root, p, false);
+    tidy_banks(&root, &with(p));
     enough_space(
         test_free.unwrap_or(fs2::available_space(&root).map_err(err)?),
         p.bytes.checked_add(p.raw).ok_or("Piano size overflow")?,
@@ -1446,14 +1580,15 @@ pub struct Attempt<'a> {
 }
 const DOWNLOAD_ATTEMPTS: usize = 4;
 const LOCK: &str = "piano.lock";
-const BUSY: &str = "Another copy of the viewer is downloading or installing the piano. Wait for it to finish, or quit it, then press Download piano again.";
+const BUSY: &str = "Another copy of the viewer is downloading or installing the piano. Wait for it to finish, or quit it, then try again.";
 const INSTALL_FROM_FILE: &str =
     "Use Install from a file… with the Accurate-Salamander V6.2a 48 kHz/24-bit ZIP.";
 /// archive.org re-uploaded files in this item on 2026-10-13 and 2026-10-15;
-/// a later upload may not be the archive this viewer admits.
-fn changed(outcome: &str) -> String {
-    format!("The piano file online has changed since this viewer was made, so it was not {outcome}. {INSTALL_FROM_FILE}")
-}
+/// a later upload may not be the archive this viewer admits. Only a newer
+/// viewer can admit it, and a ZIP the pianist chose would be refused too.
+const CHANGED: &str = "The piano file online has changed. This viewer needs an update before it can download the piano.";
+const DAMAGED: &str = "The downloaded piano was damaged, so it was not installed. Press Download piano to download it again.";
+const CANCELLED: &str = "Download cancelled. The partial download was removed.";
 /// One piano operation at a time across every copy of the viewer. The lock
 /// is released when its holders end, however they end.
 fn exclusive(root: &Path) -> Result<File, String> {
@@ -1477,11 +1612,78 @@ fn exclusive(root: &Path) -> Result<File, String> {
     }
     Err(BUSY.into())
 }
+/// The lock if nothing else holds it now; never waits.
+fn try_exclusive(root: &Path) -> Option<File> {
+    use fs2::FileExt;
+    let path = root.join(LOCK);
+    if fs::symlink_metadata(&path).is_ok() && ordinary(&path, false).is_err() {
+        return None;
+    }
+    let file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&path)
+        .ok()?;
+    file.try_lock_exclusive().ok().map(|()| file)
+}
+/// The admitted archives and `p`, which tests stand in for one of them.
+fn with<'a>(p: &'a Profile<'a>) -> Vec<&'a Profile<'a>> {
+    PROFILES.iter().copied().chain([p]).collect()
+}
+/// What a download of `p` keeps between presses: the unfinished file, the
+/// server's validator for it, and the validators of a damaged and of a
+/// refused download.
+fn download_files(root: &Path, p: &Profile) -> [PathBuf; 4] {
+    ["download.part", "download.json", "damaged.json", "refused.json"]
+        .map(|x| root.join(format!("{}{x}", p.prefix)))
+}
+/// Once a piano is installed nothing reads an unfinished download again,
+/// whichever archive it was for, so none is kept.
+fn forget_downloads(root: &Path, p: &Profile) {
+    for q in with(p) {
+        for path in download_files(root, q) {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+/// With the lock held: bank folders other than the one `current.json` names
+/// are a bank a replacement superseded, or one a kill left before its pointer
+/// was written. They are removed. Nothing is removed while the pointer can't
+/// be read.
+fn tidy_banks(root: &Path, profiles: &[&Profile]) {
+    let pointer = root.join(CURRENT);
+    let current = if fs::symlink_metadata(&pointer).is_ok() {
+        match json::<Pointer>(&pointer, 4096) {
+            Ok(x) => Some(x.directory),
+            Err(_) => return,
+        }
+    } else {
+        None
+    };
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let bank = profiles.iter().any(|p| {
+            name.len() > p.prefix.len()
+                && name.starts_with(p.prefix)
+                && name[p.prefix.len()..]
+                    .bytes()
+                    .all(|x| x.is_ascii_digit() || x == b'-')
+        });
+        if bank && current.as_ref() != Some(&name) && ordinary(&entry.path(), true).is_ok() {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
+}
 /// With the lock held nothing else is installing, so a stage a quit or crash
-/// left behind is removed. A complete archive inside one (an earlier build
-/// moved the download there) becomes the unfinished download again, to be
-/// checked rather than fetched.
-fn sweep(root: &Path, p: &Profile) {
+/// left behind is removed. For a download (`restore`), a complete archive
+/// inside one (an earlier build moved the download there) becomes the
+/// unfinished download again, to be checked rather than fetched. A ZIP the
+/// pianist chose is never kept: they still have it.
+fn sweep(root: &Path, p: &Profile, restore: bool) {
     let Ok(entries) = fs::read_dir(root) else {
         return;
     };
@@ -1494,32 +1696,14 @@ fn sweep(root: &Path, p: &Profile) {
             continue;
         }
         let archive = path.join("source.zip");
-        if ordinary(&archive, false).is_ok()
+        if restore
+            && ordinary(&archive, false).is_ok()
             && length(&archive).ok() == Some(p.bytes)
             && length(&part).is_ok_and(|have| have < p.bytes)
         {
             let _ = replace_file(&archive, &part);
         }
         let _ = fs::remove_dir_all(&path);
-    }
-}
-/// Windows: an unfinished download another process still has open is never
-/// appended to or moved.
-fn unattended(part: &Path) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        match OpenOptions::new().read(true).share_mode(0).open(part) {
-            Ok(_) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) if e.raw_os_error() == Some(32) => Err(BUSY.into()),
-            Err(e) => Err(err(e)),
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = part;
-        Ok(())
     }
 }
 /// The system's own curl appends to the unfinished file: /usr/bin/curl on
@@ -1853,13 +2037,13 @@ pub fn curl_outcome(code: Option<i32>, detail: &str) -> Fetch {
         }
         Some(33 | 36) => Fetch::Restart,
         Some(22) if http == Some(416) => Fetch::Restart,
-        Some(22) if matches!(http, Some(404 | 410)) => Fetch::Failed(format!(
-            "The piano file is no longer at its download address. {INSTALL_FROM_FILE}"
-        )),
+        Some(22) if matches!(http, Some(404 | 410)) => Fetch::Failed(
+            "The piano file is no longer at its download address. This viewer needs an update before it can download the piano.".into(),
+        ),
         Some(22) => {
             Fetch::Failed("The piano download isn't available right now. Try again later.".into())
         }
-        Some(63) => Fetch::Failed(changed("downloaded")),
+        Some(63) => Fetch::Failed(CHANGED.into()),
         Some(23) => Fetch::Failed(
             "The piano download could not be saved. Free about 4 GB and try again.".into(),
         ),
@@ -1917,23 +2101,38 @@ fn download_impl(
     cancelled(cancel)?;
     let root = prepare_root(root)?;
     let lock = exclusive(&root)?;
-    sweep(&root, p);
+    sweep(&root, p, true);
+    tidy_banks(&root, &with(p));
     let name = format!("{}download.part", p.prefix);
-    let part = root.join(&name);
-    let record = root.join(format!("{}download.json", p.prefix));
+    let [part, record, damaged, refused] = download_files(&root, p);
     let discard = || {
         let _ = fs::remove_file(&part);
         let _ = fs::remove_file(&record);
     };
     // Cancel discards the unfinished download; quitting keeps it.
     let stop = |message: String| {
-        if !keep.load(Ordering::Acquire) {
-            discard();
+        if keep.load(Ordering::Acquire) {
+            return message;
         }
-        message
+        let had = length(&part).is_ok_and(|n| n > 0);
+        discard();
+        if had { CANCELLED } else { "Download cancelled." }.to_string()
+    };
+    let read = |path: &Path| {
+        fs::read(path)
+            .ok()
+            .filter(|x| x.len() < 300)
+            .map(|x| String::from_utf8_lossy(&x).into_owned())
+    };
+    // A file this viewer refused is refused again at once, without fetching it.
+    let refuse = |validator: &Option<String>| {
+        if let Some(v) = validator {
+            let _ = fs::write(&refused, v);
+        }
+        discard();
+        CHANGED.to_string()
     };
     let percent = |have: u64| (have.min(p.bytes).saturating_mul(100) / p.bytes) as u8;
-    unattended(&part)?;
     if length(&part)? > p.bytes {
         discard();
     }
@@ -1948,15 +2147,13 @@ fn download_impl(
             Err(_) => Remote::default(),
         };
         cancelled(cancel).map_err(stop)?;
-        if remote.bytes.is_some_and(|n| n != p.bytes) {
-            discard();
-            return Err(changed("downloaded"));
+        if remote.bytes.is_some_and(|n| n != p.bytes)
+            || (remote.validator.is_some() && read(&refused) == remote.validator)
+        {
+            return Err(refuse(&remote.validator));
         }
         // A file uploaded again since the unfinished part began is not spliced onto it.
-        let known = fs::read(&record)
-            .ok()
-            .filter(|x| x.len() < 300)
-            .map(|x| String::from_utf8_lossy(&x).into_owned());
+        let known = read(&record);
         if known.is_some() && remote.validator.is_some() && known != remote.validator {
             discard();
         }
@@ -1996,6 +2193,7 @@ fn download_impl(
             match outcome {
                 Fetch::Ended => reason.clear(),
                 Fetch::Interrupted(why) => reason = why,
+                Fetch::Failed(why) if why == CHANGED => return Err(refuse(&remote.validator)),
                 Fetch::Failed(why) => return Err(why),
                 Fetch::Restart if !restarted => {
                     restarted = true;
@@ -2012,8 +2210,7 @@ fn download_impl(
                 }
             }
             if length(&part)? > p.bytes {
-                discard();
-                return Err(changed("downloaded"));
+                return Err(refuse(&remote.validator));
             }
         }
         if length(&part)? != p.bytes {
@@ -2027,6 +2224,7 @@ fn download_impl(
     // Checked where it lies: a quit while checking or installing costs no
     // download and leaves no second copy.
     ordinary(&part, false)?;
+    let validator = read(&record).unwrap_or_else(|| "-".into());
     let mut input = File::open(&part).map_err(err)?;
     let mut hash = Sha256::new();
     let mut bytes = 0u64;
@@ -2046,18 +2244,23 @@ fn download_impl(
     }
     drop(input);
     if bytes != p.bytes || hex(hash.finalize()) != p.archive_sha256 {
+        // The right size with the wrong bytes may be a resume gone wrong:
+        // the next press downloads it whole, once. The same file failing
+        // again has changed online.
+        if read(&damaged).as_ref() == Some(&validator) {
+            let _ = fs::remove_file(&damaged);
+            return Err(refuse(&Some(validator).filter(|v| v != "-")));
+        }
         discard();
-        return Err(changed("installed"));
+        let _ = fs::write(&damaged, &validator);
+        return Err(DAMAGED.into());
     }
     let id = nonce();
     let stage = root.join(format!("pending-{id}"));
     fs::create_dir(&stage).map_err(err)?;
     let _guard = OwnedDirectory(Some(stage.clone()));
     match admit(&root, &stage, &part, &id, p, cancel, progress, test_free) {
-        Ok(sfz) => {
-            discard();
-            Ok(sfz)
-        }
+        Ok(sfz) => Ok(sfz),
         Err(e) if cancel.load(Ordering::Acquire) => Err(stop(e)),
         // A full disk keeps the checked download for the next press.
         Err(e) => Err(e),
@@ -2201,5 +2404,8 @@ fn admit(
     )?;
     replace_file(&pointer, &root.join(CURRENT))?;
     publication.0 = None;
+    // The bank this one replaced, and every unfinished download, go now.
+    forget_downloads(root, p);
+    tidy_banks(root, &with(p));
     Ok(final_dir.join(p.live))
 }

@@ -35,7 +35,11 @@ Options SHALL offer one Download piano button before installation. One press SHA
 
 #### Scenario: Interrupted, cancelled or changed download
 - **WHEN** the network drops, the player cancels, or the download differs from the pinned archive
-- **THEN** a network drop keeps the partial download for the next press, cancel discards it, a changed archive is discarded and refused, and any installed bank and the preferences are unchanged
+- **THEN** a network drop keeps the partial download for the next press, cancel discards it and says so, a damaged download of the right size is discarded and fetched whole once, a changed archive is discarded and refused as needing a viewer update without fetching it again, and any installed bank and the preferences are unchanged
+
+#### Scenario: Nothing left behind
+- **WHEN** a piano is installed by either path
+- **THEN** no unfinished download or its records remain for any admitted archive, the bank it replaced is removed, and a bank folder without a pointer is removed on the next start or press
 
 #### Scenario: Already acquired original download
 - **WHEN** the operator has an existing local approved ZIP

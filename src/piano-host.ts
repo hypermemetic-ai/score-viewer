@@ -14,5 +14,7 @@ export const nativePiano={
  download:():Promise<PianoBankStatus>=>invoke('piano_bank_download'),
  audioStatus:():Promise<PianoAudioStatus>=>isTauri()?invoke('piano_audio_status'):Promise.resolve(browserAudio()),
  configure:(preferences:PianoPreferences,device:string,installed:boolean):Promise<PianoAudioStatus>=>{const p=effectivePianoPreferences(preferences,installed);return isTauri()?invoke('piano_audio_configure',{enabled:p.enabled,volume:p.volume,latencyTier:p.latencyTier,device}):Promise.resolve(browserAudio());},
+ /** The volume heard now, while the Volume track is dragged; not saved. */
+ preview:(volume:number):Promise<void>=>isTauri()?invoke('piano_audio_volume',{volume}):Promise.resolve(),
  windowsHelp:():Promise<void>=>invoke('piano_audio_help')
 };
