@@ -16,6 +16,155 @@ pub mod schedule;
 // Internal sampler quantum; device buffers may be larger and are chunked.
 pub const MAX_BLOCK: usize = 256;
 
+/// The pianist's two volume settings, 0 to 1, as the gains the mixer applies.
+/// Commands store a setting's gain; the callback only loads the two numbers.
+pub struct Volumes {
+    piano: AtomicU64,
+    cue: AtomicU64,
+}
+/// The setting at which a gain is the reference level (70%, the default).
+pub const VOLUME_DEFAULT: f64 = 0.7;
+/// Piano gain at the default setting (earlier 0.7): a hard middle C peaks
+/// around −7 dBFS and a five-note chord at velocity 100 around −3.2 dBFS,
+/// under the limiter's knee, so it is not limited. It is applied to the
+/// sampler's float output, before the limiter and before the cue is added: no
+/// sample-bank change, no reload, no rounding, live at once.
+pub const PIANO_GAIN: f64 = 2.25;
+// 100% is twice (+6 dB) the default's gain: (1 / 0.7)^CURVE = 2.
+const CURVE: f64 = 1.943_358_588_9;
+fn curve(setting: f64) -> f64 {
+    (setting.clamp(0.0, 1.0) / VOLUME_DEFAULT).powf(CURVE)
+}
+/// Piano gain for a Volume setting. The curve is close to evenly spaced in
+/// decibels over most of the track. A saved setting is never quieter than its
+/// earlier linear gain (only below about 15% does that floor apply).
+pub fn piano_gain(setting: f64) -> f64 {
+    let v = setting.clamp(0.0, 1.0);
+    (PIANO_GAIN * curve(v)).max(v)
+}
+/// Metronome and practice cue gain: the default is the earlier fixed level.
+pub fn cue_gain(setting: f64) -> f64 {
+    curve(setting)
+}
+impl Volumes {
+    pub fn new(piano: f64, cue: f64) -> Self {
+        Self::with_gains(piano_gain(piano), cue_gain(cue))
+    }
+    /// Raw gains, for diagnostics and tests that pin exact levels.
+    pub fn with_gains(piano: f64, cue: f64) -> Self {
+        Self {
+            piano: AtomicU64::new(piano.to_bits()),
+            cue: AtomicU64::new(cue.to_bits()),
+        }
+    }
+    pub fn set_piano(&self, setting: f64) {
+        self.piano
+            .store(piano_gain(setting).to_bits(), Ordering::Release);
+    }
+    pub fn set_cue(&self, setting: f64) {
+        self.cue
+            .store(cue_gain(setting).to_bits(), Ordering::Release);
+    }
+    fn gains(&self) -> (f32, f32) {
+        (
+            f64::from_bits(self.piano.load(Ordering::Relaxed)) as f32,
+            f64::from_bits(self.cue.load(Ordering::Relaxed)) as f32,
+        )
+    }
+}
+impl Default for Volumes {
+    fn default() -> Self {
+        Self::new(VOLUME_DEFAULT, VOLUME_DEFAULT)
+    }
+}
+
+/// A peak limiter on the piano, so a loud pedalled passage never clips while
+/// the metronome and practice cues keep their own level on top of it. It looks
+/// no samples ahead, so it adds no delay. It follows the piano's peak and the
+/// cue's peak separately; each is held 30 ms (longer than a bass period, so
+/// the gain does not follow the waveform) and then falls back with a 150 ms
+/// time constant. Only the piano is turned down, just enough that the held
+/// piano peak plus the held cue peak stay under the −1 dBFS ceiling; the cue
+/// is added afterwards at its own level. A soft knee from −3 dBFS bends a
+/// rising peak smoothly towards the ceiling instead of flattening its top.
+/// The piano is unchanged while its held peak is under the knee; after a loud
+/// peak, quieter frames are scaled too, during the hold and the release.
+pub struct Limiter {
+    piano: f32,
+    piano_hold: u32,
+    cue: f32,
+    cue_hold: u32,
+    hold_frames: u32,
+    release: f32,
+    pub limited_frames: u64,
+    pub deepest: f32,
+}
+impl Limiter {
+    /// −1 dBFS.
+    pub const CEILING: f32 = 0.891_250_9;
+    /// −3 dBFS: where the knee begins while no cue sounds.
+    pub const KNEE: f32 = 0.707_945_8;
+    // Lowest held piano peak: far under any knee, and never subnormal.
+    const FLOOR: f32 = 0.25;
+    pub fn new(rate: u32) -> Self {
+        let rate = rate.max(1) as f32;
+        Self {
+            piano: Self::FLOOR,
+            piano_hold: 0,
+            cue: 0.0,
+            cue_hold: 0,
+            hold_frames: (rate * 0.03) as u32,
+            release: (-1.0 / (rate * 0.15)).exp(),
+            limited_frames: 0,
+            deepest: 1.0,
+        }
+    }
+    /// A peak held for the hold time, then falling back towards `floor`.
+    #[inline]
+    fn follow(level: &mut f32, hold: &mut u32, peak: f32, floor: f32, frames: u32, release: f32) {
+        if peak > *level && peak.is_finite() {
+            *level = peak;
+            *hold = frames;
+        } else if *hold > 0 {
+            *hold -= 1;
+        } else if *level > floor {
+            let next = *level * release;
+            *level = if next > floor + 1e-4 { next } else { floor };
+        }
+    }
+    /// The gain for the piano at one frame, from the piano's peak and the
+    /// cue's (both after their volumes). The caller adds the cue unscaled.
+    #[inline]
+    pub fn gain(&mut self, piano: f32, cue: f32) -> f32 {
+        let (frames, release) = (self.hold_frames, self.release);
+        Self::follow(
+            &mut self.piano,
+            &mut self.piano_hold,
+            piano,
+            Self::FLOOR,
+            frames,
+            release,
+        );
+        Self::follow(&mut self.cue, &mut self.cue_hold, cue, 0.0, frames, release);
+        // Room left for the piano under the cue. A cue louder than half the
+        // ceiling is not given more; the final clamp is the backstop.
+        let top = (Self::CEILING - self.cue).max(Self::CEILING * 0.5);
+        let knee = Self::KNEE.min(top * 0.9);
+        if self.piano <= knee {
+            return 1.0;
+        }
+        // Above the knee the held peak maps to knee + span·x/(1 + x): the
+        // slope is 1 at the knee and the curve approaches the top, never
+        // reaching it, so a rising waveform is bent, not cut flat.
+        let span = top - knee;
+        let over = (self.piano - knee) / span;
+        let gain = (knee + span * over / (1.0 + over)) / self.piano;
+        self.limited_frames += 1;
+        self.deepest = self.deepest.min(gain);
+        gain
+    }
+}
+
 #[derive(Copy, Clone, Default)]
 pub struct Midi {
     pub connection: u64,
@@ -343,7 +492,8 @@ pub struct Mixer {
     pub synth: Option<Box<dyn Synth>>,
     pub bus: Arc<MidiBus>,
     pub mailbox: Arc<CueMailbox>,
-    pub volume: Arc<AtomicU64>,
+    pub volume: Arc<Volumes>,
+    limiter: Limiter,
     left: Box<[f32]>,
     right: Box<[f32]>,
     contacts: Contacts,
@@ -352,6 +502,9 @@ pub struct Mixer {
     player: schedule::Player,
     pub frames: Arc<AtomicU64>,
     pub peak_bits: Arc<AtomicU64>,
+    /// Frames the limiter has lowered, and its lowest gain (f32 bits).
+    pub limited: Arc<AtomicU64>,
+    pub deepest_bits: Arc<AtomicU64>,
     #[cfg(test)]
     capture: Option<Capture>,
 }
@@ -417,13 +570,14 @@ impl Mixer {
         synth: Option<Box<dyn Synth>>,
         bus: Arc<MidiBus>,
         mailbox: Arc<CueMailbox>,
-        volume: Arc<AtomicU64>,
+        volume: Arc<Volumes>,
     ) -> Self {
         Self {
             synth,
             bus,
             mailbox,
             volume,
+            limiter: Limiter::new(48000),
             left: vec![0.0; MAX_BLOCK].into_boxed_slice(),
             right: vec![0.0; MAX_BLOCK].into_boxed_slice(),
             contacts: Contacts::default(),
@@ -432,6 +586,8 @@ impl Mixer {
             player: schedule::Player::default(),
             frames: Arc::new(AtomicU64::new(0)),
             peak_bits: Arc::new(AtomicU64::new(0)),
+            limited: Arc::new(AtomicU64::new(0)),
+            deepest_bits: Arc::new(AtomicU64::new(1f32.to_bits() as u64)),
             #[cfg(test)]
             capture: None,
         }
@@ -441,6 +597,7 @@ impl Mixer {
     pub fn at_rate(mut self, rate: u32) -> Self {
         self.bus.schedule.restart();
         self.player = schedule::Player::new(&self.bus.schedule, rate);
+        self.limiter = Limiter::new(rate);
         self
     }
     pub fn fill<T: Copy>(
@@ -488,7 +645,7 @@ impl Mixer {
         // larger device packet is rendered can reach its next unsynthesized
         // chunk. Keep one bounded budget for the WHOLE device transfer.
         let mut ingress_budget = 1024;
-        let gain = f64::from_bits(self.volume.load(Ordering::Relaxed)) as f32;
+        let (gain, cue_gain) = self.volume.gains();
         let mut peak = 0.0f32;
         let mut frame_offset = 0u64;
         for chunk in out.chunks_mut(MAX_BLOCK * channels) {
@@ -556,9 +713,12 @@ impl Mixer {
                         })
                     }
                 };
-                let cue = cue + self.player.click_sample(i);
-                let l = self.left[i] * gain + cue;
-                let r = self.right[i] * gain + cue;
+                let cue = (cue + self.player.click_sample(i)) * cue_gain;
+                let (l, r) = (self.left[i] * gain, self.right[i] * gain);
+                // The limiter turns down the piano alone; the cue is added
+                // after it, so a loud chord never lowers the click.
+                let limit = self.limiter.gain(l.abs().max(r.abs()), cue.abs());
+                let (l, r) = (l * limit + cue, r * limit + cue);
                 for (c, sample) in frame.iter_mut().enumerate() {
                     let v = if channels == 1 {
                         (l + r) * 0.5
@@ -597,6 +757,10 @@ impl Mixer {
         }
         self.peak_bits
             .store((peak as f64).to_bits(), Ordering::Relaxed);
+        self.limited
+            .store(self.limiter.limited_frames, Ordering::Relaxed);
+        self.deepest_bits
+            .store(self.limiter.deepest.to_bits() as u64, Ordering::Relaxed);
     }
     #[cfg(test)]
     pub fn enable_capture(&mut self, rate: u32, channels: usize, seconds: u32) {
@@ -607,6 +771,12 @@ impl Mixer {
             channels,
         });
     }
+}
+pub fn limiter_status(limited: &AtomicU64, deepest: &AtomicU64) -> (u64, f64) {
+    (
+        limited.load(Ordering::Relaxed),
+        f32::from_bits(deepest.load(Ordering::Relaxed) as u32) as f64,
+    )
 }
 impl Drop for Mixer {
     fn drop(&mut self) {
@@ -626,6 +796,8 @@ pub struct SharedMixer {
     mixer: UnsafeCell<Mixer>,
     frames: Arc<AtomicU64>,
     peak: Arc<AtomicU64>,
+    limited: Arc<AtomicU64>,
+    deepest: Arc<AtomicU64>,
     closed: AtomicBool,
     #[cfg(test)]
     capture_taken: AtomicBool,
@@ -638,6 +810,8 @@ impl SharedMixer {
             closing: AtomicBool::new(false),
             frames: mixer.frames.clone(),
             peak: mixer.peak_bits.clone(),
+            limited: mixer.limited.clone(),
+            deepest: mixer.deepest_bits.clone(),
             mixer: UnsafeCell::new(mixer),
             closed: AtomicBool::new(false),
             #[cfg(test)]
@@ -679,6 +853,10 @@ impl SharedMixer {
     }
     pub fn counters(&self) -> (Arc<AtomicU64>, Arc<AtomicU64>) {
         (self.frames.clone(), self.peak.clone())
+    }
+    /// Frames the limiter lowered and its lowest gain, since the output opened.
+    pub fn limiter(&self) -> (u64, f64) {
+        limiter_status(&self.limited, &self.deepest)
     }
     #[cfg(test)]
     pub fn take_capture_after_close(&self) -> Option<Capture> {
@@ -786,7 +964,7 @@ mod tests {
             })),
             bus.clone(),
             Arc::new(CueMailbox::default()),
-            Arc::new(AtomicU64::new(1f64.to_bits())),
+            Arc::new(Volumes::with_gains(1.0, 1.0)),
         );
         let mut out = [0f32; MAX_BLOCK * 3];
         WATCH.with(|w| w.set(Some((0, 0))));
@@ -842,7 +1020,7 @@ mod tests {
             None,
             Arc::new(MidiBus::default()),
             mailbox,
-            Arc::new(AtomicU64::new(1f64.to_bits())),
+            Arc::new(Volumes::with_gains(1.0, 1.0)),
         )
     }
     fn watched_fill(mixer: &mut Mixer, out: &mut [f32], rate: u32, base: u64, frame: u64) {
@@ -1703,12 +1881,199 @@ mod tests {
         assert_eq!(b.connection.load(Ordering::Relaxed), 0);
     }
     #[test]
+    fn volume_curves_keep_the_default_and_never_lower_a_saved_setting() {
+        assert_eq!(piano_gain(VOLUME_DEFAULT), PIANO_GAIN);
+        assert!((piano_gain(1.0) / PIANO_GAIN - 2.0).abs() < 1e-6);
+        assert_eq!(cue_gain(VOLUME_DEFAULT), 1.0);
+        assert!((cue_gain(1.0) - 2.0).abs() < 1e-6);
+        assert_eq!((piano_gain(0.0), cue_gain(0.0)), (0.0, 0.0));
+        let mut previous = (0.0, 0.0);
+        for step in 1..=100 {
+            let v = step as f64 / 100.0;
+            let (piano, cue) = (piano_gain(v), cue_gain(v));
+            // The earlier gain was the setting itself; none is quieter now.
+            assert!(piano >= v, "{v}");
+            assert!(piano > previous.0 && cue > previous.1, "{v}");
+            previous = (piano, cue);
+        }
+        // The track's lower half still spans a useful range, not silence.
+        let db = |g: f64| 20.0 * g.log10();
+        assert!((db(cue_gain(0.35)) + 11.7).abs() < 0.1);
+        assert!(db(cue_gain(0.1)) < -30.0);
+    }
+    #[test]
+    fn limiter_is_transparent_below_the_knee_and_bends_a_loud_peak_under_the_ceiling() {
+        let rate = 48000;
+        let mut limiter = Limiter::new(rate);
+        for i in 0..rate {
+            let v = 0.7 * (i as f32 * 0.05).sin();
+            assert_eq!(limiter.gain(v.abs(), 0.0), 1.0);
+        }
+        assert_eq!(limiter.limited_frames, 0);
+        // A 220 Hz tone 7.8 dB over the ceiling, at full level from its first
+        // sample: lowered at once (no delay), never over the ceiling, and its
+        // rising quarter keeps rising, bent by the knee rather than cut flat.
+        let a = Limiter::CEILING * 10f32.powf(7.8 / 20.0);
+        let step = 220.0 * std::f32::consts::TAU / rate as f32;
+        let (mut previous, mut top) = (-1f32, 0f32);
+        for i in 0..rate / 10 {
+            let v = a * (i as f32 * step).sin();
+            let out = v * limiter.gain(v.abs(), 0.0);
+            assert!(out.abs() < Limiter::CEILING, "{i} {out}");
+            if (i as f32 * step) < std::f32::consts::FRAC_PI_2 {
+                assert!(out > previous, "{i} {out} {previous}");
+                previous = out;
+            }
+            top = top.max(out.abs());
+        }
+        // The highest output is within 1 dB of the ceiling, never at it.
+        assert!(
+            top > Limiter::CEILING * 0.89 && top < Limiter::CEILING - 1e-3,
+            "{top}"
+        );
+        assert!(limiter.deepest < 0.4);
+        // Held through the hold time, then back to unity within a second.
+        let held = limiter.gain(0.1, 0.0);
+        assert!(held < 0.4);
+        let mut back = None;
+        for i in 0..rate {
+            if limiter.gain(0.1, 0.0) == 1.0 {
+                back = Some(i);
+                break;
+            }
+        }
+        let back = back.expect("returns to unity") as f32 / rate as f32;
+        assert!(back > 0.03 && back < 0.6, "{back}");
+        // A non-finite sample cannot silence the limiter for good.
+        limiter.gain(f32::INFINITY, f32::NAN);
+        limiter.gain(f32::NAN, f32::INFINITY);
+        assert_eq!(Limiter::new(rate).gain(0.5, 0.0), 1.0);
+        let mut limiter = Limiter::new(rate);
+        limiter.gain(f32::INFINITY, f32::INFINITY);
+        assert_eq!(limiter.gain(0.5, 0.1), 1.0);
+    }
+    #[test]
+    fn a_loud_piano_and_a_cue_together_stay_under_the_ceiling() {
+        let rate = 48000;
+        let mut limiter = Limiter::new(rate);
+        let step = 110.0 * std::f32::consts::TAU / rate as f32;
+        let mut top = 0f32;
+        for i in 0..rate {
+            let piano = 4.0 * (i as f32 * step).sin();
+            // A 1200 Hz blip every 333 ms, at the metronome's 100% level.
+            let age = (i % 16000) as f32 / rate as f32;
+            let cue = 0.32 * (-age * 110.0).exp() * (age * 1200.0 * std::f32::consts::TAU).sin();
+            let out = piano * limiter.gain(piano.abs(), cue.abs()) + cue;
+            top = top.max(out.abs());
+        }
+        assert!(top <= Limiter::CEILING, "{top}");
+        // A forte chord under the knee is untouched by a sounding cue.
+        let mut limiter = Limiter::new(rate);
+        assert_eq!(limiter.gain(0.6, 0.16), 1.0);
+    }
+    #[test]
+    fn loud_piano_is_limited_and_cues_follow_their_own_volume() {
+        let mailbox = Arc::new(CueMailbox::default());
+        let volumes = Arc::new(Volumes::with_gains(5.0, 1.0));
+        let mut m = Mixer::new(
+            Some(Box::new(Fake::default())),
+            Arc::new(MidiBus::default()),
+            mailbox.clone(),
+            volumes.clone(),
+        )
+        .at_rate(48000);
+        let mut out = vec![0.0; MAX_BLOCK * 2];
+        m.fill(&mut out, 2, 1_000_000, 0, |v| v);
+        // 0.2 and 0.3 at gain 5 are 1.0 and 1.5: both lowered by one gain,
+        // the knee's for 1.5 (between the knee and the ceiling).
+        let (knee, span) = (Limiter::KNEE, Limiter::CEILING - Limiter::KNEE);
+        let over = (1.5 - knee) / span;
+        let expected = knee + span * over / (1.0 + over);
+        for f in out.chunks_exact(2) {
+            assert!((f[1] - expected).abs() < 1e-6, "{} {expected}", f[1]);
+            assert!((f[0] / f[1] - 2.0 / 3.0).abs() < 1e-5);
+        }
+        assert_eq!(m.limited.load(Ordering::Relaxed), MAX_BLOCK as u64);
+        let (_, deepest) = limiter_status(&m.limited, &m.deepest_bits);
+        assert!((deepest - expected as f64 / 1.5).abs() < 1e-6);
+
+        let click = |setting: f64| {
+            let mailbox = Arc::new(CueMailbox::default());
+            let volumes = Arc::new(Volumes::with_gains(1.0, 1.0));
+            volumes.set_cue(setting);
+            let mut m = empty_mixer(mailbox.clone());
+            m.volume = volumes;
+            let cue = Box::new(Cue::new(
+                48000,
+                lifecycle::Request::new("", 180.0, 1000.0, 0.0).unwrap(),
+                Arc::new(AtomicBool::new(false)),
+            ));
+            assert!(mailbox.publish(cue).is_ok());
+            let mut peak = 0f32;
+            let mut out = vec![0.0; 256];
+            for block in 0..400u64 {
+                m.fill(&mut out, 1, 1_000_000 + block * 5333, 0, |v| v);
+                peak = out.iter().fold(peak, |p, v| p.max(v.abs()));
+            }
+            peak
+        };
+        let (default, full, off) = (click(0.7), click(1.0), click(0.0));
+        assert!(default > 0.1 && default <= 0.16, "{default}");
+        assert!((full / default - 2.0).abs() < 0.01, "{full} {default}");
+        assert_eq!(off, 0.0);
+    }
+    #[test]
+    fn the_click_keeps_its_level_under_a_limited_piano() {
+        // The same cue rendered alone and over a piano 7.8 dB too loud.
+        let render = |synth: Option<Box<dyn Synth>>| {
+            let mailbox = Arc::new(CueMailbox::default());
+            let mut m = Mixer::new(
+                synth,
+                Arc::new(MidiBus::default()),
+                mailbox.clone(),
+                Arc::new(Volumes::with_gains(5.0, 1.0)),
+            )
+            .at_rate(48000);
+            let cue = Box::new(Cue::new(
+                48000,
+                lifecycle::Request::new("", 180.0, 1000.0, 0.0).unwrap(),
+                Arc::new(AtomicBool::new(false)),
+            ));
+            assert!(mailbox.publish(cue).is_ok());
+            let mut frames = Vec::new();
+            let mut out = vec![0.0; 512];
+            for block in 0..200u64 {
+                m.fill(&mut out, 2, 1_000_000 + block * 5333, 0, |v| v);
+                frames.extend(out.chunks_exact(2).map(|f| (f[0], f[1])));
+            }
+            (frames, m.limited.load(Ordering::Relaxed))
+        };
+        let (alone, unlimited) = render(None);
+        let (mixed, limited) = render(Some(Box::new(Fake::default())));
+        assert_eq!(unlimited, 0);
+        assert_eq!(limited, mixed.len() as u64);
+        // The piano is 1.0 left and 1.5 right before limiting, so each frame
+        // gives back its piano gain and the click under it.
+        let (mut click, mut lowest) = (0f32, 1f32);
+        for ((l, r), (cue, same)) in mixed.iter().zip(&alone) {
+            assert_eq!(cue, same);
+            assert!(l.abs().max(r.abs()) <= Limiter::CEILING + 1e-6);
+            let gain = (r - l) / 0.5;
+            let heard = r - 1.5 * gain;
+            assert!((heard - cue).abs() < 1e-5, "{heard} {cue}");
+            click = click.max(cue.abs());
+            lowest = lowest.min(gain);
+        }
+        assert!(click > 0.1, "{click}");
+        assert!(lowest < 0.6, "{lowest}");
+    }
+    #[test]
     fn mix_chunks_and_unused_channels_no_panic() {
         let mut m = Mixer::new(
             Some(Box::new(Fake::default())),
             Arc::new(MidiBus::default()),
             Arc::new(CueMailbox::default()),
-            Arc::new(AtomicU64::new(0.5f64.to_bits())),
+            Arc::new(Volumes::with_gains(0.5, 1.0)),
         );
         let mut out = vec![1.0; MAX_BLOCK * 4 + 128 * 4];
         m.fill(&mut out, 4, 1_000_000, 0, |v| v);
@@ -1732,7 +2097,7 @@ mod tests {
             Some(Box::new(Fake::default())),
             Arc::new(MidiBus::default()),
             mailbox.clone(),
-            Arc::new(AtomicU64::new(0.5f64.to_bits())),
+            Arc::new(Volumes::with_gains(0.5, 1.0)),
         );
         let mut samples = [0f32; 256];
         mixer.fill(&mut samples, 2, 1_000_000, 10_000, |v| v);
@@ -1750,7 +2115,7 @@ mod tests {
             None,
             Arc::new(MidiBus::default()),
             mailbox.clone(),
-            Arc::new(AtomicU64::new(1f64.to_bits())),
+            Arc::new(Volumes::with_gains(1.0, 1.0)),
         );
         let mut samples = [0f32; 256];
         let first = Box::new(Cue::new(
@@ -1813,7 +2178,7 @@ mod tests {
             Some(Box::new(Recorder(log.clone()))),
             bus.clone(),
             Arc::new(CueMailbox::default()),
-            Arc::new(AtomicU64::new(1f64.to_bits())),
+            Arc::new(Volumes::with_gains(1.0, 1.0)),
         )
         .at_rate(48000);
         let mut out = vec![0f32; 1024 * 2];
@@ -1886,7 +2251,7 @@ mod tests {
             })),
             bus.clone(),
             mailbox.clone(),
-            Arc::new(AtomicU64::new(0.5f64.to_bits())),
+            Arc::new(Volumes::with_gains(0.5, 1.0)),
         );
         let mut samples = [0f32; 256];
         for i in 0..3 {

@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         mpsc, Arc, Mutex, OnceLock,
     },
     time::Duration,
@@ -63,6 +63,9 @@ pub struct AudioStatus {
     pub rendered_frames: u64,
     pub peak: f64,
     pub queue_overflow: u64,
+    /// Frames the output limiter lowered, and its lowest gain (1 = never).
+    pub limited_frames: u64,
+    pub limiter_gain: f64,
 }
 impl AudioStatus {
     fn queue_horizon_frames(&self) -> u32 {
@@ -117,7 +120,7 @@ pub struct State {
     worker: OnceLock<Worker>,
     pub bus: Arc<mixer::MidiBus>,
     status: Arc<Mutex<AudioStatus>>,
-    volume: Arc<AtomicU64>,
+    volume: Arc<mixer::Volumes>,
     initial: Mutex<Config>,
     /// Command-side scheduled-note stream; never locked by the callback.
     schedule: Arc<Mutex<mixer::schedule::Submitter>>,
@@ -129,7 +132,7 @@ impl Default for State {
             worker: OnceLock::new(),
             bus: Arc::new(mixer::MidiBus::default()),
             status: Arc::new(Mutex::new(AudioStatus::default())),
-            volume: Arc::new(AtomicU64::new(0.7f64.to_bits())),
+            volume: Arc::new(mixer::Volumes::default()),
             initial: Mutex::new(Config::default()),
             schedule: Arc::new(Mutex::new(Default::default())),
         }
@@ -188,14 +191,14 @@ fn run(
     rx: mpsc::Receiver<Command>,
     bus: Arc<mixer::MidiBus>,
     status: Arc<Mutex<AudioStatus>>,
-    volume: Arc<AtomicU64>,
+    volume: Arc<mixer::Volumes>,
     initial: Config,
 ) {
     use tauri::Emitter;
     struct Active {
         app: tauri::AppHandle,
         session: lifecycle::Session,
-        onset: Arc<AtomicU64>,
+        onset: Arc<std::sync::atomic::AtomicU64>,
         finished: Arc<std::sync::atomic::AtomicBool>,
         invalid: Arc<std::sync::atomic::AtomicBool>,
         announced: bool,
@@ -664,7 +667,7 @@ fn run(
     rx: mpsc::Receiver<Command>,
     _: Arc<mixer::MidiBus>,
     _: Arc<Mutex<AudioStatus>>,
-    _: Arc<AtomicU64>,
+    _: Arc<mixer::Volumes>,
     _: Config,
 ) {
     while let Ok(c) = rx.recv() {
@@ -709,14 +712,11 @@ pub async fn piano_audio_configure(
     bank: tauri::State<'_, crate::piano_bank::State>,
     enabled: bool,
     volume: f64,
+    cue_volume: f64,
     device: String,
     latency_tier: u8,
 ) -> Result<AudioStatus, String> {
-    if !volume.is_finite()
-        || !(0.0..=1.0).contains(&volume)
-        || latency_tier > 3
-        || device.len() > 4096
-    {
+    if !setting(volume) || !setting(cue_volume) || latency_tier > 3 || device.len() > 4096 {
         return Err("Invalid piano audio settings".into());
     }
     let sfz = if enabled {
@@ -727,7 +727,8 @@ pub async fn piano_audio_configure(
     if enabled && sfz.is_none() {
         return Err("Download and install the piano first.".into());
     }
-    state.volume.store(volume.to_bits(), Ordering::Release);
+    state.volume.set_piano(volume);
+    state.volume.set_cue(cue_volume);
     let config = Config {
         enabled,
         sfz,
@@ -764,14 +765,27 @@ pub async fn piano_audio_configure(
     .await
     .map_err(|e| e.to_string())?
 }
+fn setting(volume: f64) -> bool {
+    volume.is_finite() && (0.0..=1.0).contains(&volume)
+}
 /// While the Volume track is dragged the pianist hears each new volume at
 /// once; nothing is saved until the drag ends (piano_audio_configure).
 #[tauri::command]
 pub fn piano_audio_volume(state: tauri::State<'_, State>, volume: f64) -> Result<(), String> {
-    if !volume.is_finite() || !(0.0..=1.0).contains(&volume) {
+    if !setting(volume) {
         return Err("Invalid piano volume".into());
     }
-    state.volume.store(volume.to_bits(), Ordering::Release);
+    state.volume.set_piano(volume);
+    Ok(())
+}
+/// The Metronome track, heard at once like the piano's Volume track. It sets
+/// the metronome and practice cues whether or not the piano is on.
+#[tauri::command]
+pub fn cue_audio_volume(state: tauri::State<'_, State>, volume: f64) -> Result<(), String> {
+    if !setting(volume) {
+        return Err("Invalid metronome volume".into());
+    }
+    state.volume.set_cue(volume);
     Ok(())
 }
 #[tauri::command]

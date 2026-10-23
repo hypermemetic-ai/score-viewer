@@ -1,3 +1,4 @@
+import {builtInClicks} from './piano-preferences';
 import {evenTicks,performanceSeconds,tickAtEven,writtenBarAt,type PerformanceSchedule} from './score-performance';
 
 /* Hear a score at a tempo: a metronome count-in, then the piece, on a light built-in
@@ -128,7 +129,8 @@ export class TempoAudition implements Audition {
  private click(c:{tick:number;accent:boolean}){
   const context=this.context!,at=Math.max(context.currentTime,this.timeAt(c.tick)),osc=context.createOscillator(),gain=context.createGain();
   // The practice metronome's voice: a short sine blip, higher on the bar.
-  osc.frequency.value=c.accent?1200:900;gain.gain.setValueAtTime(c.accent?.16:.12,at);gain.gain.exponentialRampToValueAtTime(.001,at+.04);
+  // Its loudness follows Options › Metronome volume, as the native clicks do.
+  const level=builtInClicks.gain;osc.frequency.value=c.accent?1200:900;gain.gain.setValueAtTime((c.accent?.16:.12)*level,at);if(level>0)gain.gain.exponentialRampToValueAtTime(.001*level,at+.04);
   osc.connect(gain).connect(this.master!);osc.start(at);osc.stop(at+.05);
   const voice:Voice={tick:c.tick,release:c.tick,start:at,nodes:[osc],gains:[gain],click:true};osc.onended=()=>this.forget(voice);
   const entry={tick:c.tick,sound:c.accent?'accent' as const:'click' as const,at};voice.entry=entry;this.voices.push(voice);this.log.push(entry);

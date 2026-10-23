@@ -1,10 +1,7 @@
 //! Event-driven shared WASAPI. All COM objects remain on their owning MTA worker.
 use super::{mixer, period, render_queue, AudioStatus, Config, Output, Outputs};
 use std::{
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant},
 };
 use windows::{
@@ -315,7 +312,7 @@ impl Host {
         config: &Config,
         bus: Arc<mixer::MidiBus>,
         mailbox: Arc<mixer::CueMailbox>,
-        volume: Arc<AtomicU64>,
+        volume: Arc<mixer::Volumes>,
     ) -> Result<Self, String> {
         unsafe {
             let com = Com::enter()?;
@@ -551,6 +548,8 @@ impl Host {
         let mut s = self.status.clone();
         s.rendered_frames = self.mixer.frames.load(Ordering::Relaxed);
         s.peak = f64::from_bits(self.mixer.peak_bits.load(Ordering::Relaxed));
+        (s.limited_frames, s.limiter_gain) =
+            mixer::limiter_status(&self.mixer.limited, &self.mixer.deepest_bits);
         s.queue_overflow = self.mixer.bus.overflow.load(Ordering::Relaxed);
         s
     }
@@ -579,7 +578,7 @@ impl Host {
         unsafe { (*self.format.0).nChannels }
     }
     #[cfg(test)]
-    pub fn frame_counter(&self) -> Arc<AtomicU64> {
+    pub fn frame_counter(&self) -> Arc<std::sync::atomic::AtomicU64> {
         self.mixer.frames.clone()
     }
     #[cfg(test)]
