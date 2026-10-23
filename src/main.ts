@@ -613,7 +613,9 @@ function labelMode(){if(!current)return 'pitch';const available=fingerDisplayAva
 function toggleLabel(){return preferences.fingerBehavior==='momentary'?(selection?'Hold pitches':'Hold fingerings'):selection?(labelMode()==='pitch'?'Show fingerings':'Show pitches'):(labelMode()==='pitch'?'Show fingerings':'Hide fingerings');}
 /** Whether the reader would show fingerings now, were they ready: a held fingering waits for shared fingers. */
 const wantsFingers=()=>!!current&&effectiveLabelMode(current.personal.view,preferences.fingerBehavior,input.fingersHeld||controls.fingersHeld,true,!!selection,selectionPitchToggle)==='finger';
-function refreshPresentation(){if(!practice&&wantsFingers()&&waitsFor('hold-fingers','fingers',refreshPresentation))return;if(practice){practice.overlay(preferences.fingerBehavior==='momentary'?input.fingersHeld||controls.fingersHeld:current?.personal.view.labelMode==='finger');return;}if(!current||!app.querySelector('.page-group'))return;renderPages();const toggle=app.querySelector('[data-action=toggle]');if(toggle)toggle.innerHTML=toggleLabel()+`<kbd>${esc(actionControlLabel(controls.bindings,'toggle'))}</kbd>`;app.querySelector('[data-action=toggle]')?.setAttribute('aria-pressed',String(labelMode()==='finger'));const status=app.querySelector('[data-label-mode]');if(status)status.textContent=labelMode()==='finger'?'Fingers':'Pitch';}
+function refreshPresentation(){if(!practice&&wantsFingers()&&waitsFor('hold-fingers','fingers',refreshPresentation))return;
+ // A held fingering let go before it could show waits no longer.
+ if(!wantsFingers()&&(presses.pending==='hold-fingers'||presses.pending==='toggle'&&preferences.fingerBehavior==='momentary'))presses.cancel();if(practice){practice.overlay(preferences.fingerBehavior==='momentary'?input.fingersHeld||controls.fingersHeld:current?.personal.view.labelMode==='finger');return;}if(!current||!app.querySelector('.page-group'))return;renderPages();const toggle=app.querySelector('[data-action=toggle]');if(toggle)toggle.innerHTML=toggleLabel()+`<kbd>${esc(actionControlLabel(controls.bindings,'toggle'))}</kbd>`;app.querySelector('[data-action=toggle]')?.setAttribute('aria-pressed',String(labelMode()==='finger'));const status=app.querySelector('[data-label-mode]');if(status)status.textContent=labelMode()==='finger'?'Fingers':'Pitch';}
 const effectiveControls=()=>practice instanceof PracticeView?practiceControlBindings(freeViewControlBindings(mainControls,preferences.freeViewControls)):practice?practiceControlBindings(freeViewControlBindings(mainControls,preferences.freeViewControls),false):selection?editorControlBindings(mainControls):readerControlBindings(mainControls);
 const rotationHint=()=>Object.values(effectiveControls().actions).some(slots=>slots.some(binding=>binding?.kind==='key'&&binding.key===rotationKey))?'':readableChord(rotationKey);
 let resolvedMain=mainControls,resolvedLocal=preferences.freeViewControls,resolvedPractice='reader';
@@ -1039,7 +1041,8 @@ const PRESS_WORDS:Readonly<Record<string,string>>={practice:READINESS_WORDS.prac
  * run it once ready and say so if that takes a moment. True when it waits. */
 function waitsFor(key:string,stage:ReadinessStage,run:()=>unknown,place:()=>ReadinessNoticePlace|undefined=readerNotice):boolean{
  if(!readiness||readiness.ready(stage))return false;
- void presses.press(key,readiness,stage,()=>{if(current)return Promise.resolve(run()).catch(reportFailure);},place,PRESS_WORDS[key]??READINESS_WORDS[stage]);return true;
+ // A stage that failed has said why (scoreReadiness); its press does not run, nor wait again.
+ const waited=readiness;void presses.press(key,waited,stage,()=>{if(current&&waited.ready(stage))return Promise.resolve(run()).catch(reportFailure);},place,PRESS_WORDS[key]??READINESS_WORDS[stage]);return true;
 }
 /** Before a long step that keeps script busy: when a press waits, let one
  * frame put its notice on screen first, so the notice can fade in by itself
@@ -1059,6 +1062,8 @@ async function resolveFingers(target:NonNullable<typeof current>,between?:()=>Pr
  await between?.();
  registered.view=before.view;registered.navigation=before.navigation;registered.editContactId=before.editContactId;
  target.personal=registered;target.personal=resolveMemory(target);
+ // The reader draws its seats from what it shows: shared fingers join it (they change no hand).
+ const editor=livePersonalEditors.get(target);if(editor)editor.visiblePersonal=structuredClone(target.personal);
 }
 /** The stages of one opened score. Pages are the opening itself; fingers are
  * resolved here when the opening left them for later; hands settle the
@@ -1071,7 +1076,9 @@ function scoreReadiness(target:NonNullable<typeof current>,fingersLater:boolean,
  // Work taken over from the library saves its engine first, which hand editing then restores.
  if(piano&&saving)shownSession(target).engineSavedBy(saving);
  return new ScoreReadiness({
-  ...(fingersLater?{fingers:{run:async signal=>{live(signal);await noticeOnScreen();live(signal);await resolveFingers(target,async()=>{await nextTask();await noticeOnScreen();live(signal);});live(signal);if(!practice)renderToolbar();}}}:{}),
+  // Its failure reaches the player as the opening's did; a stopped stage says nothing.
+  ...(fingersLater?{fingers:{run:async signal=>{try{live(signal);await noticeOnScreen();live(signal);await resolveFingers(target,async()=>{await nextTask();await noticeOnScreen();live(signal);});live(signal);if(!practice)renderToolbar();}
+   catch(error){if(!signal.aborted&&current===target){if(personalMemory.error)paintPersonalSaveError(target,personalMemory.error);else reportFailure(error);}throw error;}}}}:{}),
   ...(piano?{hands:{run:async signal=>{
    // On a folded score that is the folded pages' session: the one work taken over from the library prepared.
    if(saving)await saving.catch(()=>{});live(signal);const session=shownSession(target);session.prefetch();await session.handChoiceCheck();}}}:{}),
@@ -1351,7 +1358,7 @@ async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown
  catch(error){if(!(admission instanceof SavedPagesLackRepeats||admission instanceof SavedPagesBehindPolicy)||(error as Error).name==='AbortError')throw error;checkReading(op);console.warn('The saved edition could not be engraved again; it opens on its saved pages.',error);return false;}
  const {q,running}=prepared,
   installed=await installPreparedScore(entry,q,running,q.personal??rebuilt.personal,false,undefined,undefined,rebuilt);await readingCheckpoint(op);
- await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
+ await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);retainable.add(activated);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
  finishReading(op,true);
  notify(rebuiltNotice(rebuilt)+unsaved);return true;
 }

@@ -76,3 +76,16 @@ test('any other refusal whose engraving again fails still keeps the score from o
  const f=lacksRepeats(async()=>{throw Error('The engine refused the edition');},Error('This saved engraving does not match the current shared engraving policy.'));
  assert.match(String(await f.open()),/engine refused/);assert.deepEqual(f.kept,[]);assert.deepEqual(f.calls.slice(-1),['failed']);
 });
+
+// A saved edition engraved again opens as the new edition it installs, and is
+// kept for its next opening in the session like any other: reopening it reads nothing again.
+test('a saved edition engraved again is kept for its next opening, like one opened as it is',async()=>{
+ const retainable=new WeakSet<object>(),activated:object[]=[];let refused=false;
+ const f=reading({SavedPagesLackRepeats,keepSavedPagesWithoutRepeats(){},reengraveReadingArchive:async()=>undefined,retainable,
+  importReading:async()=>{if(!refused){refused=true;throw new SavedPagesLackRepeats('no14');}return {manifest:{version:3}};},
+  prepareRebuiltEdition:async()=>({packageBytes:new Uint8Array([2]),personal:{}}),preparePiano:async()=>({q:{package:{manifest:{version:3}}},running:{}}),
+  activateScore:async(next:object)=>{activated.push(next);return next;}});
+ assert.equal(await f.open(),undefined);
+ assert.equal(activated.length,1);assert.ok(retainable.has(activated[0]),'the re-engraved edition is retainable');
+ assert.deepEqual(f.calls.slice(0,2),['engrave-again','complete']);
+});

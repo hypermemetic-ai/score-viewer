@@ -21,11 +21,11 @@ const flush=async()=>{for(let i=0;i<10;i++)await new Promise<void>(resolve=>setI
 /** A score just reopened: its pages show, and its shared fingers get ready
  * after them, finishing when the test says. */
 function reopened(){
- let key!:(e:any)=>void,finish!:()=>void,fingersRuns=0;const calls:string[]=[],failures:unknown[]=[],shown:string[]=[];
+ let key!:(e:any)=>void,finish!:()=>void,fail!:(error:Error)=>void,fingersRuns=0;const calls:string[]=[],failures:unknown[]=[],shown:string[]=[];
  let now=0;const due:{at:number;run:()=>void;id:number}[]=[];let next=1;
  const timers:ReadinessTimers={now:()=>now,set:(run,ms)=>{const id=next++;due.push({at:now+ms,run,id});return id;},clear:id=>{const i=due.findIndex(t=>t.id===id);if(i>=0)due.splice(i,1);}};
  const view:ReadinessNoticeView={show:words=>shown.push(`show:${words}`),hide:()=>shown.push('hide'),withdraw:()=>shown.push('withdraw')};
- const readiness=new ScoreReadiness({fingers:{run:()=>{fingersRuns++;return new Promise<void>(resolve=>{finish=resolve;});}},practice:{needs:['fingers'],run:async()=>{}}});
+ const readiness=new ScoreReadiness({fingers:{run:()=>{fingersRuns++;return new Promise<void>((resolve,reject)=>{finish=resolve;fail=reject;});}},practice:{needs:['fingers'],run:async()=>{}}});
  const surface={};
  const context:any={startupReady:true,startupFailed:false,
   window:{addEventListener(_type:string,handler:any){key=handler;}},document:{hidden:false,activeElement:null},innerWidth:1280,innerHeight:720,
@@ -49,7 +49,7 @@ function reopened(){
  const target={closest(){return null;},matches(){return false;}};
  const press=(code:string)=>{key({code,key:code,target,repeat:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,preventDefault(){}});};
  const advance=async(ms:number)=>{const end=now+ms;for(;;){due.sort((a,b)=>a.at-b.at);const first=due[0];if(!first||first.at>end)break;due.shift();now=first.at;first.run();await flush();}now=end;await flush();};
- return {context,calls,failures,shown,press,advance,finish:()=>finish(),fingersRuns:()=>fingersRuns,readiness};
+ return {context,calls,failures,shown,press,advance,finish:()=>finish(),fail:(error:Error)=>fail(error),fingersRuns:()=>fingersRuns,readiness};
 }
 
 test('E pressed the moment a reopened score shows waits for its fingers, then edits once',async()=>{
@@ -99,4 +99,30 @@ test('once fingers are ready, presses run at once and show nothing',async()=>{
  r.readiness.prepare('fingers');await flush();r.finish();await flush();
  r.press('KeyE');await flush();r.press('KeyP');await flush();
  assert.deepEqual(r.calls,['edit','practice-menu']);assert.deepEqual(r.shown,[]);assert.deepEqual(r.failures,[]);
+});
+
+test('a press waiting for fingers that fail does not run, nor start the fingers again by itself',async()=>{
+ const r=reopened();
+ r.press('KeyE');await flush();assert.equal(r.context.presses.pending,'edit');
+ r.fail(Error('Personal library remained busy; new score registration was not applied.'));await flush();
+ assert.deepEqual(r.calls,[],'the edit does not run on fingers that are not there');
+ assert.equal(r.fingersRuns(),1,'the press does not wait again: the failure is said once, by the stage');
+ assert.equal(r.context.presses.pending,undefined);
+ // A later press asks for the fingers again, and runs once they are ready.
+ const up={code:'KeyE',key:'KeyE',repeat:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,preventDefault(){}};r.context.input.up(up);r.context.controls.keyUp(up);
+ r.press('KeyE');await flush();assert.equal(r.fingersRuns(),2);
+ r.finish();await flush();
+ assert.deepEqual(r.calls,['edit']);assert.deepEqual(r.failures,[]);
+});
+
+test('a command that needs nothing, such as turning the page, still cancels the waiting press',async()=>{
+ const r=reopened();
+ r.press('KeyP');await flush();assert.equal(r.context.presses.pending,'practice');
+ const turned:string[]=[];r.context.turnPage=(...args:unknown[])=>{turned.push(String(args[0]));};
+ r.press('ArrowRight');await flush();
+ assert.equal(turned.length,1,'the page turned');
+ assert.equal(r.context.presses.pending,undefined,'the page turn took the place of P');
+ r.finish();await flush();
+ assert.ok(!r.calls.includes('practice-menu'),`P did not run after the page turn: ${r.calls}`);
+ assert.deepEqual(r.failures,[]);
 });
