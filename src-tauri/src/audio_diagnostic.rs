@@ -4,7 +4,7 @@ use super::{lifecycle, mixer, platform, Config};
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
     time::Instant,
@@ -27,7 +27,7 @@ fn initialized_windows_stream_and_virtual_midi_pcm() {
     std::fs::create_dir_all(&directory).unwrap();
     let bus = Arc::new(mixer::MidiBus::default());
     let mailbox = Arc::new(mixer::CueMailbox::default());
-    let volume = Arc::new(AtomicU64::new(0.15f64.to_bits()));
+    let volume = Arc::new(mixer::Volumes::with_gains(0.15, 1.0));
     let baseline = Instant::now();
     let mut host = platform::Host::open(
         &Config {

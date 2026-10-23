@@ -2,11 +2,7 @@
 //! Never selected by ordinary tests. Loopback is the Windows mix, not the ear.
 use super::{capture_validation, mixer, platform, Config};
 use capture_validation::Packet as LoopbackPacket;
-use std::{
-    path::PathBuf,
-    sync::{atomic::AtomicU64, Arc},
-    time::Instant,
-};
+use std::{path::PathBuf, sync::Arc, time::Instant};
 use windows::{
     core::PCWSTR,
     Win32::{Media::Audio::*, System::Com::*},
@@ -206,7 +202,7 @@ fn initialized_live_piano_submission_and_loopback_latency() {
         },
         bus.clone(),
         mailbox,
-        Arc::new(AtomicU64::new(0.04f64.to_bits())),
+        Arc::new(mixer::Volumes::with_gains(0.04, 1.0)),
     )
     .unwrap();
     let initial = host.status();

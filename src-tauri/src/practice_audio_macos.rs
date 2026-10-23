@@ -75,7 +75,7 @@ impl Host {
         config: &Config,
         bus: Arc<mixer::MidiBus>,
         mailbox: Arc<mixer::CueMailbox>,
-        volume: Arc<AtomicU64>,
+        volume: Arc<mixer::Volumes>,
     ) -> Result<Self, String> {
         let device = device(&config.device)?;
         let supported = device.default_output_config().map_err(error)?;
@@ -229,6 +229,7 @@ impl Host {
         }
         s.rendered_frames = self.frames.load(Ordering::Relaxed);
         s.peak = f64::from_bits(self.peak.load(Ordering::Relaxed));
+        (s.limited_frames, s.limiter_gain) = self.mixer.limiter();
         s.queue_overflow = self.bus.overflow.load(Ordering::Relaxed);
         s
     }

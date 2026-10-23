@@ -46,15 +46,26 @@ Options SHALL offer one Download piano button before installation. One press SHA
 - **THEN** Install from a file… enters the same installer path without another Internet download or adopting an unvalidated extracted directory
 
 ### Requirement: Clear additive piano settings
-Options SHALL show Piano in its own section below Audio/MIDI and above Keys and pedals with installation/status, an optional toggle, a compact centered percentage volume spinbox with a pointer-only drag track and a compact four-choice Latency setting requesting monotonically increasing host tiers. Actual device periods MAY coincide. Browsing arrows SHALL navigate Options without adjusting sound; entered control editing SHALL own adjustments. Volume SHALL reuse the shared centered percentage spinbox with entered typing/arrow editing and stacked mouse chevrons. Latency SHALL offer four discrete choices through one browse stop and entered arrow editing. Preferences SHALL be additive, disabled by default, and preserve existing records and settings. Installation SHALL NOT connect MIDI automatically; only the one-press download switches the piano on after it succeeds. Volume SHALL be available before installation and while the piano downloads.
+Options SHALL show Piano in its own section below Audio/MIDI and above Keys and pedals with installation/status, an optional toggle, a compact centered percentage volume spinbox with a pointer-only drag track and a compact four-choice Latency setting requesting monotonically increasing host tiers. Actual device periods MAY coincide. Browsing arrows SHALL navigate Options without adjusting sound; entered control editing SHALL own adjustments. Volume SHALL reuse the shared centered percentage spinbox with entered typing/arrow editing and stacked mouse chevrons. Latency SHALL offer four discrete choices through one browse stop and entered arrow editing. Preferences SHALL be additive, disabled by default, and preserve existing records and settings. Installation SHALL NOT connect MIDI automatically; only the one-press download switches the piano on after it succeeds. Volume SHALL be available before installation and while the piano downloads. A Metronome volume, the same number box and track, SHALL sit under the piano's Volume at all times, set the metronome and practice cues with or without the piano, be heard while its track is dragged and be saved on release. A metronome volume not yet chosen SHALL mean 70%, and settings saved without it SHALL read unchanged.
 
 #### Scenario: Controls before installation
 - **WHEN** no native bank has been admitted
-- **THEN** only Download piano, Install from a file…, Volume and necessary installation status/cancel appear in the piano section, shared Audio/MIDI stay available, and piano controls/help and sampler loading remain absent
+- **THEN** only Download piano, Install from a file…, Piano volume, Metronome volume and necessary installation status/cancel appear in the piano section, shared Audio/MIDI stay available, and piano controls/help and sampler loading remain absent
 
 #### Scenario: Saving and reopening Options
 - **WHEN** the player changes Piano, volume or latency and reopens Options/restarts the app
 - **THEN** saved valid choices are retained, the effective enabled state depends on bank readiness, and unrelated settings/data remain unchanged
+
+### Requirement: Audible piano level without clipping
+At the default 70% a hard middle C SHALL peak around −7 dBFS and a five-note chord at velocity 100 SHALL not be limited. Each volume track SHALL map its setting to a gain on a smooth curve with 100% 6 dB above 70%; a saved piano volume SHALL never be quieter than its earlier linear gain, and a piano volume saved by an earlier version above 70% SHALL be set to 70% once. A peak limiter that looks no samples ahead SHALL lower only the piano, so that the mix with the metronome and cues stays at or below −1 dBFS while they keep their own level. The piano SHALL pass unchanged while its held peak is under the limiter's soft knee; after a loud peak, quieter frames are scaled during the hold and the release.
+
+#### Scenario: Loud pedalled chord
+- **WHEN** both hands strike a fortissimo chord twice with the pedal down at the default volume
+- **THEN** the output stays at or under −1 dBFS, the limiter reports the frames it lowered, a metronome click during the chord keeps its own level, and the delay per latency setting is unchanged
+
+#### Scenario: Loud volume saved by an earlier version
+- **WHEN** the viewer first reads a piano volume above 70% saved by an earlier version
+- **THEN** it is set to 70% once and written back with every other setting unchanged; a volume at or under 70% keeps its number, and a volume chosen afterwards is kept
 
 #### Scenario: Delayed-sound help
 - **WHEN** the player opens Sound feels delayed?

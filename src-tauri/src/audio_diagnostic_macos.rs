@@ -4,7 +4,7 @@ use super::{hal, lifecycle, mixer, platform, Config};
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
     time::Instant,
@@ -59,7 +59,7 @@ fn initialized_macos_stream_buffer_restore() {
     let sfz = directory.join("fixture.sfz");
     let bus = Arc::new(mixer::MidiBus::default());
     let mailbox = Arc::new(mixer::CueMailbox::default());
-    let gain = Arc::new(AtomicU64::new(0.15f64.to_bits()));
+    let gain = Arc::new(mixer::Volumes::with_gains(0.15, 1.0));
     // Initialization failure after the buffer lease must undo its own change.
     let missing = Config {
         enabled: true,

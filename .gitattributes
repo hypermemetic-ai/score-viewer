@@ -62,6 +62,7 @@ delivery-input/** -text
 "src-tauri/src/audio_latency_diagnostic.rs" -text
 "src-tauri/src/audio_mixer.rs" -text
 "src-tauri/src/audio_period.rs" -text
+"src-tauri/src/audio_playability_macos.rs" -text
 "src-tauri/src/audio_queue.rs" -text
 "src-tauri/src/audio_render_queue.rs" -text
 "src-tauri/src/audio_schedule.rs" -text
