@@ -6,10 +6,7 @@ use super::{hal, lifecycle, mixer, platform, Config};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::{
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicBool, AtomicU64},
-        Arc, Mutex,
-    },
+    sync::{atomic::AtomicBool, Arc, Mutex},
     time::Instant,
 };
 
@@ -24,6 +21,7 @@ fn now_ns() -> u64 {
 #[derive(Default)]
 struct Recording {
     samples: Vec<f32>,
+    right: Vec<f32>,
     // (host ns of the first frame, index of that frame)
     blocks: Vec<(u64, usize)>,
 }
@@ -65,6 +63,7 @@ fn input(name: &str) -> Result<Input, String> {
     let rate = config.sample_rate.0 as f64;
     let recording = Arc::new(Mutex::new(Recording {
         samples: Vec::with_capacity(rate as usize * 40),
+        right: Vec::with_capacity(rate as usize * 40),
         blocks: Vec::with_capacity(20_000),
     }));
     let sink = recording.clone();
@@ -82,6 +81,8 @@ fn input(name: &str) -> Result<Input, String> {
                 let first = r.samples.len();
                 r.blocks.push((at, first));
                 r.samples.extend(data.chunks(channels).map(|f| f[0]));
+                r.right
+                    .extend(data.chunks(channels).map(|f| f[1.min(channels - 1)]));
             },
             |e| eprintln!("loopback input error: {e}"),
             None,
@@ -159,19 +160,24 @@ struct Probe {
     mailbox: Arc<mixer::CueMailbox>,
 }
 impl Probe {
-    fn open(&self, sfz: &Path, tier: u8, volume: f64) -> Result<platform::Host, String> {
+    fn open(
+        &self,
+        sfz: &Path,
+        tier: u8,
+        volumes: Arc<mixer::Volumes>,
+    ) -> Result<platform::Host, String> {
         let config = Config {
             enabled: true,
             sfz: Some(sfz.to_path_buf()),
             device: self.id.clone(),
             tier,
         };
-        let gain = Arc::new(AtomicU64::new(volume.to_bits()));
-        platform::Host::open(&config, self.bus.clone(), self.mailbox.clone(), gain)
+        platform::Host::open(&config, self.bus.clone(), self.mailbox.clone(), volumes)
     }
     /// Note-on to first sound at the loopback input.
     fn delay(&self, sfz: &Path, tier: u8) -> serde_json::Value {
-        let mut host = match self.open(sfz, tier, 0.7) {
+        let volumes = Arc::new(mixer::Volumes::new(0.7, 0.7));
+        let mut host = match self.open(sfz, tier, volumes) {
             Ok(host) => host,
             Err(e) => return serde_json::json!({"tier":tier,"error":e}),
         };
@@ -224,22 +230,29 @@ impl Probe {
             "notesSent":sent.len(),
         })
     }
-    /// Peak and 300 ms RMS at the loopback input for one event.
+    /// Peak (both channels, and the left alone as the first probe measured)
+    /// and 300 ms RMS (left) at the loopback input for one event, with what
+    /// the output limiter did during it.
     fn level(
         &self,
         host: &mut platform::Host,
         rate: f64,
         rec: &Arc<Mutex<Recording>>,
-        play: &dyn Fn(),
+        seconds: f64,
+        play: &dyn Fn(&mut platform::Host),
     ) -> serde_json::Value {
+        let before = host.status();
         let at = now_ns();
-        play();
-        run(host, 0.6);
+        play(host);
+        run(host, seconds + 0.05);
+        let after = host.status();
         let r = rec.lock().unwrap();
         let from = r.index_at(at, rate);
-        let to = r.index_at(at + 550_000_000, rate);
+        let to = r.index_at(at + (seconds * 1e9) as u64, rate);
         let window = &r.samples[from..to];
+        let right = &r.right[from..to.min(r.right.len())];
         let peak = window.iter().fold(0f32, |p, v| p.max(v.abs()));
+        let both = right.iter().fold(peak, |p, v| p.max(v.abs()));
         let onset = window
             .iter()
             .position(|v| v.abs() > peak * 0.1)
@@ -248,16 +261,24 @@ impl Probe {
         let rms = (body.iter().map(|v| (*v as f64).powi(2)).sum::<f64>()
             / body.len().max(1) as f64)
             .sqrt();
-        serde_json::json!({"peakDbfs":dbfs(peak),"rms300msDbfs":dbfs(rms as f32)})
+        let limited = after.limited_frames - before.limited_frames;
+        serde_json::json!({
+            "peakDbfs":dbfs(both),
+            "peakLeftDbfs":dbfs(peak),
+            "rms300msDbfs":dbfs(rms as f32),
+            "limitedFrames":limited,
+            "limiterLowestGainDb":(limited > 0).then(|| dbfs(after.limiter_gain as f32)),
+        })
     }
-    fn loudness(&self, sfz: &Path, volume: f64) -> serde_json::Value {
-        let mut host = match self.open(sfz, 1, volume) {
+    fn loudness(&self, sfz: &Path, label: &str, volumes: mixer::Volumes) -> serde_json::Value {
+        let volumes = Arc::new(volumes);
+        let mut host = match self.open(sfz, 1, volumes) {
             Ok(host) => host,
-            Err(e) => return serde_json::json!({"volume":volume,"error":e}),
+            Err(e) => return serde_json::json!({"run":label,"error":e}),
         };
         let listen = match input(&self.name) {
             Ok(listen) => listen,
-            Err(e) => return serde_json::json!({"volume":volume,"error":e}),
+            Err(e) => return serde_json::json!({"run":label,"error":e}),
         };
         run(&mut host, 0.4);
         let rate = listen.rate;
@@ -265,7 +286,7 @@ impl Probe {
         let mut notes = serde_json::Map::new();
         for key in [36u8, 60, 84] {
             for vel in [16u8, 32, 64, 96, 127] {
-                let v = self.level(&mut host, rate, &rec, &|| {
+                let v = self.level(&mut host, rate, &rec, 0.55, &|_| {
                     self.bus.send(100, 1, 1, key, vel)
                 });
                 self.bus.send(100, 2, 1, key, 0);
@@ -274,7 +295,7 @@ impl Probe {
             }
         }
         let chord = [48u8, 55, 60, 64, 67];
-        let v = self.level(&mut host, rate, &rec, &|| {
+        let v = self.level(&mut host, rate, &rec, 0.55, &|_| {
             for k in chord {
                 self.bus.send(100, 1, 1, k, 100);
             }
@@ -284,9 +305,28 @@ impl Probe {
         }
         run(&mut host, 0.9);
         notes.insert("fiveNoteChordVel100".into(), v);
+        // Both hands, fortissimo, pedal down, struck twice so the second
+        // strike lands on the first one's ringing strings.
+        let full = [36u8, 43, 48, 52, 55, 60, 64, 67, 72, 76];
+        let v = self.level(&mut host, rate, &rec, 1.6, &|host| {
+            self.bus.send(100, 3, 1, 64, 127);
+            for k in full {
+                self.bus.send(100, 1, 1, k, 120);
+            }
+            run(host, 0.4);
+            for k in full {
+                self.bus.send(100, 1, 1, k, 127);
+            }
+        });
+        for k in full {
+            self.bus.send(100, 2, 1, k, 0);
+        }
+        self.bus.send(100, 3, 1, 64, 0);
+        run(&mut host, 2.0);
+        notes.insert("pedalledTwoHandChordFf".into(), v);
         let out_rate = host.status().sample_rate;
         let mailbox = self.mailbox.clone();
-        let click = self.level(&mut host, rate, &rec, &|| {
+        let click = self.level(&mut host, rate, &rec, 0.55, &|_| {
             let cue = Box::new(mixer::Cue::new(
                 out_rate,
                 lifecycle::Request::new("", 180.0, 1200.0, 0.0).unwrap(),
@@ -300,7 +340,7 @@ impl Probe {
         drop(listen.stream);
         drop(host);
         self.mailbox.reset();
-        serde_json::json!({"volume":volume,"tier":1,"levels":notes})
+        serde_json::json!({"run":label,"tier":1,"levels":notes})
     }
 }
 
@@ -316,13 +356,13 @@ fn loopback_delay_and_loudness() {
     let write = |value: serde_json::Value| {
         std::fs::write(&report, serde_json::to_vec_pretty(&value).unwrap()).unwrap()
     };
-    write(serde_json::json!({"version":1,"result":"started"}));
+    write(serde_json::json!({"version":2,"result":"started"}));
     let wanted = std::env::var("VIEWER_PLAYABILITY_OUTPUT").unwrap_or_else(|_| "BlackHole".into());
     let outputs = platform::outputs().expect("CoreAudio enumeration");
     let names: Vec<_> = outputs.outputs.iter().map(|o| o.name.clone()).collect();
     let Some(output) = outputs.outputs.iter().find(|o| o.name.contains(&wanted)) else {
         write(
-            serde_json::json!({"version":1,"result":"unavailable","reason":"no loopback output","outputs":names}),
+            serde_json::json!({"version":2,"result":"unavailable","reason":"no loopback output","outputs":names}),
         );
         return;
     };
@@ -350,9 +390,12 @@ fn loopback_delay_and_loudness() {
         Some(sfz) => {
             let sfz = PathBuf::from(sfz);
             let started = Instant::now();
-            let default = probe.loudness(&sfz, 0.7);
-            let full = probe.loudness(&sfz, 1.0);
-            serde_json::json!({"bank":sfz,"default":default,"full":full,"seconds":started.elapsed().as_secs()})
+            // The earlier levels (linear 70% piano, fixed cue, no limiting
+            // reached), then the new default and both tracks at 100%.
+            let before = probe.loudness(&sfz, "before", mixer::Volumes::with_gains(0.7, 1.0));
+            let default = probe.loudness(&sfz, "default 70%", mixer::Volumes::new(0.7, 0.7));
+            let full = probe.loudness(&sfz, "100%", mixer::Volumes::new(1.0, 1.0));
+            serde_json::json!({"bank":sfz,"before":before,"default":default,"full":full,"pianoGainAtDefault":mixer::piano_gain(0.7),"seconds":started.elapsed().as_secs()})
         }
         None => serde_json::json!("skipped: no piano bank given"),
     };
@@ -363,7 +406,7 @@ fn loopback_delay_and_loudness() {
     let reason = (!heard)
         .then_some("the loopback input recorded only zeros (microphone permission or routing)");
     write(serde_json::json!({
-        "version":1,
+        "version":2,
         "result":result,
         "reason":reason,
         "output":output.name,

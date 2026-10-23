@@ -41,3 +41,4 @@
 - [ ] 6.5 Observe one press in the native Windows and Mac packages, and the pianist's own judgement of delay and volume.
 - [x] 6.6 Keep downloads safe across quits, a killed viewer, a second viewer, a changed file online and a refused resume: one lock, curl tied to the viewer, in-place check, size/ETag check before downloading, one restart, plain messages.
 - [x] 6.7 Review round 2: delete every unfinished download after any install, remove replaced and pointerless banks, refuse a changed file without fetching it again, retry a damaged download once, keep focus on Cancel and in order, hear the Volume track while dragging.
+- [x] 6.8 Raise the piano to an audible level with a zero-delay peak limiter, map both volume tracks on a 6 dB-above-default curve, add the Metronome volume under the piano's, re-probe the loopback, and make the Mac install guide match the zip.

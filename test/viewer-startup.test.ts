@@ -5,7 +5,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {ViewerOrientation} from '../src/orientation';
 import {defaultBindings} from '../src/input';
-import {defaultPianoPreferences,readPianoPreferences} from '../src/piano-preferences';
+import {builtInClicks,cueGain,cueVolume,defaultPianoPreferences,readPianoPreferences} from '../src/piano-preferences';
 import {readFingeringAdviceSettings} from '../src/fingering-advice-settings';
 import {browserAssistanceStore} from '../src/durable-assistance-store';
 import {pendingPersonalConsolidation} from '../src/personal-consolidation-request';
@@ -21,7 +21,7 @@ function fixture(){
   LoadingProgress:class {title='';constructor(title:string){this.title=title;}markup(){return this.title;}attach(){return this;}stop(){}step(id:string){phases.push(id);}fail(){}},paintCheckpoint:async()=>{},
   readJson:async(file:string)=>{reads.push(file);assert.ok(['library.json','preferences.json'].includes(file));return file==='preferences.json'?{version:1,libraryRotation:0,keyboardLayout:'conventional-piano',bindings:defaultBindings(),piano:{...defaultPianoPreferences(),enabled:true},retainedUnknown:{value:'keep'}}:null;},
   keyboardPreference:(value:any)=>value,readBindings:(value:any)=>value,fingerPreferences:()=>({}),readMidiMapping:()=>undefined,readMidiBindings:()=>undefined,
-  readFingeringAdviceSettings,pendingPersonalConsolidation,readPianoPreferences,defaultPianoPreferences,ViewerOrientation,InputController:class {},readControlBindings:()=>({}),readFreeViewControlOverrides:()=>({}),controls:{configure(){}},
+  readFingeringAdviceSettings,pendingPersonalConsolidation,readPianoPreferences,defaultPianoPreferences,builtInClicks,cueGain,cueVolume,ViewerOrientation,InputController:class {},readControlBindings:()=>({}),readFreeViewControlOverrides:()=>({}),controls:{configure(){}},
   host:{assistanceStore,onFocusChange:async()=>{},onMidi:async()=>{},fullscreen:async()=>{}},onMidi(){},onMidiNote(){},
   configurePiano:async()=>({enabled:true,ready:true,error:null}),resetInput(){},render(){rendered++;},aheadOfTime:undefined,notify:(message:string)=>warnings.push(message),
   esc:(value:string)=>value,button:()=>'<button data-action="exit">Close Viewer</button>',validEntryStorage:()=>true,
