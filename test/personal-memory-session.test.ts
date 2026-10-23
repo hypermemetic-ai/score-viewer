@@ -258,3 +258,56 @@ test('turning pages or rotating the view does not make opening project the score
  assert.equal(inner.known(snapshot,looking),registered);assert.equal(inner.projected.size,projected,'only where the reader looks changed');
  inner.known(snapshot,choose(structuredClone(input),'b1n1',4,'2021-01-01'));assert.ok(inner.projected.size>projected,'a changed choice is projected');
 });
+
+test('reopening serves the state this session last saw, then checks it against the store after the pages show',async()=>{
+ const base=storage();let reads=0;
+ const store:AssistanceStore={read:async(...args)=>{reads++;return base.read(...args);},commit:input=>base.commit(input)};
+ const a=choose(fixture('a'),'b0n1',2),c=choose(fixture('c'),'b0n1',4,'2021-01-01');
+ const s=session(store,[a]);await s.initialize();await load(s,a);
+ const open=(since:number,earlier:boolean)=>s.loadPersonalCurrent({id:'a',importedAt:a.importedAt!},a.p,async()=>a.personal,{since,earlier});
+ // A same-session reopen reads nothing before its pages: this session wrote every change it made.
+ let before=reads;const reopened=await open(performance.now(),true);
+ assert.equal(reads,before);assert.equal(reopened.assignments?.choices.b0n1.finger,2);
+ assert.equal(await s.confirmReading('a'),true);assert.equal(reads,before+1,'the check reads the store once, after the pages');
+ assert.equal(await s.confirmReading('a'),true);assert.equal(reads,before+1,'a reading is checked once');
+ // Without `earlier`, an opening that began after the last read reads the store.
+ before=reads;await open(performance.now()+1,false);assert.equal(reads,before+1);
+ assert.equal(await s.confirmReading('a'),true);assert.equal(reads,before+1,'it read the store itself, so there is nothing to check');
+ // Another writer changes the fingering memory this score rests on: the check says so.
+ const other=session(base,[a]);await other.initialize();await load(other,c);
+ before=reads;await open(performance.now(),true);assert.equal(reads,before);
+ assert.equal(await s.confirmReading('a'),false);
+});
+
+test('a score opened with registration later is registered by register(), not by opening',async()=>{
+ const store=storage(),a=choose(fixture('a'),'b0n1',2),c=choose(fixture('c'),'b0n1',4,'2021-01-01');
+ const s=session(store,[a]);await s.initialize();
+ const memoryRef=async()=>(await store.read()).refs[personalMemoryDocument];
+ const before=await memoryRef();
+ const personal=await s.loadPersonalCurrent({id:'c',importedAt:c.importedAt!},c.p,async()=>c.personal,{register:'later'});
+ assert.equal(personal.assignments?.choices.b0n1.finger,4);
+ assert.equal(await memoryRef(),before,'opening wrote nothing');
+ const registered=await s.register({id:'c',importedAt:c.importedAt!},c.p,personal);
+ assert.equal(registered.assignments?.choices.b0n1.finger,4);
+ assert.notEqual(await memoryRef(),before,'register() wrote the new score into memory');
+ const eager=session(storage(),[a]);await eager.initialize();await load(eager,c);
+ assert.deepEqual(s.memory,eager.memory,'later registration ends where opening would have');
+});
+
+test('a prefetched read serves the opening that began before it, and is dropped once this session writes past it',async()=>{
+ const base=storage();let reads=0;
+ const store:AssistanceStore={read:async(...args)=>{reads++;return base.read(...args);},commit:input=>base.commit(input)};
+ const a=choose(fixture('a'),'b0n1',2),c=choose(fixture('c'),'b0n1',4,'2021-01-01');
+ await session(base,[a]).initialize();
+ const s=session(store,[a]);
+ // A new session: the opening begins, prefetches, and initialises from that one read.
+ let since=performance.now();s.prefetch();
+ await s.loadPersonalCurrent({id:'a',importedAt:a.importedAt!},a.p,async()=>a.personal,{since,register:'later'});
+ assert.equal(reads,1);
+ // A prefetch older than this session's own later write is not used.
+ s.prefetch();await load(s,c);
+ since=performance.now();const before=reads;
+ const personal=await s.loadPersonalCurrent({id:'c',importedAt:c.importedAt!},c.p,async()=>c.personal,{since});
+ assert.equal(personal.assignments?.choices.b0n1.finger,4);
+ assert.equal(reads,before+1,'the stale prefetch was dropped and the store read once');
+});

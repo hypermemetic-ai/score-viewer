@@ -4,7 +4,7 @@ import {PIANO_ASSIGNMENT_VERSION} from '../vendor/iso-notation/src/model/piano-f
 import {RR_PERFORMANCE_POSE_PROFILE} from '../vendor/iso-notation/src/model/isomorphic-rr-personal-pose';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
-import {importPackage,selectPresentation,validateLayerAsync,type ScorePackage,type FingerLayer} from './package';
+import {hashBytes,importPackage,selectPresentation,validateLayerAsync,type ScorePackage,type FingerLayer} from './package';
 import {readPersonal,type PersonalState} from './state';
 import {scoreCapabilities} from './score-capabilities';
 import {replayProvidedRRLayer} from './operator-finger-update';
@@ -32,6 +32,23 @@ export interface PianoReading {
 }
 export type PianoPrepared=PianoReady|PianoReading;
 export type PianoReadinessResult=PianoPrepared|PianoNotReady;
+/** Fixed-route replays already passed, by archive, keyboard and layer: the
+ * replay is a pure check of the archive's score against that layer, so a
+ * passed one need not run again. Kept on disk by the native build. */
+export interface FingerReplayReceipts {has(key:string):Promise<boolean>;add(key:string):void}
+let replayReceipts:FingerReplayReceipts|undefined;
+const passedReplays=new Set<string>();
+export function useFingerReplayReceipts(receipts:FingerReplayReceipts|undefined){replayReceipts=receipts;}
+async function replayKey(p:ScorePackage,layout:PhysicalKeyboardId,layer:FingerLayer,editionLayer:boolean):Promise<string|undefined>{
+  if(!p.archiveSha256)return;
+  return hashBytes(JSON.stringify(['rr-fixed-route-replay-v1',p.archiveSha256,layout,editionLayer?'edition':await hashBytes(JSON.stringify(layer))]));
+}
+async function replayOnce(p:ScorePackage,layout:PhysicalKeyboardId,layer:FingerLayer,editionLayer:boolean){
+  const key=await replayKey(p,layout,layer,editionLayer);
+  if(key&&(passedReplays.has(key)||await replayReceipts?.has(key).catch(()=>false))){passedReplays.add(key);return;}
+  replayProvidedRRLayer(p,layer);
+  if(key){passedReplays.add(key);replayReceipts?.add(key);}
+}
 const currentLayer=(layer:FingerLayer)=>layer.version===PIANO_ASSIGNMENT_VERSION||layer.plannerVersion===CONVENTIONAL_PLANNER_VERSION||layer.plannerVersion===RR_TEMPORAL_LAYER_PLANNER;
 const keyboardName=(layout:PhysicalKeyboardId)=>layout==='conventional-piano'?'conventional':'Jankó';
 class Cancelled extends Error {}
@@ -71,7 +88,7 @@ export async function ensurePianoReady(request:PianoReadinessRequest,admission?:
     // A provided RR layer gets its fixed-route replay; nothing is recalculated.
     if(!currentLayer(layer)&&layer.version==='physical-attack-finger-layer-v1'&&layer.physicalRowOrder==='rr-even-far-last-v1'&&
       layer.profileId===RR_PERFORMANCE_POSE_PROFILE.id&&['released-owner-actions-v1','released-owner-actions-v1/viewer-bounded-performance-v2'].includes(layer.plannerVersion))
-      replayProvidedRRLayer(p,layer);
+      await replayOnce(p,request.layout,layer,active===p.fingerLayer);
     interrupted();
     const edited=!!personal&&Object.keys(personal.overrides).length>0;
     return{status:layer.version===PIANO_ASSIGNMENT_VERSION||edited?'editable':'ready',packageBytes:original,package:p,layer,

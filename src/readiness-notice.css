@@ -1,0 +1,19 @@
+/* A press waiting for readiness says so quietly: plain words in the reader's
+   muted text with a thin, slow line under them, at the bottom centre of the
+   surface the press was made on (it turns with the reader), or just after the
+   menu item that took it. It takes no input, dims nothing and covers no music.
+   The fade-in is a delayed CSS animation, set going with the press: the
+   compositor runs it even while the score's work keeps script busy. */
+.readiness-notice{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:6px;color:#909090;font-size:.85rem;line-height:1.25;white-space:nowrap;pointer-events:none;user-select:none;opacity:0}
+.readiness-notice.shown{animation:readiness-notice-in .3s ease var(--readiness-notice-delay,0ms) both}
+.readiness-notice.leaving{animation:readiness-notice-out .3s ease both}
+@keyframes readiness-notice-in{from{opacity:0}to{opacity:1}}
+@keyframes readiness-notice-out{from{opacity:1}to{opacity:0}}
+.toolbar.visible~.readiness-notice{bottom:84px}
+.readiness-notice[data-place=after]{position:static;transform:none;align-items:flex-start;margin:4px 0 6px 13px}
+.readiness-notice-line{position:relative;display:block;align-self:stretch;min-width:120px;height:1px;overflow:hidden;background:rgba(144,144,144,.12)}
+.readiness-notice-line::after{content:"";position:absolute;inset:0 auto 0 0;width:40%;background:linear-gradient(90deg,transparent,rgba(144,144,144,.42),transparent);animation:readiness-notice-line 2.8s ease-in-out infinite}
+@keyframes readiness-notice-line{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+@media(prefers-reduced-motion:reduce){.readiness-notice.shown,.readiness-notice.leaving{animation-duration:1ms}.readiness-notice-line::after{animation:none;width:100%;opacity:.6}}
+/* Shared kbd rule: a key named here carries no text decoration. */
+.readiness-notice kbd{text-decoration:none!important}

@@ -100,6 +100,28 @@ export class PersonalMemorySession {
  private inputs=new Map<string,MemoryScoreInput>();
  private pending=new Map<string,CapturedPersonalMemoryIntent>();
  constructor(private readonly store:AssistanceStore,private readonly options:PersonalMemorySessionOptions){}
+ /** The store as this session last read or wrote it, and when (performance.now()). */
+ private seen?:{snapshot:AssistanceSnapshot;at:number};
+ /** Scores opened from a store state read before their opening began, by entry: confirmReading checks them. */
+ private servedEarlier=new Set<string>();
+ // `at` is when the read or write began: the store held at least that state then.
+ private async read():Promise<AssistanceSnapshot>{const at=performance.now(),snapshot=await this.store.read();this.see(snapshot,at);return snapshot;}
+ private async commit(input:Parameters<AssistanceStore['commit']>[0]){const at=performance.now(),result=await this.store.commit(input);this.see(result.snapshot,at);return result;}
+ private see(snapshot:AssistanceSnapshot,at:number){if(!this.seen||snapshot.revision>=this.seen.snapshot.revision)this.seen={snapshot,at};}
+ /** A read begun ahead of the opening that needs it (prefetch). */
+ private reading?:Promise<AssistanceSnapshot>;
+ /** Begin the store read an opening will need, so it overlaps reading and
+  * admitting the score itself. The opening uses it; nothing is adopted here. */
+ prefetch():void{
+  if(this.reading||this.pending.size)return;
+  const reading=this.reading=this.read();reading.catch(()=>{if(this.reading===reading)this.reading=undefined;});
+ }
+ /** The prefetched read, unless this session has since seen a later state; else a new read. */
+ private async fresh():Promise<AssistanceSnapshot>{
+  const reading=this.reading;this.reading=undefined;
+  const snapshot=reading?await reading.catch(()=>undefined):undefined;
+  return snapshot&&(!this.seen||this.seen.snapshot.revision<=snapshot.revision)?snapshot:this.read();
+ }
  /** The stored memory object `optimistic` was read from, while no edit has
   * changed it since; stored objects are named by their content. */
  private adoptedRef?:string;
@@ -133,14 +155,14 @@ export class PersonalMemorySession {
   * not indexed yet or saves wait for recovery: opening a score does those. */
  async adoptIndexed():Promise<boolean>{
   if(this.snapshot)return true;if(this.initializing){await this.initializing;return !!this.snapshot;}
-  const current=await this.store.read();
+  const current=await this.read();
   if(current.documents[personalMemoryDocument]===undefined||Object.keys(record(current.documents[pendingDocument])).length)return false;
   await this.initialize();return !!this.snapshot;
  }
  initialize():Promise<void>{return this.initializing??=this.initializeOnce().catch(error=>{this.initializing=undefined;throw error;});}
  private async initializeOnce(){
   for(let attempt=0;attempt<maxAttempts;attempt++){
-   const current=await this.store.read();
+   const current=attempt?await this.read():await this.fresh();
    if(current.documents[personalMemoryDocument]!==undefined){this.adopt(current);break;}
    const inputs=frozenInputs(await this.options.scanLibrary());this.remember(inputs);
    const actual=inputs.map(input=>({...input,personal:this.personalAt(current,input)}));
@@ -148,7 +170,7 @@ export class PersonalMemorySession {
    if(this.options.validateInputs&&!await this.options.validateInputs(inputs))throw Error('Personal library changed during indexing. Retry from the current library.');
    const changes:Record<string,unknown>={[personalMemoryDocument]:memory,[bootstrapDocument]:{version:1,complete:true,inputHashes:hashes}};
    for(const input of actual)changes[inputKey(input)]=input.personal;
-   const result=await this.store.commit({expectedRevision:current.revision,changes:json(changes)});
+   const result=await this.commit({expectedRevision:current.revision,changes:json(changes)});
    if(result.status==='committed'){this.adopt(result.snapshot);break;}
   }
   if(!this.snapshot)throw Error('Personal library remained busy during indexing.');
@@ -183,7 +205,8 @@ export class PersonalMemorySession {
   const ref=snapshot.refs[personalMemoryDocument];let registered=ref!==undefined&&this.registry?.ref===ref?this.registry.registered:undefined;
   if(!registered){
    // One canonical form per registered occurrence, not one per comparison.
-   const memory=readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);registered=new Set(Object.values(memory.occurrences).map(actual=>canonicalJson(actual.occurrence)));
+   // The memory adopted from this very object is already read.
+   const memory=ref!==undefined&&ref===this.adoptedRef&&this.optimistic?this.optimistic:readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]);registered=new Set(Object.values(memory.occurrences).map(actual=>canonicalJson(actual.occurrence)));
    if(ref!==undefined)this.registry={ref,registered};
   }
   // Where the reader is looking does not change which bars are registered, so it does not key the memo.
@@ -203,9 +226,21 @@ export class PersonalMemorySession {
   const key=inputKey(input);return readPersonal(snapshot.documents[key]??rawMemoryPersonal(input.personal),input.p);
  }
  /** Durable personal authority wins over legacy files. Loading never copies a
- * resolved/inherited display value into personal authorship. */
- async loadPersonalCurrent(entry:Pick<Entry,'id'|'importedAt'>,p:ScorePackage,legacy:()=>Promise<PersonalState>):Promise<PersonalState>{
-  await this.initialize();let current=await this.store.read();const key=personalStorageName(entry.id,p);
+ * resolved/inherited display value into personal authorship.
+ *
+ * Opening a score reads the store once. With `since` (performance.now() when
+ * the opening began), what this session read or wrote since serves it as it
+ * is. With `earlier` too, an older state serves it at once, without reading
+ * the store, and confirmReading then reads the store to check nothing this
+ * score rests on changed meanwhile: this session writes every change it
+ * makes, so only another writer can. With `register: 'later'`, a score
+ * memory does not register yet is registered by register(), not here. */
+ async loadPersonalCurrent(entry:Pick<Entry,'id'|'importedAt'>,p:ScorePackage,legacy:()=>Promise<PersonalState>,options:{since?:number;earlier?:boolean;register?:'now'|'later'}={}):Promise<PersonalState>{
+  await this.initialize();if(this.reading&&options.since!==undefined)await this.fresh();
+  const key=personalStorageName(entry.id,p),seen=this.seen,
+   reuse=options.since!==undefined&&!!seen&&!this.pending.size&&(seen.at>=options.since||!!options.earlier);
+  let current=reuse?seen!.snapshot:await this.read();
+  if(reuse&&seen!.at<options.since!)this.servedEarlier.add(entry.id);else this.servedEarlier.delete(entry.id);
   // A validated companion can retain the same source/profile/hand storage key
   // while changing only its package revision. Preserve current raw choices and
   // recheck every guard and layer before activating that narrow rebind.
@@ -217,20 +252,43 @@ export class PersonalMemorySession {
     if(attempt>=maxAttempts)throw Error('Personal library remained busy; companion revision was not rebound.');
     const rebound=readPersonal({...raw,revision:p.manifest.revision},p);
     if(rebound.layer)await validateLayerAsync(rebound.layer,p);for(const layer of rebound.history)await validateLayerAsync(layer,p,{history:true});
-    const result=await this.store.commit({expectedRevision:current.revision,changes:json({[key]:rawMemoryPersonal(rebound)})});current=result.snapshot;
+    const result=await this.commit({expectedRevision:current.revision,changes:json({[key]:rawMemoryPersonal(rebound)})});current=result.snapshot;
    }
   }
   const personal=current.documents[key]===undefined?rawMemoryPersonal(await legacy()):readPersonal(current.documents[key],p);
   const input={entryId:entry.id,importedAt:entry.importedAt,p,personal};this.remember([input]);
+  if(options.register==='later'){if(!this.pending.size)this.adopt(current);return personal;}
+  return this.registered(current,input,personal);
+ }
+ /** Register a score opened with `register: 'later'` in fingering memory, if
+  * memory does not register it yet; the personal state it was opened with. */
+ async register(entry:Pick<Entry,'id'|'importedAt'>,p:ScorePackage,personal:PersonalState):Promise<PersonalState>{
+  await this.initialize();const input={entryId:entry.id,importedAt:entry.importedAt,p,personal:rawMemoryPersonal(personal)};
+  return this.registered(this.snapshot!,input,input.personal);
+ }
+ /** Whether what an opening served from an earlier store state rests on (its
+  * hand choices and the fingering memory) is still what the store holds. True
+  * for an opening that read the store itself, and while this session's own
+  * edits wait to be saved: those are merged with any other writer's anyway. */
+ async confirmReading(entryId:string):Promise<boolean>{
+  if(!this.servedEarlier.delete(entryId))return true;
+  await this.tail;if(this.pending.size||!this.snapshot)return true;
+  const ours=this.snapshot,fresh=await this.read();if(fresh.id===ours.id||this.pending.size)return true;
+  const rests=(s:AssistanceSnapshot)=>JSON.stringify([s.refs[personalMemoryDocument]??null,Object.entries(s.refs).filter(([name])=>name.startsWith(`state-${entryId}`)).sort(([a],[b])=>a<b?-1:a>b?1:0)]);
+  if(rests(fresh)!==rests(ours))return false;
+  this.adopt(fresh);return true;
+ }
+ private async registered(current:AssistanceSnapshot,input:MemoryScoreInput,personal:PersonalState):Promise<PersonalState>{
+  const key=inputKey(input);
   // A score whose own records are registered is known: hands carried from matching
   // bars are derived, so merely opening it registers nothing new. The next edit does.
   if(!this.known(current,input)){
    await this.schedule(async()=>{
     for(let attempt=0;attempt<maxAttempts;attempt++){
-     const snapshot=await this.store.read(),latest={...input,personal:this.personalAt(snapshot,input)};
+     const snapshot=await this.read(),latest={...input,personal:this.personalAt(snapshot,input)};
      if(this.known(snapshot,latest)){this.rebase(snapshot);return;}
      const memory=importPersonalMemoryScore(readPersonalFingeringMemory(snapshot.documents[personalMemoryDocument]),latest);
-     const result=await this.store.commit({expectedRevision:snapshot.revision,changes:json({[personalMemoryDocument]:memory,[key]:latest.personal})});
+     const result=await this.commit({expectedRevision:snapshot.revision,changes:json({[personalMemoryDocument]:memory,[key]:latest.personal})});
      if(result.status==='committed'){this.rebase(result.snapshot);return;}
     }throw Error('Personal library remained busy; new score registration was not applied.');
    });
@@ -365,7 +423,7 @@ export class PersonalMemorySession {
  private async save(batch:readonly CapturedPersonalMemoryIntent[]){
   const fingerprints=new Map(await Promise.all(batch.map(async i=>[i.id,await hashBytes(JSON.stringify(i))] as const)));
   for(let attempt=0;attempt<maxAttempts;attempt++){
-   const current=await this.store.read(),applied=record(current.documents[appliedDocument]),pending=record(current.documents[pendingDocument]);
+   const current=await this.read(),applied=record(current.documents[appliedDocument]),pending=record(current.documents[pendingDocument]);
    const todo=batch.filter(i=>{if(!applied[i.id])return true;if(applied[i.id]!==fingerprints.get(i.id))throw Error('Personal decision identity was reused.');return false;});
    if(!todo.length){for(const i of batch)this.pending.delete(i.id);this.rebase(current);return;}
    // Native JSON storage reorders object fields. Compare the decision's values,
@@ -373,7 +431,7 @@ export class PersonalMemorySession {
    for(const i of todo)if(pending[i.id]&&canonicalJson(pending[i.id])!==canonicalJson(i))throw Error('Pending personal decision identity was reused.');
    const unstaged=todo.filter(i=>!pending[i.id]);
    if(unstaged.length){
-    for(const i of unstaged)pending[i.id]=i;const stage=await this.store.commit({expectedRevision:current.revision,changes:{[pendingDocument]:pending}});
+    for(const i of unstaged)pending[i.id]=i;const stage=await this.commit({expectedRevision:current.revision,changes:{[pendingDocument]:pending}});
     if(stage.status==='conflict')continue;
     // Restart from the durable journal, so no successful stage can be lost by
     // a concurrent writer before effective state and journal removal activate.
@@ -381,7 +439,7 @@ export class PersonalMemorySession {
    }
    let document=readPersonalFingeringMemory(current.documents[personalMemoryDocument]);const personal=new Map<string,PersonalState>();
    for(const i of todo){const target=this.target(i),input={...target,personal:personal.get(i.personalKey)??this.personalAt(current,target)},result=this.apply(document,input,i);document=result.document;personal.set(i.personalKey,result.personal);delete pending[i.id];applied[i.id]=fingerprints.get(i.id)!;}
-   const committed=await this.store.commit({expectedRevision:current.revision,changes:json({[personalMemoryDocument]:document,...Object.fromEntries(personal),[pendingDocument]:pending,[appliedDocument]:applied})});
+   const committed=await this.commit({expectedRevision:current.revision,changes:json({[personalMemoryDocument]:document,...Object.fromEntries(personal),[pendingDocument]:pending,[appliedDocument]:applied})});
    if(committed.status==='conflict')continue;
    for(const i of batch)this.pending.delete(i.id);this.rebase(committed.snapshot);return;
   }
@@ -409,8 +467,8 @@ export class PersonalMemorySession {
   this.remember([input]);return this.schedule(async()=>{
    if(superseded?.())return;
    for(let attempt=0;attempt<maxAttempts;attempt++){
-    const current=await this.store.read(),latest=this.personalAt(current,input),personal=readPersonal(rawMemoryPersonal(update(latest)),input.p);
-    const result=await this.store.commit({expectedRevision:current.revision,changes:json({[inputKey(input)]:personal})});
+    const current=await this.read(),latest=this.personalAt(current,input),personal=readPersonal(rawMemoryPersonal(update(latest)),input.p);
+    const result=await this.commit({expectedRevision:current.revision,changes:json({[inputKey(input)]:personal})});
     if(result.status==='committed'){this.rebase(result.snapshot);return;}
    }throw Error('Personal library remained busy; view save was not applied.');
   });
@@ -427,8 +485,8 @@ export class PersonalMemorySession {
  async deleteEntry(entryId:string):Promise<void>{
   await this.initialize();if(this.maintenance)throw Error('Personal maintenance is running; retry deletion afterward.');return this.schedule(async()=>{
    for(let attempt=0;attempt<maxAttempts;attempt++){
-    const current=await this.store.read(),memory=deletePersonalFingeringEntry(readPersonalFingeringMemory(current.documents[personalMemoryDocument]),entryId);
-    const result=await this.store.commit({expectedRevision:current.revision,changes:json({[personalMemoryDocument]:memory})});if(result.status==='committed'){this.rebase(result.snapshot);return;}
+    const current=await this.read(),memory=deletePersonalFingeringEntry(readPersonalFingeringMemory(current.documents[personalMemoryDocument]),entryId);
+    const result=await this.commit({expectedRevision:current.revision,changes:json({[personalMemoryDocument]:memory})});if(result.status==='committed'){this.rebase(result.snapshot);return;}
    }throw Error('Personal library remained busy; reference succession was not applied.');
   });
  }
@@ -437,7 +495,7 @@ export class PersonalMemorySession {
   this.maintenance=true;
   try{
    for(let attempt=0;attempt<maxAttempts;attempt++){
-    const current=await this.store.read(),memory=readPersonalFingeringMemory(current.documents[personalMemoryDocument]);
+    const current=await this.read(),memory=readPersonalFingeringMemory(current.documents[personalMemoryDocument]);
     if(memory.receipts[request.receiptId]){this.rebase(current);return clone(memory.receipts[request.receiptId]);}
     if(!await request.isSafe())throw Error('Consolidation waits until practice and pending edits have stopped.');
     const scanned=frozenInputs(await this.options.scanLibrary());this.remember(scanned);
@@ -451,7 +509,7 @@ export class PersonalMemorySession {
     const receiptKey=`personal-consolidation/${await hashBytes(request.receiptId)}`;
     const changes:Record<string,unknown>={[personalMemoryDocument]:prepared.document,[receiptKey]:{version:1,completed:true,priorManifest:current.id,inputHashes:hashes,receipt:prepared.receipt},[`${receiptKey}/originals`]:{version:1,memory,personal:Object.fromEntries(targets.map(input=>[inputKey(input),input.personal]))}};
     for(const input of targets){const personal=prepared.personalByKey[inputKey(input)];if(personal)changes[inputKey(input)]=personal;}
-    const result=await this.store.commit({expectedRevision:current.revision,changes:json(changes)});
+    const result=await this.commit({expectedRevision:current.revision,changes:json(changes)});
     if(result.status==='conflict')continue;
     this.rebase(result.snapshot);return clone(prepared.receipt);
    }throw Error('Personal library remained busy; consolidation was not activated.');

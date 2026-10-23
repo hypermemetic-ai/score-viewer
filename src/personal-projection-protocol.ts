@@ -12,11 +12,14 @@ export interface ProjectionView {score:QuantizedGridScore;pages:string[];seats:P
  * and compress the pages; either side gives the same bytes. */
 export const cachedProjectionValue=(view:ProjectionView)=>({score:view.score,pages:view.pages,seats:view.seats,annotationGeometry:view.annotationGeometry});
 /** `warm` may carry an engine this build saved for the same core: the
- * worker resumes from it when it reproduces, and engraves otherwise. `save`
+ * worker resumes from it when it reproduces, and engraves otherwise. An
+ * engine read from disk arrives still deflated (`savedEncoded`, its bytes
+ * transferred), so the worker, not the reader's thread, inflates, checks and
+ * parses it. `save`
  * asks for the core's settled engine, encoded here for the reader's disk
  * cache, so the reader's thread neither copies nor serializes it. */
 export type ProjectionRequest={id:number;key:string;create?:ProjectionCoreInputs}&(
- {kind:'warm';saved?:PersonalHandEngineState}|{kind:'project';owners:PersonalOwnerHand[];digest:string;encode?:boolean}|{kind:'save'});
+ {kind:'warm';saved?:PersonalHandEngineState;savedEncoded?:EncodedDerivedPayload}|{kind:'project';owners:PersonalOwnerHand[];digest:string;encode?:boolean}|{kind:'save'});
 export interface SerializedProjectionError {name:string;message:string;code?:string;ownerIds?:string[];context?:Record<string,unknown>}
 export type ProjectionResponse=
  {id:number;kind:'stage';stage:PreparationStage}|
@@ -25,3 +28,9 @@ export type ProjectionResponse=
   * at all because the core had already settled. */
  {id:number;kind:'done';view?:ProjectionView;settled?:'restored'|'engraved'|'already';engine?:EncodedDerivedPayload;encoded?:EncodedDerivedPayload}|
  {id:number;kind:'error';error:SerializedProjectionError};
+/** A saved engine as the disk cache must hold it; anything else is refused. */
+export function cachedEngine(value:unknown):PersonalHandEngineState {
+ const v=value as PersonalHandEngineState;
+ if(!v||typeof v!=='object'||v.version!=='personal-hand-engine-state-v1'||!Array.isArray(v.rawPages)||!v.graph||typeof v.graph!=='object')throw Error('Incomplete cached hand engine');
+ return v;
+}

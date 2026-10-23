@@ -1,7 +1,7 @@
 import {createPersonalHandProjection,HandPresentationError,type PersonalHandEngineState,type PersonalOwnerHand,type PreparationExecution,type PreparationStage} from '../vendor/iso-notation/src/score-presentation';
 import {withLayoutPeer,type StartLayoutPeer} from './layout-peer';
-import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
-import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionRequest,type ProjectionResponse,type ProjectionView,type SerializedProjectionError} from './personal-projection-protocol';
+import {decodeDerivedPayload,encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
+import {cachedEngine,cachedProjectionValue,type ProjectionCoreInputs,type ProjectionRequest,type ProjectionResponse,type ProjectionView,type SerializedProjectionError} from './personal-projection-protocol';
 
 /** The calls the projection host makes on one ISO personal projection core. */
 export interface HostedProjectionCore {
@@ -19,6 +19,9 @@ export function serializeProjectionError(error:unknown):SerializedProjectionErro
  return {name:'Error',message:String(error)};
 }
 
+async function savedEngine(encoded:EncodedDerivedPayload):Promise<PersonalHandEngineState|undefined>{
+ try{return cachedEngine(await decodeDerivedPayload(encoded));}catch{return;}
+}
 /** A real task turn, so a layout peer's messages are read between steps. */
 const taskTurn=()=>new Promise<void>(resolve=>{const channel=new MessageChannel();channel.port1.onmessage=()=>{channel.port1.close();resolve();};channel.port2.postMessage(0);});
 
@@ -53,7 +56,9 @@ export function createProjectionHost(post:(response:ProjectionResponse,transfer?
     withLayoutPeer(layoutPeer=>run(layoutPeer?{...execution,layoutPeer,yieldControl:taskTurn}:execution),options.startLayoutPeer):run(execution);
    const hostCore=core;
    if(request.kind==='warm'){
-    const already=settled.has(core),restored=!already&&!!request.saved&&!!core.restoreAsync&&await core.restoreAsync(request.saved,execution);
+    // An engine read from disk is inflated and checked here; one that fails its checks is no engine.
+    const already=settled.has(core),saved=request.saved??(request.savedEncoded&&!already?await savedEngine(request.savedEncoded):undefined),
+     restored=!already&&!!saved&&!!core.restoreAsync&&await core.restoreAsync(saved,execution);
     if(!restored)await (already?core.warmAsync(execution):engraving(execution=>hostCore.warmAsync(execution)));
     settled.add(core);post({id:request.id,kind:'done',settled:already?'already':restored?'restored':'engraved'});return;
    }

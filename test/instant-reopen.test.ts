@@ -60,7 +60,7 @@ function viewer(){
   RetainedScore,underMemoryPressure,VIEWER_DERIVED_IDENTITY:'build-a',JSON,Object,drops:0,handCarryDropGeneration:()=>context.drops,
   window:{setInterval:(f:()=>void)=>intervals.push(f),clearInterval(){}},performance:{memory:{usedJSHeapSize:300e6,jsHeapSizeLimit:4e9}},
   entries:[entryOf('no13'),entryOf('no14')],preferences:{keyboardLayout:'janko-four-row',lastWorkedEntryId:'no13',scoreTempos:{}},
-  personalMemory:{readingRefs:(id:string)=>refs.get(id),error:undefined},scoreCapabilities:(p:any)=>({pianoPreparation:!p.readingOnly}),
+  personalMemory:{readingRefs:(id:string)=>refs.get(id),error:undefined,prefetch(){}},scoreCapabilities:(p:any)=>({pianoPreparation:!p.readingOnly}),
   beginReading:()=>({keyboard:'janko-four-row'}),openingLoading:()=>undefined,readingCheckpoint:async()=>{},practice:undefined,
   savePersonal:async()=>{calls.push('save');},checkReading(){},checkReadingOwner(){},clearNotice(){},notify:(text:string)=>calls.push(text),
   host:{read:async(file:string)=>{calls.push(`read ${file}`);return new Uint8Array([1]);},fullscreen:async()=>{calls.push('fullscreen');}},

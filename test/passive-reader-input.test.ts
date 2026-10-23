@@ -24,6 +24,8 @@ function keyboardFixture(){
   syncControls(){},editSequence:{reset(){calls.push('reset');}},savePersonal(){calls.push('save');},savePersonalQuietly(){calls.push('save');},renderPages(){calls.push('pages');},renderToolbar(){calls.push('toolbar');},paintRepeatNotice(){},renderEditorNavigation(){calls.push('mode');},focusSelection(){calls.push('focus');},
   selectFinger(step:number){calls.push(`chronological:${step}`);},act(action:string){if(action==='editorPrevious'||action==='editorNext'){if(context.editNavigation==='measures')context.selectFingerMeasure(action==='editorPrevious'?-1:1);else context.selectFinger(action==='editorPrevious'?-1:1);}else if(action==='editorNavigation')context.editNavigation=context.editNavigation==='notes'?'measures':'notes';else calls.push(`action:${action}`);},edit(){calls.push('dialog');},saveFingerDigit(){calls.push('digit');return Promise.resolve();},saveHandChoice(hand:string){calls.push(`hand:${hand}`);return Promise.resolve();},reveal(){},notify(){},
   HTMLInputElement:class {},ManualPracticeView:class {},
+  // Everything this reader's commands need is ready: no press waits.
+  presses:{pending:undefined,cancel:()=>false},PRESS_NEEDS:{},waitsFor:()=>false,pressPlace:()=>()=>undefined,closeReadiness(){},
  };
  runInNewContext(production('function selectFingerSystem(','function exitSelection('),context);
  runInNewContext(production("window.addEventListener('keydown'",'\n\nfunction onMidiNote('),context);

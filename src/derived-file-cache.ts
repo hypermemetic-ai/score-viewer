@@ -70,6 +70,17 @@ export class DerivedFileCache {
    return validate(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(payload)));
   }catch{return;}
  }
+ /** An entry's payload as stored, still deflated, after its header checks:
+  * the thread that uses the value inflates and checks it
+  * (decodeDerivedPayload). The body is a copy of its own, so it can be
+  * transferred to a worker. */
+ async getEncoded(kind:string,key:string):Promise<EncodedDerivedPayload|undefined>{
+  try{
+   const found=await this.header(kind,key);if(!found)return;
+   const {header,bytes,newline}=found;
+   return {payloadSha256:header.payloadSha256,payloadBytes:header.payloadBytes,body:bytes.slice(newline+1)};
+  }catch{return;}
+ }
  /** Ordered and best effort: a refused or failed write keeps the old entry or
   * none, and resolves false. */
  put(kind:string,key:string,value:unknown,tag?:string):Promise<boolean>{return this.putEncoded(kind,key,()=>encodeDerivedPayload(value),tag);}
