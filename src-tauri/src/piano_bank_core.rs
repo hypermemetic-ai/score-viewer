@@ -84,7 +84,6 @@ const PROFILES: [&Profile<'static>; 2] = [&CURRENT_RELEASE, &ORIGINAL];
 /// The author's own archive.org copy of V6.2a, linked from
 /// https://www.ir.isas.jaxa.jp/~cyamauch/AccurateSalamander/ (CC BY 3.0).
 pub const DOWNLOAD_URL: &str = "https://archive.org/download/httpswww.ir.isas.jaxa.jpcyamauchaccuratesalamander/AccurateSalamanderGrandPianoV6.2a_48khz24bit.zip";
-pub const DOWNLOAD_BYTES: u64 = CURRENT_RELEASE.bytes;
 
 fn err(e: impl std::fmt::Display) -> String {
     format!("Piano installation could not finish: {e}")
@@ -1045,7 +1044,7 @@ mod tests {
         // archive.org's reply on 2026-10-22, redirect included.
         let head = "HTTP/2 302 \r\nlocation: https://ia801908.us.archive.org/0/items/x/y.zip\r\naccept-ranges: bytes\r\n\r\nHTTP/2 200 \r\ncontent-length: 1663231006\r\nlast-modified: Tue, 13 Oct 2026 17:18:28 GMT\r\netag: \"6ace67e4-6322e41e\"\r\naccept-ranges: bytes\r\n\r\n";
         let remote = remote_from_head(head);
-        assert_eq!(remote.bytes, Some(DOWNLOAD_BYTES));
+        assert_eq!(remote.bytes, Some(CURRENT_RELEASE.bytes));
         assert_eq!(remote.validator.as_deref(), Some("etag \"6ace67e4-6322e41e\""));
         let remote = remote_from_head("HTTP/1.1 200 OK\nLast-Modified: Thu, 15 Oct 2026 08:00:00 GMT\n\n");
         assert_eq!((remote.bytes, remote.validator.as_deref()), (None, Some("last-modified Thu, 15 Oct 2026 08:00:00 GMT")));
@@ -1061,7 +1060,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("piano-Zoë-用户-{}", nonce()));
         fs::create_dir(&dir).unwrap();
         let lock = File::create(dir.join(LOCK)).unwrap();
-        let attempt = Attempt { dir: &dir, name: "v6.2a-3bc8623b598d7d854-download.part", have: 0, bytes: DOWNLOAD_BYTES, lock: &lock };
+        let attempt = Attempt { dir: &dir, name: "v6.2a-3bc8623b598d7d854-download.part", have: 0, bytes: CURRENT_RELEASE.bytes, lock: &lock };
         let command = fetch_command(&curl(), &attempt, 1);
         assert_eq!(command.get_current_dir(), Some(dir.as_path()));
         let args: Vec<_> = command.get_args().map(|a| a.to_str().unwrap().to_string()).collect();
@@ -1069,7 +1068,7 @@ mod tests {
         for arg in &args[from..] {
             assert!(arg.is_ascii() && !arg.contains(dir.to_str().unwrap()), "{arg}");
         }
-        assert!(args.windows(2).any(|w| w == ["--max-filesize", DOWNLOAD_BYTES.to_string().as_str()]));
+        assert!(args.windows(2).any(|w| w == ["--max-filesize", CURRENT_RELEASE.bytes.to_string().as_str()]));
         assert!(args.windows(2).any(|w| w == ["--output", attempt.name]));
         fs::remove_dir_all(dir).unwrap();
     }
@@ -1148,7 +1147,6 @@ mod tests {
     }
     #[test]
     fn admitted_archives_are_distinct_and_the_download_is_the_current_release() {
-        assert_eq!(DOWNLOAD_BYTES, CURRENT_RELEASE.bytes);
         assert!(DOWNLOAD_URL.starts_with("https://") && DOWNLOAD_URL.ends_with("V6.2a_48khz24bit.zip"));
         assert_ne!(CURRENT_RELEASE.bytes, ORIGINAL.bytes, "a chosen ZIP's size selects its identity");
         assert!(!CURRENT_RELEASE.prefix.starts_with(ORIGINAL.prefix) && !ORIGINAL.prefix.starts_with(CURRENT_RELEASE.prefix));
@@ -1438,6 +1436,8 @@ pub struct Remote {
 pub struct Attempt<'a> {
     pub dir: &'a Path,
     pub name: &'a str,
+    /// curl finds this itself (`--continue-at -`); test fetchers resume from it.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub have: u64,
     pub bytes: u64,
     /// The piano lock. On macOS the curl child holds it too, so a curl that
