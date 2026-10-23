@@ -2,9 +2,9 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
-import {importPackage,keepSavedPagesBehindPolicy,requireCurrentEngraving,savedPagesBehindPolicy,selectPresentation,SavedPagesBehindPolicy,type ScorePackage} from '../src/package';
+import {importPackage,validateLayerAsync,keepSavedPagesBehindPolicy,requireCurrentEngraving,savedPagesBehindPolicy,selectPresentation,SavedPagesBehindPolicy,type ScorePackage,type Seat} from '../src/package';
 import {addKeyboardView,packageFile,prepareRebuiltEdition,shareKeyboardView} from '../src/edition-rebuild';
-import {collectionId,fingerFor,initialPersonal,personalStorageName,type Entry,type PersonalState} from '../src/state';
+import {collectionId,fingerFor,initialPersonal,personalStorageName,type Entry,type PersonalSourceAnchor,type PersonalState} from '../src/state';
 import {assigned,handFor} from '../src/personal-assignments';
 import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 
@@ -27,7 +27,15 @@ const chosenSeats=conventional.seats.filter(s=>s.ownerIds.length===1&&!s.continu
 let prior:PersonalState=initialPersonal(conventional);const chosen=new Map<string,{hand:'LH'|'RH';finger:number}>();
 for(const [i,seat] of chosenSeats.entries()){const owner=seat.ownerIds[0],hand=handFor(conventional,initialPersonal(conventional),owner)==='LH'?'RH':'LH',finger=i+2;
  prior=assigned(conventional,prior,seat,{hand,finger});chosen.set(owner,{hand,finger});}
-const entry:Entry={id,file,metadata:saved.manifest.metadata,importedAt:'2026-10-23T00:00:00.000Z',personalFiles:{[personalStorageName(id,conventional)]:journal}};
+// Their reading place: the last page and the note they were editing on it.
+const reading=(a:Seat,b:Seat)=>a.page-b.page||a.system-b.system||a.x-b.x,
+ anchor=(seat:Seat):PersonalSourceAnchor=>({owners:[...seat.ownerIds].sort(),writtenBar:seat.writtenBar,actionId:seat.actionId,continuation:!!seat.continuation,alias:0}),
+ lastPage=conventional.seats.filter(s=>s.page===conventional.pages.length-1&&!s.continuation).sort(reading),pageSeat=lastPage[0],editSeat=lastPage.at(-1)!;
+prior={...prior,view:{...prior.view,page:pageSeat.page},editContactId:editSeat.contactId,navigation:{version:1,page:anchor(pageSeat),edit:anchor(editSeat),followEdit:true}};
+// On Jankó, an earlier finger layer in their history (the owner's No. 14 journal holds one).
+const jankoJournal=`state-version-${'d'.repeat(64)}.json`,layer=earlier['janko-four-row'].fingerLayer!,
+ jankoPrior:PersonalState={...initialPersonal(earlier['janko-four-row']),history:[layer]};
+const entry:Entry={id,file,metadata:saved.manifest.metadata,importedAt:'2026-10-23T00:00:00.000Z',personalFiles:{[personalStorageName(id,conventional)]:journal,[personalStorageName(id,earlier['janko-four-row'])]:jankoJournal}};
 const host=(stored:Map<string,Uint8Array>)=>({read:async(name:string)=>stored.get(name)??null});
 
 test('saved conventional pages an earlier engine drew are behind the current shared policy; admission still reads them',()=>{
@@ -39,7 +47,7 @@ test('saved conventional pages an earlier engine drew are behind the current sha
 });
 
 test('a stale saved conventional edition is engraved again once, with every edition hand and finger and the player\'s own choices',async()=>{
- const copy=stale.slice(),stored=new Map([[journal,encode(prior)]]),
+ const copy=stale.slice(),stored=new Map([[journal,encode(prior)],[jankoJournal,encode(jankoPrior)]]),
   rebuilt=await prepareRebuiltEdition(host(stored),entry,file,stale,'conventional-piano',{refusal:new SavedPagesBehindPolicy()}),
   next=await importPackage(rebuilt.packageBytes,{allowLegacyTempo:true});
  assert.deepEqual(stale,copy,'the earlier archive is not changed');
@@ -51,7 +59,7 @@ test('a stale saved conventional edition is engraved again once, with every edit
   const before=earlier[layout],after=await selectPresentation(next,layout),s=personal[personalStorageName(id,after)];
   assert.equal(after.renderingRecipe?.engineId,APPROVED_SCORE_RENDERING_ENGINE,`${layout} is drawn under the current shared policy`);
   assert.ok(s,`${layout} has its journal`);
-  const beforeState=layout==='conventional-piano'?prior:initialPersonal(before);
+  const beforeState=layout==='conventional-piano'?prior:jankoPrior;
   for(const n of before.score.notes){
    const own=layout==='conventional-piano'?chosen.get(n.id):undefined;
    assert.equal(handFor(after,s,n.id),handFor(before,beforeState,n.id),`${layout} ${n.id} hand`);
@@ -61,6 +69,15 @@ test('a stale saved conventional edition is engraved again once, with every edit
   }
  }
  assert.equal(rebuilt.carried,chosen.size,'every choice came along');assert.equal(rebuilt.left,0,'no choice stays behind');
+ // The reading place moves through bars: the page that now holds the bar they read, and the note they edited.
+ const after=await selectPresentation(next,'conventional-piano'),place=personal[personalStorageName(id,after)],
+  holds=(seat:Seat|undefined,at:Seat)=>!!seat&&seat.writtenBar===at.writtenBar&&seat.ownerIds.some(owner=>at.ownerIds.includes(owner));
+ assert.ok(after.seats.some(seat=>seat.page===place.view.page&&holds(seat,pageSeat)),`page ${place.view.page+1} holds bar ${pageSeat.writtenBar}`);
+ assert.equal(place.navigation?.page?.writtenBar,pageSeat.writtenBar);assert.equal(place.navigation?.edit?.writtenBar,editSeat.writtenBar);assert.equal(place.navigation?.followEdit,true);
+ assert.ok(holds(after.seats.find(seat=>seat.contactId===place.editContactId),editSeat),`the edit point stays on bar ${editSeat.writtenBar}`);
+ // The earlier layer comes along: it still binds to the new pages, as the journal will be read.
+ const janko=await selectPresentation(next,'janko-four-row'),history=personal[personalStorageName(id,janko)].history;
+ assert.deepEqual(history,[layer]);await validateLayerAsync(history[0],janko,{history:true});
  assert.equal(rebuilt.replaced[file],await packageFile(rebuilt.packageBytes));
 });
 

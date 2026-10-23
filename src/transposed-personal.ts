@@ -1,7 +1,7 @@
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {Hand} from '../vendor/iso-notation/src/model/types';
-import type {FingerLayer,ScorePackage} from './package';
-import {initialPersonal,readPersonal,type PersonalState} from './state';
+import type {FingerLayer,ScorePackage,Seat} from './package';
+import {initialPersonal,readPersonal,type PersonalSourceAnchor,type PersonalState} from './state';
 import {readPersonalAssignments,type PersonalOwnerChoice} from './personal-assignments';
 import {getOriginalScoreIdentity,getScoreTransposition} from './score-transposition';
 
@@ -85,9 +85,38 @@ export function personalForTransposedEdition(s:PersonalState|undefined,from:Scor
 /** A saved edition engraved again keeps the player's journal for each
  * keyboard (`from` is the earlier edition's view on that keyboard, if it had
  * one), and the earlier edition's hands and fingers that the new pages don't
- * print travel as the player's own choices. */
+ * print travel as the player's own choices. So does their reading place. */
 export function personalForRebuiltEdition(s:PersonalState|undefined,from:ScorePackage|undefined,to:ScorePackage,
   edition:{hands:ScorePackage['score'];fingers?:FingerLayer}):RebuiltPersonal {
   if(from&&getScoreTransposition(from)!==getScoreTransposition(to))throw Error('An edition engraved again keeps its pitch.');
-  return carryChoices(s,from,to,0,{hands:new Map(edition.hands.notes.map(n=>[n.id,n.hand])),fingers:edition.fingers});
+  const carried=carryChoices(s,from,to,0,{hands:new Map(edition.hands.notes.map(n=>[n.id,n.hand])),fingers:edition.fingers});
+  return s&&from?{...carried,personal:carryReadingPlace(carried.personal,readPersonal(s,from),from,to)}:carried;
+}
+
+type Anchor=PersonalSourceAnchor;
+const reading=(a:Seat,b:Seat)=>a.page-b.page||a.system-b.system||a.x-b.x||a.id.localeCompare(b.id);
+/** Where a source anchor now stands: the seat of its notes in its bar,
+ * keeping its alias among that note's seats. */
+function anchoredSeat(p:ScorePackage,a:Pick<Anchor,'owners'|'writtenBar'|'continuation'>&{actionId?:string;alias?:number}):Seat|undefined{
+  const near=p.seats.filter(s=>s.writtenBar===a.writtenBar&&!!s.continuation===a.continuation&&s.ownerIds.some(id=>a.owners.includes(id))).sort(reading),
+    same=near.filter(s=>s.actionId===a.actionId),aliases=same.length?same:near;
+  return aliases[Math.min(a.alias??0,aliases.length-1)];
+}
+/** The anchor the reader would save for `seat` (main.ts sourceNavigationAnchor). */
+function seatAnchor(p:ScorePackage,seat:Seat):Anchor{
+  const owners=[...seat.ownerIds].sort(),aliases=p.seats.filter(s=>s.writtenBar===seat.writtenBar&&s.actionId===seat.actionId&&!!s.continuation===!!seat.continuation&&s.ownerIds.some(id=>owners.includes(id))).sort(reading);
+  return{owners,writtenBar:seat.writtenBar,actionId:seat.actionId,continuation:!!seat.continuation,alias:Math.max(0,aliases.findIndex(s=>s.id===seat.id))};
+}
+/** A seat of `from` found again in `to` by its notes and bar. */
+const sameSeat=(to:ScorePackage,seat:Seat|undefined)=>seat&&anchoredSeat(to,{owners:seat.ownerIds,writtenBar:seat.writtenBar,continuation:!!seat.continuation});
+/** The player's reading place moves through bars, not page numbers: the page
+ * that now holds the bar they were reading, and the note they were editing. */
+function carryReadingPlace(next:PersonalState,prior:PersonalState,from:ScorePackage,to:ScorePackage):PersonalState{
+  const out=structuredClone(next),
+    page=(prior.navigation?.page&&anchoredSeat(to,prior.navigation.page))??sameSeat(to,from.seats.filter(s=>s.page===prior.view.page).sort(reading)[0]),
+    edit=(prior.navigation?.edit&&anchoredSeat(to,prior.navigation.edit))??sameSeat(to,from.seats.find(s=>s.contactId===prior.editContactId));
+  if(page)out.view.page=page.page;
+  if(edit)out.editContactId=edit.contactId;else delete out.editContactId;
+  if(prior.navigation)out.navigation={version:1,followEdit:prior.navigation.followEdit,...(page?{page:seatAnchor(to,page)}:{}),...(edit?{edit:seatAnchor(to,edit)}:{})};
+  return out;
 }
