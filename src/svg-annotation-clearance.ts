@@ -2,11 +2,11 @@ import {DOMParser} from '@xmldom/xmldom';
 import {svgClassStyles,resolvedSvgStyle} from './svg-style';
 import {footerGlyphPoints,measureNumberGlyphPoints,expressionGlyphPoints,assertAnnotationInkPolicyReady,ANNOTATION_INK_POLICY,PERSONAL_ANNOTATION_INK_POLICY,type AnnotationInkPolicy} from './annotation-ink-policy';
 export type AnnotationBox=[number,number,number,number];
-type Matrix=[number,number,number,number,number,number];
-const unit:Matrix=[1,0,0,1,0,0];
-const mul=(a:Matrix,b:Matrix):Matrix=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+export type Matrix=[number,number,number,number,number,number];
+export const unit:Matrix=[1,0,0,1,0,0];
+export const mul=(a:Matrix,b:Matrix):Matrix=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const numbers=(s:string)=>s.match(/[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/gi)?.map(Number)??[];
-function transform(s:string):Matrix{
+export function transform(s:string):Matrix{
  let m=unit;const pattern=/([a-z]+)\s*\(([^)]*)\)/gi;let end=0;
  for(const match of s.matchAll(pattern)){if(s.slice(end,match.index).trim().replace(/,/g,''))throw Error('Unsupported SVG transform');
   const n=numbers(match[2]);let b:Matrix;const kind=match[1];
@@ -18,7 +18,7 @@ function transform(s:string):Matrix{
   if(!b.every(Number.isFinite))throw Error('Nonfinite SVG transform');m=mul(m,b);end=match.index!+match[0].length;
  }if(s.slice(end).trim())throw Error('Unsupported SVG transform');return m;
 }
-function pointsBox(points:Array<[number,number]>,m:Matrix,stroke=0):AnnotationBox{
+export function pointsBox(points:Array<[number,number]>,m:Matrix,stroke=0):AnnotationBox{
  if(!points.length)throw Error('Empty painted SVG geometry');
  if(points.some(p=>p.some(n=>!Number.isFinite(n))))throw Error('Nonfinite painted SVG geometry');
  const pad=stroke/2*Math.hypot(m[0],m[1],m[2],m[3]);
@@ -84,7 +84,7 @@ function arcCorners(x1:number,y1:number,rx:number,ry:number,degrees:number,large
 /** Bézier curves stay inside their control hull. Reserve the entire hull;
  * arcs reserve their exact box; unsupported commands refuse instead of
  * inventing a narrower ink bound. */
-function pathPoints(d:string):Array<[number,number]>{
+export function pathPoints(d:string):Array<[number,number]>{
  const tokens=d.match(/[a-df-z]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/gi)??[],points:Array<[number,number]>=[];
  let i=0,x=0,y=0,sx=0,sy=0,cmd='';
  while(i<tokens.length){if(/^[a-z]$/i.test(tokens[i]))cmd=tokens[i++];if(!cmd)throw Error('Malformed SVG path');

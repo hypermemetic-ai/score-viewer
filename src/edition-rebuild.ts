@@ -1,7 +1,7 @@
 import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import {scoreWithCalculationContext} from '../vendor/iso-notation/src/model/piano-calculation-context';
-import {archivePackage,handDigest,hashBytes,importPackage,readEditionContent,selectPresentation,FIXED_PAGES_PROFILE,type Manifest,type PresentationDescriptor,type ScorePackage} from './package';
+import {archivePackage,handDigest,hashBytes,importPackage,readEditionContent,selectPresentation,validateLayerAsync,FIXED_PAGES_PROFILE,type FingerLayer,type Manifest,type PresentationDescriptor,type ScorePackage} from './package';
 import {publishPackage} from './publication';
 import {CALCULATED_HAND_SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/score-presentation';
 import {engraveEdition,getOriginalScorePackageBytes,getScoreTransposition,type EditionView} from './score-transposition';
@@ -231,7 +231,10 @@ export async function prepareRebuiltEdition(host:{read(name:string):Promise<Uint
    const to=await selectPresentation(next,id),from=edition.earlier[id],
     prior=from?await loadPersonalJournal(host,entry,from,{personalFiles:files,retained:true}):undefined,
     result=personalForRebuiltEdition(prior,from,to,{hands:(from??first).score,fingers:from?.fingerLayer});
-   checkReadingExecution(execution);out.push({to,...(from?{from}:{}),personal:result.personal,carried:result.carried,left:result.left});
+   // An earlier finger layer in their history comes along where it still binds to the new pages, as their journal is read.
+   const history:FingerLayer[]=[];
+   for(const layer of prior?.history??[])if(await validateLayerAsync(layer,to,{history:true}).then(()=>true,()=>false))history.push(structuredClone(layer));
+   checkReadingExecution(execution);out.push({to,...(from?{from}:{}),personal:{...result.personal,history},carried:result.carried,left:result.left});
   }
   return out;
  };

@@ -10,7 +10,7 @@ async function run(status:string,changed=false,wrongCollection=false){
  const p={availablePresentations:['janko-four-row'],manifest:{version:1},collection:'source'},q={status,package:p,personal,packageBytes:changed?new Uint8Array([1,2,4]):new Uint8Array(data)};
  const calls:string[]=[],op={keyboard:'janko-four-row'},context:any={
   retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),getScoreTransposition:()=>0,keyboardLabel:(layout:string)=>layout,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
-  host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>p,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
+  host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>p,requireCurrentEngraving:(x:unknown)=>x,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
   loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>wrongCollection?'other':'source',
   installPreparedScore:async()=>{calls.push('install');if(wrongCollection)throw Error('Calculated score belongs to a different source.');return {entry,personal};},
   activateScore:async(next:any)=>{calls.push('activate');assert.equal(next.entry,entry);assert.equal(next.personal,personal);return next;},saveReadingPreferences:async()=>{},checkReadingOwner(){},notify(){},clearNotice(){},finishReading(_op:any,success:boolean){calls.push(success?'complete':'failed');},
@@ -32,7 +32,7 @@ test('actual identical bytes cannot bypass the source collection gate',async()=>
 function reading(overrides:Record<string,unknown>){
  const entry={id:'part',file:'part.tuna'},p={manifest:{version:3},reading:{dual:{}}},calls:string[]=[],op={keyboard:'janko-four-row',controller:new AbortController()},context:any={
   retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},checkReadingOwner(){},
-  host:{read:async()=>new Uint8Array([1]),fullscreen:async()=>{}},importReading:async()=>p,admitReadingSource:async()=>{calls.push('source');},
+  host:{read:async()=>new Uint8Array([1]),fullscreen:async()=>{}},importReading:async()=>p,requireCurrentEngraving:(x:unknown)=>x,SavedPagesBehindPolicy:class extends Error{},admitReadingSource:async()=>{calls.push('source');},
   readingProgress:(_op:unknown,step:string)=>calls.push(step),readingExecution:()=>({}),
   reengraveReadingArchive:async()=>{calls.push('engraved');return new Uint8Array([2]);},
   admitReading:async()=>{calls.push('admit-again');return p;},guitarProContext:()=>({groupId:'group'}),

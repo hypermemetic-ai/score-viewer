@@ -64,7 +64,7 @@ function viewer(){
   beginReading:()=>({keyboard:'janko-four-row'}),openingLoading:()=>undefined,readingCheckpoint:async()=>{},practice:undefined,
   savePersonal:async()=>{calls.push('save');},checkReading(){},checkReadingOwner(){},clearNotice(){},notify:(text:string)=>calls.push(text),
   host:{read:async(file:string)=>{calls.push(`read ${file}`);return new Uint8Array([1]);},fullscreen:async()=>{calls.push('fullscreen');}},
-  importReading:async()=>context.lastPackage,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async(p:unknown)=>p,
+  importReading:async()=>context.lastPackage,requireCurrentEngraving:(x:unknown)=>x,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async(p:unknown)=>p,
   loadPersonal:async()=>({view:{page:0}}),collectionId:(p:any)=>p.collection,
   prepareScore:async(_data:unknown,_layout:unknown,personal:unknown,prior:unknown)=>({q:{package:prior,personal,packageBytes:new Uint8Array([1])},running:{}}),
   installPreparedScore:async()=>{calls.push('install');},
