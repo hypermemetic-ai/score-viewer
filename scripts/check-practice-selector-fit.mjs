@@ -1,5 +1,5 @@
 // Production SVG/layout regression; no acquired score or personal state is stored here.
-// PRACTICE_ZELDA optionally adds the operator's read-only archive to the same checks.
+// PRACTICE_PRIVATE_SCORE optionally adds a read-only private archive to the same checks.
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
@@ -13,7 +13,7 @@ let vite,browser;
 const server=createServer((req,res)=>{if(req.url==='/__fit'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><main id="app"></main><script type="module">import "/src/style.css";</script>');return;}vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});});
 const inputs=[{name:'schumann-janko',keyboard:'janko-four-row',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},
  {name:'schumann-conventional',keyboard:'conventional-piano',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
-if(process.env.PRACTICE_ZELDA)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'zelda-'+keyboard,path:process.env.PRACTICE_ZELDA,keyboard,pedal:true});
+if(process.env.PRACTICE_PRIVATE_SCORE)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'private-'+keyboard,path:process.env.PRACTICE_PRIVATE_SCORE,keyboard,pedal:true});
 try{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root,configFile:root+'/vite.config.ts',server:{middlewareMode:true,hmr:false,ws:{server,clientPort:server.address().port,host:'127.0.0.1'}},appType:'custom'});
  browser=await chromium.launch({headless:true});

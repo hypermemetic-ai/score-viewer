@@ -8,7 +8,7 @@ import {collectionId,fingerFor,initialPersonal,personalStorageName,type Entry,ty
 import {assigned,handFor} from '../src/personal-assignments';
 import {APPROVED_SCORE_RENDERING_ENGINE,SCORE_RENDERING_ENGINE} from '../vendor/iso-notation/src/render/iso/score-rendering-recipe';
 
-// The owner's conventional No. 14 opened on pages the no14-recovery engine drew
+// A saved conventional No. 14 opened on pages the no14-recovery engine drew
 // (augmentation dots and all), because only approved recipes were checked
 // against the current shared policy. This edition is the same kind: a Jankó
 // view and a conventional view showing those very pages.
@@ -32,7 +32,7 @@ const reading=(a:Seat,b:Seat)=>a.page-b.page||a.system-b.system||a.x-b.x,
  anchor=(seat:Seat):PersonalSourceAnchor=>({owners:[...seat.ownerIds].sort(),writtenBar:seat.writtenBar,actionId:seat.actionId,continuation:!!seat.continuation,alias:0}),
  lastPage=conventional.seats.filter(s=>s.page===conventional.pages.length-1&&!s.continuation).sort(reading),pageSeat=lastPage[0],editSeat=lastPage.at(-1)!;
 prior={...prior,view:{...prior.view,page:pageSeat.page},editContactId:editSeat.contactId,navigation:{version:1,page:anchor(pageSeat),edit:anchor(editSeat),followEdit:true}};
-// On Jankó, an earlier finger layer in their history (the owner's No. 14 journal holds one).
+// On Jankó, an earlier finger layer in their history (a saved No. 14 journal can hold one).
 const jankoJournal=`state-version-${'d'.repeat(64)}.json`,layer=earlier['janko-four-row'].fingerLayer!,
  jankoPrior:PersonalState={...initialPersonal(earlier['janko-four-row']),history:[layer]};
 const entry:Entry={id,file,metadata:saved.manifest.metadata,importedAt:'2026-10-23T00:00:00.000Z',personalFiles:{[personalStorageName(id,conventional)]:journal,[personalStorageName(id,earlier['janko-four-row'])]:jankoJournal}};

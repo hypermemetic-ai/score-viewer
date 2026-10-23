@@ -115,7 +115,7 @@ test('source expression words receive verified finite glyph coverage and matchin
  assert.throws(()=>actualPageObstacles(expression('dy="100"'),new Map(),PERSONAL_ANNOTATION_INK_POLICY),/Unsupported/);
 });
 
-// Geometry of No. 13, bar 38 (owner's hands): a left-hand note whose carrier
+// Geometry of No. 13, bar 38 (edited hands): a left-hand note whose carrier
 // sits 1.3 units from the next column, with the bottom staff line just below.
 const crowded={x:379.39,top:393.84,direction:1 as const,gap:3.09,height:4.02,em:7.73,width:[-1.47,1.31] as [number,number],
  columns:[331.89,378.09,379.39,383.55,401.99],page:{width:595.28,height:841.89,boxes:[[30.4,395.1,576.7,397.9],[378.1,390.5,383.5,391.5]] as [number,number,number,number][]},occupied:[],preferNearest:true};

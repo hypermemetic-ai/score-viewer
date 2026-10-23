@@ -1,9 +1,8 @@
-# Point the laptop's existing taskbar pin at a newly installed viewer.
+# Point the existing taskbar pin at a newly installed viewer.
 #
-# The owner reads from the television, never the laptop panel, and launches the
-# viewer from its taskbar pin there. Windows opens a window launched from a
-# taskbar on that taskbar's screen; desktop icons always live on the primary
-# (laptop) screen. So an install never creates a pin or a shortcut, and a
+# The viewer is read on a second display and launched from the taskbar pin
+# there. Windows opens a window launched from a taskbar on that taskbar's
+# screen; desktop icons always live on the primary screen. So an install never creates a pin or a shortcut, and a
 # desktop shortcut to the viewer is set aside in -Keep, because it can only ever
 # open from the wrong screen.
 #
@@ -18,7 +17,7 @@
 # kept in -Keep.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File windows-viewer-links.ps1 `
-#     -Destination 'C:\Users\qqp\ISO Score Viewer\<package>' -Keep '<backup folder>'
+#     -Destination '%USERPROFILE%\ISO Score Viewer\<package>' -Keep '<backup folder>'
 #
 # Run it after the old viewer has stopped and the new package is installed.
 # Every link is classified and every backup name checked before anything
@@ -107,5 +106,5 @@ foreach($step in @($plan|Where-Object kind -eq 'desktop')){
 }
 $pinned=@(Get-ChildItem -LiteralPath $Pins -Filter *.lnk -ErrorAction SilentlyContinue|Where-Object{$t=$shell.CreateShortcut($_.FullName).TargetPath;$t -and (Is-Viewer $t) -and ([IO.Path]::GetFullPath($t) -ieq $currentExe)})
 $out.pinned=@($pinned|ForEach-Object FullName)
-if(-not $pinned.Count){$out.warning="No taskbar pin targets the viewer. Start $currentExe, pin it from the television's taskbar, close it and run this again; nothing was created."}
+if(-not $pinned.Count){$out.warning="No taskbar pin targets the viewer. Start $currentExe, pin it from the taskbar of the display it is read on, close it and run this again; nothing was created."}
 $out|ConvertTo-Json -Depth 4

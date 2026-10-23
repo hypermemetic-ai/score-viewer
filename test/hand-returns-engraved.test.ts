@@ -29,7 +29,7 @@ test('No. 13 from MusicXML: a hand moved in the first time through is drawn at e
 
  const session=new PersonalPresentationSession(p,undefined,{worker:null,cache:null});
  const view=await session.project(personal);
- // The engraving draws each copy in the moved hand, as the owner's own move.
+ // The engraving draws each copy in the moved hand, as a move of its own.
  for(const id of [left,e4,...carried.keys()]){
   const n=view.score.notes.find(n=>n.id===id)!;
   assert.equal(n.hand,'RH',`bar ${barOf(id)}`);
@@ -41,7 +41,7 @@ test('No. 13 from MusicXML: a hand moved in the first time through is drawn at e
  // The pages that hold the returns are engraved again.
  const page=(id:string)=>p.seats.find(s=>s.ownerIds.includes(id))!.page;
  for(const id of carried.keys())assert.notEqual(view.pages[page(id)],p.pages[page(id)],`the page with bar ${barOf(id)}`);
- // Derived only: the owner's two records are all that is stored.
+ // Derived only: the two records are all that is stored.
  assert.deepEqual(personal.assignments,stored);assert.deepEqual(Object.keys(stored!.choices).sort(),[left,e4].sort());
  // Undoing the move in bar 3 undoes its copies.
  const undone=assigned(p,personal,p.seats.find(s=>s.ownerIds.includes(left))!,{hand:'LH'});

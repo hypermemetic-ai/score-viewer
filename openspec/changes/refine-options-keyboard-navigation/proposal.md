@@ -1,6 +1,6 @@
 # Why
 
-Options currently puts every setting into one long scrolling dialog. Its arrow navigation guesses neighboring controls from their rendered positions, and reader-toolbar arrows can turn pages while the player is trying to browse controls. The operator approved a moderate centered, section-based Options dialog and asked for a keyboard-first audit across the interface.
+Options currently puts every setting into one long scrolling dialog. Its arrow navigation guesses neighboring controls from their rendered positions, and reader-toolbar arrows can turn pages while the player is trying to browse controls. A moderate centered, section-based Options dialog was chosen; a keyboard-first audit across the interface follows.
 
 # What Changes
 

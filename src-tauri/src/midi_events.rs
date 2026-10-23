@@ -1,4 +1,4 @@
-//! Passive reader input: the operator's saved Cantabile held-note guard, at 60 ms.
+//! Passive reader input: a held-note guard, at 60 ms.
 //! No musical MIDI is modified or delayed. Suppressed attacks remain marked for
 //! the reader's bounded diagnostic trace, never for scoring or live contacts.
 

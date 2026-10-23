@@ -4,10 +4,10 @@
 
 For each written bar with deliberate hand changes (a hand differing from the written hand with recorded `intent.hand`, not `handScope: 'local'`), every other bar is compared over the stretch shared from both downbeats: `min(extent(donor), extent(other))` ticks. The comparison covers every note sounding in that stretch, including notes held into it, in both hands. Each note is compared by written hand, pitch, onset relative to the downbeat and duration. The two bars match when the lists are equal. Each moved note that starts inside the stretch then reaches the note with the identical tuple in the other bar; a moved note after the stretch (in bar 11's pickup) stays in its own bar and does not stop the others from travelling.
 
-Each alternative fails on the owner's data:
+Each alternative fails on real scores:
 
-- **Whole-bar or fingering-memory keys** (including the extent). No. 13's bar 11 is 96 ticks because it carries the RH pickup to the return. Bar 21 is 72 ticks, and its pickup is written in bar 22. These keys never match the case the owner asked for.
-- **Only the notes sounding with the moved notes.** In No. 14, bar 60 and bar 30 differ only in the downbeat bass (C#3 vs C3). The owner fingered bar 14 (identical to 30) differently from 60. That rule would carry across different music.
+- **Whole-bar or fingering-memory keys** (including the extent). No. 13's bar 11 is 96 ticks because it carries the RH pickup to the return. Bar 21 is 72 ticks, and its pickup is written in bar 22. These keys never match the case this change is for.
+- **Only the notes sounding with the moved notes.** In No. 14, bar 60 and bar 30 differ only in the downbeat bass (C#3 vs C3). A player may finger bar 14 (identical to 30) differently from 60. That rule would carry across different music.
 - **Pickup bars.** A pickup bar has no downbeat, so comparing it from its start would line its first note up with another bar's downbeat. A pickup bar (a bar shorter than its meter that opens the piece or follows another short bar, as bar 22 follows bar 21) therefore matches only another pickup bar of the same length. Without a meter in the source, the usual bar length stands in for it. Material after the shared stretch (bar 11's pickup) is not compared and is never moved.
 
 ## Precedence and controls
@@ -34,7 +34,7 @@ The carry is derived on read. Its result is kept with the hand-record object it 
 
 When carried hands would leave a key in a receiving bar with one hand-less head and one handed head, the bar is skipped and listed with its reason. The editor's whole-score drawability check reads carried hands, so a skipped carry never makes another edit fail.
 
-When the engraver refuses a carried hand, on opening or after an edit, nothing is written. That receiving bar keeps its written hands for the rest of the session (per score and keyboard layout, in memory only), it is listed as skipped, and the player is told in plain words: "Bar 21 keeps its written hands: the carried hand can't be drawn there." A refused hand of the owner's own still returns as before.
+When the engraver refuses a carried hand, on opening or after an edit, nothing is written. That receiving bar keeps its written hands for the rest of the session (per score and keyboard layout, in memory only), it is listed as skipped, and the player is told in plain words: "Bar 21 keeps its written hands: the carried hand can't be drawn there." A refused hand of the player's own still returns as before.
 
 ## Practice and calculation
 
@@ -42,11 +42,11 @@ Practice (`personalPracticePackage`), the Fingers view (the projected package) a
 
 ## Older hand records (No. 14)
 
-Hand records saved before recorded intent existed (No. 14 has seven) are not migrated and do not travel. Where such a note would reach matching bars, the editor says so at the note: "Moved before hand changes were shared. Press <kbd>R</kbd> to share it with bar 30." Pressing that key once records the choice with intent, and from then on it reaches matching bars (bar 14 → bar 30 in No. 14).
+Hand records saved before recorded intent existed are not migrated and do not travel. Where such a note would reach matching bars, the editor says so at the note: "Moved before hand changes were shared. Press <kbd>R</kbd> to share it with bar 30." Pressing that key once records the choice with intent, and from then on it reaches matching bars (bar 14 → bar 30 in No. 14).
 
-## The owner's own hand: one rule
+## The player's own hand: one rule
 
-A stored hand is the owner's own when it was chosen with recorded intent, kept to its note, or differs from the written hand. Before 2026-10-14 (f00f698) a finger edit also saved the note's hand as it then was. No. 14's 44 records that hold the written hand without intent are all of that kind: each was first saved with a finger, between 01:28 and 05:40 UTC that day, and none ever held another hand. They are no hand choice, so a carried hand replaces them, and they are not migrated. `ownsHand` is exported and asked by the carry (pages, practice), by `pianoRequestAuthority` and, when it rebases, by the repeat fold, so the page and the calculator cannot disagree about a note. On the owner's data no such record is carried over today: No. 14 has no hand change with intent that reaches another bar.
+A stored hand is the player's own when it was chosen with recorded intent, kept to its note, or differs from the written hand. Before 2026-10-14 (f00f698) a finger edit also saved the note's hand as it then was. A record that holds the written hand without intent and was first saved with a finger is of that kind and never held another hand. It is no hand choice, so a carried hand replaces it, and it is not migrated. `ownsHand` is exported and asked by the carry (pages, practice), by `pianoRequestAuthority` and, when it rebases, by the repeat fold, so the page and the calculator cannot disagree about a note.
 
 ## Following a matching bar again by L or R
 

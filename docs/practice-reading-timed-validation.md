@@ -16,7 +16,7 @@ regression failed before the fix and passed afterward.
 
 Independent production-browser inspection at the complete `0bb5afb` checkpoint
 passed 28 drawing, real ordinary Worker/receiving admission, mode, join, keyboard,
-neutral-manual and lifecycle cases. It inspected retained Schumann No.14 and Zelda
+neutral-manual and lifecycle cases. It inspected retained Schumann No.14 and a private score
 in both piano presentations, complete source restoration, joined Reading and its
 four-measure Free return, fixed notation/footer bounds, and normal/narrow/rotated
 layouts including disconnected Done and the centered Speed control. Retained raw

@@ -10,7 +10,7 @@ See [proposal.md](proposal.md) and [the capability delta](specs/calculated-hand-
 
 **Goals:** Make authority decisions explicit and owner-scoped; admit coherent calculated editions; retain original source and older edition journals; develop independent gates before the new ISO engine is ready.
 
-**Non-Goals:** Implement or copy ISO engraving/solver modules, redesign musical import, certify continuous movement, migrate native identity or publish a competing native delivery. Paid Zelda material remains outside Git.
+**Non-Goals:** Implement or copy ISO engraving/solver modules, redesign musical import, certify continuous movement, migrate native identity or publish a competing native delivery. Paid private material remains outside Git.
 
 ## Decisions
 

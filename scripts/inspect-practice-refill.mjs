@@ -8,7 +8,7 @@ const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-refill'
 await mkdir(output,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});
 const inputs=[{name:'schumann-janko',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},{name:'schumann-conventional',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
-if(process.env.PRACTICE_ZELDA)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'zelda-'+keyboard,path:process.env.PRACTICE_ZELDA,keyboard});
+if(process.env.PRACTICE_PRIVATE_SCORE)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'private-'+keyboard,path:process.env.PRACTICE_PRIVATE_SCORE,keyboard});
 for(const profile of ['traced','uniform'])inputs.push({name:'fixture-'+profile,package:durationFixture('hollow-stem',true,profile,true,true,4)});
 const results=[],captures=[];
 async function capture(page,path){const metadata=await page.evaluate(()=>{const v=window.practice;v.paintControls();v.status(v.session?.message??'');return {phase:v.session?.phase,bars:v.crops.map(c=>c.bar+1),status:document.querySelector('.practice-status').textContent,controls:document.querySelector('.practice-controls').innerText};});captures.push({path,viewport:page.viewportSize(),...metadata});await page.screenshot({path});}

@@ -181,7 +181,7 @@ buffer itself, before driver and device latency:
 | High | larger of default and 10 ms | from 10.7–21.3 ms | 4 periods |
 
 Windows adds a wait of up to one period; with a 10 ms shared period the lowest
-choice is roughly 10–20 ms of software delay. An earlier coarse loopback on a MOTU
+choice is roughly 10–20 ms of software delay. An earlier coarse loopback on a USB audio
 interface at 44.1 kHz/512 frames measured 18.9–30.5 ms end to end.
 
 Earlier the bank sounded at unity and the piano volume was a plain linear factor,

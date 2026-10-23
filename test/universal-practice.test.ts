@@ -12,7 +12,7 @@ import {host,practiceAudio} from '../src/host';
 /** Retained connection-boundary reader/clock regressions; current workload tests live in practice-boundaries.test.ts. */
 function planPractice(p:Parameters<typeof sourcePlan>[0],partition:Parameters<typeof sourcePlan>[1]='connection-boundary-v1'){return sourcePlan(p,partition);}
 const base=await referenceFixture(new URL('../vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna',import.meta.url));
-/** Small public behavior fixture, not an encoding of the private Zelda score. */
+/** Small public behavior fixture, not an encoding of any private score. */
 function score(bars=12){const p=structuredClone(base);p.score.id='universal-piano-fixture';p.score.referencePerformanceTempo={version:'reference-performance-tempo-v1',bpm:104,beat:{numerator:1,denominator:4},provenance:{kind:'editorial',reference:'Public clock regression fixture'}};p.score.timeSignatures=[{tick:0,numerator:3,denominator:4}];p.score.sourceBarTicks=Array.from({length:bars+1},(_,i)=>i*144);p.score.totalTicks=bars*144;delete p.score.writtenPresentation;delete p.score.tieChains;p.score.phrases=[];p.score.notes=Array.from({length:bars},(_,i)=>({...base.score.notes[0],id:`source-${i}`,startTick:i*144,durationTicks:48,voice:1}));return p;}
 test('score facts admit quarter and rational beats without a score-ID whitelist',()=>{
  const p=score(),plan=planPractice(p),state=initialPractice(plan);state.working=104;

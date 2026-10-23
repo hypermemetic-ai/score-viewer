@@ -151,7 +151,7 @@ test('the click or key that opens the score under way hands its work to the read
  }
  // Opening another score stops the paused work and frees its worker.
  const l=library();l.work.start(['no13']);await wait(40);l.idles.shift()!();await wait(0);l.input('pointerdown');l.engrave();
- await l.open('zelda');await wait(5);assert.deepEqual(l.aborted,['no13']);assert.equal(l.released(),1);
+ await l.open('other');await wait(5);assert.deepEqual(l.aborted,['no13']);assert.equal(l.released(),1);
  // Left alone again, held work goes on by itself.
  const q=library(10);q.work.start(['no13']);await wait(20);q.idles.shift()!();await wait(0);q.input('wheel');q.engrave();await wait(30);q.saveEngine();await wait(5);
  assert.deepEqual(q.steps,['no13 admitted','no13 engraved','no13 pages','no13 engine']);

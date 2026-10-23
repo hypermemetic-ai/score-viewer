@@ -50,8 +50,8 @@ test('loading text names no time estimate',()=>{
 });
 
 // The physical keyboard is legitimately the Jankó keyboard, and its key
-// layout is the Jankó layout (owner direction 2026-10-18: the conventional and
-// Jankó layouts are two key layouts of one piano). The notation is always
+// layout is the Jankó layout (the conventional and Jankó layouts are two key
+// layouts of one piano). The notation is always
 // "ISO notation" and is never called Janko in anything the player sees.
 test('the notation and its pages are never called Janko',()=>{
  const root=new URL('../',import.meta.url),files=['index.html',...readdirSync(new URL('src/',root)).filter(f=>/\.(ts|html|css)$/.test(f)).map(f=>'src/'+f)];

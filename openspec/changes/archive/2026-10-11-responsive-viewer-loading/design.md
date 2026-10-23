@@ -50,4 +50,4 @@ Score opens use the same visual component with the existing cancel/install bound
 
 ## Migration Plan
 
-Deliver the shared execution seam through a reviewed ISO PR, integrate its exact merged pin and unchanged source provenance into a reviewed viewer PR, and execute the existing paired Windows/Mac carrier path. Observe the built viewer and repeat named cold/warm benchmarks. Preserve a fresh closed-app snapshot before switching the normal laptop shortcut and restoring the current secondary monitor placement. Derived cache files are additive and disposable; rollback retains authoritative data and the prior verified application.
+Deliver the shared execution seam through a reviewed ISO PR, integrate its exact merged pin and unchanged source provenance into a reviewed viewer PR, and execute the existing paired Windows/Mac carrier path. Observe the built viewer and repeat named cold/warm benchmarks. Preserve a fresh closed-app snapshot before switching the normal shortcut and restoring the current window placement. Derived cache files are additive and disposable; rollback retains authoritative data and the prior verified application.

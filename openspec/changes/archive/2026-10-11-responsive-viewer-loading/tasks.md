@@ -23,5 +23,5 @@
 ## 5. Paired native activation and closure
 
 - [x] 5.1 Build and admit the exact paired Windows/Mac release through the existing reviewed carrier lane, verify complete downloads and publish atomically; record native checks, frontend parity and release identities.
-- [x] 5.2 Preserve fresh closed-app user data, switch the usual laptop shortcut to the verified candidate, reopen on the same secondary screen and observe cold/warm readiness; verify the data audit, other music apps and retained recovery path.
+- [x] 5.2 Preserve fresh closed-app data, switch the usual shortcut to the verified candidate, reopen on the same screen and observe cold/warm readiness; verify the data audit, other music apps and retained recovery path.
 - [x] 5.3 Sync and strictly validate the resulting main specification, archive the completed change through reviewed closeout, stop task-owned temporary processes and verify fresh final Git/PR status and delivery receipts.

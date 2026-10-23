@@ -2,7 +2,7 @@
 
 ## Why
 
-The user selected a clearer TAB vocabulary: fret numbers carry pitch, detached headless duration cues sit below the strings, black ink gives a consistent reading surface, and rests belong on the TAB staff. The user also approved simplifying only source-proven isolated rests whose written dots and tuplet ratio resolve exactly to an ordinary undotted rest. Adopting these display rules needs versioned source recipes and a safe additive presentation edition without reinterpreting historical archives or losing manual practice progress.
+A clearer TAB vocabulary was chosen: fret numbers carry pitch, detached headless duration cues sit below the strings, black ink gives a consistent reading surface, and rests belong on the TAB staff. Only source-proven isolated rests whose written dots and tuplet ratio resolve exactly to an ordinary undotted rest are simplified. Adopting these display rules needs versioned source recipes and a safe additive presentation edition without reinterpreting historical archives or losing manual practice progress.
 
 ## What Changes
 

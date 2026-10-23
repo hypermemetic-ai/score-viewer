@@ -757,7 +757,7 @@ function editorMemoryMarkup(){
 /** A row's buttons: on their own line under the row's fact when it has one. */
 const editorActions=(underFact:boolean,buttons:string)=>underFact?`<span class="editor-row-actions">${buttons}</span>`:buttons;
 /** Where the selected note's hand comes from, beside its finger's provenance.
- * The explanation is shown, not only hovered: nobody hovers on the TV. */
+ * The explanation is shown, not only hovered: nobody hovers on a distant screen. */
 function editorHandMarkup(){
  if(!current||!selection)return'';const view=handChoiceView(current.package,current.personal,selection.ownerIds[0],printedBars(current));if(!view)return'';
  const said=view.said.map(word=>typeof word==='string'?esc(word):`<kbd>${esc(word.key)}</kbd>`).join('');

@@ -37,7 +37,7 @@
 
 ## 6. Schumann 14 one-time consolidation
 
-- [x] 6.1 Resolve the operator-selected Schumann 14 to its admitted library/source identity and capture a read-only local snapshot without disturbing practice; verify package/personal hashes and keep private inputs outside Git.
+- [x] 6.1 Resolve the selected Schumann 14 to its admitted library/source identity and capture a read-only local snapshot without disturbing practice; verify package/personal hashes and keep private inputs outside Git.
 - [x] 6.2 Implement snapshot-based earliest-field consolidation across combined admitted whole/hand equivalence before materializing scope records, including ambiguous saved legacy fingers and later gap-filling; verify conflicting RH choices under independently repeated differing LH accompaniments, later protected exceptions, shuffled input, absent fields, immutable hand partition, no copied/undo/calculated donors, and no changes outside the target.
 - [x] 6.3 Produce immutable recovery data and a readable before/after donor report, stage inherited consolidated results and commit an idempotent completion receipt; verify no-op retries, later local exceptions, stale-input aborts and interrupted commits in migration tests, and document recovery.
 - [x] 6.4 Inspect the generated Schumann 14 consolidation report and rendered result on the local candidate; verify changed measures and source links against retained originals, and record counts and visual limits without claiming a live migration has run.
@@ -49,6 +49,6 @@
 - [x] 7.3 Review and land the scoped viewer implementation through the ordinary PR path, then sync/archive the completed specification change only when its required work is complete; verify source and dependency identities and report any native verification blocker separately.
 - [ ] 7.4 Build and admit the intended native package through the repository's delivery path and activate the Schumann 14 consolidation at an application-owned safe boundary after the practicing app's pending work is drained; verify current input guards, completion receipt, retained originals, current score location, practice progress and settings. Do not externally overwrite a live journal or interrupt an active practice attempt.
 
-Integration evidence and remaining limits: `docs/practice-fingering-validation-20261014.md`. Task 7.2 has actual one-score browser coverage and automated cross-score/succession coverage; the application has no deletion UI. Native activation and live consolidation remain pending while the operator practices.
+Integration evidence and remaining limits: `docs/practice-fingering-validation-20261014.md`. Task 7.2 has actual one-score browser coverage and automated cross-score/succession coverage; the application has no deletion UI. Native activation and live consolidation remain pending while practice is in progress.
 
 Delivery status: PR98/99 are merged and main specs are synchronized. Reviewed replacement carrier31520bda is retained in ISO PR371; its paired run38510326660 was blocked before startup by GitHub account billing/spending limits. No new native pair was published or installed. Task7.4 and the explicit broader browser limits remain pending, so the change is not archived.

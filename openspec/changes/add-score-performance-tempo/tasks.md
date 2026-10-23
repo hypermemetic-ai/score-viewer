@@ -24,7 +24,7 @@
 
 - [x] 4.1 Unit tests for marking interpretation, resolution, owner records, schedules and audition timing.
 - [x] 4.2 Build, full tests and type checks.
-- [x] 4.3 Rehearse every owner score on a copy of the owner data; confirm practice tempos/progress unchanged; run the flow by keyboard; inspect screenshots.
+- [x] 4.3 Rehearse every score on a private data copy; confirm practice tempos/progress unchanged; run the flow by keyboard; inspect screenshots.
 - [ ] 4.4 Owner listening acceptance on the desktop app (audible quality, output device, marking values).
 - [x] 4.5 Native Salamander playback of the performance: scheduled note/click stream on the native clock through the selected output, with tempo-change cuts, release and backpressure; the dialog names the voice and offers the persistent Piano switch; built-in fallback. Portable-core Rust tests (including the allocator test) and frontend tests.
 - [ ] 4.6 Native build on Windows/macOS and owner listening acceptance of the native preview (timing, latency, count-in alignment, tempo changes).

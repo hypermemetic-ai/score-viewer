@@ -21,7 +21,7 @@ The viewer SHALL automatically reuse personal fingerings for exact whole-measure
 - **AND** transposed resemblance alone does not establish a match
 
 #### Scenario: Same music in a bar written short
-- **WHEN** Schumann Op. 68 No. 13 bar 11, which also holds the pickup to the return, has the owner's fingers, and bar 21 plays the same notes in each hand from the downbeat and is written short
+- **WHEN** Schumann Op. 68 No. 13 bar 11, which also holds the pickup to the return, has the player's fingers, and bar 21 plays the same notes in each hand from the downbeat and is written short
 - **THEN** bar 21 shows bar 11's fingers on every note both bars play, each hand matched on its own
 - **AND** bar 11's pickup fingers stay in bar 11, and the return's pickup bar takes no fingers from a downbeat
 - **AND** opening the score writes nothing, and a finger changed in bar 21 is an exception there while a change at bar 11 reaches bar 21

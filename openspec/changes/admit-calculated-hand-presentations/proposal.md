@@ -26,4 +26,4 @@ None. The retained native delivery and practice contracts remain applicable and 
 
 ## Impact
 
-Viewer `piano-readiness`, package import/assembly/publication, personal state, worker results, and atomic installation. ISO owns engraving and the temporary dependency must move only to an exact reviewed compatible revision. Native identity/settings/MIDI/audio and the busy Viewer checkout/delivery remain preserved. No paid Zelda source enters Git; its proposed route remains a private comparison hypothesis.
+Viewer `piano-readiness`, package import/assembly/publication, personal state, worker results, and atomic installation. ISO owns engraving and the temporary dependency must move only to an exact reviewed compatible revision. Native identity/settings/MIDI/audio and the busy Viewer checkout/delivery remain preserved. No paid private source enters Git; its proposed route remains a private comparison hypothesis.

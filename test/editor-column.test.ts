@@ -15,7 +15,7 @@ function edges(w:number,h:number,v:ViewState,total=3){
  return {fit,left,right:fit.width-left-width};
 }
 
-test('one page on the TV or a laptop keeps its size and place; the editor column is the room beside it',()=>{
+test('one page on a large or a small screen keeps its size and place; the editor column is the room beside it',()=>{
  for(const [w,h] of [[1920,1080],[1280,720],[960,540],[1366,768],[1280,800]]){
   const v=view(),plain=viewportFit(w,h,v,3),{fit,left,right}=edges(w,h,v);
   assert.equal(fit.scale,plain.scale,`${w}x${h} scale`);assert.equal(fit.shift,0);assert.deepEqual(fit.pages,plain.pages);
@@ -25,7 +25,7 @@ test('one page on the TV or a laptop keeps its size and place; the editor column
 
 test('pages that crowd the column are centred in the room left of it, and shrink only as much as that room needs',()=>{
  const tv=edges(1920,1080,view({count:2}));
- assert.equal(tv.fit.scale,viewportFit(1920,1080,view({count:2}),3).scale,'two pages on the TV only move');
+ assert.equal(tv.fit.scale,viewportFit(1920,1080,view({count:2}),3).scale,'two pages on a 1920×1080 screen only move');
  for(const [w,h,count] of [[1920,1080,2],[1280,720,2],[1280,720,3],[1920,1080,3],[1366,768,2],[1080,1920,1]] as const){
   const {fit,left,right}=edges(w,h,view({count}));
   assert.ok(right>=EDITOR_COLUMN-1e-6,`${w}x${h}x${count} column`);assert.ok(Math.abs(fit.column-right)<1e-6,`${w}x${h}x${count} the column is the room right of the pages`);
@@ -33,7 +33,7 @@ test('pages that crowd the column are centred in the room left of it, and shrink
   assert.ok(Math.abs(left-(right-EDITOR_COLUMN))<1e-6,`${w}x${h}x${count} centred`);assert.ok(left>=EDITOR_GUTTER-1e-6,`${w}x${h}x${count} clear of the edge`);
   assert.ok(fit.scale<=viewportFit(w,h,view({count}),3).scale);
  }
- // The TV at 150% with two pages: the pages stand off the left edge by the gutter, as the column does from the right.
+ // A 1920×1080 screen at 150% with two pages: the pages stand off the left edge by the gutter, as the column does from the right.
  const tv150=edges(1280,720,view({count:2}));assert.ok(Math.abs(tv150.left-EDITOR_GUTTER)<1e-6);
  const turned=edges(1920,1080,view({rotation:90})),upright=edges(1080,1920,view());
  assert.deepEqual(turned.fit,{...upright.fit,width:upright.fit.width,height:upright.fit.height});

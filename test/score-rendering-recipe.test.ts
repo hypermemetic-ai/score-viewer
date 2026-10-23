@@ -25,8 +25,7 @@ test('passive recipe admits resolved preparation, rejects programs, unresolved d
   assert.throws(()=>validateScoreRenderingRecipe({...recipe,engineId:'imported-program'}),/Unsupported/);
 });
 
-// Saved pages are derived output, not a byte-identity gate (owner direction,
-// 2026-10-17). ISO #388 (pinned at bee8c67) seats dynamics by their own music,
+// Saved pages are derived output, not a byte-identity gate. ISO #388 (pinned at bee8c67) seats dynamics by their own music,
 // which moves the frozen No14 systems this recipe draws today (the reader
 // shows a retained edition's stored pages). The retained recipe still draws every source owner
 // on the same seats, deterministically and lint-clean.

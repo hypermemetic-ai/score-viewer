@@ -50,10 +50,10 @@ An older measure's ordinary note ink SHALL become eligible for retirement after 
 ### Requirement: Source-owned held tie cues
 A visually retired tied owner SHALL retain a readable authored tie cue while useful in the current measure. If its verified endpoints remain resident within the same displayed consecutive source run, the full original bow SHALL remain. Otherwise a source-owned continuation SHALL use shared curve rules and the verified continuation endpoint. Its actual paint SHALL reserve space independently of the old note bundle. The cue SHALL end at that measure's finish or the owner's sounding end, whichever occurs first. Untied or pedal-only holds SHALL NOT receive invented ties.
 
-#### Scenario: Zelda19 continues sounding through20
-- **WHEN** the note attacked at2592 remains sounding until2880 and its old measure ink retires while20 is being played
+#### Scenario: A held note continues sounding through the next bar
+- **WHEN** a tied note attacked in one bar remains sounding into the next bar and its old measure ink retires while that next bar is being played
 - **THEN** a source-owned tie cue remains without its old head or duration stem
-- **AND** the continuation head's2736 onset does not prematurely remove the cue or end the assessed hold
+- **AND** the continuation head's onset in the next bar does not prematurely remove the cue or end the assessed hold
 
 ### Requirement: Resident restoration and original error context
 Free view SHALL restore complete source notation in centered consecutive windows of up to four selected measures, advancing by two with a bounded final tail. It SHALL stop live playback without discarding saved evidence or original source obligation definitions. Retired bundles SHALL NOT be inserted over live allocations; failures SHALL retain their original source context.

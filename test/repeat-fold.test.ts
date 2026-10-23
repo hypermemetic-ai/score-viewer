@@ -189,7 +189,7 @@ test('a hand carried from matching music reaches both passes, so they still fold
 });
 
 test('a hand change with its finger in one pass carries its hand to the twin, which still reads the finger, so the passes fold', async()=>{
- // Op. 68 No. 13 as the owner left it: bar 11's 4 and 3 moved and fingered, bar 21 reached only by the carried hand.
+ // Op. 68 No. 13 with bar 11's 4 and 3 moved and fingered, bar 21 reached only by the carried hand.
  const p=await returning(),first=ownerAt(p,1,1),second=ownerAt(p,9,1),at='2026-10-22T00:00:00.000Z';
  const moved=assigned(p,fingered(p,initialPersonal(p),{[first]:2}),seatOf(p,first),{hand:'LH'});
  for(const c of Object.values(moved.assignments!.choices))if(c.hand!==undefined)c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};

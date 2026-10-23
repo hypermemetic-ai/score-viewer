@@ -2,7 +2,7 @@
 
 The first source checkpoint is `bff72dc865987018a31aa3800642662370f34fab`, with `src/main.ts` SHA256 `9e9ed4f87c9333b3b504402c40969b14612748940550d0d96ebd535dc1105feb`. Source-pin admission, TypeScript and Vite build passed. The focused routing/navigation/Reading/repeat/progression checks passed 98 tests, including six tests executing the actual production keyboard/MIDI/toolbar handlers. The final inactive-reader guard also passed those six handler tests and TypeScript.
 
-The reusable [production browser check](../scripts/check-passive-score-editing.mjs) serves `dist` under the application's actual CSP. It opens fully admitted public archives through the real library and reader, connects MIDI through Options, and sends simulated native MIDI callbacks into production dispatch. Its storage is isolated browser storage, not the operator's managed library. It records source and frontend hashes, fixture identities, host, browser, viewport, checks and screenshots.
+The reusable [production browser check](../scripts/check-passive-score-editing.mjs) serves `dist` under the application's actual CSP. It opens fully admitted public archives through the real library and reader, connects MIDI through Options, and sends simulated native MIDI callbacks into production dispatch. Its storage is isolated browser storage, not the user's managed library. It records source and frontend hashes, fixture identities, host, browser, viewport, checks and screenshots.
 
 The first actual browser run used host `qq-box`, Linux, Node `v26.7.0`, Chromium `151.0.7922.34` and a 1440 × 900 CSS-pixel viewport:
 
