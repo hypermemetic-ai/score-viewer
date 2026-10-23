@@ -264,7 +264,7 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  }
  const memory={adoptIndexed:async()=>{log.push('indexed');return true;},storedRefs:()=>{log.push('hand choices read');return [];},personalFor:()=>({})};
  const context:any={
-  JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,refusedWhen,admissionRejection,engravingRefusal,
+  JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,refusedWhen,admissionRejection,engravingRefusal,savedPagesBehindPolicy:()=>false,
   checkReadingExecution:(e:any)=>{if(e?.signal?.aborted)throw new DOMException('stop','AbortError');},
   entries:[{id:'no13',file:'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
   personalMemory:{...memory,memoryRevision:0},FoldedReader,withRepeatInheritance:(_p:unknown,s:unknown)=>s,withResolvedMemory:()=>({}),resolveMemoryInput:()=>({}),host:{read:async()=>new Uint8Array([1,2,3])},

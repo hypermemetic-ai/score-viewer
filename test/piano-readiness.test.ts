@@ -4,7 +4,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 import {strToU8} from 'fflate';
 import {ensurePianoReady as calculateEdition} from './support/calculate-edition';
 import {ensurePianoReady} from '../src/piano-readiness';
-import {archivePackage,hashBytes,importPackage} from '../src/package';
+import {archivePackage,hashBytes,importPackage,SavedPagesBehindPolicy} from '../src/package';
 import {publishPreparedNative} from '../src/publication';
 import {corrected,initialPersonal,personalStorageName,legacyPersonalStorageName} from '../src/state';
 import {loadPersonalJournal,PersonalJournalError} from '../src/personal-journal';
@@ -91,7 +91,9 @@ test('earlier edition reads exact pages and its own correction journal, without 
  assert.equal(next.status,'editable');
  const installed=await stagePresentationInstall({async write(name,bytes){stored.set(name,bytes);}},{entry,entries:[entry],personalKey:key,
   packageBytes:next.packageBytes,personalBytes:strToU8(JSON.stringify(next.personal))});
- const restored=await prepareRetainedEdition({async read(name){return stored.get(name)??null;}},installed.entry,file,'janko-four-row');
+ // These saved pages predate the current shared policy: opening them for display engraves them again first; here they are read as saved.
+ await assert.rejects(prepareRetainedEdition({async read(name){return stored.get(name)??null;}},installed.entry,file,'janko-four-row'),SavedPagesBehindPolicy);
+ const restored=await prepareRetainedEdition({async read(name){return stored.get(name)??null;}},installed.entry,file,'janko-four-row',false);
  assert.deepEqual(restored.packageBytes,old.packageBytes);assert.deepEqual(restored.package.pages,old.package.pages);
  assert.deepEqual(restored.package.seats,old.package.seats);assert.deepEqual(restored.personal,state);
  assert.deepEqual(restored.personalFiles,entry.personalFiles);
@@ -117,7 +119,7 @@ test('an archived package with a missing declared journal cannot restore an empt
   stored=new Map<string,Uint8Array>([[file,archive],[legacy,strToU8(JSON.stringify(other))],['library.json',library]]),reads:string[]=[];
  let writes=0;const host={async read(name:string){reads.push(name);return stored.get(name)??null;},async write(){writes++;}};
  await assert.rejects((async()=>{
-  const retained=await prepareRetainedEdition(host,entry,file,'janko-four-row');
+  const retained=await prepareRetainedEdition(host,entry,file,'janko-four-row',false);
   await stagePresentationInstall(host,{entry,entries:[entry],packageBytes:retained.packageBytes,
    personalBytes:strToU8(JSON.stringify(retained.personal)),personalKey:key,personalFiles:retained.personalFiles});
  })(),error=>error instanceof PersonalJournalError&&error.code==='retained-journal');

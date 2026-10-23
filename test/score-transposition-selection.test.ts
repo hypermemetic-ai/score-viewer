@@ -46,11 +46,11 @@ test('new pitch installation keeps original correction/progress/performance byte
  assert.notEqual(personalStorageName(entry.id,derived),key);assert.notEqual(practiceStorageName(entry.id,derived),practiceFile);assert.notEqual(performanceStorageName(entry.id,derived),performanceFile);
  assert.deepEqual(stored.get(file),bytes);assert.deepEqual(stored.get(key),originalJournal);assert.deepEqual(stored.get(practiceFile),encode(progress));assert.deepEqual(stored.get(performanceFile),performance);
  assert.deepEqual(fresh.overrides,{});assert.deepEqual(fresh.history,[]);
- const restored=await prepareRetainedEdition(host,next.entry,retainedTranspositionFile(next.entry,0,'janko-four-row')!,'janko-four-row');
+ const restored=await prepareRetainedEdition(host,next.entry,retainedTranspositionFile(next.entry,0,'janko-four-row')!,'janko-four-row',false);
  assert.equal(getScoreTransposition(restored.package),0);assert.deepEqual(restored.packageBytes,bytes);assert.deepEqual(restored.personal,personal);
  const zero=await stagePresentationInstall(host,{entry:next.entry,entries:next.entries,packageBytes:restored.packageBytes,personalBytes:encode(restored.personal),personalKey:key,personalFiles:restored.personalFiles,transposition:{steps:0,layout:'janko-four-row'}});
  assert.equal(zero.entry.file,file);assert.equal(zero.entry.transposition!.steps,0);assertSelectedTransposition(zero.entry,restored.package);assert.deepEqual(stored.get(key),originalJournal);assert.deepEqual(stored.get(zero.entry.personalFiles![key]),originalJournal);
- const again=await prepareRetainedEdition(host,zero.entry,retainedTranspositionFile(zero.entry,1,'janko-four-row')!,'janko-four-row');assert.equal(getScoreTransposition(again.package),1);assert.deepEqual(again.personal,fresh);
+ const again=await prepareRetainedEdition(host,zero.entry,retainedTranspositionFile(zero.entry,1,'janko-four-row')!,'janko-four-row',false);assert.equal(getScoreTransposition(again.package),1);assert.deepEqual(again.personal,fresh);
 });
 
 test('failure or supersession during pitch staging never activates the new offset or overwrites old files',async()=>{
