@@ -70,7 +70,7 @@ test('a changed receipt is refused on opening, and a member that differs from it
 
 test('the footer probe edition opens through its receipt on both keyboards at the ISO pin',async()=>{
  const bytes=new Uint8Array(readFileSync(new URL('../fixtures/footer-probe-calculated-edition.tuna',import.meta.url)));
- assert.equal(await hashBytes(bytes),'e94adc39471cca60671ce21157cd5750e8a021060e42c2c81224bae6282d8040','src/footer-ink-probe.ts names these bytes');
+ assert.equal(await hashBytes(bytes),'f174c6baa8cb34694db1202c1c64a5a057a675ffea9b52d19994613846836c8d','src/footer-ink-probe.ts names these bytes');
  const fixture=await readEditionContent(new Uint8Array(readFileSync(new URL('../fixtures/authored-calculated-preparation-v2.tuna',import.meta.url))));
  for(const layout of ['conventional-piano','janko-four-row'] as const){
   const result=await ensurePianoReady({packageBytes:bytes,layout});
