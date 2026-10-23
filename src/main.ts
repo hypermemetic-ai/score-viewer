@@ -1640,7 +1640,7 @@ async function startPractice(context?:PracticeViewContext,admitted?:AdmittedPrac
    selection=seat;const saving=saveSelectedChoice({finger},false);selection=undefined;return saving.catch(error=>{if(current&&(personalMemory.error||personalEditor(current).queue.error))paintPersonalSaveError(current,error);throw error;});},saveHand:(seat,hand)=>{if(!current)return Promise.reject(Error('No open score.'));selection=seat;const saving=saveHandChoice(hand);selection=undefined;return saving;},settings:()=>settings()});practice=next;await next.mount(context,admitted);}
 
 /** What a command needs ready before it runs; it waits for it (waitsFor). */
-const PRESS_NEEDS:Readonly<Record<string,ReadinessStage>>={edit:'fingers',toggle:'fingers',options:'fingers','restore-all':'fingers','undo-restore':'fingers',practice:'fingers','practice-fingers':'practice','practice-sections':'practice'};
+const PRESS_NEEDS:Readonly<Record<string,ReadinessStage>>={edit:'fingers',toggle:'fingers',options:'fingers',practiceSettings:'fingers','restore-all':'fingers','undo-restore':'fingers',practice:'fingers','practice-fingers':'practice','practice-sections':'practice'};
 /** A practice step chosen in its menu waits beside the item that took the press. */
 const pressPlace=(action:string)=>():ReadinessNoticePlace|undefined=>{const item=dialog?.querySelector<HTMLElement>(`[data-action="${action}"]`);return item?{after:item}:readerNotice();};
 async function act(action:string){try{if(!startupReady&&action!=='exit')return;

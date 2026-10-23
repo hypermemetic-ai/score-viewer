@@ -5,7 +5,7 @@ import {runInNewContext} from 'node:vm';
 import {stripTypeScriptTypes} from 'node:module';
 import {ControlResolver,readControlBindings,controlActionAllowed,readerControlBindings,isEditorAction} from '../src/control-bindings';
 import {actionCode,inputCode,chord,directFingerKey,InputController,rotationShortcut,defaultBindings} from '../src/input';
-import {defaultView,viewportFit} from '../src/state';
+import {defaultView,viewportFit,effectiveLabelMode} from '../src/state';
 import {PracticeView} from '../src/practice-view';
 import {arrangeBottomNavigation,applicationNavigationKey} from '../src/application-navigation';
 import {importPackage} from '../src/package';
@@ -36,7 +36,7 @@ function reopened(){
   inputCode,actionCode,chord,directFingerKey,rotationShortcut,controlActionAllowed,isEditorAction,PracticeView,viewportFit,arrangeBottomNavigation,applicationNavigationKey,effectiveView:(v:any)=>v,readerPackage:()=>pkg,
   syncControls(){},reveal(){},notify(message:string){calls.push(`notify:${message}`);},HTMLInputElement:class {},ManualPracticeView:class {},
   // What each command does once it runs.
-  selectFinger(){calls.push('edit');},practiceMenu(){calls.push('practice-menu');},startPractice(){calls.push('practice-start');},
+  selectFinger(){calls.push('edit');},options(){calls.push('options');},practiceMenu(){calls.push('practice-menu');},startPractice(){calls.push('practice-start');},
   fingerDisplayAvailable:()=>true,currentFingerPresentation:()=>undefined,refreshPresentation(){calls.push('fingers-shown');},
   savePersonal(){},savePersonalQuietly(){},renderPages(){},renderToolbar(){},render(){},
   requirePianoCapability(){},
@@ -125,4 +125,25 @@ test('a command that needs nothing, such as turning the page, still cancels the 
  r.finish();await flush();
  assert.ok(!r.calls.includes('practice-menu'),`P did not run after the page turn: ${r.calls}`);
  assert.deepEqual(r.failures,[]);
+});
+
+test('O pressed before fingers are ready opens Options once they are, so it offers what shared fingers allow (Restore all)',async()=>{
+ const r=reopened();
+ r.press('KeyO');await flush();
+ assert.deepEqual(r.calls,[]);assert.equal(r.context.presses.pending,'practiceSettings');
+ r.finish();await flush();
+ assert.deepEqual(r.calls,['options']);assert.deepEqual(r.failures,[]);
+});
+
+test('a held fingering let go before fingers are ready stops waiting, and never shows',async()=>{
+ const r=reopened();r.context.preferences.fingerBehavior='momentary';r.context.effectiveLabelMode=effectiveLabelMode;r.context.selectionPitchToggle=false;
+ // The reader's own presentation refresh, as main.ts has it.
+ runInNewContext(production('/** Whether the reader would show fingerings now','\nconst effectiveControls'),r.context);
+ r.press('KeyF');await r.advance(READINESS_NOTICE_DELAY_MS+1);
+ assert.equal(r.context.presses.pending,'toggle');assert.equal(r.context.presses.showing,true);
+ const up={code:'KeyF',key:'KeyF',repeat:false,ctrlKey:false,altKey:false,metaKey:false,shiftKey:false,preventDefault(){}};
+ r.context.input.up(up);r.context.controls.keyUp(up);r.context.refreshPresentation();await flush();
+ assert.equal(r.context.presses.pending,undefined,'letting go cancels the wait');
+ r.finish();await flush();
+ assert.equal(r.context.current.personal.view.labelMode??'pitch','pitch');assert.deepEqual(r.failures,[]);
 });
