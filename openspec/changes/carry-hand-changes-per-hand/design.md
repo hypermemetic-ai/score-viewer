@@ -7,7 +7,7 @@ The moves are grouped by written bar and by the hand the source writes them in. 
 1. **Same beat.** It stands at the same place in its bar, counted from the downbeat. A pickup bar starts `full − extent` ticks before its downbeat, so No. 13's opening B4 (bar 1) stands at the same beat as the pickup B4 at the end of bar 11.
 2. **Same hand around it.** Over the part of the two bars that both share as seen from the two notes (`max(bar start − onset)` to `min(bar end − onset)`), every note the source writes in that hand and that sounds there, held notes included, has the same pitch, offset, length and marks. The other hand is not compared.
 
-Then the move's hand is carried to `q`, unless `q` has the owner's own hand (`ownsHand`) or the result can't be drawn. Each bar `t` gets the moves found in it together, so the drawability check still sees all the copies a bar receives.
+Then the move's hand is carried to `q`, unless `q` has the owner's own hand (`ownsHand`) or the result can't be drawn. The moves of one hand in one bar that reach the same bar `t` are carried there together, so the drawability check sees all the copies that hand brings; moves of the other hand in the same bar are matched, and checked, on their own.
 
 ### Articulation marks
 
