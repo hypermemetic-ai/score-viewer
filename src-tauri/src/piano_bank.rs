@@ -30,6 +30,8 @@ struct Inner {
 pub struct State {
     inner: Arc<Mutex<Inner>>,
     cancel: Arc<AtomicBool>,
+    /// The viewer is quitting: work stops, and a download keeps what arrived.
+    quitting: Arc<AtomicBool>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -48,10 +50,24 @@ impl Default for State {
                 busy: false,
             })),
             cancel: Arc::new(AtomicBool::new(false)),
+            quitting: Arc::new(AtomicBool::new(false)),
         }
     }
 }
 impl State {
+    /// On exit: stop any download, check or install and wait briefly for it,
+    /// so curl is gone before the viewer is. An unfinished download is kept
+    /// for the next press.
+    pub fn shutdown(&self) {
+        self.quitting.store(true, Ordering::Release);
+        self.cancel.store(true, Ordering::Release);
+        let start = std::time::Instant::now();
+        while self.inner.lock().map(|s| s.busy).unwrap_or(false)
+            && start.elapsed() < std::time::Duration::from_secs(5)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+    }
     pub fn ready_sfz(&self) -> Result<Option<PathBuf>, String> {
         let state = self
             .inner
@@ -310,7 +326,7 @@ pub async fn piano_bank_download(
             .inner
             .lock()
             .map_err(|_| "Piano bank state unavailable")?;
-        if s.busy {
+        if s.busy || state.quitting.load(Ordering::Acquire) {
             return Err("Piano installation is already running.".into());
         }
         if s.ready.is_some() {
@@ -326,12 +342,14 @@ pub async fn piano_bank_download(
     let state = state.inner().clone();
     let worker = state.clone();
     match tauri::async_runtime::spawn_blocking(move || {
-        let cancel = worker.cancel.clone();
+        let directory = root.clone();
         let result = core::download(
             &root,
             &worker.cancel,
+            &worker.quitting,
             |phase, pct| worker.progress(phase, pct),
-            |part, _have, grew| core::curl_fetch(part, &cancel, grew),
+            || core::curl_probe(&directory, &worker.cancel),
+            |attempt, grew| core::curl_fetch(attempt, &worker.cancel, grew),
         );
         worker.finish(result.map(Some))
     })

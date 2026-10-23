@@ -39,3 +39,4 @@
 - [x] 6.3 Add a pointer drag track beside the Volume field, shown before installation and during the download, with keyboard editing unchanged.
 - [x] 6.4 Test success, cancel, network failure, integrity failure and already installed in the core and the frontend; observe the real download through the production core on Linux.
 - [ ] 6.5 Observe one press in the native Windows and Mac packages, and the pianist's own judgement of delay and volume.
+- [x] 6.6 Keep downloads safe across quits, a killed viewer, a second viewer, a changed file online and a refused resume: one lock, curl tied to the viewer, in-place check, size/ETag check before downloading, one restart, plain messages.
