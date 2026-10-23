@@ -184,8 +184,10 @@ export async function engraveEdition(request:{
   throw Error('An edition needs exactly one view for each keyboard it serves.');
  // Fresh pages follow the shared rules alone, exactly as a new import does;
  // the base edition's own recipe belongs to its old pages.
- // Page one keeps printing the notices the base edition printed.
- const notices=editionPrintedNotices(base),options=approvedProductionIsoOptions(notices?{printedNotices:notices}:{}),tokens=resolveIsoTokens({}),
+ // Page one keeps printing the notices the base edition printed, named only
+ // where they differ from the source's own.
+ const printed=editionPrintedNotices(base),notices=printed&&canonicalJson(printed)!==canonicalJson(source.publicationNotices??[])?printed:undefined,
+  options=approvedProductionIsoOptions(notices?{printedNotices:notices}:{}),tokens=resolveIsoTokens({}),
   shared:Record<string,Uint8Array>={[baseManifest.font]:base.files[baseManifest.font],...Object.fromEntries(baseManifest.notices.map(name=>[name,base.files[name]]))},
   engraved=new Map<string,{score:string;seats:string;recipe:string;pages:string[]}>(),chosen:EditionView[]=[],fellBack:PhysicalKeyboardId[]=[];
  if(kept)for(const [name,bytes]of Object.entries(keep!.files))if(name!=='manifest.json')shared[name]=bytes;
