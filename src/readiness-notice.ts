@@ -19,7 +19,7 @@ const realTimers:ReadinessTimers={now:()=>performance.now(),set:(run,ms)=>setTim
 
 /** The quiet line a waiting press shows: plain words and a thin, slow line
  * under them, in the reader's muted text. No modal, no spinner over the music,
- * no dimming and no sound; it takes no input and covers nothing. */
+ * no dimming and no sound; it takes no input and covers no control. */
 export class ReadinessNotice implements ReadinessNoticeView {
  private element?:HTMLElement;
  private fading?:ReturnType<typeof setTimeout>;
@@ -52,6 +52,15 @@ export class ReadinessNotice implements ReadinessNoticeView {
   element.innerHTML='<span class="readiness-notice-words"></span><span class="readiness-notice-line" aria-hidden="true"></span>';
   return element;
  }
+}
+
+/** Keeps the surface told how tall its toolbar is (--toolbar-height), so an
+ * open toolbar's notice stands just above the toolbar's top edge however many
+ * rows it wraps to. Returns what stops it. */
+export function trackToolbarHeight(surface:HTMLElement,toolbar:HTMLElement,Observer:typeof ResizeObserver=ResizeObserver):()=>void{
+ const measure=()=>surface.style.setProperty('--toolbar-height',`${toolbar.offsetHeight}px`);
+ measure();const observer=new Observer(measure);observer.observe(toolbar);
+ return ()=>observer.disconnect();
 }
 
 /** What a press waits for: anything that answers whether a stage is ready and

@@ -3,7 +3,8 @@ import {readFileSync} from 'node:fs';
 import {importPackage,selectPresentation} from '../src/package';
 import {rebuildEdition} from '../src/edition-rebuild';
 import {engraveEdition} from '../src/score-transposition';
-import {editionPrintedNotices,titleAreaInk,titleAreaOverlap} from '../src/title-area-clearance';
+import {editionPrintedNotices,engraveClearOfTitleArea,titleAreaInk,titleAreaOverlap} from '../src/title-area-clearance';
+import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 
 // The owner's No. 14 printed two notices on page one (Encoding, Reference).
 // Engraved again from the current shared options alone, it printed its
@@ -45,15 +46,33 @@ test('an edition engraved again prints the notices its saved page one printed, c
  }
 });
 
-test('when page one\'s music reaches its title area, page one\'s header grows until it stands clear',async()=>{
- // A base that names no notices: the source's six print, which on the
- // ordinary header reach into bar 1.
- const base={...early,pages:[],renderingRecipe:undefined};
- assert.equal(editionPrintedNotices(base),undefined);
- const engraved=await engraveEdition({base,source:early.score,sourceBytes:early.files['score.json'],views:[{layout:'janko-four-row',score:early.score}],refusal:'refused'}),
-  view=await selectPresentation(await importPackage(engraved.bytes,{allowLegacyTempo:true}),'janko-four-row'),o=view.renderingRecipe!.options;
- assert.equal(notices(view.pages[0]).length,6,'every notice prints');
- assert.equal(titleAreaOverlap(view.pages[0],0),0,'none of them meets the music');
- assert.ok((o.headerHeight as number)>48,'page one\'s header grew');
- assert.equal(o.runningHeaderHeight,48,'later pages keep the header they had');
+test('a page one that prints every one of its notices keeps them all clear of the music, and later pages are unchanged',async()=>{
+ // The source's six notices, all of them for print: four more lines than the
+ // edition's two. Its four working notes are not printed as they stand
+ // (ISO #474), so here they are given as ordinary notices.
+ const six=early.score.publicationNotices!.map((n,i)=>i<2?n:`Note ${i-1}: ${n.replace(/^[^:]*:\s*/,'')}`),
+  engrave=async(publicationNotices:string[])=>{const source={...early.score,publicationNotices},base={...early,score:source,pages:[],renderingRecipe:undefined};
+   assert.equal(editionPrintedNotices(base),undefined,'a base that names no notices prints its source\'s');
+   const engraved=await engraveEdition({base,source,sourceBytes:new TextEncoder().encode(JSON.stringify(source)),views:[{layout:'janko-four-row',score:source}],refusal:'refused'});
+   return selectPresentation(await importPackage(engraved.bytes,{allowLegacyTempo:true}),'janko-four-row');},
+  top=(svg:string)=>Math.min(...titleAreaInk(svg).music.map(b=>b[1]));
+ const two=await engrave(printed),all=await engrave(six);
+ assert.equal(notices(two.pages[0]).length,2);
+ assert.equal(notices(all.pages[0]).length,6,'every notice prints');
+ assert.equal(titleAreaOverlap(all.pages[0],0),0,'none of them meets the music');
+ assert.equal(titleAreaOverlap(all.pages[0]),0,'and it keeps its air');
+ assert.ok(top(all.pages[0])>top(two.pages[0]),'page one\'s music stands lower under the longer title area');
+ assert.equal(all.pages.length,two.pages.length);
+ for(let i=1;i<all.pages.length;i++)assert.equal(top(all.pages[i]),top(two.pages[i]),`page ${i+1} keeps the header it had`);
+});
+
+test('when page one\'s music reaches its title area, the viewer deepens page one\'s header until it stands clear, and refuses rather than print over it',async()=>{
+ const page=(musicTop:number)=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800"><g id="page-header"><text class="janko-source-notice" x="20" y="100" font-family="serif" font-size="5.5">Reference</text></g><g id="system-1"><line x1="20" y1="${musicTop}" x2="580" y2="${musicTop}" stroke="#000" stroke-width="1"/></g></svg>`;
+ const base=approvedProductionIsoOptions({headerHeight:48}),seen:{headerHeight:number;runningHeaderHeight?:number}[]=[];
+ // The music sits as deep under the header as the header is booked: 98 + (headerHeight - 48).
+ const rendered=await engraveClearOfTitleArea(base,async options=>{seen.push({headerHeight:options.headerHeight,runningHeaderHeight:options.runningHeaderHeight});return {pages:[page(98+options.headerHeight-48)]};});
+ assert.equal(titleAreaOverlap(rendered.pages[0]),0,'it ends clear');
+ assert.equal(seen.length,2);assert.ok(seen[1].headerHeight>48,'page one\'s header grew');
+ assert.equal(seen[1].runningHeaderHeight,48,'later pages keep the header they had');
+ await assert.rejects(engraveClearOfTitleArea(base,async()=>({pages:[page(98)]})),/reaches its title area/,'after three tries it is refused');
 });

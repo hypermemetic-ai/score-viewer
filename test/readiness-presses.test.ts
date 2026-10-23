@@ -9,6 +9,7 @@ import {defaultView,viewportFit,effectiveLabelMode} from '../src/state';
 import {PracticeView} from '../src/practice-view';
 import {arrangeBottomNavigation,applicationNavigationKey} from '../src/application-navigation';
 import {importPackage} from '../src/package';
+import {requirePianoCapability} from '../src/score-capabilities';
 import {READINESS_WORDS,ScoreReadiness} from '../src/score-readiness';
 import {PendingPress,READINESS_NOTICE_DELAY_MS,type ReadinessNoticeView,type ReadinessTimers} from '../src/readiness-notice';
 
@@ -99,6 +100,16 @@ test('once fingers are ready, presses run at once and show nothing',async()=>{
  r.readiness.prepare('fingers');await flush();r.finish();await flush();
  r.press('KeyE');await flush();r.press('KeyP');await flush();
  assert.deepEqual(r.calls,['edit','practice-menu']);assert.deepEqual(r.shown,[]);assert.deepEqual(r.failures,[]);
+});
+
+test('P on a score that is not for piano offers no piano practice: it says what the score is for instead of opening the practice menu',async()=>{
+ const r=reopened();
+ // A part reading (such as Add It Up): its toolbar offers no Practice, so P must not open Fingers or Sections either.
+ r.context.current.package={manifest:{version:3}};r.context.requirePianoCapability=requirePianoCapability;
+ r.readiness.prepare('fingers');await flush();r.finish();await flush();
+ r.press('KeyP');await flush();
+ assert.ok(!r.calls.includes('practice-menu'),`no practice menu: ${r.calls}`);assert.ok(!r.calls.includes('practice-start'));
+ assert.deepEqual(r.failures.map(e=>(e as Error).message),['This score is available for reading. Piano practice and fingering controls apply to piano scores.']);
 });
 
 test('a press waiting for fingers that fail does not run, nor start the fingers again by itself',async()=>{
