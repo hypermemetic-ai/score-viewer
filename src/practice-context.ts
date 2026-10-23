@@ -1,4 +1,4 @@
-import {initialPractice,readPractice,passageHierarchy,planPractice,requirePracticeHands,practicePartition,setPracticeGoal,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
+import {initialPractice,readPractice,passageHierarchy,sharedPracticePlan,requirePracticeHands,practicePartition,setPracticeGoal,type PracticePartition,type PracticePassagePlan,type PracticePlan,type PracticeState} from './practice';
 import type {PracticeMode,PracticePrimaryMode} from './practice-view';
 import type {PersonalState} from './state';
 import type {ScorePackage} from './package';
@@ -31,12 +31,12 @@ export function admitPracticeContext(p:ScorePackage,saved:unknown,context?:Pract
  requirePracticeHands(p,personal);
  const remembered=savedPlayerTempo(p.score,saved,context?.preferences),standIn=fingersOnly&&!remembered&&p.score.referencePerformanceTempo===undefined;
  const player=standIn?playerTempo(p.score,FINGERS_LAYOUT_TEMPO):remembered??(p.score.referencePerformanceTempo===undefined?chosenTempo:undefined);
- const plan=planPractice(p,'bounded-exercises-v1',personal,player);
+ const plan=sharedPracticePlan(p,'bounded-exercises-v1',personal,player);
  // A folded edition reads the score's journal by music. Fingers alone saves
  // nothing and reads only the player's settings.
  let journal:FoldedPracticeJournal|undefined;
  if(fold&&fingersOnly)saved=foldedPracticePreferences(saved,plan);
- else if(fold){const written={key:fold.key,written:planPractice(fold.written,'bounded-exercises-v1',fold.personal,player)},raw=saved;saved=foldedPracticeJournal(raw,plan,written);journal=new FoldedPracticeJournal(written,raw);}
+ else if(fold){const written={key:fold.key,written:sharedPracticePlan(fold.written,'bounded-exercises-v1',fold.personal,player)},raw=saved;saved=foldedPracticeJournal(raw,plan,written);journal=new FoldedPracticeJournal(written,raw);}
  let state=practiceStateForContext(plan,saved,context);journal?.read(state);
  // The stand-in never becomes the player's goal, so no snapshot can carry it.
  const rememberTempo=!!plan.playerTempo&&!state.personalGoal&&!standIn;

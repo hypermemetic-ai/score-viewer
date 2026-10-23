@@ -66,6 +66,14 @@ export function repeatOwnerFacts(p:ScorePackage,s:PersonalState):Map<string,Verb
  return facts;
 }
 
+/** Whether the reader may fold a repeat of this score at all: it is one the
+ * reader folds and its music has a verbatim repeat. Only then can the
+ * player's choices (shared fingers among them) change which pages it draws. */
+export function repeatsMayFold(p:ScorePackage):boolean{
+ const source=foldable(p);if(!source)return false;
+ // Folded or refused, the music has a repeat; the same answer the opening's own fold reads, when no choices differ.
+ const found=foldVerbatimRepeats(source,{sourceHash:p.sourceSha256});return !!(found.fold||found.refused);
+}
 /** The verbatim repeats the reader shows for these choices, or none for a score it does not fold. */
 export function verbatimRepeats(p:ScorePackage,s:PersonalState):VerbatimRepeatResult|undefined{
  const source=foldable(p);if(!source)return;

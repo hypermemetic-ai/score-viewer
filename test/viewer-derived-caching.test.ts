@@ -213,7 +213,9 @@ test('reopening resumes hand editing from the saved engine instead of engraving 
  // hand choices draw exactly as a cold engraving draws them.
  const second=fakeWorker(spying),reopened=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(second.spawn),cache,cacheWriteDelayMs:0});
  reopened.prefetch();await reopened.ensureHandChoicesDrawable();
- assert.deepEqual(restores,[true]);assert.equal(second.log[0].kind,'warm');assert.ok((second.log[0] as {saved?:unknown}).saved);
+ assert.deepEqual(restores,[true]);assert.equal(second.log[0].kind,'warm');
+ // The engine reaches the worker as stored, still compressed: the worker, not the reader's thread, inflates it.
+ assert.ok((second.log[0] as {savedEncoded?:{body?:unknown}}).savedEncoded?.body instanceof Uint8Array);assert.equal((second.log[0] as {saved?:unknown}).saved,undefined);
  const view=await reopened.project(choice);
  assert.deepEqual(view.pages,local.pages);assert.deepEqual(view.seats,local.seats);assert.deepEqual(view.score,local.score);assert.deepEqual(view.annotationGeometry,local.annotationGeometry);
  assert.deepEqual(second.log.map(m=>m.kind),['warm','warm','project'],'a restored engine is not saved again');
@@ -221,7 +223,7 @@ test('reopening resumes hand editing from the saved engine instead of engraving 
  // resumes from the saved engine: restore, then place only the choice.
  const third=fakeWorker(spying),direct=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:new ProjectionWorkerClient(third.spawn),cache:new EvictedProjections(store,'build-a'),cacheWriteDelayMs:0});
  assert.deepEqual((await direct.project(choice)).pages,local.pages);
- assert.deepEqual(third.log.map(m=>m.kind),['warm','project']);assert.ok((third.log[0] as {saved?:unknown}).saved);assert.deepEqual(restores,[true,true]);
+ assert.deepEqual(third.log.map(m=>m.kind),['warm','project']);assert.ok((third.log[0] as {savedEncoded?:{body?:unknown}}).savedEncoded?.body instanceof Uint8Array);assert.deepEqual(restores,[true,true]);
  // On the reader's thread too.
  const here=new PersonalPresentationSession(p,new PersonalPreparationPool<any>(),{worker:null,cache});
  await here.warm();assert.deepEqual((await here.project(choice)).pages,local.pages);
@@ -272,7 +274,7 @@ test('a hand choice right after an opening that took library work over restores 
   // The player's first hand choice checks the engraving before the save has run.
   const check=reader.ensureHandChoicesDrawable();await new Promise(r=>setTimeout(r,20));
   await background.flushEngine();await cache.flush();saved();await check;
-  return {restores,warms:later.log.filter(m=>m.kind==='warm').map(m=>!!(m as {saved?:unknown}).saved)};
+  return {restores,warms:later.log.filter(m=>m.kind==='warm').map(m=>!!(m as {saved?:unknown;savedEncoded?:unknown}).saved||!!(m as {savedEncoded?:unknown}).savedEncoded)};
  };
  assert.deepEqual(await run(false),{restores:[],warms:[false]},'read too early: the reader engraves the whole score again');
  assert.deepEqual(await run(true),{restores:[true],warms:[true]},'it waits for the save, then restores the engine');

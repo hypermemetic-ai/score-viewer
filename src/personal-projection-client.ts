@@ -4,7 +4,7 @@ import {checkReadingExecution,type ReadingExecution} from './reading-execution';
 import type {EncodedDerivedPayload} from './derived-payload';
 
 export interface ProjectionWorkerLike {
- postMessage(message:ProjectionRequest):void;terminate():void;
+ postMessage(message:ProjectionRequest,transfer?:Transferable[]):void;terminate():void;
  onmessage:((event:MessageEvent<ProjectionResponse>)=>void)|null;onerror:((event:Event)=>void)|null;
  onmessageerror?:((event:MessageEvent)=>void)|null;
 }
@@ -61,7 +61,11 @@ export class ProjectionWorkerClient {
  }
  private send(p:Pending){
   const worker=this.start(),create=this.known.has(p.request.key)?undefined:p.inputs;
-  this.known.add(p.request.key);worker.postMessage({...p.request,...(create?{create}:{})});
+  this.known.add(p.request.key);
+  // A deflated engine goes as a copy of its bytes, transferred: a request sent again (a restarted worker) sends its own.
+  const encoded=p.request.kind==='warm'?p.request.savedEncoded:undefined,body=encoded&&encoded.body.slice();
+  const message={...p.request,...(create?{create}:{}),...(encoded&&body?{savedEncoded:{...encoded,body}}:{})};
+  if(body)worker.postMessage(message,[body.buffer]);else worker.postMessage(message);
  }
  private receive(worker:ProjectionWorkerLike,response:ProjectionResponse){
   if(this.worker!==worker)return;this.answered=true;
@@ -73,7 +77,7 @@ export class ProjectionWorkerClient {
   this.pending.delete(response.id);p.cleanup();
   if(response.kind==='done')p.resolve(response);else{if(response.error.name!=='HandPresentationError')this.known.delete(p.request.key);p.reject(deserializeProjectionError(response.error));}
  }
- private request(base:{kind:'warm';saved?:PersonalHandEngineState}|{kind:'project';owners:PersonalOwnerHand[];digest:string;encode?:boolean}|{kind:'save'},key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<Done>{
+ private request(base:{kind:'warm';saved?:PersonalHandEngineState;savedEncoded?:EncodedDerivedPayload}|{kind:'project';owners:PersonalOwnerHand[];digest:string;encode?:boolean}|{kind:'save'},key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution):Promise<Done>{
   checkReadingExecution(execution);
   return new Promise((resolve,reject)=>{
    const id=++this.sequence,signal=execution?.signal;
@@ -93,9 +97,10 @@ export class ProjectionWorkerClient {
   });
  }
  /** Settle a core's engraving ahead of its first projection, from `saved`
-  * when it reproduces. Resolves how it settled. */
- warm(key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution,saved?:PersonalHandEngineState):Promise<'restored'|'engraved'|'already'>{
-  return this.request({kind:'warm',...(saved?{saved}:{})},key,inputs,execution).then(done=>done.settled??'engraved');
+  * when it reproduces. Resolves how it settled. A saved engine still
+  * deflated, as read from disk, is inflated in the worker. */
+ warm(key:string,inputs:ProjectionCoreInputs,execution?:ReadingExecution,saved?:SavedEngine):Promise<'restored'|'engraved'|'already'>{
+  return this.request({kind:'warm',...(saved?isEncodedEngine(saved)?{savedEncoded:saved}:{saved}:{})},key,inputs,execution).then(done=>done.settled??'engraved');
  }
  /** The core's settled engine, encoded for the disk cache, when the worker still holds a settled core. */
  save(key:string,inputs:ProjectionCoreInputs):Promise<EncodedDerivedPayload|undefined>{return this.request({kind:'save'},key,inputs).then(done=>done.engine);}
@@ -106,6 +111,9 @@ export class ProjectionWorkerClient {
   return view;
  }
 }
+/** A saved engine: decoded (one an import adopted), or as read from disk. */
+export type SavedEngine=PersonalHandEngineState|EncodedDerivedPayload;
+export const isEncodedEngine=(saved:SavedEngine):saved is EncodedDerivedPayload=>'body' in saved&&saved.body instanceof Uint8Array&&typeof (saved as EncodedDerivedPayload).payloadSha256==='string';
 /** Views the worker also encoded for the disk cache, as asked. */
 export const encodedProjections=new WeakMap<ProjectionView,EncodedDerivedPayload>();
 /** The reader's projection worker, built as its own module chunk. */

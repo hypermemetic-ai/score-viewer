@@ -9,7 +9,7 @@ async function run(status:string,changed=false,wrongCollection=false){
  const entry={id:'source',file:'retained.tuna',personalFiles:{journal:'original.json'}},data=new Uint8Array([1,2,3]),personal={overrides:{owner:{hand:'LH',finger:2}},history:['retained']};
  const p={availablePresentations:['janko-four-row'],manifest:{version:1},collection:'source'},q={status,package:p,personal,packageBytes:changed?new Uint8Array([1,2,4]):new Uint8Array(data)};
  const calls:string[]=[],op={keyboard:'janko-four-row'},context:any={
-  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),getScoreTransposition:()=>0,keyboardLabel:(layout:string)=>layout,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
+  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),personalMemory:{prefetch(){}},getScoreTransposition:()=>0,keyboardLabel:(layout:string)=>layout,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
   host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>p,requireCurrentEngraving:(x:unknown)=>x,admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
   loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>wrongCollection?'other':'source',
   installPreparedScore:async()=>{calls.push('install');if(wrongCollection)throw Error('Calculated score belongs to a different source.');return {entry,personal};},
@@ -31,7 +31,7 @@ test('actual identical bytes cannot bypass the source collection gate',async()=>
 // A Guitar Pro reading: its archive admits, then its source is checked.
 function reading(overrides:Record<string,unknown>){
  const entry={id:'part',file:'part.tuna'},p={manifest:{version:3},reading:{dual:{}}},calls:string[]=[],op={keyboard:'janko-four-row',controller:new AbortController()},context:any={
-  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},checkReadingOwner(){},
+  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:false}),readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},checkReadingOwner(){},
   host:{read:async()=>new Uint8Array([1]),fullscreen:async()=>{}},importReading:async()=>p,requireCurrentEngraving:(x:unknown)=>x,SavedPagesBehindPolicy:class extends Error{},admitReadingSource:async()=>{calls.push('source');},
   readingProgress:(_op:unknown,step:string)=>calls.push(step),readingExecution:()=>({}),
   reengraveReadingArchive:async()=>{calls.push('engraved');return new Uint8Array([2]);},
@@ -75,4 +75,17 @@ test('saved pages that lack their repeat signs open as saved, with a plain notic
 test('any other refusal whose engraving again fails still keeps the score from opening',async()=>{
  const f=lacksRepeats(async()=>{throw Error('The engine refused the edition');},Error('This saved engraving does not match the current shared engraving policy.'));
  assert.match(String(await f.open()),/engine refused/);assert.deepEqual(f.kept,[]);assert.deepEqual(f.calls.slice(-1),['failed']);
+});
+
+// A saved edition engraved again opens as the new edition it installs, and is
+// kept for its next opening in the session like any other: reopening it reads nothing again.
+test('a saved edition engraved again is kept for its next opening, like one opened as it is',async()=>{
+ const retainable=new WeakSet<object>(),activated:object[]=[];let refused=false;
+ const f=reading({SavedPagesLackRepeats,keepSavedPagesWithoutRepeats(){},reengraveReadingArchive:async()=>undefined,retainable,
+  importReading:async()=>{if(!refused){refused=true;throw new SavedPagesLackRepeats('no14');}return {manifest:{version:3}};},
+  prepareRebuiltEdition:async()=>({packageBytes:new Uint8Array([2]),personal:{}}),preparePiano:async()=>({q:{package:{manifest:{version:3}}},running:{}}),
+  activateScore:async(next:object)=>{activated.push(next);return next;}});
+ assert.equal(await f.open(),undefined);
+ assert.equal(activated.length,1);assert.ok(retainable.has(activated[0]),'the re-engraved edition is retainable');
+ assert.deepEqual(f.calls.slice(0,2),['engrave-again','complete']);
 });

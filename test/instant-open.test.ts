@@ -40,7 +40,9 @@ test('an engine encoded in the worker that holds it is stored byte for byte as t
  assert.equal(await new DerivedFileCache(there.store,'build-a').putEncoded('personal-engine-v1',sha('b'),{...encoded,payloadSha256:'nope'}),false,'a malformed digest is never written');
  // The reader settles its engine for editing only after work it took over has saved one, so it restores that engine.
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
- assert.match(main,/saving=aheadOfTime\?\.finishing\(next\.entry\.id\);\s*if\(saving\)\{shownSession\(next\)\.engineSavedBy\(saving\);void saving\.then\(settle\);\}else settle\(\);/,'and every settle of its session, a hand choice\'s check too, waits for that save');
+ assert.match(main,/readiness=scoreReadiness\(next,fingersLater,context\?undefined:aheadOfTime\?\.finishing\(next\.entry\.id\)\)/,'the opened score\'s stages know the save');
+ assert.match(main,/if\(piano&&saving\)shownSession\(target\)\.engineSavedBy\(saving\);/,'and every settle of its session, a hand choice\'s check too, waits for that save');
+ assert.match(main,/if\(saving\)await saving\.catch\(\(\)=>\{\}\);live\(signal\);const session=shownSession\(target\);session\.prefetch\(\);/,'its hands stage settles only after that save');
 });
 
 test('a derived entry\'s tag reads from its header alone, and only this build\'s entry has one',async()=>{

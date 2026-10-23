@@ -106,7 +106,7 @@ async function opening(rebuilds:boolean,times=1){
  const entry={id:'source',file:'saved.tuna',personalFiles:{}},data=new Uint8Array([1,2,3]),personal={overrides:{},history:[]},
   p={availablePresentations:['janko-four-row'],manifest:{version:2},collection:'source'},q={status:'reading',package:p,personal,packageBytes:new Uint8Array(data)};
  let calls:string[]=[],notices:string[]=[];const kept=new Set<string>(),op={keyboard:'janko-four-row'},context:any={
-  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),getScoreTransposition:()=>0,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
+  retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),personalMemory:{prefetch(){}},getScoreTransposition:()=>0,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
   host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>{calls.push('admit');return p;},admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
   requireCurrentEngraving:(p:unknown)=>{if(!kept.has('archive'))throw new SavedPagesBehindPolicy('archive');return p;},keepSavedPagesBehindPolicy:(archive:string)=>{calls.push('keep');kept.add(archive);},
   SavedPagesBehindPolicy,SavedPagesLackRepeats:class extends Error{},

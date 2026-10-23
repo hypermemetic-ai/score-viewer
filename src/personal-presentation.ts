@@ -9,10 +9,10 @@ import type {PersonalState} from './state';
 import {conservativeMaterialBytes} from './package-material';
 import {PersonalPreparationPool,type PreparationLease,type PreparationRequest} from './personal-preparation-pool';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
-import {cachedProjectionValue,type ProjectionCoreInputs,type ProjectionView} from './personal-projection-protocol';
-import {ProjectionWorkerClient,ProjectionWorkerUnavailable,encodedProjections,projectionWorkerClient} from './personal-projection-client';
+import {cachedEngine,cachedProjectionValue,type ProjectionCoreInputs,type ProjectionView} from './personal-projection-protocol';
+import {ProjectionWorkerClient,ProjectionWorkerUnavailable,encodedProjections,isEncodedEngine,projectionWorkerClient,type SavedEngine} from './personal-projection-client';
 import type {DerivedFileCache} from './derived-file-cache';
-import {encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
+import {decodeDerivedPayload,encodeDerivedPayload,type EncodedDerivedPayload} from './derived-payload';
 
 /** One captured projection core, on the reader's thread or in the projection worker. */
 export interface PersonalProjectionCore {
@@ -20,7 +20,7 @@ export interface PersonalProjectionCore {
   * `saved`: an engine this build saved for the same captured package, to
   * resume from instead of engraving. Resolves false when the engraving did
   * not settle, else how: restored, engraved, or already settled before. */
- warm(execution?:ReadingExecution,offThreadOnly?:boolean,saved?:PersonalHandEngineState):Promise<false|'restored'|'engraved'|'already'>;
+ warm(execution?:ReadingExecution,offThreadOnly?:boolean,saved?:SavedEngine):Promise<false|'restored'|'engraved'|'already'>;
  /** `encode`: the worker also encodes the view for the disk cache. */
  project(owners:readonly PersonalOwnerHand[],digest:string,execution?:ReadingExecution,encode?:boolean):Promise<ProjectionView>;
  /** The settled engine, encoded for the disk cache on the thread that holds
@@ -39,7 +39,9 @@ function localCore(inputs:ProjectionCoreInputs):Core {
   async warm(e,offThreadOnly,saved){
    if(offThreadOnly)return false;
    if(settled)return 'already';
-   if(saved&&(e?await core.restoreAsync(saved,e):core.restore(saved))){settled=true;return 'restored';}
+   // Without a worker, an engine read from disk is inflated and checked here.
+   const state=saved&&isEncodedEngine(saved)?await decodedEngine(saved):saved;
+   if(state&&(e?await core.restoreAsync(state,e):core.restore(state))){settled=true;return 'restored';}
    if(e)await core.warmAsync(e);else core.warm();settled=true;return 'engraved';
   },
   async project(owners,digest,e){const view=e?await core.projectAsync(owners,digest,e):core.project(owners,digest);settled=true;return view;},
@@ -121,11 +123,7 @@ export async function projectionServed(cache:DerivedFileCache,served:ProjectionE
  * state that does not reproduce; the cache's build identity keeps another
  * build's engine away. */
 export const PERSONAL_ENGINE_CACHE_KIND='personal-engine-v1';
-export function cachedEngine(value:unknown):PersonalHandEngineState {
- const v=value as PersonalHandEngineState;
- if(!v||typeof v!=='object'||v.version!=='personal-hand-engine-state-v1'||!Array.isArray(v.rawPages)||!v.graph||typeof v.graph!=='object')throw Error('Incomplete cached hand engine');
- return v;
-}
+async function decodedEngine(encoded:EncodedDerivedPayload):Promise<PersonalHandEngineState|undefined>{try{return cachedEngine(await decodeDerivedPayload(encoded));}catch{return;}}
 /** A cached view must be the complete projection made for exactly these hand
  * choices: the assignment digest covers every owner's identity and hand. */
 export function cachedProjection(owners:readonly PersonalOwnerHand[],digest:string){
@@ -348,7 +346,7 @@ export class PersonalPresentationSession {
   throw error;
  }
  /** The engine saved for this captured package, read once per session. */
- private savedEngine?:Promise<PersonalHandEngineState|undefined>;
+ private savedEngine?:Promise<SavedEngine|undefined>;
  private engineWrite?:ReturnType<typeof setTimeout>;
  /** Settle the engraving for hand editing: from the engine saved on disk
   * when there is one that reproduces, else by engraving, which is then saved. */
@@ -364,13 +362,14 @@ export class PersonalPresentationSession {
  }
  /** Whether the saved engine is the one the import of this package adopted. */
  private imported=false;
- private savedState():Promise<PersonalHandEngineState|undefined>{
+ private savedState():Promise<SavedEngine|undefined>{
   if(this.savedEngine)return this.savedEngine;
   const state=importedEngines.get(this.base);
   if(state){this.imported=true;importedEngines.delete(this.base);return this.savedEngine=Promise.resolve(state);}
   const cache=this.cache;if(!cache)return Promise.resolve(undefined);
   // The engine is read once per session, so not before a save under way has finished.
-  return this.savedEngine=(this.engineArriving??Promise.resolve()).then(()=>this.engineKey()).then(key=>cache.get(PERSONAL_ENGINE_CACHE_KIND,key,cachedEngine)).catch(()=>undefined);
+  // It stays deflated here: the worker that restores it inflates and checks it.
+  return this.savedEngine=(this.engineArriving??Promise.resolve()).then(()=>this.engineKey()).then(key=>cache.getEncoded(PERSONAL_ENGINE_CACHE_KIND,key)).catch(()=>undefined);
  }
  private engineArriving?:Promise<unknown>;
  /** This package's engine is being saved elsewhere (work an opening took

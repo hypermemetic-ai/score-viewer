@@ -11,7 +11,7 @@ import type {PersonalState} from './state';
 import {requirePitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {snapPracticeSpeed,snapPracticeStep} from './tempo-presentation';
 import {registerPracticePatterns,bindPracticePassages,equivalentPracticeClaims,practiceSpanEvidenceKey,practiceExerciseEvidenceKey,musicalSpanFact} from './practice-equivalence';
-import {requirePianoCapability} from './score-capabilities';
+import {requirePianoCapability,scoreCapabilities} from './score-capabilities';
 import {attainedRate,readManualAttainment,claimIdentity,type ManualAttainment} from './practice-attainment';
 import{MidiSoundingNotes,type MidiStream,type PracticeMidiSetup}from'./midi-sustain';
 import type{MidiCC}from'./midi';
@@ -82,6 +82,33 @@ export function planPractice(p:ScorePackage,partition:PracticePartition='bounded
  const player=p.score.referencePerformanceTempo===undefined&&playerTempo?validateReferencePerformanceTempo(playerTempo):undefined;
  if(!player)requireReferencePerformanceTempo(p.score);
  const plan=planSource(p,partition,personal,player);scorePulseGrid(plan,plan.barTicks);return plan;
+}
+/** The plan practice opens with, shared by everyone who opens practice on the
+ * same score, partition, choices and tempo: a plan is a pure result of them,
+ * and practice changes none it is given (its lookups are registered on the
+ * plan itself). Opening practice, and getting it ready ahead of a press, plan
+ * once. A caller that changes a plan plans its own with planPractice. */
+export function sharedPracticePlan(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState,playerTempo?:ReferencePerformanceTempo):PracticePlan {
+ const player=p.score.referencePerformanceTempo===undefined&&playerTempo?validateReferencePerformanceTempo(playerTempo):undefined;
+ const key=practicePlanKey(p,partition,personal,player),known=plannedPractice.get(key);
+ if(known){plannedPractice.delete(key);plannedPractice.set(key,known);return known;}
+ const plan=planPractice(p,partition,personal,player);
+ plannedPractice.set(key,plan);if(plannedPractice.size>KEPT_PLANS)plannedPractice.delete(plannedPractice.keys().next().value!);
+ return plan;
+}
+/** Plans kept by what they were planned from, newest last. */
+const plannedPractice=new Map<string,PracticePlan>(),KEPT_PLANS=4;
+/** What a plan is planned from, by content: the score (and the source it is
+ * cut by), its keyboard (the plan names it), its revision and edition fingers (hands resolve against them),
+ * whether it may be practised, the partition, the player's choices and tempo.
+ * Where the reader is looking plans nothing. */
+function practicePlanKey(p:ScorePackage,partition:PracticePartition,personal:PersonalState|undefined,player:ReferencePerformanceTempo|undefined):string{
+ const {view:_view,navigation:_navigation,editContactId:_edit,...choices}=personal??{} as Partial<PersonalState>;
+ const text=JSON.stringify([partition,personal?choices:null,player??null,scoreCapabilities(p).pianoPractice,p.keyboardLayout??null,p.sourceRevision??null,p.manifest,p.fingerLayer??null,p.score,p.sourceScore&&p.sourceScore!==p.score?p.sourceScore:null]);
+ // Two independent 32-bit FNV-1a passes, with the length: a content name, not a security claim.
+ let a=0x811c9dc5,b=0x01000193^text.length;
+ for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);a=Math.imul(a^c,0x01000193);b=Math.imul(b^c,0x5bd1e995);b^=b>>>15;}
+ return `${text.length}:${(a>>>0).toString(36)}:${(b>>>0).toString(36)}`;
 }
 export function planSource(p:ScorePackage,partition:PracticePartition='bounded-exercises-v1',personal?:PersonalState,playerTempo?:ReferencePerformanceTempo):PracticePlan {
  requirePianoCapability(p,'pianoPractice');
