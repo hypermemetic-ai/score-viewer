@@ -14,6 +14,8 @@ import {initialPersonal,personalStorageName,type PersonalState} from '../src/sta
 import type {ScorePackage} from '../src/package';
 import {undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
+import {foldVerbatimRepeats} from '../vendor/iso-notation/src/model/verbatim-repeats';
+import {buildSchumannNo13MusicXmlImport} from '../vendor/iso-notation/src/scores/schumann-no13-musicxml-import';
 
 // Schumann Op. 68 No. 13 as the owner's edition writes it: bar 11 holds the
 // return pickup (B4 C#5, right hand) in its last half beat; bar 21 is the same
@@ -42,12 +44,16 @@ function choose(input:MemoryScoreInput,id:string,hand:PersonalHand,options:{loca
  return next;
 }
 const owners=(input:MemoryScoreInput)=>{let personal=choose(input,e4(11),'RH');personal=choose({...input,personal},dSharp4(11),'RH',{at:'2026-10-21T04:56:50.493Z'});return personal;};
+/** The bass under bar 11's 4, which bar 21 plays between the same left-hand notes, moved as well: two notes of bar 21 follow bar 11. */
+const under=(bar:number)=>`m${bar}:n4`,withBass=(input:MemoryScoreInput)=>choose({...input,personal:owners(input)},under(11),'RH',{at:'2026-10-21T04:57:00.000Z'});
 
 test('No. 13: the owner’s bar 11 hand change reaches bar 21, the same music written short, and nothing is written there',()=>{
  const input=no13(),personal=owners(input),stored=structuredClone(personal.assignments);
  const r=handRecurrences(input.p,personal);
  assert.deepEqual([...r.targets],[[11,[21]]]);assert.deepEqual(r.skipped,[]);
- assert.equal(handFor(input.p,personal,e4(21)),'RH');assert.equal(handFor(input.p,personal,dSharp4(21)),'RH');
+ assert.equal(handFor(input.p,personal,e4(21)),'RH');
+ // The 3 (D#4) is followed in the left hand by bar 12's downbeat in bar 11, and by bar 22's in bar 21: written out, it stays.
+ assert.equal(handFor(input.p,personal,dSharp4(21)),'LH');
  assert.deepEqual(r.carried.get(e4(21)),{hand:'RH',fromBar:11,fromOwnerId:e4(11)});
  // The bass of both chords and every other note keep the written hand.
  for(const a of effectiveAssignments(input.p,personal))if(![e4(11),dSharp4(11),e4(21),dSharp4(21)].includes(a.id))assert.equal(a.hand,input.p.score.notes.find(n=>n.id===a.id)!.hand);
@@ -65,7 +71,7 @@ test('No. 13: the owner’s bar 11 hand change reaches bar 21, the same music wr
 // The owner's No. 13 folds its repeat: stored bars 12–21 are printed bars 2–11 played again, and bar 22 on prints ten bars earlier.
 const foldedNo13=(bar:number)=>bar<=11?bar:bar-10;
 test('No. 13 folded: bar 21 is bar 11 played again, so the hand notices name no bar that is not on the page', ()=>{
- const input=no13(),personal=owners(input);
+ const input=no13(),personal=withBass(input);
  assert.equal(handCarryNotice(input.p,input.personal,personal,e4(11)),'RH also in bar 21: the same music.','written out, bar 21 is its own bar');
  assert.equal(handCarryNotice(input.p,input.personal,personal,e4(11),false,foldedNo13),undefined,'folded, its second pass is the bar just edited');
  assert.equal(handChoiceView(input.p,personal,e4(11),foldedNo13),undefined);
@@ -108,39 +114,40 @@ test('only a hand chosen with recorded intent travels; a legacy hand or an only-
 });
 
 test('the owner’s own hand in the receiving bar wins, note by note',()=>{
- const input=no13();let personal=owners(input);
+ const input=no13();let personal=withBass(input);
  personal=choose({...input,personal},e4(21),'LH',{local:true,at:'2026-10-22T00:00:00.000Z'});
- assert.equal(handFor(input.p,personal,e4(21)),'LH');assert.equal(handFor(input.p,personal,dSharp4(21)),'RH');
+ assert.equal(handFor(input.p,personal,e4(21)),'LH');assert.equal(handFor(input.p,personal,under(21)),'RH');
  assert.deepEqual(handProvenance(input.p,personal,e4(21)),{kind:'local',hand:'LH',follows:11});
  assert.equal(handChoiceView(input.p,personal,e4(21))?.action?.label,'Use bar 11’s hand');
  // The edited note says its own hand in the editor; the notice names only other bars.
- assert.equal(handCarryNotice(input.p,owners(input),personal,e4(21)),undefined);
- // Bar 21's D#4 still follows bar 11, so bar 21 does not have its own hands again.
- assert.equal(handCarryNotice(input.p,owners(input),personal),'In bar 21, 4 is in its written hand again.');
- const undone=choose({...input,personal:owners(input)},e4(11),'LH');
- assert.equal(handCarryNotice(input.p,owners(input),undone,e4(11)),'In bar 21, 4 is in its written hand again.');
- assert.equal(handCarryNotice(input.p,owners(input),input.personal),'Bar 21 keeps its written hands again.');
+ assert.equal(handCarryNotice(input.p,withBass(input),personal,e4(21)),undefined);
+ // Bar 21's bass under the 4 still follows bar 11, so bar 21 does not have its own hands again.
+ assert.equal(handCarryNotice(input.p,withBass(input),personal),'In bar 21, 4 is in its written hand again.');
+ const undone=choose({...input,personal:withBass(input)},e4(11),'LH');
+ assert.equal(handCarryNotice(input.p,withBass(input),undone,e4(11)),'In bar 21, 4 is in its written hand again.');
+ assert.equal(handCarryNotice(input.p,withBass(input),input.personal),'Bar 21 keeps its written hands again.');
  // The editor's buttons say what happened to the selected note before the bars it changed.
- assert.equal(handActionNotice(input.p,owners(input),personal,e4(21),'hand-not-here'),'The rest of bar 21 still follows bar 11.');
- const unshared=structuredClone(owners(input));unshared.assignments!.choices[e4(11)].handScope='local';
- assert.equal(handActionNotice(input.p,owners(input),unshared,e4(11),'hand-only-here'),'In bar 21, 4 is in its written hand again.');
+ assert.equal(handActionNotice(input.p,withBass(input),personal,e4(21),'hand-not-here'),'The rest of bar 21 still follows bar 11.');
+ const unshared=structuredClone(withBass(input));unshared.assignments!.choices[e4(11)].handScope='local';
+ assert.equal(handActionNotice(input.p,withBass(input),unshared,e4(11),'hand-only-here'),'In bar 21, 4 is in its written hand again.');
  // The Hand row now names bar 21 ("RH · also in bar 21"), so the notice doesn't say it again.
- assert.equal(handActionNotice(input.p,unshared,owners(input),e4(11),'hand-shared'),undefined);
+ assert.equal(handActionNotice(input.p,unshared,withBass(input),e4(11),'hand-shared'),undefined);
  // Its Hand row now reads "RH · from bar 11", so nothing else is said.
- assert.equal(handActionNotice(input.p,personal,owners(input),e4(21),'hand-shared'),undefined);
+ assert.equal(handActionNotice(input.p,personal,withBass(input),e4(21),'hand-shared'),undefined);
 });
 
 test('practice plays and the calculator keeps the hand the page shows in bar 21',()=>{
- const input=no13(),personal=owners(input);
+ const input=no13(),personal=withBass(input);
  const practiced=personalPracticePackage(input.p,personal).score.notes;
- for(const id of [e4(21),dSharp4(21),e4(11),dSharp4(11)])assert.equal(practiced.find(n=>n.id===id)!.hand,'RH');
+ for(const id of [e4(21),under(21),e4(11),dSharp4(11),under(11)])assert.equal(practiced.find(n=>n.id===id)!.hand,'RH');
+ assert.equal(practiced.find(n=>n.id===dSharp4(21))!.hand,'LH','bar 21’s 3 leads elsewhere');
  const hands=(s:PersonalState)=>new Map(pianoRequestAuthority(input.p,{...input.p.score,totalTicks:2016,sourceBarTicks:[...barTicks,2016]} as never,'janko-four-row',undefined,s,'calculate').filter(c=>c.hand!==undefined).map(c=>[c.ownerId,[c.hand,c.provenance.kind]]));
  const authority=hands(personal);
- assert.deepEqual(authority.get(e4(21)),['RH','personal-choice']);assert.deepEqual(authority.get(dSharp4(21)),['RH','personal-choice']);
+ assert.deepEqual(authority.get(e4(21)),['RH','personal-choice']);assert.deepEqual(authority.get(under(21)),['RH','personal-choice']);assert.equal(authority.get(dSharp4(21)),undefined);
  assert.deepEqual(authority.get(e4(11)),['RH','personal-choice']);assert.equal(authority.get(m21bass),undefined);
  // An exception at bar 21 is what the calculator keeps there.
  const exception=choose({...input,personal},e4(21),'LH',{local:true,at:'2026-10-22T00:00:00.000Z'});
- assert.deepEqual(hands(exception).get(e4(21)),['LH','personal-choice']);assert.deepEqual(hands(exception).get(dSharp4(21)),['RH','personal-choice']);
+ assert.deepEqual(hands(exception).get(e4(21)),['LH','personal-choice']);assert.deepEqual(hands(exception).get(under(21)),['RH','personal-choice']);
  // Nothing carried, nothing added.
  assert.equal(hands(input.personal).size,0);
 });
@@ -176,18 +183,18 @@ test('a matching bar the result could not be drawn in is skipped and said, not r
 
 test('a carried hand repartitions bar 21’s fingering memory and keeps the fingers the owner saw',()=>{
  const input=no13();
- // The owner's finger 3 on bar 21's D#4, entered while it was a left-hand note.
- const fingered=assigned(input.p,input.personal,seat(input,dSharp4(21)),{finger:3});fingered.assignments!.choices[dSharp4(21)].intent={finger:{decisionId:'d',lineageId:'d',authoredAt:'2026-10-20T00:00:00.000Z'}};
+ // The owner's finger 3 on bar 21's E4, entered while it was a left-hand note.
+ const fingered=assigned(input.p,input.personal,seat(input,e4(21)),{finger:3});fingered.assignments!.choices[e4(21)].intent={finger:{decisionId:'d',lineageId:'d',authoredAt:'2026-10-20T00:00:00.000Z'}};
  const before={...input,personal:fingered},document=bootstrapPersonalFingeringMemory([before]);
- assert.equal(resolvePersonalFingeringMemory(document,'no13',input.p,fingered).byOwner[dSharp4(21)].finger?.value,3);
+ assert.equal(resolvePersonalFingeringMemory(document,'no13',input.p,fingered).byOwner[e4(21)].finger?.value,3);
  const after={...input,personal:owners(before)};
  const hand=(r:ReturnType<typeof projectPersonalMemoryScore>,bar:number,scope:PersonalHand)=>r.find(x=>x.writtenBar===bar&&x.occurrence.scope===scope)!.ownerIds.sort();
  const projected=projectPersonalMemoryScore(after);
- assert.ok(hand(projected,21,'RH').includes(e4(21))&&hand(projected,21,'RH').includes(dSharp4(21)));assert.ok(!hand(projected,21,'LH').includes(dSharp4(21)));
+ assert.ok(hand(projected,21,'RH').includes(e4(21))&&!hand(projected,21,'RH').includes(dSharp4(21)));assert.ok(!hand(projected,21,'LH').includes(e4(21)));
  assert.deepEqual(hand(projected,11,'RH').filter(id=>[e4(11),dSharp4(11)].includes(id)),[dSharp4(11),e4(11)].sort());
- const preserved=preservePersonalMemoryHandChange(document,before,after,dSharp4(11));
- assert.equal(resolvePersonalFingeringMemory(preserved,'no13',input.p,after.personal).byOwner[dSharp4(21)].finger?.value,3);
- assert.ok(Object.values(preserved.occurrences).some(r=>r.writtenBar===21&&r.occurrence.scope==='RH'&&r.ownerIds.includes(dSharp4(21))));
+ const preserved=preservePersonalMemoryHandChange(document,before,after,e4(11));
+ assert.equal(resolvePersonalFingeringMemory(preserved,'no13',input.p,after.personal).byOwner[e4(21)].finger?.value,3);
+ assert.ok(Object.values(preserved.occurrences).some(r=>r.writtenBar===21&&r.occurrence.scope==='RH'&&r.ownerIds.includes(e4(21))));
 });
 
 class Locks implements AssistanceBrowserLocks {private tail:Promise<unknown>=Promise.resolve();request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}}
@@ -240,27 +247,29 @@ test('opening a score whose existing hand change now reaches another bar writes 
  assert.ok(Object.values(after.occurrences).some(r=>r.writtenBar===21&&r.occurrence.scope==='RH'&&r.ownerIds.includes(e4(21))));
 });
 
-test('the moves inside the stretch both bars play travel; one in bar 11’s pickup stays in bar 11',()=>{
+test('a move in bar 11’s pickup, which bar 21 does not play, stays in bar 11',()=>{
  const input=no13(),pickup='m11:n13';
  // The owner also moves bar 11's pickup B4 (right hand, after the stretch bar 21 plays) to the left hand.
  const personal=choose({...input,personal:owners(input)},pickup,'LH',{at:'2026-10-22T00:00:00.000Z'}),r=handRecurrences(input.p,personal);
- assert.equal(handFor(input.p,personal,e4(21)),'RH');assert.equal(handFor(input.p,personal,dSharp4(21)),'RH');
+ assert.equal(handFor(input.p,personal,e4(21)),'RH');
  assert.deepEqual([...r.targets],[[11,[21]]]);assert.ok(![...r.carried.values()].some(c=>c.fromOwnerId===pickup));
- // A bar whose only moves lie after the shared stretch reaches nothing.
+ // A bar whose only move lies where the other bar plays nothing reaches nothing.
  const alone=choose(input,pickup,'LH');assert.equal(handRecurrences(input.p,alone).carried.size,0);
 });
 
-test('a pickup matches only a pickup of its length, not the downbeat of a full bar',()=>{
- const upbeat:Row[]=[['RH',64,0,24],['LH',52,0,24]];
- // Bar 1 is the opening pickup, bar 22 the pickup to the return; bar 5 starts with the same notes on its downbeat.
- const input=no13({1:upbeat,5:[...upbeat,['RH',66,24,72],['LH',50,24,72]],21:chords,22:upbeat});
- const fromPickup=choose(input,'m1:n1','RH');
- assert.equal(handFor(input.p,fromPickup,'m22:n1'),'RH');assert.equal(handFor(input.p,fromPickup,'m5:n1'),'LH');
- assert.deepEqual([...handRecurrences(input.p,fromPickup).targets],[[1,[22]]]);
- const fromDownbeat=choose(input,'m5:n1','RH');
- assert.equal(handFor(input.p,fromDownbeat,'m1:n1'),'LH');assert.equal(handFor(input.p,fromDownbeat,'m22:n1'),'LH');assert.equal(handRecurrences(input.p,fromDownbeat).carried.size,0);
+test('a pickup matches a pickup on the same beat between the same notes, never a downbeat, and the opening pickup only one with nothing before it',()=>{
+ // Bar 11's pickup B4 C#5 returns as bar 22, the pickup into the second part, after the same chord; bar 5 plays it on its
+ // downbeat after the same chord; bar 1 opens the piece with it.
+ const pickup:Row[]=[['RH',59,0,12],['RH',61,12,12]];
+ const input=no13({1:pickup,4:[['RH',54,72,24],['RH',59,72,24]],5:pickup,11:[...chords,['RH',59,72,12],['RH',61,84,12]],21:chords,22:pickup});
+ const fromPickup=choose(input,'m11:n13','LH');
+ assert.equal(handFor(input.p,fromPickup,'m22:n0'),'LH');assert.equal(handFor(input.p,fromPickup,'m5:n0'),'RH');
+ assert.equal(handFor(input.p,fromPickup,'m1:n0'),'RH','nothing comes before the opening pickup');
+ assert.deepEqual([...handRecurrences(input.p,fromPickup).targets],[[11,[22]]]);
+ const fromDownbeat=choose(input,'m5:n0','LH');
+ assert.equal(handFor(input.p,fromDownbeat,'m11:n13'),'RH');assert.equal(handFor(input.p,fromDownbeat,'m22:n0'),'RH');assert.equal(handRecurrences(input.p,fromDownbeat).carried.size,0);
+ assert.equal(handRecurrences(input.p,choose(input,'m1:n0','LH')).carried.size,0);
 });
-
 test('a hand moved before hand changes were shared says so where it would reach, and R shares it',async()=>{
  const input=no13(),legacy=assigned(input.p,input.personal,seat(input,e4(11)),{hand:'RH'});
  for(const c of Object.values(legacy.assignments!.choices))delete c.intent;
@@ -329,6 +338,33 @@ test('L, then R, on a carried note: it follows bar 11 again, not the right hand 
  await step(handAction(e4(11),'LH','undo'));assert.equal(handFor(input.p,personal,e4(21)),'LH');
  // R on a note that does not follow another bar is still that note's own hand.
  await step(handAction(m21bass,'RH','bass'));assert.equal(personal.assignments!.choices[m21bass].hand,'RH');
+});
+
+test('L, then R, on a note of a folded repeat leaves the stored records as they were',async()=>{
+ // ISO's public No. 13 MusicXML: bar 20 is bar 10 played again, so the reader folds them and edits both passes.
+ const score=buildSchumannNo13MusicXmlImport().score,bars=score.sourceBarTicks!,fold=foldVerbatimRepeats(score).fold!;
+ const at=(bar:number,onset:number)=>score.notes.filter(n=>n.hand==='RH'&&n.startTick===bars[bar-1]+onset&&'pitch' in n&&n.pitch.pitchClass===4).map(n=>n.id);
+ // Bar 10's last sixteenth, the right hand's E4, and its twin in bar 20.
+ const [first]=at(10,84),[second]=at(20,84);assert.equal(fold.shownBy.get(second),first);
+ const p={manifest:{version:1,revision:'revision',metadata:{title:'No. 13'}},keyboardLayout:'janko-four-row',profileSha256:'geometry',pages:['svg'],score,
+  seats:score.notes.map((n,i)=>({id:`s${i}`,ownerIds:[n.id],writtenBar:bars.findLastIndex(t=>t<=n.startTick)+1,contactId:`c${i}`,actionId:`a${i}`,page:0,system:0,x:i,baseline:0,fontSize:12,pitchDigit:'1'}))} as unknown as ScorePackage;
+ const input={entryId:'no13-xml',importedAt:'2026-10-23T00:00:00.000Z',p,personal:initialPersonal(p)} as MemoryScoreInput;
+ const store=storage(),s=session(store,input);await s.initialize();
+ let personal=await s.loadPersonalCurrent({id:'no13-xml',importedAt:input.importedAt!},p,async()=>input.personal);
+ const records=async()=>JSON.stringify(((await store.read()).documents[personalStorageName('no13-xml',p)] as unknown as PersonalState|undefined)?.assignments);
+ const before=await records();
+ // As the editor does: one hand action per pass the folded note shows, each on the result of the last.
+ const press=async(hand:PersonalHand,owners:string[])=>{for(const ownerId of owners){const receipt=s.accept({...input,personal},handAction(ownerId,hand,`${hand}:${ownerId}`));await receipt.saved;personal=receipt.personal;}};
+ // L: the first pass is moved and the second follows it, so both passes now carry the choice.
+ await press('LH',[first]);
+ assert.deepEqual([handFor(p,personal,first),handFor(p,personal,second)],['LH','LH']);
+ assert.deepEqual(Object.keys(personal.assignments!.choices),[first]);
+ assert.notEqual(await records(),before,'the move is stored');
+ // R on both passes: the written hand undoes the move, and nothing is written for the second pass.
+ await press('RH',[first,second]);
+ assert.deepEqual([handFor(p,personal,first),handFor(p,personal,second)],['RH','RH']);
+ assert.equal(personal.assignments,undefined);
+ assert.equal(await records(),before,'the stored records are as before');
 });
 
 test('R on a note already in the owner’s right hand changes nothing, even where a matching bar would carry it',async()=>{

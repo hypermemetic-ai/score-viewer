@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Direct personal hand and finger decisions
-In note editing, L/R SHALL assign the selected note's effective performing hand as a persistent personal choice, including a choice different from imported hand authority. A hand key SHALL retain its current finger number and selection; finger digits SHALL retain existing advance behavior. The original assignment SHALL remain recoverable. Exact matching recurrences SHALL follow personal-fingering-memory rules; resemblance alone SHALL NOT authorize propagation. A deliberate hand choice SHALL also apply, without being stored there, to every other note of the score that is the same note and stands on the same beat of its bar (counted from the downbeat) among the same notes of the moved note's written hand. The same note means the same pitch, duration, written value and ties, articulation, slur membership and graces. The same notes means those the source writes in that hand over the part of the bar both places share, held notes included, alike in pitch, place, duration and those marks. The other hand SHALL NOT be compared.
+In note editing, L/R SHALL assign the selected note's effective performing hand as a persistent personal choice, including a choice different from imported hand authority. A hand key SHALL retain its current finger number and selection; finger digits SHALL retain existing advance behavior. The original assignment SHALL remain recoverable. Exact matching recurrences SHALL follow personal-fingering-memory rules; resemblance alone SHALL NOT authorize propagation. A deliberate hand choice SHALL also apply, without being stored there, to every other note of the score that is the same note, stands on the same beat of its bar (counted from the downbeat), is struck with the same notes of the moved note's written hand, and has the same neighbours in that hand. The same note means the same pitch, duration, written value and ties, articulation, slur membership and graces. The neighbours are the notes the source writes in that hand at the onset just before the note and just after it, across the barline if need be, alike in pitch, place, duration and those marks; a side with no such note matches only a side with none. Notes further away in that hand MAY differ, and the other hand SHALL NOT be compared. Choosing the written hand where a note has no hand of its own SHALL store nothing.
 
 #### Scenario: Change hand then finger
 - **WHEN** the player selects a left-hand note with finger 3, presses R, then enters 2
@@ -19,8 +19,9 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **AND** nonmatching independent notes remain unchanged, while exact reusable matches follow their shared or local authority
 
 #### Scenario: Hand change reaches the same music written short
-- **WHEN** the player moves Schumann Op. 68 No. 13 bar 11's LH E4 and D#4 to the right hand
-- **THEN** bar 21's E4 and D#4 are also right-hand notes, and the editor names bar 11 as their source
+- **WHEN** the player moves Schumann Op. 68 No. 13 bar 11's LH E4 and D#4 to the right hand, in the written-out form
+- **THEN** bar 21's E4 is also a right-hand note, and the editor names bar 11 as its source
+- **AND** bar 21's D#4 keeps its left hand: the left hand goes on to bar 12's downbeat after bar 11, and to bar 22's other notes after bar 21
 - **AND** no record is written for bar 21, and the bass notes and every other note keep their hands
 - **AND** a bar with another bass under the same chords, in the left hand, is not changed
 
@@ -29,22 +30,31 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **THEN** the return takes the moved hand
 
 #### Scenario: Duration or articulation differs
-- **WHEN** a return plays the same pitches in the moved note's hand, but that note or another note of that hand there differs in duration or written value (a dotted quarter against a tied quarter and eighth), staccato, accent or slur
+- **WHEN** a return plays the same pitches in the moved note's hand, but the moved note, a note struck with it or the note just before or after it in that hand differs there in pitch, duration or written value (a dotted quarter against a tied quarter and eighth), staccato, accent or slur
 - **THEN** that return keeps its hands
+
+#### Scenario: A difference further away
+- **WHEN** a return plays the moved note between the same neighbours in its hand, but another note of that hand further away differs, in the same bar or beyond
+- **THEN** that return takes the moved hand (No. 13 bar 6's first note reaches bar 7, though only bar 6 has a grace before its last eighth)
 
 #### Scenario: Keep, don't share and reset, note by note
 - **WHEN** the player presses L or Keep its written LH at bar 21's carried E4, or Don't share this note's hand at bar 11's E4
-- **THEN** that note keeps its own hand, the other bar's E4 keeps its own effective hand, and bar 21's D#4 still follows bar 11
+- **THEN** that note keeps its own hand, the other bar's E4 keeps its own effective hand, and any other note of bar 21 that follows bar 11 still does
 - **AND** the notice names the note and what happened to it before the bars it changed
 - **AND** Use bar 11's hand or Share this note's hand returns to the shared hand, and choosing the written hand at bar 11 undoes the change in both bars
 
 #### Scenario: A move in bar 11's pickup
-- **WHEN** the player also moves bar 11's pickup B4, after the stretch bar 21 plays
-- **THEN** bar 11's E4 and D#4 still reach bar 21, and the pickup's hand does not reach bar 21
+- **WHEN** the player also moves bar 11's pickup B4, which bar 21, written short, does not play
+- **THEN** bar 11's E4 still reaches bar 21, and the pickup's hand does not reach bar 21
 
 #### Scenario: Pickups
 - **WHEN** a hand is moved in a pickup bar, or in a full bar's last beats that a pickup bar repeats
-- **THEN** it reaches the same note at the same beat counted from the downbeat (No. 13 bar 11's pickup B4 reaches the opening B4 of bar 1), never a full bar's downbeat
+- **THEN** it reaches the same note at the same beat counted from the downbeat between the same neighbours, never a full bar's downbeat
+- **AND** the opening pickup, with nothing before it, reaches only a place with nothing before it either: No. 13 bar 11's pickup B4 does not reach the opening B4 of bar 1
+
+#### Scenario: L, then R, on a folded repeat
+- **WHEN** the player presses L at bar 10's E4 in No. 13, written in the right hand and folded with bar 20, then R
+- **THEN** the stored records are exactly as before: no record for bar 10 and none for bar 20
 
 #### Scenario: L, then R, at a carried note
 - **WHEN** the player presses L at bar 21's carried E4, then R

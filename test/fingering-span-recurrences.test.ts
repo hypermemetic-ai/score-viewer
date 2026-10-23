@@ -84,9 +84,10 @@ test('a pickup bar is never read from its start: bar 22 does not take the downbe
  assert.ok(fingersIn(document,{...pickup,personal},22).every(f=>f===null));
 });
 
-/** Bar 11's LH 4 (E4) and LH 3 (D#4) moved to the right hand, with recorded intent; bar 21 receives them. */
-function movedHands(input:MemoryScoreInput,personal:PersonalState):PersonalState {
- for(const [id,at] of [['m11:n5','2026-10-21T04:56:19.263Z'],['m11:n10','2026-10-21T04:56:50.493Z']] as const){
+/** Bar 11's LH 4 (E4) moved to the right hand, with recorded intent; bar 21 receives it. Bar 11's LH 3 (D#4)
+ * would not reach bar 21: after it bar 11's left hand rests under the pickup, while bar 21's goes on into bar 22. */
+function movedHands(input:MemoryScoreInput,personal:PersonalState,moved:readonly (readonly [string,string])[]=[['m11:n5','2026-10-21T04:56:19.263Z']]):PersonalState {
+ for(const [id,at] of moved){
   personal=assigned(input.p,personal,seat(input,id),{hand:'RH'});const c=personal.assignments!.choices[id];c.intent={...c.intent,hand:{decisionId:`${id}:${at}`,lineageId:`${id}:${at}`,authoredAt:at}};
  }
  return personal;
@@ -98,14 +99,14 @@ test('hands and fingers compare the same bars: one pickup rule, with or without 
  assert.deepEqual(pickups(metered),[1,22]);assert.deepEqual(pickups(unmetered),[1,22]);
  for(const input of [metered,unmetered]){
   const personal=movedHands(input,owners(input)),document=bootstrapPersonalFingeringMemory([{...input,personal}]);
-  assert.equal(handFor(input.p,personal,'m21:n10'),'RH','the hand reaches bar 21');
+  assert.equal(handFor(input.p,personal,'m21:n5'),'RH','the hand reaches bar 21');
   assert.deepEqual(fingersIn(document,{...input,personal},21),bar11Fingers.slice(0,13),'and so do the fingers');
  }
  // Bar 21 written short with nothing after it to complete it (bar 22 a full bar of 1/8): it follows a full bar, so it starts on a downbeat for both.
  const lone=no13({11:bar11,21:chords,23:bar23});(lone.p.score as {timeSignatures:unknown[]}).timeSignatures=[{tick:0,numerator:2,denominator:4},{tick:barTicks[21],numerator:1,denominator:8},{tick:barTicks[22],numerator:2,denominator:4}];
  assert.deepEqual(pickups(lone),[1]);
  const personal=movedHands(lone,owners(lone)),document=bootstrapPersonalFingeringMemory([{...lone,personal}]);
- assert.equal(handFor(lone.p,personal,'m21:n10'),'RH');assert.deepEqual(fingersIn(document,{...lone,personal},21),bar11Fingers.slice(0,13));
+ assert.equal(handFor(lone.p,personal,'m21:n5'),'RH');assert.deepEqual(fingersIn(document,{...lone,personal},21),bar11Fingers.slice(0,13));
  // A score's meters decide only its pickups: bar 21 in 3/8 still plays bar 11's music in 2/4 from the downbeat.
  const meters=no13();(meters.p.score as {timeSignatures:unknown[]}).timeSignatures=[{tick:0,numerator:2,denominator:4},{tick:barTicks[20],numerator:3,denominator:8},{tick:barTicks[21],numerator:2,denominator:4}];
  assert.deepEqual(pickups(meters),[1]);
@@ -139,10 +140,12 @@ test('an exception at bar 11 stays in bar 11: bar 21 keeps the shared finger',()
  assert.equal(r.byOwner['m11:n3'].finger?.value,4);assert.equal(r.byOwner['m21:n3'].finger?.value,5);
 });
 
-test('after bar 11’s LH 4 and 3 move to the right hand, carried to bar 21, bar 21 keeps bar 11’s fingers',()=>{
+test('after bar 11’s LH 4 moves to the right hand, carried to bar 21, bar 21 keeps bar 11’s fingers',()=>{
  const input=no13(),before={...input,personal:owners(input)},document=bootstrapPersonalFingeringMemory([before]);
- const personal=movedHands(input,before.personal),after={...input,personal};assert.equal(handFor(input.p,personal,'m21:n5'),'RH');assert.equal(handFor(input.p,personal,'m21:n10'),'RH');
- const preserved=preservePersonalMemoryHandChange(document,before,after,'m11:n10');
+ const personal=movedHands(input,before.personal),after={...input,personal};assert.equal(handFor(input.p,personal,'m21:n5'),'RH');assert.equal(handFor(input.p,personal,'m21:n10'),'LH');
+ // LH 3 moved as well stays in bar 11: the left hand goes on differently after it.
+ assert.equal(handFor(input.p,movedHands(input,before.personal,[['m11:n5','2026-10-21T04:56:19.263Z'],['m11:n10','2026-10-21T04:56:50.493Z']]),'m21:n10'),'LH');
+ const preserved=preservePersonalMemoryHandChange(document,before,after,'m11:n5');
  assert.deepEqual(fingersIn(preserved,after,11),bar11Fingers);assert.deepEqual(fingersIn(preserved,after,21),bar11Fingers.slice(0,13));
  assert.deepEqual(fingersIn(document,after,21),bar11Fingers.slice(0,13));
 });
@@ -176,13 +179,13 @@ test('a refused carried hand: bar 21 is resolved again with its written hands, a
  const target={package:input.p,entry:{id:'no13',importedAt:input.importedAt},personal:await session.loadPersonalCurrent({id:'no13',importedAt:input.importedAt!},input.p,async()=>stored.personal)};
  target.personal=context.resolveMemory(target);
  const bar21=()=>input.p.score.notes.filter(n=>n.id.startsWith('m21:')).map(n=>target.personal.memoryResolved?.choices[n.id]?.finger??null);
- // Before the refusal bar 21 carries bar 11's hands and fingers: D#4 (3) in the RH with 1.
- assert.equal(handFor(input.p,target.personal,'m21:n10'),'RH');assert.deepEqual(bar21(),bar11Fingers.slice(0,13));
+ // Before the refusal bar 21 carries bar 11's hands and fingers: E4 (4) in the RH with 1.
+ assert.equal(handFor(input.p,target.personal,'m21:n5'),'RH');assert.deepEqual(bar21(),bar11Fingers.slice(0,13));
  const memory=JSON.stringify((await store.read()).documents[personalMemoryDocument]),records=JSON.stringify(target.personal.assignments);
  const kept=await context.keepDrawableHands(target,target.personal,refusal(),(id:string)=>input.p.score.notes.find(n=>n.id===id)?.hand??null);
  assert.deepEqual([...kept.dropped],[21]);assert.deepEqual([...kept.unshared],[21]);
- // D#4 is back in the LH beside B3, and neither keeps bar 11's 1: bar 21's hands no longer play bar 11's.
- assert.equal(handFor(input.p,target.personal,'m21:n10'),'LH');assert.deepEqual(bar21(),Array(13).fill(null));
+ // E4 is back in the LH beside B3, and neither keeps bar 11's fingers: bar 21's hands no longer play bar 11's.
+ assert.equal(handFor(input.p,target.personal,'m21:n5'),'LH');assert.deepEqual(bar21(),Array(13).fill(null));
  assert.ok(input.p.score.notes.filter(n=>n.id.startsWith('m11:')).every((n,i)=>target.personal.memoryResolved?.choices[n.id]?.finger===bar11Fingers[i]),'bar 11 keeps its own');
  assert.equal(droppedCarryText(kept.dropped,kept.unshared),'Bar 21 keeps its written hands, and its fingers stay unshared: the carried hand can’t be drawn there.');
  // Nothing is written: the refusal lasts for the session only.
@@ -242,10 +245,10 @@ test('reopened after a refused carried hand, bar 21’s hands as written are reg
  const bar21LH=async()=>Object.values(((await store.read()).documents[personalMemoryDocument] as unknown as {occurrences:Record<string,{writtenBar:number;occurrence:{scope?:string};ownerIds:string[]}>}).occurrences)
   .some(r=>r.writtenBar===21&&r.occurrence.scope==='LH'&&r.ownerIds.includes('m21:n5')&&r.ownerIds.includes('m21:n10'));
  let personal=await open();const before=(await store.read()).revision;
- assert.equal(handFor(input.p,personal,'m21:n10'),'RH');assert.equal(await bar21LH(),false,'only the carried split is known');
+ assert.equal(handFor(input.p,personal,'m21:n5'),'RH');assert.equal(await bar21LH(),false,'only the carried split is known');
  // Opening it again unchanged writes nothing.
  personal=await open();assert.equal((await store.read()).revision,before);
- assert.equal(dropHandCarry(input.p,personal,'m21:n5'),21);assert.equal(handFor(input.p,personal,'m21:n10'),'LH');
+ assert.equal(dropHandCarry(input.p,personal,'m21:n5'),21);assert.equal(handFor(input.p,personal,'m21:n5'),'LH');
  // Reopened in the same session, the score is known with bar 21's hands as written only once they are registered.
  await open();assert.equal(await bar21LH(),true);assert.ok((await store.read()).revision>before);
 });
