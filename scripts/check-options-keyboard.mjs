@@ -48,6 +48,24 @@ try{
  await capture('options-pressure-practice-return.png');
  // A neutral instrument uses the same visible Options navigation without piano-only score controls.
  for(let n=0;n<3;n++)await key('Escape');await page.locator('.library').waitFor();
+ // A waiting press's notice (built as ReadinessNotice builds it) stands just above an open toolbar, however many rows the
+ // toolbar wraps to, and never on one of its controls; with the toolbar hidden it keeps its place near the bottom edge.
+ {await page.locator('[data-open]').first().click();await page.locator('.reader').waitFor();
+  const place=()=>page.evaluate(()=>{const surface=document.querySelector('.surface'),bar=surface.querySelector('.toolbar');let notice=surface.querySelector('.readiness-notice');
+   if(!notice){notice=document.createElement('div');notice.className='readiness-notice shown';notice.dataset.place='surface';notice.innerHTML='<span class="readiness-notice-words">Getting fingers ready…</span><span class="readiness-notice-line"></span>';surface.append(notice);}
+   const box=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom};};
+   return {open:bar.classList.contains('visible'),notice:box(notice),bar:box(bar),surface:box(surface),controls:[...bar.querySelectorAll('button,select,small,input')].filter(e=>e.getClientRects().length).map(e=>({name:e.dataset.action??e.getAttribute('aria-label')??e.textContent.trim(),...box(e)}))};});
+  const overlaps=(a,b)=>a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom;record.noticePlaces=[];
+  for(const viewport of [{width:1920,height:1080},{width:1280,height:800},{width:680,height:900}]){
+   await page.setViewportSize(viewport);await page.locator('.reader').focus();if(!await page.locator('.toolbar.visible').count())await key('Tab');await page.locator('.toolbar.visible').waitFor();
+   const open=await place(),rows=open.controls.map(c=>(c.top+c.bottom)/2).sort((a,b)=>a-b).filter((y,i,all)=>i===0||y-all[i-1]>22).length;record.noticePlaces.push({viewport,toolbar:'open',rows,...open});
+   assert.deepEqual(open.controls.filter(c=>overlaps(c,open.notice)).map(c=>c.name),[],`the notice covers no toolbar control at ${viewport.width}×${viewport.height}`);
+   assert.ok(open.notice.bottom<=open.bar.top&&open.bar.top-open.notice.bottom<=16,`the notice stands just above the open toolbar at ${viewport.width}×${viewport.height}: ${open.bar.top-open.notice.bottom}px`);
+   await capture(`readiness-notice-toolbar-${viewport.width}x${viewport.height}.png`);
+   await page.locator('.reader').focus();await key('h');await page.locator('.toolbar.visible').waitFor({state:'detached'});const hidden=await place();record.noticePlaces.push({viewport,toolbar:'hidden',...hidden});
+   assert.ok(Math.abs(hidden.surface.bottom-hidden.notice.bottom-14)<=1,`with the toolbar hidden the notice keeps its place 14px above the bottom edge at ${viewport.width}×${viewport.height}`);}
+  await page.setViewportSize({width:1440,height:1080});await page.evaluate(()=>document.querySelector('.readiness-notice')?.remove());for(let n=0;n<3&&!await page.locator('.library').count();n++)await key('Escape');await page.locator('.library').waitFor();
+  check(`The press notice stands just above the open toolbar (${record.noticePlaces.filter(p=>p.toolbar==='open').map(p=>`${p.viewport.width}×${p.viewport.height}: ${p.rows} row${p.rows>1?'s':''}, toolbar ${Math.round(p.bar.bottom-p.bar.top)}px`).join('; ')}) and covers no control; hidden, it stays 14px above the bottom edge`);}
  const readingFile=join(evidence,'neutral-reading.tuna');await writeFile(readingFile,await authoredReadingPackage());
  const readingChooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Import',exact:false}).click();await(await readingChooser).setFiles(readingFile);await page.locator('.reader').waitFor({timeout:120000});await key('o');await page.locator('dialog[data-kind=options]').waitFor();assert.equal(await page.locator('[data-options-section=score]').count(),1);assert.equal(await page.locator('[data-score-transpose]').count(),0);assert.equal(await page.locator('[data-finger-behavior]').count(),0,'a neutral instrument has no piano finger behaviour');await section('keys');assert.equal(await page.locator('[data-control=toggle]').count(),0);assert.equal(await page.locator('[data-control=edit]').count(),0);await capture('options-neutral-instrument.png');check('Neutral instrument retains Score, page and Options controls while omitting piano-only controls');await key('Escape');
  // Exercise real installed/absent piano UI through a bounded browser-only IPC simulation.

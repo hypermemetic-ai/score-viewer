@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PendingPress,READINESS_NOTICE_DELAY_MS,READINESS_NOTICE_MIN_MS,type ReadinessNoticePlace,type ReadinessNoticeView,type ReadinessTimers} from '../src/readiness-notice';
+import {readFileSync} from 'node:fs';
+import {PendingPress,READINESS_NOTICE_DELAY_MS,READINESS_NOTICE_MIN_MS,trackToolbarHeight,type ReadinessNoticePlace,type ReadinessNoticeView,type ReadinessTimers} from '../src/readiness-notice';
 import {ScoreReadiness,type ReadinessStage} from '../src/score-readiness';
 
 const flush=async()=>{for(let i=0;i<5;i++)await Promise.resolve();};
@@ -131,4 +132,22 @@ test('the notice can sit after a chosen menu item, and a failing stage still run
  assert.deepEqual(log[0]?.place,{after:item});
  await c.advance(600);
  assert.equal(await outcome,'ran');assert.equal(ran,1,'the action says what went wrong in its own words');
+});
+
+test('with the toolbar open the notice stands just above its measured top edge, however many rows it wraps to; hidden, it keeps its place',()=>{
+ const set=new Map<string,string>(),surface={style:{setProperty:(name:string,value:string)=>set.set(name,value)}} as unknown as HTMLElement;
+ const toolbar={offsetHeight:64} as HTMLElement;
+ let resized:(()=>void)|undefined,observed:unknown,disconnected=false;
+ class Observer{constructor(run:()=>void){resized=run;}observe(target:unknown){observed=target;}disconnect(){disconnected=true;}}
+ const stop=trackToolbarHeight(surface,toolbar,Observer as unknown as typeof ResizeObserver);
+ assert.equal(observed,toolbar);assert.equal(set.get('--toolbar-height'),'64px','one row, measured at once');
+ // At 1920×1080 the owner's open toolbar wraps to two rows.
+ (toolbar as {offsetHeight:number}).offsetHeight=144;resized!();
+ assert.equal(set.get('--toolbar-height'),'144px','two rows: the notice moves up with the toolbar\'s top edge');
+ stop();assert.ok(disconnected);
+ // The stylesheet places an open toolbar's notice from that measure, and a hidden toolbar's where it always was.
+ const css=readFileSync(new URL('../src/readiness-notice.css',import.meta.url),'utf8');
+ assert.match(css,/\.toolbar\.visible~\.readiness-notice\{bottom:calc\(var\(--toolbar-height,64px\) \+ 10px\)\}/);
+ assert.match(css,/\.readiness-notice\{position:absolute;left:50%;bottom:14px;/);
+ assert.doesNotMatch(css,/bottom:84px/,'no fixed guess at the toolbar\'s height');
 });

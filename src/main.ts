@@ -43,7 +43,7 @@ import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTrans
 import {PitchInputEpoch,FINGERS_LAYOUT_TEMPO,type AdmittedPracticeContext,type PracticeFoldSource,type PracticeViewContext} from './practice-context';
 import {PracticeView} from './practice-view';
 import {READINESS_WORDS,ScoreReadiness,afterPaint,nextTask,prepareAfterPaint,type ReadinessStage} from './score-readiness';
-import {PendingPress,ReadinessNotice,type ReadinessNoticePlace} from './readiness-notice';
+import {PendingPress,ReadinessNotice,trackToolbarHeight,type ReadinessNoticePlace} from './readiness-notice';
 import {ManualPracticeView} from './manual-practice-view';
 import {ManualReadingContext} from './manual-reading-context';
 import {planManualPractice} from './manual-practice-plan';
@@ -652,7 +652,9 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){
  libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>esc(readingParts.summary(entry)),preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
  const restore=libraryFocusElement(app,focusKey);if(restore&&!restore.hidden)restore.focus();else if(entries.length)libraryMenu.focus();else app.querySelector<HTMLElement>('[data-action=import]')?.focus();
 }
-function render(){if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><div class="editor-column"><div class="editor-navigation" hidden></div></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;renderPages();renderToolbar();paintHandPreparation();app.querySelector<HTMLElement>('.reader')?.focus();}
+/** Stops measuring the last reader's toolbar for the press notice. */
+let toolbarHeight:(()=>void)|undefined;
+function render(){toolbarHeight?.();toolbarHeight=undefined;if(!current){renderLibrary();return;}orientation.admitReader(current.personal.view.rotation);app.innerHTML=`<section class="surface"><div class="reader" tabindex="-1" aria-label="Score pages"><div class="page-group"></div></div><div class="editor-column"><div class="editor-navigation" hidden></div></div><nav class="toolbar" aria-label="Reader controls"></nav></section>`;toolbarHeight=trackToolbarHeight(app.querySelector<HTMLElement>('.surface')!,app.querySelector<HTMLElement>('.toolbar')!);renderPages();renderToolbar();paintHandPreparation();app.querySelector<HTMLElement>('.reader')?.focus();}
 function renderPages(){
  if(practice||!current)return;
  const p=readerPackage(),s={...(livePersonalEditors.get(current)?.visiblePersonal??current.personal),view:current.personal.view},v=effectiveView(followedPage===undefined?s.view:{...s.view,page:followedPage}),mode=labelMode(),surface=app.querySelector<HTMLElement>('.surface')!,group=app.querySelector<HTMLElement>('.page-group')!;
