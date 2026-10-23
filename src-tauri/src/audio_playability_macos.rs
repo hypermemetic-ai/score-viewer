@@ -270,6 +270,112 @@ impl Probe {
             "limiterLowestGainDb":(limited > 0).then(|| dbfs(after.limiter_gain as f32)),
         })
     }
+    /// The left channel at the loopback input for one event, with the frames
+    /// the limiter lowered during it and its lowest gain since the output opened.
+    fn capture(
+        &self,
+        host: &mut platform::Host,
+        rate: f64,
+        rec: &Arc<Mutex<Recording>>,
+        seconds: f64,
+        play: &dyn Fn(&mut platform::Host),
+    ) -> (Vec<f32>, u64, f64) {
+        let before = host.status();
+        let at = now_ns();
+        play(host);
+        run(host, seconds + 0.05);
+        let after = host.status();
+        let r = rec.lock().unwrap();
+        let from = r.index_at(at, rate);
+        let to = r.index_at(at + (seconds * 1e9) as u64, rate);
+        (
+            r.samples[from..to].to_vec(),
+            after.limited_frames - before.limited_frames,
+            after.limiter_gain,
+        )
+    }
+    /// The metronome's level while a pedalled fortissimo chord is limited:
+    /// the same cue is recorded alone, then started with the chord. Its level
+    /// under the chord is the least-squares scale of the lone recording found
+    /// in the mix (0 dB: its own level), aligned where they match best. The
+    /// same projection on the chord without a cue shows how much the piano
+    /// alone leaks into that estimate.
+    fn click_under_chord(
+        &self,
+        host: &mut platform::Host,
+        rate: f64,
+        rec: &Arc<Mutex<Recording>>,
+        out_rate: u32,
+    ) -> serde_json::Value {
+        let mailbox = self.mailbox.clone();
+        let cue = || {
+            let cue = Box::new(mixer::Cue::new(
+                out_rate,
+                lifecycle::Request::new("", 180.0, 1200.0, 0.0).unwrap(),
+                Arc::new(AtomicBool::new(false)),
+            ));
+            assert!(mailbox.publish(cue).is_ok());
+        };
+        let full = [36u8, 43, 48, 52, 55, 60, 64, 67, 72, 76];
+        let chord = |with_cue: bool| {
+            self.bus.send(100, 3, 1, 64, 127);
+            for k in full {
+                self.bus.send(100, 1, 1, k, 127);
+            }
+            if with_cue {
+                cue();
+            }
+        };
+        let rest = |host: &mut platform::Host| {
+            for k in full {
+                self.bus.send(100, 2, 1, k, 0);
+            }
+            self.bus.send(100, 3, 1, 64, 0);
+            run(host, 2.0);
+            self.mailbox.reclaim();
+        };
+        let (alone, _, _) = self.capture(host, rate, rec, 1.3, &|_| cue());
+        run(host, 0.5);
+        self.mailbox.reclaim();
+        let peak = alone.iter().fold(0f32, |p, v| p.max(v.abs()));
+        let Some(onset) = alone.iter().position(|v| v.abs() > peak * 0.1) else {
+            return serde_json::json!({"error":"the lone click was not heard"});
+        };
+        // Three clicks at 180 per minute.
+        let n = ((rate * 0.9) as usize).min(alone.len() - onset);
+        let template = &alone[onset..onset + n];
+        let energy = template.iter().map(|v| (*v as f64).powi(2)).sum::<f64>();
+        let (mixed, limited, lowest) = self.capture(host, rate, rec, 1.3, &|_| chord(true));
+        rest(host);
+        let (piano, _, _) = self.capture(host, rate, rec, 1.3, &|_| chord(false));
+        rest(host);
+        let project = |x: &[f32], at: usize| {
+            x.get(at..at + n).map_or(0.0, |w| {
+                w.iter()
+                    .zip(template)
+                    .map(|(a, b)| *a as f64 * *b as f64)
+                    .sum::<f64>()
+                    / energy
+            })
+        };
+        // The cue starts within a callback or two of where it did alone.
+        let reach = (rate * 0.02) as usize;
+        let lag = (onset.saturating_sub(reach)..onset + reach)
+            .max_by(|a, b| project(&mixed, *a).total_cmp(&project(&mixed, *b)))
+            .unwrap();
+        let scale = project(&mixed, lag);
+        let leak = project(&piano, lag).abs();
+        let db = |v: f64| ((20.0 * v.max(1e-9).log10()) * 10.0).round() / 10.0;
+        serde_json::json!({
+            "clickAlonePeakDbfs":dbfs(peak),
+            "clickUnderChordRelativeDb":db(scale),
+            "pianoLeakIntoEstimateDb":db(leak),
+            "alignmentShiftMs":ms(lag as f64 - onset as f64, rate),
+            "chordPeakDbfs":dbfs(mixed.iter().fold(0f32, |p, v| p.max(v.abs()))),
+            "limitedFrames":limited,
+            "limiterLowestGainSinceOpenDb":(limited > 0).then(|| dbfs(lowest as f32)),
+        })
+    }
     fn loudness(&self, sfz: &Path, label: &str, volumes: mixer::Volumes) -> serde_json::Value {
         let volumes = Arc::new(volumes);
         let mut host = match self.open(sfz, 1, volumes) {
@@ -337,6 +443,8 @@ impl Probe {
         run(&mut host, 1.0);
         self.mailbox.reclaim();
         notes.insert("metronomeClick".into(), click);
+        let under = self.click_under_chord(&mut host, rate, &rec, out_rate);
+        notes.insert("metronomeClickUnderPedalledChordFf".into(), under);
         drop(listen.stream);
         drop(host);
         self.mailbox.reset();
@@ -356,13 +464,13 @@ fn loopback_delay_and_loudness() {
     let write = |value: serde_json::Value| {
         std::fs::write(&report, serde_json::to_vec_pretty(&value).unwrap()).unwrap()
     };
-    write(serde_json::json!({"version":2,"result":"started"}));
+    write(serde_json::json!({"version":3,"result":"started"}));
     let wanted = std::env::var("VIEWER_PLAYABILITY_OUTPUT").unwrap_or_else(|_| "BlackHole".into());
     let outputs = platform::outputs().expect("CoreAudio enumeration");
     let names: Vec<_> = outputs.outputs.iter().map(|o| o.name.clone()).collect();
     let Some(output) = outputs.outputs.iter().find(|o| o.name.contains(&wanted)) else {
         write(
-            serde_json::json!({"version":2,"result":"unavailable","reason":"no loopback output","outputs":names}),
+            serde_json::json!({"version":3,"result":"unavailable","reason":"no loopback output","outputs":names}),
         );
         return;
     };
@@ -406,7 +514,7 @@ fn loopback_delay_and_loudness() {
     let reason = (!heard)
         .then_some("the loopback input recorded only zeros (microphone permission or routing)");
     write(serde_json::json!({
-        "version":2,
+        "version":3,
         "result":result,
         "reason":reason,
         "output":output.name,
