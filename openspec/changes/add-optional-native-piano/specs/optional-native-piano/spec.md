@@ -57,11 +57,15 @@ Options SHALL show Piano in its own section below Audio/MIDI and above Keys and 
 - **THEN** saved valid choices are retained, the effective enabled state depends on bank readiness, and unrelated settings/data remain unchanged
 
 ### Requirement: Audible piano level without clipping
-At the default 70% a hard middle C SHALL peak around −6 to −3 dBFS. Each volume track SHALL map its setting to a gain on a smooth curve with 100% 6 dB above 70%; a saved piano volume SHALL never be quieter than its earlier linear gain. The final mix SHALL pass a peak limiter that looks no samples ahead, holds every frame at or below −1 dBFS and leaves frames under that ceiling exactly unchanged.
+At the default 70% a hard middle C SHALL peak around −7 dBFS and a five-note chord at velocity 100 SHALL not be limited. Each volume track SHALL map its setting to a gain on a smooth curve with 100% 6 dB above 70%; a saved piano volume SHALL never be quieter than its earlier linear gain, and a piano volume saved by an earlier version above 70% SHALL be set to 70% once. A peak limiter that looks no samples ahead SHALL lower only the piano, so that the mix with the metronome and cues stays at or below −1 dBFS while they keep their own level. The piano SHALL pass unchanged while its held peak is under the limiter's soft knee; after a loud peak, quieter frames are scaled during the hold and the release.
 
 #### Scenario: Loud pedalled chord
 - **WHEN** both hands strike a fortissimo chord twice with the pedal down at the default volume
-- **THEN** the output peaks at −1 dBFS, the limiter reports the frames it lowered, and the delay per latency setting is unchanged
+- **THEN** the output stays at or under −1 dBFS, the limiter reports the frames it lowered, a metronome click during the chord keeps its own level, and the delay per latency setting is unchanged
+
+#### Scenario: Loud volume saved by an earlier version
+- **WHEN** the viewer first reads a piano volume above 70% saved by an earlier version
+- **THEN** it is set to 70% once and written back with every other setting unchanged; a volume at or under 70% keeps its number, and a volume chosen afterwards is kept
 
 #### Scenario: Delayed-sound help
 - **WHEN** the player opens Sound feels delayed?

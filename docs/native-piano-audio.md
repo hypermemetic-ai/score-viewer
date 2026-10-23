@@ -186,29 +186,47 @@ interface at 44.1 kHz/512 frames measured 18.9–30.5 ms end to end.
 
 Earlier the bank sounded at unity and the piano volume was a plain linear factor,
 so at the default 70% a hard middle C peaked at only −17.2 dBFS and 100% added
-3 dB. The piano gain is now applied where the sampler's float output is summed
-with the cues, just before a peak limiter, inside the output callback:
+3 dB. The piano gain is now applied to the sampler's float output inside the
+output callback, then a peak limiter turns the piano down when needed, and the
+metronome and practice cues are added last at their own level:
 
 - The engine renders float, so a gain there has no rounding and no clipping
   before the limiter. Changing the bank (an SFZ `volume`) or the engine's own
   volume would need a reload or a re-render for each change, and could not see
   the cues; a drag must be heard at once.
 - It is the one place where everything that reaches the device is summed, so the
-  limiter there sees the true final peak.
-- It costs one multiply per sample. The limiter adds about 1–2 ns per stereo
-  frame (0.4 µs per 256-frame chunk, under 0.01% of real time, measured on a
-  Ryzen 7 250); it has no lookahead and adds no delay.
+  limiter there sees both the piano's peak and the cue's.
+- It costs one multiply per sample. While it is limiting, the limiter costs about
+  4.4 ns per stereo frame, about 0.02% of real time at 48 kHz (measured by the
+  review on the earlier limiter, and again on this one on a Ryzen 7 250); it has
+  no lookahead and adds no delay.
 
-The piano gain is 2.7 × (setting / 70%)^1.94: 70% stays the default and is
-+11.7 dB over the old default, 100% is +6 dB over 70%, 50% is −5.7 dB and 35% is
+The piano gain is 2.25 × (setting / 70%)^1.94: 70% stays the default and is
++10.1 dB over the old default, 100% is +6 dB over 70%, 50% is −5.7 dB and 35% is
 −11.7 dB. A saved setting is never quieter than before (the gain is at least the
 old linear one), and 0% is silent. The Metronome volume uses the same curve
-without the piano's 2.7, so its default leaves the click as before.
+without the piano's 2.25, so its default leaves the click as before.
 
-The limiter is stereo-linked with a −1 dBFS ceiling, an instant attack, a 30 ms
-hold and a 150 ms release. Below the ceiling it passes the signal untouched; a
-peak above it is brought down in the same frame, so nothing clips at the device.
-The status reports how many frames it reduced and its deepest reduction.
+A piano volume saved by an earlier version above 70% is set to 70% once, the
+first time this version reads the settings, so the louder curve cannot startle
+at first launch; 70% is still about 7 dB louder than the old 100%. Volumes at or
+under 70% keep their number. The settings then carry `levels: 2`, which marks a
+volume chosen on this curve, so the change never repeats; the file is written
+back as it was read with only the piano entry changed.
+
+The limiter follows the piano's peak (stereo-linked) and the cue's peak
+separately, each with an instant attack, a 30 ms hold and a 150 ms release. It
+lowers only the piano, just enough that the held piano peak plus the held cue
+peak stay under the −1 dBFS ceiling, so a fortissimo chord on the beat never
+turns the click down. A soft knee begins at −3 dBFS (lower while a cue sounds,
+to leave it room): above it a held peak maps to knee + span·x/(1 + x), whose
+slope is 1 at the knee and which approaches the ceiling without reaching it.
+With no lookahead, the frames of a rising peak still get more gain than the rest
+of the note, but they are bent by that curve instead of being cut flat at the
+ceiling. The piano passes unchanged while its held peak is under the knee; after
+a loud peak, quieter frames are scaled too, during the hold and the release. The
+final ±1.0 clamp stays as a backstop. The status reports how many frames the
+limiter reduced and its deepest reduction.
 
 `node scripts/check-piano-audio-core.mjs` (inside qq-job) compiles the portable
 core and its tests without Tauri, GUI or outputs. Stand-in `tauri` crates
