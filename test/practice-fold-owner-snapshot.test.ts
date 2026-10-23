@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {join} from 'node:path';
-import {importPackage,type ScorePackage} from '../src/package';
+import {importPackage,selectPresentation,type ScorePackage} from '../src/package';
+import {rebuildEdition} from '../src/edition-rebuild';
 import {initialPersonal} from '../src/state';
 import {verbatimRepeats} from '../src/repeat-fold';
 import {passageHierarchy,passed,planPractice,readPractice,type PracticeState} from '../src/practice';
@@ -18,7 +19,11 @@ const without=({folded:_,...rest}:PracticeState)=>rest;
 
 test('the owner\'s No. 13 practice shows on the folded score as on the written-out one, and opening it there changes nothing written out', {skip:!dir&&'set SCORE_VIEWER_OWNER_SNAPSHOT to a copy of the owner\'s data'}, async()=>{
  const files=readdirSync(dir!),library=JSON.parse(readFileSync(join(dir!,'library.json'),'utf8')),entry=library.entries.find((e:{id:string})=>e.id===NO13);
- const p=await importPackage(new Uint8Array(readFileSync(join(dir!,entry.file)))),raw=JSON.parse(readFileSync(join(dir!,files.find(f=>f.startsWith(`practice-${NO13}-janko-four-row-`))!),'utf8'));
+ // A saved edition the pinned engraving refuses is engraved again from its own
+ // content when it is first opened, as the reader does (docs/saved-edition-reengraving.md).
+ const bytes=new Uint8Array(readFileSync(join(dir!,entry.file))),
+  opened=await importPackage(bytes,{allowLegacyTempo:true}).catch(async refusal=>importPackage((await rebuildEdition(bytes,{refusal})).bytes,{allowLegacyTempo:true}));
+ const p=await selectPresentation(opened,'janko-four-row'),raw=JSON.parse(readFileSync(join(dir!,files.find(f=>f.startsWith(`practice-${NO13}-janko-four-row-`))!),'utf8'));
  const personal=initialPersonal(p),fold=verbatimRepeats(p,personal)?.fold;assert.ok(fold,'No. 13 folds');
  const edition:ScorePackage={...p,score:fold.score,sourceScore:fold.score},source={key:'no13-fold',written:p,personal};
  const written=admitPracticeContext(p,raw,undefined,personal),folded=admitPracticeContext(edition,raw,undefined,personal,undefined,false,source);
