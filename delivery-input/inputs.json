@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "viewer": {
     "repository": "hypermemetic-ai/score-viewer",
-    "revision": "103f554e0c28984db4730e2df6f0ff6ea0d192a9",
-    "tree": "d0df406988708c10fbe4fda439d9a0857eb85fab",
-    "timestamp": "2026-10-21T07:34:19.000Z"
+    "revision": "8d338c1e1e641d2ce0417c9f40eb204c3a862e35",
+    "tree": "8f3b930c6c7c8b9f3d542ddb49550e5b52bd6a93",
+    "timestamp": "2026-10-23T09:26:11.000Z"
   },
   "notation": {
     "repository": "hypermemetic-ai/iso-notation",
-    "revision": "7b53664e2bb360a82f337ddbd67fc6f6e0658319"
+    "revision": "5026e669aaefcb6bbf3c3269b1590e841639b88d"
   },
   "nativeFiles": {
     ".cargo/config.toml": {
@@ -217,28 +217,32 @@
       "size": 9195
     },
     "src-tauri/src/audio_diagnostic_macos.rs": {
-      "sha256": "7aa56add046f1cfc467f1e583e87b5787659cbca90cf4783644e06b87d497a0f",
-      "size": 9265
+      "sha256": "34491b3e4ee834cd62c78f1ed1f2d9c23b117e134e48395517c1943ce6c0d8dd",
+      "size": 9258
     },
     "src-tauri/src/audio_diagnostic.rs": {
-      "sha256": "5560f268595e97095e5f7da70fb8928e0e4cbb0a447215c59c46e5cedab42e12",
-      "size": 7596
+      "sha256": "5d8a924ef5b80abff2238c19a7b247f460f2658f7d3a6403bfae59021822ec46",
+      "size": 7589
     },
     "src-tauri/src/audio_hal_buffer.rs": {
-      "sha256": "31d5512b57f0fbf1954b475cbf56951e6d0646bf4fb2b320983848c1e59b448b",
-      "size": 8189
+      "sha256": "d781658ad55d9532029315fff3c16d384d6ee786f966eec67a1a3e7cff87e56a",
+      "size": 9069
     },
     "src-tauri/src/audio_latency_diagnostic.rs": {
-      "sha256": "db805407ff53cbfcdd895adecbafe000667246df1a46684fe74955e2cca4fbb2",
-      "size": 18811
+      "sha256": "02d14aab6be5e9b19b0bae511c0bd60e509e25b489bd53e982c0d007621db1e5",
+      "size": 18779
     },
     "src-tauri/src/audio_mixer.rs": {
-      "sha256": "e8f79051b08484c2b109a0dc0df38c96d6b856474d88ac7cedf72462b215d738",
-      "size": 66681
+      "sha256": "a3dddbf6e7904f878df0a66c1ed623042c18d6fceeb06e3326d8a6abda38431f",
+      "size": 89634
     },
     "src-tauri/src/audio_period.rs": {
       "sha256": "600365e3be58fd114ee7059a3e91e07e0daeb858c4617e71e71aa0ad3e70f764",
       "size": 2533
+    },
+    "src-tauri/src/audio_playability_macos.rs": {
+      "sha256": "2aa8e0f2a75250b6a925039e6b0f826d51d5fa8bb7742c6bfd8bea07ec1e09a7",
+      "size": 21073
     },
     "src-tauri/src/audio_queue.rs": {
       "sha256": "7cb8c4194e639a64bf2197e2ec99bd58779e3668beb9c50eb8c2b22a296fb07b",
@@ -248,13 +252,17 @@
       "sha256": "b5927b6c5e8d9fecad0ec7161c4974c6749903a393c5aa99b031f48b0823b226",
       "size": 5071
     },
+    "src-tauri/src/audio_schedule.rs": {
+      "sha256": "e417a33f3c5a516e9594e6f5e54ada2a27b21ca85138937929909f0372c13669",
+      "size": 26024
+    },
     "src-tauri/src/derived_cache.rs": {
       "sha256": "8d53c3a071aa9dac5453388196812f80a1b942187642d013e2ea29fc4375df3e",
       "size": 12601
     },
     "src-tauri/src/main.rs": {
-      "sha256": "7a997b34396b363fec06d6803e7e92c797d5ffdd6cfdfcd0e00f42b9545edd68",
-      "size": 9567
+      "sha256": "f623d9baab2c5867c2e6edbe49ca30b9dbf4f5354f0e65b681c7512881036c35",
+      "size": 9912
     },
     "src-tauri/src/managed_files.rs": {
       "sha256": "8ff5012ee7eb77b4c2a57bc786841aa3628793dfb635bdc35c2aaeb6d8f353bb",
@@ -273,12 +281,12 @@
       "size": 11041
     },
     "src-tauri/src/piano_bank_core.rs": {
-      "sha256": "3b279dfb88cecf5f17136e1a0394ea68bcf2364fcc5ff850203143bb8a8a7192",
-      "size": 31622
+      "sha256": "416b1b92376b56214f76bf88fc5c2653b178b98d93a965a6ec83f8785739e850",
+      "size": 95048
     },
     "src-tauri/src/piano_bank.rs": {
-      "sha256": "a540cce94512bbc1f761858bdd89dc274c24490a2fbe3887ff0e2475c6bc6489",
-      "size": 9092
+      "sha256": "721cebe11e4eb161c1e4e7b38762e2908379bb120efd70c14a3397fe875b7d5d",
+      "size": 12000
     },
     "src-tauri/src/piano_engine.rs": {
       "sha256": "0106fbd30a5e0588d689c42573285a4fd5ae6062dceb896a84b584634d7e4e4d",
@@ -289,8 +297,8 @@
       "size": 40909
     },
     "src-tauri/src/practice_audio_macos.rs": {
-      "sha256": "e830cd88358ad082990f4d81c19d6ed9bc5de15190b424f66acf66afcb803b98",
-      "size": 9796
+      "sha256": "8b64397acccde5030c7558f3a18da9a0a9960617deb964baa948174bae32977d",
+      "size": 9882
     },
     "src-tauri/src/practice_audio_repeat.rs": {
       "sha256": "7ab006ca2c7a5b380715779f66aa17a1e035a02e2bf08d884d61188f7e9cdecf",
@@ -301,12 +309,12 @@
       "size": 9739
     },
     "src-tauri/src/practice_audio_windows.rs": {
-      "sha256": "efe1904900c36cc2b8af7243a1a7b9dc2dfba3cd2bffe393c14cc4c12546136f",
-      "size": 22377
+      "sha256": "387aaeb97267b0d6dccad284c768c74eaa0921dd7b5aae131d02ec4cc2435289",
+      "size": 22518
     },
     "src-tauri/src/practice_audio.rs": {
-      "sha256": "fc562138cda31f070c02dd0367e3a86a8933e80511633eef8c566748f40c098e",
-      "size": 34450
+      "sha256": "a035933b3d7f8f1581e4d48b84c89cb18a7656aebff122a6d744cd97961a5927",
+      "size": 39263
     },
     "src-tauri/src/score_pdf.rs": {
       "sha256": "9d8d57d79ced12ba7943c77e5b45c641eac19ad4077a2641470ab217d0cacd56",
@@ -7623,29 +7631,29 @@
         "sha256": "ece4c99bf27f179f7fb1adecba71795150df318edaa51a9f721cb09b2b33d9b1",
         "size": 79632
       },
-      "assets/footer-ink-probe-DWgD1KX-.js": {
-        "sha256": "b76ff4e269a31127a4b8d1d55a6f8cafcd25442a6d767e29f35af78db4fc713b",
+      "assets/footer-ink-probe-D8v_2UYx.js": {
+        "sha256": "5b481c5b555850bf8632bc6b208763417ea0026bea6e61c01e6a550373632170",
         "size": 8768
       },
-      "assets/footer-probe-calculated-edition-MudBwqqr.tuna": {
-        "sha256": "e94adc39471cca60671ce21157cd5750e8a021060e42c2c81224bae6282d8040",
-        "size": 89653
+      "assets/footer-probe-calculated-edition-h3Mfcwp7.tuna": {
+        "sha256": "f174c6baa8cb34694db1202c1c64a5a057a675ffea9b52d19994613846836c8d",
+        "size": 89730
       },
       "assets/fretted-preparation-assets-D_5Ay36F.js": {
         "sha256": "8a98e63430f98019b8dd74bdba6f6ae8a8a5bb447cf11bed8fcdedb42d784853",
         "size": 149215
       },
-      "assets/index-DIrr3PXV.css": {
-        "sha256": "5fdfb5bf5d84ba91538a0c39d9c146ba9212f1007cc83822da162004842d83d6",
-        "size": 49626
+      "assets/index-DJ6sKoCb.js": {
+        "sha256": "46f41c5f53adfd8614836a758de38afaa9a754c201b615b6d83e86ce45451025",
+        "size": 781177
       },
-      "assets/index-EDhXtdee.js": {
-        "sha256": "70e9c192936a442b4c0d2e2c2c1213ca58d67d99a249fd947a5282351a80a789",
-        "size": 676451
+      "assets/index-DjtfgL6b.css": {
+        "sha256": "c1a773640f396a89b339d7138c676f5988e1312f188a45b57dd9d714e06cbe24",
+        "size": 53919
       },
-      "assets/layout-peer-worker-TgIm7koJ.js": {
-        "sha256": "e135e4010d55bf1e5939fb096267d23dc1dcdac6ad9846e21f394ef227456d1a",
-        "size": 1240361
+      "assets/layout-peer-worker-DrWRY70e.js": {
+        "sha256": "ed94a5cae221ba43d46f02a6c73c086743e7ce58b8ead29709dbe5a9e7b00ecc",
+        "size": 1305710
       },
       "assets/LiberationSerif-Italic-CcNO01ao.ttf": {
         "sha256": "eaeaf7f2b12544ecde64290c1fa7ec403ff70fd58b313637b265400b20249242",
@@ -7655,21 +7663,21 @@
         "sha256": "8dd5e2b995569b158c41f700d1bb61a4d52640f51158f840a2425e7bfc78246c",
         "size": 6940
       },
-      "assets/musescore-import-DFVGez4o.js": {
-        "sha256": "91c20662812fac73585469223ef9c4b02a7f669dd78fa6d2449c32032b08f351",
+      "assets/musescore-import-BKLQoKD4.js": {
+        "sha256": "6d3a101676cc5cf02f4c159541be02d74cdcd9a47a1cee07dd7a25769687aeb3",
         "size": 3943
       },
-      "assets/musicxml-import-ZEbgg3AR.js": {
-        "sha256": "3e0b16cb68874133a39afbd48406bd7f2689b1867b95033d09b59fa8924088b5",
+      "assets/musicxml-import-BM4AVH2a.js": {
+        "sha256": "a233b57a82e0db9a046ef5e1e659f100a7f919a1d80d58bb03ee091d6d003ff2",
         "size": 4119
       },
-      "assets/personal-projection-worker-D07lqfIK.js": {
-        "sha256": "388670c07408d13a60b9004e87b2de46f37d65ed2d268d3123bca1ba8518b0ee",
-        "size": 1556645
+      "assets/personal-projection-worker-DCN1gQSw.js": {
+        "sha256": "432aaea0fb88d29c5fd720938c19d95f07843d4dcf595fdb3059f0a90cc260bd",
+        "size": 1644431
       },
-      "assets/piano-readiness-CPf2Loah.js": {
-        "sha256": "ee1ec91aca44c3f5b5bfa64f833bafb21d12dd2e0417e8602720c33d80896007",
-        "size": 2476928
+      "assets/piano-readiness-0hm2kTfL.js": {
+        "sha256": "59d721e42e85585d585dd4292cfcdb6076d6f3a2204ea06d58d7786a671c567b",
+        "size": 2567318
       },
       "assets/URWGothic-Demi-yZkoyEbQ.otf": {
         "sha256": "5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae",
@@ -7704,11 +7712,11 @@
         "size": 2338904
       },
       "footer-ink-probe.html": {
-        "sha256": "0438b0c437ac40c333a4f18169d9fd20e080719b999999c8f4d169475b5d2c38",
+        "sha256": "1bea3d1b15c9cc703dd0e2c90e16b0f57549c819d22f8df1a396967a2e5ed3a8",
         "size": 323
       },
       "index.html": {
-        "sha256": "3a2a8d269e8ce6c7c0cd4a1b65ebc93c2d23785c8c0959edf3360ce0b1bd5446",
+        "sha256": "4a748122818c0b37141a71261670048f89f8ddbf766eaed7a05337360582fc53",
         "size": 969
       },
       "review/schumann-no14-conventional-20261006.tuna": {
@@ -7716,11 +7724,11 @@
         "size": 423909
       }
     },
-    "digest": "ebd417c226003d3048c3b9241858480e481ee112e98152e7e3a3bcfaefdf4100"
+    "digest": "ccab12ea290832ccc8dabfefe5e8a11c2a63d99448630fe484ef862bc984ebaf"
   },
   "checks": {
-    "sha256": "a352511a43d8dec989e774e7c0c8e334a77703cb58cdd1c0bd3b832cf9fad5cd",
-    "size": 5994
+    "sha256": "deb6290e7a0eebc55e0bf4732bc96a19b4ae709a0268053c28d77d1b24233a74",
+    "size": 9789
   },
   "runtimeFontProbe": {
     "version": "viewer-native-footer-ink-probe-v2",
