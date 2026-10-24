@@ -1745,7 +1745,7 @@ async function saveSelectedChoice(choice:{hand?:PersonalHand;finger?:number},adv
  const target=chosenScore,seat=chosenSeat,units=editUnits(readerPackage()),index=seat?units.findIndex(s=>s.contactId===seat.contactId):-1,nextSeat=waitedOwner||!seat?selection:advance?nextInHand(readerPackage(),units,index)??seat:seat;
  const authoredAt=new Date().toISOString(),ownerIds=waitedOwners?.length?[...waitedOwners]:editOwners(seat!);
  if(choice.finger!==undefined&&(!Number.isInteger(choice.finger)||choice.finger<1||choice.finger>5))throw Error('Choose a finger from 1 to 5.');
- const action=(ownerId:string,decisionId=crypto.randomUUID()):PersonalMemoryAction=>choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
+ const action=(ownerId:string,decisionId=crypto.randomUUID()):PersonalMemoryAction=>choice.hand?{kind:'hand',ownerId,hand:choice.hand,decisionId,authoredAt,...(ownerIds.length>1?{passes:[...ownerIds]}:{})}:{kind:'finger',edit:{ownerId,finger:choice.finger as 1|2|3|4|5,decisionId,authoredAt}};
  if(personalEditor(target).recovering)throw Error('Personal edit recovery is already running.');if(personalEditor(target).queue.error)throw personalEditor(target).queue.error;
  const before=target.personal;
  // A folded note whose passes both carry the player's choice changes in both, so they stay one repeat.
