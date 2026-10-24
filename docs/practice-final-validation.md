@@ -35,8 +35,8 @@ Build and bridge logs are `npm-build.log` and `native-bridge-test.log`.
 
 ## Observed viewer behavior
 
-The root and independent reviewer inspected representative Schumann, private
-Zelda and shared-engine traced/uniform notation at the exact audited application
+The root and independent reviewer inspected representative Schumann, private-score
+and shared-engine traced/uniform notation at the exact audited application
 snapshot. `docs/practice-refill-validation.md` describes the actual source
 identity, geometry policy, six-case traces, legal timing variations, cue caps,
 carry/error context and limitations. The compact source-bound receipt is
@@ -52,12 +52,11 @@ Status, repeat-status, eligibility help and live Fingers changes retain the
 admitted live reference. Free view browses1–4,3–6,5–8, with bounded tail windows.
 The12px admission floor is a mechanical threshold, not pianist acceptance.
 
-Original leaf-selector observations, including actual Zelda25–29 and30–33 in both
+Original leaf-selector observations, including actual private-score 25–29 and 30–33 in both
 presentations, remain in `docs/practice-rendering-validation.md`; the final
 adaptive changes preserve their consecutive compact composition. The original
-private archive hash remains
-`d503a145624af20e66c79f80248dbea78acc5444c48a11d522e2ec3e1fedd0c2`.
-No private archive or operator data enters Git.
+private archive hash is omitted here.
+No private archive or user data enters Git.
 
 The final actual-main binding receipt observes per-slot inheritance, independent
 keyboard/MIDI updates, explicit local null after reload, hidden/later-main conflict

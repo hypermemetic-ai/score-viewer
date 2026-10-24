@@ -4,13 +4,13 @@ This change removes repeated validation of identical bytes within a bounded app-
 
 ## Measured causes and scope
 
-Original retained Zelda has 204 source owners, 207 physical seats and three pages in each saved keyboard layout. Original/+1 conventional/+1 Jankó cold import replays complete source engraving, receipts and annotation geometry. Profiling attributes most cost to that actual replay; unzip and literal member hashes do not account for the multi-second delay.
+The original retained private 3/4 score has 204 source owners, 207 physical seats and three pages in each saved keyboard layout. Original/+1 conventional/+1 Jankó cold import replays complete source engraving, receipts and annotation geometry. Profiling attributes most cost to that actual replay; unzip and literal member hashes do not account for the multi-second delay.
 
 An ordinary Chromium readiness Worker took 11.9–12.7 seconds for the original saved edition: 4.1–4.5 seconds in worker computation/initialization and 7.8–8.2 seconds in receiving validation. Actual full-main open separately measured 22–34 seconds. Those app observations include library/main preparation and are distinct from isolated imports. The retained reading path previously repeated actual source replay despite requesting unchanged saved pages.
 
 Two source changes have independent ISO review:
 
-- PR342, merged `e5ca92f1928aee4bbd58975b4db9caa4787bb106`, reads each final system's rest paint once per preparation instead of rebuilding its complete scene per source silence. Original Zelda's coverage scene evaluations fall from 126 to 21; whole import improves modestly, approximately 4–8% in the matched local observations.
+- PR342, merged `e5ca92f1928aee4bbd58975b4db9caa4787bb106`, reads each final system's rest paint once per preparation instead of rebuilding its complete scene per source silence. The original private 3/4 score's coverage scene evaluations fall from 126 to 21; whole import improves modestly, approximately 4–8% in the matched local observations.
 - PR343, merged `abe03c02ac000e5dd1ee5964e0356bd77aeddab2`, returns ephemeral written-head IDs during existing seat construction. It creates no extra layout or scene and changes no serialized page, seat, receipt or fingerprint. Exact four-edition head lookup replaces a 1.6–1.9-second independent replay with a bounded signature/ID lookup. This is a lookup improvement, not a claim that complete practice or opening is that much faster.
 
 ## Authority and ownership
@@ -31,7 +31,7 @@ Chromium measurements at application source `e55599940937198f4aaadc17ccf926f4a7e
 
 | Fixture | First cold import | Exact hit | Retained service after cold | Largest cold heartbeat gap |
 | --- | ---: | ---: | ---: | ---: |
-| Original Zelda, both saved layouts | 3,921 ms | 65 ms | 211–264 ms | 3,922 ms |
+| Original private 3/4 score, both saved layouts | 3,921 ms | 65 ms | 211–264 ms | 3,922 ms |
 | +1 Jankó | 5,785 ms | 93 ms | 377 ms | 5,786 ms |
 | +1 Conventional | 5,851 ms | 95 ms | 295 ms | 5,852 ms |
 | Public No14, both saved layouts | 247 ms | 34 ms | 121–152 ms | 247 ms |
@@ -43,7 +43,7 @@ Logical retained material is 21.1 MiB for original and 33.1–33.5 MiB for each 
 
 ## Evidence and remaining work
 
-Private measurements and fixture hashes live under `~/.local/state/score-viewer-performance-admission-20261009`. `immutable-gates.mjs` independently cold-admits all four retained Zelda views and the 1,013-owner/10-page outward bass archive. After both deliberate dependency advances, every raw member, page, receipt, policy and original journal outcome equals the PR26 baseline; all 48 original JSON files remain hash-identical. Existing historical curved policy dispatch and crossclaim/tamper controls remain required.
+Private measurements and fixture hashes live under `~/.local/state/score-viewer-performance-admission-20261009`. `immutable-gates.mjs` independently cold-admits all four retained private 3/4 score views and the 1,013-owner/10-page outward bass archive. After both deliberate dependency advances, every raw member, page, receipt, policy and original journal outcome equals the PR26 baseline; all 48 original JSON files remain hash-identical. Existing historical curved policy dispatch and crossclaim/tamper controls remain required.
 
 Session controls cover caller/options/result/companion mutation, exact-byte collision refusal, distinct producer bounds, clear while active, eviction/material budgets, actual font ambiguity and private head transfer. The real browser new-calculation control still uses an actual module Worker, emits progress and cold-admits its returned archive independently. A fast retained result cannot bypass that path. The frozen module-source configured Viewer suite passes 520/520 with zero failures/skips/cancellations. After normally merging main's PR33 repeat change, exact combined `739186e157659d418c9279773b323f5ea1ce791b` passes 544/544 configured tests, TypeScript/Vite build, 29/29 carrier/footer checks and all 12 strict OpenSpec items (four main specs/eight changes). An initial carrier/footer invocation without the TS loader failed module resolution; its bad log is retained as a harness failure. The corrected `node --import tsx --test` invocation passes without source changes. Admission/runtime/test inputs and all observed archive/font proofs remain unchanged across the ordinary main merge. Final receipt/task bookkeeping after these checks changes only documentation.
 

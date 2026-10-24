@@ -1,6 +1,6 @@
 ## Context
 
-Strict cold import validates literal archive members, hashes, source/owners, actual complete engraving, geometry, receipts and font authority. Measurements attribute most delay to real source replay, rather than unzip, hashing or XML parsing. A baseline Chromium readiness worker took 11.9–12.7 seconds: about 4.1–4.5 seconds in worker initialization/computation and 7.8–8.2 seconds in repeated receiving validation. The actual main open took 22.33 seconds for the original Zelda edition. These are fixture/host observations, not universal targets.
+Strict cold import validates literal archive members, hashes, source/owners, actual complete engraving, geometry, receipts and font authority. Measurements attribute most delay to real source replay, rather than unzip, hashing or XML parsing. A baseline Chromium readiness worker took 11.9–12.7 seconds: about 4.1–4.5 seconds in worker initialization/computation and 7.8–8.2 seconds in repeated receiving validation. The actual main open took 22.33 seconds for the original edition of a private score. These are fixture/host observations, not universal targets.
 
 ## Goals / Non-Goals
 
@@ -26,7 +26,7 @@ Actual source replay may return tiny head IDs for exact seat/page/system/x/basel
 
 ### Remaining cold stalls
 
-Reviewed main hooks paint loading and permit input only between completed import/readiness/preflight phases, then recheck operation generation, signal, job, current score and preference context. Library first paint precedes independently admitted summary work, which waits while a reader/practice/operation is active. These approved checkpoints stay outside ordinary key handlers and musical clocks.
+Reviewed main hooks paint loading and permit input only between completed import/readiness/preflight phases, then recheck operation generation, signal, job, current score and preference context. Library first paint precedes independently admitted summary work, which waits while a reader/practice/operation is active. These checkpoints stay outside ordinary key handlers and musical clocks.
 
 Cold engraving still contains long synchronous layout/scene work. An arbitrary `await` before it merely delays the same stall. Splitting that replay needs explicit pure-layout/scene boundaries or off-main computation with independent receiving verification and a separate reviewed proposal. Actual first/warm/frame-gap evidence is recorded in the source notes; warm cache hits do not solve the remaining first-cold stall.
 
@@ -40,7 +40,7 @@ Cloning adds bounded copy cost and memory; budget/eviction measurements must acc
 
 ## Validation
 
-Unit controls cover mutation, same-size byte collisions, options, companions, concurrent misses, budgets and cancellation. Real browser controls cover current font ambiguity, real worker calculation/refusal, first import, second open and keyboard changes. All four retained Zelda editions, public No14 and the 10-page bass archive preserve literal members and actual receipt/policy/geometry results. Original journals/library/progress are read-only and hash-checked. Heavy jobs use qq-job; owned browser storage/servers are disposed.
+Unit controls cover mutation, same-size byte collisions, options, companions, concurrent misses, budgets and cancellation. Real browser controls cover current font ambiguity, real worker calculation/refusal, first import, second open and keyboard changes. All four retained private-score editions, public No14 and the 10-page bass archive preserve literal members and actual receipt/policy/geometry results. Original journals/library/progress are read-only and hash-checked. Heavy jobs use qq-job; owned browser storage/servers are disposed.
 
 ## Open Questions
 

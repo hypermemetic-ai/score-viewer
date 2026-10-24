@@ -18,7 +18,7 @@ The submodule includes the original repository's tracked source and historical t
 
 ## Local build and native limitations
 
-`npm run build` checks the configured application TypeScript and produces the browser frontend, including the embedded URW font. `npm test` runs the carried application tests; `node --import tsx --test --test-concurrency=8 test/practice-*.test.ts` is a narrower practice check during repair. Test packages are the existing Schumann fixtures from the accepted repository. No private uploaded Zelda PDF/MIDI, personal library or Windows state is copied into this repository.
+`npm run build` checks the configured application TypeScript and produces the browser frontend, including the embedded URW font. `npm test` runs the carried application tests; `node --import tsx --test --test-concurrency=8 test/practice-*.test.ts` is a narrower practice check during repair. Test packages are the existing Schumann fixtures from the accepted repository. No private uploaded score PDF/MIDI, personal library or Windows state is copied into this repository.
 
 The native shell is preserved under `src-tauri/`. On a suitable native Windows host, `npm run tauri -- build` uses the existing Windows configuration. On a Mac host, the existing Mac override is `src-tauri/tauri.macos.conf.json`; building the universal target requires both Apple Rust targets and the native SDK. Its minimum macOS version remains 13.3 and the existing ad-hoc signing policy remains unchanged. The four bundled font notices have their paths adapted for the root application layout, with identical notice bytes. Linux frontend tests/builds do not establish native Windows/Mac compilation, normal launch, GUI, physical MIDI, pedal or audio acceptance.
 

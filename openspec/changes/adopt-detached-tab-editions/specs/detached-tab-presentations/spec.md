@@ -85,12 +85,12 @@ Every supported new-style archive SHALL bind a distinct known TAB engine. Histor
 - **THEN** admission refuses and existing library pointers remain unchanged
 
 ### Requirement: Source and ISO compatibility
-A presentation edition SHALL retain exact canonical source bytes, owners, written components, tuning/string-fret facts, clocks, repeats, relations and authored grouping/ISO topology. A TAB-only edition SHALL retain exact ISO output. A new shared rest-display pair MAY change ISO paint only through explicit versioned source dispatch and independently replayed proof of the exact approved isolated-rest display and its geometry; generic unequal ISO output SHALL NOT qualify. Physical capabilities and family authority SHALL remain unchanged.
+A presentation edition SHALL retain exact canonical source bytes, owners, written components, tuning/string-fret facts, clocks, repeats, relations and authored grouping/ISO topology. A TAB-only edition SHALL retain exact ISO output. A new shared rest-display pair MAY change ISO paint only through explicit versioned source dispatch and independently replayed proof of the exact adopted isolated-rest display and its geometry; generic unequal ISO output SHALL NOT qualify. Physical capabilities and family authority SHALL remain unchanged.
 
 #### Scenario: Same part with new duration paint
 - **WHEN** an admitted Bass or Guitar part is regenerated with the new TAB recipe
 - **THEN** all canonical musical facts remain exact, while each view independently replays its declared known recipe
-- **AND** ISO output remains exact unless the explicit new pair proves only the approved isolated-rest display change; legacy ISO interpretation is never replaced
+- **AND** ISO output remains exact unless the explicit new pair proves only the adopted isolated-rest display change; legacy ISO interpretation is never replaced
 - **AND** a connected piano cannot assess the neutral part
 
 ### Requirement: Actual Worker and independent cold replay

@@ -21,7 +21,7 @@ const results=[];
 try {
  const packages=[{name:'schumann-janko',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},
   {name:'schumann-conventional',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
- if(process.env.PRACTICE_ZELDA)for(const keyboard of ['conventional-piano','janko-four-row'])packages.push({name:`zelda-${keyboard}`,path:process.env.PRACTICE_ZELDA,keyboard});
+ if(process.env.PRACTICE_PRIVATE_SCORE)for(const keyboard of ['conventional-piano','janko-four-row'])packages.push({name:`private-${keyboard}`,path:process.env.PRACTICE_PRIVATE_SCORE,keyboard});
  for(const input of packages.filter(input=>!process.env.PRACTICE_FIXTURE_ONLY&&(!process.env.PRACTICE_SCORE_FILTER||input.name.includes(process.env.PRACTICE_SCORE_FILTER)))){
   const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage();
   page.on('pageerror',e=>console.error(e));
@@ -38,7 +38,7 @@ try {
    await window.practice.mount();await document.fonts.ready;window.practice.refit();
   },{encoded,keyboard:input.keyboard,baseline});
   const status=await page.evaluate(()=>({keyboard:window.pkg.keyboardLayout??'janko-four-row',chunks:window.practice.plan.chunks.map(c=>c.id),presentations:window.pkg.availablePresentations}));
-  const windows=input.name.startsWith('zelda')?['1-4','5-8','25-29','30-33']:['1-4','5-8'];
+  const windows=input.name.startsWith('private')?['1-4','5-8','25-29','30-33']:['1-4','5-8'];
   const captures=[];
   for(const id of windows){
    assert.ok(status.chunks.includes(id),`Required actual leaf ${input.name} ${id}`);
@@ -50,7 +50,7 @@ try {
    const error=await page.locator('.practice-render-error').allTextContents();
    assert.deepEqual(error,[],`${input.name} ${id} must be admitted`);
    await page.screenshot({path:`${output}/${baseline?'before':'after'}-${input.name}-${id}-active.png`});
-   if(!baseline){const bars=Number(id.split('-')[1])-Number(id.split('-')[0])+1;assertContinuous(preview,bars);assertContinuous(active,Math.min(4,bars));if(input.name.startsWith('zelda')&&id==='25-29')assert.ok(Math.abs(preview.leftAir-preview.rightAir)<1,'balanced complete preview ink');if(input.name.startsWith('zelda')&&id==='30-33')assert.ok(Math.abs(active.leftAir-active.rightAir)<1,'balanced complete leaf active ink');}
+   if(!baseline){const bars=Number(id.split('-')[1])-Number(id.split('-')[0])+1;assertContinuous(preview,bars);assertContinuous(active,Math.min(4,bars));if(input.name.startsWith('private')&&id==='25-29')assert.ok(Math.abs(preview.leftAir-preview.rightAir)<1,'balanced complete preview ink');if(input.name.startsWith('private')&&id==='30-33')assert.ok(Math.abs(active.leftAir-active.rightAir)<1,'balanced complete leaf active ink');}
    const relations=!baseline?await exerciseRelations(page):undefined;captures.push({id,preview,active,relations});
   }
   await page.evaluate(async()=>{const v=window.practice;await v.action('passage:'+v.plan.chunks[0].id);v.session.ready(0);for(const a of v.session.events)v.session.note(a.midi,v.session.startMs+(a.tick-v.session.startTick)*v.session.tickMs);v.session.update(v.session.startMs+(v.session.chunk.end-v.session.startTick)*v.session.tickMs-1);v.paintVisibility();});

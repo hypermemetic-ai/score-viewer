@@ -6,7 +6,7 @@ import {engraveEdition} from '../src/score-transposition';
 import {editionPrintedNotices,engraveClearOfTitleArea,titleAreaInk,titleAreaOverlap} from '../src/title-area-clearance';
 import {approvedProductionIsoOptions} from '../vendor/iso-notation/src/render/iso/approved-production';
 
-// The owner's No. 14 printed two notices on page one (Encoding, Reference).
+// A saved No. 14 printed two notices on page one (Encoding, Reference).
 // Engraved again from the current shared options alone, it printed its
 // source's six, and the sixth lay under bar 1's measure number, slur and beam.
 const bytes=new Uint8Array(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url))),

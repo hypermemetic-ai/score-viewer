@@ -141,7 +141,7 @@ test('with the toolbar open the notice stands just above its measured top edge, 
  class Observer{constructor(run:()=>void){resized=run;}observe(target:unknown){observed=target;}disconnect(){disconnected=true;}}
  const stop=trackToolbarHeight(surface,toolbar,Observer as unknown as typeof ResizeObserver);
  assert.equal(observed,toolbar);assert.equal(set.get('--toolbar-height'),'64px','one row, measured at once');
- // At 1920×1080 the owner's open toolbar wraps to two rows.
+ // At 1920×1080 the open toolbar wraps to two rows.
  (toolbar as {offsetHeight:number}).offsetHeight=144;resized!();
  assert.equal(set.get('--toolbar-height'),'144px','two rows: the notice moves up with the toolbar\'s top edge');
  stop();assert.ok(disconnected);

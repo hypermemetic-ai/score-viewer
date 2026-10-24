@@ -16,7 +16,7 @@ Fresh imports SHALL explicitly select the accepted production renderer without a
 - **THEN** it follows the reviewed minimal existing edition flow without adding another settings surface
 
 ### Requirement: Explicit admitted same-source style selection
-A presentation edition SHALL use an explicit path admitting both archives and proving the same canonical source, real part/scope and musical facts. TAB-only changes SHALL retain exact ISO output. A known new shared rest-policy pair SHALL require complete independent old/new recipe replay and source-owned proof of only the approved isolated-rest display and derived geometry; generic ISO inequality or app-normalized SVG comparison SHALL NOT establish compatibility. Missing proof SHALL refuse. Generic different-archive imports SHALL retain their conflict refusal, and changed source facts SHALL NOT be called a presentation-only edition.
+A presentation edition SHALL use an explicit path admitting both archives and proving the same canonical source, real part/scope and musical facts. TAB-only changes SHALL retain exact ISO output. A known new shared rest-policy pair SHALL require complete independent old/new recipe replay and source-owned proof of only the adopted isolated-rest display and derived geometry; generic ISO inequality or app-normalized SVG comparison SHALL NOT establish compatibility. Missing proof SHALL refuse. Generic different-archive imports SHALL retain their conflict refusal, and changed source facts SHALL NOT be called a presentation-only edition.
 
 #### Scenario: Compatible style versus changed source
 - **WHEN** a new supported TAB recipe changes only the admitted presentation of the same source part
@@ -26,7 +26,7 @@ A presentation edition SHALL use an explicit path admitting both archives and pr
 
 #### Scenario: New versioned pair changes a rest display
 - **WHEN** the same source is prepared under a reviewed new ISO/TAB isolated-rest policy pair
-- **THEN** compatibility requires actual independent source replay and proof of the exact approved display-only change while preserving all canonical facts and old recipe interpretation
+- **THEN** compatibility requires actual independent source replay and proof of the exact adopted display-only change while preserving all canonical facts and old recipe interpretation
 - **AND** unrelated ISO differences or absent source proof preserve the current edition through refusal
 
 ### Requirement: Additive archives and personal pointers

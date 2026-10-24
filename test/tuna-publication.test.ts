@@ -86,5 +86,5 @@ test('sharing saves installed collection once, with no personal state or MIDI/ou
  assert.equal(scoreSaveMessage({status:'saved',filename:'Study.tuna',bytes:1025}),'Score saved: Study.tuna (2 KiB)');
  assert.equal(scoreSaveMessage({status:'downloaded',filename:'Study.tuna',bytes:1024}),'Score download started: Study.tuna (1 KiB)');
  await assert.rejects(shareInstalledScore(installed,{async saveScore(){throw Error('disk unavailable');}}),/disk unavailable/);
- assert.equal(scoreFilename('../CON'),'Score.tuna');assert.equal(scoreFilename('Zelda’s Lullaby'),'Zelda-s-Lullaby.tuna');assert.throws(()=>validateScoreSave(midi,'Score.tuna'),/Invalid/);assert.throws(()=>validateScoreSave(legacy,'../Score.tuna'),/filename/);
+ assert.equal(scoreFilename('../CON'),'Score.tuna');assert.equal(scoreFilename('Mira’s Lullaby'),'Mira-s-Lullaby.tuna');assert.throws(()=>validateScoreSave(midi,'Score.tuna'),/Invalid/);assert.throws(()=>validateScoreSave(legacy,'../Score.tuna'),/filename/);
 });

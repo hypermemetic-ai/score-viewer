@@ -17,7 +17,7 @@ Current viewer evidence:
 
 ## Goals / Non-Goals
 
-**Goals:** One effective assignment view for notation, practice and calculation; sparse explicit authorship; deterministic reference lineage; immediate open-score updates without whole-library rewrites; reversible migration of the operator's chosen piece; contextual editor assistance.
+**Goals:** One effective assignment view for notation, practice and calculation; sparse explicit authorship; deterministic reference lineage; immediate open-score updates without whole-library rewrites; reversible migration of one chosen piece; contextual editor assistance.
 
 **Non-Goals:** Approximate/transposed motif matching, a new fingering solver, changes to musical source identity or practice attainment, a mandatory warning review, or any live desktop intervention during the current practice session.
 
@@ -65,9 +65,9 @@ Add a versioned library memory index and source-bound per-occurrence records. St
 
 Reserve edit target and scope at input receipt. Immediately project affected occurrences in the open score; enqueue durable work without waiting in key handling. Other score files remain untouched and resolve against current memory on load. Include relevant memory revisions in resolved-assignment, projection, practice-preparation and library cache keys. Initial import/index discovery must finish reference election before a score claims stable inherited results; background indexing must not silently choose whichever score happened to open first. Use bounded batches and progress where a library scan is necessary.
 
-### 6. Consolidate the operator's existing piece exactly once
+### 6. Consolidate one existing piece exactly once
 
-This explicitly overrides conflict preservation only for Schumann 14, the piece identified by the operator. Bind the execution to its actual admitted library/source identity; no score title or machine-local path is hard-coded into the product.
+This explicitly overrides conflict preservation only for Schumann 14, the piece chosen for consolidation. Bind the execution to its actual admitted library/source identity; no score title or machine-local path is hard-coded into the product.
 
 Freeze the current admitted package and active saved personal records. Build field-equivalence groups from admitted exact whole-measure and hand mappings before electing donors; reject contradictory or ambiguous mappings. Order current donors by retained timestamps and stable identity. For each equivalent field, choose its earliest eligible saved value across both kinds of match; later donors fill gaps. Missing data is not suppression. Include ambiguous legacy saved fingers in this explicitly requested consolidation, marking their provenance as legacy recorded intent rather than verified finger-entry events. Do not import historical editions, undo buffers or calculated layers as fresh donors: doing so could resurrect rejected choices.
 

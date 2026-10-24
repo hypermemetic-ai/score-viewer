@@ -1,6 +1,6 @@
 ## Why
 
-Opening a retained Zelda edition takes about 22 seconds in the actual viewer. Each strict cold admission costs roughly 5–7 seconds, and one open repeats that admission in preparation, worker reception and request binding. The user requests a measured performance audit and substantial improvements without weakening score authority.
+Opening a retained edition of a private score takes about 22 seconds in the actual viewer. Each strict cold admission costs roughly 5–7 seconds, and one open repeats that admission in preparation, worker reception and request binding. A measured performance audit and substantial improvements are needed without weakening score authority.
 
 ## What Changes
 
@@ -10,7 +10,7 @@ Opening a retained Zelda edition takes about 22 seconds in the actual viewer. Ea
 - Reuse receiving-realm admission only after that realm has fully cold-admitted worker output.
 - Read unchanged retained presentations through the existing policy/personal/layer service, without launching a redundant calculation worker.
 - Reuse tiny written-head IDs derived by actual strict replay, with exact mutation checks and the existing strict fallback.
-- Show loading/cancellation and yield at approved completed operation-phase boundaries; measure actual first import, repeated opens, keyboard switching and library summaries while retaining synchronous strict cold replay.
+- Show loading/cancellation and yield at completed operation-phase boundaries; measure actual first import, repeated opens, keyboard switching and library summaries while retaining synchronous strict cold replay.
 
 ## Capabilities
 

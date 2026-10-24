@@ -1,5 +1,5 @@
 // Crop every measure of each given .tuna for practice, as Mechanics and Fingers draw them,
-// and fail on any ink the crop cannot give an owner. Run it on the owner's library before
+// and fail on any ink the crop cannot give an owner. Run it on a private library copy before
 // a delivery: unit fixtures do not carry every mark the engraving can print.
 //   PRACTICE_PLAYWRIGHT=<playwright-core/index.mjs> node scripts/check-practice-crops.mjs <file.tuna>...
 import {createServer} from 'node:http';

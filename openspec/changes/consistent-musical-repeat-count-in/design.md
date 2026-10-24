@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md. Existing browser and native repeats allow past count origins and skip elapsed clicks. Native and Viewer pulse-grid admission fix score offset to two reference beats; this fits Schumann 6/8 but not Zelda 3/4. Reference tempo units are clock units, not necessarily the meter beat.
+See proposal.md. Existing browser and native repeats allow past count origins and skip elapsed clicks. Native and Viewer pulse-grid admission fix score offset to two reference beats; this fits Schumann 6/8 but not a private 3/4 score. Reference tempo units are clock units, not necessarily the meter beat.
 
 ## Goals / Non-Goals
 

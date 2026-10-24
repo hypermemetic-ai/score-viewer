@@ -10,7 +10,7 @@ Goals: keep one moderate dialog with explicit section/settings focus, retain mou
 
 ## Decisions
 
-- Render the applicable section list and all panels once; hide inactive panels. This preserves asynchronous panel work and drafts without duplicating controller ownership. A flat scrolling page was rejected by the operator; separate modal pages would complicate focus and controller lifetime.
+- Render the applicable section list and all panels once; hide inactive panels. This preserves asynchronous panel work and drafts without duplicating controller ownership. A flat scrolling page was rejected; separate modal pages would complicate focus and controller lifetime.
 - Extend the existing picker/navigation controller with explicit section boundaries and controlled select popups. Browsing never changes a dropdown or numeric value; Enter makes that ownership change. Keyboard routes respect existing draft/capture/Test handlers before general navigation.
 - Use ordered setting rows and centered row/section focus rather than geometric nearest-neighbor guessing. Keep Tab as a standard alternative and make mouse-only chevrons non-tabbable.
 - Keep the existing binding schema and shared inheritance. Display only context-applicable rows; hidden assignments remain unchanged.

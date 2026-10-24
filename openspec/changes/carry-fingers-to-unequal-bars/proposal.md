@@ -2,7 +2,7 @@
 
 ## Why
 
-Shared fingering memory copies a hand's fingers to another bar only when the two bars are identical, length included. In Schumann Op. 68 No. 13, bar 11 also holds the right hand's pickup to the return, so it is a full bar, while bar 21 plays the same music and is written short: its pickup is bar 22. The owner fingered bar 11, and bar 21 shows none of those fingers, although each hand plays the same notes from the downbeat. The owner's rule: the check is the same hand in the same bar.
+Shared fingering memory copies a hand's fingers to another bar only when the two bars are identical, length included. In Schumann Op. 68 No. 13, bar 11 also holds the right hand's pickup to the return, so it is a full bar, while bar 21 plays the same music and is written short: its pickup is bar 22. When a player fingers bar 11, bar 21 shows none of those fingers, although each hand plays the same notes from the downbeat. The check should be the same hand in the same bar.
 
 ## What Changes
 
@@ -10,7 +10,7 @@ Shared fingering memory copies a hand's fingers to another bar only when the two
 - Each hand is matched on its own, as exact hand matches already are. Equal bars keep sharing through their exact measure key.
 - A pickup bar is never read from its start, by the hand-change carry's rule: a short bar that opens the piece or follows another short bar (bar 22 after bar 21). Meter decides only that; otherwise the rule is the same hand in the same bar, whatever the meter.
 - When a carried hand can't be drawn and bar 21 keeps its written hands, its fingers are resolved again, stay unshared, and the notice says so.
-- Derived on every read and never stored. Opening a score writes nothing, and no record of the owner is rewritten.
+- Derived on every read and never stored. Opening a score writes nothing, and no record of the player is rewritten.
 - A note's own finger wins. Changing a carried finger is an exception there, Use shared returns to the carried finger, and a change at the reference bar reaches the receiving bar, as for exact copies. An exception at the donor stays there.
 
 ## Capabilities

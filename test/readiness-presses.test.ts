@@ -104,7 +104,7 @@ test('once fingers are ready, presses run at once and show nothing',async()=>{
 
 test('P on a score that is not for piano offers no piano practice: it says what the score is for instead of opening the practice menu',async()=>{
  const r=reopened();
- // A part reading (such as Add It Up): its toolbar offers no Practice, so P must not open Fingers or Sections either.
+ // A part reading (such as a guitar part): its toolbar offers no Practice, so P must not open Fingers or Sections either.
  r.context.current.package={manifest:{version:3}};r.context.requirePianoCapability=requirePianoCapability;
  r.readiness.prepare('fingers');await flush();r.finish();await flush();
  r.press('KeyP');await flush();

@@ -23,4 +23,4 @@ Three previous musical waveform tests moved the callback clock over unrendered a
 
 ## Acceptance limits
 
-This establishes a reproducible source defect and its software correction. It does not establish that the defect caused the user's listening report. Synthetic callback disturbances do not measure device underruns, DAC output, speaker latency or audible quality. No installed application, output endpoint, driver, timbre or volume was changed. Actual platform packages and device/listening acceptance remain separate delivery gates.
+This establishes a reproducible source defect and its software correction. It does not establish that the defect caused the reported listening problem. Synthetic callback disturbances do not measure device underruns, DAC output, speaker latency or audible quality. No installed application, output endpoint, driver, timbre or volume was changed. Actual platform packages and device/listening acceptance remain separate delivery gates.

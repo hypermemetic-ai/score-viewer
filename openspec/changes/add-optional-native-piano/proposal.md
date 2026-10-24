@@ -1,6 +1,6 @@
 ## Why
 
-The viewer can assess MIDI and play practice cues but cannot yet make the player's connected keyboard sound through the computer. The operator authorized integrating the measured native SFZ engine and an optional downloadable piano in the next paired native build. Samples are large and must remain a separately installed offline bank.
+The viewer can assess MIDI and play practice cues but cannot yet make the player's connected keyboard sound through the computer. This change integrates the measured native SFZ engine and an optional downloadable piano in the next paired native build. Samples are large and must remain a separately installed offline bank.
 
 ## What Changes
 

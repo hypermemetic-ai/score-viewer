@@ -57,7 +57,7 @@ The earlier-edition flow selected its exact own compatible archived bytes and de
 
 ## Boundaries at the initial source/browser milestone
 
-At this initial milestone, source/browser observations did not establish installed native identity, physical MIDI/audio/pedal behavior, measured anatomy or continuous motion certification. The companion still required parent review/landing and coordinated native delivery. No legacy ISO Viewer/workflow or active delivery service was changed. Paid Zelda source was absent from Git and these public artifacts; its requested split and recalled melody fingers remained comparison hypotheses. Later full-score and native observations are recorded below, without treating a bounded passage as a substitute for failed complete-score admission.
+At this initial milestone, source/browser observations did not establish installed native identity, physical MIDI/audio/pedal behavior, measured anatomy or continuous motion certification. The companion still required parent review/landing and coordinated native delivery. No legacy ISO Viewer/workflow or active delivery service was changed. The paid private score source was absent from Git and these public artifacts; its requested split and recalled melody fingers remained comparison hypotheses. Later full-score and native observations are recorded below, without treating a bounded passage as a substitute for failed complete-score admission.
 
 ## Earlier current-main reconciliation
 

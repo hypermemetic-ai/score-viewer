@@ -1,6 +1,6 @@
 ## Why
 
-Most imported scores carry no numeric tempo. Practice asks for one through a bare number dialog, and nothing else in the viewer knows how long a passage or the piece takes to play. The owner wants every score to have a performance tempo: taken from the composer's marking when it can be interpreted, used without an extra step when that is confident, and otherwise set by ear — a count-in, then the piece playing at the chosen tempo, adjusted from the keyboard until it sounds right.
+Most imported scores carry no numeric tempo. Practice asks for one through a bare number dialog, and nothing else in the viewer knows how long a passage or the piece takes to play. Every score should have a performance tempo: taken from the composer's marking when it can be interpreted, used without an extra step when that is confident, and otherwise set by ear — a count-in, then the piece playing at the chosen tempo, adjusted from the keyboard until it sounds right.
 
 ## What Changes
 

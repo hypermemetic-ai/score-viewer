@@ -4,7 +4,7 @@
 - [x] 1.2 Add `handScope: 'local'`, local capture for L/R on carried notes, a no-op for an unchanged hand, and the `handScope` action; verify exception, only-here, use-shared, undo and reopen through the session store.
 - [x] 1.3 Skip and report undrawable receiving bars; include carried hands in the editor's drawability check.
 - [x] 1.4 Repartition fingering memory for receiving bars and preserve shown fingers; opening registers nothing new.
-- [x] 1.5 Editor provenance text, actions and change notice; rehearse every owner score, section and Fingers on a copy of the owner data, with ringed evidence for No. 13 bars 11 and 21.
+- [x] 1.5 Editor provenance text, actions and change notice; rehearse every score, section and Fingers on a private data copy, with ringed evidence for No. 13 bars 11 and 21.
 - [x] 1.6 Turn carried hands into personal-choice hand constraints in `pianoRequestAuthority`; verify that practice packages and calculator constraints give bar 21 the hand the page shows, and that an exception there wins.
 - [x] 1.7 State the composition with the repeat fold (#173): one answer per note, the same exceptions, no double application.
 
@@ -20,5 +20,5 @@
 
 ## Review round 2
 
-- [x] 3.1 One rule for the owner's own hand (`ownsHand`), asked by the carry and by `pianoRequestAuthority`; a hand saved with a finger before recorded intent is no choice, by the owner's No. 14 records. Nothing is rewritten on open.
+- [x] 3.1 One rule for the player's own hand (`ownsHand`), asked by the carry and by `pianoRequestAuthority`; a hand saved with a finger before recorded intent is no choice. Nothing is rewritten on open.
 - [x] 3.2 L, then R, at a carried note follows the matching bar again instead of keeping the hand for that note only.

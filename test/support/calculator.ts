@@ -1,5 +1,5 @@
 /** Test-only calculator helpers. The viewer no longer calculates fingers or
- * hands (owner decision 2026-10-17); these build calculated editions as
+ * hands; these build calculated editions as
  * fixtures so retained-edition behaviour stays covered. Nothing in src/
  * imports this module. */
 import {prepareCalculatedHandPresentation,finalizeCalculatedHandRenderingRecipe} from '../../vendor/iso-notation/src/score-presentation';

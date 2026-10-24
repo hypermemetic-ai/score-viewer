@@ -121,8 +121,8 @@ blank trial status is genuine, not the old stale untimed preparation label.
 | --- | --- | ---: | ---: | --- |
 | Schumann / Jankó | 1–64 | 381 | 20 | 600.106667; 191 / 315 |
 | Schumann / conventional | 1–64 | 381 | 20 | 600.106667; 191 / 315 |
-| Zelda / Jankó | 1–38 | 204 | 12 | 614.4; 105 / 170 |
-| Zelda / conventional | 1–38 | 204 | 12 | 614.4; 105 / 170 |
+| Private score / Jankó | 1–38 | 204 | 12 | 614.4; 105 / 170 |
+| Private score / conventional | 1–38 | 204 | 12 | 614.4; 105 / 170 |
 | Pinned fixture / traced | 1–12 | 13 | 3 | 616.93; 21 / 31 |
 | Pinned fixture / uniform | 1–12 | 13 | 3 | 618.025; 21 / 31 |
 
@@ -140,7 +140,7 @@ animation frames per on-time source contain complete allocations and stable
 current CTM. Schumann432 is accepted at420; fixture bar6's attack960 is accepted
 at760 before written rest5 starts768.
 
-Zelda's genuine owner2592 has a complete authored cue at continuation2736,
+The private score's genuine owner2592 has a complete authored cue at continuation2736,
 expired exactly at2880/current20 with original owner end2880 unchanged.
 The generic bar4 cue expires at768/current5, where a new authored bar5 cue ending
 960 is legitimate while the original sounding owner remains1200. Owner-wide cue
@@ -151,9 +151,9 @@ heads/stems, retains a genuine cue and restores its original external context.
 
 Live status empty/repeat text, footer help hidden/shown (test-owned footprint
 exercise), refills and F-through-incoming-bar transitions have zero CTM drift.
-Normal minimum digits: Schumann12.642 px, Zelda12.010 px, traced12.297 px,
+Normal minimum digits: Schumann12.642 px, private score12.010 px, traced12.297 px,
 uniform12.275 px. Separately height-limited fits retain12.320/12.159/12.131 px
-respectively. Normal Zelda is already height limited; its separate comparison
+respectively. The normal private score is already height limited; its separate comparison
 viewport is slightly taller, not falsely called a smaller screen. Rotation at
 1920×1440 retains session/clock epochs and no scrollbar. Smaller unreadable views
 may refuse before audio. Manual windows preserve clocks/evidence and create no
@@ -180,10 +180,9 @@ and original main mappings remain exact outside intended assignments.
 Archive SHA-256 values: Schumann Jankó
 `75ae62bed0db164281a2e02200213d8a83ec542d50d209c6651e72764cfe3d32`,
 Schumann conventional
-`8d57b25c20eca9e5dbfcb345873a1ca1ebc2f3d4b930c968200ea4e83b8e8fc7`,
-private Zelda
-`d503a145624af20e66c79f80248dbea78acc5444c48a11d522e2ec3e1fedd0c2`.
-No private archive contents, operator data or installation changes enter Git.
+`8d57b25c20eca9e5dbfcb345873a1ca1ebc2f3d4b930c968200ea4e83b8e8fc7`;
+the private score's hash is omitted.
+No private archive contents, user data or installation changes enter Git.
 
 52 focused allocator/window/production/clock/Done/Options/inheritance tests,
 TypeScript, source-pin, strict adaptive change and four synced main capabilities

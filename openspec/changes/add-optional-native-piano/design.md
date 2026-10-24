@@ -1,6 +1,6 @@
 ## Context and authorization
 
-The operator explicitly authorized implementation and the next paired native build. Linux/Windows standalone engine measurements used the unchanged official V6.2 flat Recommended live bank. Their results establish a feasible engine candidate, not an integrated app or physical musical acceptance. Implementation proceeds through reviewed scoped source PRs and final paired validation, without another planning approval gate.
+Implementation and the next paired native build are in scope. Linux/Windows standalone engine measurements used the unchanged official V6.2 flat Recommended live bank. Their results establish a feasible engine candidate, not an integrated app or physical musical acceptance. Implementation proceeds through reviewed scoped source PRs and final paired validation, without another planning approval gate.
 
 ## Ownership
 
@@ -27,7 +27,7 @@ Piano preferences are additive in `preferences.json`: version 1, enabled false, 
 
 ## Live-response repair
 
-The user reports steady per-note delay from an earlier build and later revised the rough estimate to about 30 ms. They have not retested the current delivered 609 build after the performance repairs, so its physical symptom remains unconfirmed. The direct native MIDI queue and pinned live sampler have no intentional piano delay. Windows nevertheless previously primed and refilled all allocated `GetBufferSize` storage, independently of the requested shared engine period. Storage capacity is an upper packet bound, not a required amount of future PCM.
+A steady per-note delay, roughly estimated at about 30 ms, was reported with an earlier build. The current delivered 609 build has not been retested physically after the performance repairs, so its physical symptom remains unconfirmed. The direct native MIDI queue and pinned live sampler have no intentional piano delay. Windows nevertheless previously primed and refilled all allocated `GetBufferSize` storage, independently of the requested shared engine period. Storage capacity is an upper packet bound, not a required amount of future PCM.
 
 Windows primes/refills to `min(capacity, (tier + 1) * actualPeriod)`: one actual period at the lowest tier, then explicitly increasing queue headroom capped by capacity. Legal engine-period selection, RAW/fallback and output format stay fixed. Existing queued PCM is never truncated; padding at/above target causes a skipped transfer. Every request is bounded by capacity minus actual padding. There is no automatic hidden tier escalation. A one-period target must meet the next event/render deadline; legal API use alone does not prove reliability. Higher tiers add headroom even when all legal engine periods coincide, until capacity is reached.
 

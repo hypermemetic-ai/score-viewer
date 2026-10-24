@@ -13,7 +13,7 @@ pub fn save(data:&[u8],path:Option<&Path>)->Result<bool,String>{
 #[cfg(test)] mod tests{
  use super::*;
  #[test]fn filenames_and_archive_bounds(){
-  assert!(validate(b"PK\x03\x04data","Zeldas-Lullaby.tuna").is_ok());
+  assert!(validate(b"PK\x03\x04data","Miras-Lullaby.tuna").is_ok());
   for name in ["../Score.tuna","Score.zip","CON.tuna","LPT1.tuna",".tuna","-Score.tuna","a/b.tuna"]{assert!(validate(b"PK\x03\x04",name).is_err());}
   assert!(validate(b"not zip","Score.tuna").is_err());assert!(validate(&vec![0;MAX_SCORE_BYTES+1],"Score.tuna").is_err());
  }

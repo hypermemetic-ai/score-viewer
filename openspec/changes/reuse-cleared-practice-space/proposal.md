@@ -2,7 +2,7 @@
 
 ## Why
 
-Equal maximum-width slots waste space and make shorter measures look unlike their original engraving. Replacing four measures at once leaves no reading lead into the next music; the operator instead wants an atomic refill that uses retired space while keeping the measure being played fixed.
+Equal maximum-width slots waste space and make shorter measures look unlike their original engraving. Replacing four measures at once leaves no reading lead into the next music; an atomic refill should instead use retired space while keeping the measure being played fixed.
 
 ## What Changes
 
@@ -29,5 +29,5 @@ Equal maximum-width slots waste space and make shorter measures look unlike thei
 - Depends on the source-owned passage compositor, verified relation geometry and complete ownership registry from `repair-practice-rendering`. That repair remains separately reviewable and does not claim to implement this allocator.
 - Viewer layout/state: `src/practice-window.ts`, `src/practice-view.ts`, `src/practice-passage.ts`, `src/practice-relations.ts`, plus a scoped transient layout helper. Numeric settings work remains in the rendering repair.
 - Practice visibility: a narrow display-retirement adapter around `PracticeSession` visibility. Existing gestures are already grouped by written measure and hand; a multi-bar scale does not need a new fingering/calculator partition. Keep attack/hold assessment and saved pattern/progress identities unchanged.
-- Tests and observations: real source intervals and tie owners, early accepted attacks, mixed hands/rests, changing widths, source-system joins, repeats, Pause/error restoration and rotated viewports. Observe actual Schumann No.14 and private Zelda in both available presentations; keep private content outside Git.
+- Tests and observations: real source intervals and tie owners, early accepted attacks, mixed hands/rests, changing widths, source-system joins, repeats, Pause/error restoration and rotated viewports. Observe actual Schumann No.14 and a private score in both available presentations; keep private content outside Git.
 - Main source is the reviewed viewer extraction; ISO remains pinned at `da93cf9e0359d861987fd76611b59b14b6aedb92`. No notation/calculator API, package admission, dependency/lock/gitlink, authentication/provider/workflow or installation change is included. A repaired native release remains a separate delivery decision.

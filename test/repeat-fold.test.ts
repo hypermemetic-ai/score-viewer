@@ -33,6 +33,8 @@ function musicXml(bars:readonly string[]){
 const passage=[0,1,2,3,4,5,6,7].map(bar);
 let written:Promise<ScorePackage>|undefined;
 const returning=()=>written??=prepareMusicXmlScore(strToU8(musicXml([...passage,...passage,note('C',5,8,'whole',1,1)+'<backup><duration>8</duration></backup>'+note('C',3,8,'whole',2,5)])),assets).then(r=>importPackage(r.bytes,{allowLegacyTempo:true}));
+/** Bar `measure`'s `index`th right-hand note. A hand carried from matching music reaches a note between the
+ * same neighbours: bar 1's first note opens the piece, so its return in bar 9 (after bar 8) is not one; its second is. */
 const ownerAt=(p:ScorePackage,measure:number,index=0)=>p.score.notes.filter(n=>n.id.startsWith(`P1:m${measure}:`)&&n.hand==='RH').sort((a,b)=>a.startTick-b.startTick)[index].id;
 const seatOf=(p:ScorePackage,id:string)=>p.seats.find(s=>s.ownerIds.includes(id)&&!s.continuation)!;
 function fingered(p:ScorePackage,s:PersonalState,choices:Record<string,number>):PersonalState{
@@ -171,13 +173,13 @@ test('a hand moved in one pass moves its untouched twin', async()=>{
 test('a hand carried from matching music reaches both passes, so they still fold and the folded page shows it', async()=>{
  // The closing bar plays the passage's first bar again: a hand chosen there carries back to bar 1 and to its return.
  const p=await prepareMusicXmlScore(strToU8(musicXml([...passage,...passage,bar(0)])),assets).then(r=>importPackage(r.bytes,{allowLegacyTempo:true}));
- const at='2026-10-22T00:00:00.000Z',chosen=assigned(p,initialPersonal(p),seatOf(p,ownerAt(p,17)),{hand:'LH'});
+ const at='2026-10-22T00:00:00.000Z',chosen=assigned(p,initialPersonal(p),seatOf(p,ownerAt(p,17,1)),{hand:'LH'});
  for(const c of Object.values(chosen.assignments!.choices))c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};
  const carried=handRecurrences(p,chosen).carried;
- assert.deepEqual([ownerAt(p,1),ownerAt(p,9)].map(id=>carried.get(id)?.hand),['LH','LH'],'the chosen hand reaches both passes');
+ assert.deepEqual([ownerAt(p,1,1),ownerAt(p,9,1)].map(id=>carried.get(id)?.hand),['LH','LH'],'the chosen hand reaches both passes');
  assert.ok(verbatimRepeats(p,chosen)?.fold,'passes the same hand reaches still agree');
  const personal=withRepeatInheritance(p,chosen),view=await new FoldedReader(p,null).view(personal);
- const {edition}=view!.verbatimFold!,folded=view!.verbatimFold!.personal(personal),shown=[1,9,17].map(b=>ownerAt(p,b)).filter(id=>edition.score.notes.some(n=>n.id===id));
+ const {edition}=view!.verbatimFold!,folded=view!.verbatimFold!.personal(personal),shown=[1,9,17].map(b=>ownerAt(p,b,1)).filter(id=>edition.score.notes.some(n=>n.id===id));
  assert.ok(shown.length>=2);
  for(const id of shown){
   assert.equal(handFor(p,personal,id),'LH','one answer for the stored note');
@@ -187,8 +189,8 @@ test('a hand carried from matching music reaches both passes, so they still fold
 });
 
 test('a hand change with its finger in one pass carries its hand to the twin, which still reads the finger, so the passes fold', async()=>{
- // Op. 68 No. 13 as the owner left it: bar 11's 4 and 3 moved and fingered, bar 21 reached only by the carried hand.
- const p=await returning(),first=ownerAt(p,1),second=ownerAt(p,9),at='2026-10-22T00:00:00.000Z';
+ // Op. 68 No. 13 with bar 11's 4 and 3 moved and fingered, bar 21 reached only by the carried hand.
+ const p=await returning(),first=ownerAt(p,1,1),second=ownerAt(p,9,1),at='2026-10-22T00:00:00.000Z';
  const moved=assigned(p,fingered(p,initialPersonal(p),{[first]:2}),seatOf(p,first),{hand:'LH'});
  for(const c of Object.values(moved.assignments!.choices))if(c.hand!==undefined)c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};
  assert.equal(handRecurrences(p,moved).carried.get(second)?.hand,'LH','the hand reaches the return');
@@ -270,7 +272,7 @@ const closingReturn=()=>prepareMusicXmlScore(strToU8(musicXml([...passage,...pas
 const handIntent=(s:PersonalState)=>{const at='2026-10-22T00:00:00.000Z';for(const c of Object.values(s.assignments!.choices))if(c.hand!==undefined&&!c.intent?.hand)c.intent={...c.intent,hand:{decisionId:`${c.ownerId}:${at}`,lineageId:`${c.ownerId}:${at}`,authoredAt:at}};return s;};
 
 test('one hand order: a carried left hand against the player\'s own right hand in the other pass is written out, and U clears it, either way round', async()=>{
- const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17);
+ const p=await closingReturn(),first=ownerAt(p,1,1),second=ownerAt(p,9,1),closing=ownerAt(p,17,1);
  for(const [own,other] of [[second,first],[first,second]]){
   const where=own===second?'R in bar 9':'R in bar 1';
   // R pressed on one pass (its written hand, chosen), then L in the closing bar: it carries to the other pass only.
@@ -331,7 +333,7 @@ test('U after a hand kept "this note only" in one pass keeps it to the repeat: t
 });
 
 test('one hand order: a hand carried from matching music outranks an old record of the written hand, so no notice is shown that U could never clear', async()=>{
- const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17);
+ const p=await closingReturn(),first=ownerAt(p,1,1),second=ownerAt(p,9,1),closing=ownerAt(p,17,1);
  for(const [recorded,other] of [[first,second],[second,first]]){
   const where=recorded===first?'record in bar 1':'record in bar 9';
   // A finger saved before 2026-10-14, which also saved the note's written hand; then L in the closing bar.
@@ -349,7 +351,7 @@ test('one hand order: a hand carried from matching music outranks an old record 
 });
 
 test('a hand command on a folded note changes every pass, so the repeat stays folded', async()=>{
- const p=await closingReturn(),first=ownerAt(p,1),second=ownerAt(p,9),closing=ownerAt(p,17),reader=new FoldedReader(p,null);
+ const p=await closingReturn(),first=ownerAt(p,1,1),second=ownerAt(p,9,1),closing=ownerAt(p,17,1),reader=new FoldedReader(p,null);
  const folded=async(s:PersonalState)=>{const view=(await reader.view(withRepeatInheritance(p,s),p))!;return view.seats.find(seat=>seat.ownerIds.includes(first))!;};
  const command=async(s:PersonalState,name:Parameters<typeof noteMemoryActions>[3])=>accepting(p,s,noteMemoryActions(p,s,await folded(s),name,'2026-10-22T00:00:01.000Z'));
  const hands=(s:PersonalState)=>[first,second,closing].map(id=>handFor(p,withRepeatInheritance(p,s),id));

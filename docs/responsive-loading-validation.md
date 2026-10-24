@@ -9,8 +9,8 @@ Linux headless Chromium, 1440 × 1000 viewport, production bundles, copied exist
 | Score | Previous first open | New first open | Previous reopen | New reopen |
 | --- | ---: | ---: | ---: | ---: |
 | No. 14 · Kleine Studie | 15.724 s | 15.265 s | 14.689 s | 0.362 s |
-| Zelda’s Lullaby | 3.525 s | 2.322 s | 0.844 s | 0.547 s |
-| Add It Up | 4.240 s | 4.194 s | 0.210 s | 0.147 s |
+| Private score A | 3.525 s | 2.322 s | 0.844 s | 0.547 s |
+| Private score B | 4.240 s | 4.194 s | 0.210 s | 0.147 s |
 
 The old library mounted before its summaries settled; No. 14’s complete summary snapshot took 8.665 s. New cold startup waits visibly for that work (8.145–8.411 s). After the disposable summaries were saved, a fresh document became ready in 0.347–0.368 s. A canceled cold No. 14 open returned to the library in 17.5 ms, published no reader and wrote no files. Successful retained opens wrote only the existing last-worked preference; they created no package or personal-journal versions.
 
@@ -28,7 +28,7 @@ The startup, sound-error, retained-data-error, library, score-opening/cancel and
 
 ## Remaining limits
 
-Cold work is still costly. The longest observed cold tasks were 389 ms for No. 14, 272 ms for Zelda and 4,002 ms for Add It Up’s admission; warm tasks were 151 ms, 288 ms and below the 50 ms reporting floor respectively. Individual legacy normalization, archive/XML validation, drawing and geometry steps remain indivisible. This change does not claim every cold operation is instantaneous or meet the separate 100 ms visible-edit percentile target.
+Cold work is still costly. The longest observed cold tasks were 389 ms for No. 14, 272 ms for private score A and 4,002 ms for private score B’s admission; warm tasks were 151 ms, 288 ms and below the 50 ms reporting floor respectively. Individual legacy normalization, archive/XML validation, drawing and geometry steps remain indivisible. This change does not claim every cold operation is instantaneous or meet the separate 100 ms visible-edit percentile target.
 
 Enabled native sample-bank verification and audio configuration are awaited, with their status visible. Their costs were not simulated as measured performance, and integrity checks were not weakened. The existing host Rust runtime cannot execute local native tests because `libLLVM.so.22.1` is unavailable; exact native cache-name assertions are included and recipient native checks remain a paired-release gate. Browser evidence does not certify physical MIDI/audio, scanout, player acceptance or a user-installed Mac GUI. Native publication and data-preserving activation are recorded separately after delivery.
 

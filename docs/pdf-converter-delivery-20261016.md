@@ -15,8 +15,8 @@ Application `ba35e574ff39d96ee0fa3f3b0ebf64abe515f218` (PR 112 Save as PDF, PR 1
 
 ## Windows installation
 
-- On `DESKTOP-7LVJ0U3`, the package was extracted next to the previous version as `0.1.0-viewerba35e574-carriercf14ec5f-native`. All 480 files match the package.
-- The previous viewer had been idle since its last data write at 23:21 the night before, and it did not respond to remote keys. It was closed with Alt+F4 at the operator's request.
+- On the target Windows machine, the package was extracted next to the previous version as `0.1.0-viewerba35e574-carriercf14ec5f-native`. All 480 files match the package.
+- The previous viewer was idle and did not respond to remote keys. It was closed with Alt+F4.
 - A closed backup captured all 1865 managed files. The usual shortcut now targets the new executable, and the previous package and shortcut remain for rollback.
 - The shortcut launched the new viewer in console session 1. The library showed all scores and No. 14's practice progress. The reader opened at the saved page with the personal hands.
 - After launch, only `preferences.json` and `viewer-derived-cache-v1.json` differ from the backup. Scores, personal journals, assistance history, practice and calibration are unchanged.

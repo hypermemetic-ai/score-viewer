@@ -70,7 +70,7 @@ difference: its twin keeps its written hand.
 
 Score-viewer #175 carries a deliberate hand change to the bars that repeat it
 (bar 11 to bar 21), also derived and never saved. Both read stored records only,
-so they compose: the fold reads the owner's stored hand records, and a carried
+so they compose: the fold reads the stored hand records, and a carried
 hand gives a twin the same hand the fold would give it, so no note gets two
 answers and nothing is applied twice. A hand kept "only here" is not carried by
 #175 and writes the repeat out here. Whichever of the two merges second rebases
@@ -81,7 +81,7 @@ onto the other.
 A score that folds engraves only its folded pages and draws the player's hands
 on them; both are then kept on disk. The written-out pages are not engraved as
 well. A score that does not fold pays the fold check alone (about 10 ms cold).
-Op. 68 No. 13 on the owner data, headless Chromium on a shared machine under
+Op. 68 No. 13 on a private data copy, headless Chromium on a shared machine under
 load 25–50, first open without a derived cache: 29.4 CPU seconds against 34.7
 before (three folded pages instead of five written-out ones); wall times were
 no slower than main in paired runs. A finger that splits or rejoins the passes

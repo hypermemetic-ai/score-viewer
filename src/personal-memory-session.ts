@@ -2,7 +2,7 @@ import type {AssistanceSnapshot,AssistanceStore} from './durable-assistance-stor
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import {hashBytes,validateLayerAsync,type ScorePackage} from './package';
 import {canonicalJson} from './piano-preparation-identity';
-import {assigned,handCarryDropGeneration,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
+import {assigned,effectiveHands,handCarryDropGeneration,handChoiceOwners,handFor,handRecurrences,type PersonalHand} from './personal-assignments';
 import {personalStorageName,initialPersonal,readPersonal,restoreAll,type Entry,type PersonalState} from './state';
 import {
  bootstrapPersonalFingeringMemory,readPersonalFingeringMemory,memoryInputKey,registerMemoryScore,importPersonalMemoryScore,projectPersonalMemoryScore,
@@ -363,8 +363,12 @@ export class PersonalMemorySession {
    // Choosing the hand its matching bar would carry here gives up the note's own
    // hand: it follows that bar again (L, then R, in bar 21), as "Use bar 11's hand" does.
    const owners=handChoiceOwners(input.p,seat),without=clone(personal);for(const id of owners)if(without.assignments)delete without.assignments.choices[id];
-   const carried=handRecurrences(input.p,without).carried;
-   if(owners.some(id=>personal.assignments?.choices[id]?.hand!==undefined)&&owners.every(id=>carried.get(id)?.hand===action.hand)){
+   // Without a hand of its own, the note shows the hand carried to it, else its written hand.
+   const follows=effectiveHands(input.p,without);
+   if(!action.local&&owners.every(id=>follows(id)===action.hand)){
+    // The written hand where the note has no hand of its own (the second pass of a
+    // folded note after L at the first, then R) is nothing to store.
+    if(!owners.some(id=>personal.assignments?.choices[id]?.hand!==undefined))return{document,personal:readPersonal(personal,input.p)};
     // Only when the press changes the hand (L, then R): the hand the note already
     // shows by the owner's own choice is kept, with the bars that follow it.
     if(handFor(input.p,personal,intent.ownerId)===action.hand)return{document,personal:readPersonal(personal,input.p)};
