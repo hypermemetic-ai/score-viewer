@@ -75,3 +75,19 @@ test('L on the folded note, in either order, gives every pass the same hand',asy
   assert.deepEqual(stored(back),[],'R after L leaves nothing');
  }
 });
+test('a folded press saved to the journal replays as it applied; an intent saved without passes still loads; malformed passes are refused',async()=>{
+ const left=await accepting(initialPersonal(p),press('LH',[first]));
+ // Every write of the press, so recovery can start from the journal while it still holds the press.
+ class Locks implements AssistanceBrowserLocks {private tail:Promise<unknown>=Promise.resolve();request<T>(_name:string,callback:()=>Promise<T>):Promise<T>{const next=this.tail.then(callback);this.tail=next.catch(()=>{});return next;}}
+ const snapshots:Map<string,string>[]=[],data=new Map<string,string>();
+ const session=(data:Map<string,string>,snaps?:Map<string,string>[])=>{const store=browserAssistanceStore({getItem:key=>data.get(key)??null,setItem:(key,value)=>{data.set(key,value);snaps?.push(new Map(data));}},new Locks());const input={entryId:'no13',importedAt:at,p,personal:left};return {input,session:new PersonalMemorySession(store,{scanLibrary:async()=>[structuredClone(input)],validateInputs:async()=>true})};};
+ const live=session(data,snapshots);await live.session.initialize();
+ let personal=left;for(const action of press('RH',[second,first])){const receipt=live.session.accept({...live.input,personal},action);await receipt.saved;personal=receipt.personal;}
+ let replayed:PersonalState|undefined;
+ for(const snap of snapshots){const later=session(new Map(snap));await later.session.initialize();if(!later.session.recovery.some(i=>i.action.kind==='hand'&&i.action.passes))continue;await later.session.retry();replayed=later.session.personalFor(later.input);break;}
+ assert.ok(replayed,'the journal held the press');assert.deepEqual(stored(replayed!),stored(personal));assert.deepEqual(stored(replayed!),[]);
+ const fresh=session(new Map());await fresh.session.initialize();
+ const intent=fresh.session.capture(fresh.input,press('RH',[first,second])[0]),read=(raw:unknown)=>(fresh.session as unknown as {readIntent(raw:unknown):{action:{passes?:string[]}}}).readIntent(raw);
+ const old=structuredClone(intent) as {action:{passes?:string[]}};delete old.action.passes;assert.equal(read(old).action.passes,undefined);
+ for(const passes of [['another','one'],'one',[first,''],[]])assert.throws(()=>read({...intent,action:{...intent.action,passes}}),/Invalid pending personal fingering intent/,JSON.stringify(passes));
+});
