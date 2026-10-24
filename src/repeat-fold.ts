@@ -6,7 +6,7 @@ import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import {hashBytes,type ScorePackage,type Seat} from './package';
 import {activeLayer,type PersonalRepeatResolution,type PersonalState} from './state';
 import {effectiveHands,handRecurrences,ownsHand,type PersonalAssignments,type PersonalHand} from './personal-assignments';
-import {PersonalPresentationSession,adoptImportedReading,type PersonalPresentationOptions,type ProjectionEntry} from './personal-presentation';
+import {PersonalPresentationSession,adoptImportedReading,undrawableHandOwners,type PersonalPresentationOptions,type ProjectionEntry} from './personal-presentation';
 import {withLayoutPeer} from './layout-peer';
 import {capturedReadingExecution,checkReadingExecution,type ReadingExecution} from './reading-execution';
 import type {DerivedFileCache} from './derived-file-cache';
@@ -78,6 +78,15 @@ export function repeatsMayFold(p:ScorePackage):boolean{
 export function verbatimRepeats(p:ScorePackage,s:PersonalState):VerbatimRepeatResult|undefined{
  const source=foldable(p);if(!source)return;
  return foldVerbatimRepeats(source,{ownerFacts:repeatOwnerFacts(p,s),sourceHash:p.sourceSha256});
+}
+
+/** The written-out notes each note stands for where these choices fold a
+ * repeat: a folded note's every pass, first pass first, named by the folded
+ * note or any pass; just the note itself elsewhere. */
+export function foldedTwins(p:ScorePackage,s:PersonalState):(ownerId:string)=>readonly string[]{
+ const fold=verbatimRepeats(p,s)?.fold;if(!fold)return id=>[id];
+ const twins=new Map<string,readonly string[]>();for(const [shown,ids] of fold.shows){twins.set(shown,ids);for(const id of ids)twins.set(id,ids);}
+ return id=>twins.get(id)??[id];
 }
 
 /** A repeat the reader writes out because the player's choices differ between
@@ -203,7 +212,8 @@ async function remembering<T>(key:string,draw:()=>Promise<T>):Promise<T>{
  try{return await draw();}
  catch(error){if(aborted(error))throw error;
   // The reason is for the console, once, wherever the fold first failed (opening or preparing ahead of time).
-  console.warn('Repeats stay written out:',error);
+  // A hand the engraver can't draw is no failure of the fold: the reader answers it where it was chosen.
+  if(!undrawableHandOwners(error))console.warn('Repeats stay written out:',error);
   foldFailures.delete(key);foldFailures.set(key,error);for(const old of foldFailures.keys()){if(foldFailures.size<=KEPT_FOLD_FAILURES)break;foldFailures.delete(old);}
   throw new FoldFailure(key,error,false);}
 }

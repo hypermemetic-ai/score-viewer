@@ -13,7 +13,7 @@ import {droppedCarryText} from '../src/hand-recurrence-text';
 import {undrawableHandOwners,undrawableHandReason} from '../src/personal-presentation';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {initialPersonal,type PersonalState} from '../src/state';
-import {withRepeatInheritance} from '../src/repeat-fold';
+import {foldedTwins,withRepeatInheritance} from '../src/repeat-fold';
 import {scoreCapabilities} from '../src/score-capabilities';
 import type {ScorePackage} from '../src/package';
 import {threadCpuMs} from './support/thread-cpu';
@@ -170,7 +170,8 @@ test('a refused carried hand: bar 21 is resolved again with its written hands, a
  const body=[line('const memoryInput='),line('const memoryResolutions='),line('const resolveMemoryInput='),line('function resolveMemory('),main.slice(main.indexOf('async function keepDrawableHands('),main.indexOf('async function acceptMemoryAction('))].map(s=>stripTypeScriptTypes(s)).join('\n');
  const context:any={structuredClone,crypto,handFor,dropHandCarry,undrawableHandOwners,undrawableHandReason,rawMemoryPersonal,withResolvedMemory,withRepeatInheritance,scoreCapabilities,PersonalMemoryResolutionCache,
   personalMemory:session,memoryLibrary:{remember(){}},paintPersonalSaveError(){},
-  personalEditor:()=>({session:{project:async(s:PersonalState)=>{if(handFor(input.p,s,'m21:n5')==='RH')throw refusal();return input.p;}}})};
+  personalEditor:()=>({session:{project:async(s:PersonalState)=>{if(handFor(input.p,s,'m21:n5')==='RH')throw refusal();return input.p;}}}),
+  foldedTwins,projectShown:(t:unknown,s:PersonalState)=>context.personalEditor(t).session.project(s)};
  const refusal=()=>Error("These hand choices can't be drawn on the page yet.",{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',['m21:n5'])});
  runInNewContext(body,context);
  const target={package:input.p,entry:{id:'no13',importedAt:input.importedAt},personal:await session.loadPersonalCurrent({id:'no13',importedAt:input.importedAt!},input.p,async()=>stored.personal)};
@@ -179,7 +180,7 @@ test('a refused carried hand: bar 21 is resolved again with its written hands, a
  // Before the refusal bar 21 carries bar 11's hands and fingers: D#4 (3) in the RH with 2.
  assert.equal(handFor(input.p,target.personal,'m21:n10'),'RH');assert.deepEqual(bar21(),bar11Fingers.slice(0,13));
  const memory=JSON.stringify((await store.read()).documents[personalMemoryDocument]),records=JSON.stringify(target.personal.assignments);
- const kept=await context.keepDrawableHands(target,target.personal,refusal(),(id:string)=>input.p.score.notes.find(n=>n.id===id)?.hand??null);
+ const kept=await context.keepDrawableHands(target,target.personal,refusal(),(id:string)=>input.p.score.notes.find(n=>n.id===id)?.hand??null,target.personal);
  assert.deepEqual([...kept.dropped],[21]);assert.deepEqual([...kept.unshared],[21]);
  // D#4 is back in the LH beside B3, and neither keeps bar 11's fingers: bar 21's hands no longer play bar 11's.
  assert.equal(handFor(input.p,target.personal,'m21:n10'),'LH');assert.deepEqual(bar21(),Array(13).fill(null));

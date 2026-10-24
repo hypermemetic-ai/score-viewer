@@ -100,7 +100,7 @@ import {paintEditorAdvice} from './editor-advice-view';
 import './fingering-advice.css';
 import './personal-assistance.css';
 import {dropHandCarry,handCarryDropGeneration,effectiveHands,handFor,handsDiffer,restorePersonalAssignment,type PersonalHand} from './personal-assignments';
-import {FOLD_FAILURE_TEXT,FoldFailure,FoldedReader,editOwners,repeatsMayFold,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
+import {FOLD_FAILURE_TEXT,FoldFailure,FoldedReader,editOwners,foldedTwins,repeatsMayFold,useVerbatimFoldCache,withRepeatInheritance,writtenOutRepeat,writtenView,type FoldedPackage,type WrittenOutRepeat} from './repeat-fold';
 import {PersonalPresentationSession,separatePreparations,projectionServed,type ProjectionEntry,adoptImportedReading,engravingRefusal,undrawableHandOwners,undrawableHandReason,cancelPersonalPrefetch,usePersonalProjectionCache} from './personal-presentation';
 import {droppedCarryText,handActionNotice,handChoiceView,handCarryNotice,handKeyNotice,type HandChoiceAction,type PrintedBar} from './hand-recurrence-text';
 import {noteMemoryActions,type NoteMemoryCommand} from './note-memory-actions';
@@ -357,18 +357,24 @@ function readerPackage(){if(!current)throw Error('No open score.');return livePe
 function shownSession(target:NonNullable<typeof current>):PersonalPresentationSession{const editor=personalEditor(target);return (editor.view as FoldedPackage).verbatimFold?.session??editor.session;}
 /** The reader's pages for these choices. Where a repeat folds, only the
  * folded pages are drawn; the written-out pages are drawn when nothing folds
- * or the fold can't be drawn. */
-async function presentReader(target:NonNullable<typeof current>,personal:PersonalState,written:()=>Promise<ScorePackage>,execution?:ReadingExecution):Promise<ScorePackage>{
+ * or the fold can't be drawn. `refusals`: a hand the folded pages can't draw,
+ * on notes that can return to the hands they had, is thrown as the written-out
+ * pages throw it, for the caller to answer on the folded pages; otherwise the
+ * repeat is written out. */
+async function presentReader(target:NonNullable<typeof current>,personal:PersonalState,written:()=>Promise<ScorePackage>,execution?:ReadingExecution,refusals=false):Promise<ScorePackage>{
  if(scoreCapabilities(target.package).pianoPreparation){const fold=personalEditor(target).fold;
   if(fold.folds(personal))try{const view=await fold.view(personal,target.package,execution);if(view)return view;}
   catch(error){if(error instanceof DOMException&&error.name==='AbortError')throw error;
    // A fold that failed is remembered for the session and not drawn again; its reason was logged when it failed.
    const failure=error instanceof FoldFailure?error:undefined;if(!failure)console.warn('Repeats stay written out:',error);
+   if(refusals&&undrawableHandOwners(failure?.detail))throw failure!.detail;
    // Said once a score and fold: the pages are right, only longer.
    const said=`${target.entry.id}\n${failure?.key??''}`;if(!foldFailureSaid.has(said)){foldFailureSaid.add(said);notify(FOLD_FAILURE_TEXT);}}
  }
  return written();
 }
+/** The pages the reader shows for these choices, folded where a repeat folds; a hand the engraver can't draw on them is thrown. */
+const projectShown=(target:NonNullable<typeof current>,personal:PersonalState,execution?:ReadingExecution)=>presentReader(target,personal,()=>personalEditor(target).session.project(personal,execution),execution,true);
 /** A stored bar as the reader prints it: a folded repeat prints fewer bars. */
 function printedBar(entryId:string,bar:number):number{const fold=current?.entry.id===entryId?(readerPackage() as FoldedPackage).verbatimFold:undefined;return fold?fold.printedBar(bar):bar;}
 /** A score's stored bars as printed, for notices that name bars. */
@@ -517,10 +523,11 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  let next=target.personal;
  capturePersonalNavigation(next,editor.view,current===target?selection:undefined,!!nextSeat||!!next.navigation?.followEdit);
  const navigation=JSON.stringify([next.view,next.editContactId,next.navigation]),
-  attempted=next,projection=presentReader(target,next,()=>editor.session.project(attempted).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id));
+  // A refused hand is answered on the pages it was chosen on: a folded repeat stays folded.
+  attempted=next,projection=projectShown(target,attempted).catch(async error=>{const kept=await keepDrawableHands(target,attempted,error,id=>handFor(target.package,before,id),before);
    if(editor.generation===generation)next=target.personal;
    if(kept.keys){keptReason=kept.reason;notify(keptHandsText(kept.keys,kept.reason));}else if(kept.dropped.length)notify(droppedCarryText(kept.dropped,kept.unshared,printedBars(target)));
-   return kept.view;})),
+   return kept.view;}),
   navigationReceipt=editor.queue.accept(next);editor.projections.set(navigationReceipt.sequence,projection);
  void navigationReceipt.saved.catch(error=>paintPersonalSaveError(target,error));
  const ownerPractice=target===current&&practice instanceof PracticeView?practice:undefined,
@@ -554,30 +561,40 @@ async function presentPersonalChange(target:NonNullable<typeof current>,personal
  * written: that bar keeps its written hands for this session (`dropped`). Other refusals, and a choice whose notes had no
  * hand to return to, still reach the player unchanged. `attempted` is the
  * refused state; a note whose hand has changed since then is left as it is.
+ * A note of a repeat that `shown` (the choices the reader showed) folds returns
+ * in every pass at once, as one press on the folded note: one pass alone would
+ * split the repeat. The pages are drawn again as the reader shows them, folded
+ * where the repeat folds.
  * A refusal also names the notes the choice ran into, such as the other note
  * of a beam; one whose hand the choice did not change has nothing to return.
  * A dropped carry repartitions its bar's hands, so fingers are resolved again;
  * `unshared` is the dropped bars whose shared fingers no longer reach them. */
-async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string;dropped:number[];unshared:number[]}>{
+async function keepDrawableHands(target:NonNullable<typeof current>,attempted:PersonalState,error:unknown,hadHand:(ownerId:string)=>PersonalHand|null,shown:PersonalState,execution?:ReadingExecution):Promise<{view:ScorePackage;keys:number;reason?:string;dropped:number[];unshared:number[]}>{
  const returned=new Set<string>(),dropped=new Set<number>(),reason=undrawableHandReason(error),fingered=target.personal.memoryResolved?.choices??{};
+ let twinsOf:((ownerId:string)=>readonly string[])|undefined;const twins=(id:string)=>(twinsOf??=foldedTwins(target.package,shown))(id);
  for(let attempt=0;;attempt++){
-  const refused=undrawableHandOwners(error),seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
+  const named=undrawableHandOwners(error),refused=named&&[...new Set(named.flatMap(twins))],seats=refused?target.package.seats.filter(seat=>seat.ownerIds.some(id=>refused.includes(id))):[];
   if(!refused||!seats.length||attempt>=3)throw error;
-  let changed=false,repartitioned=false;
+  let changed=false,repartitioned=false;const folded=new Map<string,{ownerIds:string[];hand:PersonalHand}>();
+  const give=(ownerIds:readonly string[],hand:PersonalHand)=>{const authoredAt=new Date().toISOString();
+   for(const ownerId of ownerIds){const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt,...(ownerIds.length>1?{passes:[...ownerIds]}:{})});
+    target.personal=receipt.personal;target.personal=resolveMemory(target);void receipt.saved.catch(saveError=>paintPersonalSaveError(target,saveError));}};
   for(const seat of seats){
    const ownerId=seat.ownerIds.find(id=>refused.includes(id))!,refusedHand=handFor(target.package,attempted,ownerId);
    if(handFor(target.package,target.personal,ownerId)!==refusedHand){changed=true;continue;}
+   const passes=twins(ownerId);
+   // A folded note's passes return together, decided once over all of them, so the repeat stays folded and keeps no record of the press.
+   if(passes.length>1){const hand=hadHand(ownerId);if(hand===refusedHand)continue;if(!hand)throw error;const key=`${passes[0]}\n${hand}`,group=folded.get(key)??{ownerIds:[],hand};group.ownerIds.push(ownerId);folded.set(key,group);continue;}
    const bar=dropHandCarry(target.package,target.personal,ownerId);if(bar!==undefined){dropped.add(bar);changed=repartitioned=true;continue;}
    const hand=hadHand(ownerId);if(hand===refusedHand)continue;if(!hand)throw error;
-   const receipt=personalMemory.accept(memoryInput(target),{kind:'hand',ownerId,hand,decisionId:crypto.randomUUID(),authoredAt:new Date().toISOString()});
-   target.personal=receipt.personal;target.personal=resolveMemory(target);returned.add(ownerId);changed=true;
-   void receipt.saved.catch(saveError=>paintPersonalSaveError(target,saveError));
+   give([ownerId],hand);returned.add(ownerId);changed=true;
   }
+  for(const {ownerIds,hand} of folded.values()){give(ownerIds,hand);returned.add(twins(ownerIds[0])[0]);changed=true;}
   if(!changed)throw error;
   if(repartitioned)target.personal=resolveMemory(target);
   attempted=target.personal;
   const now=target.personal.memoryResolved?.choices??{},unshared=[...dropped].filter(bar=>target.package.seats.some(seat=>seat.writtenBar===bar&&seat.ownerIds.some(id=>fingered[id]&&!now[id])));
-  try{return {view:await personalEditor(target).session.project(target.personal,execution),keys:returned.size,...(reason?{reason}:{}),dropped:[...dropped],unshared};}catch(next){error=next;}
+  try{return {view:await projectShown(target,target.personal,execution),keys:returned.size,...(reason?{reason}:{}),dropped:[...dropped],unshared};}catch(next){error=next;}
  }
 }
 /** Accept one action, or one per pass of a folded note (`editOwners`) shown together, so the passes never part between them. */
@@ -1126,8 +1143,9 @@ async function activateScore(next:NonNullable<typeof current>,context?:PracticeV
  await aheadOfTime?.joined(next.entry.id,op.controller.signal);check();
  // A score that shows a repeat folded draws only its folded pages.
  cancelPersonalPrefetch();const nextEditor=personalEditor(next),folds=scoreCapabilities(next.package).pianoPreparation&&nextEditor.fold.folds(next.personal);if(!folds&&nextEditor.session.settlesOnOpen){await nextEditor.session.warm(readingExecution(op));check();}
- nextEditor.view=await presentReader(next,next.personal,()=>nextEditor.session.project(next.personal,readingExecution(op))
-  .catch(async error=>{if(fingersLater){fingersLater=false;await resolveFingers(next);}const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;unsharedFingers=kept.unshared;return kept.view;}),readingExecution(op));check();resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
+ // A saved hand the engraver can't draw returns to the score's hand on the pages the reader shows: a folded repeat opens folded.
+ const opened=next.personal;nextEditor.view=await projectShown(next,opened,readingExecution(op))
+  .catch(async error=>{if(fingersLater){fingersLater=false;await resolveFingers(next);}const kept=await keepDrawableHands(next,next.personal,error,id=>next.package.score.notes.find(n=>n.id===id)?.hand??null,opened,readingExecution(op));keptHands=kept.keys;droppedCarries=kept.dropped;unsharedFingers=kept.unshared;return kept.view;});check();resolvePersonalNavigation(next.personal,nextEditor.view);nextEditor.visiblePersonal=structuredClone(next.personal);check();
  // Publication begins here. Closing/canceling cannot roll back an installed
  // score or a practice view while its remaining host prerequisites settle.
  op.running.state='installing';readingProgress(op,'open');op.loading.saving('Almost ready. This part can’t be cancelled.');
