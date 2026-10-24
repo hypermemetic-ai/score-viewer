@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {freezeInputs} from '../scripts/native-delivery/freeze-inputs.mjs';
 import {sha256,canonical,inventory} from '../scripts/native-delivery/score-viewer-carrier-inputs.mjs';
+import {nameDigest,receiptPrivacyProblems} from '../scripts/native-delivery/receipt-privacy.mjs';
 const git=(root,...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 async function put(root,path,data){await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),data);}
 async function fixture(t,{unprotected}={}){
@@ -42,4 +43,22 @@ test('freezing refuses stale receipts, dirty sources and output overlapping sour
  await put(f.viewerSource,'src-tauri/src/assistance_store.rs','uncommitted change');await assert.rejects(freezeInputs(f),/must be clean/);
  await assert.rejects(freezeInputs({...f,output:join(f.viewerSource,'new-seal')}),/must be separate/);
  assert.equal(await readFile(join(f.viewerSource,'delivery-input/inputs.json'),'utf8'),'old seal remains untouched\n');
+});
+test('freezing refuses a receipt naming a home path, a private data copy or a private score, without saying the name',async t=>{
+ const f=await fixture(t),local=join(f.root,'private-names.txt');await writeFile(local,'# local, never committed\nAn Unpublished Nocturne\n');
+ process.env.SCORE_VIEWER_PRIVATE_SCORE_NAMES=local;t.after(()=>{delete process.env.SCORE_VIEWER_PRIVATE_SCORE_NAMES;});
+ for(const [note,kind] of [['run in /home/someone/projects/viewer',/home directory path/],['copied from C:\\Users\\someone\\AppData',/Windows user directory path/],
+  ['state in ~/.local/state/viewer',/per-user state path/],['rehearsed on /tmp/owner-data-20261021',/private data copy path/],['opened /srv/scores/private.tuna',/score archive path outside fixtures/],
+  ['opened an unpublished  NOCTURNE, at bar 3',/private score name/]]){
+  f.receipt.checks.tests.note=note;await writeFile(f.checks,JSON.stringify(f.receipt));
+  await assert.rejects(freezeInputs(f),error=>kind.test(error.message)&&error.message.includes('$.checks.tests.note')&&!/nocturne/i.test(error.message),note);
+  await assert.rejects(access(f.output),{code:'ENOENT'});
+ }
+ // Public names pass: a public studio id, a public fixture and the literal "a private score".
+ f.receipt.checks.tests.note='Rehearsed schumann-op68-no14 (fixtures/schumann-op68-no14.tuna) and a private score on a private data copy.';await writeFile(f.checks,JSON.stringify(f.receipt));
+ await freezeInputs(f);
+ // The committed deny-list holds digests only, so it prints no name; a listed name is refused by its digest.
+ assert.deepEqual(receiptPrivacyProblems({note:'nothing private'}),[]);assert.match(nameDigest('Any Title'),/^[0-9a-f]{64}$/);
+ const listed=JSON.parse(await readFile(new URL('../scripts/native-delivery/private-score-names.json',import.meta.url),'utf8'));
+ assert.ok(listed.digests.length&&listed.digests.every(d=>/^[0-9a-f]{64}$/.test(d))&&Object.keys(listed).every(k=>['description','digests'].includes(k)));
 });

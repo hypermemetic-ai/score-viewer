@@ -8,6 +8,7 @@ import {converterResourceMap} from './score-viewer-converter-release.mjs';
 import {inventory, sha256, canonical, safePath, validateRecordedChecks, validateCarrierInputs, validateLockedLocalDependencies} from './score-viewer-carrier-inputs.mjs';
 import {semanticHash,footerProbeVersion,footerMetricsSha256} from './footer-ink-receipt.mjs';
 import {validatePianoSources} from './score-viewer-piano-release.mjs';
+import {refusePrivateReceipt} from './receipt-privacy.mjs';
 const footerNotice='LiberationSerif-Italic-NOTICE.txt';
 function git(source,args,binary=false) {return execFileSync('git',args,{cwd:source,encoding:binary?undefined:'utf8',maxBuffer:32*1024*1024});}
 function inside(parent,path) {const rel=relative(parent,path);return !rel||(!rel.startsWith('..'+(process.platform==='win32'?'\\':'/'))&&rel!=='..'&&!isAbsolute(rel));}
@@ -27,6 +28,8 @@ export async function freezeInputs({viewerSource,viewerRevision,frontend,checks,
   if (frontendFiles['release-identity.json']) throw Error('Frontend already contains another native release identity');
   if (!frontendFiles['index.html'] || !Object.keys(frontendFiles).some(path=>/^assets\/.*\.js$/.test(path)) || !Object.keys(frontendFiles).some(path=>/\.otf$/.test(path))) throw Error('Frontend lacks the complete reader/font payload');
   const checksBytes=await readFile(checks),checkReceipt=JSON.parse(checksBytes);
+  // The receipt is published with the seal byte for byte: it names no private score or path (docs/native-delivery.md).
+  refusePrivateReceipt(checkReceipt);
   const inputs={schema:1,version:pkg.version,
     viewer:{repository:'hypermemetic-ai/score-viewer',revision:viewerRevision,tree:git(viewerSource,['rev-parse',`${viewerRevision}^{tree}`]).trim(),timestamp:new Date(git(viewerSource,['show','-s','--format=%cI',viewerRevision]).trim()).toISOString()},
     notation:{repository:'hypermemetic-ai/iso-notation',revision:notationRevision},nativeFiles:{},
