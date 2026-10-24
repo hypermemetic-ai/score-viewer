@@ -12,6 +12,7 @@ import {keptHandsText} from '../src/hand-editing-wait';
 import {PersonalEditQueue} from '../src/personal-edit-queue';
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {writtenOutReader} from './helpers/written-out-reader';
+import {foldedTwins} from '../src/repeat-fold';
 
 const p=await importPackage(readFileSync(new URL('../fixtures/schumann-op68-no14.tuna',import.meta.url)),{allowLegacyTempo:true});
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
@@ -29,9 +30,9 @@ function harness(personal:PersonalState,project:(s:PersonalState)=>Promise<unkno
   personalMemory:{accept(input:any,action:any){accepted.push(action);const s=p.seats.find(s=>s.ownerIds.includes(action.ownerId))!;
    return {personal:assigned(p,input.personal,s,{hand:action.hand}),saved:Promise.resolve()};}},
   memoryInput:(t:any)=>({personal:t.personal}),resolveMemory:(t:any)=>t.personal,paintPersonalSaveError(){},
-  personalEditor:()=>({session:{project}})};
+  personalEditor:()=>({session:{project}}),foldedTwins,projectShown:(_t:unknown,s:PersonalState)=>project(s)};
  runInNewContext(keepBody,context);
- return {target,accepted,keep:(attempted:PersonalState,error:unknown,hadHand:(id:string)=>'LH'|'RH'|null)=>context.keepDrawableHands(target,attempted,error,hadHand)};
+ return {target,accepted,keep:(attempted:PersonalState,error:unknown,hadHand:(id:string)=>'LH'|'RH'|null)=>context.keepDrawableHands(target,attempted,error,hadHand,personal)};
 }
 
 test('only a plain fit refusal names notes whose hands can be returned',()=>{

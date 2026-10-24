@@ -16,6 +16,7 @@ import {undrawableHandOwners,undrawableHandReason} from '../src/personal-present
 import {HandPresentationError} from '../vendor/iso-notation/src/score-presentation';
 import {foldVerbatimRepeats} from '../vendor/iso-notation/src/model/verbatim-repeats';
 import {buildSchumannNo13MusicXmlImport} from '../vendor/iso-notation/src/scores/schumann-no13-musicxml-import';
+import {foldedTwins} from '../src/repeat-fold';
 
 // Schumann Op. 68 No. 13 as the written-out edition has it: bar 11 holds the
 // return pickup (B4 C#5, right hand) in its last half beat; bar 21 is the same
@@ -310,9 +311,10 @@ test('opening: a carried hand the engraver refuses is dropped for the session, n
   personalMemory:{accept(_:unknown,action:unknown){accepted.push(action);throw Error('nothing is written');}},
   memoryInput:(t:any)=>({personal:t.personal}),resolveMemory:(t:any)=>t.personal,paintPersonalSaveError(){},
   personalEditor:()=>({session:{project:async(s:PersonalState)=>{const hand=handFor(input.p,s,e4(21))!;projected.push(hand);
-   if(hand==='RH')throw Error("These hand choices can't be drawn on the page yet.",{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',[e4(21)])});return input.p;}}})};
+   if(hand==='RH')throw Error("These hand choices can't be drawn on the page yet.",{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',[e4(21)])});return input.p;}}}),
+  foldedTwins,projectShown:(t:unknown,s:PersonalState)=>context.personalEditor(t).session.project(s)};
  runInNewContext(body,context);
- const kept=await context.keepDrawableHands(target,personal,Error("These hand choices can't be drawn on the page yet.",{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',[e4(21)])}),(id:string)=>input.p.score.notes.find(n=>n.id===id)?.hand??null);
+ const kept=await context.keepDrawableHands(target,personal,Error("These hand choices can't be drawn on the page yet.",{cause:new HandPresentationError('unsupported-fit','Personal hands cannot fit the matching musical presentation.',[e4(21)])}),(id:string)=>input.p.score.notes.find(n=>n.id===id)?.hand??null,personal);
  assert.deepEqual(accepted,[]);assert.equal(kept.keys,0);assert.deepEqual([...kept.dropped],[21]);assert.deepEqual(projected,['LH']);
  assert.deepEqual(target.personal.assignments,stored,'no "hand here only" record');
  assert.equal(handFor(input.p,personal,e4(21)),'LH');assert.equal(handFor(input.p,personal,dSharp4(21)),'LH');assert.equal(handFor(input.p,personal,e4(11)),'RH');

@@ -37,6 +37,10 @@ Each folded note is shown by its twins, one in each pass (`src/repeat-fold.ts`).
 - Every change of choices is read again: a repeat is written out as soon as an
   edit (for example in Fingers, in the second pass) makes its passes disagree,
   and folds again when they agree.
+- A hand the engraver can't draw on the folded pages is refused there: the
+  note keeps the hand it had in every pass, nothing is stored, and the repeat
+  stays folded. Its passes return together, even when only one of them can't
+  be drawn, so a refusal never splits them.
 
 ## Where it shows
 
