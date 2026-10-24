@@ -1,0 +1,14 @@
+{
+ "description": "The public studio ids a source-check receipt may name a score by (see receipt-privacy.mjs): the fixtures/ archives and the public-domain studio scores this repository already names. Any other score is written as \"a private score\".",
+ "ids": [
+  "authored-calculated-preparation-v2",
+  "authored-preparation-v1",
+  "bach-goldberg-var1",
+  "brahms-op118-no1",
+  "footer-probe-calculated-edition",
+  "schumann-op68-no13",
+  "schumann-op68-no14",
+  "schumann-op68-no30",
+  "schumann-op68-no43"
+ ]
+}
