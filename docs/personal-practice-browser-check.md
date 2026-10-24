@@ -16,7 +16,7 @@ Run after a configured build:
 PRACTICE_PLAYWRIGHT=/path/to/playwright-core/index.mjs \
 PRACTICE_CHROMIUM=/path/to/chrome \
 PERSONAL_PRACTICE_ARTIFACTS=/tmp/personal-practice-restoration \
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/check-personal-practice-restoration.mjs
+qq-job -- node --import tsx scripts/check-personal-practice-restoration.mjs
 ```
 
 This is bounded functional evidence for the editing application and a small authored score. It excludes the separate combined practice redesign, final renderer approval, the six-case 100-ms benchmark, actual earned timed runs, physical MIDI, native WebView behavior and human musical acceptance. No user-managed data was used. Server, browser contexts and temporary dependency links were stopped or removed after the check.

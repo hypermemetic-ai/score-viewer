@@ -23,7 +23,7 @@ Adversarial admission covers missing/duplicated/misattributed original-source co
 
 The owned preview at port5297 was used with isolated browser localStorage fixtures. Chromium rendered the normal library, reader, keyboard switch, earlier-edition selector and restore/refusal flows. The viewport was 1800×1300. Whole Viewer frames, unobscured complete SVG pages and focused passages were captured after fonts and toolbar transitions settled; no page paint or finger overlays were injected. Browser errors: zero. The browser and preview were stopped afterward.
 
-Durable public evidence: `/home/qqp/.local/state/score-viewer-calculated-hands-20261008/integration-final/`. `browser-observations.json` records displayed annotations and flow results. Each `*.identity.json` records the exact source/archive, complete assignment/recipe/hand identity, raw/seated baseline, seats and actual owned geometry/source inventory/coverage. `artifact-hashes.json` covers the preserved PNG/SVG/archive/receipt/script/log bytes.
+Durable public evidence: `<private-state>/score-viewer-calculated-hands-20261008/integration-final/`. `browser-observations.json` records displayed annotations and flow results. Each `*.identity.json` records the exact source/archive, complete assignment/recipe/hand identity, raw/seated baseline, seats and actual owned geometry/source inventory/coverage. `artifact-hashes.json` covers the preserved PNG/SVG/archive/receipt/script/log bytes.
 
 Artifact manifest SHA256: `3796fe040e16644f364e52e21bde05df9662f6568c4cc0acba3661e56825b8df`.
 
@@ -65,7 +65,7 @@ After the first stable source receipt `1620e236eb9c4516630e70746b42eb4b930250cf`
 
 The reconciled full frontend suite passed **446/446**, zero failures/skips, 93.9 seconds, concurrency two. The build/typecheck/source-pin check passed; the existing chunk advisory remains. The scoped diff against current main and selected strict OpenSpec validation pass. All 13 actual browser controls plus the no-write declared-journal refusal were rerun against exact reconciled source `4d0e35784b8e461b1f6eff7b86a538debab02b8e`, with zero browser errors. The owned preview5297 and browser were stopped.
 
-The prior `integration-final` set remains frozen at artifact manifest `3796fe040e16644f364e52e21bde05df9662f6568c4cc0acba3661e56825b8df`. Current-head captures/receipts/logs are separate in `/home/qqp/.local/state/score-viewer-calculated-hands-20261008/integration-reconciled/`, bound through `source-binding.json` and `browser-observations.json`. Their artifact manifest SHA256 is `3044a22050864c17abc73bddd8a9937dbb95780dff11f1c8237f0f1b0b556200`. Later receipt-only commits do not change the captured product source.
+The prior `integration-final` set remains frozen at artifact manifest `3796fe040e16644f364e52e21bde05df9662f6568c4cc0acba3661e56825b8df`. Current-head captures/receipts/logs are separate in `<private-state>/score-viewer-calculated-hands-20261008/integration-reconciled/`, bound through `source-binding.json` and `browser-observations.json`. Their artifact manifest SHA256 is `3044a22050864c17abc73bddd8a9937dbb95780dff11f1c8237f0f1b0b556200`. Later receipt-only commits do not change the captured product source.
 
 ## Source-owned tie boundary follow-up
 

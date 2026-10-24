@@ -33,7 +33,7 @@ Earlier post-GC DOM growth in the private audit came from discarded Playwright E
 
 Final runtime main SHA256: `7301a67a5232411e6fa44f455296825c62ee31f1f32b3008ea3b866282bba56a`. The source dependency is the separately reviewed ISO `abe03c02ac000e5dd1ee5964e0356bd77aeddab2`.
 
-Private evidence is retained under `/home/qqp/.local/state/score-viewer-main-hooks-20261009`: `loading-main/receipt.json`, `performance-main/receipt.json`, `public-check/pressure-browser.json`, and the phase-instrumented reader audit. The prior `6b50418` checkpoint receipts remain in `checkpoint-6b504`; the boot correction supersedes that runtime checkpoint.
+Private evidence is retained under `<private-state>/score-viewer-main-hooks-20261009`: `loading-main/receipt.json`, `performance-main/receipt.json`, `public-check/pressure-browser.json`, and the phase-instrumented reader audit. The prior `6b50418` checkpoint receipts remain in `checkpoint-6b504`; the boot correction supersedes that runtime checkpoint.
 
 | Final receipt | SHA256 |
 | --- | --- |

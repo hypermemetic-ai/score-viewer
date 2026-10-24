@@ -13,11 +13,11 @@ After timing, native writes are blocked while a hand key and finger key are issu
 Run after the tracked shared source pin has been admitted:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- npm run build
+qq-job -- npm run build
 PRACTICE_PLAYWRIGHT=/path/to/playwright-core/index.mjs \
 PRACTICE_CHROMIUM=/path/to/chrome \
 FAST_EDIT_ARTIFACTS=/tmp/score-viewer-fast-personal-editing \
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/check-fast-personal-editing.mjs
+qq-job -- node --import tsx scripts/check-fast-personal-editing.mjs
 ```
 
 The receipt retains source/frontend/fixture hashes, named host/browser/viewport, all successful and failed timings (including frame-callback arrival and correctness-verification overhead), sample counts, cold-opening time, correctness checks and screenshot names. The first changed-hand frame and its restored-hand counterpart are captured separately, alongside finger editing and recovery screens. Freshly generated public fixtures and screenshots remain in the artifact directory. At least twenty samples per class are enforced; `FAST_EDIT_SAMPLES` may increase the count. `FAST_EDIT_CASES` may select comma-separated exact case names for a bounded diagnostic run; a subset always fails the six-case acceptance gate and is labeled in the receipt.

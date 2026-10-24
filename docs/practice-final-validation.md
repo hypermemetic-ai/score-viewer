@@ -29,7 +29,7 @@ passed all four main capabilities and both active practice changes. Dependencies
 package/layer admission, calculator and worker routes are unchanged.
 
 Logs and emitted-frontend observations are retained outside Git at
-`/home/qqp/.local/state/score-viewer-practice-final-20261008/`. The full passing
+`<private-state>/score-viewer-practice-final-20261008/`. The full passing
 log is `npm-test-final.log`; the earlier failed run is retained separately.
 Build and bridge logs are `npm-build.log` and `native-bridge-test.log`.
 

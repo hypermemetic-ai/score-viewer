@@ -92,7 +92,7 @@ node scripts/release-score-viewer.mjs \
   --revision REVIEWED_CARRIER_SHA \
   --score-path public/review/schumann-no14-conventional-20261006.tuna \
   --score-sha256 2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d \
-  --output /home/qqp/projects/iso-notation-deploy/public/review/score-viewer
+  --output <iso-notation-deploy-checkout>/public/review/score-viewer
 ```
 
 The command obtains both native packages, independently verifies the complete pair, and changes the current download pointer atomically. Recheck that the selected carrier is a descendant of the then-current paired revision; an unrelated or older finishing pair is rejected and the current download stays intact. An existing complete artifact can be reused only after identical source/score and package verification. Retain actual preparation/native/assembly timings and cache context in the delivery receipt.

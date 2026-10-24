@@ -20,11 +20,11 @@ Twenty-two screenshots and the detailed `receipt.json` are retained outside Git 
 To repeat against an integrated build:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- npm run build
+qq-job -- npm run build
 PRACTICE_PLAYWRIGHT=/path/to/playwright-core/index.mjs \
 PRACTICE_CHROMIUM=/path/to/chrome \
 PASSIVE_EDIT_ARTIFACTS=/tmp/score-viewer-passive-score-editing \
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/check-passive-score-editing.mjs
+qq-job -- node --import tsx scripts/check-passive-score-editing.mjs
 ```
 
 The written-tie fixture uses the existing public complete-tie regression and shared publisher/calculator/admission helpers; no note geometry is fabricated. This checkpoint verifies passive input and navigation. It does not certify later hand-edit projection, edit latency, physical keys/MIDI/pedals, audible piano, installed WebView behavior or human musical acceptance. The browser and temporary server close in the script's cleanup path.

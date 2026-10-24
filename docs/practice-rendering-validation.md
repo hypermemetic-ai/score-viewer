@@ -67,25 +67,25 @@ Focused input, practice progression/lifecycle and production fixture checks pass
 Heavy commands run through the default `qq-job` resource profile. Keep the foreground dev/preview jobs open while inspecting; do not launch background children in a job that then exits:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- npm run dev -- --host 127.0.0.1 --port 5205 --strictPort
-/home/qqp/.local/bin/qq-job -- npm test
-/home/qqp/.local/bin/qq-job -- npm run build
-/home/qqp/.local/bin/qq-job -- npm exec vite -- preview --host 127.0.0.1 --port 5206 --strictPort
+qq-job -- npm run dev -- --host 127.0.0.1 --port 5205 --strictPort
+qq-job -- npm test
+qq-job -- npm run build
+qq-job -- npm exec vite -- preview --host 127.0.0.1 --port 5206 --strictPort
 ```
 
 Use a separately installed Playwright/Chromium without changing application dependencies:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- env \
+qq-job -- env \
  PRACTICE_PLAYWRIGHT=/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs \
- PRACTICE_CHROMIUM=/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome \
+ PRACTICE_CHROMIUM=/path/to/chromium \
  PRACTICE_ARTIFACTS=/tmp/score-viewer-practice-rendering/final-notation \
  PRACTICE_PRIVATE_SCORE=/path/to/private/score.tuna \
  node scripts/inspect-practice-rendering.mjs
 
-/home/qqp/.local/bin/qq-job -- env \
+qq-job -- env \
  PRACTICE_PLAYWRIGHT=/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs \
- PRACTICE_CHROMIUM=/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome \
+ PRACTICE_CHROMIUM=/path/to/chromium \
  PRACTICE_ARTIFACTS=/tmp/score-viewer-practice-rendering/final-app \
  PRACTICE_SETTINGS_MODES=development,production \
  node scripts/inspect-practice-settings.mjs
@@ -108,14 +108,14 @@ Current focused browser/display/metronome checks passed 19/19 (`ui-spacing-final
 Reproduce this bounded lane from its checkout with the foreground port-5207 job open:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- npm ci --ignore-scripts
-/home/qqp/.local/bin/qq-job -- npm run dev -- --host 127.0.0.1 --port 5207 --strictPort
-/home/qqp/.local/bin/qq-job -- node --import tsx --test test/practice-browser.test.ts test/practice-display.test.ts test/metronome-mark.test.ts
-/home/qqp/.local/bin/qq-job -- npm exec tsc -- --noEmit
-/home/qqp/.local/bin/qq-job -- env \
+qq-job -- npm ci --ignore-scripts
+qq-job -- npm run dev -- --host 127.0.0.1 --port 5207 --strictPort
+qq-job -- node --import tsx --test test/practice-browser.test.ts test/practice-display.test.ts test/metronome-mark.test.ts
+qq-job -- npm exec tsc -- --noEmit
+qq-job -- env \
  PRACTICE_URL=http://127.0.0.1:5207 \
  PRACTICE_PLAYWRIGHT=/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs \
- PRACTICE_CHROMIUM=/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome \
+ PRACTICE_CHROMIUM=/path/to/chromium \
  PRACTICE_ARTIFACTS=/tmp/score-viewer-practice-rendering/ui-spacing-final \
  PRACTICE_SCORE_FILTER=schumann-janko \
  node scripts/inspect-practice-rendering.mjs
@@ -166,13 +166,13 @@ Reproduce the bounded actual-main controls check with this checkout's developmen
 and emitted servers available:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- env \
+qq-job -- env \
  PRACTICE_CONTROLS_ONLY=1 \
  PRACTICE_DEVELOPMENT_URL=http://127.0.0.1:5213 \
  PRACTICE_PRODUCTION_URL=http://127.0.0.1:5214 \
  PRACTICE_ARTIFACTS=/tmp/score-viewer-practice-rendering/controls-refinement \
  PRACTICE_PLAYWRIGHT=/tmp/score-viewer-practice-browser/node_modules/playwright-core/index.mjs \
- PRACTICE_CHROMIUM=/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome \
+ PRACTICE_CHROMIUM=/path/to/chromium \
  node scripts/inspect-practice-settings.mjs
 ```
 
@@ -188,7 +188,7 @@ The protected refill checker also tests the permitted upper width when its conse
 
 Final source checks pass 486/486 Viewer tests, configured TypeScript/Vite build, 15 focused relation/refill tests and 29 native-carrier/footer-runtime tests. The public real-browser runner `scripts/inspect-practice-relations.mjs` exercises both traced and uniform three-component source holds, range/cache ordering, nonconsecutive gaps, head-gap attachment at nonzero frames, real note/annotation clearance, complete ownership/restoration and malformed contour, wrong-head, stale-timing, same-system contradiction and exhausted-clearance refusals. Its white bounded captures are `public-controls/public-traced.png` and `public-uniform.png`; `public-relations.json` binds the exact script/source hashes. Run it with an ordinary Vite server at `PRACTICE_URL`, Playwright module at `PRACTICE_PLAYWRIGHT`, and output directory at `PRACTICE_ARTIFACTS`.
 
-Private read-only evidence lives under `/home/qqp/.local/state/score-viewer-practice-tie-repair-20261009/`; no score payload is in Git. `final-leaf-lifecycle/receipt.json` binds the exact source hashes and 1920×1080 viewport. Real ordinary Worker preparation plus independent receiving/cold admission passed all four exact original/+1 Conventional/Jankó inputs: 36 actual leaf previews (including their retained five-bar leaves), 16 Free view windows, and active 17–20 and 25–29 on each edition. These active windows consumed 17 and 36 source attacks respectively, retained complete cues, restored full owned ink and restarted the admitted loop. Each 25–29 window performed one refill; all protected-measure transform deltas were zero. The 25–29 hold expires by the selected end; the 17–20 hold remains visible until the selected boundary, with post-boundary carry-out unclaimed. Source/pages/seats and the in-memory saved practice state remained exact.
+Private read-only evidence lives under `<private-state>/score-viewer-practice-tie-repair-20261009/`; no score payload is in Git. `final-leaf-lifecycle/receipt.json` binds the exact source hashes and 1920×1080 viewport. Real ordinary Worker preparation plus independent receiving/cold admission passed all four exact original/+1 Conventional/Jankó inputs: 36 actual leaf previews (including their retained five-bar leaves), 16 Free view windows, and active 17–20 and 25–29 on each edition. These active windows consumed 17 and 36 source attacks respectively, retained complete cues, restored full owned ink and restarted the admitted loop. Each 25–29 window performed one refill; all protected-measure transform deltas were zero. The 25–29 hold expires by the selected end; the 17–20 hold remains visible until the selected boundary, with post-boundary carry-out unclaimed. Source/pages/seats and the in-memory saved practice state remained exact.
 
 `complete-private-probe/receipt.json` separately records all four editions at 2560×1440 with the actual joined 25–33 range: 56 source attacks, two refill epochs and three cue observations per edition, full restoration and zero protected-measure drift. At 1920 pixels, larger 25–33 and full 1–38 still refuse under their actual cue/placement constraints. A conservative compact estimate alone is not proof of impossibility: the actual 25–29 leaf passes the unchanged exhaustive 16-state certificate at that same viewport. No minimum scale, source width or cue reservation was reduced.
 

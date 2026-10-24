@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {exerciseBrowserSelection,exercisePartialBrowser,exercisePassage,exerciseFixture,exerciseOwnedView,exercisePreviewFit,exerciseRelations} from './practice-rendering-cases.mjs';
 import {mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
+import {practicePrivateScore} from './practice-private-score.mjs';
+const privateScore=practicePrivateScore();
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-rendering';
 const baseline=process.argv.includes('--baseline');
@@ -21,7 +23,7 @@ const results=[];
 try {
  const packages=[{name:'schumann-janko',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},
   {name:'schumann-conventional',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
- if(process.env.PRACTICE_PRIVATE_SCORE)for(const keyboard of ['conventional-piano','janko-four-row'])packages.push({name:`private-${keyboard}`,path:process.env.PRACTICE_PRIVATE_SCORE,keyboard});
+ if(privateScore)for(const keyboard of ['conventional-piano','janko-four-row'])packages.push({name:`private-${keyboard}`,path:privateScore,keyboard});
  for(const input of packages.filter(input=>!process.env.PRACTICE_FIXTURE_ONLY&&(!process.env.PRACTICE_SCORE_FILTER||input.name.includes(process.env.PRACTICE_SCORE_FILTER)))){
   const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage();
   page.on('pageerror',e=>console.error(e));

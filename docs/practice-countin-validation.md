@@ -20,7 +20,7 @@ The browser scheduler excludes the predecessor's terminal boundary pulse within 
 
 The reproducible `scripts/inspect-practice-countin.mjs` uses real Chromium `PracticeView`, running WebAudio oscillators and source-linked note timing. Private archives enter only through a caller-supplied file and are never stored in Git. The probe records actual oscillator starts, frequencies, source exits, count receipts, display changes and unchanged score/page/seat data. It asserts one correctly accented pulse at every completed repeat count position and exact source-end handoff. All temporary servers and browsers close in its `finally` path.
 
-The final integrated V2-shape receipt is retained privately at `/home/qqp/.local/state/score-viewer-repeat-countin-20261009/source-final-ack-expiry/receipt.json`:
+The final integrated V2-shape receipt is retained privately at `<private-state>/score-viewer-repeat-countin-20261009/source-final-ack-expiry/receipt.json`:
 
 | Case | Completed tempos | Repeat preparation/adoption | Artificial save delay |
 | --- | --- | --- | --- |
@@ -36,4 +36,4 @@ These observations establish source scheduling and real browser audio-event beha
 
 The later [complete-main integration](main-operation-validation-20261009.md) wires Performance to the same admitted source grid for count labels and exact playback duration. Its real browser main/WebAudio probe observes Schumann's two dotted-quarter and the private 3/4 score's three quarter counts through source entry; MIDI connection is explicitly simulated and full Performance recording is not claimed.
 
-Native PR32 was independently reviewed and merged at `760a4b8e1d3ea173637b43b825979da26cb54111` (reviewed head `d03b83b52629214594615e918c992804177167ba`, identical tree `99d407d4e52f6c16980882f3f23396e8c0e6a237`). Its 55 exact-source tests include rendered PCM at 44.1/48 kHz, V2/legacy admission, future queue deadlines and owner/activation/cancellation races. The actual complete Windows/Tauri test executable compiled and linked with 16 expected system imports and no new VC runtime prerequisite; it was not executed on Windows. The source-bound receipt is `/home/qqp/.local/state/score-viewer-repeat-countin-20261009/native/native-checkpoint-review.json`.
+Native PR32 was independently reviewed and merged at `760a4b8e1d3ea173637b43b825979da26cb54111` (reviewed head `d03b83b52629214594615e918c992804177167ba`, identical tree `99d407d4e52f6c16980882f3f23396e8c0e6a237`). Its 55 exact-source tests include rendered PCM at 44.1/48 kHz, V2/legacy admission, future queue deadlines and owner/activation/cancellation races. The actual complete Windows/Tauri test executable compiled and linked with 16 expected system imports and no new VC runtime prerequisite; it was not executed on Windows. The source-bound receipt is `<private-state>/score-viewer-repeat-countin-20261009/native/native-checkpoint-review.json`.

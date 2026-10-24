@@ -6,6 +6,8 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {createServer as createViteServer} from 'vite';
+import {practicePrivateScore} from './practice-private-score.mjs';
+const privateScore=practicePrivateScore();
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const root=resolve('.'),output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-selector-fit',receipt={source:'production PracticeView.mount and browser SVG geometry',cases:[],errors:[],limits:['Chromium layout is source evidence, not installed WebView or physical musical acceptance.']};
 await mkdir(output,{recursive:true});
@@ -13,7 +15,7 @@ let vite,browser;
 const server=createServer((req,res)=>{if(req.url==='/__fit'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><main id="app"></main><script type="module">import "/src/style.css";</script>');return;}vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});});
 const inputs=[{name:'schumann-janko',keyboard:'janko-four-row',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},
  {name:'schumann-conventional',keyboard:'conventional-piano',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
-if(process.env.PRACTICE_PRIVATE_SCORE)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'private-'+keyboard,path:process.env.PRACTICE_PRIVATE_SCORE,keyboard,pedal:true});
+if(privateScore)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'private-'+keyboard,path:privateScore,keyboard,pedal:true});
 try{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root,configFile:root+'/vite.config.ts',server:{middlewareMode:true,hmr:false,ws:{server,clientPort:server.address().port,host:'127.0.0.1'}},appType:'custom'});
  browser=await chromium.launch({headless:true});

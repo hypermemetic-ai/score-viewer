@@ -53,9 +53,9 @@ not attributed to TAB.
 Reproduce the added checks from the checkout:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- node --import tsx --test --test-concurrency=1 test/bounded-session-clocks.test.ts
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-session-excerpts.mjs
-/home/qqp/.local/bin/qq-job -- npm run build
+qq-job -- node --import tsx --test --test-concurrency=1 test/bounded-session-clocks.test.ts
+qq-job -- node --import tsx scripts/inspect-bounded-session-excerpts.mjs
+qq-job -- npm run build
 ```
 
 The inspector writes its receipt and screenshots to
@@ -108,8 +108,8 @@ The final focused rerun passed all 73 tests. The configured build passed on tria
 native timing and installed application acceptance remain separate gates.
 
 ```sh
-/home/qqp/.local/bin/qq-job -- node --import tsx --test --test-concurrency=1 test/bounded-held-tail.test.ts
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-held-origins.mjs
+qq-job -- node --import tsx --test --test-concurrency=1 test/bounded-held-tail.test.ts
+qq-job -- node --import tsx scripts/inspect-bounded-held-origins.mjs
 ```
 
 The inspector closes its temporary Vite server and Chromium in `finally` and
