@@ -17,7 +17,7 @@
 # kept in -Keep.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File windows-viewer-links.ps1 `
-#     -Destination '%USERPROFILE%\ISO Score Viewer\<package>' -Keep '<backup folder>'
+#     -Destination "$env:USERPROFILE\ISO Score Viewer\<package>" -Keep '<backup folder>'
 #
 # Run it after the old viewer has stopped and the new package is installed.
 # Every link is classified and every backup name checked before anything

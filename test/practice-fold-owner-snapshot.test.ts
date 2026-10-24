@@ -29,6 +29,8 @@ test('a saved No. 13 practice shows on the folded score as on the written-out on
  const edition:ScorePackage={...p,score:fold.score,sourceScore:fold.score},source={key:'no13-fold',written:p,personal};
  const written=admitPracticeContext(p,raw,undefined,personal),folded=admitPracticeContext(edition,raw,undefined,personal,undefined,false,source);
  const settings=(s:PracticeState)=>[s.working,s.start,s.connectionStart,s.target,s.personalGoal?.bpm,s.step,s.countInBars,s.resumeCooldownSeconds,s.keepTempo,s.audioOutput];
+ // The saved settings are read, not defaulted: the written-out practice holds the journal's own values, and the fold the same.
+ assert.deepEqual(settings(written.state),[raw.working,raw.start,raw.connectionStart,raw.target,raw.personalGoal?.bpm,raw.step,raw.countInBars,raw.resumeCooldownSeconds,raw.keepTempo,raw.audioOutput]);
  assert.deepEqual(settings(folded.state),settings(written.state));
  const sections=(a:typeof written)=>[...passageHierarchy(a.plan,a.state).all.values()].filter(c=>c.kind==='section');
  assert.equal(sections(written).length,15);assert.equal(sections(folded).length,8);
