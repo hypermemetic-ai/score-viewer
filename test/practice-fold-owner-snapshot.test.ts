@@ -10,6 +10,7 @@ import {passageHierarchy,passed,planPractice,readPractice,type PracticeState} fr
 import {attainedRate} from '../src/practice-attainment';
 import {admitPracticeContext} from '../src/practice-context';
 import {foldedPracticeJournal} from '../src/practice-fold-journal';
+import {practiceSpanEvidenceKey} from '../src/practice-equivalence';
 import {savedPlayerTempo} from '../src/player-tempo';
 
 // A private data copy holding Schumann Op. 68 No. 13 and its practice journal, read only. Its library
@@ -34,17 +35,30 @@ test('a saved No. 13 practice shows on the folded score as on the written-out on
  assert.deepEqual(settings(folded.state),settings(written.state));
  const sections=(a:typeof written)=>[...passageHierarchy(a.plan,a.state).all.values()].filter(c=>c.kind==='section');
  assert.equal(sections(written).length,15);assert.equal(sections(folded).length,8);
- // Nothing is credited yet in the written-out journal, so the folded score claims nothing either.
- for(const a of [written,folded])for(const c of passageHierarchy(a.plan,a.state).all.values())assert.equal(attainedRate(a.state,c.pattern,c.id),0);
+ // The folded score shows each exercise's credit as the written-out one shows its music: the best of the
+ // written-out exercises with that music. Its own exercises have nothing yet under this new fold.
+ const credit=(a:typeof written)=>{const all=passageHierarchy(a.plan,a.state).all,byMusic=new Map<string,number>();
+  for(const c of all.values()){const music=practiceSpanEvidenceKey(a.plan,c);if(music)byMusic.set(music,Math.max(byMusic.get(music)??0,attainedRate(a.state,c.pattern,c.id)));}
+  return {all,byMusic};};
+ const creditMatches=(a:typeof written,b:typeof folded)=>{const w=credit(a),f=credit(b);let shared=0;
+  for(const c of f.all.values()){const music=practiceSpanEvidenceKey(b.plan,c),expected=music?w.byMusic.get(music):undefined;if(expected!==undefined)shared++;
+   assert.equal(attainedRate(b.state,c.pattern,c.id),expected??0,`folded bars ${c.firstBar}–${c.lastBar}`);}
+  return shared;};
+ assert.ok(creditMatches(written,folded)>0,'the folded score shares music with the written-out one');
+ // The same holds with credit given in the written-out journal, so the comparison is not of two empty journals.
+ const practised=structuredClone(written.state),twin=sections(written).find(w=>sections(folded).some(f=>practiceSpanEvidenceKey(folded.plan,f)===practiceSpanEvidenceKey(written.plan,w)))!;
+ practised.working=Math.max(...[...credit(written).byMusic.values()],0)+7;passed(twin,practised);
+ const creditedRaw=json(practised),credited=[admitPracticeContext(p,creditedRaw,undefined,personal),admitPracticeContext(edition,creditedRaw,undefined,personal,undefined,false,source)] as const;
+ assert.ok(attainedRate(credited[0].state,twin.pattern,twin.id)>0);creditMatches(...credited);
  // Saving there leaves the written-out journal as it was, and adds nothing while the fold has nothing of its own.
  const saved=readPractice(json(folded.journal!.written(folded.plan,structuredClone(folded.state))),written.plan);
  assert.deepEqual(json(without(saved)),json(without(readPractice(raw,written.plan))));
- assert.equal(saved.folded,undefined);
+ assert.equal(JSON.stringify(saved.folded),JSON.stringify(readPractice(raw,written.plan).folded),'other folds\' records are kept as they were');
  // A folded section no written-out section matches (printed bars 12–14) keeps its credit with the fold.
  const own=structuredClone(folded.state),plan=folded.plan,c=sections(folded).find(c=>c.firstBar===11)!;own.working=40;passed(c,own);
  const back=json(folded.journal!.written(plan,own)),fresh=planPractice(edition,'bounded-exercises-v1',personal,savedPlayerTempo(p.score,back));
  readPractice(back,written.plan);
- assert.deepEqual(Object.keys(back.folded),['no13-fold']);
+ assert.equal(Object.keys(back.folded).at(-1),'no13-fold');
  // The journal grows by that section's record (its credit and working tempo, each under the section's music), not by a copy of the folded state.
  const growth=JSON.stringify(back).length-JSON.stringify(raw).length,record=JSON.stringify(back.folded['no13-fold']).length;
  assert.ok(growth<=record+100&&record<3*JSON.stringify(c.pattern).length,`grew by ${growth} characters`);
