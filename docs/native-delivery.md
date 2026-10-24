@@ -27,6 +27,12 @@ node scripts/native-delivery/freeze-inputs.mjs \
   <new-built-frontend> <new-source-checks.json> <new-sealed-output>
 ```
 
+### Neutral naming in the receipt
+
+The receipt is copied byte for byte into the public seal and its SHA256 is pinned, so it can't be cleaned up later without a new seal. Name scores by their public studio ids (for example `schumann-op68-no14`, or a path under `fixtures/`) or as the literal "a private score" ("a private score 2" where one map holds several). Name a copy of private data as "a private data copy", never by path. Leave out home and user-profile paths (`/home/...`, `/Users/...`, `C:\Users\...`, `%USERPROFILE%`, `$HOME`, `~/.local`, `~/.config`) and absolute paths to `.tuna` archives outside `fixtures/`.
+
+`freeze-inputs.mjs` refuses a receipt that breaks these rules before it writes anything (`scripts/native-delivery/receipt-privacy.mjs`). Where the receipt names scores, the rule is positive: every key of a map keyed by score (any key that is not a field name or a relative path) every `score`, `title`, `piece`, `work` or `composer` field (or its plural) and every `entryId` or `libraryId` field must be an id in `scripts/native-delivery/public-score-ids.json` or "a private score". Free text is not read for titles, only for the paths above, so write "a private score" there yourself. To refuse further names anywhere in the receipt on one machine, set `SCORE_VIEWER_PRIVATE_SCORE_NAMES` to a local file with one name per line; never commit it. The repository keeps no private name, nor any digest of one: a digest of a short title can be reversed by hashing a list of known titles. The refusal names the kind of problem and its JSON location, never the name, and a location shows a key only when the key is a field name. The receipt sealed before this rule still names private scores. It stays as sealed and is replaced at the next seal.
+
 The output directory must be new and separate from the source and frontend. The command reads the application commit directly, derives its native files and locked tarballs, validates the frozen converter closure, and binds the exact footer policy, metrics, fixture and viewer-owned helper bytes. It verifies the complete staged seal against the original checkout and leaves that checkout unchanged. Replace `delivery-input/` with the resulting directory in a later reviewed delivery commit. That delivery commit identifies the workflow checkout; the seal continues to identify the application commit it actually builds.
 
 ## Historical ISO carrier procedure
@@ -86,7 +92,7 @@ node scripts/release-score-viewer.mjs \
   --revision REVIEWED_CARRIER_SHA \
   --score-path public/review/schumann-no14-conventional-20261006.tuna \
   --score-sha256 2ffc820dc1f57ba45249331c68671d82e71ea7edd0edc284fcbc03d90fd5584d \
-  --output /home/qqp/projects/iso-notation-deploy/public/review/score-viewer
+  --output <iso-notation-deploy-checkout>/public/review/score-viewer
 ```
 
 The command obtains both native packages, independently verifies the complete pair, and changes the current download pointer atomically. Recheck that the selected carrier is a descendant of the then-current paired revision; an unrelated or older finishing pair is rejected and the current download stays intact. An existing complete artifact can be reused only after identical source/score and package verification. Retain actual preparation/native/assembly timings and cache context in the delivery receipt.

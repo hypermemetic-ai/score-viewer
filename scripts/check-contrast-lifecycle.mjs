@@ -8,7 +8,7 @@ const root=resolve('.'),output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewe
 let vite,browser;const receipt={cases:[],limits:['Production browser geometry and controlled musical clock/MIDI; no physical piano, native installation, or human musical acceptance.']};
 const server=createServer((req,res)=>{if(req.url==='/__contrast'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><main id="app"></main><script type="module">import "/src/style.css";</script>');return;}vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});});
 try{
- await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root,configFile:root+'/vite.config.ts',server:{middlewareMode:true,hmr:false},appType:'custom'});browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM??'/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome'});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root,configFile:root+'/vite.config.ts',server:{middlewareMode:true,hmr:false},appType:'custom'});browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM});
  for(const [keyboard,path]of [['janko-four-row','vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'],['conventional-piano','vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna']]){
   const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port+'/__contrast');
   const result=await page.evaluate(async({encoded,keyboard})=>{

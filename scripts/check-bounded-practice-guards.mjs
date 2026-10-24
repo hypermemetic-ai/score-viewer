@@ -14,7 +14,7 @@ async function open(page){await page.locator('.composer-entry,[data-action=pract
 async function shot(page,name){await page.screenshot({path:output+'/'+name+'.png'});}
 try{
  server=await preview({preview:{host:'127.0.0.1',port:0,strictPort:false}});const url='http://127.0.0.1:'+server.httpServer.address().port;
- browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM??'/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome'});
+ browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM});
  for(const width of [1280,800,480]){
   console.log('Inspect viewport',width);const context=await browser.newContext({viewport:{width,height:720},reducedMotion:'reduce'});await context.addInitScript(({encoded,metadata,id,file})=>{
    window.inspectionNotices=[];new MutationObserver(()=>{const t=document.querySelector('.toast');if(t?.textContent&&!window.inspectionNotices.includes(t.textContent))window.inspectionNotices.push(t.textContent);}).observe(document,{childList:true,subtree:true,characterData:true});if(localStorage.getItem('bounded-seeded'))return;localStorage.setItem('bounded-seeded','1');const put=(name,value)=>localStorage.setItem('iso-viewer-dev/'+name,btoa(unescape(encodeURIComponent(JSON.stringify(value)))));

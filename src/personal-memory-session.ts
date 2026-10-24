@@ -20,8 +20,10 @@ type FingerOperation='none'|'add'|'shared'|'local'|'reset';
 export type PersonalMemoryAction=
  | {kind:'finger';edit:MemoryFingerEdit;operation?:FingerOperation}
  /** `local`: the hand applies here only. Captured when the note's hand was
-  * carried from another bar, so the choice is an exception there. */
- | {kind:'hand';ownerId:string;hand:PersonalHand;decisionId:string;authoredAt:string;local?:boolean}
+  * carried from another bar, so the choice is an exception there. `passes`:
+  * one press on a folded note, sent once per pass; it names every pass (this
+  * one included), so the passes are decided together, in any order. */
+ | {kind:'hand';ownerId:string;hand:PersonalHand;decisionId:string;authoredAt:string;local?:boolean;passes?:string[]}
  /** The note's own hand applies here only (`local`), or follows matching bars again (`shared`). */
  | {kind:'handScope';ownerId:string;scope:'local'|'shared';decisionId:string;authoredAt:string}
  | {kind:'reference';ownerId:string;decisionId:string;authoredAt:string}
@@ -68,6 +70,13 @@ export function rawMemoryPersonal(personal:PersonalState):PersonalState {
  const raw=clone(personal) as PersonalState&{memoryResolved?:unknown};delete raw.memoryResolved;delete raw.repeatResolved;return raw;
 }
 const json=<T>(value:T):T=>JSON.parse(JSON.stringify(value));
+/** Every owner one hand press reaches across the passes it names. */
+const passOwners=(p:ScorePackage,passes:readonly string[])=>[...new Set(passes.flatMap(id=>{const seat=p.seats.find(s=>s.ownerIds.includes(id));if(!seat)throw Error('Personal edit has no admitted contact.');return handChoiceOwners(p,seat);}))];
+/** The state without the hands of the press's other passes. */
+const withoutOtherPasses=(p:ScorePackage,personal:PersonalState,action:Extract<PersonalMemoryAction,{kind:'hand'}>)=>{
+ if(!action.passes||action.passes.length<2)return personal;
+ const own=new Set(passOwners(p,[action.ownerId])),without=clone(personal);for(const id of passOwners(p,action.passes))if(!own.has(id)&&without.assignments)delete without.assignments.choices[id];return without;
+};
 const inputKey=(input:MemoryScoreInput)=>personalStorageName(input.entryId,input.p);
 const undoGuard=(personal:PersonalState)=>JSON.stringify({undo:personal.undo,undoAssignments:personal.undoAssignments,undoCalculatedOwners:personal.undoCalculatedOwners});
 const record=(value:unknown):Record<string,any>=>{
@@ -302,7 +311,7 @@ export class PersonalMemorySession {
  resolve(input:MemoryScoreInput){return resolvePersonalFingeringMemory(this.memory,input.entryId,input.p,rawMemoryPersonal(input.personal));}
  private readIntent(raw:unknown):CapturedPersonalMemoryIntent {
   const intent=clone(raw) as CapturedPersonalMemoryIntent;
-  if(!intent||intent.version!==1||typeof intent.id!=='string'||!intent.id||typeof intent.entryId!=='string'||typeof intent.personalKey!=='string'||typeof intent.sourceRevision!=='string'||!intent.guard||!intent.action||!['finger','hand','handScope','reference','reset','calculated','restoreAll','undoRestore'].includes(intent.action.kind))throw Error('Invalid pending personal fingering intent.');
+  if(!intent||intent.version!==1||typeof intent.id!=='string'||!intent.id||typeof intent.entryId!=='string'||typeof intent.personalKey!=='string'||typeof intent.sourceRevision!=='string'||!intent.guard||!intent.action||!['finger','hand','handScope','reference','reset','calculated','restoreAll','undoRestore'].includes(intent.action.kind)||intent.action.kind==='hand'&&intent.action.passes!==undefined&&(!Array.isArray(intent.action.passes)||!intent.action.passes.includes(intent.ownerId)||!intent.action.passes.every(id=>typeof id==='string'&&id)))throw Error('Invalid pending personal fingering intent.');
   return intent;
  }
  private target(intent:CapturedPersonalMemoryIntent):MemoryScoreInput {
@@ -322,7 +331,8 @@ export class PersonalMemorySession {
    captured.operation=captured.edit.finger!=='inherit'&&resolvePersonalFingeringMemory(memory,input.entryId,input.p,raw.personal).byOwner[ownerId]?.finger?.value===captured.edit.finger?'none':captured.edit.captured?.operation;
   }
   // Changing a hand carried from another bar makes an exception here, as changing an inherited finger does.
-  if(captured.kind==='hand'&&captured.local===undefined&&handRecurrences(input.p,input.personal).carried.has(ownerId))captured.local=true;
+  // A hand carried from another pass of the same press is that press's own, no other bar's.
+  if(captured.kind==='hand'&&captured.local===undefined&&handRecurrences(input.p,withoutOtherPasses(input.p,input.personal,captured)).carried.has(ownerId))captured.local=true;
   const id=captured.kind==='finger'?captured.edit.decisionId:captured.decisionId;
   const authoredAt=captured.kind==='finger'?captured.edit.authoredAt:captured.authoredAt;
   if(!id||!Number.isFinite(Date.parse(authoredAt)))throw Error('Personal edit requires stable authorship.');
@@ -362,20 +372,29 @@ export class PersonalMemorySession {
    if(action.local&&handRecurrences(input.p,personal).carried.get(intent.ownerId)?.hand===action.hand)return{document,personal:readPersonal(personal,input.p)};
    // Choosing the hand its matching bar would carry here gives up the note's own
    // hand: it follows that bar again (L, then R, in bar 21), as "Use bar 11's hand" does.
-   const owners=handChoiceOwners(input.p,seat),without=clone(personal);for(const id of owners)if(without.assignments)delete without.assignments.choices[id];
    // Without a hand of its own, the note shows the hand carried to it, else its written hand.
-   const follows=effectiveHands(input.p,without);
-   if(!action.local&&owners.every(id=>follows(id)===action.hand)){
+   const owners=handChoiceOwners(input.p,seat),follows=(ids:readonly string[])=>{const without=clone(personal);for(const id of ids)if(without.assignments)delete without.assignments.choices[id];return effectiveHands(input.p,without);};
+   const following=(ids:readonly string[],shown:readonly string[])=>{
     // The written hand where the note has no hand of its own (the second pass of a
     // folded note after L at the first, then R) is nothing to store.
-    if(!owners.some(id=>personal.assignments?.choices[id]?.hand!==undefined))return{document,personal:readPersonal(personal,input.p)};
+    if(!ids.some(id=>personal.assignments?.choices[id]?.hand!==undefined))return{document,personal:readPersonal(personal,input.p)};
     // Only when the press changes the hand (L, then R): the hand the note already
     // shows by the owner's own choice is kept, with the bars that follow it.
-    if(handFor(input.p,personal,intent.ownerId)===action.hand)return{document,personal:readPersonal(personal,input.p)};
+    if(shown.every(id=>handFor(input.p,personal,id)===action.hand))return{document,personal:readPersonal(personal,input.p)};
     // A fresh copy: carried hands are kept with the records they were read from.
-    personal=clone(personal);for(const id of owners){const c=personal.assignments?.choices[id];if(!c)continue;delete c.hand;delete c.handScope;if(c.intent)delete c.intent.hand;if(c.finger===undefined)delete personal.assignments!.choices[id];}
+    personal=clone(personal);for(const id of ids){const c=personal.assignments?.choices[id];if(!c)continue;delete c.hand;delete c.handScope;if(c.intent)delete c.intent.hand;if(c.finger===undefined)delete personal.assignments!.choices[id];}
     if(personal.assignments&&!Object.keys(personal.assignments.choices).length)delete personal.assignments;
     return{document:preservePersonalMemoryHandChange(document,input,{...input,personal},intent.ownerId),personal:readPersonal(personal,input.p)};
+   };
+   // One press on a folded note is decided over all its passes, with none of their
+   // own hands, so a hand one pass merely carries from the other cannot decide it:
+   // the first pass applied clears every pass, and the rest find nothing to store.
+   const passes=action.passes&&action.passes.length>1?action.passes:[intent.ownerId];
+   if(!action.local){
+    const all=passes.length>1?passOwners(input.p,passes):owners,followAll=follows(all);
+    if(all.every(id=>followAll(id)===action.hand))return following(all,passes);
+    // Otherwise each pass is decided alone, as a press on one note is.
+    if(passes.length>1){const followOwn=follows(owners);if(owners.every(id=>followOwn(id)===action.hand))return following(owners,[intent.ownerId]);}
    }
    personal=assigned(input.p,personal,seat,{hand:action.hand,...(action.local===undefined?{}:{local:action.local})});
    for(const id of handChoiceOwners(input.p,seat)){const c=personal.assignments!.choices[id];c.intent!.hand={decisionId:action.decisionId,lineageId:action.decisionId,authoredAt:action.authoredAt};c.createdAt=input.personal.assignments?.choices[id]?.createdAt??action.authoredAt;}

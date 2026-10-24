@@ -79,11 +79,11 @@ workload examples, not evidence that the heuristics recover all musical forms.
 Reproduce after a configured build:
 
 ```sh
-/home/qqp/.local/bin/qq-job -- npm run build
-PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-ui-guards-after /home/qqp/.local/bin/qq-job -- node scripts/check-bounded-practice-guards.mjs
-PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-source-sections-after /home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-source-sections.mjs
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-bounded-preview-continuity.mjs
-PRACTICE_ARTIFACTS=/tmp/score-viewer-contrast-lifecycle-preview-after /home/qqp/.local/bin/qq-job -- node scripts/check-contrast-lifecycle.mjs
+qq-job -- npm run build
+PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-ui-guards-after qq-job -- node scripts/check-bounded-practice-guards.mjs
+PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-source-sections-after qq-job -- node --import tsx scripts/inspect-bounded-source-sections.mjs
+qq-job -- node --import tsx scripts/inspect-bounded-preview-continuity.mjs
+PRACTICE_ARTIFACTS=/tmp/score-viewer-contrast-lifecycle-preview-after qq-job -- node scripts/check-contrast-lifecycle.mjs
 ```
 
 The configured build and 17 focused preview/browser/cache tests passed. The
@@ -124,7 +124,7 @@ lifecycle evidence above. This run does not add installed, native timing or
 pianist acceptance.
 
 ```sh
-PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-excluded-percent /home/qqp/.local/bin/qq-job -- node scripts/check-bounded-practice-guards.mjs
+PRACTICE_ARTIFACTS=/tmp/score-viewer-bounded-excluded-percent qq-job -- node scripts/check-bounded-practice-guards.mjs
 ```
 
 The retained selected/hovered screenshots are
@@ -170,7 +170,7 @@ This establishes source/browser correctness, not installed native acceptance,
 physical playing acceptance or an editing-latency result.
 
 ```sh
-/home/qqp/.local/bin/qq-job -- node --import tsx scripts/inspect-sparse-manual-preview.mjs
+qq-job -- node --import tsx scripts/inspect-sparse-manual-preview.mjs
 ```
 
 

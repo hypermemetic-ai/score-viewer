@@ -3,12 +3,14 @@
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {durationFixture} from '../test/support/practice-rendering-fixture.ts';
+import {practicePrivateScore} from './practice-private-score.mjs';
+const privateScore=practicePrivateScore();
 const {chromium}=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core');
 const output=process.env.PRACTICE_ARTIFACTS??'/tmp/score-viewer-practice-refill';
 await mkdir(output,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.PRACTICE_CHROMIUM,headless:true});
 const inputs=[{name:'schumann-janko',path:'vendor/iso-notation/public/review/schumann-op68-no14-current-fingers.tuna'},{name:'schumann-conventional',path:'vendor/iso-notation/public/review/schumann-no14-conventional-actions-20261007.tuna'}];
-if(process.env.PRACTICE_PRIVATE_SCORE)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'private-'+keyboard,path:process.env.PRACTICE_PRIVATE_SCORE,keyboard});
+if(privateScore)for(const keyboard of ['janko-four-row','conventional-piano'])inputs.push({name:'private-'+keyboard,path:privateScore,keyboard});
 for(const profile of ['traced','uniform'])inputs.push({name:'fixture-'+profile,package:durationFixture('hollow-stem',true,profile,true,true,4)});
 const results=[],captures=[];
 async function capture(page,path){const metadata=await page.evaluate(()=>{const v=window.practice;v.paintControls();v.status(v.session?.message??'');return {phase:v.session?.phase,bars:v.crops.map(c=>c.bar+1),status:document.querySelector('.practice-status').textContent,controls:document.querySelector('.practice-controls').innerText};});captures.push({path,viewport:page.viewportSize(),...metadata});await page.screenshot({path});}

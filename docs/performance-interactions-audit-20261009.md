@@ -89,7 +89,7 @@ passed. No native delivery, physical MIDI, audio latency, low-end laptop or
 human musical acceptance is claimed by this rendering audit.
 
 Detailed private receipts, profiles and captures are retained outside Git at
-`/home/qqp/.local/state/score-viewer-performance-interactions-20261009/`:
+`<private-state>/score-viewer-performance-interactions-20261009/`:
 `matched-comparison.json`, both `merged-*-gc-nohmr/receipt.json`,
 `cache-controls/receipt.json` and `final-all-editions-active/receipt.json`.
 Owned probe servers and browser processes are closed after every run.

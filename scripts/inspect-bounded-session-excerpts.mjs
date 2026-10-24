@@ -10,7 +10,7 @@ const receipt={cases:[],limits:['Source-browser mounted production views and aut
 let vite,browser;const server=createServer((req,res)=>{if(req.url==='/__excerpts'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><main id="app"></main><script type="module">import "/src/style.css";</script>');return;}vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});});
 try{
  const {piano}=await oversizedPracticeFixture(),manualBytes=await oversizedDualPracticeFixture();
- await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root:resolve('.'),server:{middlewareMode:true,hmr:false},appType:'custom'});browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM??'/home/qqp/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome'});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));vite=await createViteServer({root:resolve('.'),server:{middlewareMode:true,hmr:false},appType:'custom'});browser=await chromium.launch({headless:true,executablePath:process.env.PRACTICE_CHROMIUM});
  for(const assessment of ['piano','manual']){
   const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port+'/__excerpts');
   const cases=await page.evaluate(async({assessment,piano,encoded})=>{

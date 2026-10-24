@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {freezeInputs} from '../scripts/native-delivery/freeze-inputs.mjs';
 import {sha256,canonical,inventory} from '../scripts/native-delivery/score-viewer-carrier-inputs.mjs';
+import {receiptPrivacyProblems} from '../scripts/native-delivery/receipt-privacy.mjs';
 const git=(root,...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 async function put(root,path,data){await mkdir(join(root,path,'..'),{recursive:true});await writeFile(join(root,path),data);}
 async function fixture(t,{unprotected}={}){
@@ -42,4 +43,27 @@ test('freezing refuses stale receipts, dirty sources and output overlapping sour
  await put(f.viewerSource,'src-tauri/src/assistance_store.rs','uncommitted change');await assert.rejects(freezeInputs(f),/must be clean/);
  await assert.rejects(freezeInputs({...f,output:join(f.viewerSource,'new-seal')}),/must be separate/);
  assert.equal(await readFile(join(f.viewerSource,'delivery-input/inputs.json'),'utf8'),'old seal remains untouched\n');
+});
+test('freezing refuses a receipt naming a home path, a private data copy or a score by anything but a public id, without saying the name',async t=>{
+ const f=await fixture(t),local=join(f.root,'private-names.txt');await writeFile(local,'# local, never committed\nAn Unpublished Nocturne\n');
+ process.env.SCORE_VIEWER_PRIVATE_SCORE_NAMES=local;t.after(()=>{delete process.env.SCORE_VIEWER_PRIVATE_SCORE_NAMES;});
+ const refused=async(checks,kind,where,secret)=>{
+  f.receipt.checks.tests={status:'passed',...checks};await writeFile(f.checks,JSON.stringify(f.receipt));
+  await assert.rejects(freezeInputs(f),error=>kind.test(error.message)&&error.message.includes(where)&&!(secret&&error.message.toLowerCase().includes(secret.toLowerCase())),JSON.stringify(checks));
+  await assert.rejects(access(f.output),{code:'ENOENT'});
+ };
+ for(const [note,kind] of [['run in /home/someone/projects/viewer',/home directory path/],['copied from C:\\Users\\someone\\AppData',/Windows user directory path/],
+  ['state in ~/.local/state/viewer',/per-user state path/],['rehearsed on /tmp/owner-data-20261021',/private data copy path/],['opened /srv/scores/private.tuna',/score archive path outside fixtures/],
+  ['opened an unpublished  NOCTURNE, at bar 3',/local private list/]])await refused({note},kind,'$.checks.tests.note','nocturne');
+ // Where a receipt names scores (a map keyed by score, or a score field), only public ids and "a private score" pass;
+ // the location shows the key's position, not the key, even for a problem found beneath it.
+ await refused({timingsMs:{'schumann-op68-no14':[1,2],'A Private Title':[3,4]}},/not a public studio id/,'$.checks.tests.timingsMs{key 1} (key)','private title');
+ await refused({timingsMs:{'A Private Title':{data:'/home/someone/copy'}}},/home directory path/,'$.checks.tests.timingsMs{key 0}.data','private title');
+ await refused({rehearsed:[{score:'A Private Title'}]},/not a public studio id/,'$.checks.tests.rehearsed[0].score','private title');
+ await refused({scores:['schumann-op68-no14','No. 13']},/not a public studio id/,'$.checks.tests.scores[1]','no. 13');
+ // Public names pass: public studio ids, a public fixture path, field names, relative paths and the literal "a private score".
+ f.receipt.checks.tests={status:'passed',note:'Rehearsed schumann-op68-no14 (fixtures/schumann-op68-no14.tuna) and a private score on a private data copy.',
+  timingsMs:{note:'first open / reopen','schumann-op68-no13':[1,2],'a private score':[3,4],'a private score 2':[5,6]},files:{'src/main.ts':1},scores:['bach-goldberg-var1','a private score']};
+ await writeFile(f.checks,JSON.stringify(f.receipt));await freezeInputs(f);
+ assert.deepEqual(receiptPrivacyProblems({note:'nothing private'}),[]);
 });
