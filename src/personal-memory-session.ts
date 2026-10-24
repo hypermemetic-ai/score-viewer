@@ -389,10 +389,13 @@ export class PersonalMemorySession {
    // One press on a folded note is decided over all its passes, with none of their
    // own hands, so a hand one pass merely carries from the other cannot decide it:
    // the first pass applied clears every pass, and the rest find nothing to store.
-   const passes=action.passes??[intent.ownerId],all=passOwners(input.p,passes),followAll=follows(all);
-   if(!action.local&&all.every(id=>followAll(id)===action.hand))return following(all,passes);
-   const followOwn=follows(owners);
-   if(!action.local&&owners.every(id=>followOwn(id)===action.hand))return following(owners,[intent.ownerId]);
+   const passes=action.passes&&action.passes.length>1?action.passes:[intent.ownerId];
+   if(!action.local){
+    const all=passes.length>1?passOwners(input.p,passes):owners,followAll=follows(all);
+    if(all.every(id=>followAll(id)===action.hand))return following(all,passes);
+    // Otherwise each pass is decided alone, as a press on one note is.
+    if(passes.length>1){const followOwn=follows(owners);if(owners.every(id=>followOwn(id)===action.hand))return following(owners,[intent.ownerId]);}
+   }
    personal=assigned(input.p,personal,seat,{hand:action.hand,...(action.local===undefined?{}:{local:action.local})});
    for(const id of handChoiceOwners(input.p,seat)){const c=personal.assignments!.choices[id];c.intent!.hand={decisionId:action.decisionId,lineageId:action.decisionId,authoredAt:action.authoredAt};c.createdAt=input.personal.assignments?.choices[id]?.createdAt??action.authoredAt;}
    next=preservePersonalMemoryHandChange(document,input,{...input,personal},intent.ownerId);
