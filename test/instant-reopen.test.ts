@@ -77,13 +77,14 @@ function viewer(){
 }
 
 test('reopening the score just closed, with nothing changed, draws it as it was left: no read, admission or install',async()=>{
+ // The opening's dialog leaves as the score is drawn ('complete'); the last score is saved after, so a press on it reaches it.
  const v=viewer();await v.open('no13');const first=v.context.opened;
- assert.deepEqual(await v.open('no13'),['save','read package-no13.tuna','fullscreen','activate no13','preferences','complete'],'kept only after Back');
+ assert.deepEqual(await v.open('no13'),['save','read package-no13.tuna','fullscreen','activate no13','complete','preferences'],'kept only after Back');
  v.context.retainScore(v.context.opened);
- assert.deepEqual(await v.open('no13'),['save','fullscreen','activate no13','preferences','complete']);
+ assert.deepEqual(await v.open('no13'),['save','fullscreen','activate no13','complete','preferences']);
  assert.notEqual(v.context.opened,first);
  v.context.retainScore(v.context.opened);const kept=v.context.opened;
- assert.deepEqual(await v.open('no13'),['save','fullscreen','activate no13','preferences','complete']);
+ assert.deepEqual(await v.open('no13'),['save','fullscreen','activate no13','complete','preferences']);
  assert.equal(v.context.opened,kept,'the same reading, with its pages and hand projection, is activated again');
  assert.ok(!v.calls.includes('install'),'nothing of the score, its records or progress is written');
 });
@@ -102,7 +103,7 @@ test('the order a score was last opened in does not invalidate it; its records, 
 
 test('opening another score frees the kept one',async()=>{
  const v=viewer();await v.open('no13');v.context.retainScore(v.context.opened);
- assert.deepEqual(await v.open('no14'),['save','read package-no14.tuna','fullscreen','activate no14','preferences','complete']);
+ assert.deepEqual(await v.open('no14'),['save','read package-no14.tuna','fullscreen','activate no14','complete','preferences']);
  assert.ok((await v.open('no13')).includes('read package-no13.tuna'));
 });
 

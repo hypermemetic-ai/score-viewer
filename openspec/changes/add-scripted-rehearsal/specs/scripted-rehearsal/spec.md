@@ -56,11 +56,15 @@ For every score in the library and both keyboard layouts, the rehearsal SHALL op
 - **THEN** neither the practice menu nor practice is shown, and the rehearsal passes that check
 
 ### Requirement: An early press runs exactly once
-The rehearsal SHALL press P, E and F at moments swept around the opening dialog leaving, measure each press against the moment the dialog left, and fail when a press made after the dialog left runs zero or two times, or any press runs twice. Presses made while the dialog still showed are reported with how many ran.
+The rehearsal SHALL press P, E and F at moments swept around the opening dialog leaving, measure each press against the moment the dialog left, and fail when a press made once the score is drawn (behind the dialog or after it left) runs zero or two times, or any press runs twice. Presses made while the dialog still showed are reported with how many ran.
 
 #### Scenario: Press at the paint
 - **WHEN** P is pressed within a frame of the opening dialog leaving
 - **THEN** the practice menu's command runs exactly once
+
+#### Scenario: Press with the score drawn behind the dialog
+- **WHEN** E is pressed after the score is drawn but before the opening dialog has left
+- **THEN** editing begins exactly once
 
 ### Requirement: Timings and pages are reports, not gates
 The rehearsal SHALL record, per score and layout, the first open, the reopen, the layout change where one happened, Fingers' opening, the number of sections and section entry times, and the page count, in the report and the summary. None of these SHALL make the run fail.

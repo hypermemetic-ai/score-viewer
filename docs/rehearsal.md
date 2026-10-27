@@ -28,7 +28,7 @@ For every score and both keyboard layouts:
 - a piano score offers practice; Fingers opens and still draws after End takes it to its last measure; every listed section can be entered and draws its music, except one locked until its parts are learned (its Practise button is disabled), which is counted in the report;
 - no error or refusal is shown, and the page raises no uncaught error;
 - a score for another instrument offers no practice;
-- **an early press runs exactly once:** P, E and F are pressed at moments swept around the opening dialog leaving. Each press is measured against that moment on the page's own clock. A press after the dialog left must run exactly once; no press may run twice. Presses while the dialog still showed are reported. When the player's fingerings show only while held, the fingering key is held until it runs, as a player holds it to look; letting go before fingers are ready cancels it by design.
+- **an early press runs exactly once:** P, E and F are pressed at moments swept around the opening dialog leaving. Each press is measured against that moment on the page's own clock. A press made once the score is drawn, whether the dialog has left or not, must run exactly once; no press may run twice. Presses while the dialog still showed the opening's progress are reported. When the player's fingerings show only while held, the fingering key is held until it runs, as a player holds it to look; letting go before fingers are ready cancels it by design.
 
 ## Reports
 
