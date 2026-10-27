@@ -10,8 +10,8 @@ Carrier `a89b4f097c30ec557aa0b8800849195148ecec30` deliberately carries the froz
 
 | Package | Bytes | SHA256 |
 | --- | ---: | --- |
-| [Windows ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-a89b4f097c30ec557aa0b8800849195148ecec30/packages/Windows.zip) | 8,810,883 | `4afd65974c93a0481938f159d50a865d406c69851a0cd384b71343859bdb0cef` |
-| [Mac ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-a89b4f097c30ec557aa0b8800849195148ecec30/packages/Mac.zip) | 30,145,446 | `1a01c219d380d6654591942e8d6ff09608d2bce6db69bdd4d22c76cb1a4388e7` |
+| Windows ZIP | 8,810,883 | `4afd65974c93a0481938f159d50a865d406c69851a0cd384b71343859bdb0cef` |
+| Mac ZIP | 30,145,446 | `1a01c219d380d6654591942e8d6ff09608d2bce6db69bdd4d22c76cb1a4388e7` |
 
 The frozen original 19-asset frontend digest is `c338253b9935f755944fc8b5a5b1577a124138d0ca62c56edd9200229a5669de`; the release adds its own identity asset. Source checks are `a632819575805325eda81a1b796cb4747bb643536c7f6c5b087323870c63a290`; independent pair admission is `811ed2db4535905339ee68dd7b26847444530b15c2a47c0b5f3d1f7c96594347`. The serialization fix preserves the strict verifier and all 18 non-HTML assets; three startup controls and built readiness cases passed separately after it. The earlier rejected native preparation remains diagnostic evidence, not a published release.
 

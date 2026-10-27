@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Shared Options menu keyboard binding and name
-Options SHALL have a configurable keyboard binding in the shared Keys and pedals interface, available from the full-score reader, passage selection and active practice. Its buttons, dialog title, binding entry, and accessible names SHALL use the same Options label. Configurable buttons SHALL show the current configured control. The default keyboard chord SHALL be O, with conflict-free admission for older preferences that preserves existing assignments and explicitly empty controls using the compatible persisted action identity. The library SHALL retain its Options entry.
+Options SHALL have a configurable keyboard binding in the shared Keys and pedals interface, available from the full-score reader, passage selection and active practice. Its buttons, dialog title, binding entry, and accessible names SHALL use the same Options label. Configurable buttons SHALL show the current configured control. The default keyboard chord SHALL be O, with conflict-free admission for older preferences that preserves existing assignments and explicitly empty controls using the compatible persisted action identity. The library SHALL retain its Options entry. For an opened score, Score SHALL be a visible expanded section with the current piece subtitle, normal heading hierarchy and aligned settings; it SHALL appear first in reader Options and immediately after Practice in practice Options. Share score SHALL be a visible action beneath score settings, followed by applicable correction and retained-edition actions. Source & review SHALL remain the secondary disclosure.
 
 #### Scenario: Opening Options from either practice interface
 - **WHEN** the user presses the configured Options key in passage selection or active practice
@@ -27,3 +27,14 @@ Options SHALL have a configurable keyboard binding in the shared Keys and pedals
 - **THEN** all original assignments remain unchanged and the new action receives an available default or fallback
 - **AND** explicitly empty Options controls remain empty and a hardcoded reader O does not bypass the configured binding
 - **AND** the library Options entry remains available
+
+#### Scenario: Confident opened-score controls
+- **WHEN** the user opens Options from the reader
+- **THEN** Score and the piece subtitle appear before general device settings, with Transpose aligned
+- **AND** Share score is visible without expanding a disclosure
+- **AND** correction count and correction actions are proportionate, irrelevant disabled actions are omitted, and Undo restore remains available when applicable
+- **AND** expanding Source & review retains provenance and applicable font-license access
+
+#### Scenario: Options without an opened score
+- **WHEN** the user opens Options from the library
+- **THEN** general settings remain available without an empty Score section or a Transpose control for an unspecified score

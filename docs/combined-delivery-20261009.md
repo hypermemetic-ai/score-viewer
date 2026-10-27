@@ -72,8 +72,8 @@ The final replacement carrier is `e6cdb2e58b83311b206109959e8e0a52953191f0`, tre
 
 | Final served packet | Verified bytes | SHA256 |
 | --- | --- | --- |
-| [Windows x64 ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-e6cdb2e58b83311b206109959e8e0a52953191f0/packages/Windows.zip) | 7,014,828 | `e7ce1d705ebef4bec7bd53c759076ff43c4e875ceec07025b9883f6af243963c` |
-| [Universal Mac ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-e6cdb2e58b83311b206109959e8e0a52953191f0/packages/Mac.zip) | 23,641,734 | `7aa0dd242ca01433174a21d0c3df81d816744fee786228d9aa9eccf67f6c2569` |
+| Windows x64 ZIP | 7,014,828 | `e7ce1d705ebef4bec7bd53c759076ff43c4e875ceec07025b9883f6af243963c` |
+| Universal Mac ZIP | 23,641,734 | `7aa0dd242ca01433174a21d0c3df81d816744fee786228d9aa9eccf67f6c2569` |
 
 The final Windows executable SHA256 is `95d4f2214aefaf64c3099f9878f09b21a60d7a340c0ad18430983c30891def37`. The usual `%USERPROFILE%\Desktop\ISO Score Viewer.lnk` targets `%USERPROFILE%\ISO Score Viewer\0.1.0-viewer609eb2b1-carriere6cdb2e5-verified\iso-score-viewer.exe` with empty arguments. A fresh ordinary shortcut launch started the viewer in the console session; root inspected the completed No.14 original Jankó page 1 of 3 on the unchanged display. The ready capture SHA256 is `8aaacab667cf2b32e1119f2d66b0a0a6c13fae851a8f32dd77812dbd22f3ad08`. Final release-manifest SHA256 is `6d753f4812b7ffa6328ab9ec6592ecea5749698ea015b07d5d155bd622722caa`.
 
@@ -95,8 +95,8 @@ The audited rollback restored both local and HTTP current pointers to `95cccdbc`
 
 | Historical `005778fe` packet | Verified bytes | SHA256 |
 | --- | --- | --- |
-| [Windows x64 ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-005778fe67b18e7c9fea600703e2089cbf48daf5/packages/Windows.zip) | 7,013,983 | `b3e7722372a6769bada429d73a95a525a15ad2e264d720b4fadb1200a8d8358a` |
-| [Universal Mac ZIP](http://100.102.70.49:5175/review/score-viewer/releases/0.1.0-005778fe67b18e7c9fea600703e2089cbf48daf5/packages/Mac.zip) | 23,640,713 | `48bcf6b4dfcf3ba3c885498a974259901953f2f2a14895b8d00dbefa6c1ce65b` |
+| Windows x64 ZIP | 7,013,983 | `b3e7722372a6769bada429d73a95a525a15ad2e264d720b4fadb1200a8d8358a` |
+| Universal Mac ZIP | 23,640,713 | `48bcf6b4dfcf3ba3c885498a974259901953f2f2a14895b8d00dbefa6c1ce65b` |
 
 The historical Windows executable hash is `cd5a8a232ad671e6667382e68662a77b4658189cf7562057e49f406dfb7c9d95`. Its release-manifest SHA256 is `4fe1bb960fb71a0e77c2250e2631c960e03706178601a5f563c2e77c15ec82aa`; `bfcca4a86cc40d4cc30f9e81a82048e7f9a02a4c244ff77fba32ba452ae620e7` identifies the former `005778fe` current pointer, before rollback. None identifies an accepted final shortcut activation.
 
