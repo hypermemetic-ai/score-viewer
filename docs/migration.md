@@ -28,6 +28,6 @@ This migration creates no workflow, performs no release dispatch and publishes n
 
 The retained [paired delivery specification](../openspec/specs/score-viewer-delivery/spec.md) remains the required release behavior, not a claim that the new repository already implements its release lane. Porting that lane is a follow-up, with explicit identity for both the viewer revision and notation dependency. Until then, repairs can be developed and reviewed here; native release coordination must deliberately choose the reviewed combined inputs. The local Windows emergency rollback is independently owned and does not alter this source extraction.
 
-## Practice repair starts here
+## Practice repair
 
-The report in [practice-repair-handoff.md](practice-repair-handoff.md) is intentionally retained as work to reproduce and fix separately. Relevant starting points are `src/practice-preview.ts`, `src/practice-view.ts`, `src/practice-window.ts`, `src/practice-crop-fit.ts` and the corresponding tests. The known disconnected strips and remaining long-note stem ink are not repaired by this migration.
+The migration itself did not fix the disconnected practice strips or the long-note stem ink left behind. Both were repaired afterwards and shipped on 2026-10-10; see [the practice repair](practice-repair-handoff.md).
