@@ -17,6 +17,7 @@ import {requirePianoEvent} from './piano-event';
 import {requirePianoCapability} from './score-capabilities';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
 import {editionPrintedNotices,engraveClearOfTitleArea} from './title-area-clearance';
+import {meterPulseOptions} from './meter-pulse';
 
 export const SCORE_TRANSPOSITION_VERSION='viewer-score-transposition-v1' as const;
 export interface TranspositionOwner {id:string;pitch:number;startTick:number;durationTicks:number;hand:Hand}
@@ -163,7 +164,8 @@ function ownerMap(original:QuantizedGridScore,score:QuantizedGridScore):Transpos
  * production rules. Each keyboard view shows the hands it is given, as plain
  * content; views with the same hands share one set of pages, engraved with
  * `approvedProductionIsoOptions()` and default tokens, page one clear of its
- * title area. The base edition's printed page-one notices, font, notice
+ * title area, with beat lines at the score's own metre pulse
+ * (`meterPulseOptions`). The base edition's printed page-one notices, font, notice
  * files and reference recording carry over; its old pages and their
  * recipe need not reproduce. A finger layer stays edition
  * content, bound to its new pages. With `keep`, that admitted edition's own
@@ -187,7 +189,7 @@ export async function engraveEdition(request:{
  // Page one keeps printing the notices the base edition printed, named only
  // where they differ from the source's own.
  const printed=editionPrintedNotices(base),notices=printed&&canonicalJson(printed)!==canonicalJson(source.publicationNotices??[])?printed:undefined,
-  options=approvedProductionIsoOptions(notices?{printedNotices:notices}:{}),tokens=resolveIsoTokens({}),
+  options=approvedProductionIsoOptions({...meterPulseOptions(source),...notices?{printedNotices:notices}:{}}),tokens=resolveIsoTokens({}),
   shared:Record<string,Uint8Array>={[baseManifest.font]:base.files[baseManifest.font],...Object.fromEntries(baseManifest.notices.map(name=>[name,base.files[name]]))},
   engraved=new Map<string,{score:string;seats:string;recipe:string;pages:string[]}>(),chosen:EditionView[]=[],fellBack:PhysicalKeyboardId[]=[];
  if(kept)for(const [name,bytes]of Object.entries(keep!.files))if(name!=='manifest.json')shared[name]=bytes;

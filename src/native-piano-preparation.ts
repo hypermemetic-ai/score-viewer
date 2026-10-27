@@ -9,6 +9,7 @@ import {publishPackage,publishPreparedNative} from './publication';
 import {checkReadingExecution,type ReadingExecution} from './reading-execution';
 import {withLayoutPeer} from './layout-peer';
 import {engraveClearOfTitleArea} from './title-area-clearance';
+import {meterPulseOptions} from './meter-pulse';
 
 export interface NativePianoAssets {font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>}
 export interface NativePianoPreparation {
@@ -26,8 +27,8 @@ export interface NativePianoPreparation {
 
 /** The shared tail of native piano preparation. The score's own hands are
  * kept exactly; nothing is calculated or inferred. Pages use the approved
- * production engraving with zero lint violations and page one clear of its
- * title area, both keyboards get the
+ * production engraving with zero lint violations, beat lines at the score's
+ * own metre pulse and page one clear of its title area, both keyboards get the
  * same pages, and the recipe that reproduces them is retained, as calculated
  * editions and personal hand editing require. The package passes ordinary
  * admission. The reading engrave is returned too, so hand editing can start
@@ -36,7 +37,7 @@ export async function publishNativePianoScore(score:QuantizedGridScore,input:Nat
  const {execution,assets}=input,Refusal=input.refusal??Error;
  const source=strToU8(JSON.stringify(score)),sourceSha256=await hashBytes(source);
  let recipe=validateScoreRenderingRecipe({version:SCORE_RENDERING_RECIPE_VERSION,engineId:APPROVED_SCORE_RENDERING_ENGINE,sourceSha256,
-  options:approvedProductionIsoOptions(input.options),tokens:resolveIsoTokens(input.tokens??{}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
+  options:approvedProductionIsoOptions({...meterPulseOptions(score),...input.options}),tokens:resolveIsoTokens(input.tokens??{}),baseline:{pageSha256:['0'.repeat(64)],seatSha256:'0'.repeat(64)}},{sourceSha256});
  // The score as the package stores it: hand editing reads it from there, and
  // takes this engrave as its own only for that very score.
  let rendered;

@@ -6,7 +6,8 @@ untransposed archive at `transposition/original.tuna` (transposed scores saved
 before 2026-10-17 use an earlier member name, which still opens). A retained baseline
 with a transposition envelope is refused before nested admission. The new
 edition is engraved afresh with the current engine and the shared rules alone
-(`approvedProductionIsoOptions()` and default tokens, as a new import is); the
+(`approvedProductionIsoOptions()` and default tokens, with beat lines at the
+score's own metre pulse, as a new import is); the
 baseline's recipe belongs to its old pages, which need not reproduce first. This member
 is the portable exact 0 restoration archive; the collection installer preserves
 its original sidecar and achievement journals separately.
