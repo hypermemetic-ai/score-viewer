@@ -32,12 +32,12 @@ An admitted transposition SHALL shift all sounding pitch references by the same 
 - **THEN** admission refuses with a concise explanation and the prior score remains usable
 - **AND** the control does not persist an invalid or partially applied value
 
-### Requirement: Fresh physical fingerings and complete notation
-Each genuinely new transposed presentation SHALL use the existing shared engraving and planning authority to regenerate complete pages, seats, fingerings and physical contacts for its actual pitches. Matching prior hand assignments SHALL NOT permit reuse of old pitch ink. Both supported keyboard presentations SHALL retain the selected edition's owner hand map and complete geometry admission.
+### Requirement: Fresh pages and complete notation
+Each genuinely new transposed presentation SHALL use the existing shared engraving authority to engrave complete pages and seats for its actual pitches, from the score's own hands. Nothing SHALL be calculated: no fingering or hand is chosen by a calculator. The earlier edition's printed finger layer SHALL NOT be carried, because those fingerings belong to its pitches. Matching prior hand assignments SHALL NOT permit reuse of old pitch ink. Both supported keyboard presentations SHALL retain the selected edition's owner hand map and complete geometry admission.
 
 #### Scenario: Transpose without changing any hand assignments
 - **WHEN** the new pitches retain all existing owner hands
-- **THEN** pages and seats are freshly rendered for those pitches, with newly valid finger/contact choices
+- **THEN** pages and seats are freshly rendered for those pitches
 - **AND** full-score pages and four-measure previews show coherent notation, including ties, slurs and duration ink
 
 #### Scenario: Conventional and Jankó presentation
@@ -59,7 +59,7 @@ A transposed archive SHALL retain its exact admitted untransposed baseline and b
 - **AND** historical policy dispatch and existing font/geometry checks remain intact
 
 #### Scenario: Selected hand map differs from immutable source
-- **WHEN** transposition retains a currently admitted calculated hand map
+- **WHEN** transposition retains a currently admitted selected hand map
 - **THEN** receiving admission verifies it equals the selected requested edition and its complete guards normalize to original owner identities/pitches/timing
 - **AND** cold admission treats it as explicit Viewer selection authority while enforcing authored/editorial hand requirements
 - **AND** the retained baseline is exactly one untransposed archive, without nested transformation envelopes
@@ -88,12 +88,12 @@ The selected offset SHALL persist for the original score and apply consistently 
 - **THEN** it cannot activate stale output, overwrite original journals, or leave the visible value disagreeing with the selected score
 
 ### Requirement: Pitch-specific personal and achievement evidence
-Transposed editions SHALL preserve the original archives, corrections, calculation history and achievement journals without treating original pitch/contact guards or achieved playing as evidence for new pitches. Corrections and measured/manual achievement for a transposed edition SHALL remain correctly bound to that edition. Returning to a retained edition SHALL recover its own saved evidence.
+Transposed editions SHALL preserve the original archives, corrections and achievement journals without treating original pitch/contact guards or achieved playing as evidence for new pitches. The player's own hand and finger choices SHALL move with their notes: each note keeps its identity and timing, and its guard pitch moves by the transposition steps. A choice that cannot move stays with the earlier edition. Corrections and measured/manual achievement for a transposed edition SHALL remain correctly bound to that edition. Returning to a retained edition SHALL recover its own saved evidence.
 
 #### Scenario: Original edited score is transposed
 - **WHEN** the original contains personal corrections and practice progress
 - **THEN** those originals remain unchanged and recoverable
-- **AND** a newly transposed edition starts with independently valid calculated fingerings and no falsely inherited correction or achievement claim
+- **AND** a newly transposed edition carries the player's own hand and finger choices to the moved notes, with no calculated fingerings and no falsely inherited achievement claim
 - **AND** non-achievement practice preferences remain available without copying played progress or completion
 
 ### Requirement: Reading and assessment use one effective pitch context
