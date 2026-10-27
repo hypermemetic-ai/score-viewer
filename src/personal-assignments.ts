@@ -58,7 +58,8 @@ export function handlessMessage(count:number,purpose:string):string {
 const noteIndexes=new WeakMap<ScorePackage,ReadonlyMap<string,ScorePackage['score']['notes'][number]>>();
 const noteIndex=(p:ScorePackage)=>{let index=noteIndexes.get(p);if(!index)noteIndexes.set(p,index=new Map(p.score.notes.map(n=>[n.id,n])));return index;};
 /** A note's hand, in one order everywhere: the owner's own hand (`ownsHand`),
- * else a hand carried from a matching bar, else its repeat twin's (derived,
+ * else a hand carried from a matching bar (never onto a note whose hand the
+ * edition changes there, `editedHand`), else its repeat twin's (derived,
  * #173), else a stored record that is no hand choice, else the written hand. */
 const handInOrder=(c:PersonalOwnerChoice|undefined,written:PersonalHand|null,carried:PersonalHand|undefined,twin:PersonalHand|undefined):PersonalHand|null=>
  (ownsHand(c,written)?c!.hand!:undefined)??carried??twin??c?.hand??written;
@@ -284,6 +285,10 @@ function neighbours(index:RecurrenceIndex,n:Note):Neighbours {
  const side=(at:number|undefined)=>at===undefined?undefined:index.struck.get(`${hand}:${at}`)!.map(q=>`${pitch(q)}:${q.startTick-n.startTick}:${q.durationTicks}:${index.marks.get(q.id)}`).sort().join('|');
  const value={before:side(onsets[lo-1]),at:side(n.startTick)!,after:side(onsets[lo+1])};index.neighbours.set(n.id,value);return value;
 }
+/** The edition changes this note's hand here: an edit made at this note, which
+ * a hand carried from a return never overrides. Each place keeps its own edit,
+ * so the order is the edit at this note, then a carried hand, then the source's. */
+const editedHand=(n:Note)=>n.editorialHand?.kind==='flip';
 /** The same note struck with the same notes, with the same note on at least one
  * side. A missing side never matches, so a note with nothing before it (an
  * opening pickup) is decided by the note after it alone. */
@@ -322,8 +327,9 @@ function deriveHandRecurrences(p:ScorePackage,a:PersonalAssignments):HandRecurre
  * into a return (No. 13 bar 11's last eighth) matches the opening pickup it
  * repeats, but never a downbeat, and a return that changes elsewhere in the
  * bar still takes the moves of the notes it plays alike. The changes of one hand in one bar that reach the same bar
- * travel together. A note with the owner's own hand keeps it, and a bar where
- * the result could not be drawn is skipped. */
+ * travel together. A note with the owner's own hand keeps it, and so does a
+ * note whose hand the edition changes there; a bar where the result could not
+ * be drawn is skipped. */
 function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note>,choices:PersonalAssignments['choices'],moves:Array<PersonalOwnerChoice&{hand:PersonalHand}>,older:Array<PersonalOwnerChoice&{hand:PersonalHand}>,dropped:ReadonlySet<number>|undefined):HandRecurrences {
  const {bars,downbeats,keys}=index;
  const barOf=(tick:number)=>{let lo=0,hi=bars.length-2;while(lo<hi){const mid=(lo+hi+1)>>1;if(bars[mid]<=tick)lo=mid;else hi=mid-1;}return lo;};
@@ -351,6 +357,7 @@ function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note
   const adding=new Map<string,PersonalHand>(),sources=new Map<string,string>();
   for(const {n,hand,ownerId} of found){
    if(ownsHand(choices[n.id],n.hand??null)){if(!following.has(n.id))following.set(n.id,b+1);continue;}
+   if(editedHand(n))continue;
    const prior=carried.get(n.id);if(prior&&prior.hand!==hand)continue;adding.set(n.id,hand);sources.set(n.id,ownerId);
   }
   if(!adding.size)continue;
@@ -363,7 +370,7 @@ function findHandRecurrences(index:RecurrenceIndex,notes:ReadonlyMap<string,Note
   for(const ownerId of new Set(found.map(f=>f.ownerId))){const bars=reach.get(ownerId)??[];if(!bars.includes(t+1))reach.set(ownerId,[...bars,t+1]);}
  }
  for(const moved of byBar(older))for(const {t,found} of matching(moved))for(const {n,ownerId} of found)
-  if(!ownsHand(choices[n.id],n.hand??null)){const reach=unshared.get(ownerId)??[];if(!reach.includes(t+1))unshared.set(ownerId,[...reach,t+1]);}
+  if(!ownsHand(choices[n.id],n.hand??null)&&!editedHand(n)){const reach=unshared.get(ownerId)??[];if(!reach.includes(t+1))unshared.set(ownerId,[...reach,t+1]);}
  return{carried,targets,reach,skipped,following,unshared};
 }
 /** Where the selected note's hand comes from, for the editor to say. `follows`
