@@ -30,7 +30,12 @@ test('Schumann Op. 68 No. 13 imports from MusicXML, opens on both keyboards and 
  assert.deepEqual([...all.availablePresentations??[]].sort(),['conventional-piano','janko-four-row']);
  for(const layout of ['conventional-piano','janko-four-row'] as const){
   const p=await selectPresentation(all,layout);
-  assert.equal(p.pages.length,5,layout);assert.equal(p.score.notes.length,778,layout);
+  assert.equal(p.score.notes.length,778,layout);
+  // The whole piece is engraved: every note has a seat, and every page carries some of them.
+  const seated=new Set(p.seats.flatMap(s=>s.ownerIds));assert.ok(p.score.notes.every(n=>seated.has(n.id)),layout);
+  assert.deepEqual([...new Set(p.seats.map(s=>s.page))].sort((a,b)=>a-b),p.pages.map((_,i)=>i),layout);
+  // Lines are as dense as their ink allows (ISO #480): never sparser than the 4 pages first drawn at ISO 3bbe6a9.
+  assert.ok(p.pages.length>1&&p.pages.length<=4,`${layout}: ${p.pages.length} pages`);
   // Hands come from the printed staves: one hand per staff, nothing inferred.
   const byStaff=new Map<string,Set<string>>();
   for(const n of p.score.notes){assert.ok(n.hand,`${n.id} has a hand`);assert.match(n.handInference?.evidence??'',/^Printed staff/,`${n.id} hand comes from its staff`);

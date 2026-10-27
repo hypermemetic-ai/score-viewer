@@ -2,6 +2,7 @@ import type {QuantizedGridScore} from '../vendor/iso-notation/src/model/types';
 import {BOUNDED_PRACTICE_POLICY as policy,boundedPracticePolicyFingerprint} from './practice-sizing';
 import {choosePracticeExcerptBoundary,type PracticeSectionPlanning} from './practice-boundaries';
 import type {PracticeSectionSimilarity,PracticeSimilaritySection} from './practice-similarity';
+import {compoundPulseTicks} from './meter-pulse';
 
 export type PracticeContrastSource=Pick<QuantizedGridScore,'notes'|'tieChains'|'sourceBarTicks'|'ticksPerBeat'|'timeSignatures'>;
 export interface PracticeSourceClip {
@@ -34,7 +35,7 @@ const noteEnd=(n:PracticeContrastSource['notes'][number])=>n.startTick+n.duratio
 function pulseAt(source:PracticeContrastSource,tick:number):number {
  const meter=source.timeSignatures.findLast(m=>m.tick<=tick);
  if(!meter||!Number.isFinite(source.ticksPerBeat)||source.ticksPerBeat<=0)throw Error('Contrast needs source pulse context.');
- return source.ticksPerBeat*4/meter.denominator*(meter.denominator>=8&&meter.numerator>3&&meter.numerator%3===0?3:1);
+ return compoundPulseTicks(source.ticksPerBeat,meter)??source.ticksPerBeat*4/meter.denominator;
 }
 function sourceClip(source:PracticeContrastSource,section:PracticeSimilaritySection,start:number,end:number,divergence:number,id:string,profile:PracticeContrastOptions['profile']):PracticeSourceClip {
  const bars=source.sourceBarTicks;

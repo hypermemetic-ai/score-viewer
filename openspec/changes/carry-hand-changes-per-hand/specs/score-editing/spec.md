@@ -47,6 +47,11 @@ In note editing, L/R SHALL assign the selected note's effective performing hand 
 - **AND** the notice names the note and what happened to it before the bars it changed
 - **AND** Use bar 11's hand or Share this note's hand returns to the shared hand, and choosing the written hand at bar 11 undoes the change in both bars
 
+#### Scenario: An edit at a return
+- **WHEN** the edition changes a note's hand at a return, as No. 14's edition moves bar 30's second A3 from the RH it is written in to the LH, and the player moves bar 60's matching A3 to the right hand
+- **THEN** bar 30's A3 keeps its edited LH, beamed with the LH, with its finger on the LH side; a return with no edit at that note still takes the move
+- **AND** at every note the order is: the edit made at that note (the player's own or the edition's), then a hand carried from a return, then the source's hand, so each place keeps its own edit
+
 #### Scenario: A move in bar 11's pickup
 - **WHEN** the player also moves bar 11's pickup B4, which bar 21, written short, does not play
 - **THEN** bar 11's E4 still reaches bar 21, and the pickup's hand does not reach bar 21

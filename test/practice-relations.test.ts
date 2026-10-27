@@ -29,5 +29,6 @@ test('authored three-component hold retains complete source components, distinct
  assert.equal(paths.filter(p=>p.getAttribute('data-tie-component')==='1').length,1);
  assert.deepEqual(paths.filter(p=>p.getAttribute('data-tie-component')==='0').map(p=>p.getAttribute('data-tie-from-tick')),['960','960']);
  assert.deepEqual(paths.filter(p=>p.getAttribute('data-tie-component')==='0').map(p=>p.getAttribute('data-tie-to-tick')),['1152','1152']);
- assert.deepEqual(paths.filter(p=>p.getAttribute('data-tie-component')==='0').map(p=>p.getAttribute('data-tie-side')),['below','above'],'the pinned engine itself produces legitimate opposite-sided system fragments');
+ assert.equal(paths.filter(p=>p.getAttribute('data-tie-component')==='0').map(p=>p.getAttribute('data-tie-side')).length,2);
+ assert.equal(new Set(paths.filter(p=>p.getAttribute('data-tie-component')==='0').map(p=>p.getAttribute('data-tie-side'))).size,1,'a tie split across systems bows the same way on both halves (R-ties, ISO #494)');
 });

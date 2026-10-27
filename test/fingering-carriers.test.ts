@@ -76,6 +76,14 @@ test('an opposed shared-head alias uses its performing contact branch and retain
  const a=seat('a',['a','b'],100),q=fixture([note('a',60,0,48,'RH'),note('b',60,0,24,'RH')],[a],stem(50,95.8,80)+stem(50,104.2,120)),before=JSON.stringify(q),c=fingeringCarriers(q).get('a')!;
  assert.equal(c.kind,'stem');assert.equal(c.direction,-1);assert.equal(c.edge,80);assert.equal(c.stemIds.length,1);assert.equal(c.associatedStemIds.length,2);assert.equal(JSON.stringify(q),before);
 });
+test('a shared head keeps its lone stem on a parallel voice seat beside the column; a single head does not borrow it',()=>{
+ // No. 13 bar 2, LH F4: two voices strike it for one value; the beamed voice's stem stands 1.3 left of the column.
+ for(const dx of [-1.3,1.3]){
+  const shared=seat('a',['a','b'],100),q=fixture([note('a',60,0,24,'LH'),note('b',60,0,24,'LH')],[shared],stem(50+dx,104.2,120)),c=fingeringCarriers(q).get('a')!;
+  assert.equal(c.kind,'stem');assert.equal(c.direction,1);assert.equal(c.edge,120);assert.deepEqual(c.associatedStemIds,['0:0:stem-0']);
+  const single=seat('a',['a'],100);assert.equal(fingeringCarriers(fixture([note('a',60,0,24,'LH')],[single],stem(50+dx,104.2,120))).get('a')!.kind,'head');
+ }
+});
 test('explicit chord bridge identities associate displaced shared members without annexing another onset',()=>{
  const high=seat('high',['high'],80,50),low=seat('low',['low'],100,55),foreign=seat('foreign',['foreign'],120,55),q=fixture([note('high',72),note('low',60),note('foreign',48,24)],[high,low,foreign],stem(50,75.8,60)+'<line class="janko-chord-bridge" data-bridge-notes="high,low" x1="50" y1="80" x2="50" y2="100"/>');
  const c=fingeringCarriers(q);assert.equal(c.get('high')!.id,c.get('low')!.id);assert.notEqual(c.get('low')!.id,c.get('foreign')!.id);
