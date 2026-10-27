@@ -41,7 +41,7 @@ test('literal No14 single pages and overlapping spreads equal the complete place
  }
 });
 test('calculated tied owners spanning three pages retain complete physical stacks and exact geometry in both keyboards',async()=>{
- const source=completeTieBoundaryStudy(4,'RH'),base=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:255}),
+ const source=completeTieBoundaryStudy(4,'RH'),base=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:210}),
   hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?'RH':n.hand!]));
  for(const keyboard of ['conventional-piano','janko-four-row'] as const){
   const {p}=await calculatedStudy(base.p,keyboard,hands);

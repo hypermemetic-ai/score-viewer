@@ -1424,22 +1424,53 @@
     "Cancelled joint study",
     "Workflow/auth/provider configuration"
   ],
-  "dependencyRevision": "68d8f086b3dcb400ae8699d7aa86ca8750e0c7a6",
+  "dependencyRevision": "3bbe6a960c9edcf7d83648518189f92c0c73063c",
   "dependencyReview": {
     "pullRequests": [
-      "https://github.com/hypermemetic-ai/iso-notation/pull/468",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/469",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/472",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/471",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/473",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/465",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/474",
-      "https://github.com/hypermemetic-ai/iso-notation/pull/475"
+      "https://github.com/hypermemetic-ai/iso-notation/pull/476",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/477",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/478",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/479",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/480",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/481",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/482",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/483",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/484",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/485",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/486",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/487",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/488",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/489",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/490",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/491",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/492",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/493",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/494",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/495",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/496",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/497",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/498",
+      "https://github.com/hypermemetic-ai/iso-notation/pull/499"
     ],
-    "previousRevision": "5026e669aaefcb6bbf3c3269b1590e841639b88d",
-    "scope": "Seats beside other voices, one stem per hand value, and ISO's own title-area clearance, 2026-10-23. This pin is ISO main 68d8f08, #475's merge commit; it is 5026e66 followed by #468, #469, #472, #471, #473, #465, #474 and #475. #468: one hand's heads of one value share one stem whichever source voice wrote them (No. 30 bar 32 and its repeat); its audit found every page of a private library byte-identical. #465: a +½ mark is seated beside another voice's beam instead of falling back to a dot, and no beam crosses a stem it doesn't own where a voice could stand aside; a leap slur may follow its notes' leap where no calm bow lands (No. 30 bars 32 and 48 only). In a private library's No. 13 (repeat-sign form) this exchanges two seats: bar 26 LH C#5 and A3, bar 28 RH E5 and A4. #473 lints note-gesture slur tips that stand sideways off their notes; routing is unchanged. #474 stops ISO printing the internal working notes ('Editorial hands-only review:' and 'Current finger study:' lines) and reserves page one's header depth for its title area in ISO itself; the viewer already printed only No. 14's two public notes and already guarded the title area (engraveClearOfTitleArea), so test/title-area-clearance.test.ts now states that guard through an engraving whose music reaches the title area and checks that a page one printing every notice it is given keeps them clear of the music. #469, #471 and #475 hold, repair or retire ISO's known-failing tests (#471 repairs two fretted-import refusals; #475 removes the bent-ribbon path, which no production recipe reached); #472 lands #470's packaging closure (a derived files list, the cut @xmldom chain, ES2022). No production policy key changes. In a rehearsal on a copy of a private library, both layouts, against viewer main 338e501 at 5026e66, only No. 13's page 3 changes (bars 26 and 28); every other page of its four piano scores, plain and with fingerings shown, is pixel-identical, a private score's ten pages match the installed build's, and opening times are within noise. The footer probe's saved edition, redrawn at this pin by test/support/footer-probe-edition.ts, differs from the fixture only in its manifest createdAt, so the fixture and its hash are kept. #468, #469, #471, #472, #473, #465 and #474 record their reviews in their PR bodies; #475 records none; all eight were merged without GitHub review records."
+    "previousRevision": "68d8f086b3dcb400ae8699d7aa86ca8750e0c7a6",
+    "scope": "Denser lines, one stem per voice, fanned and split ties, hand-change lines and marks where the reader looks, and voices painted by rank, 2026-10-27. This pin is ISO main 3bbe6a9, #499's merge commit; it is 68d8f08 followed by #476 through #499. #480 lets production lines fill toward their legible limit: in a private library No. 14 returns to six bars a line on three pages (viewer main at 68d8f08 drew four bars a line on four pages), No. 13 (repeat-sign form) goes from three pages to two, and two other piano scores lose a page or several lines; its slur-side choice turns the LH-into-RH arpeggio slurs of No. 14's conventional layout over the RH in about thirty bars and turns No. 13's LH slur in bars 5 and 20 under its beam, the trade-off #480 names; its step beams lift a few two-note beams about 0.8 pt off the lane line in the non-piano score, which changes nowhere else. #486 and #499 leave one stem where two voices strike a shared key for one value (No. 13 bars 2, 4, 17, 19 and 28); that stem keeps its parallel-voice seat 1.3 left of the column. #499 draws stems that passed under another voice in voice order (No. 13 bars 16 and 26 to 28). #488 fans two ties held over one onset (No. 13 bars 12 to 13); #494 bows both halves of a split tie the same way. #492 drops the hand-change line between two single notes and moves No. 13's hand mark in bars 6 to 7 and 21 to 22 from the LH note to the RH note. #476 fixes small engraving faults, among them No. 14 bar 64's rests. #497 and #498 are byte-identical speed work. #477 to #479, #481 to #485, #490, #491, #493, #495 and #496 are rulebook, census and test-selection changes with no production effect. No production policy key changes. #499's lone stem on a parallel seat was not claimed by the viewer's fingering carriers, so practice refused No. 13 on the Jankó layout ('unresolved janko-stem ownership'); src/fingering-carriers.ts now lets a shared head claim a stem standing on a parallel seat within 1.3 of its column, and test/fingering-carriers.test.ts states it. The footer probe's saved edition no longer reproduces at this pin (#480's denser lines) and was redrawn from the 0013cd6 fixture by test/support/footer-probe-edition.ts with both keyboards' hands and fingers; its hash is updated. In a rehearsal on a copy of a private library, both layouts, every piano score reopened, paged plain and with fingerings shown, walked through Fingers in both hands and through every practice section in reading and timed modes, with E, F and P pressed at first paint: no errors or refusals; the non-piano score opens and offers no piano practice. The library copy changed only by the viewer's own writes (re-engraved editions, new state versions, practice records, library and preferences). #486 (review round 2), #488 and #492 (owner review 2026-10-24) record reviews in their PR bodies; #499's body asks not to merge before the architect reviews its pictures and records no review, yet it was merged; the others record none; all twenty-four were merged without GitHub review records."
   },
   "previousDependencyReviews": [
+    {
+      "revision": "68d8f086b3dcb400ae8699d7aa86ca8750e0c7a6",
+      "pullRequests": [
+        "https://github.com/hypermemetic-ai/iso-notation/pull/468",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/469",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/472",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/471",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/473",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/465",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/474",
+        "https://github.com/hypermemetic-ai/iso-notation/pull/475"
+      ],
+      "previousRevision": "5026e669aaefcb6bbf3c3269b1590e841639b88d",
+      "scope": "Seats beside other voices, one stem per hand value, and ISO's own title-area clearance, 2026-10-23. This pin is ISO main 68d8f08, #475's merge commit; it is 5026e66 followed by #468, #469, #472, #471, #473, #465, #474 and #475. #468: one hand's heads of one value share one stem whichever source voice wrote them (No. 30 bar 32 and its repeat); its audit found every page of a private library byte-identical. #465: a +½ mark is seated beside another voice's beam instead of falling back to a dot, and no beam crosses a stem it doesn't own where a voice could stand aside; a leap slur may follow its notes' leap where no calm bow lands (No. 30 bars 32 and 48 only). In a private library's No. 13 (repeat-sign form) this exchanges two seats: bar 26 LH C#5 and A3, bar 28 RH E5 and A4. #473 lints note-gesture slur tips that stand sideways off their notes; routing is unchanged. #474 stops ISO printing the internal working notes ('Editorial hands-only review:' and 'Current finger study:' lines) and reserves page one's header depth for its title area in ISO itself; the viewer already printed only No. 14's two public notes and already guarded the title area (engraveClearOfTitleArea), so test/title-area-clearance.test.ts now states that guard through an engraving whose music reaches the title area and checks that a page one printing every notice it is given keeps them clear of the music. #469, #471 and #475 hold, repair or retire ISO's known-failing tests (#471 repairs two fretted-import refusals; #475 removes the bent-ribbon path, which no production recipe reached); #472 lands #470's packaging closure (a derived files list, the cut @xmldom chain, ES2022). No production policy key changes. In a rehearsal on a copy of a private library, both layouts, against viewer main 338e501 at 5026e66, only No. 13's page 3 changes (bars 26 and 28); every other page of its four piano scores, plain and with fingerings shown, is pixel-identical, a private score's ten pages match the installed build's, and opening times are within noise. The footer probe's saved edition, redrawn at this pin by test/support/footer-probe-edition.ts, differs from the fixture only in its manifest createdAt, so the fixture and its hash are kept. #468, #469, #471, #472, #473, #465 and #474 record their reviews in their PR bodies; #475 records none; all eight were merged without GitHub review records."
+    },
     {
       "revision": "5026e669aaefcb6bbf3c3269b1590e841639b88d",
       "pullRequests": [

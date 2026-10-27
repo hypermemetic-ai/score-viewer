@@ -10,10 +10,10 @@ import type {Hand,QuantizedGridScore} from '../../vendor/iso-notation/src/model/
 import type {PhysicalKeyboardId} from '../../vendor/iso-notation/src/model/physical-keyboard';
 /** Public independently authored musical source, with a two-level gesture and
  * a separate melody silence while accompaniment can move to that hand. */
-export function transferStudy(hand:Hand='LH'):QuantizedGridScore{
+export function transferStudy(hand:Hand='LH',pitches:readonly number[]=[48,52,55]):QuantizedGridScore{
  const other=hand==='LH'?'RH':'LH';return{id:'viewer-authored-'+hand,title:'Viewer hand-transfer study '+hand,composer:'Viewer regression',
   ticksPerBeat:48,totalTicks:288,sourceBarTicks:[0,144,288],productionLayout:true,
-  notes:[48,52,55].map((pitch,i)=>({id:'gesture-'+i,startTick:i*12,durationTicks:12,hand,eventKind:'pitched' as const,pitch:{octave:4,pitchClass:pitch-48},
+  notes:pitches.map((pitch,i)=>({id:'gesture-'+i,startTick:i*12,durationTicks:12,hand,eventKind:'pitched' as const,pitch:{octave:Math.floor(pitch/12),pitchClass:pitch%12},
    sourceBeam:{group:'public-authored-gesture',noBeam:false},sourceProvenance:{voices:['accompaniment'],staves:['lower'],hands:[hand],unison:false}}))
    .concat([{id:'melody-entrance',startTick:144,durationTicks:144,hand:other,eventKind:'pitched' as const,pitch:{octave:5,pitchClass:9},sourceBeam:{group:'melody',noBeam:true},
     sourceProvenance:{voices:['melody'],staves:['upper'],hands:[other],unison:false}}]),

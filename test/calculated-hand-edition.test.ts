@@ -16,8 +16,9 @@ async function repinned(p:ScorePackage,edit:(f:Record<string,Uint8Array>)=>void)
  m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([name,b])=>[name,await hashBytes(b)])));return archivePackage(m,files);
 }
 test('both keyboards and transfer directions cold-replay complete authored beams and independent melody silence, with usable annotations',async()=>{
- for(const hand of ['LH','RH'] as const)for(const layout of ['conventional-piano','janko-four-row'] as const){
-  const original=await sourcePackage(transferStudy(hand)),other:Hand=hand==='LH'?'RH':'LH',hands={'gesture-0':hand,'gesture-1':other,'gesture-2':hand,'melody-entrance':other},
+ // The written study changes hands between close single notes (4 and 3 semitones); the far one 7 apart each time.
+ for(const [pitches,far] of [[[48,52,55],false],[[48,55,62],true]] as const)for(const hand of ['LH','RH'] as const)for(const layout of ['conventional-piano','janko-four-row'] as const){
+  const original=await sourcePackage(transferStudy(hand,pitches)),other:Hand=hand==='LH'?'RH':'LH',hands={'gesture-0':hand,'gesture-1':other,'gesture-2':hand,'melody-entrance':other},
    q=await calculatedStudy(original.p,layout,hands),cold=await importPackage(q.bytes,{keyboardLayout:layout});
   assert.deepEqual(cold.files['source-score.json'],original.p.files['source-score.json']);assert.ok(cold.score.notes.every(n=>!n.editorialHand&&n.derivedHand));
   assert.deepEqual(cold.score.notes.map(n=>requirePianoEvent(n).hand),Object.values(hands));
@@ -25,9 +26,13 @@ test('both keyboards and transfer directions cold-replay complete authored beams
   assert.deepEqual(source.owners.map(o=>{assert.ok('pitch' in o);return[o.id,o.pitch,o.startTick,o.durationTicks];}),original.source.notes.map(n=>[n.id,requirePitchedEvent(n).pitch.octave*12+requirePitchedEvent(n).pitch.pitchClass,n.startTick,n.durationTicks]).sort((a,b)=>String(a[0])<String(b[0])?-1:1));
   assert.equal(source.silences.length,1);assert.equal(source.silences[0].source.voice,'melody');
   assert.equal(coverage.silences[0].disposition,'visible');assert.ok(coverage.silences[0].paint[0].ids.length);
-  // ISO #383: a beam splits where its hand changes, and each change is cued head to head.
+  // ISO #383: a beam splits where its hand changes. R-hand-change-cue (ISO #489, #492): a line joins the two heads
+  // across a span of 6 semitones or more, or where a beamed group stands beside the change; two close single notes
+  // are joined by eye, their flags carrying the value, so no line is drawn and none is refused.
   assert.equal(q.r.layouts[0].beams.length,0);
-  assert.deepEqual(q.r.layouts[0].handTransfers!.map(t=>[t.fromIds,t.toIds,t.fromHand,t.toHand,!!t.cue]),[[['gesture-0'],['gesture-1'],hand,other,true],[['gesture-1'],['gesture-2'],other,hand,true]]);
+  if(far)assert.deepEqual(q.r.layouts[0].handTransfers!.map(t=>[t.fromIds,t.toIds,t.fromHand,t.toHand,!!t.cue]),[[['gesture-0'],['gesture-1'],hand,other,true],[['gesture-1'],['gesture-2'],other,hand,true]]);
+  else assert.equal(q.r.layouts[0].handTransfers?.length??0,0);
+  assert.equal(q.r.lint.violations.length,0);
   assert.equal(coverage.gestures[0].memberIds.length,3);assert.equal(coverage.gestures[0].edgeIds.length,4);
   assert.equal(annotationPositions(cold).size,cold.seats.length);assert.equal(fingerDisplayAvailable(cold,initialPersonal(cold),'annotations'),true);
   const replacementUnavailable={...cold,fingerEligibility:{eligible:false}};
@@ -76,7 +81,7 @@ test('actual all-five replacement failure retains complete fresh long-value anno
 test('complete three/four-component source ties cold-read across every page on both keyboards without losing remote ownership or annotations',async()=>{
  for(const count of [3,4] as const)for(const layout of ['conventional-piano','janko-four-row'] as const){
   const hand:Hand=count===3?'RH':'LH',source=completeTieBoundaryStudy(count,hand),
-   original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:255}),before=await hashBytes(original.bytes),
+   original=await sourcePackage(source,{measuresPerSystem:1,systemsPerPage:1,pageWidth:210}),before=await hashBytes(original.bytes),
    hands=Object.fromEntries(source.notes.map(n=>[n.id,n.id==='following-attack'?hand:requirePianoEvent(n).hand])),q=await calculatedStudy(original.p,layout,hands),
    cold=await importPackage(q.bytes,{keyboardLayout:layout}),seats=cold.seats.filter(s=>s.ownerIds.includes('written-hold')),
    components=source.tieChains![0].components;
