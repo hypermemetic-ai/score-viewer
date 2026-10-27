@@ -85,7 +85,7 @@ Both selector lists and completed/unfinished sections SHALL use one roomier row 
 - **AND** each focused highlight encloses its centered row content, and three-digit ranges remain clear of right-aligned percentages
 
 ### Requirement: Quiet practice range context and progress summary
-Practice strips SHALL omit individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Selector and active header SHALL identify the selected exercise. Each concrete exercise row SHALL show its highest measured or manual-inclusive achieved speed relative to target, without a preparation bonus. Group rows SHALL have no percentage or assessment identity. Total SHALL equally weight all included catalog exercises, including locked exercises. Include manual SHALL remain checked by default and affect presentation only. Library/save totals SHALL use the same manual-inclusive catalog total.
+Practice strips SHALL omit individual measure numbers while retaining accessible source identities and explicit nonconsecutive boundaries. Selector and active header SHALL identify the selected exercise. Each concrete exercise row SHALL show its highest measured or manual-inclusive achieved speed relative to target, without a preparation bonus. Group rows SHALL have no percentage or assessment identity. Total SHALL equally weight all included catalog exercises, including locked exercises. Include manual SHALL remain checked by default and affect presentation only. Library/save totals SHALL use the same manual-inclusive catalog total. Exercise rates SHALL remain independent unless they resolve to the exact same source-owned musical equivalence class, including repeated identical child classes. Heterogeneous exercises SHALL NOT borrow component evidence.
 
 #### Scenario: Original and independent connections
 - **WHEN** originals A, B, C, pairs A–B, B–C and one contrast are included
@@ -100,7 +100,7 @@ Practice strips SHALL omit individual measure numbers while retaining accessible
 
 #### Scenario: Different section and joined-run attainment
 - **WHEN** original and adjacent-double attainment differ, or a historical whole-piece run is retained
-- **THEN** current exercise rows retain their own correct achieved-speed percentages without borrowing component or long-run evidence
+- **THEN** current heterogeneous exercise rows retain their own correct achieved-speed percentages without borrowing component or long-run evidence
 - **AND** Total summarizes the included bounded catalog without rewriting historical attainment
 
 #### Scenario: Mixed completion with manual results included
@@ -200,11 +200,11 @@ Practice presentation repair SHALL preserve prepared score bytes, source/keyboar
 - **AND** a rendering admission failure retains that package and saved data while identifying the unsupported passage
 
 ### Requirement: Shared Options menu keyboard binding and name
-Options SHALL have a configurable keyboard binding in the shared Keys and pedals interface, available from the full-score reader, passage selection and active practice. Its buttons, dialog title, binding entry, and accessible names SHALL use the same Options label. Configurable buttons SHALL show the current configured control. The default keyboard chord SHALL be O, with conflict-free admission for older preferences that preserves existing assignments and explicitly empty controls using the compatible persisted action identity. The library SHALL retain its Options entry.
+Options SHALL have a configurable keyboard binding in the shared Keys and pedals interface, available from the full-score reader, passage selection and active practice. Its buttons, dialog title, binding entry, and accessible names SHALL use the same Options label. Configurable buttons SHALL show the current configured control. The default keyboard chord SHALL be O, with conflict-free admission for older preferences that preserves existing assignments and explicitly empty controls using the compatible persisted action identity. The library SHALL retain its Options entry. For an opened score, Score SHALL be a visible expanded section with the current piece subtitle, normal heading hierarchy and aligned settings; it SHALL appear first in reader Options and immediately after Practice in practice Options. Share score SHALL be a visible action beneath score settings, followed by applicable correction and retained-edition actions. Source & review SHALL remain the secondary disclosure.
 
 #### Scenario: Opening Options from either practice interface
 - **WHEN** the user presses the configured Options key in passage selection or active practice
-- **THEN** the shared Options dialog opens with a Practice section first and the existing audio/MIDI, Keys and pedals, fingering display and applicable score controls below
+- **THEN** the shared Options dialog opens with Practice first in its section list and selected, with applicable Score, audio/MIDI, Piano, Keys and pedals and fingering display sections available
 - **AND** active practice follows the existing Pause behavior without changing completion eligibility, progress, or speed policy, and closing Options retains the passage and paused session
 
 #### Scenario: Practice Options describes applicable actions
@@ -224,6 +224,17 @@ Options SHALL have a configurable keyboard binding in the shared Keys and pedals
 - **THEN** all original assignments remain unchanged and the new action receives an available default or fallback
 - **AND** explicitly empty Options controls remain empty and a hardcoded reader O does not bypass the configured binding
 - **AND** the library Options entry remains available
+
+#### Scenario: Confident opened-score controls
+- **WHEN** the user opens Options from the reader
+- **THEN** Score and the piece subtitle appear before general device settings, with Transpose aligned
+- **AND** Share score is visible without expanding a disclosure
+- **AND** correction count and correction actions are proportionate, irrelevant disabled actions are omitted, and Undo restore remains available when applicable
+- **AND** expanding Source & review retains provenance and applicable font-license access
+
+#### Scenario: Options without an opened score
+- **WHEN** the user opens Options from the library
+- **THEN** general settings remain available without an empty Score section or a Transpose control for an unspecified score
 
 ### Requirement: Clear selector and practice settings presentation
 Concrete selector exercise rows SHALL retain achieved-speed percentages and genuine completion evidence while omitting redundant visible Not yet completed wording. Completed group rows SHALL omit percentages. Category labels SHALL be concise and descriptive: Completed, Incomplete, Connections and existing Contrasts, without instructional suffixes or new learning terminology. Shared tempo controls SHALL place small up/down chevrons vertically inside the numeric box's right edge and reserve space for their focus borders without overlapping the entered value or neighboring controls. Numeric values SHALL be centered in slightly narrower boxes; the three Practice numeric boxes SHALL align in one column regardless of external unit length. `%` and the beat-unit marking SHALL remain outside the numeric box. Visible absolute per-minute units SHALL consistently use `/min`, with spelled-out accessible labels. Full-score Performance controls and execution SHALL be absent; historical records SHALL remain retained. Practice Performance target SHALL remain absolute, and retained practice tempo controls SHALL preserve their existing admission, clock and record meaning. Mouse adjustment behavior and established field-specific increments SHALL remain available. Performance-target explanations SHALL agree with the displayed metronome marking and identify the reference for percentage controls; No helper text SHALL offer full-score note/timing assessment outside section Reading/Timed. Fresh and retained practice increase values and achievements SHALL retain their current admitted behavior; removing full-score assessment SHALL NOT change speed settings.
@@ -337,7 +348,7 @@ Free view Previous/Next controls SHALL inherit the current main-menu controls pe
 - **AND** runtime, binding Test, capture and visible hints use the same effective admitted controls
 
 ### Requirement: Bounded exercise browsing
-Passage selection SHALL browse original sections, independent adjacent doubles and contrast exercises through completed groups and incomplete originals, without recursive growing joins. Existing column geometry, row spacing, concrete-exercise right-aligned percentages and accessible source/component identity SHALL remain stable. Group rows SHALL open contents without being practice targets. Originals and doubles SHALL retain coherent source previews; contrasts SHALL identify both excerpt locations without implying the intervening source is played. Attainment SHALL remain independent.
+Passage selection SHALL browse original sections, independent adjacent doubles and contrast exercises through completed groups and incomplete originals, without recursive growing joins. Existing column geometry, row spacing, concrete-exercise right-aligned percentages and accessible source/component identity SHALL remain stable. Group rows SHALL open contents without being practice targets. Originals and doubles SHALL retain coherent source previews; contrasts SHALL identify both excerpt locations without implying the intervening source is played. Attainment SHALL remain independent unless it resolves to the exact same source-owned musical equivalence class, including repeated identical child classes. Heterogeneous exercises SHALL NOT borrow component evidence.
 
 #### Scenario: Selecting an adjacent double and its originals
 - **WHEN** A–B and B–C are available
@@ -403,3 +414,77 @@ Each maximal consecutive run of completed original sections SHALL occupy one gro
 - **WHEN** completion or Include manual causes a displayed group to merge or split
 - **THEN** the selected concrete exercise and appropriate focus remain identifiable by their original source-bound identity
 - **AND** no other exercise starts, no duplicate retained group is fabricated, and raw evidence and exclusions remain intact
+
+### Requirement: Stable short-passage practice framing
+Selected passages of at most four measures SHALL retain one complete-source stationary fit across Ready, MIDI/manual Start, count-in and playing within an unchanged viewport. Connection status or preparation state SHALL NOT reduce notation size or move its source reading references. Source-owned note retirement and held cues SHALL preserve structural staff and real measure frames; Free view SHALL restore all owned ink.
+
+#### Scenario: Start with a piano connected
+- **WHEN** a four-bar passage enters measured count-in and then trial from Ready
+- **THEN** its source note positions, common scale and staff frame remain identical to the established Ready geometry
+- **AND** disconnected Start uses the same framing, without accepting invented attacks
+
+### Requirement: Current practice speed lattice
+Fresh practice Starting speed SHALL be 10% of the performance target, Connection speed SHALL independently default to 50%, and fresh Increase per success SHALL default to 2%. Explicit selection of a new passage SHALL use the configured start for its category rather than saved workingByPattern or the previous passage. Connections SHALL require joined adjacent components with independently complete original leaves; labels or a completed parent alone SHALL NOT establish that category. Resume, repeat and restoration of the same session SHALL retain current captured/queued speed. Current starting/connection/working/increase controls SHALL admit half-percentage-point units, including typed, held, restored and automatic changes. The truthful native lower tempo limit MAY impose the nearest legal lattice floor. Present custom or historically ambiguous increments SHALL remain exact; changing an existing setting to 2% SHALL be an explicit setting edit. Raw attainment and history SHALL remain exact. An attempt SHALL capture its rate; live requested changes SHALL apply at the next musical boundary without changing its clock or crediting an unplayed rate.
+
+#### Scenario: Fresh target and queued working speed
+- **WHEN** a fresh passage has target 360/min and the user presses Up while playing
+- **THEN** it starts at 36/min (10%) and requests 10.5% for the next attempt
+- **AND** the current attempt remains at 10% through completion and records that actual rate
+
+#### Scenario: Select new material after a fast passage
+- **WHEN** the user selects an unfinished leaf after practising another passage at 70%
+- **THEN** the leaf starts at its configured Starting speed, default 10%, even if a historical workingByPattern value exists
+- **AND** its raw attainment and custom increment remain unchanged
+
+#### Scenario: Select a completed connection
+- **WHEN** the user selects a joined adjacent run whose original leaves are independently complete
+- **THEN** it starts at independently editable Connection speed, default 50%, with a fresh default increase of 2%
+- **AND** resuming or repeating that same session retains its requested/captured working speed
+
+### Requirement: Editable source-meter repeat cue
+Practice SHALL default to two count-in bars of the entry source meter, configurable from one to eight in Options. Startup, resume and every repeat SHALL supply a consistent audible metric hierarchy aligned to the overarching source beat structure and exact entry phase. Strict musical grid V3 SHALL bind the chosen bars and source phase; historical V2 replay SHALL remain literal and unrelated Performance policy SHALL remain unchanged.
+
+Ordinary repeats SHALL supply the configured cue without adding surprise bars because of unrelated journal persistence or UI work. Preparation SHALL preserve final-attack authority and captured-rate credit. A genuine backend readiness failure SHALL produce an honest stopped/refused state rather than a shortened, skipped, off-grid or concealed cue.
+
+#### Scenario: Compound-meter entry and repeat
+- **WHEN** a 6/8 passage starts or repeats at 10% working speed
+- **THEN** two complete 6/8 count-in bars clearly cue their two principal beats and subordinate subdivisions
+- **AND** source entry and subsequent repeats retain exact phase and queued-rate alignment
+
+#### Scenario: Repeat while a journal save is pending
+- **WHEN** an accepted attempt completes while unrelated serialized persistence is still pending
+- **THEN** the next complete configured count-in remains aligned to the admitted musical boundary without an extra bar
+- **AND** only accepted attacks and the captured actual rate determine the completed evidence
+
+### Requirement: Continuous native metronome waveform
+An admitted native click SHALL advance by emitted output sample frames after its eligible onset. Callback presentation-time jitter SHALL NOT reset its waveform phase across blocks or armed repeats. Existing timbre, gain, accents, strict onset admission, cancellation and output-device policy SHALL remain unchanged.
+
+#### Scenario: Armed repeat across jittered callbacks
+- **WHEN** a repeat cue spans varying callback blocks with monotonic presentation estimates containing small jitter
+- **THEN** its PCM remains continuous at the admitted sample rate and preserves the same crisp click waveform as an initial cue
+- **AND** lifecycle horizons and musical receipts retain their independent authority
+
+### Requirement: Visible editable resume cooldown
+Practice error recovery SHALL guard resume for an Options-configured cooldown of zero to thirty seconds, default three. While guarded, a subtle centered lock silhouette SHALL show remaining seconds inside its body, then disappear at expiry. A blocked pointer or keyboard Resume SHALL retrigger one brief, restrained horizontal shake without resetting the guard or moving notation. Reduced-motion preferences SHALL disable the shake without removing the countdown. Close, changed attempt and cancellation SHALL clear obsolete timers without delayed musical activation.
+
+#### Scenario: Error recovery
+- **WHEN** a default practice attempt fails and the user presses Resume before three seconds elapse
+- **THEN** playback remains stopped and the visible lock explains the remaining wait
+- **AND** resume becomes available at expiry without starting automatically
+- **AND** the number sits within the lock body and a blocked press provides brief feedback without changing the remaining wait or staff geometry
+
+### Requirement: End-to-end practice keyboard operation
+Keyboard operation SHALL be a delivery requirement throughout passage selection, active practice, Options, numeric draft editing, Free view and return. Plain active Up/Down SHALL adjust Working speed in 0.5% units when no authoritative binding, field, modal or capture owns them. Options browsing SHALL navigate rows without changing values; Enter activates editing, edit Up/Down adjusts values, and Escape cancels the draft before closing. Mouse chevrons SHALL add no keyboard stops. Saved controls, modifiers, repeated keys and capture SHALL retain coherent ownership; applicable Free view navigation, Space Resume, disconnected Done and Back SHALL remain usable.
+
+#### Scenario: Complete keyboard practice flow
+- **WHEN** the user selects a passage, starts, changes working speed, opens Options, edits and cancels a number, enters Free view, browses and resumes using only keys
+- **THEN** each step acts on the visibly focused or active context without silently consuming an actionable key or triggering another context's action
+- **AND** custom bindings, disconnected Done and Back retain their admitted behavior
+
+### Requirement: Exact repeated musical completion equivalence
+Passages with exact source musical equivalence SHALL resolve the same measured/manual attainment without rewriting raw evidence. Repeated identical child classes, including A+A, SHALL share A's completion class; heterogeneous ordered sequences SHALL retain independent completion. Equivalence SHALL include genuine performing roles, pitches, written timing, ties, rests, meter/phase and performance reference. Include manual SHALL filter provenance, and manual undo from an equivalent passage SHALL reverse the applicable shared manual claim without deleting measured or other-rate evidence.
+
+#### Scenario: Identical Schumann components and repetitive parent
+- **WHEN** a completed component reappears with exactly the same musical structure, or an otherwise identical parent consists only of repetitions of that class
+- **THEN** its displayed completion resolves from the same existing evidence
+- **AND** a differing rhythm, hand, reference or heterogeneous component order cannot borrow that completion
