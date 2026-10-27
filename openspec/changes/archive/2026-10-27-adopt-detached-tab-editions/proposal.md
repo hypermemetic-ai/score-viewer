@@ -1,5 +1,7 @@
 # Proposal
 
+> **Archived 2026-10-27 without implementation.** No task was started, and its specs were not synced. The plan rests on retained style editions that replay old pages literally. Later work replaced that: saved pages are derived and are engraved again from their source and the player's edits (#200, `docs/saved-edition-reengraving.md`, rule `R-iterate` in ISO notation's rulebook). Engraving vocabulary, including TAB duration marks, now belongs to ISO notation and arrives here as finished batches (`docs/handoff-2026-10-27.md`). No TAB work has landed in either repository since 2026-10-10: ISO's related `squared-fretted-techniques` change has been idle since then. If the detached TAB vocabulary is still wanted, it starts as ISO notation work.
+
 ## Why
 
 A clearer TAB vocabulary was chosen: fret numbers carry pitch, detached headless duration cues sit below the strings, black ink gives a consistent reading surface, and rests belong on the TAB staff. Only source-proven isolated rests whose written dots and tuplet ratio resolve exactly to an ordinary undotted rest are simplified. Adopting these display rules needs versioned source recipes and a safe additive presentation edition without reinterpreting historical archives or losing manual practice progress.
