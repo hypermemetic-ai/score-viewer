@@ -52,3 +52,6 @@
 Integration evidence and remaining limits: `docs/practice-fingering-validation-20261014.md`. Task 7.2 has actual one-score browser coverage and automated cross-score/succession coverage; the application has no deletion UI. Native activation and live consolidation remain pending while practice is in progress.
 
 Delivery status: PR98/99 are merged and main specs are synchronized. Reviewed replacement carrier31520bda is retained in ISO PR371; its paired run38510326660 was blocked before startup by GitHub account billing/spending limits. No new native pair was published or installed. Task7.4 and the explicit broader browser limits remain pending, so the change is not archived.
+
+Update 2026-10-27: the native package half of 7.4 has been carried since the 2026-10-14 deliveries (#101, #103), and the latest is 956bbe66 (#208, run 40577544036). #103 reports that the startup consolidation passed against a closed Windows library snapshot. The repository holds no record that the live Schumann No. 14 consolidation ran on the installed app, so 7.4 stays open. 7.2 stays open as described above.
+The MODIFIED "Direct personal hand and finger decisions" block in specs/score-editing was synced on 2026-10-13 (9823b98). Later changes extended it, and the block now repeats the current main requirement so the change still validates.

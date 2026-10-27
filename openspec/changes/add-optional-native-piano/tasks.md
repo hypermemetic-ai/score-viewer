@@ -30,7 +30,7 @@
 
 - [x] 5.1 Implement and prove bounded Windows queue targets, shared packet bounds, per-sampler-quantum MIDI/panic intake and retained actual prepared-cue horizons without Mac/vendor/config changes.
 - [x] 5.2 Observe root-controlled same-endpoint admitted-bank baseline/repaired submission, independently admitted coarse loopback intervals, actual stream latency and exact three-attack service headroom; preserve fine-timing refusals, sustained-heavy-load limits and separate physical acceptance.
-- [ ] 5.3 Independently review, merge and include the source repair in the ordinary paired native delivery with exact source and preservation receipts.
+- [x] 5.3 Independently review, merge and include the source repair in the ordinary paired native delivery with exact source and preservation receipts. Evidence: the source repair merged in #40 (d7dc1e3) and is in the 2026-10-10 paired delivery (viewer 37aecb0, run 38029615851) and every later one; the latest is the 2026-10-27 delivery 956bbe66 (#208), which seals app db86351 on ISO 3bbe6a96; paired native run 40577544036 succeeded for Windows x64 and universal Mac, and the Windows build is installed (docs/handoff-2026-10-27.md).
 
 ## 6. One-press download
 

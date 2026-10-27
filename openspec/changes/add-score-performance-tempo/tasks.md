@@ -27,4 +27,5 @@
 - [x] 4.3 Rehearse every score on a private data copy; confirm practice tempos/progress unchanged; run the flow by keyboard; inspect screenshots.
 - [ ] 4.4 Owner listening acceptance on the desktop app (audible quality, output device, marking values).
 - [x] 4.5 Native Salamander playback of the performance: scheduled note/click stream on the native clock through the selected output, with tempo-change cuts, release and backpressure; the dialog names the voice and offers the persistent Piano switch; built-in fallback. Portable-core Rust tests (including the allocator test) and frontend tests.
-- [ ] 4.6 Native build on Windows/macOS and owner listening acceptance of the native preview (timing, latency, count-in alignment, tempo changes).
+- [x] 4.6 Native build on Windows/macOS. Evidence: the native preview merged in #174 and is in the 2026-10-27 delivery 956bbe66 (#208), which seals app db86351 on ISO 3bbe6a96; paired native run 40577544036 succeeded for Windows x64 and universal Mac, and the Windows build is installed (docs/handoff-2026-10-27.md).
+- [ ] 4.7 Owner listening acceptance of the native preview (timing, latency, count-in alignment, tempo changes).
