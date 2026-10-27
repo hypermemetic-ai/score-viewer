@@ -1,125 +1,144 @@
 {
-  "schema": 1,
-  "viewerRevision": "8d338c1e1e641d2ce0417c9f40eb204c3a862e35",
-  "notationRevision": "5026e669aaefcb6bbf3c3269b1590e841639b88d",
-  "frontendDigest": "ccab12ea290832ccc8dabfefe5e8a11c2a63d99448630fe484ef862bc984ebaf",
-  "checks": {
-    "tests": {
-      "status": "passed",
-      "sourceCommit": "8d338c1e1e641d2ce0417c9f40eb204c3a862e35",
-      "command": "npm test",
-      "tests": 1408,
-      "passed": 1399,
-      "failed": 0,
-      "skipped": 1,
-      "todo": 8,
-      "durationMs": 267679,
-      "additional": [
-        {
-          "command": "node --test test/*.test.mjs",
-          "tests": 47,
-          "passed": 47,
-          "failed": 0,
-          "durationMs": 21292
-        },
-        {
-          "command": "npx tsc --noEmit -p .",
-          "result": "clean"
-        }
-      ],
-      "todoNote": "5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved (4 in fingering-studio, 1 in operator-finger-update). 3 are half-handed unison keys whose source pages ISO refuses on import (handless-owners).",
-      "skipNote": "The 1 skipped test is the opt-in owner No. 13 test (test/practice-fold-owner-snapshot.test.ts), which runs only with SCORE_VIEWER_OWNER_SNAPSHOT set to a copy of the owner's data. Viewer #198 reports it passing on a copy of /tmp/owner-data-20261021; it was not run here.",
-      "scope": "Complete suite on a clean, self-contained clone (no --reference) of merged main 8d338c1 with the submodule at 5026e669, after npm ci --ignore-scripts and npm run build. Merged since the 103f554 seal (PR 171): viewer PRs 172-185, 189, 192-198; notation pin 7b53664 -> 5026e669."
+ "schema": 1,
+ "viewerRevision": "db8635135740e985fadf98377052cb4db0fce202",
+ "notationRevision": "3bbe6a960c9edcf7d83648518189f92c0c73063c",
+ "frontendDigest": "39916a53a0741da0014d3976e87762026c4ced99a09a84c25fe8c2eb1f07cdf7",
+ "checks": {
+  "tests": {
+   "status": "passed",
+   "sourceCommit": "db8635135740e985fadf98377052cb4db0fce202",
+   "command": "npm test",
+   "tests": 1479,
+   "passed": 1470,
+   "failed": 0,
+   "skipped": 1,
+   "todo": 8,
+   "durationMs": 84907,
+   "additional": [
+    {
+     "command": "node --test test/*.test.mjs",
+     "tests": 49,
+     "passed": 49,
+     "failed": 0,
+     "durationMs": 9447
     },
-    "build": {
-      "status": "passed",
-      "sourceCommit": "8d338c1e1e641d2ce0417c9f40eb204c3a862e35",
-      "configured": "npm run build: TypeScript + source pin validation (Notation source verified: 5026e669) + Vite",
-      "frontendFiles": 24,
-      "frontendDigest": "ccab12ea290832ccc8dabfefe5e8a11c2a63d99448630fe484ef862bc984ebaf"
-    },
-    "browserInspection": {
-      "status": "passed",
-      "ownerLibraryRehearsal": {
-        "sourceCommit": "84d41349972833df4070942d22668dea107d5841",
-        "frontendIdentity": "Viewer #198's rehearsal served the frontend built at 386f76f / 84d4134 (the #198 head; 8d338c1 has the same tree 8f3b930c). Its recorded digest (/tmp/sv-deliv3-work/dryrun-checks*.json) is ccab12ea290832ccc8dabfefe5e8a11c2a63d99448630fe484ef862bc984ebaf, identical to the frontend built here from 8d338c1 and sealed in this receipt; the rehearsal report's worker URLs (layout-peer-worker-DrWRY70e.js, personal-projection-worker-DCN1gQSw.js) name the same files. The rehearsal is cited, not re-run.",
-        "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints",
-        "data": "Fresh read-only copy of /tmp/owner-data-20261021 (the owner's laptop data taken 2026-10-21); every write kept in memory",
-        "output": "/tmp/sv-deliv3-rehearsal/20261023T0850Z on the build host (raw-integrated/report.json and raw-edits-integrated/report.json: errors [])",
-        "observed": "Real key presses through main.ts. No. 13: 3 pages with repeat signs, Fingers both hands walked to the end 28 of 28, practice sections 8/8. No. 14: 3 pages, Fingers 64 of 64 with every note fingered, sections 5/6 (one heading without a passage, as before). Zelda's Lullaby: 2 pages, Fingers every note fingered, sections 7/7. Goldberg Var. 1: 4 pages, Fingers 0% fingered, sections 15/15. Add It Up: 10 pages, not a piano score, no sections, opened four times without bouncing back to the library. No. 13, Zelda, Goldberg and Add It Up are engraved again once on first open; No. 14 opens without it. Edits through the app, then undone: No. 13 Options > Transpose 2 accepted ('Transposed +2 steps with the score's own hands. Your hand and finger choices for 129 notes came along.'), written out on 5 pages, back to 0 restores 3 pages with repeat signs; No. 14 conventional bar 1 LH G moved to the RH accepted with no refusal, undo restores pixel-identical pages. No console errors, no page errors.",
-        "timingsMs": {
-          "note": "Back-to-back with main 5207818 on the same data copy, round 2 (load 7.1), first open / reopen",
-          "No. 13": [
-            5016,
-            550
-          ],
-          "No. 14": [
-            2254,
-            380
-          ],
-          "Zelda's Lullaby": [
-            2091,
-            511
-          ],
-          "Goldberg Var. 1": [
-            1456,
-            447
-          ],
-          "Add It Up": [
-            17282,
-            143
-          ]
-        },
-        "pullRequest": "https://github.com/hypermemetic-ai/score-viewer/pull/198"
-      },
-      "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio (including #196's louder piano and Metronome volume), practice at a keyboard and the pianist's musical acceptance were not observed. The owner's conventional No. 14 still opens on its saved pages with augmentation dots in bar 48. No. 14 bar 64's rests crowd together. No. 13 at +2 stays written out. Add It Up's first open takes about 17 s, once per saved edition.",
-      "nativeObservation": {
-        "observed": "None for this application revision. Scratch native runs of PR 196 (39897247335 at af7194b) passed on Mac and Windows but are not this revision; the laptop runs viewer 4167793 / application 103f554 with ISO 7b53664."
-      }
-    },
-    "independentReview": {
-      "status": "passed",
-      "sourceCommit": "8d338c1e1e641d2ce0417c9f40eb204c3a862e35",
-      "reviews": [
-        {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/196",
-          "verdict": "Independent review round 2, af7194b: merge. All five round-1 items fixed: the click is added after the piano-only limiter (every-frame test); soft knee continuous; one-time >70% -> 70% migration writes once atomically; docs figures; closing Options mid-drag restores both tracks. Nothing new allocates or locks in the audio callback. Follow-up: listening on real speakers is still owed."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/197",
-          "verdict": "Independent review round 1, a7a8ad7: merge. Pin exactly 221058d0, 21 ISO PRs in scope (#446-#464) match the first-parent merges; footer probe differs only in createdAt; npm test 1408 (0 fail); seal dry run complete with -text passing. Follow-ups (owner test re-engraves first, todo accounting, provenance wording) folded into #198."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/198",
-          "verdict": "Independent review round 1, 84d41349: merge. Pin exactly 5026e669, scope exactly ISO #466 and #467; owner test rebuilds the edition as the app does; footer probe createdAt only; npm test 1408 (0 fail); frontend digest ccab12ea... matches; rehearsal without console or page errors; only No. 14 Janko pages and the edited conventional pages differ from the 221058d0 run."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/461",
-          "verdict": "Independent review round 1: merge. Pages byte-identical in all 17 fixtures; tests fail on main without the fix; test:full 1555 pass / 0 fail."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/462",
-          "verdict": "Independent review round 1: merge. Exactly 12 heads move, all in studio No. 30; no other score moves, owner packages included; comment fix 2ae8432."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/463",
-          "verdict": "Independent review round 1: merge. Rule matches the owner's provisional wording (level only when the ends are the same pitch); probe over 12 scores finds 0 level beams with differing ends; owner No. 14 unchanged; conflict resolution with #464 specified."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/464",
-          "verdict": "Independent review round 1: merge after fixes (b26b7bf, checked). Owner pages byte-identical except the two intended cases (No. 13 +2 bar 36; No. 14 conventional bar 1 LH note to RH), both now admitted with no lint violations; viewer at this pin 0 fail."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/466",
-          "verdict": "Independent review round 1 (9d8f75dd): merge after fixes (layout-time blocker, five-note turn flip, catalogue, text); round 2 (41ae67db): merge. Owner No. 14: 12 slurs change, all under, as gestures; owner No. 13, Zelda, Goldberg: 0; no slur turns to the other side; first layout within noise."
-        },
-        {
-          "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/467",
-          "verdict": "Independent review round 1 (0d9a6fbb): merge after fixes; fixes checked at 831292b2: merge. Tests only: archival Goldberg window check now refuses all 14 mutations on all 5 windows; test:full 0 failing files."
-        }
-      ],
-      "scope": "Reviews cited for viewer #196-#198 and ISO #461-#464, #466, #467 (ISO #465 is still open and is not in the 5026e669 pin). Every other viewer PR merged since the 103f554 seal (172-185, 189, 192-195) records its own review in its PR body; the ISO PRs in 7b53664..221058d0 are recorded with their reviews in docs/source-provenance.json (dependencyReview and previousDependencyReviews, chain 5026e669 -> 221058d0 -> 6729e500 -> 7a4a6794 -> 7b53664e). None has a GitHub review record.",
-      "reviewedCommits": []
+    {
+     "command": "npx tsc --noEmit -p .",
+     "result": "clean"
     }
+   ],
+   "todoNote": "5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved (4 in fingering-studio, 1 in operator-finger-update). 3 are half-handed unison keys whose source pages ISO refuses on import (handless-owners). The same 8 as in the 8d338c1 seal.",
+   "skipNote": "The 1 skipped test is the opt-in owner No. 13 test (test/practice-fold-owner-snapshot.test.ts), which runs only with SCORE_VIEWER_OWNER_SNAPSHOT set to a private data copy. It was not run here.",
+   "scope": "Complete suite on a clean, self-contained clone (no --reference) of merged main db86351 with the submodule at 3bbe6a96, after npm ci --ignore-scripts and npm run build; the clone stayed clean. Merged since the 8d338c1 seal (PR 199): viewer PRs 200-202 and 204-207; notation pin 5026e669 -> 68d8f086 (PR 202) -> 3bbe6a96 (PR 207)."
+  },
+  "build": {
+   "status": "passed",
+   "sourceCommit": "db8635135740e985fadf98377052cb4db0fce202",
+   "configured": "npm run build: TypeScript + source pin validation (Notation source verified: 3bbe6a96) + Vite",
+   "frontendFiles": 24,
+   "frontendDigest": "39916a53a0741da0014d3976e87762026c4ced99a09a84c25fe8c2eb1f07cdf7"
+  },
+  "browserInspection": {
+   "status": "passed",
+   "ownerLibraryRehearsal": {
+    "sourceCommit": "5c831f748a494c8464e52a402972bebca6224490",
+    "frontendIdentity": "Viewer #207's final rehearsal served the frontend built from its head 5c831f7, whose tree is identical to merged main db86351. That build's digest is 39916a53a0741da0014d3976e87762026c4ced99a09a84c25fe8c2eb1f07cdf7, identical to the frontend built here from db86351 and sealed in this receipt (24 files). The rehearsal is cited, not re-run.",
+    "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints",
+    "data": "A fresh writable copy of a private data copy (the owner's laptop data taken 2026-10-24), writes going through to the copy; the original was hashed before and after and is unchanged",
+    "observed": "Real key presses through main.ts, conventional layout first, then Janko. schumann-op68-no14: 3 pages on both layouts, 381 fingers shown with F held, Fingers every note fingered in both hands, 20 sections opened in Read and Speed, 15 connections locked until passed; one beat line per bar at the dotted quarter (64 in 64 bars); Janko bar 30's edited LH A3 drawn in the LH. schumann-op68-no13: 2 pages, 213 fingers on the Janko layout and none on the conventional (as on the installed build), 8 sections opened. bach-goldberg-var1: 3 pages, unfingered, 15 sections opened. A private score: 2 pages, 207 fingers, 7 sections opened. A private score 2 (not a piano score): 10 pages, reading only, no practice offered. Each saved edition is engraved again once on first open and says so. No console errors, no page errors, no alerts or refusals. An instrumented copy of the same source compared every note of every score on both layouts with the installed build: 0 drawn hands and 0 drawn fingers differ.",
+    "timingsMs": {
+     "note": "Conventional layout, first open (engraves the saved edition again) / reopen in a new session. This run shared the build host with the test suite and two other browser runs; an earlier, less loaded run of #207 measured 5.5 s for schumann-op68-no14's first open.",
+     "schumann-op68-no14": [
+      10137,
+      2156
+     ],
+     "schumann-op68-no13": [
+      6090,
+      1224
+     ],
+     "bach-goldberg-var1": [
+      3949,
+      554
+     ],
+     "a private score": [
+      5056,
+      757
+     ],
+     "a private score 2": [
+      30486,
+      286
+     ]
+    },
+    "pullRequest": "https://github.com/hypermemetic-ai/score-viewer/pull/207"
+   },
+   "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice at a keyboard and the pianist's musical acceptance were not observed. A key pressed while the opening dialog is still up is sometimes not acted on (seen on viewer main before #207 too). The first open of each saved edition engraves it again, once.",
+   "nativeObservation": {
+    "observed": "None for this application revision. The laptop runs application 8d338c1 with ISO 5026e669 (delivery 3dae1a5)."
+   }
+  },
+  "independentReview": {
+   "status": "passed",
+   "sourceCommit": "db8635135740e985fadf98377052cb4db0fce202",
+   "reviews": [
+    {
+     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/200",
+     "verdict": "Review round 1 (head dd087c4), recorded in the PR body: six items (page-1 title area blocker, failed re-engrave remembered for the session, body, mixed-edition test, transposition test, reading place) fixed in ec25685, dd087c4 and 4b7933c, each with a test."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/204",
+     "verdict": "Reviewed after merge (e4fda82); its follow-ups (hand press on a folded note decided over all passes; private names kept out of the seal receipt) are viewer #205."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/205",
+     "verdict": "Reviewed; its cross-pass gap (a refused hand press on a folded repeat) is fixed in viewer #206."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/207",
+     "verdict": "Architect review before merge: findings reported with crops; two defects sent back and fixed on the PR with tests that fail without them (6/8 beat lines from the metre; an edit at a note outranks a hand carried from a return, decided by the architect); rerun gates, rehearsal and census; merged by the architect."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/465",
+     "verdict": "Review round 2, recorded in the PR body."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/468",
+     "verdict": "Independent review round 1 (3de154f2): merge after one small fix; fixes checked at 00164d13: merge."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/469",
+     "verdict": "Independent review round 1 (1511ebdc): merge."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/471",
+     "verdict": "Review round 1 (head 1439579b), recorded in the PR body."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/472",
+     "verdict": "No new code; reviewed as #470's independent review round 1 (1dc5610d): merge, with the stack gates run on #469-#471."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/473",
+     "verdict": "Review round 1, recorded in the PR body."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/486",
+     "verdict": "Review round 2 (reviewer-fixer), recorded in the PR body."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/488",
+     "verdict": "Reviewed (review-iso-488-r1); architect merge."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/492",
+     "verdict": "Owner review 2026-10-24, recorded in the PR body."
+    },
+    {
+     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/499",
+     "verdict": "The architect reviewed its crops before merging it."
+    }
+   ],
+   "scope": "Reviews cited as recorded. No review is recorded for viewer #201, #202 and #206, for ISO #474 and #475 (in the 68d8f086 pin), or for ISO #476-#485, #487, #489-#491 and #493-#498 (in the 3bbe6a96 pin). The ISO PRs in both pins are listed with their scope in docs/source-provenance.json (dependencyReview and previousDependencyReviews). None has a GitHub review record.",
+   "reviewedCommits": []
   }
+ }
 }
