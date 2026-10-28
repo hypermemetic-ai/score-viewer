@@ -1375,17 +1375,20 @@ async function changeTransposition(steps:number){
  }catch(error){if(prepared){prepared.running.state='failed';if(dialog===prepared.dialog)closeDialog();}throw error;}
  finally{transpositionChanging=false;}
 }
+const sameBytes=(a:Uint8Array,b:Uint8Array)=>a.byteLength===b.byteLength&&a.every((value,index)=>value===b[index]);
 async function switchKeyboard(value:unknown){const source=document.activeElement as HTMLElement|null,optionsSurface=dialog,id=keyboardPreference(value);if(keyboardChanging)return;keyboardChanging=true;let op:ReadingOperation|undefined;
 
  try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id,new LoadingProgress(previous.entry.metadata.title,['check','save','hands','open'],{kicker:`Switching to the ${layoutName(id)}`,cancel:true,cancelNote:'Cancel keeps the current layout.'}));readingProgress(op,'check');await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
 
   const existing=previous.package.availablePresentations?.includes(id)?await selectPresentation(previous.package,id):undefined,
-   personal=existing?await loadPersonal(previous.entry,existing):undefined,{q,running,gained}=await preparePianoLayout(bytes,id,personal,previous.package,op,previous.entry);
+   personal=existing?await loadPersonal(previous.entry,existing,op):undefined,{q,running,gained}=await preparePianoLayout(bytes,id,personal,previous.package,op,previous.entry);
   if(current!==previous)throw Error('The current score changed while switching keyboards; prior choices are retained.');
    const next=q.personal??(existing?readPersonal(personal,q.package):await loadPersonal(previous.entry,q.package));
    next.view=anchorView(previous.personal.view,q.package,writtenAnchor(previous.package,previous.personal.view.page,selection?.ownerIds[0]));
 
-   const installed=await installPreparedScore(previous.entry,q,running,next,false,undefined,context,gained?.rebuilt);await readingCheckpoint(op);
+   // An edition that already has this layout's pages is installed as it is: nothing is written, as when it opens on this layout.
+   const unchanged=collectionId(q.package)===previous.entry.id&&!gained&&sameBytes(q.packageBytes,bytes),checked=unchanged?readPersonal(next,q.package):undefined,
+    installed=checked?{entry:previous.entry,personal:checked,practiceContext:context&&await PracticeView.prepareContext(q.package,previous.entry.id,context,checked)}:await installPreparedScore(previous.entry,q,running,next,false,undefined,context,gained?.rebuilt);await readingCheckpoint(op);
 
    preferences.keyboardLayout=id;await savePreferences().catch(error=>notify(`Keyboard layout choice was not saved: ${error.message}`));
    await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext,op);
@@ -1448,7 +1451,7 @@ async function openReading(entry:Entry,op:ReadingOperation,sourceGroup?:string){
  const loadedPersonal=q.personal??await loadPersonal(entry,q.package,op),
   // An admitted retained view needs no new package or personal-journal version.
   // Byte equality also covers retained ready/editable finger layers.
-  unchangedArchive=collectionId(q.package)===entry.id&&q.packageBytes.byteLength===data.byteLength&&q.packageBytes.every((value,index)=>value===data[index]),
+  unchangedArchive=collectionId(q.package)===entry.id&&sameBytes(q.packageBytes,data),
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);finishReading(op,true);
   await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));

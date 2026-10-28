@@ -311,3 +311,16 @@ test('a prefetched read serves the opening that began before it, and is dropped 
  assert.equal(personal.assignments?.choices.b0n1.finger,4);
  assert.equal(reads,before+1,'the stale prefetch was dropped and the store read once');
 });
+test('a view save that changes nothing stored writes nothing; a changed view, or one another session moved, is written',async()=>{
+ const input=fixture(),store=storage();let commits=0;
+ const counting:AssistanceStore={read:id=>store.read(id),commit:input=>{commits++;return store.commit(input);}},s=session(counting,[input]);await s.initialize();await load(s,input);
+ const rotation=async()=>((await store.read()).documents[personalStorageName(input.entryId,input.p)] as unknown as PersonalState).view.rotation;
+ const written=commits,revision=(await store.read()).revision;
+ // Leaving the view where it was (closing a score, switching its layout) writes nothing.
+ await s.saveView(structuredClone(input));assert.equal(commits,written);assert.equal((await store.read()).revision,revision);
+ input.personal.view.rotation=90;await s.saveView(input);assert.equal(commits,written+1);assert.equal(await rotation(),90);
+ await s.saveView(structuredClone(input));assert.equal(commits,written+1);
+ // Another session turned the view: saving this one's view writes it back.
+ const other=session(store,[input]);await other.initialize();await other.saveView({...input,personal:{...structuredClone(input.personal),view:{...input.personal.view,rotation:180}}});
+ assert.equal(await rotation(),180);await s.saveView(input);assert.equal(commits,written+2);assert.equal(await rotation(),90);
+});
