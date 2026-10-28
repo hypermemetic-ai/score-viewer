@@ -1496,7 +1496,7 @@ async function importScore(){
     !priorEntry&&gained?.rebuilt?bytes:undefined);
   await readingCheckpoint(op);
   const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);finishReading(op,true);
-  await saveReadingPreferences();
+  await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
   const said=gained&&gainedNotice(gained,q.package,!priorEntry);if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
 }
