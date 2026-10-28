@@ -162,10 +162,10 @@ export function fingeringCarriers(p:Pick<ScorePackage,'seats'|'score'|'pages'>,p
     return [{id:`${page}:${systemId}:stem-${index}`,element,x:(Math.min(...xs)+Math.max(...xs))/2,low:Math.min(...ys),high:Math.max(...ys),...(line?{start:points[0][1],end:points[1][1]}:{}),width:number(element,'stroke-width')||.9,heads:[]}];
    });
    const owned=new Map(heads.map(head=>[head,[] as Array<{stem:Stem;direction:-1|1}>]));
-   // A shared head's voices stand on parallel stem seats within 1.3 of its
-   // column (ISO #499); a voice that states its value on another's stem
-   // leaves that seat's stem alone on the head.
-   const branched=(head:Head,stem:Stem)=>head.seat.ownerIds.length>1&&stem.start!==undefined&&stem.x>=head.box[0]-.025&&stem.x<=head.box[2]+.025&&(Math.abs(stem.x-head.column)<=1.3+.025||stems.some(other=>other!==stem&&other.start!==undefined&&close(other.start,stem.start!)&&close((stem.x+other.x)/2,head.column)&&Math.sign(other.end!-other.start!)===Math.sign(stem.end!-stem.start!)));
+   // A shared head whose voices keep their own stems stands them on parallel
+   // seats either side of its column. A key with one stem stands it on the
+   // column (ISO #505), so a lone stem beside the column is never claimed.
+   const branched=(head:Head,stem:Stem)=>head.seat.ownerIds.length>1&&stem.start!==undefined&&stem.x>=head.box[0]-.025&&stem.x<=head.box[2]+.025&&stems.some(other=>other!==stem&&other.start!==undefined&&close(other.start,stem.start!)&&close((stem.x+other.x)/2,head.column)&&Math.sign(other.end!-other.start!)===Math.sign(stem.end!-stem.start!));
    for(const stem of stems){
     const explicit=(stem.element.getAttribute('data-owner-ids')??'').split('|').filter(Boolean);
     const incident=heads.flatMap(head=>{const direction=attachment(head,stem,branched(head,stem));return direction!==undefined&&(!explicit.length||head.seat.ownerIds.some(id=>explicit.includes(id)))?[{head,direction}]:[];});
