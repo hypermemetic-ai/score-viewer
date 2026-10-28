@@ -103,7 +103,10 @@ export function pathPoints(d:string):Array<[number,number]>{
 }
 export const boxesOverlap=(a:AnnotationBox,b:AnnotationBox,gap=.2)=>a[0]<b[2]+gap&&a[2]>b[0]-gap&&a[1]<b[3]+gap&&a[3]>b[1]-gap;
 
-type PageObstacles={width:number;height:number;boxes:AnnotationBox[]};
+/** `curves[i]`, when present, gives the two ends (page coordinates) of the
+ * slur or tie whose ink `boxes[i]` covers: the curve itself or its knockout.
+ * Technique brackets share the phrase class and are not curves. */
+type PageObstacles={width:number;height:number;boxes:AnnotationBox[];curves?:Array<[number,number][]|undefined>};
 // Exact serialized page/head/policy inputs admit reuse across personal editions.
 // Bound both entry count and retained key bytes: opening other scores cannot
 // turn this into an unbounded library cache. Stored geometry is never exposed.
@@ -121,13 +124,30 @@ function obstacleKey(svg:string,heads:ReadonlyMap<string,AnnotationBox>,policy:A
  const key=JSON.stringify([svg,entries,policy??null],(_key,value)=>typeof value==='number'&&Object.is(value,-0)?['negative-zero']:value);
  return key.length<=maximumObstacleKeyUnits?key:undefined;
 }
-const detachedObstacles=(p:PageObstacles):PageObstacles=>({width:p.width,height:p.height,boxes:p.boxes.map(b=>[...b] as AnnotationBox)});
+const detachedObstacles=(p:PageObstacles):PageObstacles=>({width:p.width,height:p.height,boxes:p.boxes.map(b=>[...b] as AnnotationBox),
+ ...(p.curves?{curves:p.curves.map(c=>c?.map(e=>[...e] as [number,number]))}:{})});
 function rememberObstacles(key:string,p:PageObstacles):void{
- const owned=detachedObstacles(p);for(const box of owned.boxes)Object.freeze(box);Object.freeze(owned.boxes);Object.freeze(owned);
+ const owned=detachedObstacles(p);for(const box of owned.boxes)Object.freeze(box);Object.freeze(owned.boxes);
+ for(const ends of owned.curves??[])if(ends){for(const end of ends)Object.freeze(end);Object.freeze(ends);}if(owned.curves)Object.freeze(owned.curves);Object.freeze(owned);
  obstaclePages.set(key,owned);obstacleKeyUnits+=key.length;
  while(obstaclePages.size>maximumObstaclePages||obstacleKeyUnits>maximumObstacleKeyUnits){const oldest=obstaclePages.keys().next().value!;
   obstaclePages.delete(oldest);obstacleKeyUnits-=oldest.length;
  }
+}
+
+const classes=(el:Element)=>(el.getAttribute('class')??'').split(/\s+/);
+const slur=(el:Element)=>el.localName==='path'&&classes(el).includes('janko-phrase')&&!classes(el).includes('janko-technique-connector');
+/** A slur, a tie, or the knockout drawn just before a slur. */
+function isCurve(el:Element):boolean{
+ if(el.hasAttribute('data-tie-note')||slur(el))return true;
+ if(!classes(el).includes('janko-phrase-grid-knockout'))return false;
+ let next=el.nextSibling;while(next&&next.nodeType!==1)next=next.nextSibling;
+ return !!next&&slur(next as Element);
+}
+/** A curve's two ends: its leftmost and rightmost drawn points on the page. */
+function curveEnds(d:string,m:Matrix):[number,number][]{
+ const points=pathPoints(d).map(([x,y]):[number,number]=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]);
+ return [points.reduce((a,b)=>b[0]<a[0]?b:a),points.reduce((a,b)=>b[0]>a[0]?b:a)];
 }
 
 /** Independently inventory every rendered SVG primitive, including foreign
@@ -140,7 +160,7 @@ export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,Annotati
  const key=obstacleKey(svg,heads,policy),saved=key===undefined?undefined:obstaclePages.get(key);
  if(saved){obstaclePages.delete(key!);obstaclePages.set(key!,saved);return detachedObstacles(saved);}
  const doc=new DOMParser().parseFromString(svg,'image/svg+xml'),root=doc.documentElement!,view=numbers(root.getAttribute('viewBox')??''),
-  width=view[2]??Number(root.getAttribute('width')),height=view[3]??Number(root.getAttribute('height')),boxes:AnnotationBox[]=[];
+  width=view[2]??Number(root.getAttribute('width')),height=view[3]??Number(root.getAttribute('height')),boxes:AnnotationBox[]=[],curves:Array<[number,number][]|undefined>=[];
  if(view.length&& (view.length!==4||view[0]!==0||view[1]!==0)||![width,height].every(n=>Number.isFinite(n)&&n>0))throw Error('Unsupported annotation page coordinates');
  const styles=svgClassStyles(doc as unknown as Document);
  function visit(el:Element,parent:Matrix,inherited:Record<string,string>):void{
@@ -178,11 +198,13 @@ export function actualPageObstacles(svg:string,heads:ReadonlyMap<string,Annotati
      const y=value('y'),band=pointsBox([[0,y-size*2],[width,y+size]],m,stroke);boxes.push([0,band[1],width,band[3]]);}}
    return;
   }else if(!['svg','g'].includes(tag))throw Error('Unsupported SVG annotation element: '+tag);
+  const before=boxes.length;
   if(ribbon)for(const hull of ribbon){const b=pointsBox(hull,m,stroke),margin=1e-6+Math.max(ribbonMagnitude,...b.map(Math.abs))*Number.EPSILON*64,
    expanded:AnnotationBox=[b[0]-margin,b[1]-margin,b[2]+margin,b[3]+margin];
    if(expanded.some(n=>!Number.isFinite(n)))throw Error('Unbounded paired SVG ribbon');boxes.push(expanded);
   }else if(points)boxes.push(pointsBox(points,m,stroke));
+  if(tag==='path'&&boxes.length>before&&isCurve(el)){const ends=curveEnds(el.getAttribute('d')??'',m);for(let i=before;i<boxes.length;i++)curves[i]=ends;}
   for(const child of Array.from(el.childNodes))if(child.nodeType===1)visit(child as Element,m,style);
  }
- visit(root as unknown as Element,unit,{});const result={width,height,boxes};if(key===undefined)return result;rememberObstacles(key,result);return detachedObstacles(result);
+ visit(root as unknown as Element,unit,{});const result:PageObstacles={width,height,boxes,...(curves.length?{curves:Array.from({length:boxes.length},(_,i)=>curves[i])}:{})};if(key===undefined)return result;rememberObstacles(key,result);return detachedObstacles(result);
 }
