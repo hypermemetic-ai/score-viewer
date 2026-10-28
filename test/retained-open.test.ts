@@ -33,7 +33,7 @@ function reading(overrides:Record<string,unknown>){
  const entry={id:'part',file:'part.tuna'},p={manifest:{version:3},reading:{dual:{}}},calls:string[]=[],op={keyboard:'janko-four-row',controller:new AbortController()},context:any={
   retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:false}),readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},checkReadingOwner(){},
   host:{read:async()=>new Uint8Array([1]),fullscreen:async()=>{}},importReading:async()=>p,requireCurrentEngraving:(x:unknown)=>x,SavedPagesBehindPolicy:class extends Error{},admitReadingSource:async()=>{calls.push('source');},
-  readingProgress:(_op:unknown,step:string)=>calls.push(step),readingExecution:()=>({}),
+  readingProgress:(_op:unknown,step:string)=>calls.push(step),readingExecution:()=>({}),aheadOfTime:undefined,
   reengraveReadingArchive:async()=>{calls.push('engraved');return new Uint8Array([2]);},
   admitReading:async()=>{calls.push('admit-again');return p;},guitarProContext:()=>({groupId:'group'}),
   assertSelectedTransposition(){},selectPresentation:async()=>p,loadPersonal:async()=>({}),prepareScore:async()=>({q:{package:p,packageBytes:new Uint8Array([1])},running:{}}),

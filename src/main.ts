@@ -87,7 +87,9 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
-import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
+import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,AheadOfTimeRefusal,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
+import {engravedAgainFromRecord,useEngravedAgainStore} from './engraved-again';
+import {ENGRAVE_AGAIN_KINDS,engraveAgainInWorker} from './engrave-again-client';
 import {projectionWorkerClient,type ProjectionWorkerClient} from './personal-projection-client';
 import {withResolvedMemory,memoryAdviceEvidence,memoryReferenceTarget,memoryChoiceLabel,memoryFingerSource} from './personal-assistance';
 import type {MemoryScoreInput,PersonalFingeringMemory} from './personal-fingering-memory';
@@ -140,6 +142,9 @@ if(isTauri()&&!import.meta.env.DEV&&host.derived){
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
  useFingerReplayReceipts({has:async key=>await derived.peek('finger-replay-checks-v1',key)==='passed',add:key=>void derived.put('finger-replay-checks-v1',key,true,'passed')});
  useCalculatedAdmissionEvidence({get:key=>derived.get('calculated-admission-v1',key,calculatedAdmissionEvidence),put:(key,evidence)=>void derived.put('calculated-admission-v1',key,evidence)});
+ // Saved archives engraved again in the library are read here when they open. An
+ // archive engraved again on opening is replaced as it opens, so it is not kept.
+ useEngravedAgainStore({get:key=>derived.get('engraved-again-v1',key,engravedAgainFromRecord),put:()=>{}});
 }
 // Ahead-of-time work is for when the player leaves the library alone; any input there defers it.
 holdAheadOfTimeOnInput(window,()=>aheadOfTime,()=>!current&&!readingOperation);
@@ -155,9 +160,10 @@ function aheadOfTimeBasis(entryId:string):string {
 let aheadWorker:ProjectionWorkerClient|undefined;
 const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:64*1024*1024});
 /** Make what opening a score reads from the derived-file cache: its pages for
- * the player's saved hands, exactly as opening would project them. Read only:
- * an edition that must be engraved again, a layout it lacks or memory not yet
- * indexed is left for opening, which writes what it must. */
+ * the player's saved hands, exactly as opening would project them, or, for a
+ * saved archive the current engraving no longer reproduces, its engraving
+ * made again. Read only: installing that engraving, a layout the edition
+ * lacks or memory not yet indexed is left for opening, which writes what it must. */
 const idleTime=()=>new Promise<void>(resolve=>{if(typeof requestIdleCallback==='function')requestIdleCallback(()=>resolve(),{timeout:5000});else setTimeout(resolve,0);});
 async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,work:AheadOfTimeWork){
  if(!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
@@ -173,11 +179,18 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  // the work here until the next quiet moment: the player never waits for it.
  const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
  await prepareRecorded(derived,key,async read=>{
-  if(readingOnlyArchive(bytes))return null;
-  // Only admission rejecting the archive, or the engraver refusing its pages, is a refusal.
-  await answerInput();const prior=await refusedWhen(aheadAdmission.import(bytes,{allowLegacyTempo:true,execution}),admissionRejection);await answerInput();
-  // Pages an earlier engine drew are engraved again, and saved, by opening them.
-  if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout)||savedPagesBehindPolicy(prior))return null;
+  // A reading is admitted, and engraved again when opening would, off this thread.
+  const reading=readingOnlyArchive(bytes);
+  if(reading){await engraveAgainAhead(derived,bytes,execution,work,true);return null;}
+  // An archive admission rejects, or whose pages an earlier engine drew, is
+  // engraved again by opening it: that engraving is made here. Opening
+  // installs it and says so. Only the engraving failing is a refusal.
+  await answerInput();
+  let prior:ScorePackage;try{prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});}
+  catch(error){if(!admissionRejection(error)&&!(error instanceof SavedPagesLackRepeats))throw error;await engraveAgainAhead(derived,bytes,execution,work);return null;}
+  await answerInput();
+  if(savedPagesBehindPolicy(prior)){await engraveAgainAhead(derived,bytes,execution,work);return null;}
+  if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
   const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(journals,entry,selected);checkReadingExecution(execution);
@@ -211,6 +224,19 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
   return served;
  });
+}
+/** A saved archive engraved again in a worker, while the player is in the
+ * library, and kept with what admitting it checked; opening it reads that
+ * engraving rather than making it. The worker's engraving failing is a
+ * refusal, so it is not tried again until the archive changes. */
+async function engraveAgainAhead(derived:DerivedFileCache,bytes:Uint8Array,execution:ReadingExecution,work:AheadOfTimeWork,admit=false){
+ await work.quiet();checkReadingExecution(execution);
+ const reply=await engraveAgainInWorker(bytes,execution.signal,admit);checkReadingExecution(execution);
+ await Promise.all(reply.made.filter(record=>ENGRAVE_AGAIN_KINDS.includes(record.kind)).map(record=>derived.putEncoded(record.kind,record.key,record.encoded,record.tag)));
+ checkReadingExecution(execution);
+ // An opening that took this work over reads the engraving now.
+ work.ready();
+ if(reply.error!==undefined)throw new AheadOfTimeRefusal(Error(reply.error));
 }
 type ReadingJob=NonNullable<typeof job>;
 interface ReadingOperation {
@@ -1314,7 +1340,7 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
  if(kept){await host.fullscreen(true);checkReading(op);const activated=await activateScore(kept,undefined,undefined,op,true);retainable.add(activated);finishReading(op,true);await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));return;}
  const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  // Pages an earlier engine drew are engraved again with the current shared policy, once: the new edition is saved.
- let prior:ScorePackage,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
+ let prior:ScorePackage,admitted:ScorePackage|undefined,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(admitted=await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup,admitted))return;
   // Pages drawn before the current policy, or that only lack their repeat signs, open as saved, for the rest of the session, when they can’t be engraved again.
   if(error instanceof SavedPagesBehindPolicy){keepSavedPagesBehindPolicy(error.archiveSha256);keptSaved=true;}else{keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);withoutRepeats=true;}prior=await importReading(data,op);}
  // A piano score's opening reads the store; that read runs while its source is admitted.
@@ -1380,12 +1406,14 @@ const SAVED_PAGES_KEPT='This score couldn’t be engraved again with the current
  * the earlier archive and its journals stay saved. False when pages that only
  * lack their repeat signs, or that an earlier engine drew, couldn't be
  * engraved again: they open as saved. */
-async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string):Promise<boolean>{
+async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string,content?:ScorePackage):Promise<boolean>{
  readingProgress(op,'engrave-again');
+ // Engraving under way in the library for this score is awaited, then read, not made a second time.
+ await aheadOfTime?.joined(entry.id,op.controller.signal);checkReading(op);
  const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
  if(reading){await openReengravedReading(entry,reading,op,sourceGroup);return true;}
  let rebuilt:RebuiltInstall,prepared:Awaited<ReturnType<typeof preparePiano>>;
- try{rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true})},readingExecution(op));
+ try{rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true}),...(content?{content}:{})},readingExecution(op));
   await readingCheckpoint(op);prepared=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op);}
  catch(error){if(!(admission instanceof SavedPagesLackRepeats||admission instanceof SavedPagesBehindPolicy)||(error as Error).name==='AbortError')throw error;checkReading(op);console.warn('The saved edition could not be engraved again; it opens on its saved pages.',error);return false;}
  const {q,running}=prepared,
