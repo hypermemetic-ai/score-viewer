@@ -21,7 +21,7 @@ function harness(engrave:()=>Promise<Uint8Array>){
   getScoreTransposition:()=>0,canShareKeyboardView:()=>false,shareKeyboardView:async()=>{throw Error('not shared');},
   canAddKeyboardView:()=>true,addKeyboardView:engrave,prepareRebuiltEdition:async()=>{throw Error('not rebuilt');},
   prepareSourceTransposition:async()=>{throw Error('not transposed');},selectPresentation:async()=>({}),personalForAddedKeyboard:()=>undefined,
-  readingProgress:()=>{},readingExecution:()=>({}),checkReading:()=>{if(controller.signal.aborted)throw Error(READING_CANCELLED);},
+  readingProgress:()=>{},readingExecution:()=>({}),checkReading:()=>{if(controller.signal.aborted)throw Error(READING_CANCELLED);},laterLayouts:()=>undefined,
   preparePiano:async(bytes:Uint8Array,layout:string)=>{opened.push(layout);return {q:{packageBytes:bytes,package:{keyboardLayout:layout}},running:{},dialog:{}};},
  };
  runInNewContext(layoutFlow+'\nthis.preparePianoLayout=preparePianoLayout;',context);

@@ -51,7 +51,7 @@ Fingerings made for one layout (the Jankó operator fingers with their physical 
 
 ## What the new edition carries
 
-`src/edition-rebuild.ts` reads the edition's content with `readEditionContent`. That is the ordinary integrity check without the page replay, and its result is never displayed. The edition is then engraved with the approved engine through the shared production rules (`engraveEdition` in `src/score-transposition.ts`; transposing uses the same path). The new edition serves both keyboards. Its pages use `approvedProductionIsoOptions()` and default tokens, exactly as a new import does, with beat lines at the score's own metre pulse (`meterPulseOptions` in `src/meter-pulse.ts`): a compound metre such as No. 14's 6/8 draws one line per dotted quarter, as its saved pages did, and a simple metre keeps the engraving's quarter pulse. The earlier recipe's other settings belong to the earlier pages and are not carried. The base edition's font, notices and reference recording carry over. A transposed edition keeps its pitch, and it is bound to the original the current score was made from or to its own original engraved again.
+`src/edition-rebuild.ts` reads the edition's content with `readEditionContent`. That is the ordinary integrity check without the page replay, and its result is never displayed. The edition is then engraved with the approved engine through the shared production rules (`engraveEdition` in `src/score-transposition.ts`; transposing uses the same path). The new edition is engraved for the keyboard layout in use first and serves the other layout once that is engraved too, from the same earlier edition (see [Opening a score instantly](instant-opening.md)); a transposed edition serves both at once. Its pages use `approvedProductionIsoOptions()` and default tokens, exactly as a new import does, with beat lines at the score's own metre pulse (`meterPulseOptions` in `src/meter-pulse.ts`): a compound metre such as No. 14's 6/8 draws one line per dotted quarter, as its saved pages did, and a simple metre keeps the engraving's quarter pulse. The earlier recipe's other settings belong to the earlier pages and are not carried. The base edition's font, notices and reference recording carry over. A transposed edition keeps its pitch, and it is bound to the original the current score was made from or to its own original engraved again.
 
 For each keyboard view:
 
@@ -82,9 +82,11 @@ For the new edition:
 
 Practice moves before the selection changes, so a rebuilt Earlier edition opens with its own progress. Practice that can't move stays with the earlier edition; it doesn't block the install. Closing the Earlier editions dialog cancels an engraving that is still running.
 
+The library installs an edition engraved again in the background through this same install, when nothing is open and no other write is queued, so the first opening after an engraver update reads the new edition. A crash at any write leaves the library pointing at the earlier edition with every file it names unchanged; the next visit installs it again.
+
 A pitch whose saved edition was made from an earlier engraving of the original, with the same hands at that pitch, is engraved again from the current original rather than opened against it.
 
-The notice reads: "This score was engraved again with the current engraving. Your hands, fingers and choices came along." When hands or fingers moved into the player's choices, it adds "The edition's hands and fingers now show as your own choices." When choices could not move, it says "Your hands and fingers came along." and how many notes' choices stay with the earlier edition. If practice could not move, it says so too.
+The notice reads: "This score was engraved again with the current engraving. Your hands, fingers and choices came along." When hands or fingers moved into the player's choices, it adds "The edition's hands and fingers now show as your own choices." When choices could not move, it says "Your hands and fingers came along." and how many notes' choices stay with the earlier edition. If practice could not move, it says so too. An edition installed in the library says this the first time the player opens the score.
 
 ## Musical readings
 
