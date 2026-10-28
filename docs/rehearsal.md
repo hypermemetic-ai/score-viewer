@@ -22,6 +22,8 @@ The host (`scripts/rehearse/host.ts`, `page.js`) answers the frontend's native c
 
 ## Invariants
 
+First, the library is left alone until its background work has prepared every score (`src/preparing-indicator.ts`). Throughout, a line shows only under the row of the score the application declares it is preparing (`data-preparing` on `#app`), or its folded composer's; a score's line never moves back; and once the work ends no line, and no row marked `data-preparing`, is left. The report gives how many scores the work went through, how many showed a line (work shorter than a second shows none), and the main thread's longest tasks meanwhile.
+
 For every score and both keyboard layouts:
 
 - the score imports (default data), opens and reopens, with its pages drawn;

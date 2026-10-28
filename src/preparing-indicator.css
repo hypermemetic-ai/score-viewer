@@ -1,0 +1,11 @@
+/* The line under a library row whose score is being prepared (src/preparing-indicator.ts).
+   An overlay in the row: it starts under the row's text (--from) as a short stub and grows
+   to the row's right edge with the work (--progress, 0 to 1); done, it fades. Nothing in
+   the flow moves. */
+.score-entry,.composer-entry{position:relative}
+.preparing-line{--stub:28px;position:absolute;left:var(--from,34px);bottom:6px;height:2px;width:calc(var(--stub) + (100% - var(--from,34px) - var(--stub)) * var(--progress,0));background:#8a8a8a;pointer-events:none;transition:width .5s ease-out}
+.preparing-line[data-end]{opacity:0;transition:width .4s ease-out,opacity .6s .45s}
+/* An open composer shows the score's own row; its own line waits until it folds. */
+.composer-entry[aria-expanded=true] .preparing-line{display:none}
+/* Without motion it shows full for as long as it would have faded, then goes. */
+@media(prefers-reduced-motion:reduce){.preparing-line,.preparing-line[data-end]{transition:none}.preparing-line[data-end]{opacity:1}}

@@ -8,6 +8,7 @@ import {shareInstalledScore,scoreSaveMessage} from './share-score';
 import './style.css';
 import './readiness-notice.css';
 import './application-navigation.css';
+import './preparing-indicator.css';
 import {annotationPositions,paintFinger,type AnnotationPosition} from './fingering-presentation';
 import {expertSettings,fingerBehaviorSettings} from './expert-settings';
 import {MidiOptionsPanel,AudioOptionsPanel} from './device-options';
@@ -89,6 +90,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
+import {PreparingIndicator} from './preparing-indicator';
 import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,AheadOfTimeRefusal,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
 import {engravedAgainFromRecord,useEngravedAgainStore} from './engraved-again';
 import {ENGRAVE_AGAIN_KINDS,engraveAgainInWorker} from './engrave-again-client';
@@ -138,7 +140,7 @@ let aheadOfTime:AheadOfTimeEngraving|undefined;
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
  // What opening each score reads from disk is made while the player is in the library.
- aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();}});
+ aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();},activity:progress=>{preparing.activity(progress);declareState();}});
  usePersonalProjectionCache(derived);useVerbatimFoldCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
@@ -189,20 +191,21 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
  // An edition engraved again here is installed here too; its pages are prepared next.
  let installed=false;
- await prepareRecorded(derived,key,async read=>{
+ const outcome=await prepareRecorded(derived,key,async read=>{
   // A reading is admitted, and engraved again when opening would, off this thread.
   const reading=readingOnlyArchive(bytes);
-  if(reading){if(await engraveAgainAhead(derived,bytes,execution,work,{admit:true}))installed=await installAhead(entry,bytes,'reading',execution,work);work.ready();return null;}
+  if(reading){work.plan(['engrave','install']);if(await engraveAgainAhead(derived,bytes,execution,work,{admit:true})){work.reached('engrave');installed=await installAhead(entry,bytes,'reading',execution,work);if(installed)work.reached('install');else work.failed();}work.ready();return null;}
   // An archive admission rejects, or whose pages an earlier engine drew, is
   // engraved again, for the keyboard layout in use, off this thread, and
   // installed as opening would install it. Only the engraving failing is a refusal.
   await answerInput();
-  const again=async()=>{await engraveAgainAhead(derived,bytes,execution,work,{layouts:[layout]});installed=await installAhead(entry,bytes,'edition',execution,work);work.ready();return null;};
+  const again=async()=>{work.plan(['engrave','install',...AHEAD_LATER,...AHEAD_PAGES]);await engraveAgainAhead(derived,bytes,execution,work,{layouts:[layout]});work.reached('engrave');installed=await installAhead(entry,bytes,'edition',execution,work);if(installed)work.reached('install');else work.failed();work.ready();return null;};
   let prior:ScorePackage;try{prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});}
   catch(error){if(!admissionRejection(error)&&!(error instanceof SavedPagesLackRepeats))throw error;return again();}
   await answerInput();
   if(savedPagesBehindPolicy(prior))return again();
   if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
+  work.plan(AHEAD_PAGES);
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
   const selected=await selectPresentation(prior,layout),journal=await loadPersonalJournal(journals,entry,selected);checkReadingExecution(execution);
@@ -210,6 +213,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   await answerInput();const q=await ensurePianoReady({packageBytes:bytes,layout,personal,signal:execution.signal},aheadAdmission);await answerInput();
   // An edition that must be engraved again is made, and saved, by opening it.
   if(!('package' in q))return null;
+  work.reached('hands');
   // A score that shows a repeat folded opens on its folded pages, from its choices
   // as opening resolves them: shared memory first, then the repeat's twins.
   // Its files are written at the steps below, never on a timer of their own.
@@ -228,7 +232,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   // The pages opening reads are written as soon as input allows; an opening
   // that took this work over goes on from here.
   if(drawn){await answerInput();await session.flushProjection();checkReadingExecution(execution);}
-  work.ready();
+  work.reached('pages');work.ready();
   // Then, in idle time, the engine hand editing resumes from: settled when an
   // earlier reading made the pages but saved none, and saved before the
   // worker holding it is freed. The worker encodes it; this thread writes a file.
@@ -236,6 +240,7 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
   return served;
  });
+ if(outcome==='refused')work.failed();
  if(installed)return prepareAheadOfTime(derived,entryId,execution,work);
 }
 /** A saved archive engraved again in a worker, while the player is in the
@@ -252,17 +257,20 @@ async function engraveAgainAhead(derived:DerivedFileCache,bytes:Uint8Array,execu
  if(reply.error!==undefined)throw new AheadOfTimeRefusal(Error(reply.error));
  return reply.made.some(record=>record.kind==='engraved-again-v1');
 }
+/** The stages the library's line under a score grows by (src/preparing-indicator.ts):
+ * the layouts an edition left for later, engraved and installed, then its hands, pages and engine. */
+const AHEAD_LATER=['later','later-install'],AHEAD_PAGES=['hands','pages','engine'];
 /** Editions whose layouts left for later couldn't be engraved this session: their pages are prepared all the same. */
 const laterRefused=new Set<string>();
 /** The layouts `entry`'s edition left for later, engraved from its earlier
  * edition off this thread and installed. An opening of the score stops this
  * (it needs only the layout in use), except once the install has begun. */
 async function completeAhead(derived:DerivedFileCache,entry:Entry,bytes:Uint8Array,later:{from:string;layouts:PhysicalKeyboardId[]},execution:ReadingExecution,work:AheadOfTimeWork):Promise<boolean>{
- work.optional();
+ work.optional();work.plan([...AHEAD_LATER,...AHEAD_PAGES]);
  let earlier:Uint8Array;try{earlier=await readRetainedEdition(host,entry,later.from);}catch(error){checkReadingExecution(execution);console.warn('The earlier edition is missing; its other keyboard layout is engraved when the player switches to it.',error);laterRefused.add(entry.file);return false;}
- try{await engraveAgainAhead(derived,bytes,execution,work,{layouts:later.layouts,earlier});}
+ try{await engraveAgainAhead(derived,bytes,execution,work,{layouts:later.layouts,earlier});work.reached('later');}
  catch(error){if(!(error instanceof AheadOfTimeRefusal))throw error;laterRefused.add(entry.file);return false;}
- const installed=await installAhead(entry,bytes,'complete',execution,work,{...later,earlier});work.ready();if(!installed)laterRefused.add(entry.file);return installed;
+ const installed=await installAhead(entry,bytes,'complete',execution,work,{...later,earlier});if(installed)work.reached('later-install');work.ready();if(!installed)laterRefused.add(entry.file);return installed;
 }
 /** The library's background work installs it now: no score is open or
  * opening (except an opening of this very score, which waits for it), no
@@ -436,8 +444,10 @@ async function startingPractice(start:()=>Promise<void>){practiceStarting=true;d
 /** Where the application is, as data-* attributes on #app (app-state.ts). */
 /** Whether a package can be practised at the piano, asked once per package: state is declared on every paint. */
 const declaredPiano=new WeakMap<object,boolean>(),declaredPianoPractice=(p:ScorePackage)=>{let piano=declaredPiano.get(p);if(piano===undefined)declaredPiano.set(p,piano=scoreCapabilities(p).pianoPractice);return piano;};
-function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:declaredPianoPractice(current.package)}:undefined,layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting}));}let libraryRepaintPending=false;
+function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:declaredPianoPractice(current.package)}:undefined,layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting,preparing:preparing.preparing}));}let libraryRepaintPending=false;
 const libraryMenu=new LibraryMenu();
+/** The line under the library row of the score being prepared in the background. */
+const preparing=new PreparingIndicator(()=>app.querySelector<HTMLElement>('.library')?.parentElement);
 const matchingCurrent=(target:NonNullable<typeof current>)=>current&&current.entry.file===target.entry.file&&current.entry.id===target.entry.id&&current.package.sourceSha256===target.package.sourceSha256&&personalStorageName(current.entry.id,current.package)===personalStorageName(target.entry.id,target.package)?current:undefined;
 const memoryLibrary=new PersonalMemoryLibrary(host,()=>entries,bytes=>readerAdmission.import(bytes,{allowLegacyTempo:true}));
 const personalMemory=new PersonalMemorySession(host.assistanceStore!,{scanLibrary:()=>memoryLibrary.scan(),validateInputs:()=>memoryLibrary.validate(),awaitingEngraving:()=>memoryLibrary.awaitingEngraving});
@@ -796,6 +806,7 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){declare
  const libraryNavigation=document.createElement('nav');libraryNavigation.className='library-navigation';libraryNavigation.setAttribute('aria-label','Library navigation');app.querySelector('.surface')!.append(libraryNavigation);arrangeBottomNavigation(libraryNavigation,null,app.querySelector<HTMLButtonElement>('[data-action=options]'));
  transformSurface(app.querySelector('.surface')!,preferences.libraryRotation);
  libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>esc(readingParts.summary(entry)),preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
+ preparing.paint();
  const restore=libraryFocusElement(app,focusKey);if(restore&&!restore.hidden)restore.focus();else if(entries.length)libraryMenu.focus();else app.querySelector<HTMLElement>('[data-action=import]')?.focus();
 }
 /** Stops measuring the last reader's toolbar for the press notice. */

@@ -283,7 +283,7 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  install?:(request:any)=>Promise<void>}={}){
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
- const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a'),installs:any[]=[];
+ const log:string[]=[],progress:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a'),installs:any[]=[];
  const stop=(step:string)=>{log.push(step);if(options.stopAt===step)controller.abort();};
  class Session {
   waiting=false;
@@ -341,15 +341,19 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  };
  if(options.behind)context.savedPagesBehindPolicy=(p:any)=>p.earlier;
  runInNewContext(source,context);
- const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready'),replacing:()=>log.push('replacing'),optional:()=>log.push('optional')});
+ const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready'),replacing:()=>log.push('replacing'),optional:()=>log.push('optional'),
+  // The stages the library's line grows by: what was planned, reached, or failed.
+  plan:(stages:readonly string[])=>progress.push(`plan ${stages.join(' ')}`),reached:(stage:string)=>progress.push(stage),failed:()=>progress.push('failed')});
  const recorded=async()=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),'janko-four-row','no13','t1',null,[]]))))!==undefined;
- return {log,run,recorded,derived,context,controller,installs};
+ return {log,progress,run,recorded,derived,context,controller,installs};
 }
 test('a preparation writes the pages before an opening goes on, then saves the engine, and records itself only after both',async()=>{
  const whole=preparation();await whole.run();
  // Its basis is fixed once the memory is indexed and its inputs are read, before anything else.
  assert.deepEqual(whole.log.splice(0,3),['indexed','hand choices read','started']);
  assert.deepEqual(whole.log,['project','pages written','ready','engine saved']);assert.equal(await whole.recorded(),true);
+ // Its line grows when the hands are made and the pages written; the engine saved ends the work.
+ assert.deepEqual(whole.progress,['plan hands pages engine','hands','pages']);
  // Pages an earlier reading made, without an engine: the engine is settled and saved.
  const settle=preparation({projected:true});await settle.run();settle.log.splice(0,3);
  assert.deepEqual(settle.log,['ready','engine settled','engine saved']);
@@ -371,7 +375,7 @@ test('only admission rejecting a score, or the engraver refusing its pages, is r
   ['the engraver cannot fit the saved hands',{projection:unfit}],
   ['the same refusal in the player\'s words',{projection:Error("These hand choices can't be drawn on the page yet.",{cause:unfit})}],
  ];
- for(const [what,failure] of refusals){const p=preparation(failure);await p.run();assert.equal(await p.recorded(),true,what);}
+ for(const [what,failure] of refusals){const p=preparation(failure);await p.run();assert.equal(await p.recorded(),true,what);assert.equal(p.progress.at(-1),'failed',what);}
  const passing:[string,{admission?:unknown;projection?:unknown}][]=[
   ['another import holds admission',{admission:new PackageAdmissionBusy()}],
   ['admission runs out of memory',{admission:new RangeError('Array buffer allocation failed')}],
@@ -397,6 +401,8 @@ test('an archive opening would engrave again is engraved again in a worker for t
   // The other layout is engraved next from the same earlier edition; it is left for later, so an opening stops it.
   assert.deepEqual(p.installs.map(i=>i.record),[{from:'package-no13.tuna',later:['conventional-piano'],untold:{hands:'edition',fingers:'none',left:0,practiceLeft:0}}],what);
   assert.deepEqual(p.log.slice(8),prepared,'then the new edition\'s pages are prepared as any score\'s are');
+  // One plan for the whole score, its first: engraved, installed, the other layout (if left for later), its hands and pages.
+  assert.deepEqual(p.progress,['plan engrave install later later-install hands pages engine','engrave','install','plan hands pages engine','hands','pages'],what);
   assert.ok(await p.derived.has('engraved-again-v1',sha('b')),what);assert.equal(await p.derived.peek('piano-page-checks-v1',sha('c')),'checked',what);
   // The worker hands back derived files only.
   assert.equal(await p.derived.has('player-data',sha('d')),false,what);
@@ -405,13 +411,14 @@ test('an archive opening would engrave again is engraved again in a worker for t
  const reading=preparation({reading:true,engraved});await reading.run();
  assert.deepEqual(reading.log.slice(3,8),['admitted and engraved again','replacing','prepared the reading from the kept engraving','installed','ready']);
  assert.deepEqual(reading.installs.map(i=>i.record),[{from:'package-no13.tuna',untold:{reading:true,hands:'edition',fingers:'none',left:0,practiceLeft:0}}]);
+ assert.deepEqual(reading.progress.slice(0,3),['plan engrave install','engrave','install']);
  // A worker lost, out of memory or stopped records nothing: the next visit tries again.
  const lost=preparation({behind:true,engraved:async()=>{throw Error('The engraving worker stopped: out of memory');}});
  await assert.rejects(lost.run(),/out of memory/);assert.equal(await lost.recorded(),false);
  const stopped=preparation({behind:true,stopAt:'engraved janko-four-row again',engraved});
  await assert.rejects(stopped.run(),{name:'AbortError'});assert.equal(await stopped.recorded(),false);assert.equal(await stopped.derived.has('engraved-again-v1',sha('b')),false);
  // Content the current engraving cannot make again is a refusal, recorded once, and nothing is installed.
- const refused=preparation({behind:true});await refused.run();assert.equal(await refused.recorded(),true);assert.deepEqual(refused.installs,[]);
+ const refused=preparation({behind:true});await refused.run();assert.equal(await refused.recorded(),true);assert.deepEqual(refused.installs,[]);assert.equal(refused.progress.at(-1),'failed');
 });
 
 test('the layouts an edition left for later are engraved from its earlier edition and installed before its pages are prepared',async()=>{
@@ -422,10 +429,12 @@ test('the layouts an edition left for later are engraved from its earlier editio
  // Everything came along as it was: nothing to say when the score opens.
  assert.deepEqual(p.installs.map(i=>i.file),['package-again.tuna']);assert.deepEqual(p.installs.map(i=>i.record),[null]);
  assert.deepEqual(p.log.slice(9),['indexed','hand choices read','started','project','pages written','ready','engine saved']);
+ assert.deepEqual(p.progress,['plan later later-install hands pages engine','later','later-install','plan hands pages engine','hands','pages']);
  // Refused, it is not tried again this session, and the pages of the edition as it is are prepared.
  const refused=preparation({later:true});await refused.run();
  assert.deepEqual(refused.log.slice(3),['optional','engraved conventional-piano again from the earlier edition','started','project','pages written','ready','engine saved']);
  assert.deepEqual(refused.installs,[]);
+ assert.deepEqual(refused.progress,['plan later later-install hands pages engine','plan hands pages engine','hands','pages'],'not a failure of the score: its pages are prepared');
 });
 
 test('a background install waits for the library to be quiet, and an opening of another score stops it with nothing written',async()=>{

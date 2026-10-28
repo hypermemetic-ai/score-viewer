@@ -41,12 +41,24 @@ export interface AheadOfTimeWork {
   * layout): an opening of the score stops it, unless it is replacing the
   * edition already. */
  optional():void;
+ /** The stages this score's work goes through, in order, as soon as they
+  * are known. The first plan of a run stands: a step that goes on with the
+  * score's next step keeps it. */
+ plan(stages:readonly string[]):void;
+ /** A stage of the plan is done. Progress never moves back, and a stage
+  * skipped (nothing to do there) counts as passed by the next one reached. */
+ reached(stage:string):void;
+ /** The score's work could not be done; it ends as failed, not done. */
+ failed():void;
 }
+/** How far the work on one score has come, from the stages it reached. */
+export interface AheadOfTimeProgress {entryId:string;stage?:string;fraction:number;end?:'done'|'failed'}
 /** The preparation under way: its basis once it has read its inputs, and
  * whether an opening has taken it over. */
 interface Running {entryId:string;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>;
  /** The current step's ready has been given. */
- readied?:boolean;markReady:()=>void;replacing?:boolean;optional?:boolean}
+ readied?:boolean;markReady:()=>void;replacing?:boolean;optional?:boolean;
+ plan?:readonly string[];stage?:string;fraction:number;failed?:boolean}
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
  private running?:Running;
@@ -63,6 +75,10 @@ export class AheadOfTimeEngraving {
  constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,work:AheadOfTimeWork)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
   /** No work remains or the work stopped: free what it held (its own projection worker). */
   release?:()=>void;
+  /** The score work is on and how far it has come, and how it ended; or
+   * none once no work remains or the work stopped. Between two scores the
+   * last one stands. */
+  activity?:(progress:AheadOfTimeProgress|undefined)=>void;
   /** Everything a preparation of this score is made for, as it stands now
    * (the keyboard layout, the score's files and stored hand choices). Read
    * when the preparation has read those; an opening takes it over only while
@@ -123,7 +139,7 @@ export class AheadOfTimeEngraving {
   if(this.running){this.hold();return;}
   if(this.timer===undefined&&this.waiting===undefined&&!this.queue.length)return;
   const entryIds=[...(this.waiting!==undefined?[this.waiting]:[]),...this.queue];
-  this.end(false);this.queue=entryIds;this.arm();
+  this.end(false,true);this.queue=entryIds;this.arm();
  }
  stop():void {this.end(true);}
  private arm(){this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.delay);}
@@ -134,28 +150,39 @@ export class AheadOfTimeEngraving {
  private unhold(){const held=this.held;this.held=undefined;if(!held)return;if(held.timer!==undefined)clearTimeout(held.timer);held.resume();}
  private readonly quiet:AheadOfTimeQuiet=()=>this.held?.until??Promise.resolve();
  /** End the run: its list, the score waiting, the score under way. `release`
-  * also frees the worker; a pause in the list keeps it for what follows. */
- private end(release:boolean){
+  * also frees the worker; a pause in the list keeps it for what follows.
+  * Work `going` on after the pause is still the work under way. */
+ private end(release:boolean,going=false){
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   this.queue=[];this.waiting=undefined;this.generation++;
-  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.unhold();
+  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.unhold();if(!going)this.options.activity?.(undefined);
   if(release)this.free();
  }
  private free(){if(!this.holding)return;this.holding=false;this.options.release?.();}
  private next():void {
-  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.free();return;}
+  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.free();this.options.activity?.(undefined);return;}
   this.waiting=entryId;
   const idle=this.options.idle??((run:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(run,{timeout:5000}):setTimeout(run,0));
   idle(()=>{
    if(generation!==this.generation||this.running)return;
    this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
-   const running:Running={entryId,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve()};this.running=running;
+   const running:Running={entryId,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve(),fraction:0};this.running=running;
    const arm=()=>{running.readied=false;running.replacing=false;running.optional=false;running.ready=new Promise<void>(resolve=>{running.markReady=()=>{running.readied=true;resolve();};});};arm();
    const started=()=>{if(this.running!==running)return;if(running.readied)arm();running.replacing=false;running.optional=false;running.basis=this.basis(entryId);};
-   const work:AheadOfTimeWork={quiet:this.quiet,started,ready:()=>running.markReady(),replacing:()=>{running.replacing=true;},optional:()=>{running.optional=true;}};
-   running.done=this.prepare(entryId,{signal:controller.signal},work).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
+   const report=(end?:'done'|'failed')=>this.options.activity?.({entryId,...(running.stage===undefined?{}:{stage:running.stage}),fraction:running.fraction,...(end?{end}:{})});
+   const reached=(stage:string)=>{
+    const at=running.plan?.indexOf(stage)??-1;if(this.running!==running||at<0)return;
+    const fraction=(at+1)/running.plan!.length;if(fraction<=running.fraction)return;
+    running.fraction=fraction;running.stage=stage;report();
+   };
+   const work:AheadOfTimeWork={quiet:this.quiet,started,ready:()=>running.markReady(),replacing:()=>{running.replacing=true;},optional:()=>{running.optional=true;},
+    plan:stages=>{if(!running.plan)running.plan=[...stages];},reached,failed:()=>{running.failed=true;}};
+   report();
+   // A failure is a miss on opening, as before; a stop has been reported already.
+   running.done=this.prepare(entryId,{signal:controller.signal},work).then(()=>!running.failed,()=>false).then(done=>{
     if(this.controller!==controller)return;
-    this.controller=undefined;this.running=undefined;this.next();
+    this.controller=undefined;this.running=undefined;
+    if(done)running.fraction=1;report(done?'done':'failed');this.next();
    });
   });
  }

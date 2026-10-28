@@ -29,6 +29,12 @@ const READ_STATE=`(()=>{const app=document.querySelector('#app'),out={};for(cons
 /** What is wrong on screen, by the application's own error elements. */
 const PROBLEMS=`[...document.querySelectorAll('.practice-render-error,.section-fingering-error,dialog[data-kind=loading-failed],[role=alert]')].map(e=>({kind:e.matches('dialog')?'loading-failed':e.className||e.getAttribute('role'),text:e.textContent.trim().replace(/\\s+/g,' ').slice(0,300)})).filter(p=>p.text)`;
 
+export interface PreparingSample {work?:string;lines:Array<{score?:string;composer?:string;ended:boolean;progress:number;rowPreparing:boolean}>;rows:Array<{score?:string;composer?:string}>;workComposer?:string}
+const PREPARING_LINES=`(()=>{const app=document.querySelector('#app'),work=app?.getAttribute('data-preparing')??undefined,
+ who=row=>row.classList.contains('composer-entry')?{composer:row.dataset.composer}:{score:row.dataset.open};
+ return {work,workComposer:work?document.querySelector('[data-open="'+CSS.escape(work)+'"]')?.dataset.composer:undefined,
+  lines:[...document.querySelectorAll('.preparing-line')].map(l=>({...who(l.parentElement),ended:!!l.dataset.end,progress:Number(l.dataset.progress),rowPreparing:l.parentElement.dataset.preparing!==undefined})),
+  rows:[...document.querySelectorAll('.scores [data-preparing]')].map(who)};})()`;
 const FOCUS=`(()=>{const a=document.activeElement;return a?a.tagName.toLowerCase()+(a.className?'.'+String(a.className).split(' ').join('.'):'')+(a.closest('dialog')?' in dialog '+a.closest('dialog').dataset.kind:''):'nothing'})()`;
 export class Driver {
  constructor(readonly page:Page,readonly keys:Keys){}
@@ -52,7 +58,7 @@ export class Driver {
   throw new StateTimeout('the library',await this.state());
  }
  /** Esc once; resolves when the declared state has changed. */
- async back(){const before=await this.state();await this.press(this.keys.back);await this.until(s=>s.screen!==before.screen||s.dialog!==before.dialog||s.editing!==before.editing||s.section!==before.section||s.step!==before.step||s.busy!==before.busy,'Esc to take effect',30_000).catch(async()=>console.log(`    Esc changed nothing; focus on ${await this.page.evaluate(FOCUS)}`));}
+ async back(){const before=await this.state();await this.press(this.keys.back);await this.until(s=>s.screen!==before.screen||s.dialog!==before.dialog||s.editing!==before.editing||s.section!==before.section||s.step!==before.step||s.busy!==before.busy,'Esc to take effect',30_000).catch(async()=>console.log(`    Esc changed nothing; focus on ${await this.page.evaluate(FOCUS)}; the player was told ${JSON.stringify(await this.page.evaluate(`document.querySelector('.toast')?.textContent??''`))}`));}
  /** Shows a score's row, opening its composer's group if needed, and focuses it. */
  async focusScore(id:string){
   const any=this.page.locator(`[data-open="${id}"]`),shown=this.page.locator(`[data-open="${id}"]:not([hidden])`);
@@ -145,6 +151,14 @@ export class Driver {
  async startOpen(id:string){await this.toLibrary();await this.focusScore(id);await this.press(this.keys.choose);}
  /** The key that runs a reader command. */
  keyFor(action:'practice'|'edit'|'toggle'){return this.keys[action];}
+ /** The library's lines under scores being prepared (src/preparing-indicator.ts): which row
+  * each is under, whether it is finishing, how far it has come, and the score the work is on. */
+ preparingLines():Promise<PreparingSample>{return this.page.evaluate(PREPARING_LINES);}
+ /** The longest main-thread tasks since `since` (ms on the page's clock), as Chromium reports them. */
+ longTasks(since=0):Promise<number[]>{return this.page.evaluate(`(window.__longTasks??[]).filter(t=>t.at>=${since}).map(t=>t.ms)`);}
+ /** Starts recording main-thread tasks over 50 ms. */
+ watchLongTasks(){return this.page.evaluate(`(()=>{if(window.__longTasks)return;window.__longTasks=[];new PerformanceObserver(list=>{for(const e of list.getEntries())window.__longTasks.push({at:e.startTime,ms:Math.round(e.duration)});}).observe({type:'longtask',buffered:true});})()`);}
+ now():Promise<number>{return this.page.evaluate('performance.now()');}
  /** The moments the page recorded: dialogs leaving and keys arriving (page.js). */
  marks():Promise<{closed:Array<{kind:string;at:number}>;keys:Array<{code:string;at:number}>;screens:Array<{screen:string;at:number}>}>{return this.page.evaluate('window.__rehearsal');}
 }
