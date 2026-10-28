@@ -1,52 +1,52 @@
 {
  "schema": 1,
- "viewerRevision": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
+ "viewerRevision": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
  "notationRevision": "68db77e1bfe2dfb21fc69567d1d337421457b040",
- "frontendDigest": "22bbf5a620b37468edc568f1ab2e6b291ff503f21d64fe3bc75bad39eb90795c",
+ "frontendDigest": "5196fd23752cdf4e2ae2c64153cde6a4258db2f62b4589b5959497db6fce9a29",
  "checks": {
   "tests": {
    "status": "passed",
-   "sourceCommit": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
+   "sourceCommit": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
    "command": "npm test",
-   "tests": 1507,
-   "passed": 1498,
+   "tests": 1518,
+   "passed": 1509,
    "failed": 0,
    "skipped": 1,
    "todo": 8,
-   "durationMs": 96110,
+   "durationMs": 131125,
    "additional": [
     {
      "command": "node --test test/*.test.mjs",
      "tests": 49,
      "passed": 49,
      "failed": 0,
-     "durationMs": 25923
+     "durationMs": 45329
     },
     {
      "command": "npx tsc --noEmit -p .",
      "result": "clean"
     }
    ],
-   "todoNote": "The same 8 todo tests as in the e4af4f5 seal: 5 need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved (4 in fingering-studio, 1 in operator-finger-update); 3 are half-handed unison keys whose source pages ISO refuses on import (handless-owners).",
+   "todoNote": "The same 8 todo tests as in the faa0bbd seal: 5 need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved (4 in fingering-studio, 1 in operator-finger-update); 3 are half-handed unison keys whose source pages ISO refuses on import (handless-owners).",
    "skipNote": "The 1 skipped test is the opt-in owner No. 13 test (test/practice-fold-owner-snapshot.test.ts), which runs only with SCORE_VIEWER_OWNER_SNAPSHOT set to a private data copy. It was not run here.",
-   "loadNote": "A first run of the suite on the clean clone, made while the rehearsal on a private data copy loaded the host, had 1 failure: the Guitar Pro bass-track import test exceeded its 5 s worker budget (work-budget refusal). That file alone then passed 3 of 3, and the complete suite rerun through the host queue passed with the counts above.",
-   "scope": "Complete suite on a clean, self-contained clone (no --reference) of merged main faa0bbd with the submodule at 68db77e1, after npm ci --ignore-scripts and npm run build; the clone stayed clean. The same counts on the delivery worktree at the same commit (105 s). Merged since the e4af4f5 seal (PR 215): viewer PRs 216-220, including the notation repin from 3bbe6a96 to 68db77e1 (PR 218)."
+   "loadNote": "The first run of the suite on the clean clone, on a loaded shared host, had 1 failure: the Guitar Pro bass-track import test exceeded its 5 s worker budget (work-budget refusal), as in the faa0bbd seal. That file alone then passed 3 of 3, and the complete suite rerun through the host queue passed with the counts above.",
+   "scope": "Complete suite on a clean, self-contained clone (no --reference) of merged main 61f2c76 with the submodule at 68db77e1, after npm ci --ignore-scripts and npm run build; the clone stayed clean. The same counts on the delivery worktree at the same commit (135 s). Merged since the faa0bbd seal (PR 221, merged as 6c97aaf): viewer PRs 222-224. No notation repin: the pin stays 68db77e1."
   },
   "build": {
    "status": "passed",
-   "sourceCommit": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
+   "sourceCommit": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
    "configured": "npm run build: TypeScript + source pin validation (Notation source verified: 68db77e1; fingering assistance pin verified) + Vite",
    "frontendFiles": 25,
-   "frontendDigest": "22bbf5a620b37468edc568f1ab2e6b291ff503f21d64fe3bc75bad39eb90795c",
+   "frontendDigest": "5196fd23752cdf4e2ae2c64153cde6a4258db2f62b4589b5959497db6fce9a29",
    "reproduced": "The same digest from the builds of this commit on the clean clone and on the delivery worktree; each rehearsal builds its own copy."
   },
   "browserInspection": {
    "status": "passed",
    "harness": "npm run rehearse (scripts/rehearse): headless Chromium (playwright-core), the production build of this commit, a simulated native host answering the Tauri commands from a data directory, real key presses through main.ts. The library is first left alone until its background work ends, with the progress line checked throughout. Pass or fail by invariants; timings are reports.",
    "studioRehearsal": {
-    "sourceCommit": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
+    "sourceCommit": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
     "command": "npm run rehearse",
-    "durationMs": 98460,
+    "durationMs": 125580,
     "scores": 6,
     "pianoScores": 5,
     "layouts": [
@@ -56,12 +56,22 @@
     "sectionsListed": 114,
     "imports": 7,
     "libraryLeftAlone": {
-     "ms": 11491,
+     "ms": 12211,
      "scoresWorkedOn": 6,
      "scoresWithALine": 0,
-     "longestTaskMs": 67,
-     "tasksOver50ms": 6,
-     "tasksOver200ms": 0
+     "longestTaskMs": 108,
+     "tasksOver50ms": 12,
+     "tasksOver200ms": 0,
+     "editionsReplaced": 0
+    },
+    "libraryLeftAloneAgain": {
+     "ms": 10154,
+     "scoresWorkedOn": 5,
+     "scoresWithALine": 0,
+     "longestTaskMs": 0,
+     "tasksOver50ms": 0,
+     "tasksOver200ms": 0,
+     "editionsReplaced": 0
     },
     "invariants": [
      {
@@ -73,17 +83,35 @@
      {
       "invariant": "a line shows only under the score being prepared",
       "held": true,
-      "checked": 1,
+      "checked": 2,
       "failed": 0
      },
      {
       "invariant": "the line never moves back",
       "held": true,
-      "checked": 1,
+      "checked": 2,
       "failed": 0
      },
      {
       "invariant": "the line is gone once the work ends",
+      "held": true,
+      "checked": 2,
+      "failed": 0
+     },
+     {
+      "invariant": "a pitch choice names the edition the library installed",
+      "held": true,
+      "checked": 6,
+      "failed": 0
+     },
+     {
+      "invariant": "no pitch choice is left on an edition installed on the way",
+      "held": true,
+      "checked": 6,
+      "failed": 0
+     },
+     {
+      "invariant": "a second visit to the library engraves no edition again",
       "held": true,
       "checked": 1,
       "failed": 0
@@ -92,6 +120,12 @@
       "invariant": "opens",
       "held": true,
       "checked": 12,
+      "failed": 0
+     },
+     {
+      "invariant": "the edition shown was drawn by the current engraver",
+      "held": true,
+      "checked": 24,
       "failed": 0
      },
      {
@@ -188,7 +222,7 @@
       "doubled": 0,
       "readerShown": 0,
       "ignoredReaderShown": 0,
-      "readerShownMs": 1.9
+      "readerShownMs": 2.1
      },
      "unmeasured": {
       "presses": 0,
@@ -198,11 +232,11 @@
      },
      "byAction": {
       "practice": {
-       "presses": 9,
+       "presses": 10,
        "lost": 0
       },
       "edit": {
-       "presses": 12,
+       "presses": 11,
        "lost": 0
       },
       "toggle": {
@@ -213,10 +247,10 @@
     }
    },
    "ownerLibraryRehearsal": {
-    "sourceCommit": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
+    "sourceCommit": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
     "command": "npm run rehearse -- --data <a private data copy> --presses 300",
-    "data": "A private data copy: the owner's laptop data taken 2026-10-28 with the viewer closed, before this install, verified against the live data (0 mismatches) and copied here byte for byte (SHA256 of every file). The rehearsal works on its own writable copy; the private data copy was read-only throughout.",
-    "durationMs": 1405793,
+    "data": "A private data copy: the owner's laptop data taken 2026-10-28 with the viewer closed, after the faa0bbd install and before this one, verified against the live data (0 mismatches) and copied here byte for byte (SHA256 of every file). The rehearsal works on its own writable copy; the private data copy was read-only throughout.",
+    "durationMs": 1089405,
     "scores": 5,
     "pianoScores": 4,
     "layouts": [
@@ -225,28 +259,56 @@
     ],
     "sectionsListed": 86,
     "libraryLeftAlone": {
-     "ms": 40660,
+     "ms": 59168,
      "scoresWorkedOn": 5,
      "scoresWithALine": 5,
-     "longestTaskMs": 222,
-     "tasksOver50ms": 45,
-     "tasksOver200ms": 1
+     "longestTaskMs": 623,
+     "tasksOver50ms": 50,
+     "tasksOver200ms": 1,
+     "editionsReplaced": 4
+    },
+    "libraryLeftAloneAgain": {
+     "ms": 10307,
+     "scoresWorkedOn": 3,
+     "scoresWithALine": 0,
+     "longestTaskMs": 90,
+     "tasksOver50ms": 2,
+     "tasksOver200ms": 0,
+     "editionsReplaced": 0
     },
     "invariants": [
      {
       "invariant": "a line shows only under the score being prepared",
       "held": true,
-      "checked": 1,
+      "checked": 2,
       "failed": 0
      },
      {
       "invariant": "the line never moves back",
       "held": true,
-      "checked": 1,
+      "checked": 2,
       "failed": 0
      },
      {
       "invariant": "the line is gone once the work ends",
+      "held": true,
+      "checked": 2,
+      "failed": 0
+     },
+     {
+      "invariant": "a pitch choice names the edition the library installed",
+      "held": true,
+      "checked": 5,
+      "failed": 0
+     },
+     {
+      "invariant": "no pitch choice is left on an edition installed on the way",
+      "held": true,
+      "checked": 5,
+      "failed": 0
+     },
+     {
+      "invariant": "a second visit to the library engraves no edition again",
       "held": true,
       "checked": 1,
       "failed": 0
@@ -255,6 +317,12 @@
       "invariant": "opens",
       "held": true,
       "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "the edition shown was drawn by the current engraver",
+      "held": true,
+      "checked": 20,
       "failed": 0
      },
      {
@@ -339,67 +407,67 @@
     "earlyPress": {
      "presses": 300,
      "afterClose": {
-      "presses": 178,
-      "once": 178,
+      "presses": 189,
+      "once": 189,
       "lost": 0,
       "doubled": 0
      },
      "whileOpening": {
-      "presses": 122,
-      "once": 55,
-      "ignored": 67,
+      "presses": 111,
+      "once": 47,
+      "ignored": 64,
       "doubled": 0,
-      "readerShown": 5,
+      "readerShown": 8,
       "ignoredReaderShown": 0,
-      "readerShownMs": 2.9
+      "readerShownMs": 3.3
      }
     },
     "timings": {
      "schumann-op68-no14": {
       "janko": {
-       "firstOpenMs": 2440,
-       "reopenMs": 104,
-       "fingersMs": 1986,
+       "firstOpenMs": 1395,
+       "reopenMs": 2606,
+       "fingersMs": 838,
        "sections": 6,
        "locked": 0,
-       "sectionEntryMedianMs": 85,
-       "sectionEntryMaxMs": 218
+       "sectionEntryMedianMs": 120,
+       "sectionEntryMaxMs": 317
       },
       "conventional": {
-       "firstOpenMs": 972,
-       "layoutChangeMs": 782,
-       "reopenMs": 346,
-       "fingersMs": 476,
+       "firstOpenMs": 1270,
+       "layoutChangeMs": 1039,
+       "reopenMs": 474,
+       "fingersMs": 706,
        "sections": 20,
        "locked": 0,
-       "sectionEntryMedianMs": 80,
-       "sectionEntryMaxMs": 98
+       "sectionEntryMedianMs": 134,
+       "sectionEntryMaxMs": 160
       }
      },
      "a private score": {
       "janko": {
-       "firstOpenMs": 527,
-       "reopenMs": 396,
-       "fingersMs": 262,
+       "firstOpenMs": 759,
+       "reopenMs": 503,
+       "fingersMs": 412,
        "sections": 7,
        "locked": 0,
-       "sectionEntryMedianMs": 104,
-       "sectionEntryMaxMs": 148
+       "sectionEntryMedianMs": 136,
+       "sectionEntryMaxMs": 260
       },
       "conventional": {
-       "firstOpenMs": 429,
-       "reopenMs": 48,
-       "fingersMs": 315,
+       "firstOpenMs": 602,
+       "reopenMs": 47,
+       "fingersMs": 424,
        "sections": 7,
        "locked": 0,
-       "sectionEntryMedianMs": 101,
-       "sectionEntryMaxMs": 140
+       "sectionEntryMedianMs": 156,
+       "sectionEntryMaxMs": 210
       }
      },
      "a private score 2": {
       "janko": {
-       "firstOpenMs": 297,
-       "reopenMs": 91,
+       "firstOpenMs": 445,
+       "reopenMs": 141,
        "fingersMs": null,
        "sections": null,
        "locked": null,
@@ -407,8 +475,8 @@
        "sectionEntryMaxMs": null
       },
       "conventional": {
-       "firstOpenMs": 259,
-       "reopenMs": 134,
+       "firstOpenMs": 265,
+       "reopenMs": 149,
        "fingersMs": null,
        "sections": null,
        "locked": null,
@@ -418,42 +486,42 @@
      },
      "schumann-op68-no13": {
       "janko": {
-       "firstOpenMs": 741,
-       "reopenMs": 117,
-       "fingersMs": 536,
+       "firstOpenMs": 1301,
+       "reopenMs": 672,
+       "fingersMs": 969,
        "sections": 8,
        "locked": 0,
-       "sectionEntryMedianMs": 147,
-       "sectionEntryMaxMs": 176
+       "sectionEntryMedianMs": 212,
+       "sectionEntryMaxMs": 260
       },
       "conventional": {
-       "firstOpenMs": 1579,
-       "reopenMs": 107,
-       "fingersMs": 547,
+       "firstOpenMs": 2055,
+       "reopenMs": 120,
+       "fingersMs": 421,
        "sections": 8,
        "locked": 0,
-       "sectionEntryMedianMs": 150,
-       "sectionEntryMaxMs": 165
+       "sectionEntryMedianMs": 149,
+       "sectionEntryMaxMs": 180
       }
      },
      "bach-goldberg-var1": {
       "janko": {
-       "firstOpenMs": 351,
-       "reopenMs": 333,
-       "fingersMs": 379,
+       "firstOpenMs": 586,
+       "reopenMs": 439,
+       "fingersMs": 346,
        "sections": 15,
        "locked": 0,
-       "sectionEntryMedianMs": 59,
-       "sectionEntryMaxMs": 86
+       "sectionEntryMedianMs": 82,
+       "sectionEntryMaxMs": 127
       },
       "conventional": {
-       "firstOpenMs": 326,
-       "reopenMs": 48,
-       "fingersMs": 329,
+       "firstOpenMs": 545,
+       "reopenMs": 68,
+       "fingersMs": 453,
        "sections": 15,
        "locked": 0,
-       "sectionEntryMedianMs": 57,
-       "sectionEntryMaxMs": 82
+       "sectionEntryMedianMs": 81,
+       "sectionEntryMaxMs": 107
       }
      }
     },
@@ -461,46 +529,46 @@
     "pagesNote": "The rehearsal counts drawn page elements; the reader draws one page at a time, so it reports 1 for every score."
    },
    "firstOpenAfterIdle": {
-    "sourceCommit": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
-    "note": "Janko layout (the owner's), a fresh writable copy of the private data copy for each run, each score opened in library order with Back in between. \"At once\": opened as soon as the library showed. \"After idle\": the library was left alone until no score was being prepared and no line showed for 6 s (35 s; 5 scores worked on, 5 with a line), so its background work (viewer PRs 214, 216, 217) had run. The simulated host starts with an empty derived-file store. Measured on a shared, loaded build host.",
+    "sourceCommit": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
+    "note": "Janko layout (the owner's), a fresh writable copy of the private data copy for each run, each score opened in library order with Back in between. \"At once\": opened as soon as the library showed. \"After idle\": the library was left alone until no score was being prepared and no line showed for 6 s (45 s; 5 scores worked on, 5 with a line), so its background work (viewer PRs 214, 216, 217, 222) had run. The simulated host starts with an empty derived-file store. Measured on a shared, loaded build host.",
     "timingsMs": {
      "schumann-op68-no14": {
-      "atOnceMs": 2396,
-      "afterIdleMs": 591
+      "atOnceMs": 5403,
+      "afterIdleMs": 1849
      },
      "a private score": {
-      "atOnceMs": 1470,
-      "afterIdleMs": 440
+      "atOnceMs": 2088,
+      "afterIdleMs": 740
      },
      "a private score 2": {
-      "atOnceMs": 5956,
-      "afterIdleMs": 195
+      "atOnceMs": 2424,
+      "afterIdleMs": 296
      },
      "schumann-op68-no13": {
-      "atOnceMs": 2853,
-      "afterIdleMs": 565
+      "atOnceMs": 6156,
+      "afterIdleMs": 1143
      },
      "bach-goldberg-var1": {
-      "atOnceMs": 862,
-      "afterIdleMs": 331
+      "atOnceMs": 1468,
+      "afterIdleMs": 506
      }
     }
    },
    "limits": "Headless Chromium with a simulated native host, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice at a keyboard and the pianist's musical acceptance were not observed. A key pressed while the opening dialog still shows its progress can be ignored by design; none is lost once the score is drawn.",
    "nativeObservation": {
-    "observed": "None for this application revision before sealing. The laptop runs application e4af4f57 with ISO 3bbe6a96 (delivery 22a9ac74)."
+    "observed": "None for this application revision before sealing. The laptop runs application faa0bbd5 with ISO 68db77e1 (delivery 8d80727b)."
    }
   },
   "independentReview": {
    "status": "passed",
-   "sourceCommit": "faa0bbd5e02b48bb346c1c0c4690b70c1dd66f50",
+   "sourceCommit": "61f2c764d66c2a9a0f43592bf486a086a30fc06f",
    "reviews": [
     {
-     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/215",
-     "verdict": "The e4af4f5 seal, reviewed by the architect as its review point and merged; with PR 208 it carries every review recorded for the application up to e4af4f5."
+     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/221",
+     "verdict": "The faa0bbd seal, the architect's review point, merged as 6c97aaf; with PRs 208 and 215 it carries every review recorded for the application up to faa0bbd."
     }
    ],
-   "scope": "No review is recorded for viewer PRs 216 (editions engraved again are installed in the library, for the layout in use first), 217 (a progress line under the library row of the score being prepared), 218 (the notation repin to 68db77e1 and fingers centred on lone stems), 219 (a finger at a slur or tie end sits on its stem's axis) and 220 (a layout switch keeps an unchanged edition; the other layout's pages are prepared in a second round). They were merged by the author on green gates; none has a GitHub review record. The notation pin's ISO PRs 502-509 have no GitHub review record either; 509's rows were seen by the owner before merge (docs/source-provenance.json, dependencyReview). The seal pull request itself is reviewed by the architect before it merges.",
+   "scope": "No review is recorded for viewer PRs 222 (each keyboard view records the engraver that drew its pages; an approved view without the current record is engraved again once), 223 (a pitch choice keeps naming the completed edition after a layout is engraved later) and 224 (a pitch choice left on an edition installed on the way is repaired once when the library opens). They were merged on green gates at the architect's direction; none has a GitHub review record. The seal pull request itself is reviewed by the architect before it merges.",
    "reviewedCommits": []
   }
  }
