@@ -1,10 +1,12 @@
 /* The library's sign that scores are being prepared (src/preparing-indicator.ts).
    Only opacity changes: nothing is laid out anew when it comes or goes. */
-.preparing-words{font-size:13px;color:#8a8a8a;letter-spacing:.02em;opacity:0;visibility:hidden;transition:opacity .4s,visibility 0s .4s;pointer-events:none;user-select:none;white-space:nowrap}
+.preparing-words{font-size:13px;line-height:44px;color:#8a8a8a;letter-spacing:.02em;opacity:0;visibility:hidden;transition:opacity .4s,visibility 0s .4s;pointer-events:none;user-select:none;white-space:nowrap}
 .surface[data-preparing][data-preparing-design=footer] .preparing-words{opacity:1;visibility:visible;transition:opacity .4s}
-.preparing-edge{position:absolute;left:0;right:0;bottom:0;height:2px;background:#6a6a6a;opacity:0;pointer-events:none;transition:opacity .4s;z-index:4}
+.preparing-edge{position:absolute;left:0;right:0;bottom:0;height:2px;background:#8a8a8a;opacity:0;pointer-events:none;transition:opacity .4s;z-index:4}
 .surface[data-preparing][data-preparing-design=edge] .preparing-edge{opacity:1;animation:preparing-breathe 2.4s ease-in-out infinite}
 .score-entry,.composer-entry{position:relative}
-.surface[data-preparing][data-preparing-design=row] .score-entry[data-preparing-row]::before,.surface[data-preparing][data-preparing-design=row] .composer-entry[data-preparing-row][aria-expanded=false]::before{content:'';position:absolute;left:0;top:50%;width:2px;height:20px;margin-top:-10px;background:#8a8a8a;pointer-events:none;animation:preparing-breathe 2.4s ease-in-out infinite}
+.surface[data-preparing][data-preparing-design=row] .score-entry[data-preparing-row]::before,.surface[data-preparing][data-preparing-design=row] .composer-entry[data-preparing-row][aria-expanded=false]::before{content:'';position:absolute;left:58px;bottom:7px;width:min(280px,50%);height:2px;background:#8a8a8a;pointer-events:none;animation:preparing-breathe 2.4s ease-in-out infinite}
+/* Under the composer's name, which starts nearer the edge than a score's. */
+.surface[data-preparing][data-preparing-design=row] .composer-entry[data-preparing-row][aria-expanded=false]::before{left:32px;width:min(200px,50%)}
 @keyframes preparing-breathe{0%,100%{opacity:.35}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.preparing-words,.preparing-edge{transition:none}.surface[data-preparing] .preparing-edge,.surface[data-preparing] [data-preparing-row]::before{animation:none}}

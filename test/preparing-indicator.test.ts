@@ -51,7 +51,7 @@ test('the sign changes only opacity: no layout property, no focus, and no motion
   shown=[...css.matchAll(/\.surface\[data-preparing\][^{]*\{([^}]*)\}/g)].map(m=>m[1]);
  assert.ok(shown.length>=3);
  for(const rule of shown)for(const property of rule.split(';').map(d=>d.split(':')[0].trim()).filter(Boolean))
-  assert.ok(['opacity','visibility','transition','animation','content','position','left','top','width','height','margin-top','background','pointer-events'].includes(property),property);
+  assert.ok(['opacity','visibility','transition','animation','content','position','left','right','bottom','width','height','background','pointer-events'].includes(property),property);
  // Only an overlay (::before, an absolute line) or the empty middle of the bottom bar is drawn into; nothing in the flow grows.
  assert.match(css,/\.preparing-words\{[^}]*opacity:0;visibility:hidden/);
  assert.match(css,/@media\(prefers-reduced-motion:reduce\)\{.*animation:none\}\}/);

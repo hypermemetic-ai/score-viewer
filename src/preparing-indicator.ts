@@ -7,8 +7,8 @@
  * Three designs stay behind an internal switch until one is chosen:
  * - `footer`: the words "Preparing scores" in the middle of the bottom bar,
  *   where task controls go (the library has none);
- * - `row`: a short line beside the score being prepared, or beside its
- *   composer while that composer is folded;
+ * - `row`: a line under the score being prepared, or under its composer
+ *   while that composer is folded;
  * - `edge`: a hairline along the bottom edge of the screen. */
 export type PreparingDesign='footer'|'row'|'edge';
 export const PREPARING_DESIGNS:readonly PreparingDesign[]=['footer','row','edge'];
