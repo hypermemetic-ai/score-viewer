@@ -11,6 +11,7 @@ import {collectionId,personalStorageName,type Entry,type PersonalState} from './
 import {loadPersonalJournal} from './personal-journal';
 import {scoreFileName} from './score-file-name';
 import {personalForRebuiltEdition} from './transposed-personal';
+import {engraveAgainOnce} from './engraved-again';
 
 const KEYBOARDS=['janko-four-row','conventional-piano'] as const;
 export const packageFile=async(bytes:Uint8Array)=>scoreFileName(await hashBytes(bytes));
@@ -78,10 +79,14 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
  /** An early-format edition whose pages carry nothing made for one keyboard
   * layout keeps them: both layouts show its existing pages, and nothing is
   * engraved (linkEarlyEdition). */
- keepPages?:boolean}={},input?:ReadingExecution):Promise<RebuiltEdition>{
+ keepPages?:boolean;
+ /** These very bytes, already admitted by the caller (an edition whose
+  * pages an earlier engine drew reads in full): its content is not read a
+  * second time. */
+ content?:ScorePackage}={},input?:ReadingExecution):Promise<RebuiltEdition>{
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
  const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError'||options.refusal===undefined)throw error;throw options.refusal;},
-  content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),manifest=content.collectionManifest??content.manifest;
+  content=options.content??await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),manifest=content.collectionManifest??content.manifest;
  checkReadingExecution(execution);try{requirePianoCapability(content,'pianoPreparation');}catch(error){refuse(error);}
  const own=editionSource(content);
  if(!own)return refuse(Error('This saved edition has no linked source to engrave again from.'));
@@ -119,8 +124,9 @@ export async function rebuildEdition(bytes:Uint8Array,options:{original?:{packag
   transposition={original:original.package.transpositionOriginal??original.package,originalBytes:original.bytes,selectedBytes:new Uint8Array(bytes),steps};
   originalRebuilt=rebuiltOriginal;
  }
- const engraved=await engraveEdition({base:content,source,sourceBytes,context:manifest.calculationContext,views,transposition,
-  refusal:"This saved edition can't be engraved again with the current engraving. It stays saved."},execution);
+ // Made once: ahead-of-time work may already have engraved these very bytes (and original).
+ const engraved=await engraveAgainOnce('edition',[bytes,...(transposition?[transposition.originalBytes]:[])],()=>engraveEdition({base:content,source,sourceBytes,context:manifest.calculationContext,views,transposition,
+  refusal:"This saved edition can't be engraved again with the current engraving. It stays saved."},execution));
  replaced[await packageFile(bytes)]=await packageFile(engraved.bytes);
  return{bytes:engraved.bytes,earlier,fellBack:engraved.fellBack,droppedFingers:engraved.droppedFingers,replaced,primary,...(originalRebuilt?{original:originalRebuilt}:{})};
 }
@@ -216,10 +222,10 @@ export async function prepareRebuiltEdition(host:{read(name:string):Promise<Uint
  personalFiles?:Record<string,string>;
  admit?:(bytes:Uint8Array)=>Promise<ScorePackage>;
  /** See rebuildEdition. */
- keepPages?:boolean;
+ keepPages?:boolean;content?:ScorePackage;
 }={},input?:ReadingExecution):Promise<RebuiltInstall>{
  const execution=input?capturedReadingExecution(input):undefined;checkReadingExecution(execution);
- const rebuilt=await rebuildEdition(bytes,{original:options.original,refusal:options.refusal,keepPages:options.keepPages},execution),earliest=rebuilt.earlier[rebuilt.primary]!;
+ const rebuilt=await rebuildEdition(bytes,{original:options.original,refusal:options.refusal,keepPages:options.keepPages,content:options.content},execution),earliest=rebuilt.earlier[rebuilt.primary]!;
  if(collectionId(earliest)!==entry.id)throw Error('The saved edition belongs to another score. Every edition is retained.');
  const admitted=await (options.admit??(b=>importPackage(b,{allowLegacyTempo:true,...(execution?{execution}:{})})))(rebuilt.bytes);checkReadingExecution(execution);
  const journals=(name:string)=>(name===entry.file?entry.personalFiles:entry.editionPersonalFiles?.[name])??{},

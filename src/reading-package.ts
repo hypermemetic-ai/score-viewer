@@ -6,6 +6,7 @@ import {hashBytes,importPackageForReading,readEditionContent,type Manifest,type 
 import type {ReadingExecution} from './reading-execution';
 import {admitDualReadingContent,prepareDualReadingPacket,type DualReadingDescriptor,type DualReadingContent} from './dual-reading-package';
 import {currentReadingOptions} from './reading-options';
+import {engraveAgainOnce} from './engraved-again';
 
 export interface LegacyReadingDescriptor {
   version:'instrument-reading-package-v1';
@@ -167,19 +168,21 @@ export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown,e
   const content=await readEditionContent(bytes,{allowLegacyTempo:true,...(execution?{execution}:{})}).catch(refuse),m=content.manifest,files=content.files;
   const score=JSON.parse(strFromU8(files['score.json'])) as QuantizedGridScore,common={score,metadata:structuredClone(m.metadata),createdAt:m.createdAt,
     font:{name:m.font,bytes:files[m.font]},notices:Object.fromEntries(m.notices.map(name=>[name,files[name]]))};
-  let again:Uint8Array;
+  let engrave:()=>Promise<Uint8Array>;
   if(m.reading?.version==='instrument-reading-package-v2'){
     const d=m.reading,drawn=new Set(['score.json','seats.json',m.font,...m.notices,...Object.values(d.views).flatMap(v=>[...v.pages,v.owners,v.scene,v.geometry])]),
       retained=Object.keys(m.files).filter(name=>!drawn.has(name));
     // Imported source files come along; anything else under the drawn views would be stale ink.
     if(retained.some(name=>name.startsWith('reading/')))return refuse(Error('This reading carries files engraving it again would not keep.'));
-    again=(await prepareDualReadingPacket({...common,retainedFiles:Object.fromEntries(retained.map(name=>[name,files[name]])),
+    engrave=async()=>(await prepareDualReadingPacket({...common,retainedFiles:Object.fromEntries(retained.map(name=>[name,files[name]])),
       options:currentReadingOptions(d.options)},execution)).bytes;
   }else{
     const d=m.reading as LegacyReadingDescriptor,members=new Set(['score.json','seats.json',d.owners,d.layout,m.font,...m.notices,...m.pages]);
     if(Object.keys(m.files).length!==members.size||Object.keys(m.files).some(name=>!members.has(name)))return refuse(Error('This reading carries files engraving it again would not keep.'));
-    again=await prepareReadingPackage({...common,options:currentReadingOptions(d.options)},execution);
+    engrave=()=>prepareReadingPackage({...common,options:currentReadingOptions(d.options)},execution);
   }
+  // Made once: ahead-of-time work may already have engraved these very bytes.
+  const again=(await engraveAgainOnce('reading',[bytes],async()=>({bytes:await engrave(),fellBack:[],droppedFingers:[]}))).bytes;
   // The score's identity is its source bytes; engraving again never changes them.
   if(manifestOf(again)?.revision!==m.revision)return refuse(Error('Engraving this reading again would change its musical source.'));
   return again;

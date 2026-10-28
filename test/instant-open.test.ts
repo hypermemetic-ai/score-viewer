@@ -243,7 +243,11 @@ test('the viewer holds ahead-of-time work through its own listener and saves an 
 });
 
 /** The viewer's own preparation of one score, against stubs that log each step. */
-function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean;admission?:unknown;projection?:unknown;folds?:boolean}={}){
+function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:boolean;admission?:unknown;projection?:unknown;folds?:boolean;
+ /** Opening would engrave the archive again (its pages an earlier engine drew), or it is a reading. */
+ behind?:boolean;reading?:boolean;
+ /** What the engraving worker answers; by default the archive's content does not read. */
+ engraved?:()=>Promise<{made:{kind:string;key:string;encoded:unknown;tag?:string}[];error?:string}>}={}){
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
  const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a');
@@ -274,11 +278,15 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
   projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>{if(options.admission)throw options.admission;return {availablePresentations:['janko-four-row']};}},
   scoreCapabilities:()=>({pianoPreparation:true}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>undefined,
   ensurePianoReady:async()=>({package:{}}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
+  AheadOfTimeRefusal,SavedPagesLackRepeats:class extends Error{},ENGRAVE_AGAIN_KINDS:['engraved-again-v1','reading-admission-v1','piano-page-checks-v1','calculated-admission-v1'],
+  engraveAgainInWorker:async(_bytes:Uint8Array,_signal:AbortSignal,admit:boolean)=>{stop(admit?'admitted and engraved again':'engraved again');return options.engraved?options.engraved():{made:[],error:'This saved edition does not read.'};},
  };
+ if(options.behind)context.savedPagesBehindPolicy=()=>true;
+ if(options.reading)context.readingOnlyArchive=()=>true;
  runInNewContext(source,context);
  const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready')});
  const recorded=async()=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),'janko-four-row','no13','t1',null,[]]))))!==undefined;
- return {log,run,recorded};
+ return {log,run,recorded,derived};
 }
 test('a preparation writes the pages before an opening goes on, then saves the engine, and records itself only after both',async()=>{
  const whole=preparation();await whole.run();
@@ -302,7 +310,7 @@ test('a preparation writes the pages before an opening goes on, then saves the e
 test('only admission rejecting a score, or the engraver refusing its pages, is recorded as a refusal; anything else is tried again',async()=>{
  const unfit=new HandPresentationError('unsupported-fit','Hands cannot be fitted in bar 11.');
  const refusals:[string,{admission?:unknown;projection?:unknown}][]=[
-  ['admission rejects the archive',{admission:Error('Package manifest is invalid')}],
+  ['admission rejects the archive, whose content does not read either',{admission:Error('Package manifest is invalid')}],
   ['the engraver cannot fit the saved hands',{projection:unfit}],
   ['the same refusal in the player\'s words',{projection:Error("These hand choices can't be drawn on the page yet.",{cause:unfit})}],
  ];
@@ -318,6 +326,28 @@ test('only admission rejecting a score, or the engraver refusing its pages, is r
  // The wrapper keeps what failed, and passes everything else on unchanged.
  const busy=new PackageAdmissionBusy();await assert.rejects(refusedWhen(Promise.reject(busy),admissionRejection),e=>e===busy);
  await assert.rejects(refusedWhen(Promise.reject(unfit),engravingRefusal),e=>e instanceof AheadOfTimeRefusal&&e.cause===unfit);
+});
+
+test('an archive opening would engrave again is engraved again in a worker and kept, once; installing it is left for opening',async()=>{
+ const engraving=await encodeDerivedPayload({version:'engraved-again-v1',archive:'AQID',fellBack:[],droppedFingers:[]}),
+  engraved=async()=>({made:[{kind:'engraved-again-v1',key:sha('b'),encoded:{...engraving,body:new Uint8Array(engraving.body)}},
+   {kind:'piano-page-checks-v1',key:sha('c'),encoded:await encodeDerivedPayload(true),tag:'checked'},{kind:'player-data',key:sha('d'),encoded:await encodeDerivedPayload(true)}]});
+ for(const [what,options] of [['pages an earlier engine drew',{behind:true}],['admission rejects the pages',{admission:Error('Page 1 differs from its replay')}],['a reading',{reading:true}]] as const){
+  const p=preparation({...options,engraved});await p.run();
+  // Engraved, written, and only then may an opening that took it over go on; no projection is made for the earlier archive.
+  assert.deepEqual(p.log.slice(3),[what==='a reading'?'admitted and engraved again':'engraved again','ready'],what);
+  assert.ok(await p.derived.has('engraved-again-v1',sha('b')),what);assert.equal(await p.derived.peek('piano-page-checks-v1',sha('c')),'checked',what);
+  // The worker hands back derived files only.
+  assert.equal(await p.derived.has('player-data',sha('d')),false,what);
+  assert.equal(await p.recorded(),true,what);
+ }
+ // A worker lost, out of memory or stopped records nothing: the next visit tries again.
+ const lost=preparation({behind:true,engraved:async()=>{throw Error('The engraving worker stopped: out of memory');}});
+ await assert.rejects(lost.run(),/out of memory/);assert.equal(await lost.recorded(),false);
+ const stopped=preparation({behind:true,stopAt:'engraved again',engraved});
+ await assert.rejects(stopped.run(),{name:'AbortError'});assert.equal(await stopped.recorded(),false);assert.equal(await stopped.derived.has('engraved-again-v1',sha('b')),false);
+ // Content the current engraving cannot make again is a refusal, recorded once.
+ const refused=preparation({behind:true});await refused.run();assert.equal(await refused.recorded(),true);
 });
 
 test('an opening cancelled with Esc, or failed, returns to a library that prepares scores again',async()=>{

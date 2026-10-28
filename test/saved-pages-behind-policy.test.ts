@@ -105,14 +105,17 @@ const open=stripTypeScriptTypes(source.slice(source.indexOf('async function open
 async function opening(rebuilds:boolean,times=1){
  const entry={id:'source',file:'saved.tuna',personalFiles:{}},data=new Uint8Array([1,2,3]),personal={overrides:{},history:[]},
   p={availablePresentations:['janko-four-row'],manifest:{version:2},collection:'source'},q={status:'reading',package:p,personal,packageBytes:new Uint8Array(data)};
- let calls:string[]=[],notices:string[]=[];const kept=new Set<string>(),op={keyboard:'janko-four-row'},context:any={
+ let calls:string[]=[],notices:string[]=[],joined=0;const kept=new Set<string>(),op={keyboard:'janko-four-row',controller:new AbortController()},context:any={
   retained:{take:()=>undefined},retainable:new WeakSet(),beginReading:()=>op,openingLoading:()=>undefined,scoreCapabilities:()=>({pianoPreparation:true}),personalMemory:{prefetch(){}},getScoreTransposition:()=>0,readingCheckpoint:async()=>{},practice:undefined,savePersonal:async()=>{},checkReading(){},
   host:{read:async()=>data,fullscreen:async()=>{}},importReading:async()=>{calls.push('admit');return p;},admitReadingSource:async()=>{},assertSelectedTransposition(){},selectPresentation:async()=>p,
   requireCurrentEngraving:(p:unknown)=>{if(!kept.has('archive'))throw new SavedPagesBehindPolicy('archive');return p;},keepSavedPagesBehindPolicy:(archive:string)=>{calls.push('keep');kept.add(archive);},
   SavedPagesBehindPolicy,SavedPagesLackRepeats:class extends Error{},
   keepSavedPagesWithoutRepeats:()=>calls.push('without-repeats'),
   readingProgress:()=>calls.push('engrave-again'),reengraveReadingArchive:async()=>undefined,readingExecution:()=>({}),
-  prepareRebuiltEdition:async(_h:unknown,_e:unknown,_f:unknown,_b:unknown,_l:unknown,options:{refusal:unknown})=>{assert.ok(options.refusal instanceof SavedPagesBehindPolicy);calls.push('rebuild');if(!rebuilds)throw Error('cannot engrave');return {packageBytes:new Uint8Array([9]),personal,left:0,carried:0,practice:[],additionalPersonal:[],replaced:{}};},
+  // Work under way in the library for this score is awaited first.
+  aheadOfTime:{joined:async(id:string)=>{assert.equal(id,'source');joined++;}},
+  // The edition just admitted is engraved again from, not read a second time.
+  prepareRebuiltEdition:async(_h:unknown,_e:unknown,_f:unknown,_b:unknown,_l:unknown,options:{refusal:unknown;content?:unknown})=>{assert.ok(options.refusal instanceof SavedPagesBehindPolicy);assert.equal(options.content,p);calls.push('rebuild');if(!rebuilds)throw Error('cannot engrave');return {packageBytes:new Uint8Array([9]),personal,left:0,carried:0,practice:[],additionalPersonal:[],replaced:{}};},
   preparePiano:async()=>({q,running:{}}),
   loadPersonal:async()=>personal,prepareScore:async()=>({q,running:{}}),collectionId:()=>'source',
   installPreparedScore:async()=>{calls.push('install');return {entry,personal};},
@@ -120,12 +123,12 @@ async function opening(rebuilds:boolean,times=1){
   console:{warn(){}},
  };
  runInNewContext(open,context);const opened=[];
- for(let i=0;i<times;i++){calls=[];notices=[];let error:unknown;try{await context.open(entry);}catch(e){error=e;}opened.push({calls,notices,error});}
+ for(let i=0;i<times;i++){calls=[];notices=[];joined=0;let error:unknown;try{await context.open(entry);}catch(e){error=e;}opened.push({calls,notices,error,joined});}
  return opened;
 }
 test('opening saved pages an earlier engine drew engraves the edition again and installs it',async()=>{
  const [f]=await opening(true);assert.equal(f.error,undefined);
- assert.deepEqual(f.calls,['admit','engrave-again','rebuild','install','activate','complete']);
+ assert.deepEqual(f.calls,['admit','engrave-again','rebuild','install','activate','complete']);assert.equal(f.joined,1);
  assert.deepEqual(f.notices,['This score was engraved again with the current engraving. Your hands, fingers and choices came along.']);
 });
 test('when they can\'t be engraved again, the score still opens on its saved pages and says so',async()=>{
