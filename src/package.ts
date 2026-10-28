@@ -26,13 +26,19 @@ import {validateDerivedHandPresentation,sourceFactsProjection,CALCULATED_HAND_SC
 import {admitCalculatedHandEdition,calculatedAdmissionKey,type CalculatedAdmissionEvidence,type CalculatedAdmissionEvidenceStore,type CalculatedHandReceipt} from './calculated-hand-edition';
 import {admitScoreTransposition,type ScoreTransposition} from './score-transposition';
 import {withKnownComposerRepeats} from '../vendor/iso-notation/src/scores/composer-repeats';
+import {CURRENT_ENGRAVER} from './engraver-identity';
 export interface Attack {id:string;writtenBar:number;startTick:number;pitch:number;hand:Hand;finger:number;row?:number;contact?:PhysicalKeyContact;owners:Array<{id:string;durationTicks:number;releaseTick:number;voice?:number}>}
 export interface FingerLayer {version:'physical-attack-finger-layer-v1'|'physical-contact-finger-layer-v2'|'piano-finger-assignments-v1';baseScoreId:string;sourceHash:string;inputSha256:string;plannerVersion:string;ticksPerBeat:number;reviewedFingerAuthority?:unknown;attacks:Attack[];sourceOwnerToAttack:Record<string,string>;traversal:number[];[key:string]:unknown}
 export interface Seat {id:string;page:number;ownerIds:string[];actionId:string;contactId:string;pitchDigit:string;x:number;baseline:number;fontSize:number;system:number;writtenBar:number;continuation?:boolean}
 export interface Metadata {title:string;composer:string;opus?:number;opusLabel?:string;piece?:number;provenance:string[];variant?:string}
 
-export interface Manifest {format:'iso-score';version:1|2|3;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;transposition?:ScoreTransposition;reading?:ReadingDescriptor}
-export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;calculationContext?:PianoCalculationContext|null}
+export interface Manifest {format:'iso-score';version:1|2|3;scoreId:string;revision:string;engineVersion:string;metadata:Metadata;semanticSha256:string;layerSourceHash?:string;files:Record<string,string>;pages:string[];font:string;notices:string[];createdAt:string;fingerGeometry?:{version:string;fontSha256:string};sourceScore?:string;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;renderingRecipe?:string;presentations?:Partial<Record<PhysicalKeyboardId,PresentationDescriptor>>;referenceMidi?:{file:'reference.mid'};calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;transposition?:ScoreTransposition;reading?:ReadingDescriptor;
+ /** The primary view's engraver, as its descriptor records it. */
+ engraver?:string}
+export interface PresentationDescriptor {layoutId:PhysicalKeyboardId;score:string;seats:string;fingers?:string;pages:string[];renderingRecipe?:string;revision:string;profileId:string;profileSha256:string;effectiveHandSha256:string;layerSourceHash:string;engineVersion:string;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:string;calculationContext?:PianoCalculationContext|null;
+ /** The engraver that drew these pages (`CURRENT_ENGRAVER` when they were
+  * drawn); absent from editions saved before 2026-10-28. */
+ engraver?:string}
 export interface ScorePackage {manifest:Manifest;score:QuantizedGridScore;seats:Seat[];pages:string[];files:Record<string,Uint8Array>;fingerLayer?:FingerLayer;fingerEligibility:{eligible:boolean;reason?:string};sourceScore?:QuantizedGridScore;sourceRevision?:string;sourceSha256?:string;keyboardLayout?:PhysicalKeyboardId;profileId?:string;profileSha256?:string;effectiveHandSha256?:string;availablePresentations?:PhysicalKeyboardId[];collectionManifest?:Manifest;renderingRecipe?:PassiveScoreRenderingRecipe;referenceMidi?:Uint8Array;calculationContext?:PianoCalculationContext;preparationIdentity?:PianoPreparationIdentity;calculatedHandReceipt?:CalculatedHandReceipt;annotationGeometry?:PresentationAnnotationGeometry;personalAnnotationInkPolicy?:PersonalAnnotationInkPolicy;transposition?:ScoreTransposition;transpositionOriginal?:ScorePackage;archiveSha256?:string;reading?:ReadingContent}
 
 export const hashBytes=async(b:Uint8Array|string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof b==='string'?strToU8(b):new Uint8Array(b)))).map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -74,10 +80,17 @@ export function keepSavedPagesBehindPolicy(archiveSha256:string|undefined){if(ar
  * or replays it. The no14-recovery engine, a retained approved v1 or v2
  * recipe, and pages saved with no recipe at all (an early-format edition)
  * predate it, however faithfully they read. Admission still opens them for
- * their content; opening one for display engraves it again. */
+ * their content; opening one for display engraves it again.
+ *
+ * An approved recipe's pages are not replayed on opening, so its view must
+ * also record that the current engraver drew them (`CURRENT_ENGRAVER`): an
+ * engraver update that changes no policy key still draws differently. A view
+ * saved before views recorded their engraver is behind once. A calculated-hand
+ * view needs no record: admission replays its pages with this engraver. */
 export function savedPagesBehindPolicy(p:ScorePackage):boolean{
  if(p.manifest.version===3)return false;
- const current=(view:ScorePackage)=>view.renderingRecipe?.engineId===APPROVED_SCORE_RENDERING_ENGINE||view.renderingRecipe?.engineId===CALCULATED_HAND_SCORE_RENDERING_ENGINE;
+ const current=(view:ScorePackage)=>view.renderingRecipe?.engineId===CALCULATED_HAND_SCORE_RENDERING_ENGINE||
+  view.renderingRecipe?.engineId===APPROVED_SCORE_RENDERING_ENGINE&&view.manifest.engraver===CURRENT_ENGRAVER;
  return [...(linkedViews.get(p)?.values()??[p])].some(view=>!current(view));
 }
 /** Refuses an edition whose saved pages predate the current shared policy,
@@ -434,13 +447,14 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  const views=new Map<PhysicalKeyboardId,ScorePackage>(),actualHeads=new Map<ScorePackage,readonly PresentationWrittenHead[]>();
  for(const [key,raw]of Object.entries(m.presentations)){
   if(!layoutId(key)||!isObject(raw)||raw.layoutId!==key||typeof raw.score!=='string'||typeof raw.seats!=='string'||!Array.isArray(raw.pages)||!raw.pages.length||raw.pages.some((x:unknown)=>typeof x!=='string'||!m.files[x])||
-   !digest(raw.revision)||m.files[raw.score]!==raw.revision||!m.files[raw.seats]||typeof raw.profileId!=='string'||!raw.profileId||!digest(raw.profileSha256)||!digest(raw.effectiveHandSha256)||!digest(raw.layerSourceHash)||typeof raw.engineVersion!=='string'||!raw.engineVersion||
+   !digest(raw.revision)||m.files[raw.score]!==raw.revision||!m.files[raw.seats]||typeof raw.profileId!=='string'||!raw.profileId||!digest(raw.profileSha256)||!digest(raw.effectiveHandSha256)||!digest(raw.layerSourceHash)||typeof raw.engineVersion!=='string'||!raw.engineVersion||raw.engraver!==undefined&&(typeof raw.engraver!=='string'||!raw.engraver)||
    raw.fingers!==undefined&&(typeof raw.fingers!=='string'||!m.files[raw.fingers])||raw.renderingRecipe!==undefined&&(typeof raw.renderingRecipe!=='string'||!m.files[raw.renderingRecipe])||raw.calculatedHandReceipt!==undefined&&(typeof raw.calculatedHandReceipt!=='string'||!m.files[raw.calculatedHandReceipt]))fail('Unsupported linked presentation descriptor');
   const d=raw as PresentationDescriptor;
   const viewContext=d.calculationContext===undefined?calculationContext:d.calculationContext===null?undefined:validatePianoCalculationContext(d.calculationContext,m.sourceSha256!,source),
     planningSource=scoreWithCalculationContext(source,viewContext,m.sourceSha256!);
   if(planningSource.referencePerformanceTempo!==undefined)validateReferencePerformanceTempo(planningSource.referencePerformanceTempo);else if(d.fingers&&!options.allowLegacyTempo)requireReferencePerformanceTempo(planningSource);
-  const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe,preparationIdentity:d.preparationIdentity,calculatedHandReceipt:d.calculatedHandReceipt};
+  const viewManifest:Manifest={...m,revision:d.revision,semanticSha256:d.revision,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,layerSourceHash:d.layerSourceHash,engineVersion:d.engineVersion,pages:d.pages.slice(),renderingRecipe:d.renderingRecipe,preparationIdentity:d.preparationIdentity,calculatedHandReceipt:d.calculatedHandReceipt,engraver:d.engraver};
+  if(d.engraver===undefined)delete viewManifest.engraver;
   if(viewContext)viewManifest.calculationContext=viewContext;else delete viewManifest.calculationContext;
   const p=await presentation(viewManifest,d.score,d.seats,d.fingers,{sourceScore:source,sourceRevision:m.sourceRevision,sourceSha256:m.sourceSha256,keyboardLayout:key,profileId:d.profileId,profileSha256:d.profileSha256,effectiveHandSha256:d.effectiveHandSha256,collectionManifest:m,...(transposition?{transposition:transposition.envelope,transpositionOriginal:transposition.original}:{}),...(viewContext?{calculationContext:viewContext}:{})});
   // Context is an explicit known field, never a blanket exclusion of source tempo.
@@ -472,7 +486,7 @@ async function admitPackage(bytes:Uint8Array,options:PackageReadOptions,contentO
  const primary=views.get(m.keyboardLayout)!;
  const d=m.presentations[m.keyboardLayout]!;
  if(!primary||d.score!=='score.json'||d.seats!=='seats.json'||d.fingers!==('fingers.json' in m.files?'fingers.json':undefined)||
-  ['revision','engineVersion','profileId','profileSha256','effectiveHandSha256','layerSourceHash','renderingRecipe','calculatedHandReceipt'].some(key=>(d as any)[key]!==((m as any)[key]))||JSON.stringify(d.pages)!==JSON.stringify(m.pages)||JSON.stringify(d.preparationIdentity)!==JSON.stringify(m.preparationIdentity)||
+  ['revision','engineVersion','profileId','profileSha256','effectiveHandSha256','layerSourceHash','renderingRecipe','calculatedHandReceipt','engraver'].some(key=>(d as any)[key]!==((m as any)[key]))||JSON.stringify(d.pages)!==JSON.stringify(m.pages)||JSON.stringify(d.preparationIdentity)!==JSON.stringify(m.preparationIdentity)||
   d.calculationContext!==undefined&&JSON.stringify(d.calculationContext??undefined)!==JSON.stringify(m.calculationContext))fail('Linked primary presentation differs from root manifest');
  for(const p of views.values()){p.availablePresentations=[...views.keys()];linkedViews.set(p,views);}
  // Defer registration until every companion and outer root-manifest check

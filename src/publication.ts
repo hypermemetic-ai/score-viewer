@@ -78,6 +78,8 @@ export interface PreparedNativePublication {
   source:Uint8Array;
   metadata:Metadata;
   engineVersion:string;
+  /** The engraver that drew `pages`, when the caller just drew them (`CURRENT_ENGRAVER`). */
+  engraver?:string;
   createdAt:string;
   font:{name:string;bytes:Uint8Array};
   notices:Record<string,Uint8Array>;
@@ -94,11 +96,11 @@ export async function publishPreparedNative(input:PreparedNativePublication,refe
     if(!['janko-four-row','conventional-piano'].includes(p.layoutId)||!p.pages.length)throw Error('Unsupported or empty prepared presentation.');
     const prefix=index?`presentations/${p.layoutId}/`:'',scoreBytes=p.score??input.source,score=normalizeLegacyScoreEvents(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(scoreBytes)) as QuantizedGridScore);
     const revision=await hashBytes(scoreBytes),profileId='publisher-fixed-pages-v1',profileSha256=await hashBytes(JSON.stringify({kind:profileId,layoutId:p.layoutId}));
-    const d:PresentationDescriptor={layoutId:p.layoutId,score:prefix+'score.json',seats:prefix+'seats.json',pages:p.pages.map((_,i)=>prefix+`pages/${i+1}.svg`),revision,profileId,profileSha256,effectiveHandSha256:await handDigest(source,score),layerSourceHash:sourceHash,engineVersion:input.engineVersion};
+    const d:PresentationDescriptor={layoutId:p.layoutId,score:prefix+'score.json',seats:prefix+'seats.json',pages:p.pages.map((_,i)=>prefix+`pages/${i+1}.svg`),revision,profileId,profileSha256,effectiveHandSha256:await handDigest(source,score),layerSourceHash:sourceHash,engineVersion:input.engineVersion,...(input.engraver?{engraver:input.engraver}:{})};
     put(d.score,scoreBytes);put(d.seats,strToU8(JSON.stringify(p.seats)));d.pages.forEach((n,i)=>put(n,strToU8(p.pages[i])));presentations[p.layoutId]=d;
   }
   const primary=presentations[input.presentations[0].layoutId]!;
-  const m:Manifest={format:'iso-score',version:2,scoreId:source.id,metadata:input.metadata,createdAt:input.createdAt,sourceScore:'source-score.json',sourceRevision:sourceHash,sourceSha256:sourceHash,keyboardLayout:primary.layoutId,semanticSha256:primary.revision,revision:primary.revision,profileId:primary.profileId,profileSha256:primary.profileSha256,effectiveHandSha256:primary.effectiveHandSha256,layerSourceHash:primary.layerSourceHash,engineVersion:primary.engineVersion,pages:primary.pages,presentations,font:input.font.name,notices:Object.keys(input.notices),files:{}};
+  const m:Manifest={format:'iso-score',version:2,scoreId:source.id,metadata:input.metadata,createdAt:input.createdAt,sourceScore:'source-score.json',sourceRevision:sourceHash,sourceSha256:sourceHash,keyboardLayout:primary.layoutId,semanticSha256:primary.revision,revision:primary.revision,profileId:primary.profileId,profileSha256:primary.profileSha256,effectiveHandSha256:primary.effectiveHandSha256,layerSourceHash:primary.layerSourceHash,engineVersion:primary.engineVersion,pages:primary.pages,...(input.engraver?{engraver:input.engraver}:{}),presentations,font:input.font.name,notices:Object.keys(input.notices),files:{}};
   m.files=Object.fromEntries(await Promise.all(Object.entries(files).map(async([n,b])=>[n,await hashBytes(b)])));files['manifest.json']=strToU8(JSON.stringify(m));
   return publishPackage(await importPackage(zipSync(files,{level:9})),referenceMidi);
 }
