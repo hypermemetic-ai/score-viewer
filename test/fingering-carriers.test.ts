@@ -76,11 +76,16 @@ test('an opposed shared-head alias uses its performing contact branch and retain
  const a=seat('a',['a','b'],100),q=fixture([note('a',60,0,48,'RH'),note('b',60,0,24,'RH')],[a],stem(50,95.8,80)+stem(50,104.2,120)),before=JSON.stringify(q),c=fingeringCarriers(q).get('a')!;
  assert.equal(c.kind,'stem');assert.equal(c.direction,-1);assert.equal(c.edge,80);assert.equal(c.stemIds.length,1);assert.equal(c.associatedStemIds.length,2);assert.equal(JSON.stringify(q),before);
 });
-test('a shared head keeps its lone stem on a parallel voice seat beside the column; a single head does not borrow it',()=>{
- // No. 13 bar 2, LH F4: two voices strike it for one value; the beamed voice's stem stands 1.3 left of the column.
+test('a shared head claims its lone stem on the column, and its two voices\' parallel stems beside it, but never a lone stem beside it',()=>{
+ // No. 13 printed 1, LH 5: two voices strike the key for one value and the voice ends there, so one stem stands on the column (ISO #505).
+ const shared=seat('a',['a','b'],100),notes=[note('a',60,0,24,'LH'),note('b',60,0,24,'LH')],c=fingeringCarriers(fixture(notes,[shared],stem(50,104.2,120))).get('a')!;
+ assert.equal(c.kind,'stem');assert.equal(c.x,50);assert.equal(c.direction,1);assert.equal(c.edge,120);assert.deepEqual(c.associatedStemIds,['0:0:stem-0']);
+ // Two voices of different lengths keep their own stems 1.3 either side of the column (ISO #504, Brahms printed 37 LH A2).
+ const pair=fingeringCarriers(fixture([note('a',60,0,24,'LH'),note('b',60,0,48,'LH')],[shared],stem(48.7,104.2,120)+stem(51.3,104.2,126))).get('a')!;
+ assert.equal(pair.kind,'stem');assert.equal(pair.direction,1);assert.equal(pair.edge,126);assert.deepEqual(pair.associatedStemIds,['0:0:stem-0','0:0:stem-1']);
+ // ISO 3bbe6a9 stood that lone stem 1.3 off the column; such a stem belongs to no head, shared or single.
  for(const dx of [-1.3,1.3]){
-  const shared=seat('a',['a','b'],100),q=fixture([note('a',60,0,24,'LH'),note('b',60,0,24,'LH')],[shared],stem(50+dx,104.2,120)),c=fingeringCarriers(q).get('a')!;
-  assert.equal(c.kind,'stem');assert.equal(c.direction,1);assert.equal(c.edge,120);assert.deepEqual(c.associatedStemIds,['0:0:stem-0']);
+  assert.equal(fingeringCarriers(fixture(notes,[shared],stem(50+dx,104.2,120))).get('a')!.kind,'head');
   const single=seat('a',['a'],100);assert.equal(fingeringCarriers(fixture([note('a',60,0,24,'LH')],[single],stem(50+dx,104.2,120))).get('a')!.kind,'head');
  }
 });

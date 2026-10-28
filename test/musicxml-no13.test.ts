@@ -7,6 +7,8 @@ import {planPractice,initialPractice,PracticeSession} from '../src/practice';
 import {ensurePianoReady} from '../src/piano-readiness';
 import {PackageAdmissionSession} from '../src/package-admission-session';
 import {adoptImportedReading} from '../src/personal-presentation';
+import {fingeringCarriers} from '../src/fingering-carriers';
+import {DOMParser} from '@xmldom/xmldom';
 
 const root=new URL('../',import.meta.url);
 const assets={font:{name:'fonts/URWGothic-Demi.otf',bytes:readFileSync(new URL('src/URWGothic-Demi.otf',root))},
@@ -44,6 +46,14 @@ test('Schumann Op. 68 No. 13 imports from MusicXML, opens on both keyboards and 
   assert.deepEqual([p.score.notes.filter(n=>n.hand==='RH').length,p.score.notes.filter(n=>n.hand==='LH').length],[456,322]);
  }
  const p=await selectPresentation(all,'janko-four-row'),graces=p.score.graceGroups??[];
+ // A key two voices strike for one value, where one voice ends, keeps one stem on its column (ISO #505: LH 5 and 9 on row 4), and its finger hangs from that stem.
+ const carriers=fingeringCarriers(p),column=(seat:typeof p.seats[number])=>{
+  const svg=new DOMParser().parseFromString(p.pages[seat.page],'image/svg+xml').documentElement!;
+  let el:any=[...svg.getElementsByTagName('*')].find(e=>e.getAttribute('data-viewer-seat')===seat.id)??null;
+  while(el&&el.nodeType===1&&!el.hasAttribute('data-note-x'))el=el.parentNode;return el?.nodeType===1?Number(el.getAttribute('data-note-x')):seat.x;};
+ const lone=p.seats.filter(s=>s.ownerIds.length>1&&carriers.get(s.id)?.kind==='stem'&&carriers.get(s.id)!.associatedStemIds.length===1);
+ assert.ok(lone.length>=8,`${lone.length} shared keys on one stem`);
+ for(const s of lone)assert.ok(Math.abs(carriers.get(s.id)!.x-column(s))<.03,`${s.id}: stem ${carriers.get(s.id)!.x}, column ${column(s)}`);
  assert.equal(graces.length,16,'every written grace group is kept');
  assert.throws(()=>planPractice(p),/explicit reference performance tempo/,'without a tempo practice asks for one, not for grace removal');
 
