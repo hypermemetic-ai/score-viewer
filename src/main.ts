@@ -140,7 +140,8 @@ let aheadOfTime:AheadOfTimeEngraving|undefined;
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
  // What opening each score reads from disk is made while the player is in the library.
- aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();},activity:progress=>{preparing.activity(progress);declareState();}});
+ // Once every score is ready on the keyboard layout in use, its pages for the other layout are made too, so a switch finds them.
+ aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work,round)=>prepareAheadOfTime(derived,entryId,execution,work,round?otherLayout(preferences.keyboardLayout):undefined),{rounds:2,basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();},activity:progress=>{preparing.activity(progress);declareState();}});
  usePersonalProjectionCache(derived);useVerbatimFoldCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
@@ -169,14 +170,18 @@ const aheadAdmission=new PackageAdmissionSession({maxEntries:1,maxRetainedBytes:
  * made again. Read only: installing that engraving, a layout the edition
  * lacks or memory not yet indexed is left for opening, which writes what it must. */
 const idleTime=()=>new Promise<void>(resolve=>{if(typeof requestIdleCallback==='function')requestIdleCallback(()=>resolve(),{timeout:5000});else setTimeout(resolve,0);});
-async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,work:AheadOfTimeWork){
+const otherLayout=(layout:PhysicalKeyboardId):PhysicalKeyboardId=>layout==='janko-four-row'?'conventional-piano':'janko-four-row';
+/** `other`: the keyboard layout not in use. Its pages are made only into the
+ * derived-file cache, for an edition that already has that layout: nothing
+ * is installed, and an opening stops this rather than waiting for it. */
+async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execution:ReadingExecution,work:AheadOfTimeWork,other?:PhysicalKeyboardId){
  if(!await personalMemory.adoptIndexed().catch(()=>false))return;checkReadingExecution(execution);
  // What this preparation is made for is read here, at once; an opening takes it over only while that stands.
- const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout,stored=personalMemory.storedRefs(entryId);if(!entry||!stored)return;work.started();
+ const entry=entries.find(e=>e.id===entryId),layout=other??preferences.keyboardLayout,stored=personalMemory.storedRefs(entryId);if(!entry||!stored)return;work.started();
  const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
  // Keyboard layouts the edition left for later come before its pages: installing
  // them makes a new edition, whose pages those would no longer be.
- const later=laterLayouts(entry);
+ const later=other?undefined:laterLayouts(entry);
  if(later&&!laterRefused.has(entry.file)){
   if(await completeAhead(derived,entry,bytes,later,execution,work))return prepareAheadOfTime(derived,entryId,execution,work);
   work.started();
@@ -194,12 +199,13 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  const outcome=await prepareRecorded(derived,key,async read=>{
   // A reading is admitted, and engraved again when opening would, off this thread.
   const reading=readingOnlyArchive(bytes);
+  if(reading&&other)return null;
   if(reading){work.plan(['engrave','install']);if(await engraveAgainAhead(derived,bytes,execution,work,{admit:true})){work.reached('engrave');installed=await installAhead(entry,bytes,'reading',execution,work);if(installed)work.reached('install');else work.failed();}work.ready();return null;}
   // An archive admission rejects, or whose pages an earlier engine drew, is
   // engraved again, for the keyboard layout in use, off this thread, and
   // installed as opening would install it. Only the engraving failing is a refusal.
   await answerInput();
-  const again=async()=>{work.plan(['engrave','install',...AHEAD_LATER,...AHEAD_PAGES]);await engraveAgainAhead(derived,bytes,execution,work,{layouts:[layout]});work.reached('engrave');installed=await installAhead(entry,bytes,'edition',execution,work);if(installed)work.reached('install');else work.failed();work.ready();return null;};
+  const again=async()=>{if(other)return null;work.plan(['engrave','install',...AHEAD_LATER,...AHEAD_PAGES]);await engraveAgainAhead(derived,bytes,execution,work,{layouts:[layout]});work.reached('engrave');installed=await installAhead(entry,bytes,'edition',execution,work);if(installed)work.reached('install');else work.failed();work.ready();return null;};
   let prior:ScorePackage;try{prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});}
   catch(error){if(!admissionRejection(error)&&!(error instanceof SavedPagesLackRepeats))throw error;return again();}
   await answerInput();
@@ -1375,17 +1381,20 @@ async function changeTransposition(steps:number){
  }catch(error){if(prepared){prepared.running.state='failed';if(dialog===prepared.dialog)closeDialog();}throw error;}
  finally{transpositionChanging=false;}
 }
+const sameBytes=(a:Uint8Array,b:Uint8Array)=>a.byteLength===b.byteLength&&a.every((value,index)=>value===b[index]);
 async function switchKeyboard(value:unknown){const source=document.activeElement as HTMLElement|null,optionsSurface=dialog,id=keyboardPreference(value);if(keyboardChanging)return;keyboardChanging=true;let op:ReadingOperation|undefined;
 
  try{const previous=current;if(previous){requirePianoCapability(previous.package,'pianoPreparation');op=beginReading(previous.entry.id,new LoadingProgress(previous.entry.metadata.title,['check','save','hands','open'],{kicker:`Switching to the ${layoutName(id)}`,cancel:true,cancelNote:'Cancel keeps the current layout.'}));readingProgress(op,'check');await readingCheckpoint(op);await practice?.flush();const context=practice?.contextSnapshot();await savePersonal();checkReading(op);const bytes=await host.read(previous.entry.file);if(!bytes)throw Error('Managed score is missing; the current score is retained.');
 
   const existing=previous.package.availablePresentations?.includes(id)?await selectPresentation(previous.package,id):undefined,
-   personal=existing?await loadPersonal(previous.entry,existing):undefined,{q,running,gained}=await preparePianoLayout(bytes,id,personal,previous.package,op,previous.entry);
+   personal=existing?await loadPersonal(previous.entry,existing,op):undefined,{q,running,gained}=await preparePianoLayout(bytes,id,personal,previous.package,op,previous.entry);
   if(current!==previous)throw Error('The current score changed while switching keyboards; prior choices are retained.');
    const next=q.personal??(existing?readPersonal(personal,q.package):await loadPersonal(previous.entry,q.package));
    next.view=anchorView(previous.personal.view,q.package,writtenAnchor(previous.package,previous.personal.view.page,selection?.ownerIds[0]));
 
-   const installed=await installPreparedScore(previous.entry,q,running,next,false,undefined,context,gained?.rebuilt);await readingCheckpoint(op);
+   // An edition that already has this layout's pages is installed as it is: nothing is written, as when it opens on this layout.
+   const unchanged=collectionId(q.package)===previous.entry.id&&!gained&&sameBytes(q.packageBytes,bytes),checked=unchanged?readPersonal(next,q.package):undefined,
+    installed=checked?{entry:previous.entry,personal:checked,practiceContext:context&&await PracticeView.prepareContext(q.package,previous.entry.id,context,checked)}:await installPreparedScore(previous.entry,q,running,next,false,undefined,context,gained?.rebuilt);await readingCheckpoint(op);
 
    preferences.keyboardLayout=id;await savePreferences().catch(error=>notify(`Keyboard layout choice was not saved: ${error.message}`));
    await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},context,installed.practiceContext,op);

@@ -57,13 +57,19 @@ async function inventory():Promise<Score[]>{
 function nameByKind(scores:Score[]){if(!owner)return;let piano=0,other=0;for(const s of scores){const letter=(n:number)=>String.fromCharCode(65+n);s.label=`${s.piano?`piano score ${letter(piano++)}`:`other score ${letter(other++)}`} (${s.id.slice(0,8)})`;}}
 
 /** One layout: first open and reopen of every score; every piano score practised, every section, Fingers too. */
-async function rehearseLayout(driver:Driver,scores:Score[],layout:string){
+async function rehearseLayout(driver:Driver,host:SimulatedHost,scores:Score[],layout:string){
  for(const score of scores){
   log(`  ${score.label}`);const where={score:score.id,layout},row:Record<string,unknown>={score:score.id,layout};timings.push(row);
   const first=await driver.openScore(score.id);row.firstOpenMs=first.ms;
   if(first.state.screen!=='reader'||first.state.score!==score.id){check('opens',false,where,{declared:first.state.dialog??first.state.screen,problems:await driver.problems()});await driver.toLibrary();continue;}
   check('opens',true,where);score.piano=first.state.instrument==='piano';
-  if(score.piano&&first.state.layout!==layout){const switched=await driver.setLayout(layout);row.setLayoutMs=switched.ms;}
+  if(score.piano&&first.state.layout!==layout){
+   const edition=async()=>(JSON.parse(await readFile(join(out,'data','library.json'),'utf8')) as {entries:Array<{id:string;file:string}>}).entries.find(e=>e.id===score.id)?.file;
+   const before=await edition(),since=host.writes.length,switched=await driver.setLayout(layout);row.setLayoutMs=switched.ms;
+   // An edition that already has the layout's pages is shown as it is: switching saves the choice of layout and nothing else.
+   const written=host.writes.slice(since).map(w=>w.name).filter(name=>name!=='preferences.json');
+   if(await edition()===before)check('a layout switch that keeps the edition writes only the choice of layout',!written.length,where,{written:written.map(name=>name.replace(/[0-9a-f]{16,}/g,'…'))});
+  }
   const pages=await driver.pages();check('pages present',pages.pages>0&&pages.drawn>=pages.pages,where,pages);row.pages=pages.pages;
   await driver.toLibrary();const again=await driver.openScore(score.id);row.reopenMs=again.ms;
   check('reopens',again.state.screen==='reader'&&again.state.score===score.id,where);
@@ -189,7 +195,7 @@ async function main(){
     await driver.toLibrary();}});}
   scores=await inventory();log(`Inventory: ${scores.length} scores × ${LAYOUTS.length} layouts`);
   log('The library left alone');preparing=await session(browser,host,'library',driver=>libraryAlone(driver,owner?900_000:180_000));
-  for(const layout of LAYOUTS){log(`Layout ${layout}`);await session(browser,host,layout,driver=>rehearseLayout(driver,scores,layout));}
+  for(const layout of LAYOUTS){log(`Layout ${layout}`);await session(browser,host,layout,driver=>rehearseLayout(driver,host,scores,layout));}
   nameByKind(scores);
   const presses=Number(args.presses??(owner?120:36)),actions=(args['press-keys']?.split(',')??['practice','edit','toggle']) as PressAction[];
   if(presses>0){log(`Early presses: ${presses}`);trials=await session(browser,host,'presses',driver=>earlyPresses(driver,scores,presses,actions));

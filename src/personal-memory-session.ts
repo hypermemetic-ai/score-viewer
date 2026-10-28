@@ -490,7 +490,11 @@ export class PersonalMemorySession {
   this.remember([input]);return this.schedule(async()=>{
    if(superseded?.())return;
    for(let attempt=0;attempt<maxAttempts;attempt++){
-    const current=await this.read(),latest=this.personalAt(current,input),personal=readPersonal(rawMemoryPersonal(update(latest)),input.p);
+    // Taken before the update, which may change what it was read into.
+    const current=await this.read(),stored=current.documents[inputKey(input)],before=stored===undefined?undefined:canonicalJson(stored),
+     latest=this.personalAt(current,input),personal=readPersonal(rawMemoryPersonal(update(latest)),input.p);
+    // What the store already holds is not written again (a view left where it was).
+    if(before===canonicalJson(json(personal))){this.rebase(current);return;}
     const result=await this.commit({expectedRevision:current.revision,changes:json({[inputKey(input)]:personal})});
     if(result.status==='committed'){this.rebase(result.snapshot);return;}
    }throw Error('Personal library remained busy; view save was not applied.');

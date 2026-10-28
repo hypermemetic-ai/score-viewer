@@ -52,10 +52,14 @@ export interface AheadOfTimeWork {
  failed():void;
 }
 /** How far the work on one score has come, from the stages it reached. */
-export interface AheadOfTimeProgress {entryId:string;stage?:string;fraction:number;end?:'done'|'failed'}
+export interface AheadOfTimeProgress {entryId:string;stage?:string;fraction:number;end?:'done'|'failed';
+ /** Present from the second round on (`rounds`): work for what the score may need later. */
+ round?:number}
 /** The preparation under way: its basis once it has read its inputs, and
  * whether an opening has taken it over. */
-interface Running {entryId:string;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>;
+interface Running {entryId:string;
+ /** 0 for what opening the score needs; a later round makes what it may need later (src/main.ts: the other keyboard layout). */
+ round:number;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>;
  /** The current step's ready has been given. */
  readied?:boolean;markReady:()=>void;replacing?:boolean;optional?:boolean;
  plan?:readonly string[];stage?:string;fraction:number;failed?:boolean}
@@ -63,6 +67,9 @@ export class AheadOfTimeEngraving {
  private controller?:AbortController;
  private running?:Running;
  private queue:string[]=[];
+ /** The list a run goes through once per round, and the round under way. */
+ private list:string[]=[];
+ private round=0;
  /** The next score, between its turn coming and idle time to start it. */
  private waiting?:string;
  private timer?:ReturnType<typeof setTimeout>;
@@ -72,7 +79,11 @@ export class AheadOfTimeEngraving {
  private holding=false;
  /** Each start or stop ends the run before it, including a step still waiting for idle time. */
  private generation=0;
- constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,work:AheadOfTimeWork)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
+ constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,work:AheadOfTimeWork,round:number)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
+  /** How many times the list is gone through (default once). A later round
+   * starts once every score has had the round before it, and an opening of
+   * any score stops it rather than taking it over. */
+  rounds?:number;
   /** No work remains or the work stopped: free what it held (its own projection worker). */
   release?:()=>void;
   /** The score work is on and how far it has come, and how it ended; or
@@ -90,14 +101,15 @@ export class AheadOfTimeEngraving {
  private get delay(){return this.options.delayMs??3000;}
  /** Prepare these scores in order, after a quiet moment. Replaces any earlier list. */
  start(entryIds:readonly string[]):void {
-  this.end(true);this.queue=[...new Set(entryIds)];this.arm();
+  this.end(true);this.round=0;this.list=[...new Set(entryIds)];this.queue=[...this.list];this.arm();
  }
  /** Back in the library with these scores. Work still under way, such as the
   * score whose opening was just cancelled while it took that work over,
   * pauses as input pauses it and then goes on first, rather than starting
   * again; otherwise the list starts afresh. */
  resume(entryIds:readonly string[]):void {
-  const running=this.running;if(!running||!this.current(running)){this.start(entryIds);return;}
+  const running=this.running;if(!running||running.round||!this.current(running)){this.start(entryIds);return;}
+  this.list=[...new Set(entryIds)];
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   running.taken=false;this.waiting=undefined;this.queue=[...new Set(entryIds)].filter(id=>id!==running.entryId);this.hold();
  }
@@ -107,7 +119,7 @@ export class AheadOfTimeEngraving {
   * until its pages are written, then reads them from disk instead of
   * engraving them a second time. Work made for anything else stops at once. */
  joined(entryId:string,signal?:AbortSignal):Promise<void>{
-  const running=this.running;if(running?.entryId!==entryId)return Promise.resolve();
+  const running=this.running;if(running?.entryId!==entryId||running.round)return Promise.resolve();
   // An opening that took the work over has already checked it; what the
   // opening itself changes on the way (its memory, its entry) is no reason to stop.
   if(!running.taken&&!this.current(running)){this.end(true);return Promise.resolve();}
@@ -120,14 +132,14 @@ export class AheadOfTimeEngraving {
   * engine hand editing resumes from. The reader settles its own engine after
   * it, and so restores that one rather than engraving it again. */
  finishing(entryId:string):Promise<void>|undefined{
-  const running=this.running;return running?.entryId===entryId?running.done:undefined;
+  const running=this.running;return running?.entryId===entryId&&!running.round?running.done:undefined;
  }
  /** Stop for a reading of `entryId`: work on that score continues at once,
   * even if input held it, and the reading joins it, while it is still made
   * for what the reading will show; anything else stops now. It runs in its
   * own projection worker, so stopping it never costs the reader's warm engines. */
  yieldTo(entryId:string):void {
-  const running=this.running;if(running?.entryId!==entryId||!this.current(running)||running.optional&&!running.replacing){this.end(true);return;}
+  const running=this.running;if(running?.entryId!==entryId||running.round||!this.current(running)||running.optional&&!running.replacing){this.end(true);return;}
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   running.taken=true;this.queue=[];this.waiting=undefined;this.unhold();
  }
@@ -160,16 +172,17 @@ export class AheadOfTimeEngraving {
  }
  private free(){if(!this.holding)return;this.holding=false;this.options.release?.();}
  private next():void {
-  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.free();this.options.activity?.(undefined);return;}
+  if(!this.queue.length&&this.waiting===undefined&&this.round+1<(this.options.rounds??1)&&this.list.length){this.round++;this.queue=[...this.list];}
+  const entryId=this.queue.shift(),generation=this.generation,round=this.round;if(entryId===undefined){this.free();this.options.activity?.(undefined);return;}
   this.waiting=entryId;
   const idle=this.options.idle??((run:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(run,{timeout:5000}):setTimeout(run,0));
   idle(()=>{
    if(generation!==this.generation||this.running)return;
    this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
-   const running:Running={entryId,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve(),fraction:0};this.running=running;
+   const running:Running={entryId,round,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve(),fraction:0};this.running=running;
    const arm=()=>{running.readied=false;running.replacing=false;running.optional=false;running.ready=new Promise<void>(resolve=>{running.markReady=()=>{running.readied=true;resolve();};});};arm();
    const started=()=>{if(this.running!==running)return;if(running.readied)arm();running.replacing=false;running.optional=false;running.basis=this.basis(entryId);};
-   const report=(end?:'done'|'failed')=>this.options.activity?.({entryId,...(running.stage===undefined?{}:{stage:running.stage}),fraction:running.fraction,...(end?{end}:{})});
+   const report=(end?:'done'|'failed')=>this.options.activity?.({entryId,...(running.stage===undefined?{}:{stage:running.stage}),fraction:running.fraction,...(end?{end}:{}),...(round?{round}:{})});
    const reached=(stage:string)=>{
     const at=running.plan?.indexOf(stage)??-1;if(this.running!==running||at<0)return;
     const fraction=(at+1)/running.plan!.length;if(fraction<=running.fraction)return;
@@ -179,7 +192,7 @@ export class AheadOfTimeEngraving {
     plan:stages=>{if(!running.plan)running.plan=[...stages];},reached,failed:()=>{running.failed=true;}};
    report();
    // A failure is a miss on opening, as before; a stop has been reported already.
-   running.done=this.prepare(entryId,{signal:controller.signal},work).then(()=>!running.failed,()=>false).then(done=>{
+   running.done=this.prepare(entryId,{signal:controller.signal},work,round).then(()=>!running.failed,()=>false).then(done=>{
     if(this.controller!==controller)return;
     this.controller=undefined;this.running=undefined;
     if(done)running.fraction=1;report(done?'done':'failed');this.next();

@@ -118,6 +118,26 @@ test('ahead-of-time engraving runs one score at a time, in order, and an opening
  assert.ok(!started.includes('late:x'));
 });
 
+test('a second round goes through the list again once every score had the first; an opening of any score stops it and waits for nothing',async()=>{
+ const runs:string[]=[],finish=new Map<string,()=>void>(),tick=()=>new Promise(r=>setTimeout(r,0));
+ const work=new AheadOfTimeEngraving((id,{signal},_work,round)=>new Promise<void>((resolve,reject)=>{
+  runs.push(`${id} ${round}`);finish.set(id,resolve);signal!.addEventListener('abort',()=>reject(new DOMException('stop','AbortError')));
+ }),{delayMs:0,idle:run=>run(),rounds:2});
+ work.start(['a','b']);await tick();finish.get('a')!();await tick();await tick();finish.get('b')!();await tick();await tick();
+ assert.deepEqual(runs,['a 0','b 0','a 1'],'the second round starts once the first is through');
+ let waited=true;await work.joined('a').then(()=>{waited=false;});assert.equal(waited,false,'an opening never waits for the second round');
+ assert.equal(work.finishing('a'),undefined);
+ work.yieldTo('a');await tick();await tick();assert.equal(work.active,undefined,'even of the score it is on, an opening stops it');
+ // Back in the library, the list starts from the first round again.
+ work.resume(['b','a']);await tick();assert.deepEqual(runs.slice(3),['b 0']);
+ // Input pauses a second-round score as it pauses any other.
+ finish.get('b')!();await tick();await tick();finish.get('a')!();await tick();await tick();assert.deepEqual(runs.slice(3),['b 0','a 0','b 1']);
+ work.defer();assert.equal(work.active,'b');
+ // Without rounds, one pass and done.
+ const once:string[]=[],single=new AheadOfTimeEngraving(async id=>{once.push(id);},{delayMs:0,idle:run=>run()});
+ single.start(['a','b']);for(let i=0;i<6;i++)await tick();assert.deepEqual(once,['a','b']);
+});
+
 // The library as the viewer wires it: its input listener, and an opening that
 // yields the work to the reading (beginReading) and joins it (activateScore).
 function library(delayMs=30){
@@ -280,10 +300,12 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  /** The edition engraved for the layout in use left the other layout for later. */
  later?:boolean;
  /** How installing goes: written, or failing for a reason of its own. */
- install?:(request:any)=>Promise<void>}={}){
+ install?:(request:any)=>Promise<void>;
+ /** The edition has pages for both keyboard layouts. */
+ both?:boolean}={}){
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
- const log:string[]=[],progress:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a'),installs:any[]=[];
+ const log:string[]=[],progress:string[]=[],layouts:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a'),installs:any[]=[];
  const stop=(step:string)=>{log.push(step);if(options.stopAt===step)controller.abort();};
  class Session {
   waiting=false;
@@ -312,9 +334,9 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
   entries:[{id:'no13',file:options.later?'package-again.tuna':'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
   personalMemory:{...memory,memoryRevision:0},FoldedReader,withRepeatInheritance:(_p:unknown,s:unknown)=>s,withResolvedMemory:()=>({}),resolveMemoryInput:()=>({}),host:{read:async(name:string)=>files[name]??null},
   projectionServed:async()=>!!options.projected,readingOnlyArchive:(b:Uint8Array)=>!!options.reading,
-  aheadAdmission:{import:async(b:Uint8Array)=>{if(options.admission&&first(b))throw options.admission;return {availablePresentations:['janko-four-row'],manifest:{files:{}},earlier:first(b)};}},
+  aheadAdmission:{import:async(b:Uint8Array)=>{if(options.admission&&first(b))throw options.admission;return {availablePresentations:options.both?['janko-four-row','conventional-piano']:['janko-four-row'],manifest:{files:{}},earlier:first(b)};}},
   scoreCapabilities:()=>({pianoPreparation:!options.reading}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>({}),readPersonal:(p:unknown)=>p,GUITAR_PRO_FILES:{descriptor:'source-part.json'},
-  ensurePianoReady:async(request:any)=>({package:{keyboardLayout:request.layout},packageBytes:request.packageBytes}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
+  ensurePianoReady:async(request:any)=>(layouts.push(request.layout),{package:{keyboardLayout:request.layout},packageBytes:request.packageBytes}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
   AheadOfTimeRefusal,SavedPagesLackRepeats:class extends Error{},ENGRAVE_AGAIN_KINDS:['engraved-again-v1','reading-admission-v1','piano-page-checks-v1','calculated-admission-v1'],
   // The worker engraves only what the current engraving no longer reproduces.
   engraveAgainInWorker:async(bytes:Uint8Array,_signal:AbortSignal,admit:boolean,more:{layouts?:string[];earlier?:Uint8Array})=>{
@@ -341,11 +363,11 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  };
  if(options.behind)context.savedPagesBehindPolicy=(p:any)=>p.earlier;
  runInNewContext(source,context);
- const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready'),replacing:()=>log.push('replacing'),optional:()=>log.push('optional'),
+ const run=(other?:string)=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready'),replacing:()=>log.push('replacing'),optional:()=>log.push('optional'),
   // The stages the library's line grows by: what was planned, reached, or failed.
-  plan:(stages:readonly string[])=>progress.push(`plan ${stages.join(' ')}`),reached:(stage:string)=>progress.push(stage),failed:()=>progress.push('failed')});
- const recorded=async()=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),'janko-four-row','no13','t1',null,[]]))))!==undefined;
- return {log,progress,run,recorded,derived,context,controller,installs};
+  plan:(stages:readonly string[])=>progress.push(`plan ${stages.join(' ')}`),reached:(stage:string)=>progress.push(stage),failed:()=>progress.push('failed')},other);
+ const recorded=async(layout='janko-four-row')=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),layout,'no13','t1',null,[]]))))!==undefined;
+ return {log,progress,layouts,run,recorded,derived,context,controller,installs};
 }
 test('a preparation writes the pages before an opening goes on, then saves the engine, and records itself only after both',async()=>{
  const whole=preparation();await whole.run();
@@ -435,6 +457,19 @@ test('the layouts an edition left for later are engraved from its earlier editio
  assert.deepEqual(refused.log.slice(3),['optional','engraved conventional-piano again from the earlier edition','started','project','pages written','ready','engine saved']);
  assert.deepEqual(refused.installs,[]);
  assert.deepEqual(refused.progress,['plan later later-install hands pages engine','plan hands pages engine','hands','pages'],'not a failure of the score: its pages are prepared');
+});
+
+test('the other keyboard layout\'s pages are prepared into the derived files only: nothing is engraved again, completed or installed for it',async()=>{
+ const p=preparation({both:true});await p.run('conventional-piano');
+ assert.deepEqual(p.log,['indexed','hand choices read','started','project','pages written','ready','engine saved']);
+ assert.deepEqual(p.layouts,['conventional-piano'],'its hands and pages are made for that layout');
+ assert.equal(await p.recorded('conventional-piano'),true);assert.equal(await p.recorded(),false,'the layout in use keeps its own record');
+ // An edition without that layout, one opening would engrave again, a reading, or a layout left for
+ // later: each waits for the player to open or switch; this round writes nothing of theirs.
+ for(const [what,options] of [['no pages for it',{}],['behind the engraving',{both:true,behind:true}],['a reading',{both:true,reading:true}],['left for later',{later:true}]] as const){
+  const q=preparation(options);await q.run('conventional-piano');
+  assert.deepEqual(q.installs,[],what);assert.ok(!q.log.some(step=>/engraved|installed|replacing|optional|project/.test(step)),what+': '+q.log.join(', '));
+ }
 });
 
 test('a background install waits for the library to be quiet, and an opening of another score stops it with nothing written',async()=>{
