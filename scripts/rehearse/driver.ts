@@ -9,6 +9,7 @@ import type {Page} from 'playwright-core';
 import {readControlBindings,type ControlAction} from '../../src/control-bindings';
 import {APP_FAILURES_ATTRIBUTE,APP_RAN_ATTRIBUTE,APP_STATE_ATTRIBUTES,readRan,type AppState} from '../../src/app-state';
 import {PRACTICE_MENU_KEYS,READER_COMMAND_KEYS} from '../../src/command-keys';
+import {fingerBehavior} from '../../src/input';
 
 /** The dialog a score opens behind. */
 export const OPENING_DIALOG='score-reading';
@@ -17,7 +18,9 @@ export type State=Partial<Record<keyof AppState,string>>&{ran:Map<string,number>
 export function appKeys(preferences:Record<string,unknown>|null){
  const bindings=readControlBindings(preferences?.controlBindings,{bindings:preferences?.bindings,midi:preferences?.midi,midiBindings:preferences?.midiBindings});
  const key=(action:ControlAction)=>{const found=bindings.actions[action]?.find(b=>b?.kind==='key');if(!found||found.kind!=='key')throw Error(`No key is assigned to ${action}.`);return found.key.replace(/\bCtrl\+/,'Control+');};
- return {edit:key('edit'),toggle:key('toggle'),options:key('practiceSettings'),practice:READER_COMMAND_KEYS.practice,import:READER_COMMAND_KEYS.import,fingers:PRACTICE_MENU_KEYS['practice-fingers'],sections:PRACTICE_MENU_KEYS['practice-sections'],back:'Escape',choose:'Enter'};
+ return {edit:key('edit'),toggle:key('toggle'),options:key('practiceSettings'),practice:READER_COMMAND_KEYS.practice,import:READER_COMMAND_KEYS.import,fingers:PRACTICE_MENU_KEYS['practice-fingers'],sections:PRACTICE_MENU_KEYS['practice-sections'],back:'Escape',choose:'Enter',
+  // "Show while held": the player holds the fingering key to look, and letting go before fingers are ready cancels it.
+  holdsToggle:fingerBehavior(preferences?.fingerBehavior)==='momentary'};
 }
 export type Keys=ReturnType<typeof appKeys>;
 export class StateTimeout extends Error {constructor(what:string,public state:State){super(`Timed out waiting for ${what}; the application declares ${JSON.stringify({...state,ran:undefined})}`);}}
@@ -37,6 +40,8 @@ export class Driver {
   return s;
  }
  async press(key:string){await this.page.keyboard.press(key);}
+ /** Holds a key down until `release` is called, as a player holds the fingering key. */
+ async hold(key:string){await this.page.keyboard.down(key);return ()=>this.page.keyboard.up(key);}
  problems():Promise<Array<{kind:string;text:string}>>{return this.page.evaluate(PROBLEMS);}
  count(selector:string){return this.page.locator(selector).count();}
 
@@ -108,16 +113,27 @@ export class Driver {
  /** Enters one section: the arrows walk the list to it, as a player's would, and Enter practises it. */
  async enterSection(id:string,timeout=120_000){
   const order=await this.sections();
+  // A selection inside a section's parts (its earlier groupings) returns to the sections with ←.
+  if(await this.selectedSection()===undefined)await this.press('ArrowLeft');
   for(let step=0;step<=order.length+1;step++){
    const at=await this.selectedSection();if(at===id)break;
    const here=order.indexOf(at??''),there=order.indexOf(id);if(there<0)throw Error(`Section ${id} is not listed.`);
    await this.press(here>=0&&here>there?'ArrowUp':'ArrowDown');
   }
   if(await this.selectedSection()!==id)return {ms:0,entered:false,state:await this.state(),selected:await this.selectedSection()};
+  // A section whose parts are not yet learned is locked: its Practise button is disabled, and Enter does nothing.
+  if(await this.page.locator(`.practice-start[data-practice="passage:${id}"]`).isDisabled().catch(()=>false))return {ms:0,entered:false,locked:true,state:await this.state()};
   await this.page.locator(`.practice-overview [data-passage-id="${id}"][data-component=false]`).focus();
-  const t0=performance.now();await this.press(this.keys.choose);
-  const s=await this.until(s=>s.section===id&&!s.busy,`section ${id}`,timeout).catch(async error=>{if(error instanceof StateTimeout)return error.state;throw error;});
-  return {ms:Math.round(performance.now()-t0),entered:s.section===id,state:s};
+  let t0=performance.now();const focused=()=>this.page.evaluate(`document.activeElement?.closest?.('[data-passage-id]')?.dataset.passageId`) as Promise<string|undefined>;
+  // Enter on sections already learned together opens them onto their first part, which a second Enter practises;
+  // the passage practised declares its own id.
+  let s:State|undefined;
+  for(let opened=0;opened<3;opened++){
+   const before=await focused(),pressed=t0=performance.now();await this.press(this.keys.choose);
+   s=await this.until(s=>!!s.section&&!s.busy||!s.busy&&performance.now()-pressed>1500,`section ${id}`,timeout).catch(async error=>{if(error instanceof StateTimeout)return error.state;throw error;});
+   if(s.section||await focused()===before)break;
+  }
+  return {ms:Math.round(performance.now()-t0),entered:!!s?.section,state:s!};
  }
  /** The drawing practice shows now: a section's music, or the Fingers measure. */
  async practiceDrawing(){return {section:await this.count('.practice-stage svg'),fingers:await this.count('.section-fingering:not([hidden]) .section-fingering-stage svg')};}

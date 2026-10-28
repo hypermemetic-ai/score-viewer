@@ -5,7 +5,7 @@
 // inventory is discovered from the library; invariants decide pass or fail,
 // while timings and what changed are reports for a person. See docs/rehearsal.md.
 import {build} from 'vite';
-import {cp,mkdir,readFile,writeFile} from 'node:fs/promises';
+import {chmod,cp,mkdir,readdir,readFile,stat,writeFile} from 'node:fs/promises';
 import {join,resolve,relative,isAbsolute} from 'node:path';
 import {existsSync} from 'node:fs';
 import {homedir} from 'node:os';
@@ -44,6 +44,11 @@ async function session<T>(browser:Browser,host:SimulatedHost,label:string,run:(d
  try{await page.goto(host.url);if(await page.evaluate('window.isTauri')!==true)throw Error('The simulated native host did not install (page.js).');await driver.openLibrary();return await run(driver,page);}
  catch(error){await page.screenshot({path:join(out,`error-${label}.png`)}).catch(()=>{});throw error;}
  finally{await context.close();}
+}
+/** The copy is the application's to write, as its own data directory is, even when the original is kept read-only. */
+async function writable(dir:string){
+ await chmod(dir,(await stat(dir)).mode|0o700);
+ for(const entry of await readdir(dir,{withFileTypes:true})){const path=join(dir,entry.name);if(entry.isDirectory())await writable(path);else if(entry.isFile())await chmod(path,(await stat(path)).mode|0o600);}
 }
 /** Places a file the current engine refuses as an earlier engraving in the library, as a laptop that saved it before would hold it. */
 async function seedEarlierEdition(bytes:Uint8Array,data:string):Promise<'seeded'|'same score'|false>{
@@ -88,15 +93,17 @@ async function rehearseLayout(driver:Driver,scores:Score[],layout:string){
   const sections=await driver.chooseStep('sections');row.sectionsMs=sections.ms;
   if(sections.state.screen!=='practice'||sections.state.step!=='sections'){check('sections open',false,where,{declared:sections.state,problems:await driver.problems()});await driver.toLibrary();continue;}
   const ids=await driver.sections();row.sections=ids.length;log(`    ${ids.length} sections`);check('sections listed',ids.length>0,where,{sections:ids.length});
-  const entries:number[]=[],refused:string[]=[];
+  const entries:number[]=[],refused:string[]=[],locked:string[]=[];
   for(const id of ids){
-   const entered=await driver.enterSection(id);entries.push(entered.ms);const shown=await driver.practiceDrawing(),problems=await driver.problems();
+   const entered=await driver.enterSection(id);
+   if('locked' in entered&&entered.locked){locked.push(id);continue;}
+   entries.push(entered.ms);const shown=await driver.practiceDrawing(),problems=await driver.problems();
    if(!entered.entered||!shown.section||problems.length)refused.push(id);
    if(!entered.entered||!shown.section)check('section practicable',false,where,{section:id,declared:entered.state,drawing:shown,problems});
    if(problems.length)check('no error shown',false,where,{section:id,problems});
    if(entered.entered)await driver.back();
   }
-  check('every section practicable',!refused.length,where,{sections:ids.length,refused:refused.length});
+  check('every section practicable',!refused.length,where,{sections:ids.length,refused:refused.length,locked:locked.length});row.locked=locked.length;
   row.sectionEntryMs={median:median(entries),max:entries.length?Math.max(...entries):undefined};
   await driver.toLibrary();
  }
@@ -115,16 +122,18 @@ async function earlyPresses(driver:Driver,scores:Score[],count:number,actions:Pr
   const t0=performance.now();await driver.press(driver.keys.choose);
   if(estimate===undefined){await driver.until(s=>s.dialog!==OPENING_DIALOG&&!s.busy?.includes('reading'),'the opening',600_000);}
   else{const wait=estimate+delta-(performance.now()-t0);if(wait>0)await driver.page.waitForTimeout(wait);}
-  await driver.press(key);
+  const held=action==='toggle'&&driver.keys.holdsToggle&&!key.includes('+');
+  const release=held?await driver.hold(key):(await driver.press(key),undefined);
   const ranBefore=before.ran.get(action)??0;let quietSince:number|undefined;
   const s=await driver.until(s=>{if((s.ran.get(action)??0)>ranBefore)return true;const quiet=s.screen==='reader'&&!s.busy&&s.dialog!==OPENING_DIALOG;quietSince=quiet?quietSince??performance.now():undefined;return quietSince!==undefined&&performance.now()-quietSince>1500;},'the press to run',600_000);
+  await release?.();
   await driver.page.waitForTimeout(400);const after=await driver.state(),ran=(after.ran.get(action)??0)-ranBefore;
   const marks=await driver.marks(),closeAt=marks.closed.slice(marked).find(c=>c.kind===OPENING_DIALOG)?.at,code=key.split('+').at(-1)!,pressAt=marks.keys.filter(k=>k.code===code).at(-1)?.at,enterAt=marks.keys.filter(k=>k.code==='Enter'&&(pressAt===undefined||k.at<=pressAt)).at(-1)?.at;
   if(closeAt!==undefined&&enterAt!==undefined)opened.set(score.id+path,[...(opened.get(score.id+path)??[]),closeAt-enterAt].slice(-5));
   const offset=closeAt!==undefined&&pressAt!==undefined?Math.round((pressAt-closeAt)*10)/10:undefined;
   // When the reader was declared on screen (behind the opening dialog) before the dialog left.
   const readerAt=enterAt===undefined?undefined:marks.screens.find(m=>m.screen==='reader'&&m.at>enterAt)?.at,readerShown=closeAt!==undefined&&readerAt!==undefined?Math.round((closeAt-readerAt)*10)/10:undefined;
-  trials.push({score:score.id,path,action,offset,readerShownMs:readerShown,pressAfterReaderMs:pressAt!==undefined&&readerAt!==undefined?Math.round((pressAt-readerAt)*10)/10:undefined,ran,declared:s.dialog??s.screen,failures:after.failures-before.failures});
+  trials.push({score:score.id,path,action,...(held?{held:true}:{}),offset,readerShownMs:readerShown,pressAfterReaderMs:pressAt!==undefined&&readerAt!==undefined?Math.round((pressAt-readerAt)*10)/10:undefined,ran,declared:s.dialog??s.screen,failures:after.failures-before.failures});
   if((i+1)%50===0||i+1===count){const t=pressSummary(trials);log(`  ${i+1} presses: after the dialog left ${t.afterClose.presses} (lost ${t.afterClose.lost}, doubled ${t.afterClose.doubled}); while it showed ${t.whileOpening.presses} (ignored ${t.whileOpening.ignored})`);}
  }
  return trials;
@@ -145,7 +154,7 @@ async function main(){
  // The application as built from this checkout, into scratch.
  const t0=performance.now();await build({root:repo,logLevel:'error',build:{outDir:join(out,'dist'),emptyOutDir:true}});const buildMs=Math.round(performance.now()-t0);
  const data=join(out,'data');
- if(owner){const source=resolve(args.data!);if(inside(source,repo))throw Error('Owner data never lives in the repository.');await cp(source,data,{recursive:true});}
+ if(owner){const source=resolve(args.data!);if(inside(source,repo))throw Error('Owner data never lives in the repository.');await cp(source,data,{recursive:true});await writable(data);}
  else await mkdir(data,{recursive:true});
  // Playwright looks under $XDG_CACHE_HOME when it is set; browsers installed before it was set stay in ~/.cache.
  if(!process.env.PLAYWRIGHT_BROWSERS_PATH&&process.env.XDG_CACHE_HOME&&!existsSync(join(process.env.XDG_CACHE_HOME,'ms-playwright'))&&existsSync(join(homedir(),'.cache/ms-playwright')))process.env.PLAYWRIGHT_BROWSERS_PATH=join(homedir(),'.cache/ms-playwright');
@@ -174,6 +183,7 @@ async function main(){
    const summary=pressSummary(trials);check('an early press runs exactly once',summary.afterClose.lost===0&&summary.afterClose.doubled===0&&summary.whileOpening.doubled===0&&summary.unmeasured.doubled===0,{},summary);}
  }finally{await browser.close();await host.close();}
  check('no uncaught page error',!pageErrors.length,{},pageErrors.slice(0,20));
+ check('the simulated host answered every command',!host.errors.length,{},host.errors.slice(0,20));
  // Reports name scores by label only (owner titles never leave the data copy).
  const label=(id:unknown)=>scores.find(s=>s.id===id)?.label??id;
  for(const row of [...timings,...trials])row.score=label(row.score);for(const c of checks)if(c.score)c.score=String(label(c.score));
@@ -185,11 +195,11 @@ async function main(){
  if(Object.values(invariants).some(i=>!i.held))process.exitCode=1;
 }
 function markdown(r:{mode:string;notes:string[];durationMs:number;buildMs:number;inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
- const s=r.earlyPress.summary,lines=[`## Rehearsal: ${r.mode}`,'',`${(r.durationMs/1000).toFixed(0)} s in all (build ${(r.buildMs/1000).toFixed(1)} s). ${r.inventory.scores.length} score${r.inventory.scores.length===1?'':'s'} (${r.inventory.scores.filter(x=>x.instrument==='piano').length} piano) × ${LAYOUTS.length} layouts; ${r.inventory.sections} sections entered across both layouts.`,'','### Invariants','','| Invariant | Held | Checked | Failed |','|---|---|---|---|',
+ const s=r.earlyPress.summary,lines=[`## Rehearsal: ${r.mode}`,'',`${(r.durationMs/1000).toFixed(0)} s in all (build ${(r.buildMs/1000).toFixed(1)} s). ${r.inventory.scores.length} score${r.inventory.scores.length===1?'':'s'} (${r.inventory.scores.filter(x=>x.instrument==='piano').length} piano) × ${LAYOUTS.length} layouts; ${r.inventory.sections} sections listed across both layouts (each entered unless locked).`,'','### Invariants','','| Invariant | Held | Checked | Failed |','|---|---|---|---|',
   ...Object.entries(r.invariants).map(([name,i])=>`| ${name} | ${i.held?'yes':'**no**'} | ${i.checked} | ${i.failed.length} |`),'',
   '### Early presses','',`${s.presses} presses timed around the opening dialog leaving. After it left: ${s.afterClose.presses}, ran once ${s.afterClose.once}, lost ${s.afterClose.lost}, doubled ${s.afterClose.doubled}. While it still showed: ${s.whileOpening.presses}, ran once ${s.whileOpening.once}, ignored ${s.whileOpening.ignored}, doubled ${s.whileOpening.doubled}; of those, ${s.whileOpening.readerShown} came with the score already drawn behind the dialog (ignored ${s.whileOpening.ignoredReaderShown}). The score showed behind the dialog for ${s.whileOpening.readerShownMs??'–'} ms (median) before it left.${s.unmeasured.presses?` Unmeasured: ${s.unmeasured.presses}.`:''}`,'',
-  '### Timings (reports, not gates)','','| Score | Layout | First open ms | Reopen ms | Pages | Fingers ms | Sections | Section entry median / max ms |','|---|---|---|---|---|---|---|---|',
-  ...r.timings.map(t=>{const e=t.sectionEntryMs as {median?:number;max?:number}|undefined;return `| ${t.score} | ${t.layout} | ${t.firstOpenMs??''}${t.setLayoutMs?` (+${t.setLayoutMs} layout)`:''} | ${t.reopenMs??''} | ${t.pages??''} | ${t.fingersMs??''} | ${t.sections??''} | ${e?.median??''} / ${e?.max??''} |`;})];
+  '### Timings (reports, not gates)','','| Score | Layout | First open ms | Reopen ms | Pages | Fingers ms | Sections (locked) | Section entry median / max ms |','|---|---|---|---|---|---|---|---|',
+  ...r.timings.map(t=>{const e=t.sectionEntryMs as {median?:number;max?:number}|undefined;return `| ${t.score} | ${t.layout} | ${t.firstOpenMs??''}${t.setLayoutMs?` (+${t.setLayoutMs} layout)`:''} | ${t.reopenMs??''} | ${t.pages??''} | ${t.fingersMs??''} | ${t.sections??''}${t.locked?` (${t.locked})`:''} | ${e?.median??''} / ${e?.max??''} |`;})];
  if(r.imports.length)lines.push('','Imports: '+r.imports.map(i=>`${i.file} ${i.ms} ms${i.refused?' (refused)':''}`).join(', ')+'.');
  if(r.notes.length)lines.push('','### Notes','',...r.notes.map(n=>`- ${n}`));
  return lines.join('\n')+'\n';

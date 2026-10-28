@@ -37,11 +37,11 @@ function assistanceStore(dir:string){
  return {read,commit};
 }
 
-export interface SimulatedHost {url:string;/** The next file the native picker returns. */pick(bytes:Uint8Array):void;writes:Array<{at:number;name:string;bytes:number}>;close():Promise<void>}
+export interface SimulatedHost {url:string;/** The next file the native picker returns. */pick(bytes:Uint8Array):void;writes:Array<{at:number;name:string;bytes:number}>;/** Native commands the simulation could not answer: the rehearsal's fault, not the application's. */errors:string[];close():Promise<void>}
 export async function startHost(options:{dist:string;data:string;repo:string}):Promise<SimulatedHost>{
  const dist=resolve(options.dist),data=resolve(options.data),derived=join(data,'.rehearsal-derived');
  const csp=JSON.parse(await readFile(join(options.repo,'src-tauri/tauri.conf.json'),'utf8')).app.security.csp.replace('connect-src ipc:',"connect-src 'self' ipc:");
- const assistance=assistanceStore(join(data,'assistance-v1')),picks:Uint8Array[]=[],writes:SimulatedHost['writes']=[];
+ const assistance=assistanceStore(join(data,'assistance-v1')),picks:Uint8Array[]=[],writes:SimulatedHost['writes']=[],errors:string[]=[];
  const server=createServer(async(req,res)=>{const url=new URL(req.url!,'http://localhost');try{
   if(url.pathname==='/__managed'){let bytes:Buffer|null=null;try{bytes=await readFile(managedPath(data,url.searchParams.get('name')!));}catch{}res.end(JSON.stringify(bytes?bytes.toString('base64'):null));return;}
   if(url.pathname==='/__write'){const {name,data:b64}=JSON.parse(String(await body(req)));const path=managedPath(data,name),bytes=Buffer.from(b64,'base64');await mkdir(dirname(path),{recursive:true});await writeFile(path,bytes);writes.push({at:Date.now(),name,bytes:bytes.length});res.end('null');return;}
@@ -53,10 +53,10 @@ export async function startHost(options:{dist:string;data:string;repo:string}):P
    try{res.end(await readFile(join(derived,key)));}catch{res.end();}return;}
   const path=resolve(dist,'.'+decodeURIComponent(url.pathname));if(path!==dist&&!path.startsWith(dist+'/'))throw Error('outside');const file=path===dist?join(dist,'index.html'):path;
   res.setHeader('Content-Security-Policy',csp);res.setHeader('Content-Type',TYPES[extname(file)]??'application/octet-stream');res.end(await readFile(file));
- }catch{if(!res.headersSent)res.writeHead(404);res.end();}});
+ }catch(error){if(url.pathname.startsWith('/__')){const said=`${req.method} ${url.pathname}${url.search.slice(0,80)}: ${(error as Error).message}`;errors.push(said);console.log(`    host: ${said}`);}if(!res.headersSent)res.writeHead(404);res.end();}});
  await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));
  const address=server.address();if(!address||typeof address==='string')throw Error('host did not listen');
- return {url:`http://127.0.0.1:${address.port}`,pick:bytes=>{picks.push(bytes);},writes,close:()=>new Promise<void>(done=>{server.closeAllConnections();server.close(()=>done());})};
+ return {url:`http://127.0.0.1:${address.port}`,pick:bytes=>{picks.push(bytes);},writes,errors,close:()=>new Promise<void>(done=>{server.closeAllConnections();server.close(()=>done());})};
 }
 
 /** Runs in the page before the application (page.js). */

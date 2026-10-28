@@ -22,5 +22,5 @@
 
 ## 4. Early-press loss
 
-- [ ] 4.1 Reproduce the lost press with the sweep and record the rate; diagnose its cause in `src/`.
+- [x] 4.1 Reproduce the lost press with the sweep and record the rate; diagnose its cause in `src/`.
 - [ ] 4.2 If the fix is small and mechanical, land it separately and show zero losses and zero doubles over a few hundred presses before and after; otherwise report the diagnosis.

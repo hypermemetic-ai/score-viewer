@@ -25,10 +25,10 @@ The host (`scripts/rehearse/host.ts`, `page.js`) answers the frontend's native c
 For every score and both keyboard layouts:
 
 - the score imports (default data), opens and reopens, with its pages drawn;
-- a piano score offers practice; Fingers opens and still draws after End takes it to its last measure; every listed section can be entered and draws its music;
+- a piano score offers practice; Fingers opens and still draws after End takes it to its last measure; every listed section can be entered and draws its music, except one locked until its parts are learned (its Practise button is disabled), which is counted in the report;
 - no error or refusal is shown, and the page raises no uncaught error;
 - a score for another instrument offers no practice;
-- **an early press runs exactly once:** P, E and F are pressed at moments swept around the opening dialog leaving. Each press is measured against that moment on the page's own clock. A press after the dialog left must run exactly once; no press may run twice. Presses while the dialog still showed are reported.
+- **an early press runs exactly once:** P, E and F are pressed at moments swept around the opening dialog leaving. Each press is measured against that moment on the page's own clock. A press after the dialog left must run exactly once; no press may run twice. Presses while the dialog still showed are reported. When the player's fingerings show only while held, the fingering key is held until it runs, as a player holds it to look; letting go before fingers are ready cancels it by design.
 
 ## Reports
 
