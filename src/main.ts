@@ -75,7 +75,7 @@ import type {PianoPrepared} from './piano-readiness';
 interface PreparedScore {packageBytes:Uint8Array;package:ScorePackage;personal?:PersonalState}
 import {stagePresentationInstall} from './presentation-install';
 import {prepareRetainedEdition,readRetainedEdition} from './retained-editions';
-import {prepareRebuiltEdition,addKeyboardView,canAddKeyboardView,canShareKeyboardView,shareKeyboardView,personalForAddedKeyboard,type RebuiltInstall} from './edition-rebuild';
+import {prepareRebuiltEdition,rebuildEdition,addKeyboardView,canAddKeyboardView,canShareKeyboardView,shareKeyboardView,personalForAddedKeyboard,type RebuiltInstall} from './edition-rebuild';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {AdmittedReading} from '../vendor/iso-notation/src/score-presentation';
 
@@ -1463,17 +1463,24 @@ async function importScore(){
  if(MUSESCORE_IMPORT_ENABLED&&kind==='musescore'){readingProgress(op,'engrave');const [{frettedPreparationAssets},{prepareMuseScore}]=await Promise.all([import('./fretted-preparation-assets'),import('./musescore-import')]);checkReading(op);
   const assets=await frettedPreparationAssets(op.controller.signal);checkReading(op);
   const saved=bytes;({bytes,reading}=await prepareMuseScore(saved,assets,readingExecution(op)));await readingCheckpoint(op);}
- const p=await admitReading(bytes,op),id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.setTitle(p.manifest.metadata.title||op.loading.title);
+ // A file the current engraving refuses is engraved again from its own content, as opening it from the library would be.
+ let p:ScorePackage,engravedFrom:Uint8Array|undefined,importSaid:string|undefined;
+ try{p=await admitReading(bytes,op);}catch(admission){({bytes,package:p,earlier:engravedFrom,said:importSaid}=await importAgain(bytes,admission,op));}
+ const id=collectionId(p),priorEntry=entries.find(e=>e.id===id);op.running.entryId=id;op.loading.setTitle(p.manifest.metadata.title||op.loading.title);
  await practice?.flush();await savePersonal();
- let refresh=false,linkedRefresh=false,savedHasLayout=false;
- if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const previous=await admitReading(prior,op).catch(async error=>{try{checkReading(op);}catch{throw error;}return await editionNeedsEngravingAgain(prior,error)??Promise.reject(error);});
-  savedHasLayout=previous.availablePresentations?.includes(op.keyboard)??previous.keyboardLayout===op.keyboard;
-  if(referenceMidiDiffers(previous,p))throw Error('This score has a different MIDI reference; the installed score and your saved choices are retained.');
+ let refresh=false,linkedRefresh=false,savedHasLayout=false,previous:ScorePackage|undefined;
+ if(priorEntry){if((priorEntry.transposition?.steps??0)!==0&&getScoreTransposition(p)===0)throw Error('Restore 0 steps before updating the original score. Your selected transposition is retained.');const prior=await host.read(priorEntry.file);if(!prior)throw Error('Managed package is missing; prior library entry retained');const saved=await admitReading(prior,op).catch(async error=>{try{checkReading(op);}catch{throw error;}return await editionNeedsEngravingAgain(prior,error)??Promise.reject(error);});previous=saved;
+  savedHasLayout=saved.availablePresentations?.includes(op.keyboard)??saved.keyboardLayout===op.keyboard;
+  if(referenceMidiDiffers(saved,p))throw Error('This score has a different MIDI reference; the installed score and your saved choices are retained.');
   // An early-format score file whose notes the library's edition was already
   // engraved from (to gain a keyboard layout) is the score already saved:
   // it opens as saved, and the earlier file stays under Earlier editions.
-  if(p.manifest.version===1&&(previous.collectionManifest??previous.manifest).version!==1&&previous.sourceSha256===p.sourceSha256){
+  if(p.manifest.version===1&&(saved.collectionManifest??saved.manifest).version!==1&&saved.sourceSha256===p.sourceSha256){
    finishReading(op,false);await open(priorEntry);notify('This score is already in your library, so it opened as saved.');return;}
+ }
+ // So are pages an earlier engine drew, which opening would engrave again.
+ if(!engravedFrom&&!importSaid)try{requireCurrentEngraving(p);}catch(admission){({bytes,package:p,earlier:engravedFrom,said:importSaid}=await importAgain(bytes,admission,op));}
+ if(priorEntry&&previous){
   refresh=!sameFrozenPayload(previous.manifest,p.manifest);linkedRefresh=p.manifest.version===2&&p.sourceSha256===(previous.sourceSha256??previous.manifest.semanticSha256);
   if(refresh&&!linkedRefresh){if(!headerOnlyRefresh(previous,p))throw Error('This source revision has a different frozen presentation beyond a verified header cleanup; the existing package and saved choices are retained.');suspendReadingDialog(op);const confirmed=await confirmHeaderRefresh();checkReading(op);if(!confirmed){finishReading(op,false);return;}readingDialog(op);}
  }
@@ -1492,13 +1499,33 @@ async function importScore(){
    presentations:refresh&&!linkedRefresh?[...(priorEntry.presentations??[]),priorEntry.file]:(priorEntry.presentations??[])}:
    {id,file:scoreFileName(await hashBytes(q.packageBytes)),metadata:q.package.manifest.metadata,importedAt:new Date().toISOString()},
    installed=await installPreparedScore(entry,q,running,q.personal??(priorEntry?await loadPersonal(priorEntry,q.package):initialPersonal(q.package)),!priorEntry,undefined,undefined,gained?.rebuilt,
-    // A new score engraved again to gain a layout keeps the imported file as an Earlier edition.
-    !priorEntry&&gained?.rebuilt?bytes:undefined);
+    // A new score engraved again (to gain a layout, or because the current engraving refused its file) keeps the imported file as an Earlier edition.
+    !priorEntry?engravedFrom??(gained?.rebuilt?bytes:undefined):undefined);
   await readingCheckpoint(op);
   const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);finishReading(op,true);
   await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
-  const said=gained&&gainedNotice(gained,q.package,!priorEntry);if(said)notify(said);
+  const said=[importSaid,gained?gainedNotice(gained,q.package,!priorEntry):''].filter(Boolean).join(' ');if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
+}
+/** An imported file the current engraving refuses follows opening's rule:
+ * saved pages that no longer reproduce, pages an earlier engine drew and
+ * pages without the score's repeat signs are engraved again from the file's
+ * own content (its source, hands and fingers). The file itself comes back as
+ * `earlier`, so a new score keeps it as an Earlier edition. Pages an earlier
+ * engine drew, or that only lack their repeat signs, open as saved when they
+ * can't be engraved again; any other refusal stays. */
+async function importAgain(bytes:Uint8Array,admission:unknown,op:ReadingOperation):Promise<{bytes:Uint8Array;package:ScorePackage;earlier?:Uint8Array;said?:string}>{
+ if((admission as Error)?.name==='AbortError')throw admission;try{checkReading(op);}catch{throw admission;}
+ readingProgress(op,'engrave-again');
+ try{
+  const again=await reengraveReadingArchive(bytes,admission,readingExecution(op))??(await rebuildEdition(bytes,{refusal:admission},readingExecution(op))).bytes;
+  await readingCheckpoint(op);return {bytes:again,package:await admitReading(again,op),earlier:bytes};
+ }catch(error){
+  if(!(admission instanceof SavedPagesLackRepeats||admission instanceof SavedPagesBehindPolicy)||(error as Error).name==='AbortError')throw error;
+  checkReading(op);console.warn('The imported score could not be engraved again; it opens on its saved pages.',error);
+  if(admission instanceof SavedPagesBehindPolicy){keepSavedPagesBehindPolicy(admission.archiveSha256);return {bytes,package:await admitReading(bytes,op),said:SAVED_PAGES_KEPT};}
+  keepSavedPagesWithoutRepeats(admission.sourceSha256);return {bytes,package:await admitReading(bytes,op),said:'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.'};
+ }
 }
 async function confirmHeaderRefresh():Promise<boolean>{return new Promise(resolve=>{const d=showDialog(`<h2>Refresh printed header?</h2><p class="help">This package has identical music, glyph seats, finger choices and every vector byte outside its verified notice cleanup. Your saved corrections and finger choices stay intact. The previous package remains available through Restore previous header.</p><div class="dialog-actions"><button data-keep-header>Keep current <kbd>Esc</kbd></button><button data-refresh-header>Refresh header</button></div>`,'header-refresh');let finished=false;const done=(yes:boolean)=>{if(finished)return;finished=true;resolve(yes);closeDialog();};d.querySelector('[data-keep-header]')!.addEventListener('click',()=>done(false));d.querySelector('[data-refresh-header]')!.addEventListener('click',()=>done(true));d.addEventListener('close',()=>{if(!finished){finished=true;resolve(false);}});});}
 async function restoreHeader(){if(!current?.entry.presentations?.length)return;const target=current,history=target.entry.presentations!,file=history.at(-1)!,data=await host.read(file);if(!data)throw Error('The retained package is missing; current header preserved.');const prior=await admitOrContent(data);if(!headerOnlyRefresh(target.package,prior))throw Error('Retained package does not pass the header-only contract; current data preserved.');const updated={...target.entry,file,presentations:history.slice(0,-1),retainedPackages:[...new Set([...(target.entry.retainedPackages??[]),target.entry.file])],...(target.entry.transposition?{transposition:nextTranspositionSelection(target.entry,file,{steps:getScoreTransposition(prior),layout:prior.keyboardLayout??preferences.keyboardLayout})}: {})},next=entries.map(e=>e.id===updated.id?updated:e);await enqueue(()=>writeJson('library.json',{version:1,entries:next}));entries=next;closeDialog();await open(updated);notify('Previous header restored; saved corrections and versions retained.');}

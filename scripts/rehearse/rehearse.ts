@@ -14,9 +14,6 @@ import type {Browser,Page} from 'playwright-core';
 import {startHost,pageScript,type SimulatedHost} from './host';
 import {Driver,appKeys,OPENING_DIALOG,type State} from './driver';
 import {studioFiles} from './studio';
-import {editionNeedsEngravingAgain} from '../../src/package';
-import {packageFile} from '../../src/edition-rebuild';
-import {collectionId,type Entry} from '../../src/state';
 
 const LAYOUTS=['janko-four-row','conventional-piano'] as const;
 const repo=resolve(new URL('../..',import.meta.url).pathname);
@@ -30,7 +27,7 @@ if(inside(out,repo))throw Error('Reports stay outside the repository; choose --o
 
 interface Score {id:string;label:string;piano?:boolean}
 interface Check {invariant:string;held:boolean;score?:string;layout?:string;detail?:unknown}
-const checks:Check[]=[],timings:Array<Record<string,unknown>>=[],pageErrors:string[]=[],notes:string[]=[];
+const checks:Check[]=[],timings:Array<Record<string,unknown>>=[],pageErrors:string[]=[];
 const check=(invariant:string,held:boolean,where:{score?:string;layout?:string}={},detail?:unknown)=>{checks.push({invariant,held,...where,...(detail===undefined?{}:{detail})});if(!held)console.log(`  ✗ ${invariant} ${where.score??''} ${where.layout??''} ${detail===undefined?'':JSON.stringify(detail).slice(0,300)}`);};
 const log=(text:string)=>console.log(text);
 const median=(xs:number[])=>{if(!xs.length)return undefined;const s=[...xs].sort((a,b)=>a-b);return s[Math.floor(s.length/2)];};
@@ -49,14 +46,6 @@ async function session<T>(browser:Browser,host:SimulatedHost,label:string,run:(d
 async function writable(dir:string){
  await chmod(dir,(await stat(dir)).mode|0o700);
  for(const entry of await readdir(dir,{withFileTypes:true})){const path=join(dir,entry.name);if(entry.isDirectory())await writable(path);else if(entry.isFile())await chmod(path,(await stat(path)).mode|0o600);}
-}
-/** Places a file the current engine refuses as an earlier engraving in the library, as a laptop that saved it before would hold it. */
-async function seedEarlierEdition(bytes:Uint8Array,data:string):Promise<'seeded'|'same score'|false>{
- const content=await editionNeedsEngravingAgain(bytes,Error('refused on import'));if(!content)return false;
- const path=join(data,'library.json'),library=JSON.parse(await readFile(path,'utf8').catch(()=>'{"version":1,"entries":[]}')) as {entries:Entry[]},file=await packageFile(bytes),id=collectionId(content);
- if(library.entries.some(e=>e.id===id))return 'same score';
- await writeFile(join(data,file),bytes);library.entries.push({id,file,metadata:content.manifest.metadata,importedAt:new Date().toISOString()});await writeFile(path,JSON.stringify(library));
- return 'seeded';
 }
 /** Labels a report can carry: public titles for the studio scores, never an owner title. */
 async function inventory():Promise<Score[]>{
@@ -163,18 +152,10 @@ async function main(){
  const host=await startHost({dist:join(out,'dist'),data,repo});
  const imports:Array<Record<string,unknown>>=[];let trials:Array<Record<string,unknown>>=[],scores:Score[]=[];
  try{
-  if(!owner){const files=await studioFiles(repo,join(scratch,'sv-rehearsal-cache'));log(`Importing ${files.length} studio files`);const refused:Array<{file:{name:string;bytes:Uint8Array};detail:unknown}>=[];
+  if(!owner){const files=await studioFiles(repo,join(scratch,'sv-rehearsal-cache'));log(`Importing ${files.length} studio files`);
    await session(browser,host,'import',async driver=>{for(const file of files){host.pick(file.bytes);const r=await driver.importScore(),imported=r.state.screen==='reader'&&!!r.state.score,problems=await driver.problems();imports.push({file:file.name,ms:r.ms,score:r.state.score,...(imported?{}:{refused:problems.map(p=>p.text).join(' ')})});
-    // An edition an earlier engine drew is refused by Import (a finding, reported) but
-    // opens from a library that saved it before; such a file joins the library as saved.
-    if(imported)check('imports',true,{score:file.name});else refused.push({file,detail:{declared:r.state.dialog??r.state.screen,problems}});
-    await driver.toLibrary();}});
-   // After the session, which keeps the library it read: the next session reads the seeded one.
-   for(const {file,detail} of refused){
-    const seeded=await seedEarlierEdition(file.bytes,data);
-    if(seeded){const said=seeded==='seeded'?'it was placed in the library as a score saved before, and is rehearsed from there':'the library already holds the same score from another file, so it is not rehearsed separately';notes.push(`Import refused ${file.name} as drawn by an earlier engraving engine (a finding, not a gate); ${said}.`);log(`  ${file.name}: refused by Import as an earlier engraving; ${said}`);}
-    else check('imports',false,{score:file.name},detail);
-   }}
+    check('imports',imported,{score:file.name},imported?undefined:{declared:r.state.dialog??r.state.screen,problems});
+    await driver.toLibrary();}});}
   scores=await inventory();log(`Inventory: ${scores.length} scores × ${LAYOUTS.length} layouts`);
   for(const layout of LAYOUTS){log(`Layout ${layout}`);await session(browser,host,layout,driver=>rehearseLayout(driver,scores,layout));}
   nameByKind(scores);
@@ -189,19 +170,18 @@ async function main(){
  for(const row of [...timings,...trials])row.score=label(row.score);for(const c of checks)if(c.score)c.score=String(label(c.score));
  const invariants=Object.fromEntries([...new Set(checks.map(c=>c.invariant))].map(name=>{const all=checks.filter(c=>c.invariant===name);return [name,{held:all.every(c=>c.held),checked:all.length,failed:all.filter(c=>!c.held)}];}));
  const report={mode:owner?'owner data':'studio scores',durationMs:Math.round(performance.now()-started),buildMs,inventory:{scores:scores.map(s=>({label:s.label,instrument:s.piano===undefined?'unopened':s.piano?'piano':'other'})),layouts:LAYOUTS,sections:timings.reduce((n,r)=>n+((r.sections as number)??0),0)},
-  imports,timings,earlyPress:{summary:pressSummary(trials),trials},invariants,pageErrors,notes,writes:host.writes.length};
+  imports,timings,earlyPress:{summary:pressSummary(trials),trials},invariants,pageErrors,writes:host.writes.length};
  await writeFile(join(out,'report.json'),JSON.stringify(report,null,1));
  const summary=markdown(report);await writeFile(join(out,'summary.md'),summary);console.log('\n'+summary);
  if(Object.values(invariants).some(i=>!i.held))process.exitCode=1;
 }
-function markdown(r:{mode:string;notes:string[];durationMs:number;buildMs:number;inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
+function markdown(r:{mode:string;durationMs:number;buildMs:number;inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
  const s=r.earlyPress.summary,lines=[`## Rehearsal: ${r.mode}`,'',`${(r.durationMs/1000).toFixed(0)} s in all (build ${(r.buildMs/1000).toFixed(1)} s). ${r.inventory.scores.length} score${r.inventory.scores.length===1?'':'s'} (${r.inventory.scores.filter(x=>x.instrument==='piano').length} piano) × ${LAYOUTS.length} layouts; ${r.inventory.sections} sections listed across both layouts (each entered unless locked).`,'','### Invariants','','| Invariant | Held | Checked | Failed |','|---|---|---|---|',
   ...Object.entries(r.invariants).map(([name,i])=>`| ${name} | ${i.held?'yes':'**no**'} | ${i.checked} | ${i.failed.length} |`),'',
   '### Early presses','',`${s.presses} presses timed around the opening dialog leaving. After it left: ${s.afterClose.presses}, ran once ${s.afterClose.once}, lost ${s.afterClose.lost}, doubled ${s.afterClose.doubled}. While it still showed: ${s.whileOpening.presses}, ran once ${s.whileOpening.once}, ignored ${s.whileOpening.ignored}, doubled ${s.whileOpening.doubled}; of those, ${s.whileOpening.readerShown} came with the score already drawn behind the dialog (ignored ${s.whileOpening.ignoredReaderShown}). The score showed behind the dialog for ${s.whileOpening.readerShownMs??'–'} ms (median) before it left.${s.unmeasured.presses?` Unmeasured: ${s.unmeasured.presses}.`:''}`,'',
   '### Timings (reports, not gates)','','| Score | Layout | First open ms | Reopen ms | Pages | Fingers ms | Sections (locked) | Section entry median / max ms |','|---|---|---|---|---|---|---|---|',
   ...r.timings.map(t=>{const e=t.sectionEntryMs as {median?:number;max?:number}|undefined;return `| ${t.score} | ${t.layout} | ${t.firstOpenMs??''}${t.setLayoutMs?` (+${t.setLayoutMs} layout)`:''} | ${t.reopenMs??''} | ${t.pages??''} | ${t.fingersMs??''} | ${t.sections??''}${t.locked?` (${t.locked})`:''} | ${e?.median??''} / ${e?.max??''} |`;})];
  if(r.imports.length)lines.push('','Imports: '+r.imports.map(i=>`${i.file} ${i.ms} ms${i.refused?' (refused)':''}`).join(', ')+'.');
- if(r.notes.length)lines.push('','### Notes','',...r.notes.map(n=>`- ${n}`));
  return lines.join('\n')+'\n';
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
