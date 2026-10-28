@@ -18,7 +18,7 @@
 
 - [x] 3.1 `docs/rehearsal.md`: layers, data modes, reports, extending the driver.
 - [x] 3.2 One AGENTS.md gate line: rehearse before completion; for deliveries also the owner-data run with its summary in the PR.
-- [ ] 3.3 Gates green: `npm test`, `npm run build`, `npm run rehearse`; owner-data run once with its summary reported.
+- [x] 3.3 Gates green: `npm test`, `npm run build`, `npm run rehearse`; owner-data run once with its summary reported.
 
 ## 4. Early-press loss
 
