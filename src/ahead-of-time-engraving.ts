@@ -52,7 +52,9 @@ export interface AheadOfTimeWork {
  failed():void;
 }
 /** How far the work on one score has come, from the stages it reached. */
-export interface AheadOfTimeProgress {entryId:string;stage?:string;fraction:number;end?:'done'|'failed'}
+export interface AheadOfTimeProgress {entryId:string;stage?:string;fraction:number;end?:'done'|'failed';
+ /** Present from the second round on (`rounds`): work for what the score may need later. */
+ round?:number}
 /** The preparation under way: its basis once it has read its inputs, and
  * whether an opening has taken it over. */
 interface Running {entryId:string;
@@ -180,7 +182,7 @@ export class AheadOfTimeEngraving {
    const running:Running={entryId,round,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve(),fraction:0};this.running=running;
    const arm=()=>{running.readied=false;running.replacing=false;running.optional=false;running.ready=new Promise<void>(resolve=>{running.markReady=()=>{running.readied=true;resolve();};});};arm();
    const started=()=>{if(this.running!==running)return;if(running.readied)arm();running.replacing=false;running.optional=false;running.basis=this.basis(entryId);};
-   const report=(end?:'done'|'failed')=>this.options.activity?.({entryId,...(running.stage===undefined?{}:{stage:running.stage}),fraction:running.fraction,...(end?{end}:{})});
+   const report=(end?:'done'|'failed')=>this.options.activity?.({entryId,...(running.stage===undefined?{}:{stage:running.stage}),fraction:running.fraction,...(end?{end}:{}),...(round?{round}:{})});
    const reached=(stage:string)=>{
     const at=running.plan?.indexOf(stage)??-1;if(this.running!==running||at<0)return;
     const fraction=(at+1)/running.plan!.length;if(fraction<=running.fraction)return;

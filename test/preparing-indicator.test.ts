@@ -109,6 +109,16 @@ test('a score that fails, or work that stops, takes its line away at once',()=>w
  assert.equal(lineOf(a),null);assert.equal(lineOf(b),null);
 }));
 
+test('the other layout\'s pages, made in a later round, draw no line: a line that filled stays done',()=>withDom(()=>{
+ const {surface,a,b}=library(),line=new PreparingIndicator(()=>surface as unknown as HTMLElement);
+ line.activity(at('a',0));mock.timers.tick(PREPARING_GRACE_MS);line.activity(at('a',1,'engine','done'));mock.timers.tick(PREPARING_LEAVE_MS);assert.equal(lineOf(a),null);
+ const later=(entryId:string,fraction:number,end?:'done'):AheadOfTimeProgress=>({...at(entryId,fraction,'pages',end),round:1});
+ line.activity(later('a',0));mock.timers.tick(PREPARING_GRACE_MS*2);line.activity(later('a',0.5));
+ assert.equal(lineOf(a),null,'no second line under a score already done');assert.equal(line.showing,undefined);
+ assert.equal(line.preparing,'a','the work is still declared');
+ line.activity(later('a',1,'done'));line.activity(later('b',0));mock.timers.tick(PREPARING_GRACE_MS*2);assert.equal(lineOf(b),null);
+}));
+
 test('the line is an overlay that changes its width and opacity only: no focus, no loop, no motion when motion is reduced',()=>{
  const css=readFileSync(new URL('../src/preparing-indicator.css',import.meta.url),'utf8');
  assert.match(css,/\.preparing-line\{[^}]*position:absolute;[^}]*pointer-events:none/);

@@ -38,6 +38,8 @@ export class PreparingIndicator {
    return;
   }
   this.work=progress;
+  // The other layout's pages (a later round) draw no line: a full line says the score is done.
+  if(progress.round){this.cancel();if(this.shown!==undefined){this.finish(this.shown,false);this.shown=undefined;}return;}
   if(this.shown===progress.entryId){this.draw(progress);return;}
   if(was?.entryId===progress.entryId&&this.grace!==undefined)return;
   // Another score: its own grace. A line still drawn for the one before goes.
