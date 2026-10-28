@@ -12,6 +12,7 @@ import {importPackage} from '../src/package';
 import {requirePianoCapability} from '../src/score-capabilities';
 import {READINESS_WORDS,ScoreReadiness} from '../src/score-readiness';
 import {PendingPress,READINESS_NOTICE_DELAY_MS,type ReadinessNoticeView,type ReadinessTimers} from '../src/readiness-notice';
+import {declaredState} from './support/declared-state';
 
 // The reader's own key handling, commands and waiting presses, as main.ts has them.
 const source=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
@@ -28,7 +29,7 @@ function reopened(){
  const view:ReadinessNoticeView={show:words=>shown.push(`show:${words}`),hide:()=>shown.push('hide'),withdraw:()=>shown.push('withdraw')};
  const readiness=new ScoreReadiness({fingers:{run:()=>{fingersRuns++;return new Promise<void>((resolve,reject)=>{finish=resolve;fail=reject;});}},practice:{needs:['fingers'],run:async()=>{}}});
  const surface={};
- const context:any={startupReady:true,startupFailed:false,
+ const context:any={...declaredState(),startupReady:true,startupFailed:false,
   window:{addEventListener(_type:string,handler:any){key=handler;}},document:{hidden:false,activeElement:null},innerWidth:1280,innerHeight:720,
   input:new InputController(),controls:new ControlResolver(readerControlBindings(readControlBindings(undefined,{bindings:defaultBindings()}))),editNavigation:'notes',
   current:{entry:{id:'no14'},package:pkg,personal:{view:defaultView()}},selection:undefined,readerFocused:true,preferences:{fingerBehavior:'toggle'},

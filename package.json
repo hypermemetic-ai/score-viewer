@@ -9,7 +9,8 @@
     "tauri": "tauri",
     "test": "node --import tsx --test --test-concurrency=8 test/*.test.ts",
     "prebuild": "node scripts/check-source-pin.mjs && node scripts/check-fingering-assistance.mjs",
-    "pretest": "node scripts/check-source-pin.mjs && node scripts/check-fingering-assistance.mjs"
+    "pretest": "node scripts/check-source-pin.mjs && node scripts/check-fingering-assistance.mjs",
+    "rehearse": "node --import tsx scripts/rehearse/rehearse.ts"
   },
   "dependencies": {
     "@hypermemetic-ai/fingering-editor-assistance": "file:vendor/fingering-editor-assistance/hypermemetic-ai-fingering-editor-assistance-0.1.0.tgz",
@@ -23,6 +24,7 @@
     "@tonejs/midi": "2.0.28",
     "@types/node": "^22.20.2",
     "fake-indexeddb": "6.2.5",
+    "playwright-core": "1.62.0",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"

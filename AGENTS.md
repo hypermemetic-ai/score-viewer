@@ -4,6 +4,8 @@ This repository owns the score viewer application. Preserve the user's scores, e
 
 Use scoped branches and the ordinary reviewed pull-request path. At task start and before completion run `node /home/qqp/projects/qq-workflows/scripts/git-status.mjs` from the checkout. Preserve unrelated changes and worktrees; never reset, clean, stash or forcibly synchronize them. Stop temporary processes started for the task before finishing.
 
+Before completion run `npm run rehearse` (see docs/rehearsal.md); for a delivery also run it with `--data` on a copy of the owner's data and attach only its summary to the pull request, nothing private.
+
 Start from docs/handoff-2026-10-27.md, then read README.md, docs/migration.md and docs/practice-repair-handoff.md before proposing work. This repository contains the accepted application extraction and a pinned transitional notation dependency. The migration itself did not certify or activate a native build. Preserve the source provenance and shared dependency ownership; develop application repairs here rather than performing a competing extraction. Do not modify authentication, provider or workflow configuration.
 
 Make pianist-facing controls and musical behavior understandable. Preserve musical meaning and use shared engraving rules. Tests and artifact hashes are evidence, not a substitute for observing the viewer. Distinguish source, built package, installed package and human musical acceptance. Report visual impact and inspection limits.

@@ -19,6 +19,7 @@ import {derivedModuleClosure,viewerDerivedIdentity} from '../scripts/derived-ide
 import {sourcePackage,transferStudy} from './support/hand-edition-fixture';
 import {initialPersonal} from '../src/state';
 import {assigned} from '../src/personal-assignments';
+import {declaredState} from './support/declared-state';
 
 const sha=(c:string)=>c.repeat(64);
 function memoryStore(){
@@ -321,7 +322,7 @@ test('only admission rejecting a score, or the engraver refusing its pages, is r
 
 test('an opening cancelled with Esc, or failed, returns to a library that prepares scores again',async()=>{
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),from=main.indexOf('function finishReading('),to=main.indexOf('\nconst readerPages=',from);
- const started:string[][]=[],context:any={readingOperation:undefined,current:undefined,shownFailures:new Set(),dialog:undefined,READING_CANCELLED:'cancelled',
+ const started:string[][]=[],context:any={...declaredState(),readingOperation:undefined,current:undefined,shownFailures:new Set(),dialog:undefined,READING_CANCELLED:'cancelled',
   closeDialog(){},options(){},button:()=>'',libraryOrder:()=>['no13','no14'],aheadOfTime:{resume:(ids:string[])=>started.push(ids)}};
  runInNewContext(stripTypeScriptTypes(main.slice(from,to)),context);
  const op=()=>{const op={running:{state:'working'},loading:{stop(){},fail(){}},controller:new AbortController(),options:undefined,previous:undefined};context.readingOperation=op;return op;};
