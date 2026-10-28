@@ -107,6 +107,17 @@ test('the layout in use is engraved and installed first, the other later from th
  assert.equal(two.entry.personalFiles![janko],one.entry.personalFiles![janko]);
 });
 
+test('every pitch choice that named the earlier edition, or the edition installed first, names the completed edition on both layouts',async()=>{
+ // The player once chose another pitch and came back: the library remembers each layout's pitch choices.
+ const chosen:Entry={...entry,transposition:{version:'score-transposition-selection-v1',steps:0,editions:{'0':{'janko-four-row':file,'conventional-piano':file}}}};
+ const stored=savedLibrary();stored.set('library.json',encode({version:1,entries:[chosen]}));
+ const {lib}=library(stored),one=await install(lib,chosen,first,()=>({from:file,later:first.later!,untold:said(first)}));
+ assert.deepEqual(one.entry.transposition!.editions['0'],{'janko-four-row':one.entry.file,'conventional-piano':file},'Jankó names the edition installed first; Conventional keeps the earlier edition it still needs');
+ const completed=await prepareCompletedEdition(host(stored),one.entry,first.packageBytes,file,bytes,['conventional-piano']),
+  two=await install(lib,one.entry,completed,()=>({from:file}));
+ assert.deepEqual(two.entry.transposition!.editions['0'],{'janko-four-row':two.entry.file,'conventional-piano':two.entry.file},'no layout names the Jankó-only edition installed first');
+});
+
 test('an install stopped at any write, or at any check, leaves the library and every file it names as they were; trying again completes it',async()=>{
  for(const [what,run] of [
   ['the layout in use',(lib:EditionLibrary,live?:()=>boolean)=>install(lib,entry,first,()=>({from:file,later:first.later!,untold:said(first)}),live)],
