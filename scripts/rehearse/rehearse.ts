@@ -14,6 +14,8 @@ import type {Browser,Page} from 'playwright-core';
 import {startHost,pageScript,type SimulatedHost} from './host';
 import {Driver,appKeys,OPENING_DIALOG,type PreparingSample,type State} from './driver';
 import {studioFiles} from './studio';
+import {healPitchChoices} from '../../src/pitch-choice-heal';
+import type {Entry} from '../../src/state';
 
 const LAYOUTS=['janko-four-row','conventional-piano'] as const;
 const repo=resolve(new URL('../..',import.meta.url).pathname);
@@ -205,6 +207,8 @@ async function main(){
   const after=await editions();preparing.editionsReplaced=[...after].filter(([id,file])=>before.get(id)!==file).length;log(`  ${preparing.editionsReplaced} editions engraved again and installed`);
   // An edition installed on the way (the layout in use, before the other was engraved) is never a pitch choice once the library is done.
   for(const e of await entries()){const stray=chosen(e).filter(file=>file!==e.file&&!named.has(file));check('a pitch choice names the edition the library installed',!stray.length,{score:e.id},stray.length?{stray}:undefined);}
+  // One left there before that fix is repaired as the library opens (src/pitch-choice-heal.ts): none is left to repair.
+  for(const e of await entries()){const left=await healPitchChoices(e as Entry,name=>readFile(join(out,'data',name)).then(b=>new Uint8Array(b),()=>null));check('no pitch choice is left on an edition installed on the way',!left,{score:e.id});}
   // Once engraved with this engraver, an edition is current until the next engraver: a second visit replaces none.
   log('The library left alone again');preparingAgain=await session(browser,host,'library-again',driver=>libraryAlone(driver,owner?900_000:180_000));
   const later=await editions();preparingAgain.editionsReplaced=[...later].filter(([id,file])=>after.get(id)!==file).length;
