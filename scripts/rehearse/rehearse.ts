@@ -180,7 +180,7 @@ async function main(){
   nameByKind(scores);
   const presses=Number(args.presses??(owner?120:36)),actions=(args['press-keys']?.split(',')??['practice','edit','toggle']) as PressAction[];
   if(presses>0){log(`Early presses: ${presses}`);trials=await session(browser,host,'presses',driver=>earlyPresses(driver,scores,presses,actions));
-   const summary=pressSummary(trials);check('an early press runs exactly once',summary.afterClose.lost===0&&summary.afterClose.doubled===0&&summary.whileOpening.doubled===0&&summary.unmeasured.doubled===0,{},summary);}
+   const summary=pressSummary(trials);check('an early press runs exactly once',summary.afterClose.lost===0&&summary.afterClose.doubled===0&&summary.whileOpening.ignoredReaderShown===0&&summary.whileOpening.doubled===0&&summary.unmeasured.doubled===0,{},summary);}
  }finally{await browser.close();await host.close();}
  check('no uncaught page error',!pageErrors.length,{},pageErrors.slice(0,20));
  check('the simulated host answered every command',!host.errors.length,{},host.errors.slice(0,20));

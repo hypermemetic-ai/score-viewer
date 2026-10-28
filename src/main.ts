@@ -497,8 +497,11 @@ async function saveNotationSystem(choice:'iso'|'traditional'){
  if(choice!=='iso')throw Error('Traditional notation is not available yet.');
  await enqueue(async()=>{const next={...preferences,notationSystem:choice};await writeJson('preferences.json',next);preferences=next;});
 }
-async function saveReadingPreferences(op:ReadingOperation,target:NonNullable<typeof current>){
- await enqueue(()=>{checkReadingOwner(op);if(current!==target)throw cancelledReading();return writeJson('preferences.json',preferences);});
+/** Saves the score just opened as the last one worked. It runs after the
+ * opening's dialog has left: while the write waits its turn the score is
+ * already drawn, and a press on it must reach it, not the dialog. */
+async function saveReadingPreferences(){
+ await enqueue(()=>writeJson('preferences.json',preferences));
 }
 async function configurePiano(){if(!pianoSettings.enabled)return nativePiano.configure(pianoSettings,preferences.audioOutput??'',false);const bank=await nativePiano.bankStatus();if(!bank.installed)pianoSettings={...pianoSettings,enabled:false};return nativePiano.configure(pianoSettings,preferences.audioOutput??'',bank.installed);}
 /** `sounding`: enabling counts only once the output runs; otherwise nothing is
@@ -1308,7 +1311,7 @@ function retainScore(target:NonNullable<typeof current>){
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);
  // The score just closed, with nothing it rests on changed, is drawn again as it was left: no read, admission or projection.
  const kept=retained.take(entry.id,()=>sourceGroup===undefined?retentionConditions(entry):undefined);
- if(kept){await host.fullscreen(true);checkReading(op);const activated=await activateScore(kept,undefined,undefined,op,true);retainable.add(activated);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});finishReading(op,true);return;}
+ if(kept){await host.fullscreen(true);checkReading(op);const activated=await activateScore(kept,undefined,undefined,op,true);retainable.add(activated);finishReading(op,true);await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));return;}
  const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  // Pages an earlier engine drew are engraved again with the current shared policy, once: the new edition is saved.
  let prior:ScorePackage,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup))return;
@@ -1327,8 +1330,8 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   // Byte equality also covers retained ready/editable finger layers.
   unchangedArchive=collectionId(q.package)===entry.id&&q.packageBytes.byteLength===data.byteLength&&q.packageBytes.every((value,index)=>value===data[index]),
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
-  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});
-  finishReading(op,true);
+  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);finishReading(op,true);
+  await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
   const said=[withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',keptSaved?SAVED_PAGES_KEPT:'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
 }
@@ -1387,8 +1390,7 @@ async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown
  catch(error){if(!(admission instanceof SavedPagesLackRepeats||admission instanceof SavedPagesBehindPolicy)||(error as Error).name==='AbortError')throw error;checkReading(op);console.warn('The saved edition could not be engraved again; it opens on its saved pages.',error);return false;}
  const {q,running}=prepared,
   installed=await installPreparedScore(entry,q,running,q.personal??rebuilt.personal,false,undefined,undefined,rebuilt);await readingCheckpoint(op);
- await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);retainable.add(activated);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
- finishReading(op,true);
+ await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);retainable.add(activated);let unsaved='';finishReading(op,true);await saveReadingPreferences().catch(error=>{unsaved=` Last score was not saved: ${error.message}`;});
  notify(rebuiltNotice(rebuilt)+unsaved);return true;
 }
 
@@ -1402,8 +1404,7 @@ async function openReengravedReading(entry:Entry,bytes:Uint8Array,op:ReadingOper
  if(sourceGroup&&guitarProContext(p)?.groupId!==sourceGroup)throw Error('This source part belongs to another original input; the current score is retained.');
  const {q,running}=await prepareScore(bytes,op.keyboard,await loadPersonal(entry,p),p,op,entry,false,true),
   installed=await installPreparedScore(entry,q,running,q.personal??await loadPersonal(entry,q.package));await readingCheckpoint(op);
- await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);unsaved=` Last score was not saved: ${error.message}`;});
- finishReading(op,true);
+ await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);let unsaved='';finishReading(op,true);await saveReadingPreferences().catch(error=>{unsaved=` Last score was not saved: ${error.message}`;});
  notify('This score was engraved again with the current engraving. Your place and practice came along.'+unsaved);
 }
 
@@ -1430,7 +1431,7 @@ async function importGuitarProScore(bytes:Uint8Array){
    canCommit:()=>{try{checkReading(op);return true;}catch{return false;}},onCommitStarted:()=>{checkReading(op);op.running.state='installing';op.loading.step('save');op.loading.saving();}
   });});entries=installed.entries;const entry=installed.selected[0],part=staged.parts.find(part=>collectionId(part.package)===entry.id)!;
   checkReading(op);for(const selected of installed.selected){const prepared=staged.parts.find(part=>collectionId(part.package)===selected.id)!;readingParts.remember(selected,prepared.package);}
-  const personal=await loadPersonal(entry,part.package);checkReading(op);const activated=await activateScore({entry,package:part.package,personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated).catch(error=>{checkReadingOwner(op);notify(`Last score was not saved: ${error.message}`);});finishReading(op,true);
+  const personal=await loadPersonal(entry,part.package);checkReading(op);const activated=await activateScore({entry,package:part.package,personal},undefined,undefined,op,true);finishReading(op,true);await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
  }catch(error){
   if(error instanceof ReadingPartsCommitUnconfirmed){
    // The pointer may already have committed. Reconcile an actual readable
@@ -1494,8 +1495,8 @@ async function importScore(){
     // A new score engraved again to gain a layout keeps the imported file as an Earlier edition.
     !priorEntry&&gained?.rebuilt?bytes:undefined);
   await readingCheckpoint(op);
-  const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);await saveReadingPreferences(op,activated);
-  finishReading(op,true);
+  const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);finishReading(op,true);
+  await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
   const said=gained&&gainedNotice(gained,q.package,!priorEntry);if(said)notify(said);
  }catch(error){finishReading(op,false,error);throw error;}
 }
