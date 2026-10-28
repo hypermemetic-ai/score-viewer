@@ -8,7 +8,7 @@ import {importPackage,selectPresentation} from '../src/package';
 import {initialPersonal} from '../src/state';
 import {assigned} from '../src/personal-assignments';
 import {PersonalPresentationSession} from '../src/personal-presentation';
-import {annotationPositions,affiliatedAnnotationPosition,personalAnnotationPosition} from '../src/fingering-presentation';
+import {annotationPositions,affiliatedAnnotationPosition,personalAnnotationPosition,curveEndDrop} from '../src/fingering-presentation';
 const css='.janko-measure-num{font-family:"Liberation Serif", "Century Schoolbook", "Baskerville", "DejaVu Serif", "Times New Roman", Georgia, serif;font-style:italic;font-weight:normal;font-size:7pt;text-anchor:end}';
 const page=(attrs='',text='37')=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><style>${css}</style><text class="janko-measure-num" x="25" y="130" ${attrs}>${text}</text></svg>`;
 
@@ -134,4 +134,32 @@ test('a personal finger is always placed: unchanged where clear, least ink where
  assert.equal(affiliatedAnnotationPosition({...covered,admitOwnColumn:true}),undefined);
  assert.equal(fit.x,379.39);assert.ok(fit.top<393.84+4*3.09/2,'least ink: above the second layer');
  assert.ok(fit.top>=0&&fit.top+4.02<=841.89,'inside the page');
+});
+
+// A left-hand stem whose foot is at y 340 on column 100, and a slur below the
+// notes that ends exactly at that foot, where the finger's seat is.
+const slurPath=(cls:string,from=40,to=100)=>{const m=(from+to)/2;
+ return `<path class="janko-phrase-grid-knockout" d="M${from} 341C${m-10} 352 ${m+10} 352 ${to} 340.2L${to} 340.5C${m+10} 353.4 ${m-10} 353.4 ${from} 341.3Z" fill="white" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>`+
+  `<path class="${cls}" data-phrase="p1" d="M${from} 341C${m-10} 352 ${m+10} 352 ${to} 340.2L${to} 340.5C${m+10} 353.4 ${m-10} 353.4 ${from} 341.3Z" fill="#111111"/>`;};
+const slurPage=(paths:string,extra='')=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 850"><line x1="100" y1="300" x2="100" y2="340" stroke="#111" stroke-width="1"/>${paths}${extra}</svg>`;
+const atFoot=(svg:string)=>({x:100,top:340+3.09,direction:1 as const,gap:3.09,height:4.02,em:7.73,width:[-1.47,1.31] as [number,number],
+ columns:[80,100,120],page:actualPageObstacles(svg,new Map(),PERSONAL_ANNOTATION_INK_POLICY),occupied:[],preferNearest:true});
+test('a slur ending at the stem foot drops the finger along its stem, not beside the slur end',()=>{
+ const input=atFoot(slurPage(slurPath('janko-phrase'))),seat=[100-1.47,input.top,100+1.31,input.top+4.02] as [number,number,number,number];
+ assert.ok(input.page.boxes.some(b=>boxesOverlap(seat,b)),'the slur end takes the seat');
+ const sideways=affiliatedAnnotationPosition(input)!;
+ assert.equal(sideways.top,input.top);assert.notEqual(sideways.x,100,'the ordinary search steps beside the slur end');
+ const drop=curveEndDrop(input)!;
+ assert.equal(drop.x,100,'on the stem axis');
+ assert.ok(drop.top>input.top&&drop.top<=input.top+3.09,'dropped no more than a gap');
+ assert.ok(input.page.boxes.every(b=>!boxesOverlap([100-1.47,drop.top,100+1.31,drop.top+4.02],b)),'clear of all ink');
+});
+test('only a slur or tie end at the seat drops the finger; other ink keeps the ordinary search',()=>{
+ assert.equal(curveEndDrop(atFoot(slurPage(slurPath('janko-phrase janko-technique-connector')))),undefined,'a technique bracket is not a slur');
+ assert.equal(curveEndDrop(atFoot(slurPage(slurPath('janko-phrase',40,160)))),undefined,'a slur passing under the note, its ends elsewhere');
+ assert.equal(curveEndDrop(atFoot(slurPage(slurPath('janko-phrase'),'<line x1="0" y1="348.5" x2="600" y2="348.5" stroke="#111" stroke-width="1"/>'))),undefined,'no clear drop: the sideways step stands');
+ const tie=atFoot(slurPage(slurPath('janko-phrase').replace(/^<path class="janko-phrase-grid-knockout"[^>]*>/,'').replace('class="janko-phrase" data-phrase="p1"','data-tie-note="n1" stroke="#111111" stroke-width="1.2" stroke-linejoin="round"')));
+ assert.equal(curveEndDrop(tie)?.x,100,'a tie end drops the finger too');
+ const occupied=atFoot(slurPage(slurPath('janko-phrase')));occupied.occupied=[[98,343,102,347]] as never;
+ assert.equal(curveEndDrop(occupied),undefined,'another finger at the seat is not a slur end');
 });
