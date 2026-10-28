@@ -197,10 +197,14 @@ async function main(){
     check('imports',imported,{score:file.name},imported?undefined:{declared:r.state.dialog??r.state.screen,problems});
     await driver.toLibrary();}});}
   scores=await inventory();log(`Inventory: ${scores.length} scores × ${LAYOUTS.length} layouts`);
-  const editions=async()=>new Map((JSON.parse(await readFile(join(out,'data','library.json'),'utf8')) as {entries:Array<{id:string;file:string}>}).entries.map(e=>[e.id,e.file]));
-  const before=await editions();
+  const entries=async()=>(JSON.parse(await readFile(join(out,'data','library.json'),'utf8')) as {entries:Array<{id:string;file:string;transposition?:{editions:Record<string,Record<string,string>>}}>}).entries;
+  const editions=async()=>new Map((await entries()).map(e=>[e.id,e.file]));
+  const chosen=(e:Awaited<ReturnType<typeof entries>>[number])=>Object.values(e.transposition?.editions??{}).flatMap(pitch=>Object.values(pitch));
+  const before=await editions(),named=new Set((await entries()).flatMap(e=>[e.file,...chosen(e)]));
   log('The library left alone');preparing={...await session(browser,host,'library',driver=>libraryAlone(driver,owner?1_800_000:180_000))};
   const after=await editions();preparing.editionsReplaced=[...after].filter(([id,file])=>before.get(id)!==file).length;log(`  ${preparing.editionsReplaced} editions engraved again and installed`);
+  // An edition installed on the way (the layout in use, before the other was engraved) is never a pitch choice once the library is done.
+  for(const e of await entries()){const stray=chosen(e).filter(file=>file!==e.file&&!named.has(file));check('a pitch choice names the edition the library installed',!stray.length,{score:e.id},stray.length?{stray}:undefined);}
   // Once engraved with this engraver, an edition is current until the next engraver: a second visit replaces none.
   log('The library left alone again');preparingAgain=await session(browser,host,'library-again',driver=>libraryAlone(driver,owner?900_000:180_000));
   const later=await editions();preparingAgain.editionsReplaced=[...later].filter(([id,file])=>after.get(id)!==file).length;

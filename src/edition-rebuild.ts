@@ -170,7 +170,10 @@ export async function completeEdition(edition:Uint8Array,earlierBytes:Uint8Array
  const base=await selectPresentation(kept,kept.keyboardLayout!),
   engraved=await engraveAgainOnce(`complete:${wanted.join(',')}`,[edition,earlierBytes],()=>engraveEdition({base,source:own.source,sourceBytes:own.sourceBytes,context:manifest.calculationContext,views,keep:kept,
    refusal:"This score can't be engraved for that keyboard layout yet. The current score is retained."},execution),options.keptOnly);
- return{bytes:engraved.bytes,earlier,fellBack:engraved.fellBack,droppedFingers:engraved.droppedFingers,replaced:{},primary};
+ // The completed edition stands for the edition it completes and for the
+ // earlier edition both were engraved from: a pitch choice naming either names it.
+ const file=await packageFile(engraved.bytes);
+ return{bytes:engraved.bytes,earlier,fellBack:engraved.fellBack,droppedFingers:engraved.droppedFingers,replaced:{[await packageFile(edition)]:file,[await packageFile(earlierBytes)]:file},primary};
 }
 
 /** Whether a view's pages carry nothing made for its keyboard layout. ISO
