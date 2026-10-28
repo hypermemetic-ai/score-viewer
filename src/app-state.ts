@@ -25,9 +25,13 @@ export interface AppState {
  busy?:string;
  /** The score the library's background work is preparing (its line may show under its row). */
  preparing?:string;
+ /** The open edition holds pages another engraver drew (`savedPagesBehindPolicy`):
+  * shown where the player's hands equal the score's own. Absent when every
+  * view was drawn by the current engraver. */
+ pages?:'earlier';
 }
 /** The attribute each fact is declared as. */
-export const APP_STATE_ATTRIBUTES:Readonly<Record<keyof AppState,string>>={screen:'data-screen',dialog:'data-dialog',score:'data-score',instrument:'data-instrument',layout:'data-layout',step:'data-step',section:'data-section',editing:'data-editing',busy:'data-busy',preparing:'data-preparing'};
+export const APP_STATE_ATTRIBUTES:Readonly<Record<keyof AppState,string>>={screen:'data-screen',dialog:'data-dialog',score:'data-score',instrument:'data-instrument',layout:'data-layout',step:'data-step',section:'data-section',editing:'data-editing',busy:'data-busy',preparing:'data-preparing',pages:'data-pages'};
 /** Counts of what ran, `action:count` separated by spaces: an action run
  * twice for one press shows as two. */
 export const APP_RAN_ATTRIBUTE='data-ran';
@@ -43,6 +47,8 @@ export interface AppStateInput {
  editing?:boolean;
  reading:boolean;pressWaiting:boolean;practiceStarting:boolean;
  preparing?:string;
+ /** The open score's edition holds pages another engraver drew. */
+ earlierPages?:boolean;
 }
 export function appState(input:AppStateInput):AppState {
  const busy=[!input.started?'startup':'',input.reading?'reading':'',input.pressWaiting?'press':'',input.practiceStarting?'practice':''].filter(Boolean).join(' ');
@@ -54,6 +60,7 @@ export function appState(input:AppStateInput):AppState {
  if(state.screen==='reader'&&input.editing)state.editing='fingers';
  if(busy)state.busy=busy;
  if(input.preparing)state.preparing=input.preparing;
+ if(input.score&&input.earlierPages)state.pages='earlier';
  return state;
 }
 type Attributes=Pick<Element,'getAttribute'|'setAttribute'|'removeAttribute'>;

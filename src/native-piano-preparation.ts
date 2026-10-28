@@ -10,6 +10,7 @@ import {checkReadingExecution,type ReadingExecution} from './reading-execution';
 import {withLayoutPeer} from './layout-peer';
 import {engraveClearOfTitleArea} from './title-area-clearance';
 import {meterPulseOptions} from './meter-pulse';
+import {CURRENT_ENGRAVER} from './engraver-identity';
 
 export interface NativePianoAssets {font:{name:string;bytes:Uint8Array};notices:Record<string,Uint8Array>}
 export interface NativePianoPreparation {
@@ -49,7 +50,7 @@ export async function publishNativePianoScore(score:QuantizedGridScore,input:Nat
  if(rendered.lint.violations.length)throw new Refusal("This score can't be engraved cleanly yet: some of its notation doesn't fit the page layout.");
  recipe=validateScoreRenderingRecipe({...recipe,baseline:{pageSha256:await Promise.all(rendered.rawPages.map(hashBytes)),seatSha256:await hashBytes(JSON.stringify(rendered.seats))}},{sourceSha256});
  const published=await publishPreparedNative({source,metadata:input.metadata,
-  engineVersion:APPROVED_SCORE_RENDERING_ENGINE,createdAt:new Date().toISOString(),font:assets.font,notices:assets.notices,
+  engineVersion:APPROVED_SCORE_RENDERING_ENGINE,engraver:CURRENT_ENGRAVER,createdAt:new Date().toISOString(),font:assets.font,notices:assets.notices,
   presentations:(['conventional-piano','janko-four-row'] as const).map(layoutId=>({layoutId,seats:rendered.seats,pages:rendered.pages}))});
  checkReadingExecution(execution);
  // Retain the recipe that reproduces these pages, so Transpose can engrave

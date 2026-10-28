@@ -26,6 +26,10 @@ test('the application declares each screen it shows',()=>{
  // The score the library's background work is on, only while it is on one.
  assert.equal(appState({...idle,preparing:'a'}).preparing,'a');
  assert.equal(appState(idle).preparing,undefined);
+ // An open edition holding pages another engraver drew; none without an open score.
+ assert.equal(appState({...idle,score:{id:'a',piano:true},earlierPages:true}).pages,'earlier');
+ assert.equal(appState({...idle,score:{id:'a',piano:true}}).pages,undefined);
+ assert.equal(appState({...idle,earlierPages:true}).pages,undefined);
 });
 
 test('declaring sets what holds, removes what no longer does and rewrites nothing unchanged',()=>{

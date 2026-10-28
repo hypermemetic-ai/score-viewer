@@ -63,6 +63,8 @@ async function rehearseLayout(driver:Driver,host:SimulatedHost,scores:Score[],la
   const first=await driver.openScore(score.id);row.firstOpenMs=first.ms;
   if(first.state.screen!=='reader'||first.state.score!==score.id){check('opens',false,where,{declared:first.state.dialog??first.state.screen,problems:await driver.problems()});await driver.toLibrary();continue;}
   check('opens',true,where);score.piano=first.state.instrument==='piano';
+  // Saved pages are derived: none an earlier engraver drew is shown, nor kept to show where the player's hands equal the score's own.
+  check('the edition shown was drawn by the current engraver',first.state.pages===undefined,where);
   if(score.piano&&first.state.layout!==layout){
    const edition=async()=>(JSON.parse(await readFile(join(out,'data','library.json'),'utf8')) as {entries:Array<{id:string;file:string}>}).entries.find(e=>e.id===score.id)?.file;
    const before=await edition(),since=host.writes.length,switched=await driver.setLayout(layout);row.setLayoutMs=switched.ms;
@@ -73,6 +75,7 @@ async function rehearseLayout(driver:Driver,host:SimulatedHost,scores:Score[],la
   const pages=await driver.pages();check('pages present',pages.pages>0&&pages.drawn>=pages.pages,where,pages);row.pages=pages.pages;
   await driver.toLibrary();const again=await driver.openScore(score.id);row.reopenMs=again.ms;
   check('reopens',again.state.screen==='reader'&&again.state.score===score.id,where);
+  check('the edition shown was drawn by the current engraver',again.state.pages===undefined,where,{reopen:true});
   const answer=await driver.choosePractice();
   if(!score.piano){check('non-piano offers no practice',answer==='none',where,{answer});await driver.toLibrary();continue;}
   check('piano score offers practice',answer==='menu',where,{answer});if(answer!=='menu'){await driver.toLibrary();continue;}
@@ -187,14 +190,21 @@ async function main(){
  const playwright=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core') as typeof import('playwright-core');
  const browser=await playwright.chromium.launch({headless:true,...(process.env.REHEARSE_CHROMIUM?{executablePath:process.env.REHEARSE_CHROMIUM}:{}),args:['--disable-lcd-text','--force-color-profile=srgb']});
  const host=await startHost({dist:join(out,'dist'),data,repo});
- const imports:Array<Record<string,unknown>>=[];let preparing:Awaited<ReturnType<typeof libraryAlone>>|undefined,trials:Array<Record<string,unknown>>=[],scores:Score[]=[];
+ const imports:Array<Record<string,unknown>>=[];let preparing:(Awaited<ReturnType<typeof libraryAlone>>&{editionsReplaced?:number})|undefined,preparingAgain:(Awaited<ReturnType<typeof libraryAlone>>&{editionsReplaced?:number})|undefined,trials:Array<Record<string,unknown>>=[],scores:Score[]=[];
  try{
   if(!owner){const files=await studioFiles(repo,join(scratch,'sv-rehearsal-cache'));log(`Importing ${files.length} studio files`);
    await session(browser,host,'import',async driver=>{for(const file of files){host.pick(file.bytes);const r=await driver.importScore(),imported=r.state.screen==='reader'&&!!r.state.score,problems=await driver.problems();imports.push({file:file.name,ms:r.ms,score:r.state.score,...(imported?{}:{refused:problems.map(p=>p.text).join(' ')})});
     check('imports',imported,{score:file.name},imported?undefined:{declared:r.state.dialog??r.state.screen,problems});
     await driver.toLibrary();}});}
   scores=await inventory();log(`Inventory: ${scores.length} scores × ${LAYOUTS.length} layouts`);
-  log('The library left alone');preparing=await session(browser,host,'library',driver=>libraryAlone(driver,owner?900_000:180_000));
+  const editions=async()=>new Map((JSON.parse(await readFile(join(out,'data','library.json'),'utf8')) as {entries:Array<{id:string;file:string}>}).entries.map(e=>[e.id,e.file]));
+  const before=await editions();
+  log('The library left alone');preparing={...await session(browser,host,'library',driver=>libraryAlone(driver,owner?1_800_000:180_000))};
+  const after=await editions();preparing.editionsReplaced=[...after].filter(([id,file])=>before.get(id)!==file).length;log(`  ${preparing.editionsReplaced} editions engraved again and installed`);
+  // Once engraved with this engraver, an edition is current until the next engraver: a second visit replaces none.
+  log('The library left alone again');preparingAgain=await session(browser,host,'library-again',driver=>libraryAlone(driver,owner?900_000:180_000));
+  const later=await editions();preparingAgain.editionsReplaced=[...later].filter(([id,file])=>after.get(id)!==file).length;
+  check('a second visit to the library engraves no edition again',preparingAgain.editionsReplaced===0,{},{replaced:preparingAgain.editionsReplaced});
   for(const layout of LAYOUTS){log(`Layout ${layout}`);await session(browser,host,layout,driver=>rehearseLayout(driver,host,scores,layout));}
   nameByKind(scores);
   const presses=Number(args.presses??(owner?120:36)),actions=(args['press-keys']?.split(',')??['practice','edit','toggle']) as PressAction[];
@@ -208,15 +218,16 @@ async function main(){
  for(const row of [...timings,...trials])row.score=label(row.score);for(const c of checks)if(c.score)c.score=String(label(c.score));
  const invariants=Object.fromEntries([...new Set(checks.map(c=>c.invariant))].map(name=>{const all=checks.filter(c=>c.invariant===name);return [name,{held:all.every(c=>c.held),checked:all.length,failed:all.filter(c=>!c.held)}];}));
  const report={mode:owner?'owner data':'studio scores',durationMs:Math.round(performance.now()-started),buildMs,inventory:{scores:scores.map(s=>({label:s.label,instrument:s.piano===undefined?'unopened':s.piano?'piano':'other'})),layouts:LAYOUTS,sections:timings.reduce((n,r)=>n+((r.sections as number)??0),0)},
-  imports,preparing,timings,earlyPress:{summary:pressSummary(trials),trials},invariants,pageErrors,writes:host.writes.length};
+  imports,preparing,preparingAgain,timings,earlyPress:{summary:pressSummary(trials),trials},invariants,pageErrors,writes:host.writes.length};
  await writeFile(join(out,'report.json'),JSON.stringify(report,null,1));
  const summary=markdown(report);await writeFile(join(out,'summary.md'),summary);console.log('\n'+summary);
  if(Object.values(invariants).some(i=>!i.held))process.exitCode=1;
 }
-function markdown(r:{mode:string;durationMs:number;buildMs:number;preparing?:{ms:number;scoresWorkedOn:number;scoresWithALine:number;longestTaskMs:number;tasksOver50ms:number;tasksOver200ms:number};inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
+function markdown(r:{mode:string;durationMs:number;buildMs:number;preparing?:{ms:number;scoresWorkedOn:number;scoresWithALine:number;longestTaskMs:number;tasksOver50ms:number;tasksOver200ms:number;editionsReplaced?:number};preparingAgain?:{ms:number;scoresWorkedOn:number;editionsReplaced?:number};inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
  const s=r.earlyPress.summary,lines=[`## Rehearsal: ${r.mode}`,'',`${(r.durationMs/1000).toFixed(0)} s in all (build ${(r.buildMs/1000).toFixed(1)} s). ${r.inventory.scores.length} score${r.inventory.scores.length===1?'':'s'} (${r.inventory.scores.filter(x=>x.instrument==='piano').length} piano) × ${LAYOUTS.length} layouts; ${r.inventory.sections} sections listed across both layouts (each entered unless locked).`,'','### Invariants','','| Invariant | Held | Checked | Failed |','|---|---|---|---|',
   ...Object.entries(r.invariants).map(([name,i])=>`| ${name} | ${i.held?'yes':'**no**'} | ${i.checked} | ${i.failed.length} |`),'',
-  ...(r.preparing?['### The library left alone','',`The background work went through ${r.preparing.scoresWorkedOn} score${r.preparing.scoresWorkedOn===1?'':'s'} in ${(r.preparing.ms/1000).toFixed(0)} s; ${r.preparing.scoresWithALine} showed a line. Main-thread tasks over 50 ms: ${r.preparing.tasksOver50ms} (over 200 ms: ${r.preparing.tasksOver200ms}); the longest ${r.preparing.longestTaskMs} ms.`,'']:[]),
+  ...(r.preparing?['### The library left alone','',`The background work went through ${r.preparing.scoresWorkedOn} score${r.preparing.scoresWorkedOn===1?'':'s'} in ${(r.preparing.ms/1000).toFixed(0)} s; ${r.preparing.scoresWithALine} showed a line. Main-thread tasks over 50 ms: ${r.preparing.tasksOver50ms} (over 200 ms: ${r.preparing.tasksOver200ms}); the longest ${r.preparing.longestTaskMs} ms. It engraved again and installed ${r.preparing.editionsReplaced??0} edition${r.preparing.editionsReplaced===1?'':'s'}.`,'']:[]),
+  ...(r.preparingAgain?[`Left alone again, it went through ${r.preparingAgain.scoresWorkedOn} score${r.preparingAgain.scoresWorkedOn===1?'':'s'} in ${(r.preparingAgain.ms/1000).toFixed(0)} s and engraved ${r.preparingAgain.editionsReplaced??0} edition${r.preparingAgain.editionsReplaced===1?'':'s'} again.`,'']:[]),
   '### Early presses','',`${s.presses} presses timed around the opening dialog leaving. After it left: ${s.afterClose.presses}, ran once ${s.afterClose.once}, lost ${s.afterClose.lost}, doubled ${s.afterClose.doubled}. While it still showed: ${s.whileOpening.presses}, ran once ${s.whileOpening.once}, ignored ${s.whileOpening.ignored}, doubled ${s.whileOpening.doubled}; of those, ${s.whileOpening.readerShown} came with the score already drawn behind the dialog (ignored ${s.whileOpening.ignoredReaderShown}). The score showed behind the dialog for ${s.whileOpening.readerShownMs??'–'} ms (median) before it left.${s.unmeasured.presses?` Unmeasured: ${s.unmeasured.presses}.`:''}`,'',
   '### Timings (reports, not gates)','','| Score | Layout | First open ms | Reopen ms | Pages | Fingers ms | Sections (locked) | Section entry median / max ms |','|---|---|---|---|---|---|---|---|',
   ...r.timings.map(t=>{const e=t.sectionEntryMs as {median?:number;max?:number}|undefined;return `| ${t.score} | ${t.layout} | ${t.firstOpenMs??''}${t.setLayoutMs?` (+${t.setLayoutMs} layout)`:''} | ${t.reopenMs??''} | ${t.pages??''} | ${t.fingersMs??''} | ${t.sections??''}${t.locked?` (${t.locked})`:''} | ${e?.median??''} / ${e?.max??''} |`;})];

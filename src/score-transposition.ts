@@ -18,6 +18,7 @@ import {requirePianoCapability} from './score-capabilities';
 import {canonicalJson,identityHash} from './piano-preparation-identity';
 import {editionPrintedNotices,engraveClearOfTitleArea} from './title-area-clearance';
 import {meterPulseOptions} from './meter-pulse';
+import {CURRENT_ENGRAVER} from './engraver-identity';
 
 export const SCORE_TRANSPOSITION_VERSION='viewer-score-transposition-v1' as const;
 export interface TranspositionOwner {id:string;pitch:number;startTick:number;durationTicks:number;hand:Hand}
@@ -231,7 +232,7 @@ export async function engraveEdition(request:{
    // The layer's fingers and hands are unchanged; it now names these pages.
    if(layer&&fingers)files[fingers]=strToU8(JSON.stringify({...structuredClone(layer),...('revision' in layer?{revision}:{})}));
    presentations[view.layout]={layoutId:view.layout,score:e.score,seats:e.seats,...(fingers?{fingers}:{}),pages:e.pages.slice(),renderingRecipe:e.recipe,revision,profileId,profileSha256,
-    effectiveHandSha256:await handDigest(source,view.score),layerSourceHash:layer&&view.layerSourceHash?view.layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE};
+    effectiveHandSha256:await handDigest(source,view.score),layerSourceHash:layer&&view.layerSourceHash?view.layerSourceHash:sourceSha256,engineVersion:APPROVED_SCORE_RENDERING_ENGINE,engraver:CURRENT_ENGRAVER};
    if(transposition)handMaps[view.layout]=ownerMap(originalSource(transposition.original),view.score);
   }
   let m:Manifest;
@@ -241,7 +242,7 @@ export async function engraveEdition(request:{
    m={format:'iso-score',version:2,scoreId:source.id,metadata:structuredClone(baseManifest.metadata),createdAt:new Date().toISOString(),
     sourceScore:'source-score.json',sourceRevision:sourceSha256,sourceSha256,keyboardLayout:primary.layoutId,semanticSha256:primary.revision,revision:primary.revision,
     profileId:primary.profileId,profileSha256:primary.profileSha256,effectiveHandSha256:primary.effectiveHandSha256,layerSourceHash:primary.layerSourceHash,engineVersion:APPROVED_SCORE_RENDERING_ENGINE,
-    pages:primary.pages.slice(),renderingRecipe:primary.renderingRecipe,presentations,font:baseManifest.font,notices:baseManifest.notices.slice(),files:{},
+    pages:primary.pages.slice(),renderingRecipe:primary.renderingRecipe,engraver:CURRENT_ENGRAVER,presentations,font:baseManifest.font,notices:baseManifest.notices.slice(),files:{},
     ...(transposition?{transposition:await transpositionEnvelope(transposition.original,transposition.originalBytes,transposition.selectedBytes,transposition.steps,sourceBytes,handMaps)}:{}),
     ...(context?{calculationContext:context}:{}),...(base.referenceMidi?{referenceMidi:{file:'reference.mid' as const}}:{})};
   }

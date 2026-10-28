@@ -450,7 +450,9 @@ async function startingPractice(start:()=>Promise<void>){practiceStarting=true;d
 /** Where the application is, as data-* attributes on #app (app-state.ts). */
 /** Whether a package can be practised at the piano, asked once per package: state is declared on every paint. */
 const declaredPiano=new WeakMap<object,boolean>(),declaredPianoPractice=(p:ScorePackage)=>{let piano=declaredPiano.get(p);if(piano===undefined)declaredPiano.set(p,piano=scoreCapabilities(p).pianoPractice);return piano;};
-function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:declaredPianoPractice(current.package)}:undefined,layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting,preparing:preparing.preparing}));}let libraryRepaintPending=false;
+/** Whether an open edition holds pages another engraver drew, asked once per package. */
+const declaredEarlier=new WeakMap<object,boolean>(),declaredEarlierPages=(p:ScorePackage)=>{let earlier=declaredEarlier.get(p);if(earlier===undefined)declaredEarlier.set(p,earlier=savedPagesBehindPolicy(p));return earlier;};
+function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:declaredPianoPractice(current.package)}:undefined,earlierPages:!!current&&declaredEarlierPages(current.package),layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting,preparing:preparing.preparing}));}let libraryRepaintPending=false;
 const libraryMenu=new LibraryMenu();
 /** The line under the library row of the score being prepared in the background. */
 const preparing=new PreparingIndicator(()=>app.querySelector<HTMLElement>('.library')?.parentElement);

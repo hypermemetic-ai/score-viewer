@@ -188,7 +188,7 @@ export function layoutNeutralPages(view:ScorePackage):boolean{
 async function sharedPresentation(from:PresentationDescriptor,layout:PhysicalKeyboardId,sourceSha256:string):Promise<PresentationDescriptor>{
  return{layoutId:layout,score:from.score,seats:from.seats,pages:from.pages.slice(),...(from.renderingRecipe?{renderingRecipe:from.renderingRecipe}:{}),revision:from.revision,
   profileId:FIXED_PAGES_PROFILE,profileSha256:await hashBytes(JSON.stringify({kind:FIXED_PAGES_PROFILE,layoutId:layout})),effectiveHandSha256:from.effectiveHandSha256,
-  layerSourceHash:sourceSha256,engineVersion:from.engineVersion,...(from.calculationContext!==undefined?{calculationContext:structuredClone(from.calculationContext)}:{})};
+  layerSourceHash:sourceSha256,engineVersion:from.engineVersion,...(from.engraver?{engraver:from.engraver}:{}),...(from.calculationContext!==undefined?{calculationContext:structuredClone(from.calculationContext)}:{})};
 }
 const admitShared=async(m:Manifest,files:Record<string,Uint8Array>)=>
  (await publishPackage(await importPackage(archivePackage(m,files),{allowLegacyTempo:true}))).bytes;

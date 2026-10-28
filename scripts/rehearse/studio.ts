@@ -14,7 +14,8 @@ async function cached(cache:string,name:string,make:()=>Promise<Uint8Array>){
 }
 export async function studioFiles(repo:string,cacheRoot:string):Promise<StudioFile[]>{
  const {dependencyRevision}=JSON.parse(await readFile(join(repo,'docs/source-provenance.json'),'utf8')) as {dependencyRevision:string};
- const cache=join(cacheRoot,dependencyRevision),files:StudioFile[]=[];
+ // Scores prepared before editions recorded their engraver would be engraved again on import.
+ const cache=join(cacheRoot,`${dependencyRevision}-engraver-recorded`),files:StudioFile[]=[];
  for(const dir of ['fixtures','public/review'])for(const name of await tunaIn(join(repo,dir)))files.push({name:`${dir}/${name}`,bytes:new Uint8Array(await readFile(join(repo,dir,name)))});
  const notices:Record<string,Uint8Array>={};
  for(const name of ['URW-base35-COPYING','URW-base35-LICENSE','URW-base35-provenance.md'])notices['licenses/'+name]=new Uint8Array(await readFile(join(repo,'licenses',name)));
