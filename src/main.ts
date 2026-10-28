@@ -8,6 +8,7 @@ import {shareInstalledScore,scoreSaveMessage} from './share-score';
 import './style.css';
 import './readiness-notice.css';
 import './application-navigation.css';
+import './preparing-indicator.css';
 import {annotationPositions,paintFinger,type AnnotationPosition} from './fingering-presentation';
 import {expertSettings,fingerBehaviorSettings} from './expert-settings';
 import {MidiOptionsPanel,AudioOptionsPanel} from './device-options';
@@ -89,6 +90,7 @@ import {ConsolidationDeferred,PersonalMemorySession,rawMemoryPersonal,type Perso
 import {pendingPersonalConsolidation} from './personal-consolidation-request';
 import {PersonalMemoryResolutionCache,personalMemoryResolutionKey,AfterPaintWork} from './personal-memory-cache';
 import {PersonalMemoryLibrary,readingOnlyArchive} from './personal-memory-library';
+import {PreparingIndicator} from './preparing-indicator';
 import {AHEAD_OF_TIME_KIND,AheadOfTimeEngraving,AheadOfTimeRefusal,aheadOfTimeOrder,holdAheadOfTimeOnInput,preparedBefore,prepareRecorded,refusedWhen,type AheadOfTimeWork} from './ahead-of-time-engraving';
 import {engravedAgainFromRecord,useEngravedAgainStore} from './engraved-again';
 import {ENGRAVE_AGAIN_KINDS,engraveAgainInWorker} from './engrave-again-client';
@@ -138,7 +140,7 @@ let aheadOfTime:AheadOfTimeEngraving|undefined;
 if(isTauri()&&!import.meta.env.DEV&&host.derived){
  const derived=new DerivedFileCache(host.derived);
  // What opening each score reads from disk is made while the player is in the library.
- aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();}});
+ aheadOfTime=new AheadOfTimeEngraving((entryId,execution,work)=>prepareAheadOfTime(derived,entryId,execution,work),{basis:aheadOfTimeBasis,release:()=>{aheadWorker?.close();aheadAdmission.clear();},activity:entryId=>preparing.activity(entryId)});
  usePersonalProjectionCache(derived);useVerbatimFoldCache(derived);
  useReadingAdmissionReceipts({get:sha=>derived.get('reading-admission-v1',sha,readingAdmissionReceipt),put:(sha,receipt)=>void derived.put('reading-admission-v1',sha,receipt)});
  usePianoPageCheckReceipts({has:async key=>await derived.peek('piano-page-checks-v1',key)==='checked',add:key=>void derived.put('piano-page-checks-v1',key,true,'checked')});
@@ -438,6 +440,8 @@ async function startingPractice(start:()=>Promise<void>){practiceStarting=true;d
 const declaredPiano=new WeakMap<object,boolean>(),declaredPianoPractice=(p:ScorePackage)=>{let piano=declaredPiano.get(p);if(piano===undefined)declaredPiano.set(p,piano=scoreCapabilities(p).pianoPractice);return piano;};
 function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:declaredPianoPractice(current.package)}:undefined,layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting}));}let libraryRepaintPending=false;
 const libraryMenu=new LibraryMenu();
+/** The library's sign that scores are being prepared in the background. */
+const preparing=new PreparingIndicator(()=>app.querySelector<HTMLElement>('.library')?.parentElement);
 const matchingCurrent=(target:NonNullable<typeof current>)=>current&&current.entry.file===target.entry.file&&current.entry.id===target.entry.id&&current.package.sourceSha256===target.package.sourceSha256&&personalStorageName(current.entry.id,current.package)===personalStorageName(target.entry.id,target.package)?current:undefined;
 const memoryLibrary=new PersonalMemoryLibrary(host,()=>entries,bytes=>readerAdmission.import(bytes,{allowLegacyTempo:true}));
 const personalMemory=new PersonalMemorySession(host.assistanceStore!,{scanLibrary:()=>memoryLibrary.scan(),validateInputs:()=>memoryLibrary.validate(),awaitingEngraving:()=>memoryLibrary.awaitingEngraving});
@@ -796,6 +800,7 @@ function renderLibrary(focusKey=libraryFocusKey(document.activeElement)){declare
  const libraryNavigation=document.createElement('nav');libraryNavigation.className='library-navigation';libraryNavigation.setAttribute('aria-label','Library navigation');app.querySelector('.surface')!.append(libraryNavigation);arrangeBottomNavigation(libraryNavigation,null,app.querySelector<HTMLButtonElement>('[data-action=options]'));
  transformSurface(app.querySelector('.surface')!,preferences.libraryRotation);
  libraryMenu.mount(app,entries,preferences.lastWorkedEntryId,entry=>esc(readingParts.summary(entry)),preferences.keyboardLayout,async value=>{if(!await switchKeyboard(value))throw Error('Instrument selection was not saved. Try again.');});
+ preparing.paint();
  const restore=libraryFocusElement(app,focusKey);if(restore&&!restore.hidden)restore.focus();else if(entries.length)libraryMenu.focus();else app.querySelector<HTMLElement>('[data-action=import]')?.focus();
 }
 /** Stops measuring the last reader's toolbar for the press notice. */

@@ -63,6 +63,9 @@ export class AheadOfTimeEngraving {
  constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,work:AheadOfTimeWork)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
   /** No work remains or the work stopped: free what it held (its own projection worker). */
   release?:()=>void;
+  /** The score work has started on, or none once no work remains or the
+   * work stopped. Between two scores the last one stands. */
+  activity?:(entryId:string|undefined)=>void;
   /** Everything a preparation of this score is made for, as it stands now
    * (the keyboard layout, the score's files and stored hand choices). Read
    * when the preparation has read those; an opening takes it over only while
@@ -123,7 +126,7 @@ export class AheadOfTimeEngraving {
   if(this.running){this.hold();return;}
   if(this.timer===undefined&&this.waiting===undefined&&!this.queue.length)return;
   const entryIds=[...(this.waiting!==undefined?[this.waiting]:[]),...this.queue];
-  this.end(false);this.queue=entryIds;this.arm();
+  this.end(false,true);this.queue=entryIds;this.arm();
  }
  stop():void {this.end(true);}
  private arm(){this.timer=setTimeout(()=>{this.timer=undefined;this.next();},this.delay);}
@@ -134,16 +137,17 @@ export class AheadOfTimeEngraving {
  private unhold(){const held=this.held;this.held=undefined;if(!held)return;if(held.timer!==undefined)clearTimeout(held.timer);held.resume();}
  private readonly quiet:AheadOfTimeQuiet=()=>this.held?.until??Promise.resolve();
  /** End the run: its list, the score waiting, the score under way. `release`
-  * also frees the worker; a pause in the list keeps it for what follows. */
- private end(release:boolean){
+  * also frees the worker; a pause in the list keeps it for what follows.
+  * Work `going` on after the pause is still the work under way. */
+ private end(release:boolean,going=false){
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   this.queue=[];this.waiting=undefined;this.generation++;
-  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.unhold();
+  const controller=this.controller;this.controller=undefined;this.running=undefined;controller?.abort();this.unhold();if(!going)this.options.activity?.(undefined);
   if(release)this.free();
  }
  private free(){if(!this.holding)return;this.holding=false;this.options.release?.();}
  private next():void {
-  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.free();return;}
+  const entryId=this.queue.shift(),generation=this.generation;if(entryId===undefined){this.free();this.options.activity?.(undefined);return;}
   this.waiting=entryId;
   const idle=this.options.idle??((run:()=>void)=>typeof requestIdleCallback==='function'?requestIdleCallback(run,{timeout:5000}):setTimeout(run,0));
   idle(()=>{
@@ -153,6 +157,7 @@ export class AheadOfTimeEngraving {
    const arm=()=>{running.readied=false;running.replacing=false;running.optional=false;running.ready=new Promise<void>(resolve=>{running.markReady=()=>{running.readied=true;resolve();};});};arm();
    const started=()=>{if(this.running!==running)return;if(running.readied)arm();running.replacing=false;running.optional=false;running.basis=this.basis(entryId);};
    const work:AheadOfTimeWork={quiet:this.quiet,started,ready:()=>running.markReady(),replacing:()=>{running.replacing=true;},optional:()=>{running.optional=true;}};
+   this.options.activity?.(entryId);
    running.done=this.prepare(entryId,{signal:controller.signal},work).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
     if(this.controller!==controller)return;
     this.controller=undefined;this.running=undefined;this.next();
