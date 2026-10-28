@@ -18,7 +18,7 @@ const pageCache=new WeakMap<object,Map<number,Map<string,AnnotationPosition>>>()
  * retained editions preserve their original exact-column preference.
  * Candidate boundaries come from actual obstacles, not guessed text widths. */
 export function affiliatedAnnotationPosition(input:{x:number;top:number;direction:-1|1;gap:number;height:number;em:number;
- width:[number,number];columns:readonly number[];page:{width:number;height:number;boxes:AnnotationBox[]};occupied:AnnotationBox[];preferNearest?:boolean;admitOwnColumn?:boolean}):{x:number;top:number}|undefined{
+ width:[number,number];columns:readonly number[];page:{width:number;height:number;boxes:AnnotationBox[];curves?:ReadonlyArray<readonly(readonly[number,number])[]|undefined>};occupied:AnnotationBox[];preferNearest?:boolean;admitOwnColumn?:boolean}):{x:number;top:number}|undefined{
  const {x,top,direction,gap,height,em,width,columns,page,occupied}=input,lower=columns.filter(c=>c<x),upper=columns.filter(c=>c>x),
   left=lower.length?(Math.max(...lower)+x)/2:0,right=upper.length?(Math.min(...upper)+x)/2:page.width,ink=[...page.boxes,...occupied];
  let min=Math.max(x-em/2,left-width[0],-width[0]),max=Math.min(x+em/2,right-width[1],page.width-width[1]);
@@ -41,6 +41,23 @@ export function affiliatedAnnotationPosition(input:{x:number;top:number;directio
  return best;
 }
 type AnnotationRequest=Parameters<typeof affiliatedAnnotationPosition>[0];
+/** R-fingering-display. A finger whose seat at its stem end is taken only by
+ * the end of a slur or tie arriving there drops along the stem's axis, up to
+ * one gap, clear of the curve: beside a curve's end it would read as part of
+ * the curve. Any other ink at the seat, or no clear drop, leaves the ordinary
+ * search to place it. */
+export function curveEndDrop(input:AnnotationRequest):{x:number;top:number}|undefined{
+ const {x,top,direction,gap,height,width,page,occupied}=input,curves=page.curves,seat=(y:number):AnnotationBox=>[x+width[0],y,x+width[1],y+height];
+ if(!curves)return;
+ const blocking=page.boxes.flatMap((b,i)=>boxesOverlap(seat(top),b)?[i]:[]);
+ if(!blocking.length||occupied.some(b=>boxesOverlap(seat(top),b)))return;
+ const atSeat=([ex,ey]:readonly[number,number])=>ex>=x+width[0]-gap&&ex<=x+width[1]+gap&&ey>=top-1.5*gap&&ey<=top+height+1.5*gap;
+ if(!blocking.every(i=>curves[i]?.some(atSeat)))return;
+ const ink=[...page.boxes,...occupied];
+ for(let step=1;step<=2;step++){const y=top+direction*step*gap/2;if(y<0||y+height>page.height)return;
+  if(!ink.some(b=>boxesOverlap(seat(y),b)))return {x,top:y};}
+ return;
+}
 /** A personal reading always shows the finger. When no clear air exists in the
  * note's own reading space, keep the note's own column even where neighbouring
  * columns crowd it, and failing that take the step with the least ink beneath
@@ -113,7 +130,7 @@ function computeAnnotationPositions(p:AnnotationScore,selected?:ReadonlySet<numb
     occupied:occupiedByPage.get(group[0].page)??[],preferNearest:personal},
    // Retained calculated editions keep their admission refusal; the owner's
    // own hands and fingers are always shown.
-   fit=personal?personalAnnotationPosition(request):affiliatedAnnotationPosition(request);
+   fit=curveEndDrop(request)??(personal?personalAnnotationPosition(request):affiliatedAnnotationPosition(request));
    if(!fit)throw Error('Calculated finger annotations cannot fit actual page ink for '+group.map(s=>s.id).join(', '));
    top=fit.top;annotationX=fit.x;
   }
