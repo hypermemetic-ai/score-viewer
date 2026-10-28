@@ -41,12 +41,24 @@ export interface AheadOfTimeWork {
   * layout): an opening of the score stops it, unless it is replacing the
   * edition already. */
  optional():void;
+ /** The stages this score's work goes through, in order, as soon as they
+  * are known. The first plan of a run stands: a step that goes on with the
+  * score's next step keeps it. */
+ plan(stages:readonly string[]):void;
+ /** A stage of the plan is done. Progress never moves back, and a stage
+  * skipped (nothing to do there) counts as passed by the next one reached. */
+ reached(stage:string):void;
+ /** The score's work could not be done; it ends as failed, not done. */
+ failed():void;
 }
+/** How far the work on one score has come, from the stages it reached. */
+export interface AheadOfTimeProgress {entryId:string;stage?:string;fraction:number;end?:'done'|'failed'}
 /** The preparation under way: its basis once it has read its inputs, and
  * whether an opening has taken it over. */
 interface Running {entryId:string;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>;
  /** The current step's ready has been given. */
- readied?:boolean;markReady:()=>void;replacing?:boolean;optional?:boolean}
+ readied?:boolean;markReady:()=>void;replacing?:boolean;optional?:boolean;
+ plan?:readonly string[];stage?:string;fraction:number;failed?:boolean}
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
  private running?:Running;
@@ -63,9 +75,10 @@ export class AheadOfTimeEngraving {
  constructor(private readonly prepare:(entryId:string,execution:ReadingExecution,work:AheadOfTimeWork)=>Promise<void>,private readonly options:{delayMs?:number;idle?:(run:()=>void)=>void;
   /** No work remains or the work stopped: free what it held (its own projection worker). */
   release?:()=>void;
-  /** The score work has started on, or none once no work remains or the
-   * work stopped. Between two scores the last one stands. */
-  activity?:(entryId:string|undefined)=>void;
+  /** The score work is on and how far it has come, and how it ended; or
+   * none once no work remains or the work stopped. Between two scores the
+   * last one stands. */
+  activity?:(progress:AheadOfTimeProgress|undefined)=>void;
   /** Everything a preparation of this score is made for, as it stands now
    * (the keyboard layout, the score's files and stored hand choices). Read
    * when the preparation has read those; an opening takes it over only while
@@ -153,14 +166,23 @@ export class AheadOfTimeEngraving {
   idle(()=>{
    if(generation!==this.generation||this.running)return;
    this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
-   const running:Running={entryId,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve()};this.running=running;
+   const running:Running={entryId,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve(),fraction:0};this.running=running;
    const arm=()=>{running.readied=false;running.replacing=false;running.optional=false;running.ready=new Promise<void>(resolve=>{running.markReady=()=>{running.readied=true;resolve();};});};arm();
    const started=()=>{if(this.running!==running)return;if(running.readied)arm();running.replacing=false;running.optional=false;running.basis=this.basis(entryId);};
-   const work:AheadOfTimeWork={quiet:this.quiet,started,ready:()=>running.markReady(),replacing:()=>{running.replacing=true;},optional:()=>{running.optional=true;}};
-   this.options.activity?.(entryId);
-   running.done=this.prepare(entryId,{signal:controller.signal},work).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
+   const report=(end?:'done'|'failed')=>this.options.activity?.({entryId,...(running.stage===undefined?{}:{stage:running.stage}),fraction:running.fraction,...(end?{end}:{})});
+   const reached=(stage:string)=>{
+    const at=running.plan?.indexOf(stage)??-1;if(this.running!==running||at<0)return;
+    const fraction=(at+1)/running.plan!.length;if(fraction<=running.fraction)return;
+    running.fraction=fraction;running.stage=stage;report();
+   };
+   const work:AheadOfTimeWork={quiet:this.quiet,started,ready:()=>running.markReady(),replacing:()=>{running.replacing=true;},optional:()=>{running.optional=true;},
+    plan:stages=>{if(!running.plan)running.plan=[...stages];},reached,failed:()=>{running.failed=true;}};
+   report();
+   // A failure is a miss on opening, as before; a stop has been reported already.
+   running.done=this.prepare(entryId,{signal:controller.signal},work).then(()=>!running.failed,()=>false).then(done=>{
     if(this.controller!==controller)return;
-    this.controller=undefined;this.running=undefined;this.next();
+    this.controller=undefined;this.running=undefined;
+    if(done)running.fraction=1;report(done?'done':'failed');this.next();
    });
   });
  }

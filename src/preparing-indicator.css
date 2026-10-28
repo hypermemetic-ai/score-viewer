@@ -1,12 +1,11 @@
-/* The library's sign that scores are being prepared (src/preparing-indicator.ts).
-   Only opacity changes: nothing is laid out anew when it comes or goes. */
-.preparing-words{font-size:13px;line-height:44px;color:#8a8a8a;letter-spacing:.02em;opacity:0;visibility:hidden;transition:opacity .4s,visibility 0s .4s;pointer-events:none;user-select:none;white-space:nowrap}
-.surface[data-preparing][data-preparing-design=footer] .preparing-words{opacity:1;visibility:visible;transition:opacity .4s}
-.preparing-edge{position:absolute;left:0;right:0;bottom:0;height:2px;background:#8a8a8a;opacity:0;pointer-events:none;transition:opacity .4s;z-index:4}
-.surface[data-preparing][data-preparing-design=edge] .preparing-edge{opacity:1;animation:preparing-breathe 2.4s ease-in-out infinite}
+/* The line under a library row whose score is being prepared (src/preparing-indicator.ts).
+   An overlay in the row: it starts under the row's text (--from) as a short stub and grows
+   to the row's right edge with the work (--progress, 0 to 1); done, it fades. Nothing in
+   the flow moves. */
 .score-entry,.composer-entry{position:relative}
-.surface[data-preparing][data-preparing-design=row] .score-entry[data-preparing-row]::before,.surface[data-preparing][data-preparing-design=row] .composer-entry[data-preparing-row][aria-expanded=false]::before{content:'';position:absolute;left:58px;bottom:7px;width:min(280px,50%);height:2px;background:#8a8a8a;pointer-events:none;animation:preparing-breathe 2.4s ease-in-out infinite}
-/* Under the composer's name, which starts nearer the edge than a score's. */
-.surface[data-preparing][data-preparing-design=row] .composer-entry[data-preparing-row][aria-expanded=false]::before{left:32px;width:min(200px,50%)}
-@keyframes preparing-breathe{0%,100%{opacity:.35}50%{opacity:1}}
-@media(prefers-reduced-motion:reduce){.preparing-words,.preparing-edge{transition:none}.surface[data-preparing] .preparing-edge,.surface[data-preparing] [data-preparing-row]::before{animation:none}}
+.preparing-line{--stub:28px;position:absolute;left:var(--from,34px);bottom:6px;height:2px;width:calc(var(--stub) + (100% - var(--from,34px) - var(--stub)) * var(--progress,0));background:#8a8a8a;pointer-events:none;transition:width .5s ease-out}
+.preparing-line[data-end]{opacity:0;transition:width .4s ease-out,opacity .6s .45s}
+/* An open composer shows the score's own row; its own line waits until it folds. */
+.composer-entry[aria-expanded=true] .preparing-line{display:none}
+/* Without motion it shows full for as long as it would have faded, then goes. */
+@media(prefers-reduced-motion:reduce){.preparing-line,.preparing-line[data-end]{transition:none}.preparing-line[data-end]{opacity:1}}

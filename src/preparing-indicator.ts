@@ -1,58 +1,87 @@
-/** A quiet sign in the library that scores are being prepared in the
- * background (engraved again, installed, their pages made), so a player who
- * waits a moment knows why the next opening will be quicker. It never takes
- * focus, never moves the layout and goes when the work is done. Work too
- * short to notice (a score already prepared, looked up) never shows it.
+/** A thin line under the library row whose score is being prepared in the
+ * background (engraved again, installed, its pages made). It starts as a
+ * short stub under the row's text and grows to the row's right edge as the
+ * work reaches its stages (`AheadOfTimeWork.plan`, `reached`), so its length
+ * says how far that score has come, never more. Done, it fills the row and
+ * fades away; failed or stopped, it goes at once (opening says what went
+ * wrong, as before). Rows waiting their turn show nothing.
  *
- * Three designs stay behind an internal switch until one is chosen:
- * - `footer`: the words "Preparing scores" in the middle of the bottom bar,
- *   where task controls go (the library has none);
- * - `row`: a line under the score being prepared, or under its composer
- *   while that composer is folded;
- * - `edge`: a hairline along the bottom edge of the screen. */
-export type PreparingDesign='footer'|'row'|'edge';
-export const PREPARING_DESIGNS:readonly PreparingDesign[]=['footer','row','edge'];
-export const DEFAULT_PREPARING_DESIGN:PreparingDesign='footer';
-/** The internal switch: a development setting, not an option the player sees. */
-export const PREPARING_SWITCH='score-viewer.preparing-indicator';
-export function preparingDesign(storage:Pick<Storage,'getItem'>|undefined=globalThis.localStorage):PreparingDesign{
- try{const chosen=storage?.getItem(PREPARING_SWITCH);if(PREPARING_DESIGNS.includes(chosen as PreparingDesign))return chosen as PreparingDesign;}catch{/* no storage: the default */}
- return DEFAULT_PREPARING_DESIGN;
-}
-/** A score whose preparation ends sooner than this never shows the sign. */
-export const PREPARING_GRACE_MS=1500;
+ * It never takes focus and never moves the layout: the line is an overlay in
+ * the row, and progress changes one custom property on it. Work too short to
+ * notice (a score already prepared, looked up) never shows it. While its
+ * composer is folded, the line is drawn under the composer instead. */
+import type {AheadOfTimeProgress} from './ahead-of-time-engraving';
+
+/** A score whose work ends sooner than this never shows a line. */
+export const PREPARING_GRACE_MS=1000;
+/** A finished line fills the row, then fades: gone after this long. */
+export const PREPARING_LEAVE_MS=1200;
 
 export class PreparingIndicator {
- private entryId?:string;
- private shown=false;
- private timer?:ReturnType<typeof setTimeout>;
+ /** The score under way and how far it has come. */
+ private work?:AheadOfTimeProgress;
+ /** The score whose line is drawn. */
+ private shown?:string;
+ private grace?:ReturnType<typeof setTimeout>;
  /** `library` is the library's surface while it is drawn. */
- constructor(private readonly library:()=>HTMLElement|null|undefined,private readonly design:()=>PreparingDesign=preparingDesign){}
+ constructor(private readonly library:()=>HTMLElement|null|undefined){}
+ /** The score the line is drawn for, if any (finished lines fading out excluded). */
  get showing(){return this.shown;}
- /** The score the background work has started on, or none once no work remains. */
- activity(entryId:string|undefined){
-  if(entryId===undefined){this.cancel();this.entryId=undefined;if(this.shown){this.shown=false;this.paint();}return;}
-  const was=this.entryId;this.entryId=entryId;
-  if(this.shown){this.paint();return;}
-  if(was===entryId&&this.timer!==undefined)return;
-  this.cancel();this.timer=setTimeout(()=>{this.timer=undefined;if(this.entryId===entryId){this.shown=true;this.paint();}},PREPARING_GRACE_MS);
- }
- private cancel(){if(this.timer!==undefined)clearTimeout(this.timer);this.timer=undefined;}
- /** Paint into the library as it stands, also after it is drawn again. Only
-  * attributes and one text change: nothing is focused or laid out anew. */
- paint(){
-  const surface=this.library();if(!surface)return;
-  const design=this.design(),on=this.shown&&this.entryId!==undefined;
-  surface.dataset.preparingDesign=design;
-  if(on)surface.dataset.preparing='';else delete surface.dataset.preparing;
-  for(const row of surface.querySelectorAll<HTMLElement>('[data-preparing-row]'))delete row.dataset.preparingRow;
-  if(on&&design==='row'){
-   const row=surface.querySelector<HTMLElement>(`[data-open="${CSS.escape(this.entryId!)}"]`);
-   if(row){row.dataset.preparingRow='';const composer=surface.querySelector<HTMLElement>(`.composer-entry[data-composer="${CSS.escape(row.dataset.composer??'')}"]`);if(composer)composer.dataset.preparingRow='';}
+ /** The score the background work is on, if any. */
+ get preparing(){return this.work?.entryId;}
+ activity(progress:AheadOfTimeProgress|undefined){
+  const was=this.work;
+  if(!progress||progress.end){
+   this.work=undefined;this.cancel();
+   const shown=this.shown;this.shown=undefined;
+   if(shown!==undefined)this.finish(shown,progress?.entryId===shown&&progress.end==='done');
+   return;
   }
-  let words=surface.querySelector<HTMLElement>('.preparing-words');
-  if(!words){const slot=surface.querySelector<HTMLElement>('.library-navigation .application-navigation-actions');if(slot){words=document.createElement('span');words.className='preparing-words';words.textContent='Preparing scores';slot.append(words);}}
-  let edge=surface.querySelector<HTMLElement>('.preparing-edge');
-  if(!edge){edge=document.createElement('span');edge.className='preparing-edge';edge.setAttribute('aria-hidden','true');surface.append(edge);}
+  this.work=progress;
+  if(this.shown===progress.entryId){this.draw(progress);return;}
+  if(was?.entryId===progress.entryId&&this.grace!==undefined)return;
+  // Another score: its own grace. A line still drawn for the one before goes.
+  if(this.shown!==undefined){this.finish(this.shown,false);this.shown=undefined;}
+  this.cancel();
+  this.grace=setTimeout(()=>{this.grace=undefined;if(this.work?.entryId!==progress.entryId)return;this.shown=progress.entryId;this.draw(this.work);},PREPARING_GRACE_MS);
  }
+ private cancel(){if(this.grace!==undefined)clearTimeout(this.grace);this.grace=undefined;}
+ /** Draw into the library as it stands, also after it is drawn again. */
+ paint(){if(this.shown!==undefined&&this.work?.entryId===this.shown)this.draw(this.work);}
+ /** The rows that stand for a score: its own, and its composer's (shown while folded). */
+ private rows(entryId:string):HTMLElement[]{
+  const surface=this.library(),row=surface?.querySelector<HTMLElement>(`[data-open="${CSS.escape(entryId)}"]`);if(!surface||!row)return [];
+  const composer=surface.querySelector<HTMLElement>(`.composer-entry[data-composer="${CSS.escape(row.dataset.composer??'')}"]`);
+  return composer?[row,composer]:[row];
+ }
+ private draw(progress:AheadOfTimeProgress){
+  for(const row of this.rows(progress.entryId)){
+   let line=row.querySelector<HTMLElement>(':scope > .preparing-line');
+   if(!line){line=row.ownerDocument.createElement('span');line.className='preparing-line';line.setAttribute('aria-hidden','true');row.append(line);}
+   row.dataset.preparing=progress.stage??'';
+   line.dataset.progress=progress.fraction.toFixed(2);
+   line.style.setProperty('--progress',String(progress.fraction));
+   // It starts where the row's text starts, read from the row's style (also while it is hidden).
+   if(!line.style.getPropertyValue('--from'))line.style.setProperty('--from',`${textStart(row)}px`);
+  }
+ }
+ /** Done: the line fills the row, then fades. Failed or stopped: it goes now. */
+ private finish(entryId:string,done:boolean){
+  for(const row of this.rows(entryId)){
+   delete row.dataset.preparing;
+   const line=row.querySelector<HTMLElement>(':scope > .preparing-line');if(!line)continue;
+   if(!done){line.remove();continue;}
+   line.dataset.progress='1.00';line.style.setProperty('--progress','1');line.dataset.end='done';
+   setTimeout(()=>line.remove(),PREPARING_LEAVE_MS);
+  }
+ }
+}
+
+/** Where a row's text starts, from the row's left edge: after its padding,
+ * and for a composer after the arrow and the gap that follows it. */
+function textStart(row:HTMLElement):number{
+ const style=getComputedStyle(row),padding=parseFloat(style.paddingLeft)||0;
+ if(!row.classList.contains('composer-entry'))return padding;
+ const arrow=row.querySelector<HTMLElement>('.composer-arrow');
+ return padding+(arrow?parseFloat(getComputedStyle(arrow).width)||0:0)+(parseFloat(style.columnGap)||0);
 }

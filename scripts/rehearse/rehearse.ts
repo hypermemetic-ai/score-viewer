@@ -12,7 +12,7 @@ import {homedir} from 'node:os';
 import {parseArgs} from 'node:util';
 import type {Browser,Page} from 'playwright-core';
 import {startHost,pageScript,type SimulatedHost} from './host';
-import {Driver,appKeys,OPENING_DIALOG,type State} from './driver';
+import {Driver,appKeys,OPENING_DIALOG,type PreparingSample,type State} from './driver';
 import {studioFiles} from './studio';
 
 const LAYOUTS=['janko-four-row','conventional-piano'] as const;
@@ -98,6 +98,37 @@ async function rehearseLayout(driver:Driver,scores:Score[],layout:string){
  }
 }
 
+/** The library left alone while it prepares its scores in the background: a
+ * line shows only under the score being prepared, never moves back, and is
+ * gone once the work is done; the library's main thread stays free meanwhile. */
+async function libraryAlone(driver:Driver,limit:number){
+ await driver.watchLongTasks();const since=await driver.now(),t0=performance.now(),shown=new Set<string>(),furthest=new Map<string,number>();
+ let samples=0,stray=0,backwards=0,quietSince:number|undefined,last:PreparingSample|undefined,worked=new Set<string>();
+ for(;;){
+  const s=last=await driver.preparingLines();samples++;if(s.work)worked.add(s.work);
+  for(const line of s.lines){
+   const owner=line.score!==undefined?line.score===s.work:line.composer===s.workComposer;
+   if(line.ended)continue;
+   if(!line.rowPreparing||!owner){stray++;if(stray<=3)check('a line shows only under the score being prepared',false,{},{line,work:s.work});continue;}
+   if(line.score!==undefined){shown.add(line.score);if(line.progress<(furthest.get(line.score)??0)){backwards++;check('the line never moves back',false,{score:line.score},{from:furthest.get(line.score),to:line.progress});}furthest.set(line.score,Math.max(line.progress,furthest.get(line.score)??0));}
+  }
+  for(const row of s.rows)if(row.score!==undefined?row.score!==s.work:row.composer!==s.workComposer){stray++;check('a line shows only under the score being prepared',false,{},{row,work:s.work});}
+  const quiet=!s.work&&!s.lines.length&&!s.rows.length;quietSince=quiet?quietSince??performance.now():undefined;
+  // The work starts after a quiet moment (3 s): quiet for longer than that, it is done.
+  if(quietSince!==undefined&&performance.now()-quietSince>6000)break;
+  if(performance.now()-t0>limit)break;
+  await driver.page.waitForTimeout(50);
+ }
+ const done=quietSince!==undefined;
+ check('a line shows only under the score being prepared',stray===0,{},{samples});
+ check('the line never moves back',backwards===0,{},{scores:shown.size});
+ check('the line is gone once the work ends',done&&!last!.lines.length&&!last!.rows.length,{},done?{lines:last!.lines.length}:{stillPreparing:last!.work,afterMs:limit});
+ const tasks=(await driver.longTasks(since)).sort((a,b)=>b-a);
+ const summary={ms:Math.round(performance.now()-t0),scoresWorkedOn:worked.size,scoresWithALine:shown.size,longestTaskMs:tasks[0]??0,tasksOver50ms:tasks.length,tasksOver200ms:tasks.filter(t=>t>200).length};
+ log(`  ${summary.scoresWorkedOn} scores worked on, ${summary.scoresWithALine} showed a line; ${summary.ms} ms; longest main-thread task ${summary.longestTaskMs} ms`);
+ return summary;
+}
+
 type PressAction='practice'|'edit'|'toggle';
 /** A press made as the opening dialog leaves runs exactly once: not lost, not doubled. */
 async function earlyPresses(driver:Driver,scores:Score[],count:number,actions:PressAction[]){
@@ -150,13 +181,14 @@ async function main(){
  const playwright=await import(process.env.PRACTICE_PLAYWRIGHT??'playwright-core') as typeof import('playwright-core');
  const browser=await playwright.chromium.launch({headless:true,...(process.env.REHEARSE_CHROMIUM?{executablePath:process.env.REHEARSE_CHROMIUM}:{}),args:['--disable-lcd-text','--force-color-profile=srgb']});
  const host=await startHost({dist:join(out,'dist'),data,repo});
- const imports:Array<Record<string,unknown>>=[];let trials:Array<Record<string,unknown>>=[],scores:Score[]=[];
+ const imports:Array<Record<string,unknown>>=[];let preparing:Awaited<ReturnType<typeof libraryAlone>>|undefined,trials:Array<Record<string,unknown>>=[],scores:Score[]=[];
  try{
   if(!owner){const files=await studioFiles(repo,join(scratch,'sv-rehearsal-cache'));log(`Importing ${files.length} studio files`);
    await session(browser,host,'import',async driver=>{for(const file of files){host.pick(file.bytes);const r=await driver.importScore(),imported=r.state.screen==='reader'&&!!r.state.score,problems=await driver.problems();imports.push({file:file.name,ms:r.ms,score:r.state.score,...(imported?{}:{refused:problems.map(p=>p.text).join(' ')})});
     check('imports',imported,{score:file.name},imported?undefined:{declared:r.state.dialog??r.state.screen,problems});
     await driver.toLibrary();}});}
   scores=await inventory();log(`Inventory: ${scores.length} scores × ${LAYOUTS.length} layouts`);
+  log('The library left alone');preparing=await session(browser,host,'library',driver=>libraryAlone(driver,owner?900_000:180_000));
   for(const layout of LAYOUTS){log(`Layout ${layout}`);await session(browser,host,layout,driver=>rehearseLayout(driver,scores,layout));}
   nameByKind(scores);
   const presses=Number(args.presses??(owner?120:36)),actions=(args['press-keys']?.split(',')??['practice','edit','toggle']) as PressAction[];
@@ -170,14 +202,15 @@ async function main(){
  for(const row of [...timings,...trials])row.score=label(row.score);for(const c of checks)if(c.score)c.score=String(label(c.score));
  const invariants=Object.fromEntries([...new Set(checks.map(c=>c.invariant))].map(name=>{const all=checks.filter(c=>c.invariant===name);return [name,{held:all.every(c=>c.held),checked:all.length,failed:all.filter(c=>!c.held)}];}));
  const report={mode:owner?'owner data':'studio scores',durationMs:Math.round(performance.now()-started),buildMs,inventory:{scores:scores.map(s=>({label:s.label,instrument:s.piano===undefined?'unopened':s.piano?'piano':'other'})),layouts:LAYOUTS,sections:timings.reduce((n,r)=>n+((r.sections as number)??0),0)},
-  imports,timings,earlyPress:{summary:pressSummary(trials),trials},invariants,pageErrors,writes:host.writes.length};
+  imports,preparing,timings,earlyPress:{summary:pressSummary(trials),trials},invariants,pageErrors,writes:host.writes.length};
  await writeFile(join(out,'report.json'),JSON.stringify(report,null,1));
  const summary=markdown(report);await writeFile(join(out,'summary.md'),summary);console.log('\n'+summary);
  if(Object.values(invariants).some(i=>!i.held))process.exitCode=1;
 }
-function markdown(r:{mode:string;durationMs:number;buildMs:number;inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
+function markdown(r:{mode:string;durationMs:number;buildMs:number;preparing?:{ms:number;scoresWorkedOn:number;scoresWithALine:number;longestTaskMs:number;tasksOver50ms:number;tasksOver200ms:number};inventory:{scores:Array<{label:string;instrument:string}>;sections:number};imports:Array<Record<string,unknown>>;timings:Array<Record<string,unknown>>;earlyPress:{summary:ReturnType<typeof pressSummary>};invariants:Record<string,{held:boolean;checked:number;failed:Check[]}>}){
  const s=r.earlyPress.summary,lines=[`## Rehearsal: ${r.mode}`,'',`${(r.durationMs/1000).toFixed(0)} s in all (build ${(r.buildMs/1000).toFixed(1)} s). ${r.inventory.scores.length} score${r.inventory.scores.length===1?'':'s'} (${r.inventory.scores.filter(x=>x.instrument==='piano').length} piano) × ${LAYOUTS.length} layouts; ${r.inventory.sections} sections listed across both layouts (each entered unless locked).`,'','### Invariants','','| Invariant | Held | Checked | Failed |','|---|---|---|---|',
   ...Object.entries(r.invariants).map(([name,i])=>`| ${name} | ${i.held?'yes':'**no**'} | ${i.checked} | ${i.failed.length} |`),'',
+  ...(r.preparing?['### The library left alone','',`The background work went through ${r.preparing.scoresWorkedOn} score${r.preparing.scoresWorkedOn===1?'':'s'} in ${(r.preparing.ms/1000).toFixed(0)} s; ${r.preparing.scoresWithALine} showed a line. Main-thread tasks over 50 ms: ${r.preparing.tasksOver50ms} (over 200 ms: ${r.preparing.tasksOver200ms}); the longest ${r.preparing.longestTaskMs} ms.`,'']:[]),
   '### Early presses','',`${s.presses} presses timed around the opening dialog leaving. After it left: ${s.afterClose.presses}, ran once ${s.afterClose.once}, lost ${s.afterClose.lost}, doubled ${s.afterClose.doubled}. While it still showed: ${s.whileOpening.presses}, ran once ${s.whileOpening.once}, ignored ${s.whileOpening.ignored}, doubled ${s.whileOpening.doubled}; of those, ${s.whileOpening.readerShown} came with the score already drawn behind the dialog (ignored ${s.whileOpening.ignoredReaderShown}). The score showed behind the dialog for ${s.whileOpening.readerShownMs??'–'} ms (median) before it left.${s.unmeasured.presses?` Unmeasured: ${s.unmeasured.presses}.`:''}`,'',
   '### Timings (reports, not gates)','','| Score | Layout | First open ms | Reopen ms | Pages | Fingers ms | Sections (locked) | Section entry median / max ms |','|---|---|---|---|---|---|---|---|',
   ...r.timings.map(t=>{const e=t.sectionEntryMs as {median?:number;max?:number}|undefined;return `| ${t.score} | ${t.layout} | ${t.firstOpenMs??''}${t.setLayoutMs?` (+${t.setLayoutMs} layout)`:''} | ${t.reopenMs??''} | ${t.pages??''} | ${t.fingersMs??''} | ${t.sections??''}${t.locked?` (${t.locked})`:''} | ${e?.median??''} / ${e?.max??''} |`;})];

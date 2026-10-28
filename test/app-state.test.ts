@@ -23,6 +23,9 @@ test('the application declares each screen it shows',()=>{
  assert.equal(appState({...idle,score:{id:'a',piano:true},practice:{step:'fingers'},editing:true}).editing,undefined);
  // Practice without an open score is not a screen the reader can be on.
  assert.equal(appState({...idle,practice:{step:'fingers'}}).screen,'library');
+ // The score the library's background work is on, only while it is on one.
+ assert.equal(appState({...idle,preparing:'a'}).preparing,'a');
+ assert.equal(appState(idle).preparing,undefined);
 });
 
 test('declaring sets what holds, removes what no longer does and rewrites nothing unchanged',()=>{
