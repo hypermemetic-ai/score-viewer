@@ -235,6 +235,35 @@ test('between two scores: a stop frees the worker, and input keeps the waiting s
  last.idles.shift()!();await wait(0);assert.deepEqual(last.started,[],'held until the next quiet moment');
  await last.run();assert.deepEqual(last.started,['a']);
 });
+test('an opening waits for a background install of its score, stops work on a layout it does not need, and waits again for the next step',async()=>{
+ const tick=()=>new Promise(r=>setTimeout(r,0));
+ type Step={work:import('../src/ahead-of-time-engraving').AheadOfTimeWork;signal:AbortSignal};
+ const steps:Step[]=[],next=new Map<string,()=>void>(),aborted:string[]=[];
+ const work=new AheadOfTimeEngraving((id,{signal},w)=>new Promise<void>((resolve,reject)=>{
+  steps.push({work:w,signal:signal!});next.set(id,resolve);signal!.addEventListener('abort',()=>{aborted.push(id);reject(new DOMException('stop','AbortError'));});
+ }),{delayMs:0,idle:run=>run()});
+ // Replacing the edition: an opening of the score sees it, and waits for it.
+ work.start(['no13']);await tick();const step=steps[0];step.work.started();
+ assert.equal(work.replacing('no13'),false);step.work.replacing();assert.equal(work.replacing('no13'),true);assert.equal(work.replacing('other'),false);
+ work.yieldTo('no13');assert.deepEqual([...aborted],[],'opening this score joins the install');
+ let installed=false;const waiting=work.joined('no13').then(()=>{installed=true;});await tick();assert.equal(installed,false);
+ step.work.ready();await waiting;assert.equal(work.replacing('no13'),false,'once installed, the opening reads the new edition');
+ // The next step (the new edition's pages) has its own ready, which a second join awaits.
+ step.work.started();let paged=false;const pages=work.joined('no13').then(()=>{paged=true;});await tick();assert.equal(paged,false);
+ step.work.ready();await pages;next.get('no13')!();await tick();
+ // A layout left for later: an opening of the score stops it, unless its install has begun.
+ const later=new AheadOfTimeEngraving((id,{signal},w)=>new Promise<void>((resolve,reject)=>{
+  steps.push({work:w,signal:signal!});next.set(id,resolve);signal!.addEventListener('abort',()=>{aborted.push(id);reject(new DOMException('stop','AbortError'));});
+ }),{delayMs:0,idle:run=>run()});
+ later.start(['no14']);await tick();let s=steps.at(-1)!;s.work.started();s.work.optional();later.yieldTo('no14');
+ assert.deepEqual(aborted,['no14'],'an opening needs only the layout in use');
+ later.start(['no15']);await tick();s=steps.at(-1)!;s.work.started();s.work.optional();s.work.replacing();later.yieldTo('no15');
+ assert.deepEqual(aborted,['no14'],'an install under way is joined, not stopped');assert.equal(later.replacing('no15'),true);
+ s.work.ready();next.get('no15')!();await tick();
+ // A new step forgets the last one's kind.
+ later.start(['no16']);await tick();s=steps.at(-1)!;s.work.started();s.work.optional();s.work.started();later.yieldTo('no16');assert.deepEqual(aborted,['no14']);
+ next.get('no16')!();await tick();
+});
 test('the viewer holds ahead-of-time work through its own listener and saves an engine before freeing its worker',()=>{
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  assert.match(main,/holdAheadOfTimeOnInput\(window,\(\)=>aheadOfTime,\(\)=>!current&&!readingOperation\)/);
@@ -247,10 +276,14 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
  /** Opening would engrave the archive again (its pages an earlier engine drew), or it is a reading. */
  behind?:boolean;reading?:boolean;
  /** What the engraving worker answers; by default the archive's content does not read. */
- engraved?:()=>Promise<{made:{kind:string;key:string;encoded:unknown;tag?:string}[];error?:string}>}={}){
+ engraved?:()=>Promise<{made:{kind:string;key:string;encoded:unknown;tag?:string}[];error?:string}>;
+ /** The edition engraved for the layout in use left the other layout for later. */
+ later?:boolean;
+ /** How installing goes: written, or failing for a reason of its own. */
+ install?:(request:any)=>Promise<void>}={}){
  const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
  const source=stripTypeScriptTypes(main.slice(main.indexOf('const idleTime='),main.indexOf('\ntype ReadingJob=')));
- const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a');
+ const log:string[]=[],controller=new AbortController(),{store}=memoryStore(),derived=new DerivedFileCache(store,'build-a'),installs:any[]=[];
  const stop=(step:string)=>{log.push(step);if(options.stopAt===step)controller.abort();};
  class Session {
   waiting=false;
@@ -269,24 +302,48 @@ function preparation(options:{stopAt?:string;projected?:boolean;engineOnDisk?:bo
   async view(){stop('folded project');this.session.waiting=!options.engineOnDisk;return {verbatimFold:{session:this.session}};}
   async served(){return {kind:'verbatim-fold-v1',key:sha('f'),tag:'folded',with:[]};}
  }
+ // The library's files: the saved archive (1,2,3), its edition engraved again (4,5,6), that edition completed (7,8,9).
+ const files:Record<string,Uint8Array>={'package-no13.tuna':new Uint8Array([1,2,3]),'package-again.tuna':new Uint8Array([4,5,6]),'package-complete.tuna':new Uint8Array([7,8,9])};
+ const first=(b:Uint8Array)=>b[0]===1;
  const memory={adoptIndexed:async()=>{log.push('indexed');return true;},storedRefs:()=>{log.push('hand choices read');return [];},personalFor:()=>({})};
  const context:any={
-  JSON,Promise,setTimeout,DOMException,Error,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,refusedWhen,admissionRejection,engravingRefusal,savedPagesBehindPolicy:()=>false,
+  JSON,Promise,setTimeout,DOMException,Error,Set,AHEAD_OF_TIME_KIND:'ahead-of-time-v2',hashBytes,preparedBefore,prepareRecorded,refusedWhen,admissionRejection,engravingRefusal,savedPagesBehindPolicy:()=>false,
   checkReadingExecution:(e:any)=>{if(e?.signal?.aborted)throw new DOMException('stop','AbortError');},
-  entries:[{id:'no13',file:'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
-  personalMemory:{...memory,memoryRevision:0},FoldedReader,withRepeatInheritance:(_p:unknown,s:unknown)=>s,withResolvedMemory:()=>({}),resolveMemoryInput:()=>({}),host:{read:async()=>new Uint8Array([1,2,3])},
-  projectionServed:async()=>!!options.projected,readingOnlyArchive:()=>false,aheadAdmission:{import:async()=>{if(options.admission)throw options.admission;return {availablePresentations:['janko-four-row']};}},
-  scoreCapabilities:()=>({pianoPreparation:true}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>undefined,
-  ensurePianoReady:async()=>({package:{}}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
+  entries:[{id:'no13',file:options.later?'package-again.tuna':'package-no13.tuna',importedAt:'t1'}],preferences:{keyboardLayout:'janko-four-row'},
+  personalMemory:{...memory,memoryRevision:0},FoldedReader,withRepeatInheritance:(_p:unknown,s:unknown)=>s,withResolvedMemory:()=>({}),resolveMemoryInput:()=>({}),host:{read:async(name:string)=>files[name]??null},
+  projectionServed:async()=>!!options.projected,readingOnlyArchive:(b:Uint8Array)=>!!options.reading,
+  aheadAdmission:{import:async(b:Uint8Array)=>{if(options.admission&&first(b))throw options.admission;return {availablePresentations:['janko-four-row'],manifest:{files:{}},earlier:first(b)};}},
+  scoreCapabilities:()=>({pianoPreparation:!options.reading}),selectPresentation:async(p:unknown)=>p,loadPersonalJournal:async()=>({}),readPersonal:(p:unknown)=>p,GUITAR_PRO_FILES:{descriptor:'source-part.json'},
+  ensurePianoReady:async(request:any)=>({package:{keyboardLayout:request.layout},packageBytes:request.packageBytes}),PersonalPresentationSession:Session,separatePreparations:()=>undefined,projectionWorkerClient:()=>({}),aheadWorker:undefined,
   AheadOfTimeRefusal,SavedPagesLackRepeats:class extends Error{},ENGRAVE_AGAIN_KINDS:['engraved-again-v1','reading-admission-v1','piano-page-checks-v1','calculated-admission-v1'],
-  engraveAgainInWorker:async(_bytes:Uint8Array,_signal:AbortSignal,admit:boolean)=>{stop(admit?'admitted and engraved again':'engraved again');return options.engraved?options.engraved():{made:[],error:'This saved edition does not read.'};},
+  // The worker engraves only what the current engraving no longer reproduces.
+  engraveAgainInWorker:async(bytes:Uint8Array,_signal:AbortSignal,admit:boolean,more:{layouts?:string[];earlier?:Uint8Array})=>{
+   if(!first(bytes)&&!more.earlier)return {made:[]};
+   stop(more.earlier?`engraved ${more.layouts} again from the earlier edition`:admit?'admitted and engraved again':`engraved ${more.layouts} again`);return options.engraved?options.engraved():{made:[],error:'This saved edition does not read.'};},
+  // What a library entry keeps about its edition engraved again.
+  laterLayouts:(entry:any)=>entry.file==='package-again.tuna'&&options.later?{from:'package-no13.tuna',layouts:['conventional-piano']}:undefined,engravedAgainOf:()=>undefined,joinedNotice:(_a:unknown,b:unknown)=>b,
+  readRetainedEdition:async(_host:unknown,_entry:unknown,file:string)=>files[file],
+  prepareRebuiltEdition:async(_host:unknown,_entry:unknown,_file:string,bytes:Uint8Array,layout:string,request:any)=>{stop(`prepared ${request.layouts}${request.keptOnly?' from the kept engraving':''}`);
+   return {packageBytes:files['package-again.tuna'],package:{keyboardLayout:layout},personal:{},later:['conventional-piano'],hands:'edition',fingers:'none',left:0,carried:0};},
+  prepareCompletedEdition:async(_host:unknown,_entry:unknown,_bytes:Uint8Array,from:string,_earlier:Uint8Array,layouts:string[],request:any)=>{stop(`prepared ${layouts} from ${from}${request.keptOnly?' from the kept engraving':''}`);
+   return {packageBytes:files['package-complete.tuna'],package:{keyboardLayout:layouts[0]},personal:{},hands:'edition',fingers:'none',left:0,carried:0};},
+  reengraveReadingArchive:async(_bytes:Uint8Array,_refusal:unknown,_execution:unknown,keptOnly:boolean)=>{stop(`prepared the reading${keptOnly?' from the kept engraving':''}`);return files['package-again.tuna'];},
+  // Nothing open and nothing queued: the library is quiet.
+  startupReady:true,current:undefined,practice:undefined,job:undefined,readingOperation:undefined,dialog:undefined,queuedWrites:0,
+  editionLibrary:{},enqueue:(op:()=>Promise<unknown>)=>op(),editionNeedsEngravingAgain:async()=>undefined,
+  installEdition:async(_library:unknown,request:any)=>{
+   assert.equal(request.live(),true,'installed only while the library is quiet');
+   if(options.install)await options.install(request);
+   if(!request.live())throw Error('Saving was cancelled; existing score retained.');
+   stop('installed');installs.push({file:request.entry.file,bytes:[...request.q.packageBytes],record:JSON.parse(JSON.stringify(request.engravedAgain()??null))});
+   const next=request.q.packageBytes[0]===4?'package-again.tuna':'package-complete.tuna';context.entries=[{...context.entries[0],file:next}];
+  },
  };
- if(options.behind)context.savedPagesBehindPolicy=()=>true;
- if(options.reading)context.readingOnlyArchive=()=>true;
+ if(options.behind)context.savedPagesBehindPolicy=(p:any)=>p.earlier;
  runInNewContext(source,context);
- const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready')});
+ const run=()=>context.prepareAheadOfTime(derived,'no13',{signal:controller.signal},{quiet:async()=>{},started:()=>log.push('started'),ready:()=>log.push('ready'),replacing:()=>log.push('replacing'),optional:()=>log.push('optional')});
  const recorded=async()=>(await derived.peek('ahead-of-time-v2',await hashBytes(JSON.stringify(['ahead-of-time-v2',await hashBytes(new Uint8Array([1,2,3])),'janko-four-row','no13','t1',null,[]]))))!==undefined;
- return {log,run,recorded,derived};
+ return {log,run,recorded,derived,context,controller,installs};
 }
 test('a preparation writes the pages before an opening goes on, then saves the engine, and records itself only after both',async()=>{
  const whole=preparation();await whole.run();
@@ -328,26 +385,71 @@ test('only admission rejecting a score, or the engraver refusing its pages, is r
  await assert.rejects(refusedWhen(Promise.reject(unfit),engravingRefusal),e=>e instanceof AheadOfTimeRefusal&&e.cause===unfit);
 });
 
-test('an archive opening would engrave again is engraved again in a worker and kept, once; installing it is left for opening',async()=>{
+test('an archive opening would engrave again is engraved again in a worker for the layout in use, kept, installed in the library, and its pages prepared',async()=>{
  const engraving=await encodeDerivedPayload({version:'engraved-again-v1',archive:'AQID',fellBack:[],droppedFingers:[]}),
   engraved=async()=>({made:[{kind:'engraved-again-v1',key:sha('b'),encoded:{...engraving,body:new Uint8Array(engraving.body)}},
    {kind:'piano-page-checks-v1',key:sha('c'),encoded:await encodeDerivedPayload(true),tag:'checked'},{kind:'player-data',key:sha('d'),encoded:await encodeDerivedPayload(true)}]});
- for(const [what,options] of [['pages an earlier engine drew',{behind:true}],['admission rejects the pages',{admission:Error('Page 1 differs from its replay')}],['a reading',{reading:true}]] as const){
+ const prepared=['indexed','hand choices read','started','project','pages written','ready','engine saved'];
+ for(const [what,options] of [['pages an earlier engine drew',{behind:true}],['admission rejects the pages',{admission:Error('Page 1 differs from its replay')}]] as const){
   const p=preparation({...options,engraved});await p.run();
-  // Engraved, written, and only then may an opening that took it over go on; no projection is made for the earlier archive.
-  assert.deepEqual(p.log.slice(3),[what==='a reading'?'admitted and engraved again':'engraved again','ready'],what);
+  // Engraved for the layout in use, prepared from that kept engraving, installed, and only then may an opening that took it over go on.
+  assert.deepEqual(p.log.slice(3,8),['engraved janko-four-row again','replacing','prepared janko-four-row from the kept engraving','installed','ready'],what);
+  // The other layout is engraved next from the same earlier edition; it is left for later, so an opening stops it.
+  assert.deepEqual(p.installs.map(i=>i.record),[{from:'package-no13.tuna',later:['conventional-piano'],untold:{hands:'edition',fingers:'none',left:0,practiceLeft:0}}],what);
+  assert.deepEqual(p.log.slice(8),prepared,'then the new edition\'s pages are prepared as any score\'s are');
   assert.ok(await p.derived.has('engraved-again-v1',sha('b')),what);assert.equal(await p.derived.peek('piano-page-checks-v1',sha('c')),'checked',what);
   // The worker hands back derived files only.
   assert.equal(await p.derived.has('player-data',sha('d')),false,what);
   assert.equal(await p.recorded(),true,what);
  }
+ const reading=preparation({reading:true,engraved});await reading.run();
+ assert.deepEqual(reading.log.slice(3,8),['admitted and engraved again','replacing','prepared the reading from the kept engraving','installed','ready']);
+ assert.deepEqual(reading.installs.map(i=>i.record),[{from:'package-no13.tuna',untold:{reading:true,hands:'edition',fingers:'none',left:0,practiceLeft:0}}]);
  // A worker lost, out of memory or stopped records nothing: the next visit tries again.
  const lost=preparation({behind:true,engraved:async()=>{throw Error('The engraving worker stopped: out of memory');}});
  await assert.rejects(lost.run(),/out of memory/);assert.equal(await lost.recorded(),false);
- const stopped=preparation({behind:true,stopAt:'engraved again',engraved});
+ const stopped=preparation({behind:true,stopAt:'engraved janko-four-row again',engraved});
  await assert.rejects(stopped.run(),{name:'AbortError'});assert.equal(await stopped.recorded(),false);assert.equal(await stopped.derived.has('engraved-again-v1',sha('b')),false);
- // Content the current engraving cannot make again is a refusal, recorded once.
- const refused=preparation({behind:true});await refused.run();assert.equal(await refused.recorded(),true);
+ // Content the current engraving cannot make again is a refusal, recorded once, and nothing is installed.
+ const refused=preparation({behind:true});await refused.run();assert.equal(await refused.recorded(),true);assert.deepEqual(refused.installs,[]);
+});
+
+test('the layouts an edition left for later are engraved from its earlier edition and installed before its pages are prepared',async()=>{
+ const engraving=await encodeDerivedPayload({version:'engraved-again-v1',archive:'AQID',fellBack:[],droppedFingers:[]}),
+  engraved=async()=>({made:[{kind:'engraved-again-v1',key:sha('b'),encoded:{...engraving,body:new Uint8Array(engraving.body)}}]});
+ const p=preparation({later:true,engraved});await p.run();
+ assert.deepEqual(p.log.slice(3,9),['optional','engraved conventional-piano again from the earlier edition','replacing','prepared conventional-piano from package-no13.tuna from the kept engraving','installed','ready']);
+ // Everything came along as it was: nothing to say when the score opens.
+ assert.deepEqual(p.installs.map(i=>i.file),['package-again.tuna']);assert.deepEqual(p.installs.map(i=>i.record),[null]);
+ assert.deepEqual(p.log.slice(9),['indexed','hand choices read','started','project','pages written','ready','engine saved']);
+ // Refused, it is not tried again this session, and the pages of the edition as it is are prepared.
+ const refused=preparation({later:true});await refused.run();
+ assert.deepEqual(refused.log.slice(3),['optional','engraved conventional-piano again from the earlier edition','started','project','pages written','ready','engine saved']);
+ assert.deepEqual(refused.installs,[]);
+});
+
+test('a background install waits for the library to be quiet, and an opening of another score stops it with nothing written',async()=>{
+ const engraving=await encodeDerivedPayload({version:'engraved-again-v1',archive:'AQID',fellBack:[],droppedFingers:[]}),
+  engraved=async()=>({made:[{kind:'engraved-again-v1',key:sha('b'),encoded:{...engraving,body:new Uint8Array(engraving.body)}}]});
+ // A dialog up, then another write queued: the install waits for both.
+ const waits=preparation({behind:true,engraved});waits.context.dialog={};
+ const running=waits.run();await new Promise(resolve=>setTimeout(resolve,500));
+ assert.deepEqual(waits.installs,[],'not while a dialog is up');
+ waits.context.dialog=undefined;waits.context.queuedWrites=1;await new Promise(resolve=>setTimeout(resolve,500));
+ assert.deepEqual(waits.installs,[],'not while another write is queued');
+ waits.context.queuedWrites=0;await running;assert.equal(waits.installs.length,1);
+ // An opening of this very score waits for it: the install goes on with its dialog up.
+ const joined=preparation({behind:true,engraved});joined.context.dialog={};joined.context.readingOperation={running:{entryId:'no13'}};await joined.run();
+ assert.equal(joined.installs.length,1);
+ // A score opened, or practice, stops it at its next step: nothing is installed or recorded, and the next visit tries again.
+ for(const what of ['current','practice'] as const){
+  const stopped=preparation({behind:true,engraved,install:async()=>{stopped.context[what]={};stopped.controller.abort();}});
+  await assert.rejects(stopped.run(),{name:'AbortError'},what);assert.deepEqual(stopped.installs,[],what);assert.equal(await stopped.recorded(),false,what);
+ }
+ // An install failing for a reason of its own leaves the score for opening, which says why.
+ const failed=preparation({behind:true,engraved,install:async()=>{throw Error('The declared personal journal is missing.');}});
+ await failed.run();assert.deepEqual(failed.installs,[]);assert.equal(await failed.recorded(),true);
+ assert.ok(failed.log.includes('prepared janko-four-row from the kept engraving'));assert.ok(!failed.log.includes('installed'));
 });
 
 test('an opening cancelled with Esc, or failed, returns to a library that prepares scores again',async()=>{

@@ -6,7 +6,7 @@ import {initialPersonal,readPersonal,fingerFor,practiceStorageName,personalStora
 import {importPackage,hashBytes,selectPresentation} from '../src/package';
 import {getScoreTransposition,getOriginalScorePackageBytes} from '../src/score-transposition';import {retainedTranspositionFile} from '../src/score-transposition-selection';import {planPractice,initialPractice,readPractice,progressFor,practiceCatalogChunks,transferPracticeEdition,passageHierarchy} from '../src/practice';
 import {toggleDone} from '../src/practice-attainment';import {stagePracticeEditionTransfer,mergeEditionPractice} from '../src/practice-edition-install';
-import {stagePresentationInstall} from '../src/presentation-install';import {admitPracticeContext} from '../src/practice-context';
+import {stagePresentationInstall} from '../src/presentation-install';import {admitPracticeContext} from '../src/practice-context';import {installEdition} from '../src/edition-install';
 const bytes=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)),parsed=(v:Uint8Array)=>JSON.parse(new TextDecoder().decode(v));
 async function fixture(score=transferStudy()){
  const source=await sourcePackage(score),baseline=await ensurePianoReady({packageBytes:source.bytes,layout:'janko-four-row',performingHandPolicy:'retain-imported'});if(!('package' in baseline))throw Error('Fixture cannot prepare baseline');
@@ -134,6 +134,8 @@ const mainSource=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8'),
 function applicationInstall(s:ReturnType<typeof storage>,prepare:(...args:any[])=>Promise<any>){
  const running={state:'installing'},context:any={structuredClone,TextEncoder,job:running,readingOperation:undefined,host:s.host,readerAdmission:{import:importPackage},admitOrContent:(bytes:Uint8Array)=>importPackage(bytes,{allowLegacyTempo:true}),entries:[f.entry],preferences:{keyboardLayout:'janko-four-row'},enqueue:async(fn:()=>Promise<any>)=>fn(),
   collectionId,readPersonal,getOriginalScorePackageBytes,personalStorageName,selectPresentation,retainedTranspositionFile,getScoreTransposition,stagePracticeEditionTransfer,stagePresentationInstall,PracticeView:{prepareContext:prepare}};
+ // The library main.ts installs through (editionLibrary), over this context's host and entries.
+ context.installEdition=installEdition;context.editionLibrary={get host(){return context.host;},entries:()=>context.entries,commit:(next:unknown)=>{context.entries=next;},enqueue:(op:()=>Promise<unknown>)=>context.enqueue(op),admit:context.admitOrContent,layout:()=>context.preferences.keyboardLayout};
  runInNewContext(mainInstall,context);return {context,running,run:(navigation?:unknown,q=f.changed)=>context.installPreparedScore(f.entry,q,running,f.changed.personal,false,undefined,navigation)};
 }
 test('production main installation transfers saved catalog progress with no open practice view',async()=>{

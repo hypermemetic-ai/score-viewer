@@ -2,6 +2,7 @@ import {assigned,readPersonalAssignments,type PersonalAssignments} from './perso
 import {isPitchedEvent} from '../vendor/iso-notation/src/model/musical-event';
 import type {ScorePackage,FingerLayer,Seat,Attack,Metadata} from './package';
 import {isScoreFileName} from './score-file-name';
+import type {EngravedAgainEntry} from './engraved-again-entry';
 import {CONVENTIONAL_PIANO,physicalContact,type PhysicalKeyContact} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {FingerBehavior,FingerPresentation} from './input';
 import {getOriginalScoreIdentity} from './score-transposition';
@@ -137,7 +138,9 @@ export const rotate=(r:Rotation)=>(r+90)%360 as Rotation;
 /** Descriptive discovery only. Actual provider replay is required before this
  * hint can supply an Instrument choice or family. */
 export interface GuitarProEntryHint {version:'guitar-pro-entry-hint-v1';groupId:string;inputSha256:string;sourceTrackId:string;sourceName?:string}
-export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>;transposition?:ScoreTranspositionSelection;guitarPro?:GuitarProEntryHint}
+export interface Entry {id:string;file:string;metadata:Metadata;importedAt:string;presentations?:string[];retainedPackages?:string[];personalFiles?:Record<string,string>;editionPersonalFiles?:Record<string,Record<string,string>>;transposition?:ScoreTranspositionSelection;guitarPro?:GuitarProEntryHint;
+ /** See engraved-again-entry.ts; read through engravedAgainOf. */
+ engravedAgain?:EngravedAgainEntry}
 export function validEntryStorage(e:Entry):boolean {
  const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v),
    packageName=isScoreFileName,

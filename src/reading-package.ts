@@ -179,15 +179,15 @@ async function engraveReading(bytes:Uint8Array,refuse:(error:unknown)=>never,exe
  * or would come out with another source revision, `refusal` is thrown. A
  * refusal from engraving the content afresh at the current pin (too many
  * pages, say) is thrown as it is, since it says truthfully why the reading
- * can't open. */
-export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown,execution?:ReadingExecution):Promise<Uint8Array|undefined>{
+ * can't open. With `keptOnly`, only an engraving already kept is read. */
+export async function reengraveReadingArchive(bytes:Uint8Array,refusal:unknown,execution?:ReadingExecution,keptOnly=false):Promise<Uint8Array|undefined>{
   const peek=manifestOf(bytes),version=peek?.version===3?peek.reading?.version:undefined;
   if(version!=='instrument-reading-package-v1'&&version!=='instrument-reading-package-v2')return;
   const refuse=(error:unknown):never=>{if((error as Error)?.name==='AbortError')throw error;throw refusal;};
   // Made once: ahead-of-time work may already have engraved these very bytes,
   // having read their content and checked their members (engraveReading).
   // Reading that content replays it, so it is read only when nothing was kept.
-  const again=(await engraveAgainOnce('reading',[bytes],async()=>({bytes:await engraveReading(bytes,refuse,execution),fellBack:[],droppedFingers:[]}))).bytes;
+  const again=(await engraveAgainOnce('reading',[bytes],async()=>({bytes:await engraveReading(bytes,refuse,execution),fellBack:[],droppedFingers:[]}),keptOnly)).bytes;
   // The score's identity is its source bytes; engraving again never changes them.
   if(manifestOf(again)?.revision!==peek!.revision)return refuse(Error('Engraving this reading again would change its musical source.'));
   return again;

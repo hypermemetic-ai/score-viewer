@@ -28,14 +28,25 @@ export type AheadOfTimeQuiet=()=>Promise<void>;
 export interface AheadOfTimeWork {
  quiet:AheadOfTimeQuiet;
  /** Everything the preparation is made for has just been read: its basis is
-  * fixed now. Until then it has read nothing, and any opening may take it over. */
+  * fixed now. Until then it has read nothing, and any opening may take it over.
+  * Called again when the work goes on with the score's next step (its
+  * edition replaced, say): a new step, with a new `ready`. */
  started():void;
  /** What opening reads is written: an opening that took this work over goes on now. */
  ready():void;
+ /** From now on, until `ready`, this step replaces the score's edition: an
+  * opening of the score waits for it before reading its edition. */
+ replacing():void;
+ /** This step makes what opening the score doesn't need (another keyboard
+  * layout): an opening of the score stops it, unless it is replacing the
+  * edition already. */
+ optional():void;
 }
 /** The preparation under way: its basis once it has read its inputs, and
  * whether an opening has taken it over. */
-interface Running {entryId:string;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>}
+interface Running {entryId:string;basis?:string;taken?:boolean;done:Promise<void>;ready:Promise<void>;
+ /** The current step's ready has been given. */
+ readied?:boolean;markReady:()=>void;replacing?:boolean;optional?:boolean}
 export class AheadOfTimeEngraving {
  private controller?:AbortController;
  private running?:Running;
@@ -58,6 +69,8 @@ export class AheadOfTimeEngraving {
    * it is unchanged. */
   basis?:(entryId:string)=>string}={}){}
  get active(){return this.running?.entryId;}
+ /** Whether the work under way is replacing `entryId`'s edition now. */
+ replacing(entryId:string):boolean {const running=this.running;return running?.entryId===entryId&&!!running.replacing&&!running.readied;}
  private get delay(){return this.options.delayMs??3000;}
  /** Prepare these scores in order, after a quiet moment. Replaces any earlier list. */
  start(entryIds:readonly string[]):void {
@@ -98,7 +111,7 @@ export class AheadOfTimeEngraving {
   * for what the reading will show; anything else stops now. It runs in its
   * own projection worker, so stopping it never costs the reader's warm engines. */
  yieldTo(entryId:string):void {
-  const running=this.running;if(running?.entryId!==entryId||!this.current(running)){this.end(true);return;}
+  const running=this.running;if(running?.entryId!==entryId||!this.current(running)||running.optional&&!running.replacing){this.end(true);return;}
   if(this.timer!==undefined){clearTimeout(this.timer);this.timer=undefined;}
   running.taken=true;this.queue=[];this.waiting=undefined;this.unhold();
  }
@@ -136,9 +149,11 @@ export class AheadOfTimeEngraving {
   idle(()=>{
    if(generation!==this.generation||this.running)return;
    this.waiting=undefined;const controller=new AbortController();this.controller=controller;this.holding=true;
-   let ready!:()=>void;const running:Running={entryId,ready:new Promise<void>(resolve=>{ready=resolve;}),done:Promise.resolve()};this.running=running;
-   const started=()=>{if(this.running===running)running.basis=this.basis(entryId);};
-   running.done=this.prepare(entryId,{signal:controller.signal},{quiet:this.quiet,started,ready}).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
+   const running:Running={entryId,ready:Promise.resolve(),markReady:()=>{},done:Promise.resolve()};this.running=running;
+   const arm=()=>{running.readied=false;running.replacing=false;running.optional=false;running.ready=new Promise<void>(resolve=>{running.markReady=()=>{running.readied=true;resolve();};});};arm();
+   const started=()=>{if(this.running!==running)return;if(running.readied)arm();running.replacing=false;running.optional=false;running.basis=this.basis(entryId);};
+   const work:AheadOfTimeWork={quiet:this.quiet,started,ready:()=>running.markReady(),replacing:()=>{running.replacing=true;},optional:()=>{running.optional=true;}};
+   running.done=this.prepare(entryId,{signal:controller.signal},work).catch(()=>{/* a miss on opening, as before */}).finally(()=>{
     if(this.controller!==controller)return;
     this.controller=undefined;this.running=undefined;this.next();
    });

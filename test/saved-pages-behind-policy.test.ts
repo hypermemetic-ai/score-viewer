@@ -113,7 +113,7 @@ async function opening(rebuilds:boolean,times=1){
   keepSavedPagesWithoutRepeats:()=>calls.push('without-repeats'),
   readingProgress:()=>calls.push('engrave-again'),reengraveReadingArchive:async()=>undefined,readingExecution:()=>({}),
   // Work under way in the library for this score is awaited first.
-  aheadOfTime:{joined:async(id:string)=>{assert.equal(id,'source');joined++;}},
+  aheadOfTime:{joined:async(id:string)=>{assert.equal(id,'source');joined++;},replacing:()=>false},entries:[entry],engravedAgainOf:()=>undefined,
   // The edition just admitted is engraved again from, not read a second time.
   prepareRebuiltEdition:async(_h:unknown,_e:unknown,_f:unknown,_b:unknown,_l:unknown,options:{refusal:unknown;content?:unknown})=>{assert.ok(options.refusal instanceof SavedPagesBehindPolicy);assert.equal(options.content,p);calls.push('rebuild');if(!rebuilds)throw Error('cannot engrave');return {packageBytes:new Uint8Array([9]),personal,left:0,carried:0,practice:[],additionalPersonal:[],replaced:{}};},
   preparePiano:async()=>({q,running:{}}),

@@ -68,6 +68,7 @@ function viewer(){
   loadPersonal:async()=>({view:{page:0}}),collectionId:(p:any)=>p.collection,
   prepareScore:async(_data:unknown,_layout:unknown,personal:unknown,prior:unknown)=>({q:{package:prior,personal,packageBytes:new Uint8Array([1])},running:{}}),
   installPreparedScore:async()=>{calls.push('install');},
+  aheadOfTime:undefined,engravedAgainOf:()=>undefined,
   activateScore:async(next:any)=>{calls.push(`activate ${next.entry.id}`);context.opened=next;return next;},
   saveReadingPreferences:async()=>{calls.push('preferences');},finishReading:(_op:unknown,success:boolean)=>calls.push(success?'complete':'failed'),
  };

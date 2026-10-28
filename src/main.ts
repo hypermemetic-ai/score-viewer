@@ -74,8 +74,10 @@ import {ensurePianoReady,useFingerReplayReceipts} from './piano-readiness';
 import type {PianoPrepared} from './piano-readiness';
 interface PreparedScore {packageBytes:Uint8Array;package:ScorePackage;personal?:PersonalState}
 import {stagePresentationInstall} from './presentation-install';
+import {carryRebuiltPractice,installEdition,type EditionLibrary} from './edition-install';
+import {engravedAgainOf,joinedNotice,laterLayouts,type EngravedAgainEntry,type EngravedAgainNotice} from './engraved-again-entry';
 import {prepareRetainedEdition,readRetainedEdition} from './retained-editions';
-import {prepareRebuiltEdition,rebuildEdition,addKeyboardView,canAddKeyboardView,canShareKeyboardView,shareKeyboardView,personalForAddedKeyboard,type RebuiltInstall} from './edition-rebuild';
+import {prepareRebuiltEdition,prepareCompletedEdition,rebuildEdition,addKeyboardView,canAddKeyboardView,canShareKeyboardView,shareKeyboardView,personalForAddedKeyboard,type RebuiltInstall} from './edition-rebuild';
 import type {PhysicalKeyboardId} from '../vendor/iso-notation/src/model/physical-keyboard';
 import type {AdmittedReading} from '../vendor/iso-notation/src/score-presentation';
 
@@ -170,6 +172,13 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  // What this preparation is made for is read here, at once; an opening takes it over only while that stands.
  const entry=entries.find(e=>e.id===entryId),layout=preferences.keyboardLayout,stored=personalMemory.storedRefs(entryId);if(!entry||!stored)return;work.started();
  const bytes=await host.read(entry.file);checkReadingExecution(execution);if(!bytes)return;
+ // Keyboard layouts the edition left for later come before its pages: installing
+ // them makes a new edition, whose pages those would no longer be.
+ const later=laterLayouts(entry);
+ if(later&&!laterRefused.has(entry.file)){
+  if(await completeAhead(derived,entry,bytes,later,execution,work))return prepareAheadOfTime(derived,entryId,execution,work);
+  work.started();
+ }
  // Everything known before admission. A score already prepared, refused or
  // needing nothing costs a hash and a few header reads, not an admission.
  const key=await hashBytes(JSON.stringify([AHEAD_OF_TIME_KIND,await hashBytes(bytes),layout,entryId,entry.importedAt,entry.personalFiles??null,stored]));
@@ -178,18 +187,21 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
  // Between steps a click is answered at once, and input in the library holds
  // the work here until the next quiet moment: the player never waits for it.
  const answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
+ // An edition engraved again here is installed here too; its pages are prepared next.
+ let installed=false;
  await prepareRecorded(derived,key,async read=>{
   // A reading is admitted, and engraved again when opening would, off this thread.
   const reading=readingOnlyArchive(bytes);
-  if(reading){await engraveAgainAhead(derived,bytes,execution,work,true);return null;}
+  if(reading){if(await engraveAgainAhead(derived,bytes,execution,work,{admit:true}))installed=await installAhead(entry,bytes,'reading',execution,work);work.ready();return null;}
   // An archive admission rejects, or whose pages an earlier engine drew, is
-  // engraved again by opening it: that engraving is made here. Opening
-  // installs it and says so. Only the engraving failing is a refusal.
+  // engraved again, for the keyboard layout in use, off this thread, and
+  // installed as opening would install it. Only the engraving failing is a refusal.
   await answerInput();
+  const again=async()=>{await engraveAgainAhead(derived,bytes,execution,work,{layouts:[layout]});installed=await installAhead(entry,bytes,'edition',execution,work);work.ready();return null;};
   let prior:ScorePackage;try{prior=await aheadAdmission.import(bytes,{allowLegacyTempo:true,execution});}
-  catch(error){if(!admissionRejection(error)&&!(error instanceof SavedPagesLackRepeats))throw error;await engraveAgainAhead(derived,bytes,execution,work);return null;}
+  catch(error){if(!admissionRejection(error)&&!(error instanceof SavedPagesLackRepeats))throw error;return again();}
   await answerInput();
-  if(savedPagesBehindPolicy(prior)){await engraveAgainAhead(derived,bytes,execution,work);return null;}
+  if(savedPagesBehindPolicy(prior))return again();
   if(!scoreCapabilities(prior).pianoPreparation||!prior.availablePresentations?.includes(layout))return null;
   // A journal kept outside the store is a file: its digest joins the record.
   const journals={read:async(name:string)=>{const b=await host.read(name);read(name,b?await hashBytes(b):null);return b;}};
@@ -224,19 +236,94 @@ async function prepareAheadOfTime(derived:DerivedFileCache,entryId:string,execut
   if(session.engineWaiting){await idleTime();await answerInput();await session.flushEngine();checkReadingExecution(execution);}
   return served;
  });
+ if(installed)return prepareAheadOfTime(derived,entryId,execution,work);
 }
 /** A saved archive engraved again in a worker, while the player is in the
- * library, and kept with what admitting it checked; opening it reads that
- * engraving rather than making it. The worker's engraving failing is a
- * refusal, so it is not tried again until the archive changes. */
-async function engraveAgainAhead(derived:DerivedFileCache,bytes:Uint8Array,execution:ReadingExecution,work:AheadOfTimeWork,admit=false){
+ * library, and kept with what admitting it checked; installing it, and
+ * opening it, read that engraving rather than make it. The worker's
+ * engraving failing is a refusal, so it is not tried again until the archive
+ * changes. True when it engraved something (a reading the current engraving
+ * still reproduces needs nothing). */
+async function engraveAgainAhead(derived:DerivedFileCache,bytes:Uint8Array,execution:ReadingExecution,work:AheadOfTimeWork,request:{admit?:boolean;layouts?:PhysicalKeyboardId[];earlier?:Uint8Array}={}):Promise<boolean>{
  await work.quiet();checkReadingExecution(execution);
- const reply=await engraveAgainInWorker(bytes,execution.signal,admit);checkReadingExecution(execution);
+ const reply=await engraveAgainInWorker(bytes,execution.signal,request.admit,{...(request.layouts?{layouts:request.layouts}:{}),...(request.earlier?{earlier:request.earlier}:{})});checkReadingExecution(execution);
  await Promise.all(reply.made.filter(record=>ENGRAVE_AGAIN_KINDS.includes(record.kind)).map(record=>derived.putEncoded(record.kind,record.key,record.encoded,record.tag)));
  checkReadingExecution(execution);
- // An opening that took this work over reads the engraving now.
- work.ready();
  if(reply.error!==undefined)throw new AheadOfTimeRefusal(Error(reply.error));
+ return reply.made.some(record=>record.kind==='engraved-again-v1');
+}
+/** Editions whose layouts left for later couldn't be engraved this session: their pages are prepared all the same. */
+const laterRefused=new Set<string>();
+/** The layouts `entry`'s edition left for later, engraved from its earlier
+ * edition off this thread and installed. An opening of the score stops this
+ * (it needs only the layout in use), except once the install has begun. */
+async function completeAhead(derived:DerivedFileCache,entry:Entry,bytes:Uint8Array,later:{from:string;layouts:PhysicalKeyboardId[]},execution:ReadingExecution,work:AheadOfTimeWork):Promise<boolean>{
+ work.optional();
+ let earlier:Uint8Array;try{earlier=await readRetainedEdition(host,entry,later.from);}catch(error){checkReadingExecution(execution);console.warn('The earlier edition is missing; its other keyboard layout is engraved when the player switches to it.',error);laterRefused.add(entry.file);return false;}
+ try{await engraveAgainAhead(derived,bytes,execution,work,{layouts:later.layouts,earlier});}
+ catch(error){if(!(error instanceof AheadOfTimeRefusal))throw error;laterRefused.add(entry.file);return false;}
+ const installed=await installAhead(entry,bytes,'complete',execution,work,{...later,earlier});work.ready();if(!installed)laterRefused.add(entry.file);return installed;
+}
+/** The library's background work installs it now: no score is open or
+ * opening (except an opening of this very score, which waits for it), no
+ * dialog is up and no other write waits. */
+function backgroundInstallable(entryId:string):boolean{
+ return startupReady&&!current&&!practice&&job?.state!=='installing'&&(readingOperation?readingOperation.running.entryId===entryId:!dialog);
+}
+/** Installing in the library's background work: the same install, quietly,
+ * with its own admission, so it never holds the reader's. */
+const backgroundLibrary=():EditionLibrary=>({...editionLibrary,enqueue:op=>enqueue(op,true),
+ admit:async b=>{try{return await aheadAdmission.import(b,{allowLegacyTempo:true});}catch(error){const content=await editionNeedsEngravingAgain(b,error);if(content)return content;throw error;}}});
+/** What engraving an edition again kept, as the library keeps it to say. */
+const noticeOf=(r:RebuiltInstall,layouts?:PhysicalKeyboardId[]):EngravedAgainNotice=>({hands:r.hands,fingers:r.fingers,left:r.left,practiceLeft:r.practiceLeft??0,...(layouts?{layouts}:{})});
+/** Install, in the library's background work, what `bytes` (the entry's
+ * edition) was engraved again into, exactly as opening it would: the same
+ * preparation and the same install (installEdition), the earlier file kept
+ * under Earlier editions with its journals, the player's journals, practice
+ * and place carried. Only an engraving already kept is read; nothing is
+ * engraved here. It waits until the library is quiet and no other write is
+ * queued, and an opening of any other score stops it, leaving the library
+ * as it was. The notice opening would give is kept with the entry and said
+ * the first time the score opens. False when the score is left for opening. */
+async function installAhead(entry:Entry,bytes:Uint8Array,kind:'edition'|'reading'|'complete',execution:ReadingExecution,work:AheadOfTimeWork,later?:{from:string;layouts:PhysicalKeyboardId[];earlier:Uint8Array}):Promise<boolean>{
+ const signal=execution.signal,layout=preferences.keyboardLayout,admit=(b:Uint8Array)=>aheadAdmission.import(b,{allowLegacyTempo:true,execution}),
+  answerInput=async()=>{await new Promise(resolve=>setTimeout(resolve,0));await work.quiet();checkReadingExecution(execution);};
+ work.replacing();
+ let q:PreparedScore,personal:PersonalState,rebuilt:RebuiltInstall|undefined,record:()=>Omit<EngravedAgainEntry,'edition'>|undefined;
+ try{
+  await answerInput();
+  if(kind==='reading'){
+   const again=await reengraveReadingArchive(bytes,Error('This reading does not read.'),execution,true);if(!again)return false;
+   await answerInput();const p=await admit(again);
+   // A source part, or a piano reading, is checked and prepared as it opens.
+   if(p.manifest.files[GUITAR_PRO_FILES.descriptor]||scoreCapabilities(p).pianoPreparation)return false;
+   q={packageBytes:again,package:p,personal:readPersonal(await loadPersonalJournal(host,entry,p),p)};personal=q.personal!;
+   record=()=>({from:entry.file,untold:{reading:true,hands:'edition',fingers:'none',left:0,practiceLeft:0}});
+  }else{
+   const made=kind==='complete'?await prepareCompletedEdition(host,entry,bytes,later!.from,later!.earlier,later!.layouts,{admit,keptOnly:true},execution)
+    :await prepareRebuiltEdition(host,entry,entry.file,bytes,layout,{refusal:Error('This saved edition does not read.'),admit,layouts:[layout],keptOnly:true},execution);
+   await answerInput();
+   const ready=await ensurePianoReady({packageBytes:made.packageBytes,layout:made.package.keyboardLayout??layout,personal:made.personal,signal},aheadAdmission);checkReadingExecution(execution);
+   if(!('package' in ready))return false;
+   q=ready;personal=ready.personal??made.personal;rebuilt=made;
+   const told=engravedAgainOf(entry)?.untold;
+   record=kind==='complete'?()=>{
+    // Layouts engraved later are worth saying only when something didn't come along as it was.
+    const said=noticeOf(made,later!.layouts),quiet=said.hands==='edition'&&said.fingers!=='choices'&&!said.left&&!said.practiceLeft;
+    return told||!quiet?{from:later!.from,untold:joinedNotice(told,said)}:undefined;
+   }:()=>({from:entry.file,...(made.later?{later:made.later}:{}),untold:noticeOf(made)});
+  }
+ }catch(error){checkReadingExecution(execution);console.warn('An edition engraved again in the library is left for opening to install.',error);return false;}
+ // Its turn: the library quiet, nothing else being written.
+ for(;;){await work.quiet();checkReadingExecution(execution);if(backgroundInstallable(entry.id)&&queuedWrites===0)break;await new Promise(resolve=>setTimeout(resolve,400));}
+ const live=()=>!signal?.aborted&&backgroundInstallable(entry.id);
+ try{await installEdition(backgroundLibrary(),{entry,q,personal,...(rebuilt?{rebuilt}:{}),engravedAgain:record,live});}
+ catch(error){
+  // Stopped by the player: tried again on a later visit. Anything else is left for opening, which says why.
+  checkReadingExecution(execution);if(!backgroundInstallable(entry.id))throw error;
+  console.warn('An edition engraved again in the library is left for opening to install.',error);return false;
+ }
+ return true;
 }
 type ReadingJob=NonNullable<typeof job>;
 interface ReadingOperation {
@@ -510,7 +597,11 @@ async function retryPersonalEdits(target:NonNullable<typeof current>){
  }finally{editor.recovering=false;}
 }
 const personalFile=(entry:Entry,p:ScorePackage)=>entry.personalFiles?.[personalStorageName(entry.id,p)]??personalStorageName(entry.id,p);
-let persist=Promise.resolve();const enqueue=<T>(op:()=>Promise<T>):Promise<T>=>{const result=persist.then(op);persist=result.then(()=>{},error=>notify(error.message));return result;};
+let persist=Promise.resolve(),queuedWrites=0;
+/** Every write to the player's data runs here, one at a time. A failure is
+ * said, except from `quiet` work that answers for its own (the library's
+ * background install, which a player's action may stop). */
+const enqueue=<T>(op:()=>Promise<T>,quiet=false):Promise<T>=>{queuedWrites++;const result=persist.then(op);persist=result.then(()=>{},error=>{if(!quiet)notify(error.message);}).finally(()=>{queuedWrites--;});return result;};
 const esc=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 /** A notice belongs to the opening that said it; the next opening starts without one. */
 function clearNotice(){const t=document.querySelector<HTMLElement>('.toast');if(t)t.textContent='';}
@@ -988,44 +1079,15 @@ async function prepareScore(bytes:Uint8Array,layout:PhysicalKeyboardId,personal:
  if(scoreCapabilities(p).pianoPreparation)return preparePianoLayout(bytes,layout,personal,p,op,entry,newEntry,keepOnFailure);
  await readingCheckpoint(op);return {q:{packageBytes:bytes,package:p,...(personal?{personal:readPersonal(personal,p)}:{})},running:op.running,dialog:op.dialog!};
 }
-async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNullable<typeof job>,personal:PersonalState,newEntry=false,personalFiles?:Record<string,string>,context?:PracticeViewContext,rebuilt?:RebuiltInstall,earlier?:Uint8Array){
+/** The library as installing an edition reads and writes it (edition-install.ts). */
+const editionLibrary:EditionLibrary={host,entries:()=>entries,commit:next=>{entries=next;},enqueue,admit:admitOrContent,layout:()=>preferences.keyboardLayout};
+async function installPreparedScore(entry:Entry,q:PreparedScore,running:NonNullable<typeof job>,personal:PersonalState,newEntry=false,personalFiles?:Record<string,string>,context?:PracticeViewContext,rebuilt?:RebuiltInstall,earlier?:Uint8Array,engravedAgain?:Omit<EngravedAgainEntry,'edition'>){
  const op=readingOperation?.running===running?readingOperation:undefined;if(op)checkReading(op);
- if(collectionId(q.package)!==entry.id)throw Error('This edition belongs to a different score.');
- const checked=readPersonal(q.personal??personal,q.package),originalPackageBytes=getOriginalScorePackageBytes(q.package),
-  original=originalPackageBytes?await admitOrContent(originalPackageBytes):undefined,
-  originalPersonalFiles:Record<string,string>={};
- if(original)for(const layout of original.availablePresentations??[]){const base=await selectPresentation(original,layout),key=personalStorageName(entry.id,base),file=retainedTranspositionFile(entry,0,layout),map=file===entry.file?entry.personalFiles:entry.editionPersonalFiles?.[file??''];if(map?.[key])originalPersonalFiles[key]=map[key];}
- const previousBytes=!newEntry?await host.read(entry.file):null;
- if(!newEntry&&!previousBytes)throw Error('The prior managed score is missing; saved progress and edition retained.');
- // A re-engraved edition carries practice from the earlier views it replaces.
- // Practice moves only between keyboard editions (stagePracticeEditionTransfer);
- // a musical reading's journals are named for the score alone, so its earlier
- // archive is not read again here.
- let previous=previousBytes&&!rebuilt&&q.package.keyboardLayout?await admitOrContent(previousBytes):undefined;
- if(previous&&q.package.keyboardLayout&&previous.availablePresentations?.includes(q.package.keyboardLayout))previous=await selectPresentation(previous,q.package.keyboardLayout);
- let practiceContext:AdmittedPracticeContext|undefined;
- if(op){await readingCheckpoint(op);readingProgress(op,'save');}
-
- return enqueue(async()=>{
-  if(op){checkReading(op);running.state='installing';op.loading.saving();}
-  const latest=entries.find(e=>e.id===entry.id);
-  if(newEntry?!!latest:!latest||latest.file!==entry.file)throw Error('The library changed while saving; previous files are retained.');
-  const installed=await stagePresentationInstall(host,{packageBytes:q.packageBytes,personalBytes:new TextEncoder().encode(JSON.stringify(checked)),
-   personalKey:personalStorageName(entry.id,q.package),entry:latest??entry,entries,newEntry,personalFiles,
-   ...(rebuilt?{additionalPersonal:rebuilt.additionalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))})),replaced:rebuilt.replaced}:{}),...(earlier?{earlier}:{}),
-   beforeCommit:async()=>{
-    const live=()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file);
-    if(previous)await stagePracticeEditionTransfer(host,{entryId:entry.id,from:previous,to:q.package,personal:checked,canCommit:live});
-    if(rebuilt)await carryRebuiltPractice(entry.id,rebuilt,p=>p.to.keyboardLayout===q.package.keyboardLayout&&rebuilt.practice.includes(p)?checked:p.personal,live);
-    if(!live())throw Error('Saving was cancelled; prior practice journals retained.');
-    practiceContext=context?await PracticeView.prepareContext(q.package,entry.id,context,checked):undefined;
-    if(!live())throw Error('Saving was cancelled; prior practice journals retained.');
-   },
-   ...(entry.transposition||getScoreTransposition(q.package)!==0?{transposition:{steps:getScoreTransposition(q.package),layout:q.package.keyboardLayout??preferences.keyboardLayout,layouts:q.package.availablePresentations,originalPackageBytes,originalLayouts:original?.availablePresentations,originalPersonalFiles,
-    ...(rebuilt?.originalPersonal.length?{originalPersonal:rebuilt.originalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))}))}:{})}}:{}),
-   canCommit:()=>job===running&&running.state==='installing'&&(newEntry?!entries.some(e=>e.id===entry.id):entries.find(e=>e.id===entry.id)?.file===entry.file)});
-  entries=installed.entries;return {entry:installed.entry,personal:checked,practiceContext};
- });
+ return installEdition<AdmittedPracticeContext>(editionLibrary,{entry,q,personal,newEntry,...(personalFiles?{personalFiles}:{}),...(rebuilt?{rebuilt}:{}),...(earlier?{earlier}:{}),...(engravedAgain?{engravedAgain}:{}),
+  live:()=>job===running&&running.state==='installing',
+  queued:async()=>{if(op){await readingCheckpoint(op);readingProgress(op,'save');}},
+  saving:()=>{if(op){checkReading(op);running.state='installing';op.loading.saving();}},
+  ...(context?{context:(checked:PersonalState)=>PracticeView.prepareContext(q.package,entry.id,context,checked)}:{})});
 }
 /** How a score gained the keyboard layout it opened on: the layout its
  * edition had, whether that layout printed fingers, and the journals carried
@@ -1035,7 +1097,9 @@ interface GainedLayout {from:PhysicalKeyboardId;fingers:boolean;rebuilt?:Rebuilt
  /** The new layout shows the pages the edition already had. */
  shared?:boolean;
  /** The layout asked for, when its pages couldn't be made and the score opened on the pages it has. */
- kept?:PhysicalKeyboardId}
+ kept?:PhysicalKeyboardId;
+ /** The layout was one the edition left for later, engraved from its earlier edition. */
+ completed?:boolean}
 /** Every piano score opens on either keyboard layout: the two layouts read
  * the same notation. ISO notation draws the same pages for both and the
  * reader draws fingers at the seats, so an edition saved with pages for one
@@ -1054,6 +1118,15 @@ async function preparePianoLayout(bytes:Uint8Array,layout:PhysicalKeyboardId,per
  const from=selected.keyboardLayout??'janko-four-row',fingers=!!selected.fingerLayer,journals=newEntry?{read:async()=>null}:host,
   admit=(b:Uint8Array)=>readerAdmission.import(b,{allowLegacyTempo:true}),
   cancelled=(error:unknown)=>(error as Error)?.name==='AbortError'||(error as Error)?.message===READING_CANCELLED||op.controller.signal.aborted;
+ // A layout this edition left for later is engraved from the earlier edition
+ // it stands for: that view's hands and printed fingers, the player's journal
+ // and practice for it. The edition's own views stay as they are.
+ const later=newEntry?undefined:laterLayouts(entry);
+ if(later?.layouts.includes(layout))try{
+  readingProgress(op,'engrave-keyboard');
+  const completed=await prepareCompletedEdition(host,entry,bytes,later.from,await readRetainedEdition(host,entry,later.from),[layout,...later.layouts.filter(id=>id!==layout)],{admit},readingExecution(op));checkReading(op);
+  return {...await preparePiano(completed.packageBytes,layout,completed.personal,op),gained:{from,fingers,rebuilt:completed,completed:true}};
+ }catch(error){if(cancelled(error))throw error;console.warn('The earlier edition could not give this layout its pages; engraving them from this edition instead.',error);}
  if(canShareKeyboardView(selected,layout))try{
   if((selected.collectionManifest??selected.manifest).version===2){
    const shared=await shareKeyboardView(selected,layout);checkReading(op);
@@ -1335,12 +1408,22 @@ function retainScore(target:NonNullable<typeof current>){
  retentionWatch=window.setInterval(()=>{if(underMemoryPressure(heapMemory()))releaseUnderPressure();},30000);
 }
 async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry.id,openingLoading(entry.id));clearNotice();try{await readingCheckpoint(op);await practice?.flush();await savePersonal();checkReading(op);
+ // An edition the library is installing for this score now is awaited: the score opens on it.
+ if(aheadOfTime?.replacing(entry.id)){await aheadOfTime.joined(entry.id,op.controller.signal);checkReading(op);entry=entries.find(e=>e.id===entry.id)??entry;}
+ await openReading(entry,op,sourceGroup);
+ }catch(error){finishReading(op,false,error);throw error;}
+}
+async function openReading(entry:Entry,op:ReadingOperation,sourceGroup?:string){
  // The score just closed, with nothing it rests on changed, is drawn again as it was left: no read, admission or projection.
  const kept=retained.take(entry.id,()=>sourceGroup===undefined?retentionConditions(entry):undefined);
  if(kept){await host.fullscreen(true);checkReading(op);const activated=await activateScore(kept,undefined,undefined,op,true);retainable.add(activated);finishReading(op,true);await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));return;}
  const data=await host.read(entry.file);if(!data)throw Error('Managed score file is missing; reimport its package');
  // Pages an earlier engine drew are engraved again with the current shared policy, once: the new edition is saved.
- let prior:ScorePackage,admitted:ScorePackage|undefined,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(admitted=await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}if(await openRebuiltEdition(entry,data,error,op,sourceGroup,admitted))return;
+ let prior:ScorePackage,admitted:ScorePackage|undefined,withoutRepeats=false,keptSaved=false;try{prior=requireCurrentEngraving(admitted=await importReading(data,op));}catch(error){if((error as Error).name==='AbortError')throw error;try{checkReading(op);}catch{throw error;}
+  const opened=await openRebuiltEdition(entry,data,error,op,sourceGroup,admitted);
+  // The library installed this score's new edition while this opening waited for it.
+  if(opened==='installed'){await openReading(entries.find(e=>e.id===entry.id)!,op,sourceGroup);return;}
+  if(opened)return;
   // Pages drawn before the current policy, or that only lack their repeat signs, open as saved, for the rest of the session, when they can’t be engraved again.
   if(error instanceof SavedPagesBehindPolicy){keepSavedPagesBehindPolicy(error.archiveSha256);keptSaved=true;}else{keepSavedPagesWithoutRepeats((error as SavedPagesLackRepeats).sourceSha256);withoutRepeats=true;}prior=await importReading(data,op);}
  // A piano score's opening reads the store; that read runs while its source is admitted.
@@ -1358,29 +1441,32 @@ async function open(entry:Entry,sourceGroup?:string){const op=beginReading(entry
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);finishReading(op,true);
   await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
-  const said=[withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',keptSaved?SAVED_PAGES_KEPT:'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
- }catch(error){finishReading(op,false,error);throw error;}
+  const untold=engravedAgainOf(entry)?.untold;if(untold)void toldEngravedAgain(entry.id);
+  const said=[untold?untoldNotice(untold):'',withoutRepeats?'This score’s repeat signs couldn’t be engraved, so it opened on its saved pages without them.':'',keptSaved?SAVED_PAGES_KEPT:'',gained?gainedNotice(gained,q.package,false):''].filter(Boolean).join(' ');if(said)notify(said);
+}
+/** What the library's background work kept to say about a score engraved
+ * again in its absence, as opening would have said it. */
+function untoldNotice(n:EngravedAgainNotice):string{
+ if(n.reading)return 'This score was engraved again with the current engraving. Your place and practice came along.';
+ return n.layouts?[`Its ${n.layouts.map(layoutName).join(' and ')} pages were engraved again with the current engraving.`,...carryNotes(n)].join(' '):rebuiltNotice(n);
+}
+/** Said once: the entry no longer keeps it. Nothing else of the entry changes. */
+async function toldEngravedAgain(entryId:string){
+ await enqueue(async()=>{
+  const latest=entries.find(e=>e.id===entryId),record=latest&&engravedAgainOf(latest);if(!latest||!record?.untold)return;
+  const {untold:_said,...rest}=record,next=entries.map(e=>e===latest?{...latest,engravedAgain:rest}:e);
+  await writeJson('library.json',{version:1,entries:next});entries=next;
+ },true).catch(error=>console.warn('The notice for this score was not marked as said.',error));
 }
 
-/** Carry practice from each earlier keyboard view to its new view. Practice
- * that can't move stays with the earlier edition and is reported; it never
- * keeps the score from opening. */
-async function carryRebuiltPractice(entryId:string,r:RebuiltInstall,personalFor:(p:RebuiltInstall['practice'][number])=>PersonalState,live:()=>boolean){
- r.practiceLeft=0;
- for(const p of [...r.practice,...r.originalPractice]){
-  // A journal already shared by both views needs no carrying.
-  if(practiceStorageName(entryId,p.from)===practiceStorageName(entryId,p.to))continue;
-  try{await stagePracticeEditionTransfer(host,{entryId,from:p.from,to:p.to,personal:personalFor(p),canCommit:live});}
-  catch(error){if((error as Error).name==='AbortError'||!live())throw error;r.practiceLeft++;}
- }
-}
 /** Say plainly what engraving an edition again kept, never how its hands
  * or fingers were first made. */
-function rebuiltNotice(r:RebuiltInstall,lead='This score was engraved again with the current engraving.'){
+type CarriedSaid=Pick<RebuiltInstall,'hands'|'fingers'|'left'|'practiceLeft'>;
+function rebuiltNotice(r:CarriedSaid,lead='This score was engraved again with the current engraving.'){
  return [`${lead} ${r.left?'Your hands and fingers came along.':'Your hands, fingers and choices came along.'}`,...carryNotes(r)].filter(Boolean).join(' ');
 }
 /** Only what didn't come along as it was. */
-function carryNotes(r:RebuiltInstall):string[]{
+function carryNotes(r:CarriedSaid):string[]{
  const moved=[r.hands==='choices'?'hands':'',r.fingers==='choices'?'fingers':''].filter(Boolean).join(' and '),notes=(n:number)=>`${n} note${n===1?'':'s'}`;
  return [moved?`The edition’s ${moved} now show as your own choices.`:'',
   r.left?`Your choices for ${notes(r.left)} couldn’t move and stay with the earlier edition.`:'',
@@ -1393,7 +1479,8 @@ function gainedNotice(g:GainedLayout,shown:ScorePackage,imported:boolean):string
  if(g.kept)return `This score has no pages for the ${layoutName(g.kept)} yet and they couldn’t be made, so it opened on its ${layoutName(g.from)} pages.${g.fingers?` The fingerings shown are for the ${layoutName(g.from)}.`:''}`;
  const fingers=g.fingers&&!shown.fingerLayer?`Fingerings made for the ${layoutName(g.from)} show only on that layout.`:'';
  // The same pages serve the new layout: only fingers, and anything of the player's that couldn't move, are worth saying.
- if(g.shared)return [fingers,...(g.rebuilt&&!imported?carryNotes(g.rebuilt):[])].filter(Boolean).join(' ');
+ // A layout left for later carries what its earlier view showed: only what didn't come along is worth saying.
+ if(g.shared||g.completed)return [g.completed?'':fingers,...(g.rebuilt&&!imported?carryNotes(g.rebuilt):[])].filter(Boolean).join(' ');
  if(!g.rebuilt)return fingers;
  const lead=`This score was engraved for the ${layoutName(shown.keyboardLayout!)} from its own notes.`;
  // A fresh import has nothing of the player's to carry yet.
@@ -1405,19 +1492,24 @@ const SAVED_PAGES_KEPT='This score couldn’t be engraved again with the current
  * engraved again from its own content and installed like an Earlier edition:
  * the earlier archive and its journals stay saved. False when pages that only
  * lack their repeat signs, or that an earlier engine drew, couldn't be
- * engraved again: they open as saved. */
-async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string,content?:ScorePackage):Promise<boolean>{
+ * engraved again: they open as saved. Only the keyboard layout in use is
+ * engraved; the others are engraved later from the same earlier edition
+ * (completeAhead, preparePianoLayout). 'installed' when the library's
+ * background work installed the new edition while this waited for it. */
+async function openRebuiltEdition(entry:Entry,bytes:Uint8Array,admission:unknown,op:ReadingOperation,sourceGroup?:string,content?:ScorePackage):Promise<boolean|'installed'>{
  readingProgress(op,'engrave-again');
  // Engraving under way in the library for this score is awaited, then read, not made a second time.
  await aheadOfTime?.joined(entry.id,op.controller.signal);checkReading(op);
+ const latest=entries.find(e=>e.id===entry.id);if(latest&&latest.file!==entry.file)return 'installed';
  const reading=await reengraveReadingArchive(bytes,admission,readingExecution(op));
  if(reading){await openReengravedReading(entry,reading,op,sourceGroup);return true;}
  let rebuilt:RebuiltInstall,prepared:Awaited<ReturnType<typeof preparePiano>>;
- try{rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true}),...(content?{content}:{})},readingExecution(op));
+ try{rebuilt=await prepareRebuiltEdition(host,entry,entry.file,bytes,op.keyboard,{refusal:admission,admit:b=>readerAdmission.import(b,{allowLegacyTempo:true}),...(content?{content}:{}),layouts:[op.keyboard]},readingExecution(op));
   await readingCheckpoint(op);prepared=await preparePiano(rebuilt.packageBytes,op.keyboard,rebuilt.personal,op);}
  catch(error){if(!(admission instanceof SavedPagesLackRepeats||admission instanceof SavedPagesBehindPolicy)||(error as Error).name==='AbortError')throw error;checkReading(op);console.warn('The saved edition could not be engraved again; it opens on its saved pages.',error);return false;}
  const {q,running}=prepared,
-  installed=await installPreparedScore(entry,q,running,q.personal??rebuilt.personal,false,undefined,undefined,rebuilt);await readingCheckpoint(op);
+  // The layouts left for later are engraved from the earlier edition this one stands for.
+  installed=await installPreparedScore(entry,q,running,q.personal??rebuilt.personal,false,undefined,undefined,rebuilt,undefined,rebuilt.later?{from:entry.file,later:rebuilt.later}:undefined);await readingCheckpoint(op);
  await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);retainable.add(activated);let unsaved='';finishReading(op,true);await saveReadingPreferences().catch(error=>{unsaved=` Last score was not saved: ${error.message}`;});
  notify(rebuiltNotice(rebuilt)+unsaved);return true;
 }
@@ -1595,7 +1687,7 @@ async function earlierEditions(){
        ...(rebuilt?.originalPersonal.length?{originalPersonal:rebuilt.originalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))}))}:{})}}:{}),canCommit:()=>dialog===d&&d.open&&current===target&&entries.find(e=>e.id===target.entry.id)?.file===target.entry.file,
       ...(rebuilt?{additionalPersonal:rebuilt.additionalPersonal.map(p=>({key:p.key,bytes:new TextEncoder().encode(JSON.stringify(p.personal))})),replaced:rebuilt.replaced,
        beforeCommit:async()=>{const live=()=>dialog===d&&d.open&&current===target&&entries.find(e=>e.id===target.entry.id)?.file===target.entry.file;
-        await carryRebuiltPractice(target.entry.id,rebuilt!,p=>p.personal,live);
+        await carryRebuiltPractice(host,target.entry.id,rebuilt!,p=>p.personal,live);
         if(!live())throw Error('Edition restore cancelled. The current score is retained.');
         admitted=context?await PracticeView.prepareContext(retained.package,target.entry.id,context,retained.personal):undefined;
         if(!live())throw Error('Edition restore cancelled. The current score is retained.');}}:{}),
