@@ -321,7 +321,9 @@ let practice:PracticeView|ManualPracticeView|undefined,manualPracticeGeneration=
 let practiceStarting=false;
 async function startingPractice(start:()=>Promise<void>){practiceStarting=true;declareState();try{await start();}finally{practiceStarting=false;declareState();}}
 /** Where the application is, as data-* attributes on #app (app-state.ts). */
-function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:scoreCapabilities(current.package).pianoPractice}:undefined,layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting}));}let libraryRepaintPending=false;
+/** Whether a package can be practised at the piano, asked once per package: state is declared on every paint. */
+const declaredPiano=new WeakMap<object,boolean>(),declaredPianoPractice=(p:ScorePackage)=>{let piano=declaredPiano.get(p);if(piano===undefined)declaredPiano.set(p,piano=scoreCapabilities(p).pianoPractice);return piano;};
+function declareState(){declareAppState(app,appState({started:startupReady,dialog:dialog?.dataset.kind,score:current?{id:current.entry.id,piano:declaredPianoPractice(current.package)}:undefined,layout:preferences.keyboardLayout,practice:practice?.declared(),editing:!!selection,reading:!!readingOperation,pressWaiting:presses.pending!==undefined,practiceStarting}));}let libraryRepaintPending=false;
 const libraryMenu=new LibraryMenu();
 const matchingCurrent=(target:NonNullable<typeof current>)=>current&&current.entry.file===target.entry.file&&current.entry.id===target.entry.id&&current.package.sourceSha256===target.package.sourceSha256&&personalStorageName(current.entry.id,current.package)===personalStorageName(target.entry.id,target.package)?current:undefined;
 const memoryLibrary=new PersonalMemoryLibrary(host,()=>entries,bytes=>readerAdmission.import(bytes,{allowLegacyTempo:true}));
