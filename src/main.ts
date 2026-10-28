@@ -41,6 +41,7 @@ import {workHeadingMarkup,workReference} from './score-catalog';
 import {getScoreTransposition,scoreTranspositionRange,getOriginalScorePackageBytes,scoreTranspositionCompatible,sameHandsAtPitch,prepareSourceTransposition} from './score-transposition';
 import {personalForTransposedEdition} from './transposed-personal';
 import {retainedTranspositionFile,nextTranspositionSelection,assertSelectedTransposition} from './score-transposition-selection';
+import {healPitchChoices} from './pitch-choice-heal';
 import {PitchInputEpoch,FINGERS_LAYOUT_TEMPO,type AdmittedPracticeContext,type PracticeFoldSource,type PracticeViewContext} from './practice-context';
 import {PracticeView} from './practice-view';
 import {READINESS_WORDS,ScoreReadiness,afterPaint,nextTask,prepareAfterPaint,type ReadinessStage} from './score-readiness';
@@ -2018,6 +2019,9 @@ async function boot(){
    if(lib.version!==1||!Array.isArray(lib.entries)||lib.entries.some(e=>!validEntryStorage(e)))throw Error('Library identity differs; data retained');
    // SCORE-FILE MIGRATION: see score-file-migration.ts.
    entries=(await migrateScoreFiles(host,{version:1,entries:lib.entries})).entries;
+   // PITCH CHOICE REPAIR: see pitch-choice-heal.ts. Written once, only when a choice changes.
+   const healed=await Promise.all(entries.map(e=>healPitchChoices(e,name=>host.read(name))));
+   if(healed.some(Boolean)){const next=entries.map((e,i)=>healed[i]??e);try{await enqueue(()=>writeJson('library.json',{version:1,entries:next}));entries=next;}catch(error){console.warn('A pitch choice is left as saved.',error);}}
   }
   loading.step('settings');
   const saved=await readJson<typeof preferences>('preferences.json');
