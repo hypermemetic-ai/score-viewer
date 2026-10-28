@@ -1457,7 +1457,7 @@ async function openReading(entry:Entry,op:ReadingOperation,sourceGroup?:string){
  const loadedPersonal=q.personal??await loadPersonal(entry,q.package,op),
   // An admitted retained view needs no new package or personal-journal version.
   // Byte equality also covers retained ready/editable finger layers.
-  unchangedArchive=collectionId(q.package)===entry.id&&sameBytes(q.packageBytes,data),
+  unchangedArchive=collectionId(q.package)===entry.id&&q.packageBytes.byteLength===data.byteLength&&q.packageBytes.every((value,index)=>value===data[index]),
   installed=q.package.reading?.dual||unchangedArchive?{entry,personal:loadedPersonal}:await installPreparedScore(entry,q,running,loadedPersonal,false,undefined,undefined,gained?.rebuilt);await readingCheckpoint(op);
   await host.fullscreen(true);checkReading(op);const activated=await activateScore({entry:installed.entry,package:q.package,personal:installed.personal},undefined,undefined,op,true);if(!withoutRepeats)retainable.add(activated);finishReading(op,true);
   await saveReadingPreferences().catch(error=>notify(`Last score was not saved: ${error.message}`));
