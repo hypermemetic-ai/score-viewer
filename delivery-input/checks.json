@@ -1,143 +1,440 @@
 {
  "schema": 1,
- "viewerRevision": "db8635135740e985fadf98377052cb4db0fce202",
+ "viewerRevision": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
  "notationRevision": "3bbe6a960c9edcf7d83648518189f92c0c73063c",
- "frontendDigest": "39916a53a0741da0014d3976e87762026c4ced99a09a84c25fe8c2eb1f07cdf7",
+ "frontendDigest": "4443321423b62ca150694d41f6c1e6c057b8c11760d500c626e322b908bb7d2f",
  "checks": {
   "tests": {
    "status": "passed",
-   "sourceCommit": "db8635135740e985fadf98377052cb4db0fce202",
+   "sourceCommit": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
    "command": "npm test",
-   "tests": 1479,
-   "passed": 1470,
+   "tests": 1489,
+   "passed": 1480,
    "failed": 0,
    "skipped": 1,
    "todo": 8,
-   "durationMs": 84907,
+   "durationMs": 163183,
    "additional": [
     {
      "command": "node --test test/*.test.mjs",
      "tests": 49,
      "passed": 49,
      "failed": 0,
-     "durationMs": 9447
+     "durationMs": 218111
     },
     {
      "command": "npx tsc --noEmit -p .",
      "result": "clean"
     }
    ],
-   "todoNote": "5 todo tests need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved (4 in fingering-studio, 1 in operator-finger-update). 3 are half-handed unison keys whose source pages ISO refuses on import (handless-owners). The same 8 as in the 8d338c1 seal.",
+   "todoNote": "The same 8 todo tests as in the db86351 seal: 5 need ISO's historical fingering studio, which refuses to replay the frozen No. 14 pages ISO #388 moved (4 in fingering-studio, 1 in operator-finger-update); 3 are half-handed unison keys whose source pages ISO refuses on import (handless-owners).",
    "skipNote": "The 1 skipped test is the opt-in owner No. 13 test (test/practice-fold-owner-snapshot.test.ts), which runs only with SCORE_VIEWER_OWNER_SNAPSHOT set to a private data copy. It was not run here.",
-   "scope": "Complete suite on a clean, self-contained clone (no --reference) of merged main db86351 with the submodule at 3bbe6a96, after npm ci --ignore-scripts and npm run build; the clone stayed clean. Merged since the 8d338c1 seal (PR 199): viewer PRs 200-202 and 204-207; notation pin 5026e669 -> 68d8f086 (PR 202) -> 3bbe6a96 (PR 207)."
+   "scope": "Complete suite on a clean, self-contained clone (no --reference) of merged main e4af4f5 with the submodule at 3bbe6a96, after npm ci --ignore-scripts and npm run build; the clone stayed clean. The same counts on the delivery worktree at the same commit (140 s). Merged since the db86351 seal (PR 208): viewer PRs 209-214. The notation pin is unchanged (3bbe6a96)."
   },
   "build": {
    "status": "passed",
-   "sourceCommit": "db8635135740e985fadf98377052cb4db0fce202",
-   "configured": "npm run build: TypeScript + source pin validation (Notation source verified: 3bbe6a96) + Vite",
-   "frontendFiles": 24,
-   "frontendDigest": "39916a53a0741da0014d3976e87762026c4ced99a09a84c25fe8c2eb1f07cdf7"
+   "sourceCommit": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
+   "configured": "npm run build: TypeScript + source pin validation (Notation source verified: 3bbe6a96; fingering assistance pin verified) + Vite",
+   "frontendFiles": 25,
+   "frontendDigest": "4443321423b62ca150694d41f6c1e6c057b8c11760d500c626e322b908bb7d2f",
+   "reproduced": "The same digest from three builds of this commit: the clean clone, the delivery worktree and both rehearsals (each rehearsal builds its own copy)."
   },
   "browserInspection": {
    "status": "passed",
-   "ownerLibraryRehearsal": {
-    "sourceCommit": "5c831f748a494c8464e52a402972bebca6224490",
-    "frontendIdentity": "Viewer #207's final rehearsal served the frontend built from its head 5c831f7, whose tree is identical to merged main db86351. That build's digest is 39916a53a0741da0014d3976e87762026c4ced99a09a84c25fe8c2eb1f07cdf7, identical to the frontend built here from db86351 and sealed in this receipt (24 files). The rehearsal is cited, not re-run.",
-    "browser": "Chromium (playwright-core) headless Linux, production dist served with the CSP from src-tauri/tauri.conf.json, native IPC emulated; the harness adds 'self' to connect-src for its emulated IPC endpoints",
-    "data": "A fresh writable copy of a private data copy (the owner's laptop data taken 2026-10-24), writes going through to the copy; the original was hashed before and after and is unchanged",
-    "observed": "Real key presses through main.ts, conventional layout first, then Janko. schumann-op68-no14: 3 pages on both layouts, 381 fingers shown with F held, Fingers every note fingered in both hands, 20 sections opened in Read and Speed, 15 connections locked until passed; one beat line per bar at the dotted quarter (64 in 64 bars); Janko bar 30's edited LH A3 drawn in the LH. schumann-op68-no13: 2 pages, 213 fingers on the Janko layout and none on the conventional (as on the installed build), 8 sections opened. bach-goldberg-var1: 3 pages, unfingered, 15 sections opened. A private score: 2 pages, 207 fingers, 7 sections opened. A private score 2 (not a piano score): 10 pages, reading only, no practice offered. Each saved edition is engraved again once on first open and says so. No console errors, no page errors, no alerts or refusals. An instrumented copy of the same source compared every note of every score on both layouts with the installed build: 0 drawn hands and 0 drawn fingers differ.",
-    "timingsMs": {
-     "note": "Conventional layout, first open (engraves the saved edition again) / reopen in a new session. This run shared the build host with the test suite and two other browser runs; an earlier, less loaded run of #207 measured 5.5 s for schumann-op68-no14's first open.",
-     "schumann-op68-no14": [
-      10137,
-      2156
-     ],
-     "schumann-op68-no13": [
-      6090,
-      1224
-     ],
-     "bach-goldberg-var1": [
-      3949,
-      554
-     ],
-     "a private score": [
-      5056,
-      757
-     ],
-     "a private score 2": [
-      30486,
-      286
-     ]
-    },
-    "pullRequest": "https://github.com/hypermemetic-ai/score-viewer/pull/207"
+   "harness": "npm run rehearse (scripts/rehearse, viewer PR 211): headless Chromium (playwright-core 1.62.0), the production build of this commit, a simulated native host answering the Tauri commands from a data directory, real key presses through main.ts. Pass or fail by invariants; timings are reports.",
+   "studioRehearsal": {
+    "sourceCommit": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
+    "command": "npm run rehearse",
+    "durationMs": 247471,
+    "scores": 6,
+    "pianoScores": 5,
+    "layouts": [
+     "janko-four-row",
+     "conventional-piano"
+    ],
+    "sectionsListed": 114,
+    "imports": 7,
+    "invariants": [
+     {
+      "invariant": "imports",
+      "held": true,
+      "checked": 7,
+      "failed": 0
+     },
+     {
+      "invariant": "opens",
+      "held": true,
+      "checked": 12,
+      "failed": 0
+     },
+     {
+      "invariant": "pages present",
+      "held": true,
+      "checked": 12,
+      "failed": 0
+     },
+     {
+      "invariant": "reopens",
+      "held": true,
+      "checked": 12,
+      "failed": 0
+     },
+     {
+      "invariant": "piano score offers practice",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "Fingers opens",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "Fingers draws at its last measure",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "no error shown",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "sections listed",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "every section practicable",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "non-piano offers no practice",
+      "held": true,
+      "checked": 2,
+      "failed": 0
+     },
+     {
+      "invariant": "an early press runs exactly once",
+      "held": true,
+      "checked": 1,
+      "failed": 0
+     },
+     {
+      "invariant": "no uncaught page error",
+      "held": true,
+      "checked": 1,
+      "failed": 0
+     },
+     {
+      "invariant": "the simulated host answered every command",
+      "held": true,
+      "checked": 1,
+      "failed": 0
+     }
+    ],
+    "earlyPress": {
+     "presses": 36,
+     "afterClose": {
+      "presses": 30,
+      "once": 30,
+      "lost": 0,
+      "doubled": 0
+     },
+     "whileOpening": {
+      "presses": 6,
+      "once": 1,
+      "ignored": 5,
+      "doubled": 0,
+      "readerShown": 0,
+      "ignoredReaderShown": 0,
+      "readerShownMs": 2.2
+     },
+     "unmeasured": {
+      "presses": 0,
+      "once": 0,
+      "lost": 0,
+      "doubled": 0
+     },
+     "byAction": {
+      "practice": {
+       "presses": 10,
+       "lost": 0
+      },
+      "edit": {
+       "presses": 11,
+       "lost": 0
+      },
+      "toggle": {
+       "presses": 9,
+       "lost": 0
+      }
+     }
+    }
    },
-   "limits": "Headless Chromium with emulated IPC, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice at a keyboard and the pianist's musical acceptance were not observed. A key pressed while the opening dialog is still up is sometimes not acted on (seen on viewer main before #207 too). The first open of each saved edition engraves it again, once.",
+   "ownerLibraryRehearsal": {
+    "sourceCommit": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
+    "command": "npm run rehearse -- --data <a private data copy> --presses 300",
+    "data": "A private data copy: the owner's laptop data taken 2026-10-28 with the viewer closed, before this install, verified against the live data (0 mismatches) and copied here byte for byte (SHA256 of every file). The rehearsal works on its own writable copy; the private data copy was read-only throughout.",
+    "durationMs": 1118441,
+    "scores": 5,
+    "pianoScores": 4,
+    "layouts": [
+     "janko-four-row",
+     "conventional-piano"
+    ],
+    "sectionsListed": 86,
+    "invariants": [
+     {
+      "invariant": "opens",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "pages present",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "reopens",
+      "held": true,
+      "checked": 10,
+      "failed": 0
+     },
+     {
+      "invariant": "piano score offers practice",
+      "held": true,
+      "checked": 8,
+      "failed": 0
+     },
+     {
+      "invariant": "Fingers opens",
+      "held": true,
+      "checked": 8,
+      "failed": 0
+     },
+     {
+      "invariant": "Fingers draws at its last measure",
+      "held": true,
+      "checked": 8,
+      "failed": 0
+     },
+     {
+      "invariant": "no error shown",
+      "held": true,
+      "checked": 8,
+      "failed": 0
+     },
+     {
+      "invariant": "sections listed",
+      "held": true,
+      "checked": 8,
+      "failed": 0
+     },
+     {
+      "invariant": "every section practicable",
+      "held": true,
+      "checked": 8,
+      "failed": 0
+     },
+     {
+      "invariant": "non-piano offers no practice",
+      "held": true,
+      "checked": 2,
+      "failed": 0
+     },
+     {
+      "invariant": "an early press runs exactly once",
+      "held": true,
+      "checked": 1,
+      "failed": 0
+     },
+     {
+      "invariant": "no uncaught page error",
+      "held": true,
+      "checked": 1,
+      "failed": 0
+     },
+     {
+      "invariant": "the simulated host answered every command",
+      "held": true,
+      "checked": 1,
+      "failed": 0
+     }
+    ],
+    "earlyPress": {
+     "presses": 300,
+     "afterClose": {
+      "presses": 187,
+      "once": 187,
+      "lost": 0,
+      "doubled": 0
+     },
+     "whileOpening": {
+      "presses": 113,
+      "once": 54,
+      "ignored": 59,
+      "doubled": 0,
+      "readerShown": 7,
+      "ignoredReaderShown": 0,
+      "readerShownMs": 2.8
+     }
+    },
+    "timings": {
+     "schumann-op68-no14": {
+      "janko": {
+       "firstOpenMs": 2043,
+       "reopenMs": 49,
+       "fingersMs": 423,
+       "sections": 6,
+       "locked": 0,
+       "sectionEntryMedianMs": 88,
+       "sectionEntryMaxMs": 207
+      },
+      "conventional": {
+       "firstOpenMs": 804,
+       "reopenMs": 316,
+       "fingersMs": 456,
+       "sections": 20,
+       "locked": 0,
+       "sectionEntryMedianMs": 72,
+       "sectionEntryMaxMs": 542
+      }
+     },
+     "a private score": {
+      "janko": {
+       "firstOpenMs": 2426,
+       "reopenMs": 31,
+       "fingersMs": 318,
+       "sections": 7,
+       "locked": 0,
+       "sectionEntryMedianMs": 95,
+       "sectionEntryMaxMs": 117
+      },
+      "conventional": {
+       "firstOpenMs": 382,
+       "reopenMs": 48,
+       "fingersMs": 295,
+       "sections": 7,
+       "locked": 0,
+       "sectionEntryMedianMs": 101,
+       "sectionEntryMaxMs": 119
+      }
+     },
+     "a private score 2": {
+      "janko": {
+       "firstOpenMs": 14566,
+       "reopenMs": 107,
+       "fingersMs": null,
+       "sections": null,
+       "locked": null,
+       "sectionEntryMedianMs": null,
+       "sectionEntryMaxMs": null
+      },
+      "conventional": {
+       "firstOpenMs": 196,
+       "reopenMs": 99,
+       "fingersMs": null,
+       "sections": null,
+       "locked": null,
+       "sectionEntryMedianMs": null,
+       "sectionEntryMaxMs": null
+      }
+     },
+     "schumann-op68-no13": {
+      "janko": {
+       "firstOpenMs": 2794,
+       "reopenMs": 205,
+       "fingersMs": 525,
+       "sections": 8,
+       "locked": 0,
+       "sectionEntryMedianMs": 144,
+       "sectionEntryMaxMs": 169
+      },
+      "conventional": {
+       "firstOpenMs": 1366,
+       "reopenMs": 120,
+       "fingersMs": 520,
+       "sections": 8,
+       "locked": 0,
+       "sectionEntryMedianMs": 127,
+       "sectionEntryMaxMs": 132
+      }
+     },
+     "bach-goldberg-var1": {
+      "janko": {
+       "firstOpenMs": 1082,
+       "reopenMs": 63,
+       "fingersMs": 407,
+       "sections": 15,
+       "locked": 0,
+       "sectionEntryMedianMs": 59,
+       "sectionEntryMaxMs": 90
+      },
+      "conventional": {
+       "firstOpenMs": 340,
+       "reopenMs": 35,
+       "fingersMs": 334,
+       "sections": 15,
+       "locked": 0,
+       "sectionEntryMedianMs": 51,
+       "sectionEntryMaxMs": 84
+      }
+     }
+    },
+    "sectionsNote": "schumann-op68-no14 lists 6 sections on the Janko layout and 20 on the conventional one: the rehearsal counts top-level sections only, and the owner's Janko progress has joined earlier sections into larger ones.",
+    "pagesNote": "The rehearsal counts drawn page elements; the reader draws one page at a time, so it reports 1 for every score."
+   },
+   "firstOpenAfterIdle": {
+    "sourceCommit": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
+    "note": "Janko layout (the owner's), a fresh writable copy of the private data copy for each run, each score opened in library order with Back in between. \"At once\": opened as soon as the library showed. \"After idle\": the library sat untouched for 240 s first, so its background engraving (viewer PR 214) had run. The simulated host starts with an empty derived-file store. Measured on a shared, loaded build host.",
+    "timingsMs": {
+     "schumann-op68-no14": {
+      "atOnceMs": 3026,
+      "afterIdle240sMs": 948
+     },
+     "a private score": {
+      "atOnceMs": 2748,
+      "afterIdle240sMs": 1142
+     },
+     "a private score 2": {
+      "atOnceMs": 16941,
+      "afterIdle240sMs": 531
+     },
+     "schumann-op68-no13": {
+      "atOnceMs": 3865,
+      "afterIdle240sMs": 1046
+     },
+     "bach-goldberg-var1": {
+      "atOnceMs": 1405,
+      "afterIdle240sMs": 429
+     }
+    }
+   },
+   "limits": "Headless Chromium with a simulated native host, not WebView2 or WKWebView, not an installed package. Physical MIDI, audio, practice at a keyboard and the pianist's musical acceptance were not observed. A key pressed while the opening dialog still shows its progress can be ignored by design; none is lost once the score is drawn.",
    "nativeObservation": {
-    "observed": "None for this application revision. The laptop runs application 8d338c1 with ISO 5026e669 (delivery 3dae1a5)."
+    "observed": "None for this application revision before sealing. The laptop runs application db86351 with ISO 3bbe6a96 (delivery 956bbe66)."
    }
   },
   "independentReview": {
    "status": "passed",
-   "sourceCommit": "db8635135740e985fadf98377052cb4db0fce202",
+   "sourceCommit": "e4af4f57041a2d1a8d8b66fdc93d9f63382dd198",
    "reviews": [
     {
-     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/200",
-     "verdict": "Review round 1 (head dd087c4), recorded in the PR body: six items (page-1 title area blocker, failed re-engrave remembered for the session, body, mixed-edition test, transposition test, reading place) fixed in ec25685, dd087c4 and 4b7933c, each with a test."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/204",
-     "verdict": "Reviewed after merge (e4fda82); its follow-ups (hand press on a folded note decided over all passes; private names kept out of the seal receipt) are viewer #205."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/205",
-     "verdict": "Reviewed; its cross-pass gap (a refused hand press on a folded repeat) is fixed in viewer #206."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/207",
-     "verdict": "Architect review before merge: findings reported with crops; two defects sent back and fixed on the PR with tests that fail without them (6/8 beat lines from the metre; an edit at a note outranks a hand carried from a return, decided by the architect); rerun gates, rehearsal and census; merged by the architect."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/465",
-     "verdict": "Review round 2, recorded in the PR body."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/468",
-     "verdict": "Independent review round 1 (3de154f2): merge after one small fix; fixes checked at 00164d13: merge."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/469",
-     "verdict": "Independent review round 1 (1511ebdc): merge."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/471",
-     "verdict": "Review round 1 (head 1439579b), recorded in the PR body."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/472",
-     "verdict": "No new code; reviewed as #470's independent review round 1 (1dc5610d): merge, with the stack gates run on #469-#471."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/473",
-     "verdict": "Review round 1, recorded in the PR body."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/486",
-     "verdict": "Review round 2 (reviewer-fixer), recorded in the PR body."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/488",
-     "verdict": "Reviewed (review-iso-488-r1); architect merge."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/492",
-     "verdict": "Owner review 2026-10-24, recorded in the PR body."
-    },
-    {
-     "pr": "https://github.com/hypermemetic-ai/iso-notation/pull/499",
-     "verdict": "The architect reviewed its crops before merging it."
+     "pr": "https://github.com/hypermemetic-ai/score-viewer/pull/208",
+     "verdict": "The db86351 seal and its receipt list every review recorded for the application up to db86351 and for the notation pin 3bbe6a96, which this seal keeps unchanged."
     }
    ],
-   "scope": "Reviews cited as recorded. No review is recorded for viewer #201, #202 and #206, for ISO #474 and #475 (in the 68d8f086 pin), or for ISO #476-#485, #487, #489-#491 and #493-#498 (in the 3bbe6a96 pin). The ISO PRs in both pins are listed with their scope in docs/source-provenance.json (dependencyReview and previousDependencyReviews). None has a GitHub review record.",
+   "scope": "No review is recorded for viewer PRs 209 (handoff notes), 210 (OpenSpec reconciliation and repository tidying), 211 (the scripted rehearsal), 212 (an early press around the opening dialog), 213 (import engraves a refused earlier-engine file again) and 214 (the library engraves saved archives again in the background). They were merged by the author on green gates under the agreed rule for mechanical work; none has a GitHub review record. The seal pull request itself is reviewed by the architect before it merges.",
    "reviewedCommits": []
   }
  }
