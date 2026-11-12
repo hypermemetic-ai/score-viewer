@@ -60,6 +60,20 @@ plays the folded edition in performed order: the status counts printed bars
 on the printed bar of each pass. It sounds exactly the notes of the written-out
 score; a grace sounds on every pass through its bar.
 
+## Transposed editions
+
+A pitch edition made by Transpose ([score-transposition.md](score-transposition.md)) is engraved
+from its transposed source with the shared recipe, and its notes keep their
+identities and timing; every pitch moves by the same steps, so passes that were
+identical stay identical. The reader folds it as it folds the original: the
+same bars, the same twins, and the same rule for twins whose choices differ. The
+player's choices on it are its own, keyed to its written-out notes at the new
+pitches; those carried from another pitch fold or keep a repeat written out
+exactly as they did there. Its folded pages, and its practice under the fold,
+are kept under its own source, apart from the original's. Editions with
+calculated hands (`calculatedHandReceipt`), including pitch editions the former
+fingering calculator made, stay written out.
+
 ## When passes disagree
 
 A repeat whose passes carry different choices stays written out, and the reader
