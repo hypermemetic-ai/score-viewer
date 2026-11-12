@@ -33,8 +33,9 @@ function foldable(p:ScorePackage):QuantizedGridScore|undefined{
  let source=sources.get(p);
  if(source===undefined){
   const score=p.sourceScore??p.score;
-  // Only a piano edition engraved from its own source by the shared recipe.
-  source=p.manifest.version===2&&!p.reading&&!p.transposition&&!p.calculatedHandReceipt&&!!p.renderingRecipe&&!!p.sourceSha256&&
+  // Only a piano edition engraved from its own source by the shared recipe; a
+  // transposed edition is one, engraved from its transposed source.
+  source=p.manifest.version===2&&!p.reading&&!p.calculatedHandReceipt&&!!p.renderingRecipe&&!!p.sourceSha256&&
    (!p.sourceScore||p.sourceScore===p.score||JSON.stringify(p.sourceScore)===JSON.stringify(p.score))?score:null;
   sources.set(p,source);
  }
